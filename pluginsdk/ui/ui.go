@@ -1,8 +1,9 @@
 // Package ui is the typed view model of plugin surfaces: Go structs for every v1 node
 // and value type of the surface schema (header, tabs, text, markdown, pairs, list,
 // chips, log, actions, progress, notice, empty, section, form with fieldsets and option
-// sources, thread, terminal, the layout containers columns, pane and grid, and divider,
-// spacer and the inline group; inline spans with times and durations), builders, and
+// sources, thread, terminal, the layout containers columns, pane, grid and container,
+// divider, spacer and the inline group; the view's pinned toolbar and footer; inline
+// spans with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md shows every node
 // as JSON and Go.
@@ -122,13 +123,30 @@ const (
 	ButtonLink        ButtonStyle = "link"
 )
 
-// View is everything a surface instance shows: the header, optional tabs, and the
-// body's nodes (the active tab's, when there are tabs).
+// View is everything a surface instance shows: the header, optional tabs, an optional
+// toolbar, the body's nodes and an optional footer (the active tab's, when there are tabs:
+// the host keeps nothing of one tab's toolbar or footer for another).
+//
+// Toolbar and Footer are strips pinned around the scrolling body: the toolbar under the
+// header and tabs, the footer at the bottom of the surface; the body scrolls between them.
+// Each holds at most MaxStripNodes nodes of the strip kinds (text, chips, actions,
+// progress, and a form of inputs, dropdown selects and toggles: a search field, filters),
+// laid out in a row that wraps; they count toward MaxElements and share the view's keys.
 type View struct {
-	Header *Header `json:"header,omitempty"`
-	Tabs   *Tabs   `json:"tabs,omitempty"`
-	Nodes  []Node  `json:"nodes"`
+	Header  *Header `json:"header,omitempty"`
+	Tabs    *Tabs   `json:"tabs,omitempty"`
+	Toolbar []Node  `json:"toolbar,omitempty"`
+	Nodes   []Node  `json:"nodes"`
+	Footer  []Node  `json:"footer,omitempty"`
 }
+
+// NodeLists returns the view's node lists: the toolbar, the body's nodes and the footer,
+// in that order. They share v's arrays, so a walk can change nodes in place; with
+// Node.Children it reaches every node of the view.
+func (v View) NodeLists() [][]Node { return [][]Node{v.Toolbar, v.Nodes, v.Footer} }
+
+// MaxStripNodes is how many nodes a toolbar or a footer holds.
+const MaxStripNodes = 6
 
 // Header is the surface's identity and freshness line. The title is one line; the
 // sub-line (after SublineIcon, a neutral icon from Icons) wraps to two and is cut after
@@ -263,31 +281,32 @@ type Button struct {
 
 // Node is one body element: a key unique in the view and exactly one kind.
 type Node struct {
-	Key      string    `json:"key"`
-	Text     *Text     `json:"text,omitempty"`
-	Markdown *Markdown `json:"markdown,omitempty"`
-	Pairs    *Pairs    `json:"pairs,omitempty"`
-	List     *List     `json:"list,omitempty"`
-	Chips    *Chips    `json:"chips,omitempty"`
-	Log      *Log      `json:"log,omitempty"`
-	Actions  *Actions  `json:"actions,omitempty"`
-	Progress *Progress `json:"progress,omitempty"`
-	Notice   *Notice   `json:"notice,omitempty"`
-	Empty    *Empty    `json:"empty,omitempty"`
-	Section  *Section  `json:"section,omitempty"`
-	Form     *Form     `json:"form,omitempty"`
-	Thread   *Thread   `json:"thread,omitempty"`
-	Terminal *Terminal `json:"terminal,omitempty"`
-	Columns  *Columns  `json:"columns,omitempty"`
-	Pane     *Pane     `json:"pane,omitempty"`
-	Grid     *Grid     `json:"grid,omitempty"`
-	Divider  *Divider  `json:"divider,omitempty"`
-	Spacer   *Spacer   `json:"spacer,omitempty"`
-	Group    *Group    `json:"group,omitempty"`
+	Key       string     `json:"key"`
+	Text      *Text      `json:"text,omitempty"`
+	Markdown  *Markdown  `json:"markdown,omitempty"`
+	Pairs     *Pairs     `json:"pairs,omitempty"`
+	List      *List      `json:"list,omitempty"`
+	Chips     *Chips     `json:"chips,omitempty"`
+	Log       *Log       `json:"log,omitempty"`
+	Actions   *Actions   `json:"actions,omitempty"`
+	Progress  *Progress  `json:"progress,omitempty"`
+	Notice    *Notice    `json:"notice,omitempty"`
+	Empty     *Empty     `json:"empty,omitempty"`
+	Section   *Section   `json:"section,omitempty"`
+	Form      *Form      `json:"form,omitempty"`
+	Thread    *Thread    `json:"thread,omitempty"`
+	Terminal  *Terminal  `json:"terminal,omitempty"`
+	Columns   *Columns   `json:"columns,omitempty"`
+	Pane      *Pane      `json:"pane,omitempty"`
+	Grid      *Grid      `json:"grid,omitempty"`
+	Divider   *Divider   `json:"divider,omitempty"`
+	Spacer    *Spacer    `json:"spacer,omitempty"`
+	Group     *Group     `json:"group,omitempty"`
+	Container *Container `json:"container,omitempty"`
 }
 
 // Children returns the node lists a node holds (a section's children, each column's, a
-// pane's, each grid item's, a group's items), in order, and nil for any other node. The lists share n's arrays,
+// pane's, each grid item's, a group's items, a container's), in order, and nil for any other node. The lists share n's arrays,
 // so a walk can change nodes in place.
 func (n Node) Children() [][]Node {
 	switch {
@@ -309,6 +328,8 @@ func (n Node) Children() [][]Node {
 		return out
 	case n.Group != nil:
 		return [][]Node{n.Group.Items}
+	case n.Container != nil:
+		return [][]Node{n.Container.Children}
 	}
 	return nil
 }
@@ -693,6 +714,34 @@ const (
 	MaxGroupItems = 8
 	GroupGap      = 8
 )
+
+// ContainerWidth is how wide a Container lets its nodes be.
+type ContainerWidth string
+
+const (
+	// ContainerFull (the default) is the width of the container's own box.
+	ContainerFull ContainerWidth = "full"
+	// ContainerWide is at most ContainerWideWidth px, centred: a page's main content.
+	ContainerWide ContainerWidth = "wide"
+	// ContainerNarrow is at most ContainerNarrowWidth px, centred: reading width, forms.
+	ContainerNarrow ContainerWidth = "narrow"
+)
+
+// A Container's widest, by Width (px), which the GUI uses too.
+const (
+	ContainerNarrowWidth = 680
+	ContainerWideWidth   = 1080
+)
+
+// Container caps its nodes' width and centres them: Width ContainerNarrow (at most 680
+// px), ContainerWide (1080 px) or ContainerFull (the default: no cap). The side panel is
+// narrower than either cap, so there every width is full; on a page a narrow container
+// keeps text and forms at reading width. It draws nothing of its own, lays its nodes out
+// like the list around it, and counts as a container toward MaxDepth.
+type Container struct {
+	Width    ContainerWidth `json:"width,omitempty"`
+	Children []Node         `json:"children"`
+}
 
 // Height is a thread, terminal or pane node's height: HeightAuto (the zero value),
 // HeightFill or HeightPx(n). It travels as "auto", "fill" or a number of pixels.

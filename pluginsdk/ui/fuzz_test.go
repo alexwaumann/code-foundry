@@ -53,16 +53,28 @@ func FuzzView(f *testing.F) {
 	})
 }
 
-// layoutSeed nests section, columns and pane to the depth limit, with a
-// fill pane, a fixed and a weighted column, and live nodes in a pane.
-const layoutSeed = `{"nodes":[{"key":"s","section":{"title":"S","children":[
+// layoutSeed nests every container (section, columns, pane, container) to the depth
+// limit, with a fill pane, a fixed and a weighted column, live nodes in a pane, a narrow
+// container, and a toolbar and footer of every strip kind.
+const layoutSeed = `{"toolbar":[
+  {"key":"tb-q","form":{"fields":[{"key":"tb-qf","name":"q","input":{"placeholder":"Filter"}},
+    {"key":"tb-sel","name":"s","select":{"options":[{"key":"tb-o1","value":"a","label":"A"}]}},
+    {"key":"tb-tg","name":"t","label":"Mine","toggle":{"value":true}}],
+    "submit":{"key":"tb-go","label":"Filter","icon":"search","iconOnly":true,"action":{"event":"filter"}}}},
+  {"key":"tb-ch","chips":{"chips":[{"key":"tb-c1","label":"All","selected":true,"action":{"event":"status","data":"all"}}]}}],
+ "footer":[
+  {"key":"ft-t","text":{"content":"3 runs","size":"sm"}},
+  {"key":"ft-p","progress":{"label":"Syncing"}},
+  {"key":"ft-a","actions":{"align":"end","buttons":[{"key":"ft-b","label":"Run","action":{"event":"run"}}]}}],
+ "nodes":[{"key":"s","section":{"title":"S","children":[
   {"key":"cols","columns":{"collapse":"first","items":[
     {"key":"c1","weight":2,"children":[{"key":"p1","pane":{"height":"fill","minHeight":200,"children":[
       {"key":"s2","section":{"children":[{"key":"deep","text":{"content":"x"}}]}},
       {"key":"lg","log":{"text":"a\nb\n"}}]}}]},
     {"key":"c2","width":320,"children":[{"key":"p2","pane":{"height":480,"noScroll":true,"children":[
       {"key":"th","thread":{"threadId":"s-1","height":"fill"}}]}}]},
-    {"key":"c3","children":[{"key":"md","markdown":{"source":"**m**"}}]}]}}]}}]}`
+    {"key":"c3","children":[{"key":"md","markdown":{"source":"**m**"}}]}]}}]}},
+ {"key":"ct","container":{"width":"narrow","children":[{"key":"ct-t","text":{"content":"centred"}}]}}]}`
 
 // gridSeed has a grid nested to the depth limit (with a span and a min width), a group of
 // every kind it holds at that depth, labelled and bare dividers, and fixed and flex
@@ -125,9 +137,17 @@ func TestFuzzSeedsCoverEveryKind(t *testing.T) {
 				}
 			}
 		}
-		walk(v.Nodes)
+		for _, l := range v.NodeLists() {
+			walk(l)
+		}
+		if len(v.Toolbar) > 0 {
+			seen["toolbar"] = true
+		}
+		if len(v.Footer) > 0 {
+			seen["footer"] = true
+		}
 	}
-	for _, k := range nodeKinds() {
+	for _, k := range append(nodeKinds(), "toolbar", "footer") {
 		if !seen[k] {
 			t.Errorf("no fuzz seed has a %s node", k)
 		}

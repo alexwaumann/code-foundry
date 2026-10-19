@@ -16,9 +16,9 @@ import (
 // that breaks one and keeps the previous one.
 const (
 	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs
-	// MaxDepth is how many containers (section, columns, pane, grid) a node may sit
-	// inside: section > columns > pane > section > node. A column is part of its columns
-	// node, a grid item of its grid; a group is not a container (it holds leaves).
+	// MaxDepth is how many containers (section, columns, pane, grid, container) a node may
+	// sit inside: section > columns > pane > section > node. A column is part of its
+	// columns node, a grid item of its grid; a group is not a container (it holds leaves).
 	MaxDepth         = 4
 	MaxViewBytes     = 256 << 10 // encoded, log text excluded
 	MaxLabel         = 200
@@ -82,9 +82,11 @@ func (v View) Validate() error {
 	if v.Tabs != nil {
 		c.tabs("tabs", v.Tabs)
 	}
+	c.strip("toolbar", v.Toolbar)
 	for i, n := range v.Nodes {
 		c.node(fmt.Sprintf("nodes[%d]", i), n, 0)
 	}
+	c.strip("footer", v.Footer)
 	if c.elements > MaxElements {
 		c.bad("view", "%d elements, at most %d", c.elements, MaxElements)
 	}
@@ -363,23 +365,71 @@ func (c *checker) height(path string, h Height) {
 	}
 }
 
+// StripKinds are the node kinds a toolbar or footer holds (a form there has inputs,
+// dropdown selects and toggles only).
+var StripKinds = []string{"text", "chips", "actions", "progress", "form"}
+
+// strip checks a toolbar or footer: at most MaxStripNodes nodes, each a top-level node of
+// one of StripKinds; a form's fields are inputs, toggles or dropdown selects (no
+// fieldsets, no list-style selects: the strip is one row).
+func (c *checker) strip(path string, nodes []Node) {
+	if len(nodes) > MaxStripNodes {
+		c.bad(path, "%d nodes, at most %d", len(nodes), MaxStripNodes)
+	}
+	for i, n := range nodes {
+		p := fmt.Sprintf("%s[%d]", path, i)
+		c.node(p, n, 0)
+		if k := kindOf(n); k != "" && !slices.Contains(StripKinds, k) {
+			c.bad(p, "a %s node cannot be in the %s (%s)", k, path, strings.Join(StripKinds, ", "))
+			continue
+		}
+		if n.Form == nil {
+			continue
+		}
+		for j, f := range n.Form.Fields {
+			fp := fmt.Sprintf("%s.form.fields[%d]", p, j)
+			switch {
+			case f.Fieldset != nil:
+				c.bad(fp, "a form in the %s has no fieldsets (inputs, selects and toggles in a row)", path)
+			case f.Select != nil && f.Select.Style == SelectList:
+				c.bad(fp+".select.style", "a select in the %s is a dropdown, not a list", path)
+			}
+		}
+	}
+}
+
+// kindOf is the JSON name of n's one kind field, "" unless it has exactly one.
+func kindOf(n Node) string {
+	v, t := reflect.ValueOf(n), reflect.TypeFor[Node]()
+	name := ""
+	for i := range t.NumField() {
+		if f := v.Field(i); f.Kind() == reflect.Pointer && !f.IsNil() {
+			if name != "" {
+				return ""
+			}
+			name, _, _ = strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		}
+	}
+	return name
+}
+
 // node checks one node inside depth containers (0 = top level).
 func (c *checker) node(path string, n Node, depth int) {
 	c.key(path, n.Key)
 	if depth > MaxDepth {
-		c.bad(path, "inside %d containers (section, columns, pane, grid), at most %d", depth, MaxDepth)
+		c.bad(path, "inside %d containers (section, columns, pane, grid, container), at most %d", depth, MaxDepth)
 	}
 	kinds := 0
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
 		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil, n.Grid != nil,
-		n.Divider != nil, n.Spacer != nil, n.Group != nil} {
+		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -490,6 +540,14 @@ func (c *checker) node(path string, n Node, depth int) {
 		}
 	case n.Group != nil:
 		c.group(path+".group", n.Group, depth)
+	case n.Container != nil:
+		p := path + ".container"
+		if !slices.Contains([]ContainerWidth{"", ContainerFull, ContainerWide, ContainerNarrow}, n.Container.Width) {
+			c.bad(p+".width", "unknown width %q (narrow, wide or full)", n.Container.Width)
+		}
+		for i, ch := range n.Container.Children {
+			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, depth+1)
+		}
 	}
 }
 

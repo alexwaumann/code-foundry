@@ -36,8 +36,8 @@ var surfaceCapabilities = []string{
 	"surfaces", "view.v1", "view.append", "context", "invoke.ask",
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
-	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane",
-	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.tabs", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
+	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -204,7 +204,8 @@ func validateView(raw json.RawMessage, plugin string, perms pluginsdk.Permission
 
 // fillLists makes the view's required lists empty instead of nil, so the canonical JSON
 // has [] where viewers expect a list: a Go plugin's Section{} or Chips{} (and a view
-// without "nodes") would otherwise reach the GUI as null and break its renderer.
+// without "nodes") would otherwise reach the GUI as null and break its renderer. The
+// toolbar and footer are optional (left out when empty); their nodes are filled too.
 func fillLists(v *ui.View) {
 	if v.Nodes == nil {
 		v.Nodes = []ui.Node{}
@@ -220,7 +221,7 @@ func fillLists(v *ui.View) {
 			}
 		}
 	}
-	walkNodes(v.Nodes, func(n *ui.Node) {
+	walkView(v, func(n *ui.Node) {
 		switch {
 		case n.Pairs != nil && n.Pairs.Items == nil:
 			n.Pairs.Items = []ui.Pair{}
@@ -254,6 +255,8 @@ func fillLists(v *ui.View) {
 			}
 		case n.Group != nil && n.Group.Items == nil:
 			n.Group.Items = []ui.Node{}
+		case n.Container != nil && n.Container.Children == nil:
+			n.Container.Children = []ui.Node{}
 		case n.Form != nil:
 			if n.Form.Fields == nil {
 				n.Form.Fields = []ui.Field{}
@@ -379,7 +382,7 @@ func buildIndex(v *ui.View) *actionIndex {
 			add(element{key: t.Key, kind: pluginsdk.ActTab, label: t.Label})
 		}
 	}
-	walkNodes(v.Nodes, func(n *ui.Node) {
+	walkView(v, func(n *ui.Node) {
 		switch {
 		case n.List != nil:
 			for i := range n.List.Rows {

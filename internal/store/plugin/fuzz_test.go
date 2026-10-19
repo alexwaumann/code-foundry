@@ -111,7 +111,7 @@ func checkView(t *testing.T, raw []byte) {
 		}
 	}
 	// Appends: to every node key; only log nodes take them.
-	walkNodes(v2.Nodes, func(n *ui.Node) {
+	walkView(v2, func(n *ui.Node) {
 		_, err := in.appendLog(pluginsdk.ViewAppendParams{Instance: in.key, Key: n.Key, Text: "more\n"})
 		if (err == nil) != (n.Log != nil) {
 			t.Fatalf("append to %s (log %v): %v", n.Key, n.Log != nil, err)

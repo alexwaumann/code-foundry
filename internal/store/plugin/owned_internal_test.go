@@ -73,7 +73,7 @@ func TestOwnedNodes(t *testing.T) {
 	if el := buildIndex(&ok).elements["restart"]; el.kind != pluginsdk.ActClick || el.actionName() != "restart" {
 		t.Errorf("terminal button element = %+v", el)
 	}
-	bad := ui.View{Nodes: []ui.Node{ui.NewThread("a", "s-user"), ui.NewThread("b", "s-other"), ui.NewTerminal("c", "t-shell")}}
+	bad := ui.View{Nodes: []ui.Node{ui.NewThread("a", "s-user"), ui.NewThread("b", "s-other"), ui.NewContainer("ct", ui.ContainerNarrow, ui.NewTerminal("c", "t-shell"))}}
 	errs := a.ownedNodeProblems(&bad)
 	if len(errs) != 3 || !strings.Contains(errs[0], "s-user is not one of plugin p's threads") || !strings.Contains(errs[2], "t-shell is not one of plugin p's terminals") {
 		t.Errorf("others' nodes: %q", errs)

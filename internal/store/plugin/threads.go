@@ -420,7 +420,7 @@ func threadsWords(n int) string {
 // thread or terminal. An id the host does not know passes (the GUI shows it gone).
 func (a *actor) ownedNodeProblems(v *ui.View) []string {
 	var errs []string
-	walkNodes(v.Nodes, func(n *ui.Node) {
+	walkView(v, func(n *ui.Node) {
 		switch {
 		case n.Thread != nil && a.m.opts.Threads != nil:
 			if owner, ok := a.m.opts.Threads.Owner(n.Thread.ThreadID); ok && owner != OwnerOf(a.name) {
