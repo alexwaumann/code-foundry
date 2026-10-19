@@ -109,6 +109,9 @@ type Options struct {
 	// Registry reads the plugin registries for install, update and browse (install.go,
 	// updates.go); nil refuses installing from a registry or a release.
 	Registry *registry.Client
+	// Wakes keeps the wake subscriptions to the plugins' sources and delivers their
+	// fires (wakes.go); nil refuses wake/fire. The daemon adapts the thread store.
+	Wakes WakeSink
 }
 
 func (o *Options) defaults() {
@@ -435,7 +438,7 @@ func (m *Manager) reloadLocked(ctx context.Context) error {
 	for _, e := range gone {
 		m.stopActor(e, StateDisabled)
 		m.unregister(e.name)
-		m.forget(ctx, e.name, nil)
+		m.forget(ctx, e.name, nil, "the plugin was removed")
 		m.mu.Lock()
 		delete(m.entries, e.name)
 		m.rebuildLocked()
@@ -484,7 +487,7 @@ func (m *Manager) apply(ctx context.Context, name string, f found, r row, restar
 		}
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
-		m.forget(ctx, name, e.logs)
+		m.forget(ctx, name, e.logs, "the plugin was disabled: its permissions changed")
 		m.update(name, nil, func(e *entry) {
 			e.row = r
 			e.disabledReason = "its permissions changed: enable it again to review them"
@@ -492,6 +495,7 @@ func (m *Manager) apply(ctx context.Context, name string, f found, r row, restar
 		e.logs.add("host", "", "disabled: the manifest asks for permissions that were not granted")
 	default:
 		m.register(e)
+		m.dropUndeclaredWakes(name, f.manifest, e.logs)
 		if running && (changed || restart) {
 			m.stopActor(e, StateStopped)
 			running = false
@@ -629,7 +633,7 @@ func (m *Manager) Disable(ctx context.Context, name string) (Plugin, error) {
 	m.update(name, nil, func(e *entry) { e.row, e.disabledReason = r, "" })
 	m.stopActor(e, StateDisabled)
 	m.unregister(name)
-	m.forget(ctx, name, e.logs)
+	m.forget(ctx, name, e.logs, "the plugin was disabled")
 	e.logs.add("host", "", "disabled")
 	return m.public(name), nil
 }

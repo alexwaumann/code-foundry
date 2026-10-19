@@ -155,7 +155,9 @@ func Run(ctx context.Context, opts Options) error {
 		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
 		Facts: facts, Emitter: command.BusEmitter{Bus: events},
-		Flags:   pluginFlags{threads: st.thread},
+		Flags: pluginFlags{threads: st.thread},
+		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
+		Wakes:   pluginWakeSink{threads: st.thread},
 		Threads: pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
 		Registry: pluginRegistryClient(p, st.settings.Settings(), log.With("component", "plugin-registry")),
 		Secrets:  plugin.Keychain{Service: pluginKeychainService(p)},
@@ -168,6 +170,9 @@ func Run(ctx context.Context, opts Options) error {
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
 	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
+	// Subscriptions to the plugins' wake sources resolve their args with the plugin store
+	// and tell the plugins as they come and go (plugin_wakes.go).
+	st.thread.SetPluginWakes(threadPluginWakes{plugins: plugins})
 	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
 	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).

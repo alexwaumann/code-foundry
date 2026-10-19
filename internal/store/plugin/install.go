@@ -739,7 +739,7 @@ func (m *Manager) Uninstall(ctx context.Context, name string, purge bool) (Unins
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
 	}
-	res.RemovedThreads = m.discard(ctx, name, logs)
+	res.RemovedThreads = m.discard(ctx, name, logs, "the plugin was uninstalled")
 	link := filepath.Join(m.opts.Dir, name)
 	if fi, err := os.Lstat(link); err == nil {
 		if fi.Mode()&fs.ModeSymlink != 0 {

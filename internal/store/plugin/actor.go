@@ -50,6 +50,8 @@ type actor struct {
 	// envReady closes when the run first pushes its session environment, settles
 	// without one, or ends (environment.go): a spawn waits for it.
 	envReady chan struct{}
+	// wakes is the run's wake state (wakes.go).
+	wakes actorWakes
 
 	crashes []time.Time // only run's goroutine touches it
 }
@@ -251,6 +253,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 	a.conn = conn
 	a.mu.Unlock()
 	defer func() {
+		a.disarmWakes()
 		a.closeEvents()
 		a.mu.Lock()
 		a.conn = nil
@@ -294,6 +297,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 		e.state, e.startedAt, e.protocol, e.caps, e.nextRestartAt = StateRunning, now, res.Protocol, res.Capabilities, time.Time{}
 	})
 	info.logs.add("host", "", "running")
+	a.armWakes(conn) // after initialized: the plugin re-arms its wake sources
 	// Its Init (which pushes its session environment) runs now; a spawn waits a moment.
 	settle := time.AfterFunc(envSettle, func() { closeOnce(envReady) })
 	defer settle.Stop()
