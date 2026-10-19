@@ -96,8 +96,8 @@ You (or a child) opened a pull request and want to know when its checks finish a
 someone reviews it, without polling `gh`.
 
 ```
-code-foundry thread subscribe --pr acme/web#87 --until checks_done
-# subscribed sub-4b2c9e1d7a30: s-… wakes when pr acme/web#87 finishes its checks (once)
+code-foundry thread subscribe --pr acme/web#87 --until checks_done --repeat
+# subscribed sub-4b2c9e1d7a30: s-… wakes when pr acme/web#87 finishes its checks (repeat)
 code-foundry thread subscribe --pr acme/web#87 --until review --repeat
 ```
 
@@ -107,12 +107,15 @@ End your turn. Each wake is a message:
 [code-foundry wake] Pull request acme/web#87 "Bump the router": checks done (3 passed, 1 failed).
 ```
 
-followed by a JSON block with the pull request's state, check counts, review decision
-and the changes (counts only, never comment text). On a failure, read the failing job
-(`gh pr checks 87 --repo acme/web`), fix, push, and subscribe again for `checks_done`
-(the first one is gone once it fired). A merged pull request ends every subscription to
-it. Subscribe a child's thread instead with `--id <child>`. `code-foundry thread
-subscriptions` lists what you wait for; `thread unsubscribe --pr acme/web#87` stops.
+followed by a JSON block with the pull request's state, `head_sha`, check counts,
+review decision and the changes (counts only, never comment text). On a failure, read
+the failing job (`gh pr checks 87 --repo acme/web`), fix and push: the same `--repeat`
+subscription wakes you when the new head's checks finish. Subscribing anew right after a
+push can wake you at once with the old head's result (the poll has not seen the push
+yet): compare `head_sha` with what you pushed. A merged pull request ends every
+subscription to it. Subscribe a child's thread instead with `--id <child>`.
+`code-foundry thread subscriptions` lists what you wait for; `thread unsubscribe --pr
+acme/web#87` stops.
 
 Notes:
 

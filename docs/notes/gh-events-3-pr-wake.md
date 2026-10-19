@@ -152,6 +152,144 @@ run are InvalidArgument (store and CLI).
   Manager, fake claude); the daemon package has no Manager harness, so the daemon tests
   stop at the event handed over, and the end to end below covers the whole path.
 
+## Gotchas
+
+* **A rollup can look done before every job has registered.** CI here posts the
+  `attested` job about 10 s before the other three: a poll landing in that window sees
+  SUCCESS 1/1, which `checks_done`/`checks_passed` cannot tell from a finished run. The
+  run below did not hit it (the poll saw `pending (0/1)` then 3 pending), but with 60 s
+  polls it can happen; GitHub gives no "all jobs registered" signal.
+* **Subscribing right after a push** can fire `checks_done` at once on the old head's
+  finished checks: the cache has not seen the push yet (seen below). The skill therefore
+  tells agents to keep one `--until checks_done --repeat` subscription across pushes
+  (the edge resets on each `head_pushed`, so it wakes once per run) and to compare the
+  wake's `head_sha` with what they pushed.
+* The guide is at its 29,000-byte cap (19 bytes were left before this PR); command text
+  added anywhere needs a cut somewhere.
+* `go run ./cmd/code-foundry help …` answers from the running daemon's registry, not the
+  tree: check new flags in a test or against the branch daemon.
+
 ## End to end
 
-(below)
+2026-10-18, isolated `CODE_FOUNDRY_HOME=/tmp/cf-prwake-home`, the branch binary through a
+wrapper that unsets every `CLAUDE*` and `CODE_FOUNDRY_*` variable, `daemon --dev`. A
+scratch program (not committed) held an EventService stream open as a visible GUI client
+(`client_kind: GUI, visible: true`) so the poll ran every 60 s, as in PR A's run. This
+repository registered (`b1080fe9fff5`), one thread on this worktree with no prompt
+(`--created-by=`, Haiku 5.5, `--permission supervised` so the woken agent could not touch
+the checkout; its permission prompts were denied).
+
+```
+$ cf thread subscribe --id s-ab1fceaffa7c --pr alexwaumann/code-foundry#214 --until checks_done
+subscribed sub-f7f039d7f208: s-ab1fceaffa7c wakes when pr alexwaumann/code-foundry#214 finishes its checks (once)
+$ cf thread subscribe --id s-ab1fceaffa7c --pr https://github.com/alexwaumann/code-foundry/pull/214 --until review --repeat
+subscribed sub-fe0f755a7720: s-ab1fceaffa7c wakes when pr alexwaumann/code-foundry#214 gets a review (repeat)
+$ cf thread subscribe --id s-ab1fceaffa7c --pr alexwaumann/code-foundry#214 --until head_pushed --repeat --json
+{"subscription":{"id":"sub-c55761e82968","subscriberThreadId":"s-ab1fceaffa7c","target":"THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST","targetId":"alexwaumann/code-foundry#214","condition":"THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED","repeat":true,"createdAt":"2026-10-19T01:50:03.485Z"}}
+$ cf thread subscriptions --id s-ab1fceaffa7c
+ID                SUBSCRIBER                          TARGET                                                                                                                UNTIL        REPEAT  FIRED  LAST FIRED  TARGET STATUS
+sub-f7f039d7f208  s-ab1fceaffa7c (prwake subscriber)  pr alexwaumann/code-foundry#214 Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)  checks_done  no      0      -           open · checks pending (1/4)
+sub-fe0f755a7720  s-ab1fceaffa7c (prwake subscriber)  pr alexwaumann/code-foundry#214 Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)  review       yes     0      -           open · checks pending (1/4)
+sub-c55761e82968  s-ab1fceaffa7c (prwake subscriber)  pr alexwaumann/code-foundry#214 Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)  head_pushed  yes     0      -           open · checks pending (1/4)
+```
+
+The daemon logged `gh watched pull requests count=1`, and the next poll had `branches=1`
+(the pull request's head branch; nobody else watched it). The first CI run failed
+`go-lint` (a staticcheck nit, fixed in the next push). The poll saw it go FAILURE with one
+job still running (no wake: `checks_done` needs none pending), then the last job finish:
+
+````
+[code-foundry wake] Pull request alexwaumann/code-foundry#214 "Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)": checks done (3 passed, 1 failed).
+```json
+{
+  "kind": "pull_request",
+  "subscription_id": "sub-f7f039d7f208",
+  "condition": "checks_done",
+  "fired_at": "2026-10-19T01:54:18.476Z",
+  "pull_request": {
+    "slug": "alexwaumann/code-foundry",
+    "number": 214,
+    "url": "https://github.com/alexwaumann/code-foundry/pull/214",
+    "title": "Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)",
+    "state": "open",
+    "head_sha": "acc87083b2fe6d23d2458e4cddf74d962fd5af62",
+    "head_ref": "cf/gh-events-3-pr-wake",
+    "draft": false,
+    "review_decision": "",
+    "checks": {
+      "state": "FAILURE",
+      "total": 4,
+      "passed": 3,
+      "failed": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "reviews": 0,
+    "comments": 0,
+    "review_requests": [],
+    "latest_reviews": [],
+    "merged_at": ""
+  },
+  "changes": [
+    {
+      "kind": "checks",
+      "old_checks": {
+        "state": "FAILURE",
+        "total": 4,
+        "passed": 2,
+        "failed": 1,
+        "pending": 1,
+        "skipped": 0
+      },
+      "new_checks": {
+        "state": "FAILURE",
+        "total": 4,
+        "passed": 3,
+        "failed": 1,
+        "pending": 0,
+        "skipped": 0
+      }
+    }
+  ]
+}
+```
+````
+
+`checks_done` was a one-shot, so it went; `thread subscriptions` then read `open · checks
+failed (1/4)` for the other two. Subscribing `checks_done` again right then fired at once
+(the cache still had that head's finished rollup; a wake with `"changes": []`). Then this
+note was pushed:
+
+```
+[code-foundry wake] Pull request alexwaumann/code-foundry#214 "Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)": new commits were pushed (head acc8708 → 033728d).
+  "changes": [ { "kind": "head_pushed", "old_head_sha": "acc87083b2fe6d23d2458e4cddf74d962fd5af62",
+                 "new_head_sha": "033728df4d098e36a819f65b0796b7acda4ebf69" } ]
+```
+
+`checks_done` subscribed once more (status `open · checks pending (0/1)`), and six
+minutes later, CI green:
+
+```
+[code-foundry wake] Pull request alexwaumann/code-foundry#214 "Thread wake subscriptions to pull requests (checks done, review, comment, merged, …)": checks done (4 passed, 0 failed).
+  "checks": {"state":"SUCCESS","total":4,"passed":4,"failed":0,"pending":0,"skipped":0}
+  "changes": [{"kind":"checks","old_checks":{"state":"PENDING","total":4,"passed":3,"failed":0,"pending":1,"skipped":0},
+               "new_checks":{"state":"SUCCESS","total":4,"passed":4,"failed":0,"pending":0,"skipped":0}}]
+```
+
+The subscriber's timeline (`thread items`): `#1 wake … checks done (3 passed, 1 failed)`,
+`#6 wake …` (the at-once one), `#13 wake … new commits were pushed`, `#17 wake … checks
+done (4 passed, 0 failed)`, each followed by a short Haiku turn. The woken agent read the
+JSON (`one failed check out of four, head acc87083`) and, on the push, `PR #214 has a new
+head, 033728d … CI is now pending`.
+
+Restart (SIGTERM, start again): the store told the GitHub store `count=1` before the
+first poll, the poll carried `branches=1`, `thread subscriptions --all` listed `review`
+and `head_pushed` with their counts (`head_pushed` FIRED 1), and no wake was sent at
+startup (still four). No ERROR lines in either daemon log. Not exercised live: a review
+(posting one on the pull request was not asked for; covered by the store tests), merged
+and closed (covered by tests). Then the daemon and the presence holder were stopped and
+`/tmp/cf-prwake-home` deleted.
+
+## Daemon restart
+
+Needed: new RPC fields, conditions and commands, the GitHub store's watch set.

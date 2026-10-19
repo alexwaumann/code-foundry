@@ -44,9 +44,10 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
      child settles; best for long work or several children.
    - After opening a pull request, wait for CI or review the same way:
-     `code-foundry thread subscribe --pr <owner/name#N> --until checks_done`, then end
-     your turn (`--until review --repeat` wakes you on every review). The wake says what
-     changed; it comes with the GitHub poll (about a minute with the app open, up to 15).
+     `code-foundry thread subscribe --pr <owner/name#N> --until checks_done --repeat`,
+     then end your turn; it wakes you once per push's CI run (`--until review --repeat`:
+     on every review). The wake says what changed and its `head_sha`; it comes with the
+     GitHub poll (about a minute with the app open, up to 15).
 
    `needs attention (finished)` is a turn that ended normally (nobody has looked at it
    yet); another reason is a question, a permission or a budget stop. A wait that times
