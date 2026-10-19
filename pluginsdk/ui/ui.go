@@ -129,9 +129,11 @@ const (
 //
 // Toolbar and Footer are strips pinned around the scrolling body: the toolbar under the
 // header and tabs, the footer at the bottom of the surface; the body scrolls between them.
-// Each holds at most MaxStripNodes nodes of the strip kinds (text, chips, actions,
-// progress, and a form of inputs, dropdown selects and toggles: a search field, filters),
-// laid out in a row that wraps; they count toward MaxElements and share the view's keys.
+// Each holds at most MaxStripNodes nodes of StripKinds (text, chips, actions, progress, a
+// form of inputs, dropdown selects and toggles: a search field, filters; a divider without
+// a label, a vertical hairline; a spacer, space across, or with Flex the row's free width;
+// a group), laid out in a row that wraps; they count toward MaxElements and share the
+// view's keys.
 type View struct {
 	Header  *Header `json:"header,omitempty"`
 	Tabs    *Tabs   `json:"tabs,omitempty"`

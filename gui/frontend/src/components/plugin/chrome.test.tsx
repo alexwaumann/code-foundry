@@ -174,7 +174,7 @@ describe("the strips' row", () => {
     ]);
     // The daemon refuses a seventh; the GUI draws no more than six either way.
     expect(items("plugin-footer")).toHaveLength(STRIP_MAX_NODES);
-    expect(STRIP_KINDS).toEqual(["text", "chips", "actions", "progress", "form"]);
+    expect(STRIP_KINDS).toEqual(["text", "chips", "actions", "progress", "form", "divider", "spacer", "group"]);
     const row = screen.getByTestId("plugin-toolbar").firstElementChild?.className ?? "";
     for (const c of ["flex", "flex-wrap", "items-center", "gap-x-2"]) expect(row).toContain(c);
   });
@@ -186,6 +186,36 @@ describe("the strips' row", () => {
     expect(stripItemClass({ key: "a", actions: { buttons: [] } })).not.toContain("ml-auto");
     expect(stripItemClass(text("t"))).toBe("min-w-0");
     expect(stripItemClass({ key: "c", chips: { chips: [] } })).toBe("min-w-0");
+    expect(stripItemClass({ key: "s", spacer: { flex: true } })).toBe("flex-1");
+    expect(stripItemClass({ key: "s", spacer: { size: 8 } })).toBe("shrink-0");
+    expect(stripItemClass({ key: "d", divider: {} })).toContain("shrink-0");
+    expect(stripItemClass({ key: "g", group: { items: [] } })).toBe("min-w-0");
+    expect(stripItemClass({ key: "g", group: { align: "between", items: [] } })).toContain("flex-1");
+  });
+
+  it("draws a divider as a vertical hairline, a spacer as space across, a group as its line", () => {
+    inPanel({
+      footer: [
+        text("t"),
+        { key: "dv", divider: {} },
+        { key: "sp", spacer: { size: 24 } },
+        { key: "fx", spacer: { flex: true } },
+        { key: "grp", group: { align: "end", items: [text("g1"), { key: "g2", actions: { buttons: [{ key: "go", label: "Go", action: { event: "go" } }] } }] } },
+      ],
+    });
+    const footer = screen.getByTestId("plugin-footer");
+    const divider = footer.querySelector<HTMLElement>('[data-testid="plugin-divider"]');
+    expect(divider?.getAttribute("data-orientation")).toBe("vertical");
+    expect(divider?.className).toContain("data-[orientation=vertical]:h-5");
+    const [fixed, flex] = Array.from(footer.querySelectorAll<HTMLElement>('[data-testid="plugin-spacer"]'));
+    expect([fixed?.style.width, fixed?.style.height, fixed?.getAttribute("data-flex")]).toEqual(["24px", "", null]);
+    expect([flex?.style.minWidth, flex?.getAttribute("data-flex")]).toEqual(["12px", "true"]);
+    expect(flex?.parentElement?.className).toBe("flex-1");
+    // Neither takes back a list gap in a row.
+    expect(fixed?.className ?? "").not.toContain("-mt-3");
+    const group = footer.querySelector<HTMLElement>('[data-testid="plugin-group"]');
+    expect(group?.getAttribute("data-align")).toBe("end");
+    expect(group?.querySelectorAll('[data-testid="plugin-group-item"]')).toHaveLength(2);
   });
 
   it("lays a form out in one row: no visible label or description for a text field, the toggle's label beside it", () => {

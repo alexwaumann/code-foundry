@@ -137,8 +137,8 @@ keeps form drafts per tab. The plugin answers with the view of the new active ta
 tabs.items[0]`), so prefix tabs `tab-…`. Past the tab limit, group: collapsible sections inside a
 tab, or a second surface for a second subject. A view may add a pinned **`toolbar`** (under the
 tabs: a search field, filter chips) and **`footer`** (at the bottom: a count, an actions
-bar), up to 6 text, chips, actions, progress or form nodes each, the active tab's like
-`nodes`: `reference/ui-layout.md`.
+bar), up to 6 text, chips, actions, progress, form, divider, spacer or group nodes each,
+the active tab's like `nodes`: `reference/ui-layout.md`.
 
 ## Nodes
 

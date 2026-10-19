@@ -366,12 +366,12 @@ func (c *checker) height(path string, h Height) {
 }
 
 // StripKinds are the node kinds a toolbar or footer holds (a form there has inputs,
-// dropdown selects and toggles only).
-var StripKinds = []string{"text", "chips", "actions", "progress", "form"}
+// dropdown selects and toggles only; a divider no label: it is a vertical hairline).
+var StripKinds = []string{"text", "chips", "actions", "progress", "form", "divider", "spacer", "group"}
 
 // strip checks a toolbar or footer: at most MaxStripNodes nodes, each a top-level node of
 // one of StripKinds; a form's fields are inputs, toggles or dropdown selects (no
-// fieldsets, no list-style selects: the strip is one row).
+// fieldsets, no list-style selects: the strip is one row); a divider has no label.
 func (c *checker) strip(path string, nodes []Node) {
 	if len(nodes) > MaxStripNodes {
 		c.bad(path, "%d nodes, at most %d", len(nodes), MaxStripNodes)
@@ -382,6 +382,9 @@ func (c *checker) strip(path string, nodes []Node) {
 		if k := kindOf(n); k != "" && !slices.Contains(StripKinds, k) {
 			c.bad(p, "a %s node cannot be in the %s (%s)", k, path, strings.Join(StripKinds, ", "))
 			continue
+		}
+		if n.Divider != nil && n.Divider.Label != "" {
+			c.bad(p+".divider.label", "a divider in the %s has no label (it is a vertical hairline)", path)
 		}
 		if n.Form == nil {
 			continue

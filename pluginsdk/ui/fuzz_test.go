@@ -61,11 +61,13 @@ const layoutSeed = `{"toolbar":[
     {"key":"tb-sel","name":"s","select":{"options":[{"key":"tb-o1","value":"a","label":"A"}]}},
     {"key":"tb-tg","name":"t","label":"Mine","toggle":{"value":true}}],
     "submit":{"key":"tb-go","label":"Filter","icon":"search","iconOnly":true,"action":{"event":"filter"}}}},
+  {"key":"tb-dv","divider":{}},
+  {"key":"tb-sp","spacer":{"size":8,"flex":true}},
   {"key":"tb-ch","chips":{"chips":[{"key":"tb-c1","label":"All","selected":true,"action":{"event":"status","data":"all"}}]}}],
  "footer":[
   {"key":"ft-t","text":{"content":"3 runs","size":"sm"}},
   {"key":"ft-p","progress":{"label":"Syncing"}},
-  {"key":"ft-a","actions":{"align":"end","buttons":[{"key":"ft-b","label":"Run","action":{"event":"run"}}]}}],
+  {"key":"ft-g","group":{"align":"end","items":[{"key":"ft-a","actions":{"buttons":[{"key":"ft-b","label":"Run","action":{"event":"run"}}]}}]}}],
  "nodes":[{"key":"s","section":{"title":"S","children":[
   {"key":"cols","columns":{"collapse":"first","items":[
     {"key":"c1","weight":2,"children":[{"key":"p1","pane":{"height":"fill","minHeight":200,"children":[

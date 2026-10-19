@@ -74,7 +74,11 @@ func TestValidateStrips(t *testing.T) {
 		want          string // "" = valid
 	}{
 		{name: "every strip kind in the toolbar", toolbar: []Node{search(query, dropdown, multi, toggle), chips, text("t"), progress, bar}},
-		{name: "every strip kind in the footer", foot: []Node{text("t"), progress, bar, chips, search(query)}},
+		{name: "every strip kind in the footer", foot: []Node{text("t"), progress, bar, chips, search(query), NewDivider("dv", "")}},
+		{name: "divider, spacers and a group", toolbar: []Node{NewDivider("dv", ""), NewSpacer("sp", 24), NewFlexSpacer("fx"), NewGroup("grp", AlignBetween, text("g1"), NewActions("g2", EventButton("g3", "Go", "go")))}},
+		{name: "a labelled divider", toolbar: []Node{NewDivider("dv", "Filters")}, want: "toolbar[0].divider.label: a divider in the toolbar has no label (it is a vertical hairline)"},
+		{name: "a bad spacer", foot: []Node{NewSpacer("sp", 100)}, want: "footer[0].spacer.size: 100 px is outside 4..64"},
+		{name: "a group of a refused kind", foot: []Node{NewGroup("grp", AlignStart, NewMarkdown("md", "x"))}, want: "footer[0].group.items[0]"},
 		{name: "both, beside a body", toolbar: []Node{search(query), chips}, body: []Node{text("b")}, foot: []Node{bar}},
 		{name: "six in each", toolbar: six("t"), foot: six("f")},
 		{name: "empty strips", toolbar: []Node{}, foot: []Node{}},
@@ -116,13 +120,13 @@ func TestStripsRefuseOtherKinds(t *testing.T) {
 				v.Footer = n
 			}
 			err := v.Validate()
-			refused := err != nil && strings.Contains(err.Error(), strip+"[0]: a "+k+" node cannot be in the "+strip+" (text, chips, actions, progress, form)")
+			refused := err != nil && strings.Contains(err.Error(), strip+"[0]: a "+k+" node cannot be in the "+strip+" (text, chips, actions, progress, form, divider, spacer, group)")
 			if refused == allowed {
 				t.Errorf("%s in the %s (allowed %v): %v", k, strip, allowed, err)
 			}
 		}
 	}
-	if len(StripKinds) != 5 {
+	if len(StripKinds) != 8 {
 		t.Errorf("strip kinds %v: the GUI's StripNodes and the skill's ui-layout.md list them", StripKinds)
 	}
 }

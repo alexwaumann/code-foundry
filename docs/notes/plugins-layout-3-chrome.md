@@ -27,11 +27,14 @@ main-pane pages.
   same search field on two tabs keeps two drafts. This is the simplest rule that matches
   how tabs already work; a shared slot would need a second tab-independent view part.
 * **Cap: 6 nodes each** (`MaxStripNodes`), kinds `text`, `chips`, `actions`, `progress`,
-  `form` (`StripKinds`). A strip form's fields are inputs, toggles and dropdown selects:
-  fieldsets and `"style": "list"` selects are refused (they are vertical). Strip nodes are
-  top-level nodes (depth 0), count toward `MaxElements` and share the view's keys. The
-  GUI draws at most 6 as well. PR 2's divider, spacer and group were not on main when this
-  branched; adding them to `StripKinds` (and `STRIP_KINDS`) is a one-line follow-up each.
+  `form`, and PR 2's `divider`, `spacer`, `group` (`StripKinds`; PR 2 merged while this
+  was in review and the rebase added them). A strip form's fields are inputs, toggles and
+  dropdown selects: fieldsets and `"style": "list"` selects are refused (they are
+  vertical). In a row a divider is a vertical 20 px hairline and may not have a label; a
+  spacer is `size` px across, a flex spacer takes the row's free width (what follows sits
+  at the end); a group is its own line (one not aligned to the start takes the free
+  width to align in). Strip nodes are top-level nodes (depth 0), count toward
+  `MaxElements` and share the view's keys. The GUI draws at most 6 as well.
 * **One row that wraps** (`flex-wrap`, 8 px apart, 6 px between lines). A form and a
   progress bar grow (`flex-1`, at least 160 / 96 px), an end-aligned actions bar gets
   `ml-auto`, text and chips are as wide as their content. In the panel a search field and
@@ -41,6 +44,9 @@ main-pane pages.
   inputs and selects with an `sr-only` label (give a placeholder) and no description, a
   toggle's label beside its switch, field errors under the control, the form error on a
   line of its own under the row (`basis-full`).
+* **PR 2's flex spacer still reaches the body's bottom**: `SurfaceFrame`'s inner wrapper
+  grows to the scroll area's height and the body's list is the box list, as PR 2 had it
+  on the old panel-scrolled surface.
 * **The body scrolls between the strips.** The panel's body used to be the scroll box
   with a sticky header. Now `SurfaceFrame` makes the surface fill the panel's body (which
   no longer scrolls) and owns a scroll area (`data-scroll-root`, `plugin-scroll`) between
@@ -62,7 +68,7 @@ main-pane pages.
 
 * Go SDK (`chrome_test.go`): `NodeLists` has every `[]Node` field of `View` (reflection)
   in order and shares arrays; a table for every strip branch (each kind in each strip, 6
-  and 7, fieldset, list select, kindless and two-kind nodes, a bad node and button inside,
+  and 7, fieldset, list select, divider label, a bad spacer, a group of a refused kind, kindless and two-kind nodes, a bad node and button inside,
   keys shared with the body and across strips, form names across strips); every
   non-strip kind refused by name in both strips; strips at 400/401 elements; container
   widths and errors; JSON shapes and omission; `TestChromeNumbersMatchTheGUI` (680, 1080,
@@ -78,7 +84,8 @@ main-pane pages.
 * Hello: `TestLayoutChrome` (filter by text and status, counts, Clear filter's reset
   token, Run again's toast, other tabs without strips).
 * Vitest (`chrome.test.tsx`): the frame's order and classes, hairlines, dimming, the row
-  (order, the cap of 6, item classes), a strip form's layout vs the body's, errors, a
+  (order, the cap of 6, item classes, a vertical divider, fixed and flex spacers across, a
+  group), a strip form's layout vs the body's, errors, a
   footer form's drafts / submit lock / busy, the demo's strips, container widths and
   spacing, and fill between the strips (body box, not the panel). PR 1's `layout.test.tsx`
   now renders inside `SurfaceFrame`; store walks (strip forms reset and settle, appends,
@@ -96,8 +103,8 @@ CODE_FOUNDRY_HOME=~/.cfpl3 ./bin/code-foundry daemon --dev &      # without CLAU
 code-foundry settings set threads.default_model 'claude-haiku-5-5[1m]'
 code-foundry plugin dev plugins/examples/hello --yes --follow=false
 code-foundry thread new --no-project --name "Layout chrome" --created-by=
-code-foundry plugin act hello demo tab --key layout --thread s-466ed6278e3a
-code-foundry plugin surface hello demo --thread s-466ed6278e3a --settle 2s --json   # the fixture
+code-foundry plugin act hello demo tab --key layout --thread s-49bf52be0ed8
+code-foundry plugin surface hello demo --thread s-49bf52be0ed8 --settle 2s --json   # the fixture
 cd gui/frontend && vite --port 9381   # WebKit (Playwright) at /?daemon=…&token=…
 ```
 
@@ -116,5 +123,14 @@ were sent; the daemon was stopped and `~/.cfpl3` removed.
   so the e2e scrolls the body with `scrollTop`.
 * The fixture is recaptured from the real plugin; its ids and opened time were set back
   to the other five fixtures' so the mock's patches and time shift apply.
+* Rebased onto main after PR 2 (#229): conflicts in the Node union, the kind and depth
+  messages, `Children`, `fillLists`, capabilities, the `every` view, `childLists`, the
+  mock's walks, `nodes/index.ts`, `PluginSurface.tsx` (PR 2's grow/box body inside the
+  new frame), the hello Layout tab (PR 2's grid, groups and spacers now sit in the wide
+  container) and `ui-layout.md`. The fixture was recaptured once more and the
+  screenshots retaken after it.
+* A full `make gui-e2e` on the pre-rebase branch hit `ENOSPC` (disk briefly full while
+  other agents ran suites) in five unrelated specs and was cancelled; after the rebase only
+  the plugins spec ran (11 passed), per Alex.
 * `TestSurfaceNotRespondingAndPluginDown` failed once under the parallel `go test` load
   ("not open (watch it first)") and passed five times alone: a timing flake, unrelated.
