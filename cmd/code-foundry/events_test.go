@@ -78,6 +78,9 @@ func TestEventLine(t *testing.T) {
 			"- project snapshot"},
 		{"project updated", &v1.Event{Seq: 7, Event: &v1.Event_Project{Project: &v1.ProjectEvent{Event: &v1.ProjectEvent_ProjectUpdated{ProjectUpdated: &v1.Project{Id: "r1", Name: "app"}}}}},
 			"7 project project-updated r1"},
+		{"worktree files", &v1.Event{Seq: 11, Event: &v1.Event_Project{Project: &v1.ProjectEvent{Event: &v1.ProjectEvent_WorktreeFilesChanged{
+			WorktreeFilesChanged: &v1.WorktreeFilesChanged{ProjectId: "r1", Path: "/code/app", Files: []*v1.ChangedFile{{Path: "a.go", Op: v1.FileOp_FILE_OP_MODIFIED}}}}}}},
+			"11 project worktree-files-changed /code/app"},
 		{"terminal", &v1.Event{Seq: 8, Event: &v1.Event_Terminal{Terminal: &v1.TerminalEvent{Event: &v1.TerminalEvent_Updated{Updated: &v1.Terminal{Id: "t-1"}}}}},
 			"8 terminal updated t-1"},
 		{"ui intent", &v1.Event{Seq: 9, Event: &v1.Event_Ui{Ui: &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: "s-2"}}}}},
@@ -207,6 +210,45 @@ func TestRunEvents(t *testing.T) {
 	}
 	cancel3()
 	if err := <-done3; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A worktree's file changes reach `events --json --source project` as protojson.
+func TestRunEventsWorktreeFiles(t *testing.T) {
+	b := bus.New()
+	projects := projecttest.New(b)
+	route := api.NewEvents(api.EventsDeps{Bus: b, Project: projects}).Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	c := &client.Client{Events: codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)}
+	lw := newLineWriter()
+	var stderr bytes.Buffer
+	cl := &cli{stdout: lw, stderr: &stderr, connect: func(context.Context) (*client.Client, error) { return c, nil }}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	done := make(chan error, 1)
+	go func() { done <- runEvents(ctx, cl, []string{"--source", "project", "--json"}) }()
+
+	lw.next(t) // the snapshot
+	projects.FilesChanged(project.WorktreeFilesChanged{ProjectID: "r1", Path: "/code/app", Truncated: true, Files: []project.ChangedFile{
+		{Path: "pkg/a_test.go", Op: project.FileCreated}, {Path: "old/", Op: project.FileRemoved},
+	}})
+	var ev map[string]any
+	if err := json.Unmarshal([]byte(lw.next(t)), &ev); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(ev["project"])
+	want := `{"worktreeFilesChanged":{"files":[{"op":"FILE_OP_CREATED","path":"pkg/a_test.go"},{"op":"FILE_OP_REMOVED","path":"old/"}],"path":"/code/app","projectId":"r1","truncated":true}}`
+	if string(got) != want {
+		t.Fatalf("project = %s\nwant      %s", got, want)
+	}
+	cancel()
+	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
 }

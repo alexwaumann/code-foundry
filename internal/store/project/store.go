@@ -175,7 +175,8 @@ type Git struct {
 	pollNudge  chan struct{}
 	fetchNudge chan struct{}
 
-	details detailState // worktree detail cache (detail.go)
+	details detailState   // worktree detail cache (detail.go)
+	files   fileCollector // live worktrees' file changes (files.go)
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -878,6 +879,8 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 		g.detail(ctx, k.projectID, k.path)
 	case jobBase:
 		g.resolveBase(ctx, k.projectID)
+	case jobFiles:
+		g.flushFiles(ctx, k)
 	}
 }
 

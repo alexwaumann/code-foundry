@@ -114,6 +114,8 @@ func describe(ev *v1.Event) string {
 			return "project.removed"
 		case *v1.ProjectEvent_WorktreeDetailUpdated:
 			return "project.detail " + r.WorktreeDetailUpdated.GetPath()
+		case *v1.ProjectEvent_WorktreeFilesChanged:
+			return fmt.Sprintf("project.files %s %d", r.WorktreeFilesChanged.GetPath(), len(r.WorktreeFilesChanged.GetFiles()))
 		default:
 			return "project.other"
 		}
@@ -303,6 +305,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.project.SetDetail(project.WorktreeDetail{ProjectID: "r", Path: "/code/a"})
 	if got := describe(s.next()); got != "project.detail /code/a" {
 		t.Fatalf("got %q, want project.detail", got)
+	}
+	f.project.FilesChanged(project.WorktreeFilesChanged{ProjectID: "r", Path: "/code/a", Files: []project.ChangedFile{{Path: "a.go", Op: project.FileModified}}})
+	if got := describe(s.next()); got != "project.files /code/a 1" {
+		t.Fatalf("got %q, want project.files", got)
 	}
 	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
 	if n != 1 {

@@ -293,7 +293,45 @@ message ProjectEvent {
     ProjectSnapshot snapshot = 5;
     // A worktree's detail changed; re-read it with GetWorktreeDetail.
     WorktreeDetailRef worktree_detail_updated = 6;
+    // Files changed in a live worktree. Never part of a snapshot.
+    WorktreeFilesChanged worktree_files_changed = 7;
   }
+}
+
+// The paths that changed in one worktree within one tree window (1 s from the first
+// edit), sent once when the window closes. Only for live worktrees: ones with a thread
+// that is not archived or snoozed. Idle worktrees still refresh their status
+// (worktree_updated) but send no file lists. Paths under a .git directory, inside a
+// submodule, and gitignored ones (git check-ignore: a tracked file is never ignored)
+// are left out; a window where every path was ignored sends nothing.
+message WorktreeFilesChanged {
+  string project_id = 1;
+  // The worktree's root.
+  string path = 2;
+  // Sorted by path, at most 500.
+  repeated ChangedFile files = 3;
+  // More paths changed than files lists: run `git status` in the worktree.
+  bool truncated = 4;
+}
+
+message ChangedFile {
+  // Worktree-relative, forward slashes. A directory ends in "/" and is listed only
+  // when removed or renamed in.
+  string path = 1;
+  FileOp op = 2;
+}
+
+// What happened to a path in the window, judged by what is there when it closes.
+enum FileOp {
+  FILE_OP_UNSPECIFIED = 0;
+  // Exists, and is new.
+  FILE_OP_CREATED = 1;
+  // Exists, and was there before.
+  FILE_OP_MODIFIED = 2;
+  // Gone (deleted, or renamed away).
+  FILE_OP_REMOVED = 3;
+  // Exists, and was renamed onto this path.
+  FILE_OP_RENAMED = 4;
 }
 
 message WorktreeDetailRef {

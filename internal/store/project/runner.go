@@ -19,6 +19,20 @@ type Runner interface {
 	Run(ctx context.Context, dir string, args ...string) ([]byte, error)
 }
 
+// InputRunner is a Runner that can feed git's stdin. ExecRunner is one.
+type InputRunner interface {
+	RunInput(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error)
+}
+
+// runInput runs `git <args>` in dir with stdin through r, which must be an InputRunner.
+func runInput(ctx context.Context, r Runner, dir string, stdin []byte, args ...string) ([]byte, error) {
+	ir, ok := r.(InputRunner)
+	if !ok {
+		return nil, fmt.Errorf("git %s: the runner cannot feed stdin", strings.Join(args, " "))
+	}
+	return ir.RunInput(ctx, dir, stdin, args...)
+}
+
 // GitError is a failed git invocation.
 type GitError struct {
 	Dir      string
@@ -90,6 +104,11 @@ func gitEnv(base []string) []string {
 
 // Run implements Runner.
 func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	return r.RunInput(ctx, dir, nil, args...)
+}
+
+// RunInput implements InputRunner: Run with stdin (nil means /dev/null).
+func (r ExecRunner) RunInput(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		timeout := r.Timeout
 		if timeout <= 0 {
@@ -106,7 +125,9 @@ func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
 	cmd.Env = gitEnv(os.Environ())
-	cmd.Stdin = nil // /dev/null
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	} // else /dev/null
 	// A new thread has no controlling terminal, so neither git nor ssh can open
 	// /dev/tty to prompt for a password or host key, even when the daemon runs in a
 	// terminal with --dev.

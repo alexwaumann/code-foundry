@@ -147,6 +147,7 @@ func (g *Git) streamPaths() []string {
 // one read lock of the routing table, then triggers each key once per debouncer. Edits
 // in a worktree's tree go to treeDeb (1 s), everything else to deb (300 ms). The same
 // key from both routes keeps two independent timers; the scheduler merges the requests.
+// Tree edits in a live worktree are also collected per path for its files job.
 func (g *Git) onEvents(evs []fsevents.Event) {
 	type routed struct {
 		key  jobKey
@@ -157,11 +158,22 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		flags fsevents.EventFlags
 		n     int
 	}
+	type treeHit struct {
+		key   jobKey // the worktree's status job
+		path  string
+		flags fsevents.EventFlags
+	}
 	hits := map[routed]*hit{}
-	var order []routed
+	var (
+		order    []routed
+		treeHits []treeHit
+	)
 	g.mu.RLock()
 	for _, ev := range evs {
 		keys, tree := eventKeys(g.routes, ev.Path, ev.Flags)
+		if tree {
+			treeHits = append(treeHits, treeHit{key: keys[0], path: filepath.Clean(ev.Path), flags: ev.Flags})
+		}
 		for _, k := range keys {
 			r := routed{key: k, tree: tree}
 			if h := hits[r]; h != nil {
@@ -185,6 +197,25 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 			g.treeDeb.trigger(k)
 		} else {
 			g.deb.trigger(k)
+		}
+	}
+	// A live worktree's tree hits also feed its file changes (files.go), flushed on the
+	// same tree window.
+	live := map[string]bool{}
+	now := time.Now() // compared with file birth times: the wall clock, not g.now
+	for _, h := range treeHits {
+		isLive, ok := live[h.key.path]
+		if !ok {
+			isLive = g.isLive(h.key.path)
+			live[h.key.path] = isLive
+		}
+		if !isLive {
+			continue
+		}
+		if rel, ok := treeFile(h.key.path, h.path); ok {
+			fk := filesJob(h.key.projectID, h.key.path)
+			g.files.add(fk, rel, h.flags, now)
+			g.treeDeb.trigger(fk)
 		}
 	}
 }
