@@ -36,6 +36,9 @@ type RemovedThread struct {
 	CreatedBy string
 	Owner     string
 	Labels    []string
+	// CreatedAt is when the thread was created: its place among its siblings in a
+	// subtree it is no longer listed in (lineage.go).
+	CreatedAt time.Time
 	// Report is the thread's last report; the zero value when it never reported.
 	Report    Report
 	RemovedAt time.Time
@@ -50,7 +53,7 @@ type RemovedThread struct {
 func removedThread(t Thread, at time.Time) RemovedThread {
 	return RemovedThread{
 		ID: t.ID, Name: t.Name, ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID, CreatedBy: t.CreatedBy, Owner: t.Owner,
-		Labels: slices.Clone(t.Labels), Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
+		Labels: slices.Clone(t.Labels), CreatedAt: t.CreatedAt, Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
 	}
 }
 

@@ -112,9 +112,9 @@ func TestFilterLineage(t *testing.T) {
 		{ID: "s-plugin", CreatedAt: at(7), CreatedBy: "s-orch", Owner: "plugin:hello"},
 		{ID: "s-stranger", CreatedAt: at(0), LastActivityAt: at(60)},
 	}
-	// Lead C was removed; its worker s-c1 is still the orchestrator's (a removed thread
-	// sorts among its siblings by its removal time).
-	removed := []RemovedThread{{ID: "s-leadc", CreatedBy: "s-orch", RemovedAt: at(8)}}
+	// Lead C was removed; its worker s-c1 is still the orchestrator's, in Lead C's place
+	// among the orchestrator's children.
+	removed := []RemovedThread{{ID: "s-leadc", CreatedBy: "s-orch", CreatedAt: at(2), RemovedAt: at(8)}}
 	tests := []struct {
 		name string
 		o    ListOptions
@@ -125,7 +125,7 @@ func TestFilterLineage(t *testing.T) {
 			want: []string{"s-orch@0", "s-leada@1", "s-a1@2", "s-b1@2", "s-c1@2"}},
 		{name: "all includes archived",
 			o:    ListOptions{DescendantsOf: "s-orch", All: true},
-			want: []string{"s-orch@0", "s-leada@1", "s-a1@2", "s-a2@2", "s-leadb@1", "s-b1@2", "s-plugin@1", "s-c1@2"}},
+			want: []string{"s-orch@0", "s-leada@1", "s-a1@2", "s-a2@2", "s-leadb@1", "s-b1@2", "s-c1@2", "s-plugin@1"}},
 		{name: "archived includes archived, not owned",
 			o:    ListOptions{DescendantsOf: "s-orch", IncludeArchived: true},
 			want: []string{"s-orch@0", "s-leada@1", "s-a1@2", "s-a2@2", "s-leadb@1", "s-b1@2", "s-c1@2"}},

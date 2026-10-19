@@ -72,15 +72,14 @@ func Subtree(nodes []LineageNode, root string) []SubtreeEntry {
 
 // lineageNodes are the lineage of threads and of the removed threads: a removed
 // thread between the root and a live one keeps the line (its children's CreatedBy
-// still names it). A tombstone keeps no creation time: a removed thread sorts among
-// its siblings by when it was removed.
+// still names it), in its place among its siblings (its CreatedAt).
 func lineageNodes(threads []Thread, removed []RemovedThread) []LineageNode {
 	out := make([]LineageNode, 0, len(threads)+len(removed))
 	for _, t := range threads {
 		out = append(out, LineageNode{ID: t.ID, CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt})
 	}
 	for _, r := range removed {
-		out = append(out, LineageNode{ID: r.ID, CreatedBy: r.CreatedBy, CreatedAt: r.RemovedAt})
+		out = append(out, LineageNode{ID: r.ID, CreatedBy: r.CreatedBy, CreatedAt: r.CreatedAt})
 	}
 	return out
 }
