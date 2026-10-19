@@ -6,7 +6,7 @@
  * one, and at most INLINE_LIVE_MAX of them hold a stream at once: a node beyond the budget
  * shows "Attach", which takes the oldest holder's place.
  */
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { create } from "zustand";
 import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 
@@ -109,15 +109,26 @@ export function useOnScreen(el: HTMLElement | null): boolean {
 }
 
 /**
+ * Whether the nodes drawn here are leaving the screen with a node's act in flight: a tabs
+ * node switching to another tab, a master-detail selecting another row
+ * (docs/notes/plugins-layout-4-master-detail.md). Their live nodes let go as an inactive
+ * view tab's do.
+ */
+export const LeavingNode = createContext(false);
+
+/**
  * Whether the surface is leaving the view tab on screen: the user clicked another of the
  * plugin's tabs and its act is in flight. The old view stays drawn until the plugin's next
- * view, but its live nodes let go now (their streams must not hold up the act).
+ * view, but its live nodes let go now (their streams must not hold up the act). Inside a
+ * tabs node or a master-detail's detail the same holds for their own switch (LeavingNode).
  */
 export function useLeavingViewTab(watchKey: string): boolean {
-  return usePluginSurfacesStore((s) => {
+  const node = useContext(LeavingNode);
+  const view = usePluginSurfacesStore((s) => {
     const tabs = s.watches[watchKey]?.view?.tabs;
     const pending = s.pending[watchKey];
     if (!tabs || !pending) return false;
     return tabs.items.some((t) => t.key !== tabs.active && pending[t.key] === true);
   });
+  return node || view;
 }

@@ -8,31 +8,38 @@ import { GlyphView, InlineLine, PillView, PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
 import { toneText } from "../tones";
 
-/** The tone of a row's line 2: amber or red when its first span says so, muted otherwise. */
-function RowView({ row, glyphStyle, dense }: { row: Row; glyphStyle: "dot" | "icon"; dense: boolean }) {
+/**
+ * One list row. A row with an action runs it on click (Enter, Space); `onActivate`
+ * replaces that (a master-detail's rows: every row chooses), and `selected` the row's own
+ * selected flag (its optimistic choice).
+ */
+export function RowView({ row, glyphStyle, dense, onActivate, selected: shown }: { row: Row; glyphStyle: "dot" | "icon"; dense: boolean; onActivate?: () => void; selected?: boolean }) {
   const run = useRunAction();
   const { inert } = useViewCtx();
   const iconOnly = (row.actions ?? []).filter((b) => b.iconOnly);
   const labelled = (row.actions ?? []).filter((b) => !b.iconOnly);
-  const clickable = row.action !== undefined && !inert;
+  const clickable = (onActivate !== undefined || row.action !== undefined) && !inert;
+  const selected = shown ?? row.selected ?? false;
   const activate = () => {
-    if (clickable) run(row.key, row.action);
+    if (!clickable) return;
+    if (onActivate) onActivate();
+    else run(row.key, row.action);
   };
   return (
     <div
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
-      aria-pressed={clickable ? (row.selected ?? false) : undefined}
-      aria-current={!clickable && row.selected ? "true" : undefined}
+      aria-pressed={clickable ? selected : undefined}
+      aria-current={!clickable && selected ? "true" : undefined}
       className={cn(
         "-mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-ring",
         dense ? "h-6 items-center" : "items-start py-1.5",
         clickable && "cursor-default hover:bg-accent dark:hover:bg-accent/50",
-        row.selected && "bg-accent dark:bg-accent/50",
+        selected && "bg-accent dark:bg-accent/50",
       )}
       data-testid="plugin-row"
       data-key={row.key}
-      data-selected={row.selected || undefined}
+      data-selected={selected || undefined}
       onClick={activate}
       onKeyDown={(e: KeyboardEvent) => {
         if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {

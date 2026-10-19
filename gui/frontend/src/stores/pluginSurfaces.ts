@@ -1,7 +1,9 @@
 /**
  * Plugin surfaces on screen (docs/notes/plugins-5-gui.md): one PluginService.WatchSurface
  * per visible plugin tab (its state, view versions, log appends and toasts), the host's
- * form drafts per instance and view tab, collapsed sections, and the acts in flight.
+ * form drafts per instance and view tab (and node tab and selected row:
+ * docs/notes/plugins-layout-4-master-detail.md), collapsed sections, the master-details
+ * showing their detail alone, and the acts in flight.
  *
  * Keys: a watch is per panel tab (`watchKey`: panel key + tab id); drafts and collapsed
  * sections are per instance (the daemon's `<plugin>/<surface>/<scope id>`), so a tab that
@@ -13,6 +15,7 @@ import { invalidateOnTransportError } from "@/api/endpoint";
 import {
   actOnSurface,
   childLists,
+  nodeScope,
   VIEW_LISTS,
   viewNodes,
   nodeKind,
@@ -75,16 +78,33 @@ export interface PluginSurfacesState {
    * all), and stay (the user's values beside the plugin's errors) when it has some.
    */
   submitted: Readonly<Record<string, number>>;
+  /**
+   * Master-details showing their detail alone in the narrow layout (the user chose a row),
+   * by draftKeyOf(instance, scope, node key): the node's resetToken and selected row as
+   * last seen. A new view drops one whose resetToken changed or whose selected row changed
+   * to a key that is not a row (reconcileDetails); Back drops it.
+   */
+  details: Readonly<Record<string, DetailOpen>>;
 }
 
-export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {} }));
+/** A master-detail showing its detail alone: its resetToken and selected row as last seen. */
+export interface DetailOpen {
+  token: string;
+  selected: string;
+}
+
+export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {} }));
 
 /** A tab's watch key: its panel's key and its id. */
 export function watchKeyOf(panelKey: string, tabId: string): string {
   return `${panelKey}\u0000${tabId}`;
 }
 
-/** Where a form's drafts live: the instance, the view tab ("" without tabs) and the form's key. */
+/**
+ * Where a form's drafts live: the instance, its scope (the view tab, "" without tabs,
+ * followed by the scope of each tabs node and master-detail around it: api/plugin.ts
+ * nodeScope) and the form's key. A master-detail's narrow state uses the same key shape.
+ */
 export function draftKeyOf(instance: string, viewTab: string, formKey: string): string {
   return `${instance}\u0000${viewTab}\u0000${formKey}`;
 }
@@ -181,9 +201,26 @@ export function applySurfaceUpdate(e: SurfaceEntry, u: SurfaceUpdateView): Surfa
   }
 }
 
-/** Every form in a list of nodes (inside sections, columns, panes and containers too), by key; a view's: formsOf(viewNodes(view)). */
-export function formsOf(nodes: readonly ViewNode[]): { key: string; form: FormNodeData }[] {
-  return nodes.flatMap((n) => (n.form ? [{ key: n.key, form: n.form }] : childLists(n).flatMap((l) => formsOf(l))));
+/** Calls f for every node at any depth with its scope (the nodeScope of the nodes around it, after `scope`), parents first. */
+export function walkScoped(nodes: readonly ViewNode[], f: (n: ViewNode, scope: string) => void, scope = ""): void {
+  for (const n of nodes) {
+    f(n, scope);
+    const inner = scope + nodeScope(n);
+    for (const l of childLists(n)) walkScoped(l, f, inner);
+  }
+}
+
+/**
+ * Every form in a list of nodes (inside sections, columns, panes, containers, tabs nodes
+ * and details too), by key, with its scope below the view tab (draftKeyOf(instance, tab +
+ * scope, key)); a view's: formsOf(viewNodes(view)).
+ */
+export function formsOf(nodes: readonly ViewNode[]): { key: string; form: FormNodeData; scope: string }[] {
+  const out: { key: string; form: FormNodeData; scope: string }[] = [];
+  walkScoped(nodes, (n, scope) => {
+    if (n.form) out.push({ key: n.key, form: n.form, scope });
+  });
+  return out;
 }
 
 /**
@@ -199,8 +236,8 @@ export function reconcileResets(
   const tab = view.tabs?.active ?? "";
   let d = drafts;
   let t = tokens;
-  for (const { key, form } of formsOf(viewNodes(view))) {
-    const dk = draftKeyOf(instance, tab, key);
+  for (const { key, form, scope } of formsOf(viewNodes(view))) {
+    const dk = draftKeyOf(instance, tab + scope, key);
     const token = form.resetToken ?? "";
     const prev = t[dk];
     if (prev === token) continue;
@@ -234,7 +271,7 @@ export function settleSubmits(
   const due = Object.entries(submitted).filter(([dk, v]) => version > v && dk.startsWith(`${instance}\u0000`));
   if (due.length === 0) return { drafts, submitted };
   const tab = view.tabs?.active ?? "";
-  const forms = new Map(formsOf(viewNodes(view)).map(({ key, form }) => [draftKeyOf(instance, tab, key), form]));
+  const forms = new Map(formsOf(viewNodes(view)).map(({ key, form, scope }) => [draftKeyOf(instance, tab + scope, key), form]));
   let d = drafts;
   const settled = new Set(due.map(([dk]) => dk));
   const sub = Object.fromEntries(Object.entries(submitted).filter(([dk]) => !settled.has(dk)));
@@ -247,6 +284,36 @@ export function settleSubmits(
     }
   }
   return { drafts: d, submitted: sub };
+}
+
+/**
+ * Narrow master-details after a new view: one showing its detail goes back to its list
+ * when its resetToken changed, or its selected row changed to a key that is not a row
+ * (nothing selected included); a selected row that changed to another row is recorded.
+ * One whose node the view does not show is kept (another view tab may show it again).
+ * Returns the same object when nothing changed.
+ */
+export function reconcileDetails(details: PluginSurfacesState["details"], instance: string, view: PluginViewModel): PluginSurfacesState["details"] {
+  const tab = view.tabs?.active ?? "";
+  let d = details;
+  walkScoped(viewNodes(view), (n, scope) => {
+    const md = n.masterDetail;
+    if (!md) return;
+    const dk = draftKeyOf(instance, tab + scope, n.key);
+    const open = d[dk];
+    if (!open) return;
+    const token = md.resetToken ?? "";
+    const selected = md.selected ?? "";
+    if (token === open.token && selected === open.selected) return;
+    const isRow = (md.list.rows ?? []).some((r) => r.key === selected);
+    if (token !== open.token || !isRow) {
+      const { [dk]: _gone, ...rest } = d;
+      d = rest;
+    } else {
+      d = { ...d, [dk]: { token, selected } };
+    }
+  });
+  return d;
 }
 
 /** Whether any node of the view is of a kind this GUI does not know (shown as a notice). */
@@ -282,7 +349,7 @@ function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
     if (u.kind !== "view" || !next.view) return { watches };
     const reset = reconcileResets(s.drafts, s.resetTokens, next.instance, next.view);
     const settled = settleSubmits(reset.drafts, s.submitted, next.instance, next.view, next.version);
-    return { watches, resetTokens: reset.resetTokens, ...settled };
+    return { watches, resetTokens: reset.resetTokens, ...settled, details: reconcileDetails(s.details, next.instance, next.view) };
   });
 }
 
@@ -432,6 +499,25 @@ export function useCollapsed(instance: string, sectionKey: string): boolean | un
 
 export function setCollapsed(instance: string, sectionKey: string, collapsed: boolean): void {
   usePluginSurfacesStore.setState((s) => ({ collapsed: { ...s.collapsed, [instance]: { ...s.collapsed[instance], [sectionKey]: collapsed } } }));
+}
+
+/** Whether a master-detail (by draftKeyOf(instance, scope, node key)) shows its detail alone in the narrow layout. */
+export function useDetailOpen(detailKey: string): boolean {
+  return usePluginSurfacesStore((s) => detailKey in s.details);
+}
+
+/** The user chose a row: the master-detail shows its detail alone while narrow (until Back, or reconcileDetails). */
+export function openDetail(detailKey: string, token: string, selected: string): void {
+  usePluginSurfacesStore.setState((s) => ({ details: { ...s.details, [detailKey]: { token, selected } } }));
+}
+
+/** Back to the list (or the choice's act failed). */
+export function closeDetail(detailKey: string): void {
+  usePluginSurfacesStore.setState((s) => {
+    if (!(detailKey in s.details)) return s;
+    const { [detailKey]: _gone, ...details } = s.details;
+    return { details };
+  });
 }
 
 /** A watch's entry fields, narrowly. */

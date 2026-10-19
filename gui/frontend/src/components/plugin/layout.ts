@@ -7,7 +7,7 @@
  * tests keep them equal).
  */
 import { useLayoutEffect, useState, type CSSProperties } from "react";
-import type { ColumnData, ColumnsData, ContainerData, GridData, GridItemData, SpacerData } from "@/api/plugin";
+import type { ColumnData, ColumnsData, ContainerData, GridData, GridItemData, MasterDetailData, SpacerData } from "@/api/plugin";
 
 /** The width a weighted column needs side by side; it never gets less. */
 export const COLUMN_MIN_WIDTH = 240;
@@ -109,6 +109,30 @@ export function spacerSize(data: SpacerData): number {
 
 /** The space between a group's items (gap-2). */
 export const GROUP_GAP = 8;
+
+/** A master-detail's list width when it sets none (docs/notes/plugins-layout-4-master-detail.md). */
+export const MASTER_DETAIL_LIST_WIDTH = 280;
+/** The list widths the daemon takes. */
+export const MASTER_DETAIL_LIST_WIDTH_RANGE = [200, 400] as const;
+/** The detail's least width beside the list. */
+export const MASTER_DETAIL_MIN_DETAIL = 320;
+/** The space between the list and the detail side by side (gap-3, like columns). */
+export const MASTER_DETAIL_GAP = 12;
+
+/** A master-detail's list width: its listWidth in range, else MASTER_DETAIL_LIST_WIDTH. */
+export function masterDetailListWidth(data: MasterDetailData): number {
+  const w = data.listWidth;
+  return typeof w === "number" && Number.isInteger(w) && w >= MASTER_DETAIL_LIST_WIDTH_RANGE[0] && w <= MASTER_DETAIL_LIST_WIDTH_RANGE[1] ? w : MASTER_DETAIL_LIST_WIDTH;
+}
+
+/**
+ * Whether a master-detail `width` px wide shows its list and detail side by side: at least
+ * listWidth + MASTER_DETAIL_GAP + MASTER_DETAIL_MIN_DETAIL (612 px by default). Not
+ * measured yet (null): no, the list alone, so the side panel never flashes two sides.
+ */
+export function masterDetailWide(width: number | null, listWidth: number): boolean {
+  return width !== null && width >= listWidth + MASTER_DETAIL_GAP + MASTER_DETAIL_MIN_DETAIL;
+}
 
 /**
  * The element's width in px, followed as it resizes (one ResizeObserver); null until it

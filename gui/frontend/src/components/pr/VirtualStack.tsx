@@ -15,9 +15,13 @@ interface VirtualStackProps<T> {
   testId?: string;
 }
 
-/** The nearest scrolling ancestor ([data-scroll-root] first, e.g. the side panel's body). */
+/**
+ * The nearest scrolling ancestor: the nearest marked one first ([data-scroll-root], e.g.
+ * the side panel's body, or [data-virtual-root], a box inside it that scrolls on its own:
+ * a plugin master-detail's list side), else the nearest with overflow.
+ */
 function scrollParent(el: HTMLElement): HTMLElement | null {
-  const marked = el.parentElement?.closest<HTMLElement>("[data-scroll-root]");
+  const marked = el.parentElement?.closest<HTMLElement>("[data-scroll-root], [data-virtual-root]");
   if (marked) return marked;
   for (let p = el.parentElement; p; p = p.parentElement) {
     if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return p;
