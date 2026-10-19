@@ -62,7 +62,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 			{Name: "label", Type: String, Description: "Comma-separated labels, all required"},
 			{Name: "status", Type: Enum, Enum: ThreadReportsStatuses, Description: "Only threads with this report; none: not reported"},
 			{Name: "archived", Type: Bool, Description: "Include archived threads"},
-			{Name: "all", Type: Bool, Description: "Archived threads, and those removed within the last day (status removed)"},
+			{Name: "all", Type: Bool, Description: "Archived and removed too"},
 			{Name: "full", Type: Bool, Description: "Print each report's JSON data"},
 			{Name: "limit", Type: Int, Description: "At most this many, most recently active first (0: all)"},
 		},

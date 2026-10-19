@@ -54,7 +54,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "archived", Type: Bool, Description: "Include archived threads"},
-			{Name: "all", Type: Bool, Description: "Every thread, archived ones too, then those removed within the last day ([removed]; --json: removed, and the usage of removed threads); the other filters still apply"},
+			{Name: "all", Type: Bool, Description: "Every thread, archived ones too (--json: also the usage of removed threads); the other filters still apply"},
 			{Name: "status", Type: Enum, Enum: ThreadListStatuses, Description: "Only threads with this status: busy, idle, attention (a prompt, a question or a finished turn), or error"},
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
 			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
