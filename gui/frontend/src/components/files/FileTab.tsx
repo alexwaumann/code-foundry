@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { FileQuestion, FileX, Folder, FolderSearch, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
+import { FileImage, FileQuestion, FileText, FileX, Folder, FolderSearch, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
 import { ago } from "@/components/pr/model";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,11 @@ import type { FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
 import { FileActions, FileHeader, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
-import { fileIconOf, formatSize, languageOf, lineCount, previewKindOf, truncatedNotice } from "./fileKind";
+import { fileIconOf, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
 import { HtmlPreview } from "./HtmlPreview";
 import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { PdfPreview } from "./PdfPreview";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
 import { useDebounced, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
 
@@ -33,7 +34,8 @@ function SavedAgo({ ms }: { ms: number | null }) {
 /**
  * The File tab (surfaces/files.ts): one file read with FilesystemService.ReadFile, under
  * header A. Text is code (line numbers, the line param marked and scrolled to); markdown
- * and HTML also render (Rendered | Source, remembered per kind); images show inline;
+ * and HTML also render (Rendered | Source, remembered per kind); images show inline and
+ * PDFs as their pages (an image or PDF too large to come back whole says so); other
  * binaries, folders and missing paths get a placeholder. Read again when the tab shows, on
  * Refresh, when the worktree changes and when the thread edits the file (useTabRead).
  */
@@ -62,8 +64,11 @@ export function FileTab({ target }: { target: FileTarget }) {
   const onSize = useCallback((w: number, h: number) => {
     setDims({ w, h });
   }, []);
+  const [pages, setPages] = useState<number | null>(null);
 
-  const meta = !file ? null : file.notFound || file.isDir ? null : file.image ? (
+  const meta = !file ? null : file.notFound || file.isDir ? null : file.pdf ? (
+    pdfMeta(file.size, file.truncated ? null : pages)
+  ) : file.image ? (
     <>
       {dims && `${String(dims.w)} × ${String(dims.h)} · `}
       {formatSize(file.size)} · {extOf(abs).toUpperCase() || file.mime}
@@ -102,7 +107,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       </FileHeader>
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={text} lines={lines} line={line} rendered={rendered ? kind : null} onSize={onSize} />
+      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={text} lines={lines} line={line} rendered={rendered ? kind : null} onSize={onSize} onPages={setPages} />
     </div>
   );
 }
@@ -119,6 +124,7 @@ function FileBody({
   line,
   rendered,
   onSize,
+  onPages,
 }: {
   file: FileReadView | null;
   error: string | null;
@@ -131,6 +137,7 @@ function FileBody({
   line: number | undefined;
   rendered: "markdown" | "html" | null;
   onSize: (w: number, h: number) => void;
+  onPages: (pages: number) => void;
 }) {
   const retry = (
     <Button variant="outline" size="sm" onClick={reload} data-testid="file-retry">
@@ -180,7 +187,15 @@ function FileBody({
         {reveal}
       </FileEmptyState>
     );
-  if (file.image) return <ImagePreview bytes={file.image} mime={file.mime} name={name} onSize={onSize} />;
+  // An image or PDF over the read cap came back cut short: neither the webview nor pdf.js can show part of one.
+  const tooLarge = (icon: LucideIcon, kind: "Image" | "PDF", testId: string) => (
+    <FileEmptyState icon={icon} heading={tooLargeHeading(kind, file.size)} detail={tildify(abs)} testId={testId}>
+      {editor}
+      {reveal}
+    </FileEmptyState>
+  );
+  if (file.image) return file.truncated ? tooLarge(FileImage, "Image", "file-image-too-large") : <ImagePreview bytes={file.image} mime={file.mime} name={name} onSize={onSize} />;
+  if (file.pdf) return file.truncated ? tooLarge(FileText, "PDF", "file-pdf-too-large") : <PdfPreview bytes={file.pdf} onPages={onPages} />;
   if (text === null)
     return (
       <FileEmptyState icon={FileX} heading={`Binary file · ${formatSize(file.size)}`} detail={tildify(abs)} testId="file-binary">

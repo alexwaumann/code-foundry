@@ -14,7 +14,7 @@ import "./files.css";
 /**
  * An image in a rendered markdown file with a local path: read through ReadFile against
  * the file's directory and shown from an object URL; a chip with the path while it loads,
- * or when it is missing or not an image.
+ * or when it is missing, not an image, or too large to come back whole.
  */
 function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }) {
   const [file, setFile] = useState<FileReadView | null | "failed">(null);
@@ -22,7 +22,7 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
     const ctl = new AbortController();
     readFile(dir, decodeURI(src), undefined, ctl.signal)
       .then((f) => {
-        setFile(f.image ? f : "failed");
+        setFile(f.image && !f.truncated ? f : "failed");
       })
       .catch(() => {
         if (!ctl.signal.aborted) setFile("failed");

@@ -1,7 +1,7 @@
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileArchive, FileCode, FileImage, FileJson, FileTerminal, FileText, File as FileIcon } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { HTML_PREVIEW_CSP, fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, previewKindOf, sandboxedDocument, truncatedNotice } from "./fileKind";
+import { HTML_PREVIEW_CSP, fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, sandboxedDocument, tooLargeHeading, truncatedNotice } from "./fileKind";
 
 describe("previewKindOf", () => {
   it.each([
@@ -37,6 +37,9 @@ describe("languageOf", () => {
 describe("fileIconOf", () => {
   it("picks by type", () => {
     expect(fileIconOf("logo.png", "image/png")).toBe(FileImage);
+    expect(fileIconOf("spec.pdf", "application/pdf")).toBe(FileText);
+    expect(fileIconOf("SPEC.PDF")).toBe(FileText);
+    expect(fileIconOf("download", "application/pdf")).toBe(FileText);
     expect(fileIconOf("dist.tar")).toBe(FileArchive);
     expect(fileIconOf("package.json")).toBe(FileJson);
     expect(fileIconOf("run.sh")).toBe(FileTerminal);
@@ -57,6 +60,17 @@ describe("sizes, lines, notices", () => {
 
   it("truncatedNotice", () => {
     expect(truncatedNotice(4_400_000)).toBe("Showing the first 1 MiB of 4.2 MB");
+  });
+
+  it("pdfMeta: pages once counted", () => {
+    expect(pdfMeta(4_400_000, null)).toBe("4.2 MB · PDF");
+    expect(pdfMeta(4_400_000, 3)).toBe("3 pages · 4.2 MB · PDF");
+    expect(pdfMeta(2048, 1)).toBe("1 page · 2 KB · PDF");
+  });
+
+  it("tooLargeHeading", () => {
+    expect(tooLargeHeading("PDF", 48 * 1024 * 1024)).toBe("PDF · 48.0 MB · too large to show");
+    expect(tooLargeHeading("Image", 50_331_648)).toBe("Image · 48.0 MB · too large to show");
   });
 });
 

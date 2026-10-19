@@ -7,8 +7,8 @@ surfaces, placeholders until now, become real tabs on `FilesystemService.ReadFil
 
 Update 2026-10-18 (`binary-read-cap-and-mcp-settle.md`): ReadFile reads a non-text file
 (an image, a PDF) up to the max_bytes asked for, at most 32 MiB; text stays capped at
-1 MiB, and max_bytes 0 is still 1 MiB for everything. The File tab still asks for the
-default until the PDF PR raises it.
+1 MiB, and max_bytes 0 is still 1 MiB for everything. The File tab now asks for 32 MiB
+and shows PDFs as pages, an image or PDF over the cap as too large (`file-tab-pdf.md`).
 
 ## Files
 

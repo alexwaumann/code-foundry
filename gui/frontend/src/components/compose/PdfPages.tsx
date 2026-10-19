@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { loadPdf, type PdfDocument } from "@/lib/pdf";
 import { zoomFactor } from "@/lib/zoom";
 import { cn } from "@/lib/utils";
@@ -103,13 +103,18 @@ function PdfPage({ doc, n, aspect, root }: { doc: PdfDocument; n: number; aspect
 }
 
 /**
- * A PDF's pages for the attachment preview: a scrolling column at the dialog's width,
- * each page drawn as it comes near the view (IntersectionObserver).
+ * A PDF's pages: a scrolling column at its box's width, each page drawn as it comes near
+ * the view (IntersectionObserver). In the attachment lightbox the column is at most 85% of
+ * the window tall; with `fill` it fills a flex column instead (the File tab's body).
+ * `onPages` hears the page count once the document opens.
  */
-export function PdfPages({ file }: { file: Blob }) {
+export function PdfPages({ file, fill = false, onPages }: { file: Blob; fill?: boolean; onPages?: (pages: number) => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState<{ doc: PdfDocument; aspect: number } | null>(null);
   const [failed, setFailed] = useState(false);
+  const opened = useEffectEvent((pages: number) => {
+    onPages?.(pages);
+  });
   useEffect(() => {
     let live = true;
     const closed = () => !live;
@@ -123,7 +128,9 @@ export function PdfPages({ file }: { file: Blob }) {
         }
         doc = d;
         const first = await d.pageSize(1);
-        if (live) setOpen({ doc: d, aspect: first.width / first.height });
+        if (!live) return;
+        setOpen({ doc: d, aspect: first.width / first.height });
+        opened(d.pages);
       })
       .catch(() => {
         if (live) setFailed(true);
@@ -134,7 +141,10 @@ export function PdfPages({ file }: { file: Blob }) {
     };
   }, [file]);
   return (
-    <div ref={scroller} className="max-h-[calc(85vh/var(--cf-zoom))] min-h-40 overflow-y-auto p-4" data-testid="pdf-pages" data-pages={open?.doc.pages}>
+    <div
+      ref={scroller}
+      className={cn("overflow-y-auto p-4", fill ? "min-h-0 flex-1" : "max-h-[calc(85vh/var(--cf-zoom))] min-h-40")}
+      data-testid="pdf-pages" data-pages={open?.doc.pages}>
       {failed ? (
         <p className="py-12 text-center text-body text-muted-foreground">This PDF could not be shown.</p>
       ) : open ? (
