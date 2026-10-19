@@ -168,7 +168,7 @@ var Groups = []Group{
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
 	{GroupProjects, "Projects", "Git fetching."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
-	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, and backdrop. Applied live in every window."},
+	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window."},
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
@@ -199,6 +199,7 @@ const (
 	KeyDensity           = "appearance.density"
 	KeyThreadWidth       = "appearance.thread_width"
 	KeyBackdrop          = "appearance.backdrop"
+	KeyPanelKeepOpen     = "appearance.panel_keep_open"
 	KeyDockBadge         = "notifications.dock_badge"
 	KeyBounce            = "notifications.bounce"
 	KeySound             = "notifications.sound"
@@ -326,6 +327,12 @@ var staticFields = []Field{
 		Description: "Faint artwork behind the start page and the new-thread composer.",
 		Enum:        []string{"forest", "none"}, EnumLabels: []string{"Forest", "None"}, Default: "forest",
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
+	},
+	{
+		Key: KeyPanelKeepOpen, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Bool, Title: "Keep side panel open",
+		Description: "When its last tab closes, the side panel stays open on the new tab page instead of hiding.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Appearance.PanelKeepOpen },
 	},
 	// Appearance › Terminal.
 	{

@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   activateTab,
+  closePanelTab,
   closeTab,
   emptyEntry,
   expandPanel,
@@ -27,6 +28,7 @@ import {
   usePanelStore,
   type PanelEntry,
 } from "./panel";
+import { KEYS, useSettingsStore } from "./settings";
 import { PANEL_MIN, panelMax, useUiStore, type Selection } from "./ui";
 
 const files = makeTab("files", "Files");
@@ -120,6 +122,7 @@ describe("openTab", () => {
 
 describe("closeTab", () => {
   const three = [files, diff, pr];
+  // Closing with keepOpen off (the default); keepOpenCases below has the same entries with it on.
   const cases: [string, PanelEntry, string, PanelEntry][] = [
     ["last tab hides the panel", entry(true, [files], files.id), files.id, entry(false, [], null)],
     ["active middle tab activates the right neighbour", entry(true, three, diff.id), diff.id, entry(true, [files, pr], pr.id)],
@@ -134,11 +137,28 @@ describe("closeTab", () => {
   ];
   it.each(cases)("%s", (_name, before, id, want) => {
     expect(closeTab(before, id)).toEqual(want);
+    expect(closeTab(before, id, false)).toEqual(want);
   });
 
-  it("returns the same entry for an unknown id", () => {
+  // appearance.panel_keep_open: only closing the last tab differs.
+  const keepOpenCases: [string, PanelEntry, string, PanelEntry][] = [
+    ["last tab leaves the panel open with no tabs (the surface list)", entry(true, [files], files.id), files.id, entry(true, [], null)],
+    ["last tab keeps width and expanded", { ...entry(true, [files], files.id), width: 500, expanded: true }, files.id, { ...entry(true, [], null), width: 500, expanded: true }],
+    ["last tab of a hidden panel leaves it hidden", entry(false, [files], files.id), files.id, entry(false, [], null)],
+    ["active middle tab activates the right neighbour", entry(true, three, diff.id), diff.id, entry(true, [files, pr], pr.id)],
+    ["inactive tab keeps the active one", entry(true, three, files.id), pr.id, entry(true, [files, diff], files.id)],
+    ["unknown id changes nothing", entry(true, [files], files.id), "nope", entry(true, [files], files.id)],
+    ["picking: another tab keeps picking and pickFrom", picking(three, files.id), pr.id, picking([files, diff], files.id)],
+    ["picking: the pickFrom tab moves pickFrom to its right neighbour", picking(three, diff.id), diff.id, picking([files, pr], pr.id)],
+    ["picking: the last tab ends picking and leaves the panel open with no tabs", picking([files], files.id), files.id, entry(true, [], null)],
+  ];
+  it.each(keepOpenCases)("keepOpen: %s", (_name, before, id, want) => {
+    expect(closeTab(before, id, true)).toEqual(want);
+  });
+
+  it.each([false, true])("returns the same entry for an unknown id (keepOpen %s)", (keepOpen) => {
     const e = entry(true, [files], files.id);
-    expect(closeTab(e, "nope")).toBe(e);
+    expect(closeTab(e, "nope", keepOpen)).toBe(e);
   });
 });
 
@@ -480,6 +500,53 @@ describe("panel store", () => {
     expect(getPanel()).toEqual({ ...emptyEntry, open: true });
     useUiStore.getState().select({ kind: "none" });
     expect(startPanelPicking()).toBe(false);
+  });
+
+  describe("closePanelTab and appearance.panel_keep_open", () => {
+    afterEach(() => {
+      useSettingsStore.setState({ snapshot: null });
+    });
+
+    function withSetting(value: string | undefined): void {
+      const values: Record<string, string> = value === undefined ? {} : { [KEYS.panelKeepOpen]: value };
+      useSettingsStore.setState({ snapshot: { values, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+    }
+
+    const cases: [string, string | undefined | null, boolean | undefined, boolean][] = [
+      ["no snapshot yet hides", null, undefined, false],
+      ["a snapshot without the key hides", undefined, undefined, false],
+      ["the setting off hides", "false", undefined, false],
+      ["the setting on keeps it open", "true", undefined, true],
+      ["an explicit keepOpen wins over the setting off", "false", true, true],
+      ["an explicit keepOpen false wins over the setting on", "true", false, false],
+    ];
+    it.each(cases)("closing the last tab: %s", (_name, setting, keepOpen, wantOpen) => {
+      if (setting !== null) withSetting(setting);
+      openSurface("current", files);
+      closePanelTab("current", files.id, keepOpen === undefined ? {} : { keepOpen });
+      expect(getPanel()).toEqual(entry(wantOpen, [], null));
+    });
+
+    it("is read when the tab closes, so a change applies at once", () => {
+      openSurface("current", files);
+      openSurface("current", diff);
+      withSetting("true");
+      closePanelTab("current", files.id);
+      closePanelTab("current", diff.id);
+      expect(getPanel()).toEqual(entry(true, [], null));
+      withSetting("false");
+      openSurface("current", files);
+      closePanelTab("current", files.id);
+      expect(getPanel()).toEqual(entry(false, [], null));
+    });
+
+    it("a kept panel still hides with togglePanel (cmd+w on no tabs)", () => {
+      withSetting("true");
+      openSurface("current", files);
+      closePanelTab("current", files.id);
+      expect(togglePanel("current", false)).toBe(false);
+      expect(getPanel()).toEqual(entry(false, [], null));
+    });
   });
 
   it("showing asks for focus unless told not to; hiding never does", () => {

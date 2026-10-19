@@ -46,13 +46,18 @@ function isEditable(el: EventTarget): boolean {
 }
 
 /**
- * Closing the panel's last tab hides it. If it had focus, hand focus to the content
- * pane (a thread's prompt, or the page's focus root), so keys keep working.
+ * Closing the panel's last tab hides it, unless appearance.panel_keep_open keeps it open
+ * on the surface list. If it had focus, a hidden panel hands focus to the content pane (a
+ * thread's prompt, or the page's focus root), and a kept one takes it back (the closed
+ * tab's × had it), so keys keep working: cmd+w hides it, the letters open a surface.
  */
 function closeTab(panelKey: string, id: string): void {
   const hadFocus = useUiStore.getState().focus === "panel";
   closePanelTab(panelKey, id);
-  if (hadFocus && !getPanel(panelKey).open) useUiStore.getState().focusContent();
+  if (!hadFocus) return;
+  const after = getPanel(panelKey);
+  if (!after.open) useUiStore.getState().focusContent();
+  else if (after.tabs.length === 0) useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
 }
 
 /** Hides the panel (cmd+w with no tabs) and gives focus to the content pane. */

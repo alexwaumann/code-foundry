@@ -57,6 +57,8 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyThemeLight, in: "sepia", err: `unknown theme "sepia"; light themes are "github-light", "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
+		{key: KeyPanelKeepOpen, in: "true", want: "true"},
+		{key: KeyPanelKeepOpen, in: "yes", err: `want true or false, got "yes"`},
 		{key: KeyThreadWidth, in: "full", want: "full"},
 		{key: KeyThreadWidth, in: "wide", err: `want one of "compact", "comfortable", "full", got "wide"`},
 		{key: KeyClaudePath, in: "wt", err: `want an absolute path, got "wt"`},
@@ -120,7 +122,7 @@ func TestSchemaShape(t *testing.T) {
 	}
 	d := Defaults()
 	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Threads.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
-		d.Appearance.ThreadWidth != "comfortable" ||
+		d.Appearance.ThreadWidth != "comfortable" || d.Appearance.PanelKeepOpen ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Projects.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
 	}

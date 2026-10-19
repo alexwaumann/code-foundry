@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
+import { KEYS, useSettingsStore } from "@/stores/settings";
 import { closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
@@ -339,6 +340,73 @@ describe("the new-tab button and picking", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close #2" }));
     expect(getPanel(KEY)).toEqual({ open: false, tabs: [], activeTabId: null });
     expect(screen.queryByTestId("side-panel")).toBeNull();
+  });
+});
+
+describe("appearance.panel_keep_open", () => {
+  const one = makeTab("pullrequest", "#1", { number: "1" });
+  const two = makeTab("pullrequest", "#2", { number: "2" });
+  const aside = () => screen.getByTestId("side-panel");
+
+  function keepOpen(on: boolean): void {
+    useSettingsStore.setState({ snapshot: { values: { [KEYS.panelKeepOpen]: String(on) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+  }
+
+  beforeEach(() => {
+    vi.spyOn(pullRequestSurface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
+    useUiStore.setState({ focus: "panel", panelFocusSeq: 0 });
+    act(() => {
+      openSurface(KEY, one);
+    });
+  });
+
+  afterEach(() => {
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it("off: the last tab's × hides the panel and hands focus to the content pane", () => {
+    keepOpen(false);
+    const focusContent = vi.spyOn(useUiStore.getState(), "focusContent");
+    render(<SidePanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Close #1" }));
+    expect(getPanel(KEY).open).toBe(false);
+    expect(screen.queryByTestId("side-panel")).toBeNull();
+    expect(focusContent).toHaveBeenCalled();
+  });
+
+  it("on: the last tab's × leaves the surface list showing, with focus in the panel", () => {
+    keepOpen(true);
+    render(<SidePanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Close #1" }));
+    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(screen.getByTestId("panel-empty")).toBeTruthy();
+    expect(screen.queryByTestId("panel-new-tab")).toBeNull();
+    expect(document.activeElement).toBe(aside());
+  });
+
+  it("on: cmd+w closes the last tab and stays; cmd+w again hides the panel", () => {
+    keepOpen(true);
+    act(() => {
+      openSurface(KEY, two);
+    });
+    render(<SidePanel />);
+    fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true });
+    expect(getPanel(KEY).tabs.map((t) => t.id)).toEqual([one.id]);
+    fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true });
+    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(screen.getByTestId("panel-empty")).toBeTruthy();
+    fireEvent.keyDown(aside(), { key: "w", metaKey: true });
+    expect(getPanel(KEY).open).toBe(false);
+    expect(screen.queryByTestId("side-panel")).toBeNull();
+  });
+
+  it("on: middle click on the last tab leaves the panel open", () => {
+    keepOpen(true);
+    render(<SidePanel />);
+    const wrapper = screen.getByRole("tab", { name: "#1" }).parentElement;
+    if (!wrapper) throw new Error("no tab wrapper");
+    fireEvent(wrapper, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
   });
 });
 
