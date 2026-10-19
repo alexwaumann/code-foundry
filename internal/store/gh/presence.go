@@ -74,7 +74,7 @@ func (s *Store) PresenceChanged(from, to Presence) {
 	cfg := s.config()
 	now := s.opts.Now()
 	s.mu.Lock()
-	idle := len(s.tracked) == 0 && len(s.watches) == 0
+	idle := len(s.tracked) == 0 && len(s.watches) == 0 && len(s.prWatches) == 0
 	interval := nextInterval(cfg, to, idle, s.opts.IdleInterval)
 	soon := false
 	if to > from {
