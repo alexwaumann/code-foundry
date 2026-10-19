@@ -59,8 +59,8 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    `--notify` child from a wake turn, `thread send --id <child>` WITHOUT `--wait` and end
    the turn: `send --wait` there holds back your other children's wakes. A `--notify`
    subscription fires again on every later settle of that child, including after your
-   follow-ups. Never run a plain `thread wait` right after a `thread send`: it returns
-   the previous turn's status at once; use `send --wait`.
+   follow-ups. `thread send` prints the message's ordinal; a plain `thread wait` after it
+   waits for the answer to that message (or pass `--after <ordinal>`).
 
    `needs attention (finished)` is a turn that ended normally. A wake saying "finished
    without a report" or "(report is from before its last message)" has `report_stale:
@@ -109,8 +109,9 @@ worktrees Code Foundry made whose work is merged into origin/<default> and that 
 uncommitted changes and no thread (archived ones do not count), terminal or workspace on
 them. It never deletes branches. Run it when the user says a PR merged, not at the start
 of an orchestration: it is project-wide, and another orchestrator's fresh worktrees may
-be eligible. There is no merge notification yet: never assume a PR merged, and never
-remove worktrees any other way (`git worktree remove`, `project worktree remove`).
+be eligible. Never assume a PR merged: wait for the user, or for a
+`thread subscribe --pr <owner/name#N> --until merged` wake. Never remove worktrees any
+other way (`git worktree remove`, `project worktree remove`).
 
 ## Conventions
 
