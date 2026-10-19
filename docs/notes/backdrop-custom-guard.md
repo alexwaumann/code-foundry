@@ -75,3 +75,30 @@ showed a dead option. Custom now exists only while it has something to show.
   forest, nothing while loading).
 - e2e: `settings.spec.ts` removes the last image and checks the list is Forest and None;
   `start.spec.ts` expects the forest for a gone file.
+
+## Verified live (2026-10-19)
+
+`make build && make gui-build`, isolated `CODE_FOUNDRY_HOME=/tmp/cf-backdrop-shots`, one
+self-generated 1600x900 PNG (`/tmp/cf-gen/tide.png`, procedural).
+
+- CLI with no image: `settings set appearance.backdrop custom` exits 2 with
+  `invalid settings: appearance.backdrop: custom needs an image: add one under Settings ›
+  Appearance › Backdrop first`; with `backdrop_file` set to a name not in the folder, the
+  "is not in the backdrops folder" message.
+- Settings › Appearance with no image: the select lists Forest (default) and None only.
+- Import (`SettingsService/ImportBackdrop` over the daemon socket, see the gotcha): the row
+  showed Custom with the thumbnail selected, and the list offered Custom.
+- × on the thumbnail: the copy deleted, the file had `backdrop = "forest"` and no
+  `backdrop_file`, the select showed Forest and the gallery was gone.
+- The file hand-edited to `backdrop = "custom"`, `backdrop_file = "gone.png"`: the select
+  showed Forest and the start page drew the forest art.
+- The same rows in the light scheme. Screenshots (dark and light, no image and with one) are
+  in the PR body.
+
+## Gotchas
+
+- Driving the native open panel with synthesized keys did not work this time: the panel is
+  out of process, and Cmd-Shift-G went to whichever app had key focus (another app's
+  terminal received the typed path once). The import was made over the daemon socket
+  with curl (`Authorization: Bearer $(cat daemon.token)`) instead, and the row remounted by
+  switching pages. The panel path itself is unchanged by this PR.
