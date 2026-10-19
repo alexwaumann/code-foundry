@@ -1,13 +1,19 @@
 import { create } from "@bufbuild/protobuf";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientKind, EventSchema, type WatchEventsRequest } from "@/gen/codefoundry/v1/events_pb";
 import type { DaemonConnection } from "./endpoint";
-import { reportVisibility, watchEvents } from "./events";
+import { reportClientState, watchEvents } from "./events";
 import { onVisibilityChange } from "./stream";
 
 function setVisibility(state: DocumentVisibilityState): void {
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
   document.dispatchEvent(new Event("visibilitychange"));
+}
+
+let focused = true;
+
+function setFocus(f: boolean): void {
+  focused = f;
 }
 
 /**
@@ -17,7 +23,7 @@ function setVisibility(state: DocumentVisibilityState): void {
 function fakeDaemon() {
   const d = {
     requests: [] as Partial<WatchEventsRequest>[],
-    sets: [] as { clientId: string; visible: boolean }[],
+    sets: [] as { clientId: string; visible: boolean; focused: boolean }[],
     joined: true,
     release: (): void => undefined,
   };
@@ -38,9 +44,9 @@ function fakeDaemon() {
         yield create(EventSchema, { event: { case: "heartbeat", value: {} } });
       }
     },
-    setClientState: (req: { clientId: string; visible: boolean }) => {
+    setClientState: (req: { clientId: string; visible: boolean; focused: boolean }) => {
       if (!d.joined) return Promise.reject(new Error("not found"));
-      d.sets.push({ clientId: req.clientId, visible: req.visible });
+      d.sets.push({ clientId: req.clientId, visible: req.visible, focused: req.focused });
       return Promise.resolve({});
     },
   };
@@ -69,13 +75,20 @@ function consume(conn: DaemonConnection) {
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
+beforeEach(() => {
+  setFocus(true);
+  vi.spyOn(document, "hasFocus").mockImplementation(() => focused);
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   setVisibility("visible");
 });
 
 describe("EventService.Watch client state", () => {
-  it("opens as a GUI client with a fresh id and the page's visibility", async () => {
+  it("opens as a GUI client with a fresh id and the page's visibility and focus", async () => {
     setVisibility("hidden");
+    setFocus(false);
     const { d, conn } = fakeDaemon();
     const a = consume(conn);
     const first = a.next();
@@ -85,12 +98,13 @@ describe("EventService.Watch client state", () => {
     a.stop();
     const b = consume(conn);
     setVisibility("visible");
+    setFocus(true);
     void b.next();
     await tick();
     b.stop();
     expect(d.requests).toHaveLength(2);
-    expect(d.requests[0]).toMatchObject({ clientKind: ClientKind.GUI, visible: false });
-    expect(d.requests[1]).toMatchObject({ clientKind: ClientKind.GUI, visible: true });
+    expect(d.requests[0]).toMatchObject({ clientKind: ClientKind.GUI, visible: false, focused: false });
+    expect(d.requests[1]).toMatchObject({ clientKind: ClientKind.GUI, visible: true, focused: true });
     expect(d.requests[0]?.clientId).toMatch(/^[0-9a-f]{24}$/);
     expect(d.requests[1]?.clientId).not.toBe(d.requests[0]?.clientId);
   });
@@ -103,21 +117,50 @@ describe("EventService.Watch client state", () => {
     await tick();
     d.release();
     await first;
-    await reportVisibility(); // the first message's catch-up: nothing changed
+    await reportClientState(); // the first message's catch-up: nothing changed
     expect(d.sets).toEqual([]);
-    const unwatch = onVisibilityChange(() => void reportVisibility());
+    const unwatch = onVisibilityChange(() => void reportClientState());
     setVisibility("hidden");
-    await reportVisibility();
+    await reportClientState();
     setVisibility("hidden"); // no change: no listener call, nothing sent
-    await reportVisibility();
+    await reportClientState();
     setVisibility("visible");
-    await reportVisibility();
+    await reportClientState();
     unwatch();
     s.stop();
     const id = d.requests[0]?.clientId ?? "";
     expect(d.sets).toEqual([
-      { clientId: id, visible: false },
-      { clientId: id, visible: true },
+      { clientId: id, visible: false, focused: true },
+      { clientId: id, visible: true, focused: true },
+    ]);
+  });
+
+  it("reports focus changes too, each once; a flip back before the report sends nothing", async () => {
+    setVisibility("visible");
+    const { d, conn } = fakeDaemon();
+    const s = consume(conn);
+    const first = s.next();
+    await tick();
+    d.release();
+    await first;
+    await reportClientState();
+    setFocus(false); // another app became active: the window still shows
+    await reportClientState();
+    await reportClientState(); // nothing changed since: nothing sent
+    setVisibility("hidden"); // then covered
+    await reportClientState();
+    setVisibility("visible");
+    setFocus(true); // back in front and key, both in one report
+    await reportClientState();
+    setFocus(false);
+    setFocus(true); // a quick flip: the report reads the state it lands on
+    await reportClientState();
+    s.stop();
+    const id = d.requests[0]?.clientId ?? "";
+    expect(d.sets).toEqual([
+      { clientId: id, visible: true, focused: false },
+      { clientId: id, visible: false, focused: false },
+      { clientId: id, visible: true, focused: true },
     ]);
   });
 
@@ -129,20 +172,20 @@ describe("EventService.Watch client state", () => {
     const first = s.next();
     await tick();
     setVisibility("hidden");
-    await reportVisibility(); // NotFound: dropped
+    await reportClientState(); // NotFound: dropped
     expect(d.sets).toEqual([]);
     d.joined = true;
     d.release();
     await first;
-    await reportVisibility(); // chained after the catch-up the first message started
+    await reportClientState(); // chained after the catch-up the first message started
     s.stop();
-    expect(d.sets).toEqual([{ clientId: d.requests[0]?.clientId, visible: false }]);
+    expect(d.sets).toEqual([{ clientId: d.requests[0]?.clientId, visible: false, focused: true }]);
   });
 
   it("sends nothing without an open stream", async () => {
     const { d } = fakeDaemon();
     setVisibility("hidden");
-    await reportVisibility();
+    await reportClientState();
     expect(d.sets).toEqual([]);
   });
 });

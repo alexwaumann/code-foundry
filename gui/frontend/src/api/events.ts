@@ -1,7 +1,7 @@
 import { ClientKind, EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
 import { toActionEventView, type ActionEventView } from "./actions";
 import { daemon, type DaemonConnection } from "./endpoint";
-import { HEARTBEAT, isPageVisible, type Heartbeat } from "./stream";
+import { HEARTBEAT, isPageFocused, isPageVisible, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toPluginEventView, type PluginEventView } from "./plugin";
@@ -91,14 +91,29 @@ export function toEventView(ev: Event): EventView | null {
 }
 
 /**
+ * What the GUI tells the daemon about its window: visible (document.visibilityState)
+ * and focused (the window is key). The daemon paces GitHub polling by whether a GUI is
+ * visible (docs/notes/gh-poll-tiers.md), and counts an open thread view as seen only
+ * while one is visible and focused (docs/notes/alerts-foreground.md).
+ */
+export interface ClientState {
+  visible: boolean;
+  focused: boolean;
+}
+
+/** The page's client state now. */
+export function pageClientState(): ClientState {
+  return { visible: isPageVisible(), focused: isPageFocused() };
+}
+
+/**
  * The open EventService.Watch as the daemon knows it: the client id this stream sent
- * and the visibility the daemon last heard for it. The daemon paces GitHub polling by
- * whether a GUI is connected and visible (docs/notes/gh-poll-tiers.md).
+ * and the state the daemon last heard for it.
  */
 interface Watching {
   id: string;
   conn: DaemonConnection;
-  reported: boolean;
+  reported: ClientState;
 }
 
 let watching: Watching | null = null;
@@ -110,46 +125,46 @@ function newClientId(): string {
 }
 
 /**
- * Tells the daemon the page's current visibility over SetClientState, when the open
- * stream reported something else. Calls run one at a time and each reads the
- * visibility when it runs, so the last word is always the current state. Failures are
- * dropped: before the stream has joined (watchEvents calls this again on its first
- * message), with an older daemon, or once the stream is gone (the next connect sends
- * the state in its request).
+ * Tells the daemon the page's current visibility and focus over SetClientState, when
+ * the open stream reported something else. Calls run one at a time and each reads the
+ * state when it runs, so the last word is always the current state, and a call that
+ * finds nothing changed sends nothing. Failures are dropped: before the stream has
+ * joined (watchEvents calls this again on its first message), with an older daemon, or
+ * once the stream is gone (the next connect sends the state in its request).
  */
-export function reportVisibility(): Promise<void> {
-  reports = reports.then(sendVisibility);
+export function reportClientState(): Promise<void> {
+  reports = reports.then(sendClientState);
   return reports;
 }
 
-async function sendVisibility(): Promise<void> {
+async function sendClientState(): Promise<void> {
   const w = watching;
-  const visible = isPageVisible();
-  if (!w || w.reported === visible) return;
+  const now = pageClientState();
+  if (!w || (w.reported.visible === now.visible && w.reported.focused === now.focused)) return;
   try {
     const c = await w.conn.client(EventService);
-    await c.setClientState({ clientId: w.id, visible }, { timeoutMs: 5_000 });
-    w.reported = visible;
+    await c.setClientState({ clientId: w.id, ...now }, { timeoutMs: 5_000 });
+    w.reported = now;
   } catch {
-    // See reportVisibility.
+    // See reportClientState.
   }
 }
 
 /**
  * Opens EventService.Watch (all sources) as a GUI client with the page's visibility and
- * yields mapped events and HEARTBEAT for heartbeats.
+ * focus and yields mapped events and HEARTBEAT for heartbeats.
  */
 export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EventView | Heartbeat> {
   const c = await conn.client(EventService);
-  const me: Watching = { id: newClientId(), conn, reported: isPageVisible() };
+  const me: Watching = { id: newClientId(), conn, reported: pageClientState() };
   watching = me;
   try {
     let first = true;
-    for await (const ev of c.watch({ clientKind: ClientKind.GUI, clientId: me.id, visible: me.reported }, { signal })) {
+    for await (const ev of c.watch({ clientKind: ClientKind.GUI, clientId: me.id, ...me.reported }, { signal })) {
       if (first) {
         // The daemon has registered the stream: catch up on a change made while it opened.
         first = false;
-        void reportVisibility();
+        void reportClientState();
       }
       if (ev.event.case === "heartbeat") {
         yield HEARTBEAT;

@@ -69,10 +69,16 @@ mirrors the fields.
   events-stream (re)connect (`reconcileSessions`) and by every session snapshot event, so
   startup, a reconnect and a daemon restart (where busy threads turn into "interrupted"
   errors) never alert.
-* **Focus**: `document.hasFocus()` at the evaluation. In WKWebView the page has focus
-  while the window is key: an in-app dialog keeps it, another app takes it. Focus is only
-  read when something enters the set, so no focus listeners are needed. AppKit also
-  ignores the bounce while the app is active.
+* **Focus** (changed in `docs/notes/alerts-foreground.md`): the input is now *attended*,
+  `isPageAttended()` at the evaluation: the page is visible and `document.hasFocus()`.
+  In WKWebView the page has focus while the window is key (an in-app dialog keeps it,
+  another app takes it), and a covered or minimized window reports hidden. It is only
+  read when something enters the set; the focus and blur listeners that exist now are
+  for reporting the state to the daemon, not for this. The daemon applies the same rule
+  over every GUI client: while no window is visible and key, an open thread view no
+  longer acknowledges a finished turn, so the thread in the main pane enters the
+  attention set and alerts like any other (before, it never did). AppKit also ignores
+  the bounce while the app is active.
 * **Cooldown**: one timestamp for the alert as a whole (bounce and, in PR 2, sound fire
   together). The first trigger fires at once; triggers within `cooldown_seconds` of the
   last fired alert are dropped, not queued (a dropped one does not extend it); 0 means

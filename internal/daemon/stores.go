@@ -15,6 +15,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
@@ -85,9 +86,10 @@ type stores struct {
 
 // openStores opens the database, applies migrations, and starts every store. On
 // error, whatever was started is closed again. threadEnv is added to every Claude
-// process's environment (see threadEnv in daemon.go). presence paces the GitHub poll
-// (gh.Options.Presence).
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, presence func() gh.Presence) (_ *stores, err error) {
+// process's environment (see threadEnv in daemon.go). pres is the GUI presence: its
+// kind paces the GitHub poll (gh.Options.Presence), and whether it is attended decides
+// whether an open thread view counts as seen (thread.Options.Attended).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, pres *presence.Tracker) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -117,7 +119,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	ghOpts := gh.Options{
 		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), PollInterval: cfg.GhPollInterval(),
 		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
-		Presence: presence,
+		Presence: func() gh.Presence { return pres.Current().Kind },
 		Config: func() gh.Config {
 			c := s.settings.Settings()
 			return gh.Config{PollInterval: c.GhPollInterval(), Dashboards: c.GitHub.DashboardsEnabled}
@@ -217,6 +219,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// their pull requests in its poll (wake_pr.go).
 		PullRequest:       pullRequestForWake(s.gh),
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
+		// An open thread view counts as the user seeing the thread only while a GUI
+		// window is visible and key (docs/notes/alerts-foreground.md).
+		Attended: func() bool { return pres.Current().Attended },
 	}); err != nil {
 		return nil, err
 	}

@@ -188,7 +188,12 @@ type WatchEventsRequest struct {
 	// stream without one counts with the visibility it opened with.
 	ClientId string `protobuf:"bytes,5,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	// Whether the client's window is visible now (GUI: document.visibilityState).
-	Visible       bool `protobuf:"varint,6,opt,name=visible,proto3" json:"visible,omitempty"`
+	Visible bool `protobuf:"varint,6,opt,name=visible,proto3" json:"visible,omitempty"`
+	// Whether the client's window is key now, so keystrokes go to it (GUI:
+	// document.hasFocus()). A GUI client that is both visible and focused makes the
+	// daemon's presence "attended": only then does an open thread view count as the
+	// user seeing what Claude produces (docs/notes/alerts-foreground.md).
+	Focused       bool `protobuf:"varint,7,opt,name=focused,proto3" json:"focused,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -265,11 +270,21 @@ func (x *WatchEventsRequest) GetVisible() bool {
 	return false
 }
 
+func (x *WatchEventsRequest) GetFocused() bool {
+	if x != nil {
+		return x.Focused
+	}
+	return false
+}
+
 type SetClientStateRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// WatchEventsRequest.client_id of an open stream.
-	ClientId      string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	Visible       bool   `protobuf:"varint,2,opt,name=visible,proto3" json:"visible,omitempty"`
+	ClientId string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	// As WatchEventsRequest.visible.
+	Visible bool `protobuf:"varint,2,opt,name=visible,proto3" json:"visible,omitempty"`
+	// As WatchEventsRequest.focused.
+	Focused       bool `protobuf:"varint,3,opt,name=focused,proto3" json:"focused,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -314,6 +329,13 @@ func (x *SetClientStateRequest) GetClientId() string {
 func (x *SetClientStateRequest) GetVisible() bool {
 	if x != nil {
 		return x.Visible
+	}
+	return false
+}
+
+func (x *SetClientStateRequest) GetFocused() bool {
+	if x != nil {
+		return x.Focused
 	}
 	return false
 }
@@ -648,7 +670,7 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\xfd\x01\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x97\x02\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
 	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
@@ -657,10 +679,12 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\vclient_kind\x18\x04 \x01(\x0e2\x1a.codefoundry.v1.ClientKindR\n" +
 	"clientKind\x12\x1b\n" +
 	"\tclient_id\x18\x05 \x01(\tR\bclientId\x12\x18\n" +
-	"\avisible\x18\x06 \x01(\bR\avisible\"N\n" +
+	"\avisible\x18\x06 \x01(\bR\avisible\x12\x18\n" +
+	"\afocused\x18\a \x01(\bR\afocused\"h\n" +
 	"\x15SetClientStateRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
-	"\avisible\x18\x02 \x01(\bR\avisible\"\x18\n" +
+	"\avisible\x18\x02 \x01(\bR\avisible\x12\x18\n" +
+	"\afocused\x18\x03 \x01(\bR\afocused\"\x18\n" +
 	"\x16SetClientStateResponse\"\x9b\x06\n" +
 	"\x05Event\x128\n" +
 	"\aproject\x18\x01 \x01(\v2\x1c.codefoundry.v1.ProjectEventH\x00R\aproject\x12;\n" +

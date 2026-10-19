@@ -87,8 +87,8 @@ type runner struct {
 	wakePending, wakePub bool
 	wakeTimer            *time.Timer
 
-	// viewers is the number of item watchers (Store.WatchItems). While someone watches,
-	// whatever Claude produces is seen: see acknowledge.
+	// viewers is the number of item watchers (Store.WatchItems). While someone watches
+	// and presence is attended, whatever Claude produces is seen: see acknowledge.
 	viewers int
 }
 
@@ -133,12 +133,13 @@ func timerC(t *time.Timer) <-chan time.Time {
 // acknowledge tells the status that the user has seen everything Claude produced so
 // far, which clears "finished" attention. The rule: acknowledge when a viewer starts
 // watching the thread's items, on every result while at least one viewer watches, and
-// when the user answers a request. Pending requests are unaffected: they last until
-// answered or withdrawn.
+// when presence becomes attended while one watches, each only while presence is
+// attended (attended.go); and when the user answers a request, always. Pending
+// requests are unaffected: they last until answered or withdrawn.
 func (r *runner) acknowledge() { r.st.sd.Acknowledge() }
 
 func (r *runner) acknowledgeIfViewed() {
-	if r.viewers > 0 {
+	if r.viewers > 0 && r.m.attended() {
 		r.acknowledge()
 	}
 }

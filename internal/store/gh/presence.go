@@ -1,32 +1,25 @@
 package gh
 
-import "time"
+import (
+	"time"
 
-// Presence is whether anyone is looking at the GUI, which paces the poll (nextInterval).
-// The daemon derives it from the GUI clients connected to EventService.Watch; the store
-// reads it through Options.Presence and never keeps it.
-type Presence int
+	"github.com/alexwaumann/code-foundry/internal/presence"
+)
+
+// Presence is whether anyone is looking at the GUI, which paces the poll (nextInterval):
+// the Kind of the daemon's presence (internal/presence), which derives it from the GUI
+// clients connected to EventService.Watch. The store reads it through Options.Presence
+// and never keeps it.
+type Presence = presence.Kind
 
 const (
 	// PresenceNone: no GUI client is connected (only the CLI, or nothing).
-	PresenceNone Presence = iota
+	PresenceNone = presence.None
 	// PresenceBackground: GUI clients are connected and every one reports hidden.
-	PresenceBackground
+	PresenceBackground = presence.Background
 	// PresenceForeground: at least one GUI client is visible.
-	PresenceForeground
+	PresenceForeground = presence.Foreground
 )
-
-func (p Presence) String() string {
-	switch p {
-	case PresenceNone:
-		return "none"
-	case PresenceBackground:
-		return "background"
-	case PresenceForeground:
-		return "foreground"
-	}
-	return "unknown"
-}
 
 // tierInterval is the shortest poll interval presence p allows.
 func tierInterval(p Presence) time.Duration {
@@ -50,9 +43,9 @@ func nextInterval(cfg Config, p Presence, idle bool, idleInterval time.Duration)
 	return d
 }
 
-// presence returns the current presence; foreground without Options.Presence. Never
-// call it with s.mu held: the daemon's registry calls PresenceChanged with its own lock
-// held, and PresenceChanged takes s.mu.
+// presence returns the current presence; foreground without Options.Presence. The
+// daemon's Options.Presence reads presence.Tracker.Current, which never waits on a
+// subscriber, so this is safe with or without s.mu held.
 func (s *Store) presence() Presence {
 	if s.opts.Presence == nil {
 		return PresenceForeground

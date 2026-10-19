@@ -31,7 +31,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
-	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -114,16 +114,14 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = tcpLn.Close() }() // no-op once the server has shut it down
 	port := tcpLn.Addr().(*net.TCPAddr).Port
 
-	// The GUI clients of EventService.Watch and their visibility pace the GitHub poll
-	// (docs/notes/gh-poll-tiers.md). ghStore is set before any server starts, so before
-	// any stream can join.
-	var ghStore *gh.Store
-	clients := api.NewClients(func(from, to gh.Presence) {
-		if ghStore != nil {
-			ghStore.PresenceChanged(from, to)
-		}
-	})
-	st, err := openStores(ctx, log, p, threadEnv(port, token), clients.Presence)
+	// The GUI clients of EventService.Watch write the daemon's presence (internal/presence):
+	// whether a window is visible paces the GitHub poll (docs/notes/gh-poll-tiers.md),
+	// whether one is visible and key decides whether an open thread view counts as seen
+	// (docs/notes/alerts-foreground.md). The stores subscribe below, before any server
+	// starts, so before any stream can join.
+	pres := presence.New()
+	clients := api.NewClients(pres)
+	st, err := openStores(ctx, log, p, threadEnv(port, token), pres)
 	if err != nil {
 		// In the log file too: an auto-started daemon's stderr goes nowhere a user
 		// looks (db.ErrNewerSchema, say, after reinstalling an older build).
@@ -131,7 +129,16 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down
-	ghStore = st.gh
+	pres.Subscribe(func(from, to presence.State) {
+		if from.Kind != to.Kind {
+			st.gh.PresenceChanged(from.Kind, to.Kind)
+		}
+	})
+	pres.Subscribe(func(from, to presence.State) {
+		if from.Attended != to.Attended {
+			st.thread.AttendedChanged(to.Attended)
+		}
+	})
 
 	started := time.Now()
 	events := st.bus

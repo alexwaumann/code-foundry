@@ -45,7 +45,7 @@ type eventsFixture struct {
 	done    chan struct{}
 	events  *Events
 	client  codefoundryv1connect.EventServiceClient
-	// clients is the GUI registry; presence records its changes ("none>foreground").
+	// clients is the GUI registry; presence records its changes ("none>foreground+attended").
 	clients  *Clients
 	presence *changeLog
 }
@@ -63,7 +63,8 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	t.Cleanup(upd.Close)
 	f := &eventsFixture{bus: b, project: projecttest.New(b), term: terminaltest.New(b), th: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
 	f.presence = &changeLog{}
-	f.clients = NewClients(f.presence.record)
+	f.clients = NewClients(nil)
+	f.clients.Tracker().Subscribe(f.presence.record)
 	f.events = NewEvents(EventsDeps{Bus: b, Project: f.project, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done, Clients: f.clients})
 	route := f.events.Route()
 	mux := http.NewServeMux()

@@ -74,6 +74,8 @@ type streamState struct {
 	initDone chan initResult
 	cmds     chan threadCmd
 	viewSig  chan struct{}
+	// seenSig: presence became attended while the thread is viewed (attended.go).
+	seenSig chan struct{}
 
 	// pending holds the can_use_tool requests waiting for the user, by request id.
 	// They arrive on the Conn's ordered events, so a request's item lands right after
@@ -170,6 +172,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		initDone: make(chan initResult, 1),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
+		seenSig:  make(chan struct{}, 1),
 		pending:  map[string]*claudestream.PermissionRequest{},
 		effort:   s.Effort, wantEffort: s.Effort,
 	}
@@ -266,6 +269,8 @@ func (r *runner) run() {
 			r.onThreadCmd(cmd)
 		case <-st.viewSig:
 			r.onViewers()
+		case <-st.seenSig:
+			r.onAttended()
 		case <-r.tail.events():
 			r.pollTranscript()
 		case err := <-r.tail.errors():
@@ -734,7 +739,7 @@ func (r *runner) respond(id string, d Decision) (Item, error) {
 func (r *runner) onViewers() {
 	prev := r.viewers
 	r.viewers = r.m.viewerCount(r.id)
-	if r.viewers > prev {
+	if r.viewers > prev && r.m.attended() {
 		r.acknowledge()
 		r.checkStatus()
 	}
