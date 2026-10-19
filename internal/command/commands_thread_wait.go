@@ -43,7 +43,6 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 		Title: "Wait for Thread",
 		Description: "Wait until a thread is idle (Claude not working, no prompt or question pending), " +
 			"needs attention, has an error, or is disconnected; returns at once when it already is. " +
-			"A thread waiting on its child threads counts as idle. " +
 			"Prints the thread's status (--json: the thread). Exits 1 on timeout or removal.",
 		Category:     "Thread",
 		NoKeybinding: true,
