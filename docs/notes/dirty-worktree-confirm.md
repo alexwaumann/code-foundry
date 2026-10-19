@@ -107,4 +107,19 @@ detached or mid-rebase worktree is never marked and never forced.
 
 ## Verified
 
-See the PR body for the end-to-end runs (daemon + CLI, daemon + GUI) and screenshots.
+Built binaries against an isolated `CODE_FOUNDRY_HOME` and scratch repos under `~` with an
+origin (deleted afterwards).
+
+* Daemon + CLI: `worktree remove --yes` on a dirty worktree prints the counts and "--yes
+  does not answer this; re-run with --force to." (exit 2, worktree kept); `--yes --force`
+  removes it; on a pty, y then y removes it. Bulk `cleanup --yes` removes the clean merged
+  worktree, keeps the dirty merged ones and exits 0 with the old result; the dry-run prompt
+  lists them under the new heading. One-path cleanup on a pty: y, y removes it, branch
+  kept. `workspace remove --yes` with two dirty members refuses naming both; interactive
+  y, y removes the workspace; `workspace remove-project --yes` refuses, `--force` removes.
+* Daemon + GUI: the bulk cleanup's two dialogs; Delete Uncommitted Work removed the dirty
+  worktrees (branches kept) with a toast saying so; Cancel toasted the declined result.
+  The single remove's second dialog, then Yes removed it. The GUI was driven through a
+  throwaway dev plugin calling `host/invoke` with `confirm: ask` (no click automation on
+  this machine), which is why the screenshots say "Asked by Ask CF"; from the Projects
+  page the line is absent.
