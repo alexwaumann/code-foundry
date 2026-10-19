@@ -65,6 +65,12 @@ interface ItemBase {
   updatedAtMs: number | null;
   /** Text or tool input still growing through deltas. */
   streaming: boolean;
+  /**
+   * A message Claude read later than it arrived: the ordinal of the item it is shown after
+   * (docs/notes/orch-queued-placement.md); absent for every other item. Order by
+   * stores/thread itemOrder, never by ordinal alone.
+   */
+  placedAfter?: number;
 }
 
 export interface TurnEndView {
@@ -123,8 +129,9 @@ export type ThreadItemView = ItemBase &
      * wake: set when the daemon sent it for a wake subscription (docs/notes/agents-4-wake.md), not the user.
      * resumeNote: the line Claude got before the text after something other than the user stopped its previous turn
      * (the budget stop, another thread's interrupt, an app restart; docs/notes/orch-child-context.md).
+     * queued: set while Claude has not read it yet (sent while it worked; docs/notes/orch-queued-placement.md).
      */
-    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView; resumeNote?: string }
+    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView; resumeNote?: string; queued?: true }
     | { kind: "text"; text: string }
     | { kind: "thinking"; text: string }
     | ({ kind: "tool" } & ToolCallView)
@@ -230,6 +237,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
     createdAtMs: it.createdAt ? timestampMs(it.createdAt) : null,
     updatedAtMs: it.updatedAt ? timestampMs(it.updatedAt) : null,
     streaming: it.streaming,
+    ...(it.placedAfter > 0n ? { placedAfter: Number(it.placedAfter) } : {}),
   };
   const p = it.payload;
   switch (p.case) {
@@ -242,6 +250,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         composerText: p.value.composerText,
         ...(p.value.origin === MessageOrigin.WAKE ? { wake: { title: p.value.wakeTitle, json: p.value.wakeJson } } : {}),
         ...(p.value.resumeNote ? { resumeNote: p.value.resumeNote } : {}),
+        ...(p.value.queued ? { queued: true as const } : {}),
       };
     case "assistantText":
       return { ...base, kind: "text", text: p.value.text };

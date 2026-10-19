@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
 import { useProjectsStore } from "@/stores/projects";
 import { CiteChip } from "./cite/CiteChip";
+import { QueuedTag } from "./QueuedTag";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
@@ -174,7 +175,7 @@ function timeOf(ms: number | null): string {
  * the item carries, lib/userMessage) and citations (cite/CiteChip), attachments (images and PDFs) the text does not
  * refer to as tiles above it, and the time under it. `steer`: a message sent while the
  * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "sent mid-turn · 14:12"
- * under it.
+ * under it. `queued`: Claude has not read it yet (QueuedTag after the time).
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -182,6 +183,7 @@ export const UserBubble = memo(function UserBubble({
   attachments,
   createdAtMs,
   steer = false,
+  queued = false,
   label,
   testId,
 }: {
@@ -190,6 +192,7 @@ export const UserBubble = memo(function UserBubble({
   attachments: readonly string[];
   createdAtMs: number | null;
   steer?: boolean;
+  queued?: boolean;
   /** A small muted line inside the bubble, above the text (a subagent's "Prompt from <parent>"). */
   label?: ReactNode;
   testId?: string;
@@ -242,6 +245,12 @@ export const UserBubble = memo(function UserBubble({
         <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
           <ArrowDown className="size-3" aria-hidden />
           {["sent mid-turn", timeOf(createdAtMs)].filter(Boolean).join(" · ")}
+          {queued && <QueuedTag />}
+        </span>
+      ) : queued ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="when">{timeOf(createdAtMs)}</span>
+          <QueuedTag />
         </span>
       ) : (
         <span className="when">{timeOf(createdAtMs)}</span>
