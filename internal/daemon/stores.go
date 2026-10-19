@@ -72,6 +72,9 @@ type stores struct {
 	// stopWake stops the glue that hands every action run's end to the threads' wake
 	// subscriptions (wake.go).
 	stopWake func()
+	// stopWakePRs stops the glue that hands every pull request change the GitHub poll
+	// sees to the threads' wake subscriptions (wake_pr.go).
+	stopWakePRs func()
 	// stopProjectActivity stops the glue that tells project which worktrees have live
 	// threads and when a thread edited files (projectactivity.go).
 	stopProjectActivity func()
@@ -208,6 +211,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		WorktreeRoot: p.Worktrees(),
 		// Wake subscriptions to action runs read them here (wake.go).
 		ActionRun: actionRunForWake(s.action),
+		// Wake subscriptions to pull requests read the GitHub store's cache and keep
+		// their pull requests in its poll (wake_pr.go).
+		PullRequest:       pullRequestForWake(s.gh),
+		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
 	}); err != nil {
 		return nil, err
 	}
@@ -225,6 +232,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
+	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
@@ -293,6 +301,9 @@ func (s *stores) close() error {
 	}
 	if s.stopWake != nil {
 		s.stopWake()
+	}
+	if s.stopWakePRs != nil {
+		s.stopWakePRs()
 	}
 	if s.stopProjectActivity != nil {
 		s.stopProjectActivity()
