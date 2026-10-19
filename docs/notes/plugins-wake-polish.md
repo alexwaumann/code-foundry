@@ -14,7 +14,8 @@ just never gets `rearm`/`wake/armed`. Tag after merge: `pluginsdk/v0.2.1`.
    the requests `command/invoke`, `surface/open`, `surface/act`. Notifications wait on
    the conn's single notify goroutine, so they reach handlers in the order they came;
    requests wait on their own goroutines. If Init fails (or the host shuts the plugin
-   down first) a held request answers `CodeUnavailable` and no handler runs. Before
+   down first) a held request answers `CodeUnavailable` (or sees the connection close)
+   and no handler runs. Before
    this, the host's re-arm replay right after `initialized` raced Init, so
    test-watcher's `OnWakeSubscribed` had to check whether Init had loaded its settings
    yet and Init re-followed whatever arrived first (`initWakes`).
@@ -97,6 +98,41 @@ just never gets `rearm`/`wake/armed`. Tag after merge: `pluginsdk/v0.2.1`.
   non-semver tags ignored, dirty ignores the tag; the rendered SKILL.md for dirty,
   commit and tagged builds.
 * hello `TestReadShell` (a part-filled screen counts 2), `TestLineCount`.
+
+## End to end (isolated `CODE_FOUNDRY_HOME=~/.cf-wp-e2e`)
+
+`make build plugins`, `daemon --dev`, `plugin dev plugins/examples/hello --yes`, a
+`thread new --no-project --created-by=` thread (no prompt, no Claude turn):
+
+```
+$ code-foundry thread subscribe --id s-6a05a42fd98c --plugin hello/tick --arg every=1h --repeat
+$ code-foundry thread subscribe --id s-6a05a42fd98c --plugin hello/tick --arg every=2h --repeat
+$ code-foundry plugin restart hello
+$ code-foundry plugin logs hello | grep -E "hello is up|tick armed|replayed|re-armed|running|wake subscription"
+22:03:47.092 host       running
+22:03:47.092 log info   hello is up … flags=0 host=dev
+22:03:47.092 log info   wake subscriptions replayed count=0
+22:03:51.087 host       wake subscription sub-337afdc27e34 to tick by s-6a05a42fd98c (every=1h)
+22:03:51.087 log info   tick armed every=1h rearm=false subscription=sub-337afdc27e34
+22:03:51.102 host       wake subscription sub-3771fcca81d2 to tick by s-6a05a42fd98c (every=2h)
+22:03:51.103 log info   tick armed every=2h rearm=false subscription=sub-3771fcca81d2
+22:03:51.122 host       running
+22:03:51.122 host       re-armed 2 wake subscriptions
+22:03:51.122 log info   hello is up … (Init's line, before the replay reaches the handlers)
+22:03:51.122 log info   tick armed every=1h rearm=true subscription=sub-337afdc27e34
+22:03:51.122 log info   tick armed every=2h rearm=true subscription=sub-3771fcca81d2
+22:03:51.122 log info   wake subscriptions replayed count=2
+$ code-foundry plugin hello read-shell        # 8 s after the clock started: a part-filled screen
+Clock t-848056d18157: 4 lines with the scrollback, 4 on the screen   # was 5 on the screen
+$ code-foundry plugin hello read-shell --json | jq -c '{lines, screenLines}'
+{"lines":4,"screenLines":4}
+$ code-foundry thread unsubscribe --id s-6a05a42fd98c --plugin hello/tick   # removed both
+```
+
+The dirty build's installed skill pinned `pluginsdk@main`. After committing, `make build
+PLUGINSDK_TAG=pluginsdk/v0.2.1` (a clean commit, the tag simulated on the make line)
+and a daemon start installed `go get github.com/alexwaumann/code-foundry/pluginsdk@v0.2.1`.
+No ERROR lines in either daemon log; the daemon was stopped and `~/.cf-wp-e2e` removed.
 
 ## Gotchas
 
