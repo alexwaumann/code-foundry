@@ -16,7 +16,7 @@ import { NodeList } from "@/components/plugin/NodeList";
 import { SurfaceFrame } from "@/components/plugin/SurfaceFrame";
 import { ViewTabsBar } from "@/components/plugin/ViewTabsBar";
 import { emptyContext } from "@/stores/context";
-import { applySurfaceUpdate, emptyEntry, reconcileDetails, reconcileResets, settleSubmits, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { applyUpdateToState, emptyEntry, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 
 export const INSTANCE = "fuzz/surface/global";
 
@@ -100,16 +100,13 @@ export function pushView(view: PluginViewModel): void {
   act(() => {
     usePluginSurfacesStore.setState((s) => {
       const e = s.watches.w ?? { ...emptyEntry({ plugin: "fuzz", surface: "surface" }), instance: INSTANCE, phase: "live" as const };
-      const next = applySurfaceUpdate(e, { kind: "view", instance: INSTANCE, version: e.version + 1, view, hostRendered: false });
-      const reset = reconcileResets(s.drafts, s.resetTokens, INSTANCE, view);
-      const settled = settleSubmits(reset.drafts, s.submitted, INSTANCE, view, next.version);
-      return { watches: { ...s.watches, w: next }, resetTokens: reset.resetTokens, ...settled, details: reconcileDetails(s.details, INSTANCE, view) };
+      return applyUpdateToState({ ...s, watches: { ...s.watches, w: e } }, "w", { kind: "view", instance: INSTANCE, version: e.version + 1, view, hostRendered: false });
     });
   });
 }
 
 export function resetSurfaceStore(): void {
-  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {} });
+  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
 }
 
 /** The watch "w"'s view drawn like PluginSurface. */

@@ -85,6 +85,30 @@ export interface PluginSurfacesState {
    * to a key that is not a row (reconcileDetails); Back drops it.
    */
   details: Readonly<Record<string, DetailOpen>>;
+  /**
+   * The user's latest choice per chooser (the view's tabs, a tabs node, a master-detail),
+   * by watch key then chooserKeyOf: what reads as chosen until the plugin's view says
+   * otherwise (chooseElement).
+   */
+  choices: Readonly<Record<string, Readonly<Record<string, Choice>>>>;
+}
+
+/**
+ * A tab or row the user chose, shown as chosen from the click until the plugin's view
+ * shows it after its act was answered (the daemon answers the act when the plugin returns,
+ * and publishes the view the plugin sent meanwhile up to DefaultCoalesce, 100 ms, later;
+ * a view sent before the act can still arrive after the answer), at most CHOICE_HOLD_MS
+ * after the answer; or until the act fails, or a later choice on the same chooser
+ * replaces it.
+ */
+export interface Choice {
+  key: string;
+  /** Orders the choices (a later one replaces an earlier one; the earlier act's answer is then ignored). */
+  seq: number;
+  /** The view version the act named. */
+  version: number;
+  /** The plugin took the act: the next view ends the choice. */
+  answered: boolean;
 }
 
 /** A master-detail showing its detail alone: its resetToken and selected row as last seen. */
@@ -93,7 +117,7 @@ export interface DetailOpen {
   selected: string;
 }
 
-export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {} }));
+export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} }));
 
 /** A tab's watch key: its panel's key and its id. */
 export function watchKeyOf(panelKey: string, tabId: string): string {
@@ -107,6 +131,54 @@ export function watchKeyOf(panelKey: string, tabId: string): string {
  */
 export function draftKeyOf(instance: string, viewTab: string, formKey: string): string {
   return `${instance}\u0000${viewTab}\u0000${formKey}`;
+}
+
+/**
+ * A chooser's key: a tabs node or master-detail by draftKeyOf(instance, scope, node key)
+ * (a master-detail's is also its narrow state's key), the view's tabs by
+ * draftKeyOf(instance, "", "") (node keys are never empty).
+ */
+export function chooserKeyOf(instance: string, scope: string, nodeKey: string): string {
+  return draftKeyOf(instance, scope, nodeKey);
+}
+
+/** The value a chooser has in a view (the active tab, the selected row), or undefined when the view does not show it. */
+export function chooserValue(view: PluginViewModel, instance: string, chooser: string): string | undefined {
+  if (chooser === chooserKeyOf(instance, "", "")) return view.tabs?.active ?? "";
+  const tab = view.tabs?.active ?? "";
+  let out: string | undefined;
+  walkScoped(viewNodes(view), (n, scope) => {
+    if (out !== undefined || (!n.tabs && !n.masterDetail)) return;
+    if (chooserKeyOf(instance, tab + scope, n.key) !== chooser) return;
+    out = n.tabs ? n.tabs.active : (n.masterDetail?.selected ?? "");
+  });
+  return out;
+}
+
+/**
+ * Ends choices (by chooser) against the view on screen: each goes, and a master-detail
+ * the view shows with another row selected than its ended choice goes back to its list
+ * (the plugin did not take the row, or took it and moved on): its detail would show
+ * another row's. One the view does not show keeps its state (reconcileDetails).
+ */
+function endChoices(s: PluginSurfacesState, watchKey: string, ended: readonly string[]): Partial<PluginSurfacesState> {
+  const mine = s.choices[watchKey];
+  if (!mine || ended.length === 0) return {};
+  const e = s.watches[watchKey];
+  let rest: Readonly<Record<string, Choice>> = mine;
+  let details = s.details;
+  for (const chooser of ended) {
+    const c = rest[chooser];
+    if (!c) continue;
+    const { [chooser]: _ended, ...others } = rest;
+    rest = others;
+    const now = chooser in details && e?.view ? chooserValue(e.view, e.instance, chooser) : undefined;
+    if (now !== undefined && now !== c.key) {
+      const { [chooser]: _gone, ...d } = details;
+      details = d;
+    }
+  }
+  return { choices: { ...s.choices, [watchKey]: rest }, details };
 }
 
 export function emptyEntry(ref: Pick<SurfaceRefView, "plugin" | "surface">): SurfaceEntry {
@@ -333,6 +405,32 @@ function setEntry(watchKey: string, f: (e: SurfaceEntry) => SurfaceEntry): void 
   });
 }
 
+/**
+ * The store after one update on a watch (toasts aside): the entry, and for a view the
+ * drafts' reset tokens, settled submits, narrow master-details and the answered choices
+ * that view shows (endChoices). Pure; the same state when nothing changed.
+ */
+export function applyUpdateToState(s: PluginSurfacesState, watchKey: string, u: SurfaceUpdateView): PluginSurfacesState {
+  const e = s.watches[watchKey];
+  if (!e) return s;
+  const next = applySurfaceUpdate(e, u);
+  if (next === e) return s;
+  const watches = { ...s.watches, [watchKey]: next };
+  const view = next.view;
+  if (u.kind !== "view" || !view) return { ...s, watches };
+  const reset = reconcileResets(s.drafts, s.resetTokens, next.instance, view);
+  const settled = settleSubmits(reset.drafts, s.submitted, next.instance, view, next.version);
+  const out: PluginSurfacesState = { ...s, watches, resetTokens: reset.resetTokens, ...settled, details: reconcileDetails(s.details, next.instance, view) };
+  // An answered choice ends with the view that shows it (or no longer shows its chooser);
+  // another view may be an older one still on its way (coalesced before the act).
+  const done = Object.entries(s.choices[watchKey] ?? {}).flatMap(([k, c]) => {
+    if (!c.answered) return [];
+    const now = chooserValue(view, next.instance, k);
+    return now === undefined || now === c.key ? [k] : [];
+  });
+  return { ...out, ...endChoices(out, watchKey, done) };
+}
+
 function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
   if (u.kind === "toast") {
     if (u.level === "error") toast.error(u.text);
@@ -340,17 +438,7 @@ function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
     else toast.info(u.text);
     return;
   }
-  usePluginSurfacesStore.setState((s) => {
-    const e = s.watches[watchKey];
-    if (!e) return s;
-    const next = applySurfaceUpdate(e, u);
-    if (next === e) return s;
-    const watches = { ...s.watches, [watchKey]: next };
-    if (u.kind !== "view" || !next.view) return { watches };
-    const reset = reconcileResets(s.drafts, s.resetTokens, next.instance, next.view);
-    const settled = settleSubmits(reset.drafts, s.submitted, next.instance, next.view, next.version);
-    return { watches, resetTokens: reset.resetTokens, ...settled, details: reconcileDetails(s.details, next.instance, next.view) };
-  });
+  usePluginSurfacesStore.setState((s) => applyUpdateToState(s, watchKey, u));
 }
 
 /**
@@ -374,10 +462,11 @@ export function startSurfaceWatch(watchKey: string, ref: SurfaceRefView): () => 
   return () => {
     stop();
     usePluginSurfacesStore.setState((s) => {
-      if (!(watchKey in s.watches) && !(watchKey in s.pending)) return s;
+      if (!(watchKey in s.watches) && !(watchKey in s.pending) && !(watchKey in s.choices)) return s;
       const { [watchKey]: _w, ...watches } = s.watches;
       const { [watchKey]: _p, ...pending } = s.pending;
-      return { watches, pending };
+      const { [watchKey]: _c, ...choices } = s.choices;
+      return { watches, pending, choices };
     });
   };
 }
@@ -433,6 +522,71 @@ export async function actOnElement(watchKey: string, key: string, opts: ActOptio
   } finally {
     setPending(watchKey, key, false);
   }
+}
+
+/**
+ * How long an answered choice waits for a view that shows it before it ends anyway (a
+ * plugin that takes the act and sends nothing new, chooses something else, or answers
+ * first and sends the view late): well over the daemon's coalescing (100 ms) and its flood
+ * throttle (a view a second). Ending then reconciles (endChoices): a narrow master-detail
+ * whose plugin selected another row goes back to its list.
+ */
+export const CHOICE_HOLD_MS = 5000;
+
+let choiceSeq = 0;
+
+function setChoice(watchKey: string, chooser: string, f: (c: Choice | undefined) => Choice | undefined): void {
+  usePluginSurfacesStore.setState((s) => {
+    const mine = s.choices[watchKey] ?? {};
+    const cur = mine[chooser];
+    const next = f(cur);
+    if (next === cur) return s;
+    const { [chooser]: _was, ...rest } = mine;
+    return { choices: { ...s.choices, [watchKey]: next ? { ...rest, [chooser]: next } : rest } };
+  });
+}
+
+/** Ends the chooser's choice if it is still the one numbered `seq` (endChoices). */
+function endChoice(watchKey: string, chooser: string, seq: number): void {
+  usePluginSurfacesStore.setState((s) => (s.choices[watchKey]?.[chooser]?.seq === seq ? endChoices(s, watchKey, [chooser]) : s));
+}
+
+/**
+ * The user chose a tab or row (`key`) of a chooser (chooserKeyOf): sends its act and shows
+ * it as chosen (useChoice) from now until, after the answer, a view shows it (at most
+ * CHOICE_HOLD_MS), or until the act fails. One rule for the view's tabs, tabs nodes and
+ * master-details. A later choice on the same chooser replaces this one, and this
+ * act's answer then changes nothing: "superseded". Otherwise "took" or "refused" (toasted;
+ * the plugin's own value shows again).
+ */
+export async function chooseElement(watchKey: string, chooser: string, key: string): Promise<"took" | "refused" | "superseded"> {
+  const e = usePluginSurfacesStore.getState().watches[watchKey];
+  if (!e?.instance || e.version === 0) return "refused";
+  const seq = ++choiceSeq;
+  setChoice(watchKey, chooser, () => ({ key, seq, version: e.version, answered: false }));
+  const took = await actOnElement(watchKey, key);
+  const cur = usePluginSurfacesStore.getState().choices[watchKey]?.[chooser];
+  if (cur?.seq !== seq) return "superseded";
+  if (!took) {
+    setChoice(watchKey, chooser, (c) => (c?.seq === seq ? undefined : c));
+    return "refused";
+  }
+  const now = usePluginSurfacesStore.getState().watches[watchKey];
+  if (now?.view && chooserValue(now.view, now.instance, chooser) === key) {
+    // The view with the choice came before the answer.
+    endChoice(watchKey, chooser, seq);
+  } else {
+    setChoice(watchKey, chooser, (c) => (c?.seq === seq ? { ...c, answered: true } : c));
+    setTimeout(() => {
+      endChoice(watchKey, chooser, seq);
+    }, CHOICE_HOLD_MS);
+  }
+  return "took";
+}
+
+/** The chooser's choice in flight (a key), or undefined. */
+export function useChoice(watchKey: string, chooser: string): string | undefined {
+  return usePluginSurfacesStore((s) => s.choices[watchKey]?.[chooser]?.key);
 }
 
 /** Runs a command action with the panel's context (its confirm dialog included), pending meanwhile. */

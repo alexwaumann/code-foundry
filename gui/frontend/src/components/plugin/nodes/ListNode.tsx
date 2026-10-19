@@ -10,7 +10,8 @@ import { toneText } from "../tones";
 
 /**
  * One list row. A row with an action runs it on click (Enter, Space); `onActivate`
- * replaces that (a master-detail's rows: every row chooses), and `selected` the row's own
+ * replaces that (a master-detail's rows: every row chooses, and the chosen one is the
+ * list's current item, aria-current, not a pressed toggle), and `selected` the row's own
  * selected flag (its optimistic choice).
  */
 export function RowView({ row, glyphStyle, dense, onActivate, selected: shown }: { row: Row; glyphStyle: "dot" | "icon"; dense: boolean; onActivate?: () => void; selected?: boolean }) {
@@ -29,8 +30,8 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown }:
     <div
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
-      aria-pressed={clickable ? selected : undefined}
-      aria-current={!clickable && selected ? "true" : undefined}
+      aria-pressed={clickable && !onActivate ? selected : undefined}
+      aria-current={(!clickable || onActivate) && selected ? "true" : undefined}
       className={cn(
         "-mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-ring",
         dense ? "h-6 items-center" : "items-start py-1.5",

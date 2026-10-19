@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useEffect, useState } from "react";
 import { create } from "zustand";
-import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 
 /** Inline live streams (thread and terminal nodes) held at once, across every surface (pluginsdk/ui MaxLiveNodes). */
 export const INLINE_LIVE_MAX = 2;
@@ -118,17 +118,18 @@ export const LeavingNode = createContext(false);
 
 /**
  * Whether the surface is leaving the view tab on screen: the user clicked another of the
- * plugin's tabs and its act is in flight. The old view stays drawn until the plugin's next
+ * plugin's tabs and the plugin's view does not show it yet (stores/pluginSurfaces chooseElement). The old view stays drawn until the plugin's next
  * view, but its live nodes let go now (their streams must not hold up the act). Inside a
  * tabs node or a master-detail's detail the same holds for their own switch (LeavingNode).
  */
 export function useLeavingViewTab(watchKey: string): boolean {
   const node = useContext(LeavingNode);
   const view = usePluginSurfacesStore((s) => {
-    const tabs = s.watches[watchKey]?.view?.tabs;
-    const pending = s.pending[watchKey];
-    if (!tabs || !pending) return false;
-    return tabs.items.some((t) => t.key !== tabs.active && pending[t.key] === true);
+    const e = s.watches[watchKey];
+    const tabs = e?.view?.tabs;
+    if (!e || !tabs) return false;
+    const choice = s.choices[watchKey]?.[chooserKeyOf(e.instance, "", "")]?.key;
+    return choice !== undefined && choice !== tabs.active && tabs.items.some((t) => t.key === choice);
   });
   return node || view;
 }

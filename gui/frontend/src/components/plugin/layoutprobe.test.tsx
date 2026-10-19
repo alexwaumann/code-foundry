@@ -79,7 +79,7 @@ function mount(v: PluginViewModel) {
 }
 
 describe("master-detail: the optimistic choice", () => {
-  it.fails("BUG md-1: a failed earlier choice closes the detail of a later one still in flight (narrow)", async () => {
+  it("BUG md-1: a failed earlier choice closes the detail of a later one still in flight (narrow)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r1") as HTMLElement); // act A
@@ -91,7 +91,7 @@ describe("master-detail: the optimistic choice", () => {
     expect(root()?.dataset.showing).toBe("detail");
   });
 
-  it.fails("BUG md-2: with two choices in flight the list's first pending row shows as chosen, not the last clicked (wide)", () => {
+  it("BUG md-2: with two choices in flight the list's first pending row shows as chosen, not the last clicked (wide)", () => {
     geo.width = 900;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r1") as HTMLElement);
@@ -100,7 +100,7 @@ describe("master-detail: the optimistic choice", () => {
     expect(root()?.dataset.selected).toBe("r3");
   });
 
-  it.fails("BUG md-3: the act answering before the plugin's next view (the daemon coalesces views 100 ms) flashes the list and drops Back's focus (narrow)", async () => {
+  it("BUG md-3: the act answering before the plugin's next view (the daemon coalesces views 100 ms) flashes the list and drops Back's focus (narrow)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r2") as HTMLElement);
@@ -113,7 +113,7 @@ describe("master-detail: the optimistic choice", () => {
     expect(document.activeElement?.getAttribute("data-testid")).toBe("plugin-md-back");
   });
 
-  it.fails("BUG tabs-1: a node tab's act answering before the next view shows the old tab again until it arrives", async () => {
+  it("BUG tabs-1: a node tab's act answering before the next view shows the old tab again until it arrives", async () => {
     mount(view({ key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }], active: "ta", children: [{ key: "a-text", text: { content: "tab A" } }] } }));
     fireEvent.click(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]') as HTMLElement);
     expect(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]')?.getAttribute("aria-selected")).toBe("true");
@@ -154,10 +154,25 @@ describe("master-detail: the optimistic choice", () => {
   });
 });
 
+describe("master-detail: Back", () => {
+  it("md-4: Back focuses the row whose detail it was (the list draws it in the same commit)", async () => {
+    geo.width = 360;
+    mount(view(md({ selected: "" })));
+    fireEvent.click(row("r2") as HTMLElement);
+    await settle(true);
+    pushView(view(md({ selected: "r2" })));
+    expect(root()?.dataset.showing).toBe("detail");
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.click(screen.getByTestId("plugin-md-back"));
+    expect(root()?.dataset.showing).toBe("list");
+    expect(document.activeElement).toBe(row("r2"));
+  });
+});
+
 // md-4 and md-6 (Back in a virtualized list; the owed focus paid later) need real layout:
 // e2e/plugins-layout-fuzz.spec.ts (jsdom's virtualizer draws no rows at all).
 describe("master-detail: focus", () => {
-  it.fails("HARDEN md-7: a refused choice drops focus to the document (Back, which had it, is gone; the row does not get it back)", async () => {
+  it("HARDEN md-7: a refused choice drops focus to the document (Back, which had it, is gone; the row does not get it back)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r2") as HTMLElement);
@@ -208,7 +223,7 @@ describe("scoped state", () => {
 });
 
 describe("fill height", () => {
-  it.fails("BUG fill-1: a fill pane is not re-measured when the nodes above it change height (only the box's resize re-measures)", () => {
+  it("fill-1: a fill pane is re-measured when the nodes above it change height (not only on the box's resize)", async () => {
     geo.height = 700;
     geo.boxes.p = { top: 100 };
     const v = (text: string): PluginViewModel => view({ key: "above", text: { content: text } }, { key: "p", pane: { height: "fill", children: [{ key: "x", text: { content: "x" } }] } });
@@ -218,10 +233,14 @@ describe("fill height", () => {
     // The text above grows (or a section above folds, a notice appears): the pane's top moves to 300; the scroll area keeps its size.
     geo.boxes.p = { top: 300 };
     pushView(v("a much longer text that wraps onto three lines"));
+    // The box's MutationObserver delivers in a microtask, before the next paint.
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(pane()?.style.height).toBe("384px");
   });
 
-  it.fails("BUG fill-2: a fill node keeps its first box when an enclosing pane becomes a box (auto → px) under the same key", () => {
+  it("BUG fill-2: a fill node keeps its first box when an enclosing pane becomes a box (auto → px) under the same key", () => {
     geo.height = 700;
     geo.boxes.outer = { height: 300 };
     const v = (h: "auto" | number): PluginViewModel => view({ key: "outer", pane: { height: h, children: [{ key: "inner", pane: { height: "fill", children: [] } }] } });
@@ -288,7 +307,7 @@ describe("renders", () => {
     }
   });
 
-  it.fails("PERF render-2: a master-detail renders twice for every render of its parent (its inline callback ref detaches and re-attaches, setEl(null) then setEl(el))", () => {
+  it("PERF render-2: a master-detail renders twice for every render of its parent (its inline callback ref detaches and re-attaches, setEl(null) then setEl(el))", () => {
     const c = countRenders("masterDetail");
     const cols = countRenders("columns");
     try {

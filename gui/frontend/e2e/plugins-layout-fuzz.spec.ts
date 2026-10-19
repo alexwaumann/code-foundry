@@ -5,7 +5,8 @@ import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
  * Exploratory layout checks on the mock (WebKit; /tmp/cf-layout-fuzz/gui.md has the
  * findings). Custom views go through the mock's `view:<json>` demo tab and its fuzz controls
  * (`__viewdelay`, `__actdelay`, `__failnext`: mock/plugins.ts fuzzControl). `test.fail()`
- * marks a check that shows a bug today (it passes while the bug is there).
+ * marks a check that shows a bug today (it passes while the bug is there); the bugs fixed
+ * since (docs/notes/plugins-layout-fixes-gui.md) are plain checks now.
  */
 
 const surface = (page: Page) => page.getByTestId("plugin-surface");
@@ -63,7 +64,6 @@ test.beforeEach(async () => {
 });
 
 test("a long list in a sized pane renders its rows as the pane scrolls (virtualized lists and pane scroll)", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG virt-1: VirtualStack follows the surface's scroll area, not the pane it scrolls in");
   await openDemo(page);
   await showView(page, { view: { nodes: [{ key: "box", pane: { height: 300, children: [{ key: "lst", list: { rows: rows(80) } }] } }] } });
   const pane = surface(page).locator('[data-testid="plugin-pane"][data-key="box"]');
@@ -77,7 +77,6 @@ test("a long list in a sized pane renders its rows as the pane scrolls (virtuali
 });
 
 test("a long list in a wide master-detail's detail renders as the detail side scrolls", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG virt-2: the wide detail side scrolls on its own but is not a [data-virtual-root]");
   await page.setViewportSize({ width: 1600, height: 900 });
   await openDemo(page);
   await dragPanel(page, -600);
@@ -93,7 +92,6 @@ test("a long list in a wide master-detail's detail renders as the detail side sc
 });
 
 test("a fill pane follows its top when a section above it folds and unfolds", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG fill-1: useNodeHeight measures on mount and on the box's resize only");
   await openDemo(page);
   await showView(page, {
     view: {
@@ -194,7 +192,6 @@ test("a tabs node with eight long titles at the panel's width scrolls its strip,
 });
 
 test("runs: select and Back thrash with slow acts and coalesced views ends consistent, nothing stuck pending", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG md-3: between the act's answer and the coalesced view the plugin's old selection (and detail) shows again");
   const errors = watchErrors(page);
   await openDemo(page);
   await tab(page, "run-list").click();
@@ -229,7 +226,6 @@ test("runs: select and Back thrash with slow acts and coalesced views ends consi
 });
 
 test("runs: a refused choice after a later one leaves the later one's detail", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG md-1: the earlier act's failure closes the detail of the later choice");
   await openDemo(page);
   await tab(page, "run-list").click();
   await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
@@ -304,7 +300,6 @@ test("Back from a row far down a narrow list scrolls the body to that row", asyn
 });
 
 test("a fill pane in the second of stacked columns follows its top when the columns go side by side", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG fill-3: the box's resize re-measures before the columns re-render side by side, so the fill pane keeps its stacked top");
   await page.setViewportSize({ width: 1600, height: 900 });
   await openDemo(page);
   await showView(page, {
@@ -341,7 +336,6 @@ test("a fill pane in the second of stacked columns follows its top when the colu
 });
 
 test("Back from a row far down a long (virtualized) list focuses that row; the focus is not paid later to a row the plugin selects", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG md-4/md-6: the row is not drawn when the list comes back (virtualized, scrolled to the top), so focus stays owed and jumps later");
   await openDemo(page);
   const spec = (sel: string) => ({
     view: {
@@ -374,8 +368,8 @@ test("Back from a row far down a long (virtualized) list focuses that row; the f
   const stolen = await input.evaluate((el) => el !== document.activeElement);
   const now = await page.evaluate(() => `${document.activeElement?.getAttribute("data-testid") ?? ""}[${document.activeElement?.getAttribute("data-key") ?? ""}]`);
   test.info().annotations.push({ type: "md-6", description: `focus left the search field: ${String(stolen)}, now on ${now}` });
-  expect.soft(stolen, "BUG md-6: the owed focus jumped to the row the plugin selected").toBe(false);
-  expect(back.focused, "BUG md-4: Back did not focus the chosen row").toBe(true);
+  expect(stolen, "md-6: the owed focus must not jump to the row the plugin selects").toBe(false);
+  expect(back.focused, "md-4: Back focuses the chosen row").toBe(true);
 });
 
 test("two flex spacers in one fill pane share its free height; a flex spacer in a strip without a form takes the free width", async ({ page }) => {

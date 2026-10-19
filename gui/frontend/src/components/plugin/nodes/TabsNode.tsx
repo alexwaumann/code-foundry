@@ -1,7 +1,7 @@
 import { useContext, useMemo } from "react";
 import { nodeScope } from "@/api/plugin";
 import { cn } from "@/lib/utils";
-import { actOnElement, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { chooseElement, chooserKeyOf, useChoice } from "@/stores/pluginSurfaces";
 import { useViewCtx, ViewContext } from "../context";
 import { listGap, useInnerList } from "../list";
 import { LeavingNode } from "../live";
@@ -13,7 +13,8 @@ import { TabStrip } from "../TabStrip";
  * A node's own tab strip over the active tab's nodes (docs/notes/plugins-layout-4-master-detail.md):
  * the view's tab strip one step smaller, in the list (not pinned). A click sends a `tab`
  * act on the tab's key (the daemon names this node in it); the clicked tab reads as
- * active while the act is pending, and the old tab's live nodes let go meanwhile
+ * active from the click until the plugin's next view (stores/pluginSurfaces chooseElement),
+ * and the old tab's live nodes let go meanwhile
  * (live.ts LeavingNode). Its nodes are laid out like the list around it; their form drafts
  * are kept per tab (api/plugin.ts nodeScope).
  */
@@ -21,7 +22,10 @@ export function TabsNode({ node, data }: NodeProps<"tabs">) {
   const ctx = useViewCtx();
   const inner = useInnerList();
   const leaving = useContext(LeavingNode);
-  const switching = usePluginSurfacesStore((s) => data.items.find((t) => t.key !== data.active && s.pending[ctx.watchKey]?.[t.key])?.key);
+  const chooser = chooserKeyOf(ctx.instance, ctx.viewTab, node.key);
+  const choice = useChoice(ctx.watchKey, chooser);
+  // The latest tab clicked, while the plugin's view does not show it yet.
+  const switching = choice !== undefined && choice !== data.active && data.items.some((t) => t.key === choice) ? choice : undefined;
   const scope = nodeScope(node);
   const inside = useMemo(() => ({ ...ctx, viewTab: ctx.viewTab + scope }), [ctx, scope]);
   return (
@@ -29,7 +33,7 @@ export function TabsNode({ node, data }: NodeProps<"tabs">) {
       <TabStrip
         items={data.items}
         active={switching ?? data.active}
-        onPick={(key) => void actOnElement(ctx.watchKey, key)}
+        onPick={(key) => void chooseElement(ctx.watchKey, chooser, key)}
         inert={ctx.inert}
         size="sm"
         label="Tabs"
