@@ -77,6 +77,9 @@ func ownedPlugin() pluginsdk.Plugin {
 			"termread": call(func(ctx context.Context, h *pluginsdk.Host, p json.RawMessage) (any, error) {
 				var c pluginsdk.TerminalReadParams
 				_ = json.Unmarshal(p, &c)
+				if c.Scrollback {
+					return h.ReadTerminalWith(ctx, c.TerminalID, pluginsdk.ReadTerminalOptions{Scrollback: true, MaxBytes: c.MaxBytes})
+				}
 				return h.ReadTerminal(ctx, c.TerminalID, c.MaxBytes)
 			}),
 			"exits": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
@@ -252,6 +255,16 @@ func (t fakeTerms) Text(_ context.Context, id string) (string, error) {
 	return "$ date\nSat Oct 18 12:00:00 2026\n" + id, nil
 }
 
+// Scrollback is 300 numbered lines, then Text's screen.
+func (t fakeTerms) Scrollback(ctx context.Context, id string) (string, error) {
+	var b strings.Builder
+	for i := range 300 {
+		fmt.Fprintf(&b, "line %03d\n", i)
+	}
+	screen, _ := t.Text(ctx, id)
+	return b.String() + screen, nil
+}
+
 func (t fakeTerms) Owned(name string) []pluginsdk.PluginTerminal {
 	t.f.mu.Lock()
 	defer t.f.mu.Unlock()
@@ -378,6 +391,14 @@ func TestPluginThreadsAndTerminals(t *testing.T) {
 	}
 	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", MaxBytes: 10}); got != `{"text":"t-p1","truncated":true}` {
 		t.Errorf("read 10 bytes = %s", got)
+	}
+	// With scrollback: the history, then the screen; the head cut at maxBytes.
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", Scrollback: true}); !strings.HasPrefix(got, `{"text":"line 000\nline 001\n`) ||
+		!strings.HasSuffix(got, `line 299\n$ date\nSat Oct 18 12:00:00 2026\nt-p1","lines":303}`) {
+		t.Errorf("read scrollback = %s", got)
+	}
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", Scrollback: true, MaxBytes: 40}); got != `{"text":"$ date\nSat Oct 18 12:00:00 2026\nt-p1","truncated":true,"lines":3}` {
+		t.Errorf("read scrollback 40 bytes = %s", got)
 	}
 	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-shell"}); !strings.HasPrefix(got, "code "+strconv.Itoa(pluginsdk.CodeNotFound)) {
 		t.Errorf("read a shell = %s", got)

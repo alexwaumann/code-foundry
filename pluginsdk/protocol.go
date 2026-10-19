@@ -114,7 +114,8 @@ const (
 	// MethodTerminalList (request): {} → TerminalListResult, the plugin's own terminals.
 	MethodTerminalList = "terminal/list"
 	// MethodTerminalRead (request): TerminalReadParams → TerminalReadResult, the plain
-	// text on one of its terminals' screen.
+	// text on one of its terminals' screen, with Scrollback the history above it too
+	// (capability terminal.scrollback).
 	MethodTerminalRead = "terminal/read"
 )
 
@@ -600,18 +601,25 @@ type PluginTerminal struct {
 }
 
 // TerminalReadParams is terminal/read's params. MaxBytes bounds the text (0: 64 KiB; at
-// most 256 KiB); a longer screen gives its end.
+// most 256 KiB); a longer screen gives its end. Scrollback reads the history above the
+// screen too (MaxBytes 0: 1 MiB; at most 1 MiB).
 type TerminalReadParams struct {
 	TerminalID string `json:"terminalId"`
 	MaxBytes   int    `json:"maxBytes,omitempty"`
+	Scrollback bool   `json:"scrollback,omitempty"`
 }
 
 // TerminalReadResult is terminal/read's answer: the terminal's screen (its rows, not the
 // scrollback above them) as plain text, one line per row, trailing spaces trimmed, no
 // escape sequences. Truncated: only its last MaxBytes, from a line start.
+//
+// With Scrollback, Text is the scrollback the terminal kept (its last 10,000 rows by
+// default, the scrollback lines setting) and the screen below it, oldest line first, a
+// soft-wrapped line as one line; Lines is how many lines Text has.
 type TerminalReadResult struct {
 	Text      string `json:"text"`
 	Truncated bool   `json:"truncated,omitempty"`
+	Lines     int    `json:"lines,omitempty"`
 }
 
 // TerminalExited is terminal/exited's params. ExitCode is the process's exit status,

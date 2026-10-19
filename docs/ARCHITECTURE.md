@@ -323,7 +323,8 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 * Slow subscribers are dropped, not blocked. The PTY reader never stalls on a client.
 * The terminal store is program-agnostic. It spawns argv/env/cwd. Shells are its only
   production use since threads run headless; its Observer and ScreenText hooks remain
-  for a future program that wants them.
+  for a future program that wants them. `ScrollbackText` (scrollback + screen as plain
+  text, from the emulator) serves plugin `terminal/read` with `scrollback`.
 * Resize is driven by the attached GUI terminal; the daemon applies it to the PTY and vt.
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`

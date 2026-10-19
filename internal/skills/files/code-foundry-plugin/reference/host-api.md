@@ -351,5 +351,14 @@ scrollback above them, and at most `maxBytes` of it (0: 64 KiB, at most 256 KiB;
 from a line start, with `Truncated`). When its process exits the plugin gets
 `terminal/exited` `{terminalId, exitCode}` (`Plugin.OnTerminalExit`; 128+n when signal n
 killed it), once; read the screen then rather than polling `Terminals`. For a run whose
-whole output matters, have the command also write it to a file under `h.DataDir()`
-(`Argv: []string{"sh", "-c", "go test ./... 2>&1 | tee " + logPath}`) and read that file on exit.
+whole output matters, read it with the scrollback:
+`h.ReadTerminalWith(ctx, id, pluginsdk.ReadTerminalOptions{Scrollback: true})` returns
+everything the terminal kept, the scrollback then the screen, oldest line first, plain
+like the screen but with a soft-wrapped line as one line, and `Lines`, how many lines
+that is; at most `MaxBytes` (0 and at most: 1 MiB), its end from a line start with
+`Truncated` when longer. A terminal keeps its last 10,000 rows (the user's *Scrollback
+lines* setting, 1,000 to 100,000; a full-screen program on the alternate screen has none),
+so there is no need to `tee` or `script(1)` the run into a file; do that only for output
+beyond those bounds. Check `h.HasCapability("terminal.scrollback")` first: an older
+Code Foundry ignores `Scrollback` and answers the screen. plugintest answers it with
+`SetTerminalScrollback` and records every read (`TerminalReads`).

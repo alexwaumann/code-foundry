@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
@@ -43,6 +44,9 @@ type OwnedTerminals interface {
 	// Text is a terminal's screen as plain text (its rows, not the scrollback), one line
 	// per row, trailing spaces trimmed.
 	Text(ctx context.Context, id string) (string, error)
+	// Scrollback is a terminal's scrollback and screen as plain text, oldest line first,
+	// soft-wrapped rows joined, trailing spaces trimmed.
+	Scrollback(ctx context.Context, id string) (string, error)
 }
 
 // Limits of plugin terminals.
@@ -53,6 +57,11 @@ const (
 	// terminal/read's text: by default, and at most.
 	defaultTerminalRead = 64 << 10
 	maxTerminalRead     = 256 << 10
+	// terminal/read with scrollback: by default and at most.
+	maxScrollbackRead = 1 << 20
+	// maxReadEncoded bounds the text as a JSON string, so the answer fits a protocol line
+	// (pluginsdk.MaxLine) even when most of it is escaped ('<' is six bytes).
+	maxReadEncoded = 3 << 20
 )
 
 func terminalsGranted(p pluginsdk.Permissions) bool { return p.Terminals }
@@ -66,7 +75,7 @@ func init() {
 	} {
 		hostMethods[method] = hostMethod{perm: terminalsGranted, permName: "terminals", handle: fn}
 	}
-	hostCapabilities = append(hostCapabilities, "terminals", "view.node.terminal", "terminal.read", "terminal.exited")
+	hostCapabilities = append(hostCapabilities, "terminals", "view.node.terminal", "terminal.read", "terminal.exited", "terminal.scrollback")
 }
 
 // terminalCreate serves terminal/create.
@@ -163,8 +172,8 @@ func (a *actor) terminalList(context.Context, json.RawMessage) (any, error) {
 	return pluginsdk.TerminalListResult{Terminals: list}, nil
 }
 
-// terminalRead serves terminal/read: the screen's plain text, its end when longer than
-// maxBytes (cut at a line start).
+// terminalRead serves terminal/read: the screen's plain text (with scrollback, the
+// scrollback's and the screen's), its end when longer than maxBytes (cut at a line start).
 func (a *actor) terminalRead(ctx context.Context, params json.RawMessage) (any, error) {
 	const method = pluginsdk.MethodTerminalRead
 	terms := a.m.opts.Terminals
@@ -178,19 +187,55 @@ func (a *actor) terminalRead(ctx context.Context, params json.RawMessage) (any, 
 	if owner, ok := terms.Owner(p.TerminalID); !ok || owner != a.name {
 		return nil, pluginsdk.NewError(pluginsdk.CodeNotFound, "%s: terminal %s is not one of plugin %s's terminals", method, p.TerminalID, a.name)
 	}
-	limit := p.MaxBytes
-	switch {
-	case limit <= 0:
-		limit = defaultTerminalRead
-	case limit > maxTerminalRead:
-		limit = maxTerminalRead
+	limit := readLimit(p.MaxBytes, p.Scrollback)
+	read := terms.Text
+	if p.Scrollback {
+		read = terms.Scrollback
 	}
-	text, err := terms.Text(ctx, p.TerminalID)
+	text, err := read(ctx, p.TerminalID)
 	if err != nil {
 		return nil, ownedError(method, err)
 	}
 	text, cut := tailText(text, limit)
-	return pluginsdk.TerminalReadResult{Text: text, Truncated: cut}, nil
+	for jsonLen(text) > maxReadEncoded {
+		text, cut = tailText(text, len(text)/2)
+	}
+	res := pluginsdk.TerminalReadResult{Text: text, Truncated: cut}
+	if p.Scrollback && text != "" {
+		res.Lines = strings.Count(text, "\n") + 1
+	}
+	return res, nil
+}
+
+// readLimit is terminal/read's byte limit for a maxBytes param.
+func readLimit(maxBytes int, scrollback bool) int {
+	def, most := defaultTerminalRead, maxTerminalRead
+	if scrollback {
+		def, most = maxScrollbackRead, maxScrollbackRead
+	}
+	switch {
+	case maxBytes <= 0:
+		return def
+	case maxBytes > most:
+		return most
+	}
+	return maxBytes
+}
+
+// jsonLen is how long s is as a JSON string (encoding/json's escaping, at most).
+func jsonLen(s string) int {
+	n := 2
+	for _, r := range s {
+		switch {
+		case r == '"' || r == '\\' || r == '\n' || r == '\r' || r == '\t':
+			n += 2
+		case r < 0x20 || r == '<' || r == '>' || r == '&' || r == '\u2028' || r == '\u2029' || r == utf8.RuneError:
+			n += 6
+		default:
+			n += utf8.RuneLen(r)
+		}
+	}
+	return n
 }
 
 // tailText is the last limit bytes of s, from a line start when one is in them (else

@@ -44,7 +44,8 @@ type Plugin struct {
 	// OnEvent receives subscribed events in order.
 	OnEvent func(ctx context.Context, h *Host, ev Event)
 	// OnTerminalExit learns that the process of one of its terminals exited (terminal/
-	// exited): read what it printed with Host.ReadTerminal, close it when done.
+	// exited): read what it printed with Host.ReadTerminal (Host.ReadTerminalWith for the
+	// scrollback too), close it when done.
 	OnTerminalExit func(ctx context.Context, h *Host, ex TerminalExited)
 	// OnSecretChanged learns that the user deleted one of its secrets (`plugin secrets
 	// delete`, Settings): drop what was read from it and ask again (a form, a notice).

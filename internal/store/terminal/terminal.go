@@ -186,6 +186,11 @@ type Store interface {
 	// dialogs: TUIs position text with cursor movement, so the raw output stream does
 	// not contain the words a user sees. Must not be called from an Observer.
 	ScreenText(ctx context.Context, id string) (string, error)
+	// ScrollbackText returns the scrollback (as far as MaxScrollbackLines kept it) and
+	// the screen below it as plain text, oldest line first: soft-wrapped rows joined into
+	// one line, trailing whitespace trimmed, trailing blank rows dropped. On the alternate
+	// screen it is that screen alone. Must not be called from an Observer.
+	ScrollbackText(ctx context.Context, id string) (string, error)
 	// BracketedPaste reports whether the program has turned on bracketed paste (mode
 	// 2004), as a shell's line editor does while it reads a command line: text wrapped
 	// in ESC[200~ … ESC[201~ is then inserted as is (tabs are not completion, newlines

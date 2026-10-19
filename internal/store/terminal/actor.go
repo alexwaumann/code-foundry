@@ -384,6 +384,11 @@ func (a *actor) screenText() (string, error) {
 	return formatActivePlain(a.vt, a.cur.Cols, a.cur.Rows)
 }
 
+// scrollbackText formats the scrollback and the active area as plain text.
+func (a *actor) scrollbackText() (string, error) {
+	return formatScrollbackPlain(a.vt)
+}
+
 // bracketedPaste reports whether the program has turned on mode 2004.
 func (a *actor) bracketedPaste() bool {
 	return modeOf(a.vt, ghostty.ModeBracketedPaste)

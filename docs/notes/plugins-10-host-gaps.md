@@ -98,7 +98,7 @@ signal); it retries in 1s, or run …", exit 1, and the Shell tab's clock termin
   `--version` goes to `Act` as before.
 * `terminal/read` is the screen, not the scrollback: reading the scrollback needs a new
   terminal store method on the emulator's goroutine; host-api.md suggests `tee` to a file
-  for whole-run output.
+  for whole-run output. Since added: `docs/notes/plugins-terminal-scrollback.md`.
 
 ## Not fixed (noted for later)
 
