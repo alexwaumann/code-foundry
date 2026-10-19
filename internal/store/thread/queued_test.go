@@ -104,9 +104,10 @@ func TestQueuedPlacement(t *testing.T) {
 		},
 		{
 			name: "read after the turn's result: the next turn",
-			steps: []string{"idle:u1", replyText("m1", "done"), "send:u2", result(1), lifecycle("u2", "started"),
+			// Probed: the result says queued_turn_count 0 although u2 waits; started follows it.
+			steps: []string{"idle:u1", replyText("m1", "done"), "send:u2", result(0), lifecycle("u1", "completed"), lifecycle("u2", "started"),
 				replyText("m2", "answer to u2"), result(0)},
-			midAt: 3, mid: []string{"u1", "done", "u2*", "end"},
+			midAt: 4, mid: []string{"u1", "done", "u2*", "end"},
 			want:   []string{"u1", "done", "end", "u2", "answer to u2", "end"},
 			placed: []string{"u2"},
 		},
@@ -135,9 +136,9 @@ func TestQueuedPlacement(t *testing.T) {
 			want:  []string{"u1", "Running it", "u2", "A"},
 		},
 		{
-			name:  "no signal by the end of the turn: unqueued where it is",
+			name:  "no signal yet at the end of the turn: still queued",
 			steps: []string{"idle:u1", replyText("m1", "Running it"), "send:u2", toolUse("m1", "A"), toolResult("A"), replyText("m2", "done"), result(0)},
-			want:  []string{"u1", "Running it", "u2", "A", "done", "end"},
+			want:  []string{"u1", "Running it", "u2*", "A", "done", "end"},
 		},
 	}
 	for _, tt := range tests {
@@ -232,8 +233,8 @@ func TestForkKeepsPlacedOrder(t *testing.T) {
 }
 
 // Sent while Claude works (here: waiting on a permission), a message is queued; sent
-// while it does not, it is not. The capture's result (no queued turns left) clears a flag
-// no signal cleared.
+// while it does not, it is not. The capture has no frames for it, so it stays queued until
+// the process ends.
 func TestSendWhileWorkingIsQueued(t *testing.T) {
 	re := newFixtureEnv(t, "write-allow")
 	s := re.create(CreateOptions{Model: "haiku", PermissionMode: PermissionSupervised, InitialPrompt: "create hello.txt"})
@@ -252,7 +253,14 @@ func TestSendWhileWorkingIsQueued(t *testing.T) {
 	if _, err := re.m.Respond(re.ctx(), s.ID, snap.Pending[0].RequestID, Decision{Allow: true}); err != nil {
 		t.Fatal(err)
 	}
-	re.waitItems(s.ID, "the message unqueued", func(items []Item) bool {
+	re.waitFor(s.ID, "the turn's end", func(s Thread) bool { return s.Status != StatusNeedsAttention || s.StatusReason == "finished" })
+	if got := re.items(s.ID).Items; !slices.ContainsFunc(got, func(x Item) bool { return x.ID == it.ID && x.Queued }) {
+		t.Errorf("no signal yet, but the message is not queued: %+v", got)
+	}
+	if _, err := re.m.Archive(re.ctx(), s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	re.waitItems(s.ID, "the message unqueued at the process end", func(items []Item) bool {
 		i := slices.IndexFunc(items, func(x Item) bool { return x.ID == it.ID })
 		return i >= 0 && !items[i].Queued
 	})

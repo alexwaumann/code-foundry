@@ -21,6 +21,8 @@ import (
 // during the reply, still inside the same result), "completed" at the turn's end,
 // "cancelled" when dropped. The next system/status "requesting" lists it in
 // user_message_uuids too, a second signal. An interrupt starts what is queued at once.
+// A message that arrives as the reply ends is started right after the result (whose
+// queued_turn_count is 0 all the same): a turn of its own.
 
 // itemOrder is the log's order: by ordinal, except that a placed message (PlacedAfter)
 // sits right after the item with that ordinal, after any other message placed there
@@ -85,19 +87,6 @@ func (t *threadLog) consume(id string, place bool) (Item, bool) {
 	return it, true
 }
 
-// queuedIDs are the messages still queued, oldest first.
-func (t *threadLog) queuedIDs() []string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	var out []string
-	for _, it := range t.items {
-		if it.Queued {
-			out = append(out, it.ID)
-		}
-	}
-	return out
-}
-
 // consume applies threadLog.consume and persists the item.
 func (w itemWriter) consume(id string, place bool) (Item, bool) {
 	it, ok := w.log.consume(id, place)
@@ -123,13 +112,9 @@ func (p *projector) queueEvent(ev claudestream.Event) {
 				p.w.consume(id, true)
 			}
 		}
-	case *claudestream.Result:
-		// Safety net: with nothing left in Claude's queue every message was read, so a
-		// flag still set missed its signal. Where Claude read it is unknown: it stays.
-		if e.QueuedTurnCount == 0 {
-			for _, id := range p.w.log.queuedIDs() {
-				p.w.consume(id, false)
-			}
-		}
 	}
+	// No safety net at a result: a message that arrives while Claude ends its reply is
+	// not counted in the result's queued_turn_count (0) and starts the next turn right
+	// after it. A flag that never sees its signal clears when the process ends
+	// (closeUnfinished).
 }
