@@ -19,7 +19,7 @@ func (h *Thread) addDetail(ctx context.Context, s thread.Thread, p *v1.Thread) e
 		return err
 	}
 	d := thread.DetailOf(s, items.Items)
-	p.Pending = pendingDetailToProto(d.Pending)
+	p.Pending, p.ReportStale = pendingDetailToProto(d.Pending), d.ReportStale
 	return nil
 }
 

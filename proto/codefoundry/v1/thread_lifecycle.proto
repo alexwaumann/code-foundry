@@ -285,6 +285,10 @@ message Thread {
   // The request a "permission: …" or "question: …" status describes; set by
   // ThreadService.Get with with_detail only.
   ThreadPendingDetail pending = 59;
+  // The report was made before the thread's last message (a follow-up or a wake), so it
+  // describes an older turn: the wake's report_stale rule. Set by ThreadService.Get with
+  // with_detail only.
+  bool report_stale = 60;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -610,8 +614,9 @@ message RemovedThread {
 
 message GetThreadRequest {
   string id = 1;
-  // Also read the thread's items for Thread.pending (thread.get): the detail a wake
-  // carries. Unset leaves it empty and reads nothing.
+  // Also read the thread's items for Thread.pending and report_stale (thread.get,
+  // thread.reports): the detail a wake carries. Unset leaves them empty and reads
+  // nothing.
   bool with_detail = 2;
 }
 

@@ -662,7 +662,11 @@ type Thread struct {
 	IsCaller bool `protobuf:"varint,58,opt,name=is_caller,json=isCaller,proto3" json:"is_caller,omitempty"`
 	// The request a "permission: …" or "question: …" status describes; set by
 	// ThreadService.Get with with_detail only.
-	Pending       *ThreadPendingDetail `protobuf:"bytes,59,opt,name=pending,proto3" json:"pending,omitempty"`
+	Pending *ThreadPendingDetail `protobuf:"bytes,59,opt,name=pending,proto3" json:"pending,omitempty"`
+	// The report was made before the thread's last message (a follow-up or a wake), so it
+	// describes an older turn: the wake's report_stale rule. Set by ThreadService.Get with
+	// with_detail only.
+	ReportStale   bool `protobuf:"varint,60,opt,name=report_stale,json=reportStale,proto3" json:"report_stale,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1094,6 +1098,13 @@ func (x *Thread) GetPending() *ThreadPendingDetail {
 		return x.Pending
 	}
 	return nil
+}
+
+func (x *Thread) GetReportStale() bool {
+	if x != nil {
+		return x.ReportStale
+	}
+	return false
 }
 
 // ThreadFlag is one plugin's flag on a thread (Thread.flags).
@@ -2753,8 +2764,9 @@ func (x *RemovedThread) GetReportAt() *timestamppb.Timestamp {
 type GetThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Also read the thread's items for Thread.pending (thread.get): the detail a wake
-	// carries. Unset leaves it empty and reads nothing.
+	// Also read the thread's items for Thread.pending and report_stale (thread.get,
+	// thread.reports): the detail a wake carries. Unset leaves them empty and reads
+	// nothing.
 	WithDetail    bool `protobuf:"varint,2,opt,name=with_detail,json=withDetail,proto3" json:"with_detail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4462,7 +4474,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbf\x13\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe2\x13\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -4530,7 +4542,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x10plugin_env_stale\x188 \x01(\bR\x0epluginEnvStale\x12*\n" +
 	"\x11plugin_env_change\x189 \x01(\tR\x0fpluginEnvChange\x12\x1b\n" +
 	"\tis_caller\x18: \x01(\bR\bisCaller\x12=\n" +
-	"\apending\x18; \x01(\v2#.codefoundry.v1.ThreadPendingDetailR\apendingJ\x04\b\t\x10\n" +
+	"\apending\x18; \x01(\v2#.codefoundry.v1.ThreadPendingDetailR\apending\x12!\n" +
+	"\freport_stale\x18< \x01(\bR\vreportStaleJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xf5\x01\n" +
 	"\n" +
 	"ThreadFlag\x12\x16\n" +

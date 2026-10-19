@@ -2,6 +2,7 @@ package commandtest
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -102,7 +103,8 @@ func (s *Thread) List(_ context.Context, r *connect.Request[v1.ListThreadsReques
 	return connect.NewResponse(res), nil
 }
 
-// Get returns Current with the requested id.
+// Get returns Current with the requested id; without Current, the thread in Others
+// with that id, if any.
 func (s *Thread) Get(_ context.Context, r *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -110,6 +112,8 @@ func (s *Thread) Get(_ context.Context, r *connect.Request[v1.GetThreadRequest])
 	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_CONNECTED}
 	if s.Current != nil {
 		cur = proto.CloneOf(s.Current)
+	} else if i := slices.IndexFunc(s.Others, func(o *v1.Thread) bool { return o.GetId() == r.Msg.GetId() }); i >= 0 {
+		cur = proto.CloneOf(s.Others[i])
 	}
 	cur.Id = r.Msg.GetId()
 	return connect.NewResponse(&v1.GetThreadResponse{Thread: cur}), nil

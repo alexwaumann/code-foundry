@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -11,6 +12,30 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
+
+// Get with with_detail says whether the report predates the last message (E6 §4.2).
+func TestThreadGetDetailReportStale(t *testing.T) {
+	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name   string
+		detail bool
+		want   bool
+	}{{"with detail", true, true}, {"without", false, false}} {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newThreadServer(t)
+			fake.Put(thread.Thread{ID: "s-1", State: thread.StateConnected, Status: thread.StatusBusy,
+				Report: thread.Report{Status: thread.ReportDone, Summary: "ok", At: t0}})
+			fake.PutItems("s-1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "now the other one", CreatedAt: t0.Add(time.Minute)})
+			res, err := c.Get(context.Background(), connect.NewRequest(&v1.GetThreadRequest{Id: "s-1", WithDetail: tt.detail}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Msg.GetThread().GetReportStale(); got != tt.want {
+				t.Errorf("report_stale = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 // Get with with_detail reads the pending request from the items as a wake does (W2
 // finding 4: after respond said "1 more pending", get --json had no pending).

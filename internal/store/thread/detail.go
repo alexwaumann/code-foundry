@@ -8,6 +8,10 @@ type Detail struct {
 	// Pending is the request a "permission: …" or "question: …" status describes; nil
 	// otherwise.
 	Pending *PendingDetail
+	// ReportStale: the thread has a report made before its last user message (a
+	// follow-up or a wake), so it describes an older turn. The wake's report_stale
+	// without its "no report" half.
+	ReportStale bool
 }
 
 // PendingDetail is a pending permission prompt or question as a wake's JSON carries
@@ -19,5 +23,5 @@ type PendingDetail = wakePending
 // DetailOf reads t's Detail from its items.
 func DetailOf(t Thread, items []Item) Detail {
 	d := wakeDetailOf(t, items, wakeChildren{})
-	return Detail{Pending: d.pending}
+	return Detail{Pending: d.pending, ReportStale: d.staleReport}
 }

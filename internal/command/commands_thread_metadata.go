@@ -73,6 +73,11 @@ func labelList(s *v1.Thread) string {
 	return strings.Join(s.GetLabels(), ", ")
 }
 
+// staleNote follows a report made before its thread's last message (Thread.report_stale,
+// the wake's rule), whose status thread.get and thread.reports mark with "*" (E6 §4.2,
+// W4 finding 5: a superseded done looked current).
+const staleNote = "(report predates its last message)"
+
 // threadDetail is thread.get's text: one "key: value" line per fact the thread has.
 // names resolves the creator (threadNames): its current name, or the recorded one and
 // "removed".
@@ -105,11 +110,17 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	}
 	if st := reportStatusName(s.GetReportStatus()); st != "" {
 		r := "report: " + st
+		if s.GetReportStale() {
+			r += "*"
+		}
 		if s.GetReportSummary() != "" {
 			r += ": " + s.GetReportSummary()
 		}
 		if at := s.GetReportAt(); at != nil {
 			r += " (" + at.AsTime().Local().Format(time.DateTime) + ")"
+		}
+		if s.GetReportStale() {
+			r += " " + staleNote
 		}
 		lines = append(lines, r)
 		if s.GetReportData() != "" {
