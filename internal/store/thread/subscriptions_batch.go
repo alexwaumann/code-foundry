@@ -54,7 +54,8 @@ type threadWakePart struct {
 
 // wakeSiblings counts the subscriber's live children (created_by it, not archived) for
 // a wake about one of them: Settled of Total, the target(s) included as they fired;
-// Working and Pending (a permission prompt or question waiting) list the others.
+// Working and Pending (a permission prompt or question waiting) list the others. A
+// lead waiting on its workers (siblingsOf) is working.
 type wakeSiblings struct {
 	Settled int                  `json:"settled"`
 	Total   int                  `json:"total"`
@@ -220,7 +221,8 @@ func heldLeadWake(p threadWakePart) bool {
 }
 
 // siblingsOf counts subscriber's live children for parts' wakes about them, nil when
-// none is about one: the targets as they fired, the others as snap has them.
+// none is about one: the targets as they fired, the others as snap has them. A lead
+// with a progress report and workers still running counts as working.
 func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wakeSiblings {
 	fired := map[string]Thread{}
 	for _, p := range parts {
@@ -232,9 +234,16 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wake
 		return nil
 	}
 	kids := make([]Thread, 0, len(snap.Threads))
+	busyKids := map[string]int{} // working children per thread: a lead's workers
 	for _, k := range snap.Threads {
-		if k.CreatedBy == subscriber && k.ArchivedAt.IsZero() && !k.Removing {
+		if !k.ArchivedAt.IsZero() || k.Removing {
+			continue
+		}
+		if k.CreatedBy == subscriber {
 			kids = append(kids, k)
+		}
+		if k.CreatedBy != "" && !Meets(CondSettled, k) {
+			busyKids[k.CreatedBy]++
 		}
 	}
 	slices.SortFunc(kids, func(a, b Thread) int { return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID)) })
@@ -245,7 +254,10 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wake
 			k = f
 		}
 		s.Total++
-		settled := Meets(CondSettled, k)
+		// A lead that settled with a progress report while its workers run is waiting
+		// on them (its wake was held): still working.
+		waiting := !isTarget && k.Report.Status == ReportProgress && busyKids[k.ID] > 0
+		settled := Meets(CondSettled, k) && !waiting
 		if settled {
 			s.Settled++
 		}

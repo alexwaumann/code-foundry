@@ -103,9 +103,9 @@ func TestWakeBatchWindow(t *testing.T) {
 					time.Sleep(s.sleep)
 				}
 			}
-			items := b.waitItems(b.parent.ID, "the wakes", func(items []Item) bool { return sum(wakeSizes(t, items)) == sum(tt.want) })
+			b.waitItems(b.parent.ID, "the wakes", func(items []Item) bool { return sum(wakeSizes(t, items)) == sum(tt.want) })
 			time.Sleep(w / 3) // nothing more comes
-			items = b.items(b.parent.ID).Items
+			items := b.items(b.parent.ID).Items
 			if got := wakeSizes(t, items); !slices.Equal(got, tt.want) {
 				t.Errorf("messages = %v, want %v:\n%s", got, tt.want, describeItems(items))
 			}
@@ -211,6 +211,15 @@ func TestSiblingsOf(t *testing.T) {
 	other.CreatedBy = "q"
 	removing := kid("s-rm", busy)
 	removing.Removing = true
+	withReport := func(th Thread, st ReportStatus) Thread {
+		th.Report = Report{Status: st, Summary: "x"}
+		return th
+	}
+	worker := func(id, lead string, s step) Thread {
+		w := kid(id, s)
+		w.CreatedBy = lead
+		return w
+	}
 	tests := []struct {
 		name    string
 		threads []Thread
@@ -227,6 +236,14 @@ func TestSiblingsOf(t *testing.T) {
 				Pending: []wakeSiblingPending{{"s-3", "ns-3", "permission: Edit README.md"}}}},
 		{"a stopped child's old prompt is not pending", []Thread{kid("s-1", finished), kid("s-2", offAsking)}, []Thread{kid("s-1", finished)},
 			&wakeSiblings{Settled: 2, Total: 2, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}},
+		// A lead with a progress report whose own workers run is still working (its
+		// settled wake was held); with a done report, or its workers settled, it is not.
+		{"a lead waiting on its workers is working",
+			[]Thread{kid("s-1", busy), withReport(kid("s-2", finished), ReportProgress), worker("w-1", "s-2", busy),
+				withReport(kid("s-3", finished), ReportDone), worker("w-2", "s-3", busy),
+				withReport(kid("s-4", finished), ReportProgress), worker("w-3", "s-4", finished)},
+			[]Thread{kid("s-1", finished)},
+			&wakeSiblings{Settled: 3, Total: 4, Working: []wakeSibling{{"s-2", "ns-2"}}, Pending: []wakeSiblingPending{}}},
 		{"two targets in a batch are not listed", []Thread{kid("s-1", busy), kid("s-2", busy), kid("s-3", busy)},
 			[]Thread{kid("s-1", finished), kid("s-2", askBash)},
 			&wakeSiblings{Settled: 2, Total: 3, Working: []wakeSibling{{"s-3", "ns-3"}}, Pending: []wakeSiblingPending{}}},
