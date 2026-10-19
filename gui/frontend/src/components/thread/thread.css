@@ -926,7 +926,8 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .ccard.docked {
   background: var(--card);
 }
-.cf-thread .ccard[data-dragging] {
+.cf-thread .ccard[data-dragging],
+.cf-thread .ccard.file-drop-target-active {
   border-color: color-mix(in oklab, var(--info) 70%, transparent);
 }
 .cf-thread .pend-stack {

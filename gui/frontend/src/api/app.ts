@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Bounce, Info, PickDirectory, PlaySound, Relaunch, SetBadge, SetWindowBackground, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Bounce, Info, PickDirectory, PickFiles, PlaySound, Relaunch, SetBadge, SetWindowBackground, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -12,6 +12,9 @@ export const EVENT_CHECK_FOR_UPDATES = "app:check-for-updates";
 
 /** Emitted by app menu items that run a command in the window; data is its name (gui/menu.go EventRunCommand). */
 export const EVENT_RUN_COMMAND = "app:run-command";
+
+/** Emitted when files from the OS are dropped on a `data-file-drop-target` element (gui/filedrop.go EventFilesDropped). */
+export const EVENT_FILES_DROPPED = "app:files-dropped";
 
 const INFO_TIMEOUT_MS = 2000;
 
@@ -48,6 +51,46 @@ export async function openExternal(url: string): Promise<void> {
 export async function pickDirectory(startDir: string): Promise<string | null> {
   const path = await PickDirectory(startDir);
   return path === "" ? null : path;
+}
+
+/**
+ * Shows the native open panel for attaching (files and folders, several, no type filter),
+ * opened at startDir when it is an existing directory, else at home (gui/filedrop.go).
+ * Resolves to the chosen absolute paths ([] when cancelled), or null without a host.
+ */
+export async function pickFiles(startDir: string): Promise<string[] | null> {
+  if (!(await appInfo())) return null;
+  const paths = await PickFiles(startDir);
+  return paths ?? [];
+}
+
+/** A native file drop (gui/filedrop.go FilesDropped). */
+export interface FilesDroppedView {
+  /** Absolute paths of the dropped files and folders. */
+  paths: string[];
+  /** The drop target's `data-drop-id` ("" when it has none). */
+  target: string;
+}
+
+/** The event's data as a FilesDroppedView, or null when it is not one. */
+export function filesDroppedOf(data: unknown): FilesDroppedView | null {
+  if (typeof data !== "object" || data === null) return null;
+  const { paths, target } = data as { paths?: unknown; target?: unknown };
+  if (!Array.isArray(paths) || typeof target !== "string") return null;
+  const list = paths.filter((p): p is string => typeof p === "string" && p !== "");
+  return list.length > 0 ? { paths: list, target } : null;
+}
+
+/**
+ * Calls fn with each native file drop on a `data-file-drop-target` element (the host's
+ * overlay takes OS file drags, so the page gets no DOM drop for them). Never fires
+ * without a host. Returns an unsubscribe.
+ */
+export function onFilesDropped(fn: (drop: FilesDroppedView) => void): () => void {
+  return Events.On(EVENT_FILES_DROPPED, (ev) => {
+    const drop = filesDroppedOf(ev.data);
+    if (drop) fn(drop);
+  });
 }
 
 /**

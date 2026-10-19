@@ -9,6 +9,7 @@ import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { findTrigger, LEAF_CHAR, type TriggerChar } from "@/lib/completion";
+import { spacedAtCaret } from "@/lib/droppedPaths";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece, type PromptTag } from "@/lib/prompt";
 import { TagDraftContext, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
 import { TagNode } from "./tagNode";
@@ -48,6 +49,13 @@ export interface PromptEditorHandle {
   insertCite(citationId: string): void;
   /** Focuses the prompt with the selection collapsed to its end (a clicked tag is no longer selected). */
   focusCollapsed(): void;
+  /**
+   * Puts plain text (dropped or picked paths) at the caret, replacing a selection (the
+   * end of the prompt when it was never focused), with a space on either side where the
+   * text would otherwise touch a word (lib/droppedPaths spacedAtCaret), and leaves the
+   * caret after it. One undo step. Does nothing while the prompt is disabled.
+   */
+  insertPlain(text: string): void;
 }
 
 interface PromptEditorProps {
@@ -388,6 +396,22 @@ export function PromptEditor({
       focusCollapsed: () => {
         if (editor.isDestroyed) return;
         editor.chain().focus().setTextSelection(editor.state.selection.to).run();
+      },
+      insertPlain: (text) => {
+        if (editor.isDestroyed || !editor.isEditable || text === "") return;
+        const { state } = editor;
+        const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
+        const { $from, $to } = sel;
+        const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
+        const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
+        const insert = spacedAtCaret(text, before, after);
+        editor
+          .chain()
+          .focus()
+          .insertContentAt({ from: sel.from, to: sel.to }, { type: "text", text: insert })
+          .setTextSelection(sel.from + insert.length)
+          .scrollIntoView()
+          .run();
       },
       insertText: (range, text) => {
         const { doc } = editor.state;

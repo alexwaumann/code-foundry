@@ -87,6 +87,10 @@ func main() {
 		URL:              "/",
 		// Shown below, once the webview stops painting its own background.
 		Hidden: true,
+		// A native overlay takes file drags from the OS and hands the paths of a drop on a
+		// `data-file-drop-target` element to the page (filedrop.go; WebKit never exposes a
+		// dropped File's path).
+		EnableFileDrop: true,
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHiddenInset,
 			// No native drag band. A native band drags on any mouse-down in it, before the
@@ -95,6 +99,7 @@ func main() {
 		},
 	})
 	appService.window = window
+	forwardFileDrops(window)
 	// Wails shows a window once its page has loaded (WebViewDidFinishNavigation), but
 	// WebKit composites the page a moment later; until then an opaque webview shows its
 	// empty-page colour (#1e1e1e in dark mode) instead of BackgroundColour. So the

@@ -43,6 +43,9 @@ Three processes, one protocol.
   `docs/notes/dock-alerts.md`). It paints the window behind the page in the active
   theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
   `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`).
+  It takes file drags from the OS (`EnableFileDrop`) and hands a drop's paths and its
+  target's `data-drop-id` to the page (`app:files-dropped`), and shows the open panel
+  for attaching (`PickFiles`; `docs/notes/attach-drop.md`).
   No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call

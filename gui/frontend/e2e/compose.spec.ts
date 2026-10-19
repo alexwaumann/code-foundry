@@ -402,6 +402,46 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
+/** What the Wails host sends for a native drop (gui/filedrop.go), dispatched the way the runtime delivers it. */
+async function nativeDrop(page: Page, paths: string[], target: string): Promise<void> {
+  await page.evaluate(
+    ([data]) => {
+      (window as unknown as { _wails: { dispatchWailsEvent(e: unknown): void } })._wails.dispatchWailsEvent({ name: "app:files-dropped", data });
+    },
+    [{ paths, target }],
+  );
+}
+
+test("a native drop: images and PDFs staged by path and attached, other paths inserted; the send reuses the staged paths", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  const card = page.getByTestId("composer-card");
+  await expect(card).toHaveAttribute("data-file-drop-target", "");
+  const id = (await card.getAttribute("data-drop-id")) ?? "";
+  expect(id).not.toBe("");
+  await page.getByTestId("composer-input").fill("Compare");
+
+  // Another target's drop is not this composer's.
+  await nativeDrop(page, ["/Users/me/elsewhere.txt"], "not-this-one");
+  await nativeDrop(page, ["/Users/me/shot.png", "/Users/me/my notes.txt", "/Users/me/spec.PDF", "/Users/me/src"], id);
+  await expect(page.getByTestId("attachment")).toHaveCount(2);
+  await expect(page.getByTestId("prompt-chip")).toHaveCount(2);
+  await expect(prompt(page)).toHaveAttribute("data-value", /^Compare "\/Users\/me\/my notes\.txt" \/Users\/me\/src !\[shot\.png\]\(cf-attachment:\/\/a\d+\) !\[spec\.PDF\]\(cf-attachment:\/\/a\d+\) $/);
+  // Staged side by side, so in either order.
+  expect((await staged()).map((a) => [a.name, a.mimeType]).sort()).toEqual([
+    ["shot.png", "image/png"],
+    ["spec.PDF", "application/pdf"],
+  ]);
+
+  await page.getByTestId("composer-input").press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
+  // Staged once, at the drop; sent in the draft's order.
+  const up = await staged();
+  expect(up).toHaveLength(2);
+  const path = (name: string) => up.find((a) => a.name === name)?.path ?? "";
+  expect((await invocations()).at(-1)?.args.attachments).toBe(`${path("shot.png")},${path("spec.PDF")}`);
+});
+
 test("the draft survives switching away; Backspace goes back; Esc on an empty draft shows the project", async ({ page }) => {
   await openApp(page);
   await compose(page, 3);

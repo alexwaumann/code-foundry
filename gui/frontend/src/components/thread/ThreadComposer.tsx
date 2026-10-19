@@ -8,6 +8,7 @@ import { ATTACHMENT_ACCEPT, Attachments } from "@/components/compose/Composer";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
+import { attachLabel, useHostFiles } from "@/components/compose/useHostFiles";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource, type CompletionSource } from "@/components/compose/useCompletion";
 import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/compose/useRefSources";
@@ -185,6 +186,10 @@ export function ThreadComposer({
   const bySource: Record<TriggerChar, CompletionSource> = { "/": slashSource, "@": mentionSource, "#": prSource };
   const completion = useCompletion(trigger, setTrigger, bySource[trigger?.char ?? "/"], editorRef);
   const sending = phase !== "idle";
+  // Native drops and the native open panel (in the Wails host); the panel opens in the
+  // thread's checkout, else home (a thread without a project).
+  const worktreePath = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  const hostFiles = useHostFiles({ draftKey, editorRef, disabled: sending, startDir: worktreePath });
   // The daemon takes a message in any state: a stopped thread starts on it.
   const canSend = !sending && (text.trim() !== "" || hasAttachments);
 
@@ -307,6 +312,9 @@ export function ThreadComposer({
         className={cn("ccard", docked && "docked")}
         data-testid="thread-composer"
         data-dragging={dragging || undefined}
+        // A native drop (Wails host) lands here by this id; the runtime marks the card
+        // file-drop-target-active while a drag from the OS is over it (thread.css).
+        {...hostFiles.dropTarget}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
@@ -401,15 +409,18 @@ export function ThreadComposer({
             data-testid="thread-permission-mode"
           />
           {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label="Attach images or PDFs">
+          <Tip label={attachLabel(hostFiles.hosted)}>
             <span className="ml-auto flex">
               <button
                 type="button"
                 disabled={sending}
-                aria-label="Attach images or PDFs"
+                aria-label={attachLabel(hostFiles.hosted)}
                 data-testid="thread-attach"
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-                onClick={() => fileRef.current?.click()}
+                onClick={() => {
+                  if (hostFiles.hosted) hostFiles.pick();
+                  else fileRef.current?.click();
+                }}
               >
                 <Paperclip className="size-4" />
               </button>
