@@ -19,11 +19,12 @@ export MACOSX_DEPLOYMENT_TARGET := 13.0
 export CGO_CFLAGS  := -mmacosx-version-min=13.0
 export CGO_LDFLAGS := -mmacosx-version-min=13.0
 
-# libghostty-vt (static) is built from a pinned ghostty commit into third_party/ghostty-vt
-# by `make ghostty-vt` (scripts/ghostty-vt.sh holds the pins). The Go bindings find it via
+# libghostty-vt (static) is built from a pinned ghostty commit into a per-user cache
+# shared by all worktrees (scripts/ghostty-vt.sh holds the pins and the cache layout;
+# override the root with GHOSTTY_VT_CACHE). The Go bindings find it via
 # pkg-config. The generated .pc hardcodes this absolute prefix, so the directory cannot
 # be moved after building.
-GHOSTTY_VT_PREFIX := $(CURDIR)/third_party/ghostty-vt
+GHOSTTY_VT_PREFIX := $(shell ./scripts/ghostty-vt.sh --print-prefix)
 GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.pc
 export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
@@ -185,8 +186,10 @@ promote:
 	@sleep 5
 	@gh run list --workflow release.yml --event workflow_dispatch --limit 1 --json url --jq '.[0].url'
 
-## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 (both
-## downloaded into third_party/, gitignored). No-op once the pkg-config file exists.
+## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 into the
+## shared per-user cache (~/Library/Caches/code-foundry/ghostty-vt/<key>/, override with
+## GHOSTTY_VT_CACHE). zig and the source are deleted after the build. No-op once the
+## pkg-config file exists.
 ghostty-vt:
 	@./scripts/ghostty-vt.sh
 

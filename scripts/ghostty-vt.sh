@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Builds libghostty-vt (static) from a pinned ghostty commit with a pinned zig into
-# third_party/ghostty-vt. Idempotent: exits early when the pkg-config file exists.
-# Called by `make ghostty-vt`. See docs/notes/phase1a-terminal.md.
+# Builds libghostty-vt (static) from a pinned ghostty commit with a pinned zig into a
+# per-user cache shared by every checkout and worktree:
+#   $GHOSTTY_VT_CACHE/<key>/ghostty-vt   (default ~/Library/Caches/code-foundry/ghostty-vt)
+# where <key> is `--print-key` (ghostty commit + zig version + arch). Idempotent: exits
+# early when the pkg-config file exists. zig and the ghostty source are build
+# intermediates and are deleted after a successful build. Called by `make ghostty-vt`;
+# the Makefile reads the prefix with `--print-prefix`. See docs/notes/phase1a-terminal.md
+# and docs/notes/ghostty-vt-shared-cache.md.
 #
 # The Go bindings (go.mitchellh.com/libghostty, pinned in go.mod) track a specific
 # ghostty commit; bump GHOSTTY_COMMIT only together with that module version.
@@ -16,18 +21,25 @@ ZIG_SHA256_aarch64="b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d40
 ZIG_SHA256_x86_64="0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7"
 # ----------------------------------------------------------------------------------------
 
-# `ghostty-vt.sh --print-key` prints a cache key for CI.
-if [[ "${1:-}" == "--print-key" ]]; then
-	printf 'ghostty-vt-%s-zig-%s-%s\n' "${GHOSTTY_COMMIT}" "${ZIG_VERSION}" "$(uname -m)"
-	exit 0
-fi
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-THIRD_PARTY="${ROOT}/third_party"
-PREFIX="${THIRD_PARTY}/ghostty-vt"
-SRC="${THIRD_PARTY}/ghostty-src"
-ZIG_DIR="${THIRD_PARTY}/zig"
+KEY="ghostty-vt-${GHOSTTY_COMMIT}-zig-${ZIG_VERSION}-$(uname -m)"
+CACHE="${GHOSTTY_VT_CACHE:-${HOME}/Library/Caches/code-foundry/ghostty-vt}"
+PREFIX="${CACHE}/${KEY}/ghostty-vt"
+BUILD="${CACHE}/${KEY}/build"
+SRC="${BUILD}/ghostty-src"
+ZIG_DIR="${BUILD}/zig"
 PC="${PREFIX}/share/pkgconfig/libghostty-vt-static.pc"
+
+# `--print-key` prints the cache key (CI uses it); `--print-prefix` the install prefix.
+case "${1:-}" in
+--print-key)
+	printf '%s\n' "${KEY}"
+	exit 0
+	;;
+--print-prefix)
+	printf '%s\n' "${PREFIX}"
+	exit 0
+	;;
+esac
 
 log() { printf 'ghostty-vt: %s\n' "$*" >&2; }
 
@@ -48,7 +60,7 @@ x86_64) ARCH=x86_64 ZIG_SHA256="${ZIG_SHA256_x86_64}" ;;
 	;;
 esac
 
-mkdir -p "${THIRD_PARTY}"
+mkdir -p "${BUILD}"
 
 # ---- zig -------------------------------------------------------------------------------
 ZIG_NAME="zig-${ARCH}-macos-${ZIG_VERSION}"
@@ -109,4 +121,6 @@ if [[ ! -f "${PC}" ]]; then
 	log "build finished but ${PC} is missing"
 	exit 1
 fi
-log "done"
+# zig and the ghostty source (~800 MB) are only needed to produce the ~13 MB prefix.
+rm -rf "${BUILD}"
+log "done: ${PREFIX}"
