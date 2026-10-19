@@ -1,8 +1,11 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +40,28 @@ func TestKnownRejectNoticeKeyCollides(t *testing.T) {
 		in.reject("P", []string{"x: bad"}, true)
 		if out := string(in.renderLocked()); strings.Count(out, `"key":"cf-invalid-view"`) > 1 {
 			t.Errorf("two elements keyed cf-invalid-view: %s", out)
+		}
+	}
+}
+
+// FuzzOwnedParams crasher (2026-10-19): a terminal/create without a title takes
+// filepath.Base(argv[0]) as its title without the one-line and length rules the given
+// title gets (terminals.go:109-111), so a newline or more than 80 bytes reach the store.
+func TestKnownTerminalTitleFromArgv(t *testing.T) {
+	knownIssue(t)
+	home := t.TempDir()
+	for _, params := range []string{
+		`{"argv":["/bin/a\nb"]}`,
+		"{\"Argv\":[\"" + strings.Repeat("\xb8", 27) + "\"]}", // 27 U+FFFD after decoding: 81 bytes
+	} {
+		terms := &recordingTerms{}
+		m := &Manager{log: slog.New(slog.DiscardHandler), opts: Options{Home: home, DataDir: filepath.Join(home, "data"), Terminals: terms}}
+		a := &actor{m: m, name: "p", logs: newLogBuffer(filepath.Join(home, "p.log"), 1<<20, 10, time.Now)}
+		if _, err := a.terminalCreate(context.Background(), json.RawMessage(params)); err != nil {
+			continue // refused: fine
+		}
+		if s := terms.term; strings.ContainsAny(s.Title, "\r\n\x00") || len(s.Title) > maxTerminalTitle {
+			t.Errorf("%q: title %q (%d bytes)", params, s.Title, len(s.Title))
 		}
 	}
 }
