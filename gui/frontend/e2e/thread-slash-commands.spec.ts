@@ -7,7 +7,8 @@ import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
  * the user's skills as before, a plugin's under "Skills", Claude Code's own under "Claude
  * Code" (plain text when inserted); aliases match. A message starting with a command the
  * app replaces is refused with the daemon's text under the composer, the text kept. Set
- * SHOTS=<dir> to save screenshots.
+ * SHOTS=<dir> to save screenshots (the card in both schemes: its light pass runs only then,
+ * nothing in it is theme-specific). Matching and aliases: src/lib/completion.test.ts.
  */
 
 test.beforeEach(async () => {
@@ -39,7 +40,9 @@ const labels = (page: Page) => card(page).getByTestId("completion-label");
 const headings = (page: Page) => card(page).getByTestId("completion-group");
 const prompt = (page: Page) => page.getByTestId("thread-composer").getByTestId("composer-prompt");
 
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+
+for (const scheme of schemes) {
   test(`the card groups the running thread's commands, Claude Code last (${scheme})`, async ({ page }) => {
     await openThread(page, scheme);
     await page.keyboard.type("/");
@@ -57,19 +60,6 @@ for (const scheme of ["dark", "light"] as const) {
     await shot(page, `slash-card-${scheme}`);
   });
 }
-
-test("/co matches code-review and compact; /cost finds usage through its alias", async ({ page }) => {
-  await openThread(page);
-  await page.keyboard.type("/co");
-  // Name prefixes in Claude's order, then usage through its alias "cost"; with name matches
-  // around, description matches (simplify's "code") are left out.
-  await expect(labels(page)).toHaveText(["/commit", "/code-review", "/compact", "/context", "/usage"]);
-  await expect(headings(page)).toHaveText(["User", "Claude Code"]);
-  await page.keyboard.type("st");
-  await expect(labels(page)).toHaveText(["/usage"]);
-  // Aliases only match: the row does not list them.
-  await expect(card(page)).not.toContainText("stats");
-});
 
 test("a built-in inserts plain text; a skill keeps its tag; the text goes as typed", async ({ page }) => {
   await openThread(page);

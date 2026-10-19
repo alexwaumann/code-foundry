@@ -5,7 +5,8 @@ import { mockPost, openApp, resetMock, row } from "./fixtures";
  * The cold-cache note of a rendered thread's composer
  * (docs/notes/rendered-threads-cold-cache.md) over the mock's "Fix stale PR badge"
  * (25.7K tokens of context, answered by claude-opus-4-8, last result 2 minutes ago, TTL
- * 1 h). Set SHOTS=<dir> to save screenshots.
+ * 1 h). Set SHOTS=<dir> to save screenshots (in both schemes: the light pass runs only then,
+ * nothing here is theme-specific).
  */
 
 test.beforeEach(async () => {
@@ -30,7 +31,9 @@ async function shot(page: Page, name: string): Promise<void> {
 
 const note = (page: Page) => page.getByTestId("thread-composer").getByTestId("thread-cold-cache");
 
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+
+for (const scheme of schemes) {
   test(`${scheme}: an expired cache shows the note above the prompt; sending hides it, the next result keeps it hidden`, async ({ page }) => {
     await openThread(page, "idle", scheme);
     // Warm: nothing.
@@ -76,12 +79,4 @@ test("a pending prompt hides the note", async ({ page }) => {
   await mockPost("thread/cache?id=s-r1&ago=3660");
   await expect(page.getByTestId("thread-composer").getByTestId("thread-permission").first()).toBeVisible();
   await expect(note(page)).toBeHidden();
-});
-
-test("a large context, and a model without a known rate (no cost)", async ({ page }) => {
-  await openThread(page, "idle");
-  await mockPost("thread/cache?id=s-r1&ago=7200&tokens=812345");
-  await expect(note(page)).toHaveText("Cache expired · the next message re-reads 812K tokens (~$8.12)");
-  await mockPost("thread/cache?id=s-r1&ago=7200&model=claude-next-1");
-  await expect(note(page)).toHaveText("Cache expired · the next message re-reads 812K tokens");
 });

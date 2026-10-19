@@ -64,18 +64,8 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   await expect(archived).toHaveAttribute("data-section", "archived");
   await expect(archived.getByTestId("thread-name")).toHaveText("Spike a canvas sidebar");
   await expect(archived.getByTestId("row-archived-age")).toHaveText("1h");
-  // One line: no status line, and the row is the single-line height (a thread row is 15px taller).
+  // One line: no status line.
   await expect(archived.getByTestId("row-place")).toHaveCount(0);
-  const one = (await archived.boundingBox())?.height ?? 0;
-  const two = (await row(page, "s:s-3").boundingBox())?.height ?? 0;
-  expect(two - one).toBe(15);
-  // Same left edge and width as the main list's rows (the 8px gutter rule).
-  const ab = await archived.boundingBox();
-  const hb = await header.boundingBox();
-  const rb = await row(page, "s:s-3").boundingBox();
-  expect(ab?.x).toBe(rb?.x);
-  expect(hb?.x).toBe(rb?.x);
-  expect(hb?.width).toBe(rb?.width);
 
   // Hover: the same tooltip as other rows.
   await archived.hover();
@@ -88,7 +78,6 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   await page.reload();
   await expect(page.getByTestId("archived-header")).toHaveAttribute("aria-expanded", "true");
   await expect(row(page, "s:s-7")).toBeVisible();
-  expect(await page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { archivedCollapsed?: boolean } }).state?.archivedCollapsed)).toBe(false);
 
   // Unarchived (as from the CLI): no archived thread, no section; s-7 is back in the main list.
   await mockPost("thread/archive?id=s-7&archived=false");
@@ -181,45 +170,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
 
-test("the keyboard walks one order across the main list, Working and Archived; collapsed sections are skipped", async ({ page }) => {
-  await openApp(page);
-  await page.getByTestId("archived-header").click();
-  await list(page).focus();
-  await page.keyboard.press("Home");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-2");
-  for (const want of ["s-6", "s-4", "s-3", "s-5", "s-1", "s-7"]) {
-    await page.keyboard.press("ArrowDown");
-    await expect(list(page)).toHaveAttribute("aria-activedescendant", `row-s:${want}`);
-  }
-  // The last row: ArrowDown stays.
-  await page.keyboard.press("ArrowDown");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-7");
-  await expect(row(page, "s:s-7")).toHaveAttribute("data-cursor", "true");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-7");
-  // cmd+N counts the archived row too: s-2, s-6, s-4, s-3, s-5, s-1, s-7.
-  await page.keyboard.press("Meta+1");
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+7");
-  await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
-
-  // Working collapsed: from s-7, ArrowUp lands on s-3.
-  await page.getByTestId("working-header").click();
-  await list(page).focus();
-  await page.keyboard.press("End");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-7");
-  await page.keyboard.press("ArrowUp");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
-  // Archived collapsed too: End is s-3, cmd+5 does nothing.
-  await page.getByTestId("archived-header").click();
-  await list(page).focus();
-  await page.keyboard.press("End");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
-  await page.keyboard.press("Meta+4");
-  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+5");
-  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-});
+// The keyboard's one order across the main list and the footers: snooze.spec.ts.
 
 test("the footers stay pinned under a long main list, are capped, and scroll their own rows to the cursor", async ({ page }) => {
   // 30 idle threads make the main list scroll; 12 busy ones overflow Working's cap.

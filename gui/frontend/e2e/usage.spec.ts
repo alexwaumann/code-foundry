@@ -30,27 +30,16 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("U opens the thread's usage: cost, tokens and requests, per model and per token kind", async ({ page }) => {
+test("U opens the thread's usage over the daemon's figures", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+Shift+e");
   await expect(empty(page).locator('[data-surface="usage"]')).toBeVisible();
   await page.keyboard.press("u");
   await expectUsageTab(page);
-
+  // The figures and their layout: src/surfaces/usage.test.tsx.
   await expect(surface(page).getByTestId("usage-cost")).toHaveText("$237.82");
-  await expect(surface(page).getByTestId("usage-summary")).toHaveText("362M tokens · 412 requests");
   await expect(surface(page).getByTestId("usage-model-name")).toHaveText(["claude-opus-5-5", "claude-fable-5-1"]);
-  await expect(surface(page).getByTestId("usage-model-meta")).toHaveText(["261M tokens · 290 requests", "101M tokens · 122 requests"]);
-  await expect(surface(page).getByTestId("usage-model-cost")).toHaveText(["$129.54", "$108.28"]);
-  await expect(surface(page).getByTestId("usage-model-share")).toHaveText(["54.5%", "45.5%"]);
-  await expect(surface(page).getByTestId("usage-unpriced")).toHaveCount(0);
-  await expect(surface(page).getByTestId("usage-kind-tokens")).toHaveText(["12.9K", "980K", "349M", "1.5M", "10.7M"]);
-  await expect(surface(page).getByTestId("usage-kind-cost")).toHaveText(["$0.07", "$27.40", "$74.65", "$10.50", "$125.20"]);
-
-  // The swatch is the model's slot colour (opus: blue).
-  const bg = await surface(page).getByTestId("usage-swatch").first().evaluate((e) => getComputedStyle(e).backgroundColor);
-  expect(bg).toMatch(/rgb\((42, 120, 214|57, 135, 229)\)|#(2a78d6|3987e5)|color\(srgb/);
 });
 
 test("a thread without usage says so, then fills in live; an unknown model is unpriced", async ({ page }) => {

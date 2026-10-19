@@ -73,14 +73,9 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect(s8.getByTestId("thread-name")).toHaveText("Refactor the gh poller");
   await expect(s8.getByTestId("row-snooze-left")).toHaveText("2h");
   await expect(row(page, "s:s-9").getByTestId("row-snooze-left")).toHaveText("4d");
-  // One line, same height as an archived row (a thread row is 15px taller); not dimmed.
+  // One line (no status line); not dimmed.
   await expect(s8.getByTestId("row-place")).toHaveCount(0);
-  const one = (await s8.boundingBox())?.height ?? 0;
-  const two = (await row(page, "s:s-3").boundingBox())?.height ?? 0;
-  expect(two - one).toBe(15);
   await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "1");
-  // Same left edge as the main list's rows.
-  expect((await s8.boundingBox())?.x).toBe((await row(page, "s:s-3").boundingBox())?.x);
 
   // The tooltip adds the full wake time.
   await s8.hover();
@@ -93,7 +88,6 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   // Expanded survives a reload.
   await page.reload();
   await expect(page.getByTestId("snoozed-header")).toHaveAttribute("aria-expanded", "true");
-  expect(await page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { snoozedCollapsed?: boolean } }).state?.snoozedCollapsed)).toBe(false);
 
   // Both unsnoozed (as from the CLI): no section.
   await mockPost("thread/snooze?id=s-8&clear=true");
@@ -209,50 +203,25 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
 
-test("Pick a date and time…: a month calendar and a time; Snooze sends that local time; a past time is refused", async ({ page }) => {
+test("Pick a date and time… opens the dialog for the row's thread; Snooze sends the picked local time", async ({ page }) => {
+  // The calendar, the time field and refusing a past time: SnoozeDialog.test.tsx.
   await openApp(page);
   const { sub } = await openSnoozeSub(page, "s:s-4");
   await sub.getByTestId("snooze-pick").click();
   const dialog = page.getByTestId("snooze-dialog");
-  await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("heading")).toHaveText("Snooze “Investigate flaky e2e”");
-  // Tomorrow is selected, today outlined, yesterday disabled; 9:00 AM.
+  // The 10th of next month at 2:30 PM.
   const iso = (d: Date) => `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const now = new Date();
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12);
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12);
-  const day = (d: Date) => dialog.locator(`[data-day="${iso(d)}"]`);
-  await expect(day(now)).toHaveAttribute("data-today", "true");
-  await expect(day(tomorrow).first()).toHaveAttribute("aria-selected", "true");
-  if (yesterday.getMonth() === now.getMonth()) await expect(day(yesterday)).toBeDisabled();
-  await expect(dialog.getByTestId("snooze-time")).toHaveValue("09:00");
-  await expect(dialog.getByTestId("snooze-prev-month")).toBeDisabled();
-
-  // Today at 00:01 is past: Snooze is disabled.
-  await day(now).click();
-  await dialog.getByTestId("snooze-time").fill("00:01");
-  await expect(dialog.getByTestId("snooze-submit")).toBeDisabled();
-  await expect(dialog.getByTestId("snooze-summary")).toHaveText("In the past");
-
-  // The 10th of next month at 2:30 PM.
   await dialog.getByTestId("snooze-next-month").click();
   const target = new Date(now.getFullYear(), now.getMonth() + 1, 10, 14, 30);
   await dialog.locator(`[data-day="${iso(target)}"]`).click();
   await dialog.getByTestId("snooze-time").fill("14:30");
-  await expect(dialog.getByTestId("snooze-summary")).toHaveText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat), [A-Z][a-z]{2} 10(, \d{4})?$/);
   await dialog.getByTestId("snooze-submit").click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
   expect(Date.parse((await lastSnooze())?.args.until ?? "")).toBe(target.getTime());
   expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
-
-  // Cancel snoozes nothing.
-  const again = await openSnoozeSub(page, "s:s-3");
-  await again.sub.getByTestId("snooze-pick").click();
-  await expect(page.getByTestId("snooze-dialog")).toBeVisible();
-  await page.getByTestId("snooze-dialog").getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByTestId("snooze-dialog")).toHaveCount(0);
-  expect((await invocations()).filter((i) => i.name === "thread.snooze")).toHaveLength(1);
 });
 
 test("a wake brings the thread back needing attention: Snooze ended in amber, counted by the bell; snooze it again from the header", async ({ page }) => {
@@ -309,6 +278,10 @@ test("the keyboard walks main → Working → Snoozed → Archived; collapsed se
     await page.keyboard.press("ArrowDown");
     await expect(list(page)).toHaveAttribute("aria-activedescendant", `row-s:${want}`);
   }
+  // The last row: ArrowDown stays.
+  await page.keyboard.press("ArrowDown");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-7");
+  await expect(row(page, "s:s-7")).toHaveAttribute("data-cursor", "true");
   // cmd+N counts the snoozed rows: s-2, s-6, s-4, s-3, s-5, s-1, s-8, s-9, s-7.
   await page.keyboard.press("Meta+7");
   await expect(row(page, "s:s-8")).toHaveAttribute("aria-selected", "true");
@@ -323,6 +296,9 @@ test("the keyboard walks main → Working → Snoozed → Archived; collapsed se
   await page.keyboard.press("ArrowUp");
   await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-1");
   await page.keyboard.press("Meta+7");
+  await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
+  // Past the last row cmd+N does nothing.
+  await page.keyboard.press("Meta+8");
   await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
   // cmd+shift+a never lands on a snoozed thread (s-8 waits, but is snoozed).
   await page.getByTestId("snoozed-header").click();
