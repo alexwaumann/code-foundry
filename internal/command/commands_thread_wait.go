@@ -41,7 +41,7 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.wait",
 		Title: "Wait for Thread",
-		Description: "Wait until a thread is idle (Claude not working and no question or permission prompt pending), " +
+		Description: "Wait until a thread is idle (Claude not working, no prompt or question pending), " +
 			"needs attention, has an error, or is disconnected; returns at once when it already is. " +
 			"Prints the thread's status (--json: the thread). Exits 1 when the time runs out.",
 		Category:     "Thread",
@@ -49,10 +49,11 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 		Args: []ArgSpec{
 			idArg,
 			{Name: "until", Type: Enum, Enum: ThreadWaitConditions, Default: "idle",
-				Description: "idle, attention (needs attention: a prompt, a question or a finished turn), error, or disconnected"},
+				Description: "The condition; attention covers a prompt, a question and a finished turn"},
 			waitForArg,
 			{Name: "after", Type: String, Description: "An item id or ordinal (#N in thread read): count the condition only once Claude reacted after it " +
-				"(a turn end, error, permission request or question follows it), so the status of an earlier turn does not count"},
+				"(a turn end, error, permission request or question follows it); default: the thread's latest message (yours or a wake), " +
+				"so a wait after a send waits for its answer"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

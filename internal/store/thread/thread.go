@@ -69,7 +69,8 @@ type PermissionMode int
 const (
 	// PermissionDefault passes no flag: Claude's own default (manual).
 	PermissionDefault PermissionMode = iota
-	// PermissionSupervised: --permission-mode manual, every tool call is confirmed.
+	// PermissionSupervised: --permission-mode manual, edits and commands are confirmed;
+	// reads, searches and read-only commands run unconfirmed (Claude's own rules).
 	PermissionSupervised
 	// PermissionAcceptEdits: --permission-mode acceptEdits.
 	PermissionAcceptEdits

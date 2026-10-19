@@ -28,6 +28,10 @@ const threadModelHelp = "Model: a claude-* id with the 1M context suffix; quote 
 // (bypassPermissions) is deliberately not offered.
 var ThreadPermissions = []string{"supervised", "accept-edits", "auto"}
 
+// supervisedHelp says what supervised does: Claude's manual mode, which asks before
+// edits and commands but runs reads, searches and read-only commands unasked.
+const supervisedHelp = "supervised (asks before edits and commands; read-only ones run unasked)"
+
 var threadPermissionModes = map[string]v1.PermissionMode{
 	"supervised":   v1.PermissionMode_PERMISSION_MODE_SUPERVISED,
 	"accept-edits": v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
@@ -105,7 +109,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
-					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},
+					Description: "Permissions: " + supervisedHelp + ", accept-edits (file edits allowed), or auto (Claude's auto mode)"},
 				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt); without it the thread works in the given worktree, else the project's own checkout (the GUI's threads.default_worktree does not apply)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
