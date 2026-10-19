@@ -13,7 +13,7 @@ import { ViewContext, type ViewCtx } from "./context";
 import { GRID_GAP, GRID_MAX_COLUMNS, GRID_MAX_SPAN, GRID_MIN_WIDTH, GROUP_GAP, SPACER_SIZE, gridColumns, gridMinWidth, gridSpan, spacerSize } from "./layout";
 import { NodeList } from "./NodeList";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", version: 1, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
 
 let widths: Record<string, number> = {};
 let observers: (() => void)[] = [];

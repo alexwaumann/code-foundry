@@ -1,14 +1,16 @@
 import { createContext, useContext } from "react";
 import type { UiContextView } from "@/api/command";
 
-/** What every node of one surface's view needs to act: its watch, instance, version and context. */
+/**
+ * What every node of one surface's view needs to act: its watch, instance and context. Not
+ * the view's version (acts read it from the store): every node consumes this, so it stays
+ * the same object from one view to the next.
+ */
 export interface ViewCtx {
   /** The tab's watch (stores/pluginSurfaces watchKeyOf). */
   watchKey: string;
   /** The daemon's instance key; drafts and collapsed sections hang off it. */
   instance: string;
-  /** The view version on screen (acts name it). */
-  version: number;
   plugin: string;
   /** The view's active tab ("" without tabs): drafts are per instance and tab. */
   viewTab: string;

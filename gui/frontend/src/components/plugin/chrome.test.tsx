@@ -33,7 +33,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 }));
 
 const INSTANCE = "hello/demo/thread:s-1";
-const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, version: 1, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
 
 /** Each fake element's box by data-testid or data-key: top (page coordinates) and height. */
 let boxes: Record<string, { top: number; height: number }> = {};

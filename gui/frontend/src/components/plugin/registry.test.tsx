@@ -12,7 +12,7 @@ import { ViewContext, type ViewCtx } from "./context";
 import { NodeList } from "./NodeList";
 import { renderers } from "./nodes/index";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", version: 1, plugin: "hello", viewTab: "overview", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", plugin: "hello", viewTab: "overview", uiContext: emptyContext, inert: false };
 
 function inView(children: ReactNode, c: Partial<ViewCtx> = {}) {
   return render(<ViewContext.Provider value={{ ...ctx, ...c }}>{children}</ViewContext.Provider>);

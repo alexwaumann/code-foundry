@@ -261,6 +261,58 @@ export function appendToView(view: PluginViewModel, key: string, text: string, l
   return view;
 }
 
+/** Deep equality of plain data (a view's nodes: objects, arrays, strings, numbers, booleans). */
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((x, i) => same(x, b[i]));
+  if (Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  const ob = b as Record<string, unknown>;
+  return ka.length === Object.keys(ob).length && ka.every((k) => k in ob && same((a as Record<string, unknown>)[k], ob[k]));
+}
+
+/**
+ * `next`'s nodes with `prev`'s node objects (matched by key) wherever they are equal, at
+ * any depth, so the memoized renderers (NodeList NodeView) skip what a new view did not
+ * change; the same `prev` array when nothing changed. Pure.
+ */
+export function shareNodes(prev: readonly ViewNode[], next: readonly ViewNode[]): readonly ViewNode[] {
+  if (prev === next) return next;
+  const byKey = new Map(prev.map((n) => [n.key, n]));
+  let changed = prev.length !== next.length;
+  const out = next.map((n, i) => {
+    const p = byKey.get(n.key);
+    const r = p ? shareNode(p, n) : n;
+    if (r !== prev[i]) changed = true;
+    return r;
+  });
+  return changed ? out : prev;
+}
+
+function shareNode(p: ViewNode, n: ViewNode): ViewNode {
+  if (same(p, n)) return p;
+  const nl = childLists(n);
+  if (nl.length === 0 || nodeKind(p) !== nodeKind(n)) return n;
+  const pl = childLists(p);
+  return withChildLists(
+    n,
+    nl.map((l, i) => shareNodes(pl[i] ?? [], l)),
+  );
+}
+
+/** A new view sharing the unchanged nodes of the one before (shareNodes). */
+export function shareView(prev: PluginViewModel | null, next: PluginViewModel): PluginViewModel {
+  if (!prev) return next;
+  const out: PluginViewModel = { ...next };
+  for (const list of VIEW_LISTS) {
+    const n = next[list];
+    const p = prev[list];
+    if (n && p) out[list] = shareNodes(p, n) as ViewNode[];
+  }
+  return out;
+}
+
 /** An entry after one update (toasts are side effects: see startSurfaceWatch). Pure. */
 export function applySurfaceUpdate(e: SurfaceEntry, u: SurfaceUpdateView): SurfaceEntry {
   switch (u.kind) {
@@ -268,7 +320,7 @@ export function applySurfaceUpdate(e: SurfaceEntry, u: SurfaceUpdateView): Surfa
       return { ...e, instance: u.instance || e.instance, phase: u.phase, message: u.message, pluginState: u.pluginState, error: null };
     case "view":
       if (!u.view) return e;
-      return { ...e, instance: u.instance || e.instance, version: u.version, view: u.view, hostRendered: u.hostRendered, error: null };
+      return { ...e, instance: u.instance || e.instance, version: u.version, view: shareView(e.view, u.view), hostRendered: u.hostRendered, error: null };
     case "append":
       if (!e.view || u.version !== e.version) return e;
       return { ...e, view: appendToView(e.view, u.key, u.text, u.lines) };

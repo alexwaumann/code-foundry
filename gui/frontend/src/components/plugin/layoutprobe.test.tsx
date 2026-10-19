@@ -290,37 +290,92 @@ function countRenders(kind: string): { n: () => number; restore: () => void } {
   };
 }
 
+/** Every node kind's renders, counted (the renderers table, wrapped). */
+function countAll(): { n: () => number; restore: () => void } {
+  const counters = Object.keys(renderers).map((k) => countRenders(k));
+  return {
+    n: () => counters.reduce((a, c) => a + c.n(), 0),
+    restore: () => {
+      for (const c of counters) c.restore();
+    },
+  };
+}
+
+const append = (key: string, text: string) => {
+  act(() => {
+    usePluginSurfacesStore.setState((s) => {
+      const e = s.watches.w;
+      if (!e) return s;
+      return { watches: { w: applySurfaceUpdate(e, { kind: "append", instance: INSTANCE, version: e.version, key, text, lines: [] }) } };
+    });
+  });
+};
+
+/** A view of 16 nodes: a master-detail (and its detail's text), a log, a text, columns holding a grid of ten texts. */
+const busy = (tick: string): PluginViewModel =>
+  view(
+    md({ selected: "r1" }),
+    { key: "lg", log: { lines: [{ text: "one" }] } },
+    { key: "tick", text: { content: tick } },
+    {
+      key: "cols",
+      columns: {
+        items: [
+          { key: "c1", children: [{ key: "g", grid: { items: Array.from({ length: 10 }, (_, i) => ({ key: `gi${String(i)}`, children: [{ key: `gt${String(i)}`, text: { content: `cell ${String(i)}` } }] })) } }] },
+          { key: "c2", children: [] },
+        ],
+      },
+    },
+  );
+
 describe("renders", () => {
-  it.fails("PERF render-1: a log append re-renders every other node of the view (no renderer is memoized; mapNode's kept identities buy nothing)", () => {
+  it("render-1: a log append re-renders the log only, not the other nodes (memoized renderers, mapNode's kept identities)", () => {
     const c = countRenders("masterDetail");
     try {
       mount(view(md({ selected: "r1" }), { key: "lg", log: { lines: [{ text: "one" }] } }));
       const before = c.n();
-      act(() => {
-        usePluginSurfacesStore.setState((s) => {
-          const e = s.watches.w;
-          if (!e) return s;
-          return { watches: { w: applySurfaceUpdate(e, { kind: "append", instance: INSTANCE, version: e.version, key: "lg", text: "two\n", lines: [] }) } };
-        });
-      });
+      append("lg", "two\n");
       expect(c.n() - before).toBe(0);
     } finally {
       c.restore();
     }
   });
 
-  it("PERF render-2: a master-detail renders twice for every render of its parent (its inline callback ref detaches and re-attaches, setEl(null) then setEl(el))", () => {
+  it("render-2: a master-detail renders once per change of its own (a stable callback ref)", () => {
     const c = countRenders("masterDetail");
-    const cols = countRenders("columns");
     try {
-      mount(view(md({ selected: "r1" }), { key: "cols", columns: { items: [{ key: "c1", children: [] }, { key: "c2", children: [] }] } }));
-      const [m0, c0] = [c.n(), cols.n()];
-      pushView(view(md({ selected: "r1" }), { key: "cols", columns: { items: [{ key: "c1", children: [] }, { key: "c2", children: [] }] } }));
-      expect(cols.n() - c0).toBe(1);
+      mount(view(md({ selected: "r1" })));
+      const m0 = c.n();
+      pushView(view(md({ selected: "r2" })));
       expect(c.n() - m0).toBe(1);
     } finally {
       c.restore();
-      cols.restore();
+    }
+  });
+
+  // The numbers in docs/notes/plugins-layout-fixes-gui.md: renders of every kind for one update of a 16-node view
+  // (before the fixes 16 for each of the four).
+  it("render-1: renders per update of a 16-node view: 1 for an append, 1 for the view after it (the log's lines change back), 0 for an equal view, 1 for a one-text change", () => {
+    const c = countAll();
+    try {
+      mount(busy("0"));
+      let at = c.n();
+      const step = () => {
+        const d = c.n() - at;
+        at = c.n();
+        return d;
+      };
+      append("lg", "two\n");
+      const a = step();
+      pushView(busy("0"));
+      const after = step();
+      pushView(busy("0"));
+      const same = step();
+      pushView(busy("1"));
+      const one = step();
+      expect([a, after, same, one]).toEqual([1, 1, 0, 1]);
+    } finally {
+      c.restore();
     }
   });
 });

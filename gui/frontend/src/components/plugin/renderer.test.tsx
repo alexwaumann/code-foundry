@@ -17,7 +17,7 @@ import { SurfaceHeader } from "./Header";
 import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", version: 1, plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
 
 function inView(children: ReactNode) {
   return render(<ViewContext.Provider value={ctx}>{children}</ViewContext.Provider>);

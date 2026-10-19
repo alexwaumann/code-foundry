@@ -36,7 +36,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 }));
 
 const INSTANCE = "hello/demo/thread:s-1";
-const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, version: 1, plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
 const DK = draftKeyOf(INSTANCE, "run-list", "md");
 
 let boxes: Record<string, { top: number; height: number; width: number }> = {};
@@ -229,7 +229,7 @@ describe("master-detail, narrow", () => {
     expect(screen.getByTestId("plugin-md-content").getAttribute("data-pending")).toBe("true");
     await settle(true);
     r.rerender(
-      <ViewContext.Provider value={{ ...ctx, version: 2 }}>
+      <ViewContext.Provider value={ctx}>
         <SurfaceFrame top={null} toolbar={[]} footer={[]}>
           <NodeList nodes={[mdNode({ selected: "r2" })]} />
         </SurfaceFrame>

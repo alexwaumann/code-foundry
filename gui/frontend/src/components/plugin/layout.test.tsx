@@ -21,7 +21,7 @@ import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
 import { SurfaceFrame } from "./SurfaceFrame";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", version: 1, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
 
 /** Each fake element's box: top (page coordinates), height, width. */
 interface Box {

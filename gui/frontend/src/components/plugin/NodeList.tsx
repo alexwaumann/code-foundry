@@ -1,11 +1,17 @@
+import { memo } from "react";
 import { nodeKind, type NodeKind, type ViewNode } from "@/api/plugin";
 import { cn } from "@/lib/utils";
 import { BoxList, InnerList, listGap } from "./list";
 import { renderers } from "./nodes/index";
 import type { NodeRenderer } from "./registry";
 
-/** One view node by its kind's renderer (nodes/index.ts); a notice for a kind this GUI does not know. */
-export function NodeView({ node }: { node: ViewNode }) {
+/**
+ * One view node by its kind's renderer (nodes/index.ts); a notice for a kind this GUI does
+ * not know. Memoized on the node's identity: a log append (stores/pluginSurfaces mapNode)
+ * and a new view (shareView) keep the objects of the nodes they did not change, so only
+ * the changed path renders again.
+ */
+export const NodeView = memo(function NodeView({ node }: { node: ViewNode }) {
   const kind = nodeKind(node);
   if (kind === null) {
     // The daemon refuses kinds it does not know, so only a newer daemon with an older GUI gets here.
@@ -18,7 +24,7 @@ export function NodeView({ node }: { node: ViewNode }) {
   const Render = renderers[kind] as NodeRenderer<NodeKind>;
   const data = node[kind] as NonNullable<ViewNode[NodeKind]>;
   return <Render node={node} data={data} />;
-}
+});
 
 /**
  * A list of view nodes: 12 px apart at the top level, 6 px inside sections and cards.

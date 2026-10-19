@@ -112,9 +112,8 @@ export function resetSurfaceStore(): void {
 /** The watch "w"'s view drawn like PluginSurface. */
 export function Surface() {
   const view = usePluginSurfacesStore((s) => s.watches.w?.view ?? null);
-  const version = usePluginSurfacesStore((s) => s.watches.w?.version ?? 0);
   const viewTab = view?.tabs?.active ?? "";
-  const ctx = useMemo<ViewCtx>(() => ({ watchKey: "w", instance: INSTANCE, version, plugin: "fuzz", viewTab, uiContext: emptyContext, inert: false }), [version, viewTab]);
+  const ctx = useMemo<ViewCtx>(() => ({ watchKey: "w", instance: INSTANCE, plugin: "fuzz", viewTab, uiContext: emptyContext, inert: false }), [viewTab]);
   if (!view) return null;
   return (
     <ViewContext.Provider value={ctx}>
