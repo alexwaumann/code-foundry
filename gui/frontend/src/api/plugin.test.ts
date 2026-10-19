@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PluginEventSchema, PluginSchema, PluginSecretSchema, PluginState, SurfacePhase, SurfaceUpdateSchema } from "@/gen/codefoundry/v1/plugin_pb";
 import { demoJson, demoView } from "@/test/pluginFixtures";
 import { HEARTBEAT } from "./stream";
-import { childLists, consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, withChildLists, toPluginEventView, toPluginView, toSecretView, toSurfaceUpdateView, type ViewNode } from "./plugin";
+import { childLists, consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, VIEW_LISTS, viewNodes, withChildLists, toPluginEventView, toPluginView, toSecretView, toSurfaceUpdateView, type ViewNode } from "./plugin";
 
 function allNodes(nodes: readonly ViewNode[]): ViewNode[] {
   return nodes.flatMap((n) => [n, ...childLists(n).flatMap((l) => allNodes(l))]);
@@ -16,15 +16,26 @@ describe("view model", () => {
     for (const tab of ["overview", "form", "log", "assistant", "shell", "layout"] as const) {
       const v = demoView(tab);
       expect(v.tabs?.active).toBe(tab);
-      for (const n of allNodes(v.nodes)) {
+      for (const n of allNodes(viewNodes(v))) {
         const k = nodeKind(n);
         expect(k, n.key).not.toBeNull();
         kinds.add(k ?? "");
       }
     }
     // The demo exercises every v1 node kind (thread and terminal on the Assistant and Shell
-    // tabs, columns and pane on Layout).
+    // tabs, columns, pane and container on Layout).
     expect([...kinds].sort()).toEqual([...NODE_KINDS].sort());
+    // Layout has a toolbar and a footer; the other tabs neither.
+    const layout = demoView("layout");
+    expect([layout.toolbar?.map((n) => n.key), layout.footer?.map((n) => n.key)]).toEqual([["layout-search-form", "layout-status"], ["layout-count", "layout-footer-bar"]]);
+    expect(demoView("overview").toolbar).toBeUndefined();
+  });
+
+  it("walks a view's lists in order: the toolbar, the body, the footer", () => {
+    const t = (key: string): ViewNode => ({ key, text: { content: key } });
+    expect(VIEW_LISTS).toEqual(["toolbar", "nodes", "footer"]);
+    expect(viewNodes({ toolbar: [t("a")], nodes: [t("b")], footer: [t("c"), t("d")] }).map((n) => n.key)).toEqual(["a", "b", "c", "d"]);
+    expect(viewNodes({ nodes: [t("b")] }).map((n) => n.key)).toEqual(["b"]);
   });
 
   it("lists a container's nodes and replaces them in the same order", () => {
@@ -33,6 +44,8 @@ describe("view model", () => {
     expect(childLists(cols).map((l) => l.map((n) => n.key))).toEqual([["a1"], ["b1", "b2"]]);
     expect(childLists({ key: "p", pane: { height: "fill", children: [t("p1")] } }).map((l) => l.map((n) => n.key))).toEqual([["p1"]]);
     expect(childLists({ key: "s", section: { children: [t("s1")] } }).map((l) => l.map((n) => n.key))).toEqual([["s1"]]);
+    expect(childLists({ key: "w", container: { width: "narrow", children: [t("w1"), t("w2")] } }).map((l) => l.map((n) => n.key))).toEqual([["w1", "w2"]]);
+    expect(withChildLists({ key: "w", container: { width: "wide", children: [] } }, [[t("q")]]).container).toEqual({ width: "wide", children: [t("q")] });
     expect(childLists(t("x"))).toEqual([]);
     const swapped = withChildLists(cols, [[t("z")], [t("y")]]);
     expect(swapped.columns).toEqual({ collapse: "first", items: [{ key: "a", weight: 2, children: [t("z")] }, { key: "b", width: 200, children: [t("y")] }] });

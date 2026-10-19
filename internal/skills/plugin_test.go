@@ -81,11 +81,13 @@ func TestRenderPluginSkill(t *testing.T) {
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
 		t.Error("primitives.md lacks the limits table")
 	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid) a node sits inside | 4 |") {
-		t.Error("primitives.md lacks the container depth")
+	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid, container) a node sits inside | 4 |") ||
+		!strings.Contains(prim, "| Nodes in the toolbar / in the footer | 6 / 6 |") || !strings.Contains(prim, "| A container's widest: narrow / wide (px) | 680 / 1080 |") {
+		t.Error("primitives.md lacks the container depth, the strips' or the container's limits")
 	}
-	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "2 columns need 492 px") || !strings.Contains(layout, "view.node.columns") {
-		t.Error("ui-layout.md lacks the side by side rule or the capability")
+	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "2 columns need 492 px") || !strings.Contains(layout, "view.node.columns") ||
+		!strings.Contains(layout, "`view.toolbar`, `view.footer`") || !strings.Contains(layout, "**Up to 6 nodes each**") || !strings.Contains(layout, "`narrow` is at most 680 px, `wide` at most 1080 px") {
+		t.Error("ui-layout.md lacks the side by side rule, the capabilities, the strips' cap or the container's widths")
 	}
 	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "floor((width + 12) / (minWidth + 12))") || !strings.Contains(layout, "view.node.group") ||
 		!strings.Contains(layout, "text, chips, actions and progress") {

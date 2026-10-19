@@ -254,3 +254,9 @@ func NewFlexSpacer(key string) Node { return Node{Key: key, Spacer: &Spacer{Flex
 func NewGroup(key string, align Align, items ...Node) Node {
 	return Node{Key: key, Group: &Group{Items: items, Align: align}}
 }
+
+// NewContainer returns a container capping its nodes at width (ContainerNarrow,
+// ContainerWide, ContainerFull), centred.
+func NewContainer(key string, width ContainerWidth, children ...Node) Node {
+	return Node{Key: key, Container: &Container{Width: width, Children: children}}
+}

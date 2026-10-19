@@ -85,536 +85,677 @@
     ],
     "active": "layout"
   },
-  "nodes": [
+  "toolbar": [
     {
-      "key": "layout-intro",
-      "text": {
-        "content": "Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in the side panel."
+      "key": "layout-search-form",
+      "form": {
+        "fields": [
+          {
+            "key": "layout-q",
+            "name": "q",
+            "label": "Filter runs",
+            "input": {
+              "placeholder": "Filter runs"
+            }
+          }
+        ],
+        "submit": {
+          "key": "layout-search",
+          "label": "Filter",
+          "icon": "search",
+          "action": {
+            "event": "layout-filter"
+          },
+          "iconOnly": true
+        },
+        "resetToken": "0"
       }
     },
     {
-      "key": "layout-cols",
-      "columns": {
-        "items": [
+      "key": "layout-status",
+      "chips": {
+        "chips": [
           {
-            "key": "layout-left",
-            "weight": 2,
-            "children": [
-              {
-                "key": "layout-pane",
-                "pane": {
-                  "height": 320,
-                  "children": [
-                    {
-                      "key": "layout-log",
-                      "log": {
-                        "lines": [
-                          {
-                            "text": "step 01  ok"
-                          },
-                          {
-                            "text": "step 02  ok"
-                          },
-                          {
-                            "text": "step 03  ok"
-                          },
-                          {
-                            "text": "step 04  ok"
-                          },
-                          {
-                            "text": "step 05  ok"
-                          },
-                          {
-                            "text": "step 06  ok"
-                          },
-                          {
-                            "text": "step 07  ok"
-                          },
-                          {
-                            "text": "step 08  ok"
-                          },
-                          {
-                            "text": "step 09  retrying flaky test",
-                            "tone": "attention"
-                          },
-                          {
-                            "text": "step 10  ok"
-                          },
-                          {
-                            "text": "step 11  ok"
-                          },
-                          {
-                            "text": "step 12  ok"
-                          },
-                          {
-                            "text": "step 13  ok"
-                          },
-                          {
-                            "text": "step 14  ok"
-                          },
-                          {
-                            "text": "step 15  ok"
-                          },
-                          {
-                            "text": "step 16  ok"
-                          },
-                          {
-                            "text": "step 17  cache miss",
-                            "tone": "muted"
-                          },
-                          {
-                            "text": "step 18  ok"
-                          },
-                          {
-                            "text": "step 19  ok"
-                          },
-                          {
-                            "text": "step 20  ok"
-                          },
-                          {
-                            "text": "step 21  ok"
-                          },
-                          {
-                            "text": "step 22  ok"
-                          },
-                          {
-                            "text": "step 23  ok"
-                          },
-                          {
-                            "text": "step 24  ok"
-                          }
-                        ],
-                        "title": "build 3"
-                      }
-                    },
-                    {
-                      "key": "layout-runs",
-                      "list": {
-                        "rows": [
-                          {
-                            "key": "layout-run-3",
-                            "glyph": {
-                              "status": "running"
-                            },
-                            "title": "Build #3",
-                            "trailing": "main"
-                          },
-                          {
-                            "key": "layout-run-2",
-                            "glyph": {
-                              "status": "failed"
-                            },
-                            "title": "Build #2",
-                            "trailing": "cf/fix"
-                          },
-                          {
-                            "key": "layout-run-1",
-                            "glyph": {
-                              "status": "ok"
-                            },
-                            "title": "Build #1",
-                            "trailing": "main"
-                          }
-                        ],
-                        "dense": true
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
+            "key": "layout-st-all",
+            "label": "All",
+            "meta": "6",
+            "selected": true,
+            "action": {
+              "event": "layout-status",
+              "data": "all"
+            }
           },
           {
-            "key": "layout-right",
-            "children": [
-              {
-                "key": "layout-md",
-                "markdown": {
-                  "source": "**Columns** take a weight (1 to 6) or a fixed width. A **pane** is a box with its own height and scroll: the log and the runs beside this scroll inside theirs."
-                }
-              },
-              {
-                "key": "layout-facts",
-                "pairs": {
-                  "items": [
-                    {
-                      "key": "layout-f-cols",
-                      "label": "Columns",
-                      "value": "2 to 4"
-                    },
-                    {
-                      "key": "layout-f-min",
-                      "label": "Side by side",
-                      "value": "240 px a column"
-                    },
-                    {
-                      "key": "layout-f-gap",
-                      "label": "Gap",
-                      "value": "12 px"
-                    }
-                  ]
-                }
-              }
-            ]
+            "key": "layout-st-running",
+            "label": "Running",
+            "status": "running",
+            "meta": "1",
+            "action": {
+              "event": "layout-status",
+              "data": "running"
+            }
+          },
+          {
+            "key": "layout-st-failed",
+            "label": "Failed",
+            "status": "failed",
+            "meta": "2",
+            "action": {
+              "event": "layout-status",
+              "data": "failed"
+            }
+          },
+          {
+            "key": "layout-st-ok",
+            "label": "Passed",
+            "status": "ok",
+            "meta": "3",
+            "action": {
+              "event": "layout-status",
+              "data": "ok"
+            }
           }
         ]
       }
-    },
+    }
+  ],
+  "nodes": [
     {
-      "key": "layout-grid-rule",
-      "divider": {
-        "label": "Grid"
-      }
-    },
-    {
-      "key": "layout-grid",
-      "grid": {
-        "minWidth": 200,
-        "items": [
+      "key": "layout-page",
+      "container": {
+        "width": "wide",
+        "children": [
           {
-            "key": "layout-cell-build",
-            "children": [
-              {
-                "key": "layout-cell-build-card",
-                "section": {
-                  "title": "Build",
-                  "card": true,
+            "key": "layout-intro",
+            "text": {
+              "content": "Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in the side panel."
+            }
+          },
+          {
+            "key": "layout-cols",
+            "columns": {
+              "items": [
+                {
+                  "key": "layout-left",
+                  "weight": 2,
                   "children": [
                     {
-                      "key": "layout-build-facts",
+                      "key": "layout-pane",
+                      "pane": {
+                        "height": 320,
+                        "children": [
+                          {
+                            "key": "layout-log",
+                            "log": {
+                              "lines": [
+                                {
+                                  "text": "step 01  ok"
+                                },
+                                {
+                                  "text": "step 02  ok"
+                                },
+                                {
+                                  "text": "step 03  ok"
+                                },
+                                {
+                                  "text": "step 04  ok"
+                                },
+                                {
+                                  "text": "step 05  ok"
+                                },
+                                {
+                                  "text": "step 06  ok"
+                                },
+                                {
+                                  "text": "step 07  ok"
+                                },
+                                {
+                                  "text": "step 08  ok"
+                                },
+                                {
+                                  "text": "step 09  retrying flaky test",
+                                  "tone": "attention"
+                                },
+                                {
+                                  "text": "step 10  ok"
+                                },
+                                {
+                                  "text": "step 11  ok"
+                                },
+                                {
+                                  "text": "step 12  ok"
+                                },
+                                {
+                                  "text": "step 13  ok"
+                                },
+                                {
+                                  "text": "step 14  ok"
+                                },
+                                {
+                                  "text": "step 15  ok"
+                                },
+                                {
+                                  "text": "step 16  ok"
+                                },
+                                {
+                                  "text": "step 17  cache miss",
+                                  "tone": "muted"
+                                },
+                                {
+                                  "text": "step 18  ok"
+                                },
+                                {
+                                  "text": "step 19  ok"
+                                },
+                                {
+                                  "text": "step 20  ok"
+                                },
+                                {
+                                  "text": "step 21  ok"
+                                },
+                                {
+                                  "text": "step 22  ok"
+                                },
+                                {
+                                  "text": "step 23  ok"
+                                },
+                                {
+                                  "text": "step 24  ok"
+                                }
+                              ],
+                              "title": "build 3"
+                            }
+                          },
+                          {
+                            "key": "layout-runs",
+                            "list": {
+                              "rows": [
+                                {
+                                  "key": "layout-run-6",
+                                  "glyph": {
+                                    "status": "running"
+                                  },
+                                  "title": "Build #6",
+                                  "trailing": "main"
+                                },
+                                {
+                                  "key": "layout-run-5",
+                                  "glyph": {
+                                    "status": "failed"
+                                  },
+                                  "title": "Build #5",
+                                  "trailing": "cf/fix"
+                                },
+                                {
+                                  "key": "layout-run-4",
+                                  "glyph": {
+                                    "status": "ok"
+                                  },
+                                  "title": "Build #4",
+                                  "trailing": "main"
+                                },
+                                {
+                                  "key": "layout-run-3",
+                                  "glyph": {
+                                    "status": "failed"
+                                  },
+                                  "title": "Build #3",
+                                  "trailing": "cf/retry"
+                                },
+                                {
+                                  "key": "layout-run-2",
+                                  "glyph": {
+                                    "status": "ok"
+                                  },
+                                  "title": "Build #2",
+                                  "trailing": "cf/fix"
+                                },
+                                {
+                                  "key": "layout-run-1",
+                                  "glyph": {
+                                    "status": "ok"
+                                  },
+                                  "title": "Build #1",
+                                  "trailing": "main"
+                                }
+                              ],
+                              "dense": true,
+                              "emptyText": "No runs match the filter"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-right",
+                  "children": [
+                    {
+                      "key": "layout-md",
+                      "markdown": {
+                        "source": "**Columns** take a weight (1 to 6) or a fixed width. A **pane** is a box with its own height and scroll: the log and the runs beside this scroll inside theirs. The **toolbar** and **footer** stay pinned while the body scrolls between them; the toolbar filters the runs."
+                      }
+                    },
+                    {
+                      "key": "layout-facts",
                       "pairs": {
                         "items": [
                           {
-                            "key": "layout-build-branch",
-                            "label": "Branch",
-                            "value": "main"
+                            "key": "layout-f-cols",
+                            "label": "Columns",
+                            "value": "2 to 4"
                           },
                           {
-                            "key": "layout-build-time",
-                            "label": "Took",
-                            "value": "4m 12s"
+                            "key": "layout-f-min",
+                            "label": "Side by side",
+                            "value": "240 px a column"
+                          },
+                          {
+                            "key": "layout-f-gap",
+                            "label": "Gap",
+                            "value": "12 px"
                           }
                         ]
                       }
                     }
                   ]
                 }
-              }
-            ]
-          },
-          {
-            "key": "layout-cell-tests",
-            "children": [
-              {
-                "key": "layout-cell-tests-card",
-                "section": {
-                  "title": "Tests",
-                  "card": true,
-                  "children": [
-                    {
-                      "key": "layout-tests-chips",
-                      "chips": {
-                        "chips": [
-                          {
-                            "key": "layout-tests-unit",
-                            "label": "Unit",
-                            "status": "ok"
-                          },
-                          {
-                            "key": "layout-tests-e2e",
-                            "label": "e2e",
-                            "status": "running"
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "key": "layout-cell-cover",
-            "children": [
-              {
-                "key": "layout-cell-cover-card",
-                "section": {
-                  "title": "Coverage",
-                  "card": true,
-                  "children": [
-                    {
-                      "key": "layout-cover",
-                      "progress": {
-                        "value": 0.82,
-                        "label": "Lines"
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "key": "layout-cell-deploy",
-            "span": 2,
-            "children": [
-              {
-                "key": "layout-cell-deploy-card",
-                "section": {
-                  "title": "Deploy",
-                  "card": true,
-                  "children": [
-                    {
-                      "key": "layout-deploy-text",
-                      "text": {
-                        "content": "Rolling out to 2 of 4 regions. A span-2 card takes two columns where there are two."
-                      }
-                    },
-                    {
-                      "key": "layout-deploy",
-                      "progress": {
-                        "value": 0.5,
-                        "label": "Regions"
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "key": "layout-cell-notes",
-            "children": [
-              {
-                "key": "layout-cell-notes-card",
-                "section": {
-                  "title": "Notes",
-                  "card": true,
-                  "children": [
-                    {
-                      "key": "layout-notes",
-                      "text": {
-                        "content": "Columns: as many 200 px ones as fit, at most 6."
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "key": "layout-group-rule",
-      "divider": {
-        "label": "Inline groups"
-      }
-    },
-    {
-      "key": "layout-line",
-      "group": {
-        "items": [
-          {
-            "key": "layout-line-text",
-            "text": {
-              "content": {
-                "spans": [
-                  {
-                    "text": "3 of 4",
-                    "strong": true
-                  },
-                  {
-                    "text": " checks passed"
-                  }
-                ]
-              }
-            }
-          },
-          {
-            "key": "layout-line-bar",
-            "actions": {
-              "buttons": [
-                {
-                  "key": "layout-line-rerun",
-                  "label": "Re-run",
-                  "action": {
-                    "event": "click"
-                  }
-                },
-                {
-                  "key": "layout-line-docs",
-                  "label": "Docs",
-                  "action": {
-                    "openUrl": "https://github.com/alexwaumann/code-foundry"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "align": "between"
-      }
-    },
-    {
-      "key": "layout-steps",
-      "group": {
-        "items": [
-          {
-            "key": "layout-steps-chips",
-            "chips": {
-              "chips": [
-                {
-                  "key": "layout-step-lint",
-                  "label": "Lint",
-                  "status": "ok"
-                },
-                {
-                  "key": "layout-step-test",
-                  "label": "Test",
-                  "status": "running"
-                }
               ]
             }
           },
           {
-            "key": "layout-steps-progress",
-            "progress": {
-              "value": 0.34
+            "key": "layout-grid-rule",
+            "divider": {
+              "label": "Grid"
             }
           },
           {
-            "key": "layout-steps-left",
-            "text": {
-              "content": {
-                "spans": [
-                  {
-                    "text": "about 2 min left",
-                    "tone": "muted"
-                  }
-                ]
-              }
-            }
-          }
-        ],
-        "align": "start"
-      }
-    },
-    {
-      "key": "layout-rule",
-      "divider": {}
-    },
-    {
-      "key": "layout-push",
-      "section": {
-        "title": "Pinned to the bottom",
-        "card": true,
-        "children": [
-          {
-            "key": "layout-push-pane",
-            "pane": {
-              "height": 180,
-              "children": [
+            "key": "layout-grid",
+            "grid": {
+              "minWidth": 200,
+              "items": [
                 {
-                  "key": "layout-push-text",
-                  "text": {
-                    "content": "A flex spacer in a pane with a height pushes what follows it to the pane's bottom."
-                  }
-                },
-                {
-                  "key": "layout-push-spacer",
-                  "spacer": {
-                    "flex": true
-                  }
-                },
-                {
-                  "key": "layout-push-bar",
-                  "group": {
-                    "items": [
-                      {
-                        "key": "layout-push-actions",
-                        "actions": {
-                          "buttons": [
-                            {
-                              "key": "layout-push-go",
-                              "label": "Click",
-                              "action": {
-                                "event": "click"
-                              }
+                  "key": "layout-cell-build",
+                  "children": [
+                    {
+                      "key": "layout-cell-build-card",
+                      "section": {
+                        "title": "Build",
+                        "card": true,
+                        "children": [
+                          {
+                            "key": "layout-build-facts",
+                            "pairs": {
+                              "items": [
+                                {
+                                  "key": "layout-build-branch",
+                                  "label": "Branch",
+                                  "value": "main"
+                                },
+                                {
+                                  "key": "layout-build-time",
+                                  "label": "Took",
+                                  "value": "4m 12s"
+                                }
+                              ]
                             }
-                          ]
-                        }
+                          }
+                        ]
                       }
-                    ],
-                    "align": "end"
-                  }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-cell-tests",
+                  "children": [
+                    {
+                      "key": "layout-cell-tests-card",
+                      "section": {
+                        "title": "Tests",
+                        "card": true,
+                        "children": [
+                          {
+                            "key": "layout-tests-chips",
+                            "chips": {
+                              "chips": [
+                                {
+                                  "key": "layout-tests-unit",
+                                  "label": "Unit",
+                                  "status": "ok"
+                                },
+                                {
+                                  "key": "layout-tests-e2e",
+                                  "label": "e2e",
+                                  "status": "running"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-cell-cover",
+                  "children": [
+                    {
+                      "key": "layout-cell-cover-card",
+                      "section": {
+                        "title": "Coverage",
+                        "card": true,
+                        "children": [
+                          {
+                            "key": "layout-cover",
+                            "progress": {
+                              "value": 0.82,
+                              "label": "Lines"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-cell-deploy",
+                  "span": 2,
+                  "children": [
+                    {
+                      "key": "layout-cell-deploy-card",
+                      "section": {
+                        "title": "Deploy",
+                        "card": true,
+                        "children": [
+                          {
+                            "key": "layout-deploy-text",
+                            "text": {
+                              "content": "Rolling out to 2 of 4 regions. A span-2 card takes two columns where there are two."
+                            }
+                          },
+                          {
+                            "key": "layout-deploy",
+                            "progress": {
+                              "value": 0.5,
+                              "label": "Regions"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-cell-notes",
+                  "children": [
+                    {
+                      "key": "layout-cell-notes-card",
+                      "section": {
+                        "title": "Notes",
+                        "card": true,
+                        "children": [
+                          {
+                            "key": "layout-notes",
+                            "text": {
+                              "content": "Columns: as many 200 px ones as fit, at most 6."
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
                 }
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "key": "layout-gap",
-      "spacer": {
-        "size": 24
-      }
-    },
-    {
-      "key": "layout-detail",
-      "columns": {
-        "items": [
+          },
           {
-            "key": "layout-detail-summary",
-            "children": [
-              {
-                "key": "layout-summary",
-                "text": {
-                  "content": {
-                    "spans": [
+            "key": "layout-group-rule",
+            "divider": {
+              "label": "Inline groups"
+            }
+          },
+          {
+            "key": "layout-line",
+            "group": {
+              "items": [
+                {
+                  "key": "layout-line-text",
+                  "text": {
+                    "content": {
+                      "spans": [
+                        {
+                          "text": "3 of 4",
+                          "strong": true
+                        },
+                        {
+                          "text": " checks passed"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "layout-line-bar",
+                  "actions": {
+                    "buttons": [
                       {
-                        "text": "The assistant's thread is the second column here: "
+                        "key": "layout-line-rerun",
+                        "label": "Re-run",
+                        "action": {
+                          "event": "click"
+                        }
                       },
                       {
-                        "text": "collapse: first",
-                        "mono": true
-                      },
-                      {
-                        "text": " drops it where the columns stack."
+                        "key": "layout-line-docs",
+                        "label": "Docs",
+                        "action": {
+                          "openUrl": "https://github.com/alexwaumann/code-foundry"
+                        }
                       }
                     ]
                   }
                 }
-              }
-            ]
+              ],
+              "align": "between"
+            }
           },
           {
-            "key": "layout-detail-chat",
-            "weight": 2,
-            "children": [
-              {
-                "key": "layout-chat-pane",
-                "pane": {
-                  "height": "fill",
-                  "minHeight": 320,
-                  "noScroll": true,
+            "key": "layout-steps",
+            "group": {
+              "items": [
+                {
+                  "key": "layout-steps-chips",
+                  "chips": {
+                    "chips": [
+                      {
+                        "key": "layout-step-lint",
+                        "label": "Lint",
+                        "status": "ok"
+                      },
+                      {
+                        "key": "layout-step-test",
+                        "label": "Test",
+                        "status": "running"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": "layout-steps-progress",
+                  "progress": {
+                    "value": 0.34
+                  }
+                },
+                {
+                  "key": "layout-steps-left",
+                  "text": {
+                    "content": {
+                      "spans": [
+                        {
+                          "text": "about 2 min left",
+                          "tone": "muted"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "align": "start"
+            }
+          },
+          {
+            "key": "layout-rule",
+            "divider": {}
+          },
+          {
+            "key": "layout-push",
+            "section": {
+              "title": "Pinned to the bottom",
+              "card": true,
+              "children": [
+                {
+                  "key": "layout-push-pane",
+                  "pane": {
+                    "height": 180,
+                    "children": [
+                      {
+                        "key": "layout-push-text",
+                        "text": {
+                          "content": "A flex spacer in a pane with a height pushes what follows it to the pane's bottom."
+                        }
+                      },
+                      {
+                        "key": "layout-push-spacer",
+                        "spacer": {
+                          "flex": true
+                        }
+                      },
+                      {
+                        "key": "layout-push-bar",
+                        "group": {
+                          "items": [
+                            {
+                              "key": "layout-push-actions",
+                              "actions": {
+                                "buttons": [
+                                  {
+                                    "key": "layout-push-go",
+                                    "label": "Click",
+                                    "action": {
+                                      "event": "click"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "align": "end"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "layout-gap",
+            "spacer": {
+              "size": 24
+            }
+          },
+          {
+            "key": "layout-detail",
+            "columns": {
+              "items": [
+                {
+                  "key": "layout-detail-summary",
                   "children": [
                     {
-                      "key": "layout-thread",
-                      "thread": {
-                        "threadId": "s-85cf5166e109",
-                        "placeholder": "Message the assistant…",
-                        "height": "fill"
+                      "key": "layout-summary",
+                      "text": {
+                        "content": {
+                          "spans": [
+                            {
+                              "text": "The assistant's thread is the second column here: "
+                            },
+                            {
+                              "text": "collapse: first",
+                              "mono": true
+                            },
+                            {
+                              "text": " drops it where the columns stack."
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "layout-detail-chat",
+                  "weight": 2,
+                  "children": [
+                    {
+                      "key": "layout-chat-pane",
+                      "pane": {
+                        "height": "fill",
+                        "minHeight": 320,
+                        "noScroll": true,
+                        "children": [
+                          {
+                            "key": "layout-thread",
+                            "thread": {
+                              "threadId": "s-85cf5166e109",
+                              "placeholder": "Message the assistant…",
+                              "height": "fill"
+                            }
+                          }
+                        ]
                       }
                     }
                   ]
                 }
-              }
-            ]
+              ],
+              "collapse": "first"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "footer": [
+    {
+      "key": "layout-count",
+      "text": {
+        "content": "6 of 6 runs",
+        "size": "sm"
+      }
+    },
+    {
+      "key": "layout-footer-bar",
+      "actions": {
+        "buttons": [
+          {
+            "key": "layout-clear",
+            "label": "Clear filter",
+            "action": {
+              "event": "layout-clear"
+            },
+            "disabled": true
+          },
+          {
+            "key": "layout-rerun",
+            "label": "Run again",
+            "icon": "rotate-ccw",
+            "style": "attention",
+            "action": {
+              "event": "layout-rerun"
+            }
           }
         ],
-        "collapse": "first"
+        "align": "end"
       }
     }
   ]

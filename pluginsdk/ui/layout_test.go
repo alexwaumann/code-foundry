@@ -51,7 +51,7 @@ func withKind(key, k string) Node {
 // pass as a second kind, or fail alone.
 func TestEveryKindIsOneKind(t *testing.T) {
 	kinds := nodeKinds()
-	if len(kinds) != 20 {
+	if len(kinds) != 21 {
 		t.Errorf("%d kinds: %v (a new kind needs its validation, GUI renderer and docs)", len(kinds), kinds)
 	}
 	for _, k := range kinds {
@@ -82,7 +82,8 @@ var containers = map[string]func(key string, child Node) Node{
 	"columns": func(key string, child Node) Node {
 		return NewColumns(key, NewColumn(key+"-a", child), NewColumn(key+"-b"))
 	},
-	"pane": func(key string, child Node) Node { return NewPane(key, HeightAuto, child) },
+	"pane":      func(key string, child Node) Node { return NewPane(key, HeightAuto, child) },
+	"container": func(key string, child Node) Node { return NewContainer(key, ContainerNarrow, child) },
 	"grid": func(key string, child Node) Node {
 		return NewGrid(key, NewGridItem(key+"-a", child), NewGridItem(key+"-b"))
 	},
@@ -145,7 +146,7 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("%d %s deep: %v", MaxDepth, k, err)
 			}
 			err := (View{Nodes: []Node{nest(append(at, k))}}).Validate()
-			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid), at most %d", MaxDepth+1, MaxDepth)) {
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container), at most %d", MaxDepth+1, MaxDepth)) {
 				t.Errorf("%d %s deep: %v", MaxDepth+1, k, err)
 			}
 			// Children reaches the leaf through every level.
@@ -181,6 +182,10 @@ func TestContainerDepth(t *testing.T) {
 	// The planned page layout: section > columns > pane > leaf, and one spare level.
 	if err := (View{Nodes: []Node{nest([]string{"section", "columns", "pane", "section"})}}).Validate(); err != nil {
 		t.Errorf("section > columns > pane > section > leaf: %v", err)
+	}
+	// A page's container takes the spare level.
+	if err := (View{Nodes: []Node{nest([]string{"container", "columns", "pane", "section"})}}).Validate(); err != nil {
+		t.Errorf("container > columns > pane > section > leaf: %v", err)
 	}
 	if (Node{Key: "t", Text: &Text{}}).Children() != nil {
 		t.Error("a text node has children")

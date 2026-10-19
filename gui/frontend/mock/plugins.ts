@@ -126,16 +126,22 @@ function shiftTimes(v: unknown, shiftMs: number): unknown {
 
 type Node = Record<string, unknown> & { key: string };
 
-/** The node lists a node holds: a section's children, each column's, a pane's, each grid item's, a group's items (api/plugin.ts childLists). */
+/** The node lists a node holds: a section's children, each column's, a pane's, each grid item's, a group's items, a container's (api/plugin.ts childLists). */
 function childListsOf(n: Node): Node[][] {
   const sec = n.section as { children?: Node[] } | undefined;
   const cols = n.columns as { items?: { children?: Node[] }[] } | undefined;
   const pane = n.pane as { children?: Node[] } | undefined;
   const grid = n.grid as { items?: { children?: Node[] }[] } | undefined;
   const group = n.group as { items?: Node[] } | undefined;
-  return [sec?.children, ...(cols?.items ?? []).map((c) => c.children), pane?.children, ...(grid?.items ?? []).map((it) => it.children), group?.items].filter(
+  const box = n.container as { children?: Node[] } | undefined;
+  return [sec?.children, ...(cols?.items ?? []).map((c) => c.children), pane?.children, ...(grid?.items ?? []).map((it) => it.children), group?.items, box?.children].filter(
     (l): l is Node[] => Array.isArray(l),
   );
+}
+
+/** A view's node lists: the toolbar, the body and the footer (api/plugin.ts VIEW_LISTS). */
+function viewListsOf(view: Record<string, unknown>): Node[][] {
+  return [view.toolbar, view.nodes, view.footer].filter((l): l is Node[] => Array.isArray(l));
 }
 
 /** Applies f to the node with `key` (at any depth); returns whether it found it. */
@@ -154,15 +160,17 @@ interface Element {
   key: string;
   kind: "click" | "submit" | "change" | "tab" | "host";
   event: string;
+  /** The event's data (a chip's status, a row's id). */
+  data?: string;
 }
 
 /** The elements of a view that act, by key (like the daemon's actionIndex). */
 function elementsOf(view: Record<string, unknown>): Map<string, Element> {
   const out = new Map<string, Element>();
   const action = (key: string, a: unknown, kind: Element["kind"]) => {
-    const act = a as { event?: string } | undefined;
+    const act = a as { event?: string; data?: string } | undefined;
     if (!act) return;
-    out.set(key, { key, kind: act.event ? kind : "host", event: act.event ?? "" });
+    out.set(key, { key, kind: act.event ? kind : "host", event: act.event ?? "", ...(act.data ? { data: act.data } : {}) });
   };
   const button = (b: unknown, kind: Element["kind"] = "click") => {
     const x = b as { key: string; action?: unknown };
@@ -208,7 +216,7 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
       for (const children of childListsOf(n)) walk(children);
     }
   };
-  walk(view.nodes as Node[]);
+  for (const nodes of viewListsOf(view)) walk(nodes);
   return out;
 }
 
@@ -222,6 +230,8 @@ class DemoInstance {
   resetToken = 0;
   build = 0;
   running = false;
+  /** The Layout tab's toolbar filter (the real plugin's layoutFilter). */
+  layoutFilter = { status: "", query: "", resets: 0 };
   buildLog = "";
   version = 0;
   view: Record<string, unknown> | null = null;
@@ -293,6 +303,7 @@ class DemoInstance {
       patchNode(nodes, "layout-thread", (n) => {
         (n.thread as { threadId: string }).threadId = HELLO_THREAD;
       });
+      this.patchLayoutFilter(v);
     } else if (this.tab === "shell") {
       patchNode(nodes, "clock", (n) => {
         (n.terminal as { terminalId: string }).terminalId = HELLO_TERMINAL;
@@ -315,6 +326,51 @@ class DemoInstance {
     this.message = "";
     const u = this.viewUpdate();
     if (u) this.hub.publish(u);
+  }
+
+  /**
+   * The Layout tab after its toolbar's filter, as the real plugin renders it (plugins/
+   * examples/hello/layout.go): the runs that match, the chosen chip, the footer's count and
+   * Clear filter, the search's value and reset token. The captured view is unfiltered.
+   */
+  private patchLayoutFilter(v: Record<string, unknown>): void {
+    const f = this.layoutFilter;
+    const status = f.status === "" ? "all" : f.status;
+    const q = f.query.trim().toLowerCase();
+    const states: Record<string, string> = { running: "running", failed: "failed", ok: "ok" };
+    type Row = { key: string; title: string; glyph?: { status?: string }; trailing?: string };
+    let shown = 0;
+    let total = 0;
+    patchNode(v.nodes as Node[], "layout-runs", (n) => {
+      const list = n.list as { rows: Row[] };
+      total = list.rows.length;
+      list.rows = list.rows.filter((r) => (status === "all" || states[r.glyph?.status ?? ""] === status) && (q === "" || `${r.title} ${r.trailing ?? ""}`.toLowerCase().includes(q)));
+      shown = list.rows.length;
+    });
+    const toolbar = (v.toolbar ?? []) as Node[];
+    const footer = (v.footer ?? []) as Node[];
+    patchNode(toolbar, "layout-search-form", (n) => {
+      const form = n.form as { resetToken?: string; fields: { input?: { value?: string } }[] };
+      form.resetToken = String(f.resets);
+      const input = form.fields[0]?.input;
+      if (input) {
+        if (f.query) input.value = f.query;
+        else delete input.value;
+      }
+    });
+    patchNode(toolbar, "layout-status", (n) => {
+      for (const c of (n.chips as { chips: { key: string; selected?: boolean }[] }).chips) {
+        if (c.key === `layout-st-${status}`) c.selected = true;
+        else delete c.selected;
+      }
+    });
+    patchNode(footer, "layout-count", (n) => {
+      (n.text as { content: unknown }).content = `${String(shown)} of ${String(total)} runs`;
+    });
+    patchNode(footer, "layout-footer-bar", (n) => {
+      const clear = (n.actions as { buttons: { key: string; disabled?: boolean }[] }).buttons.find((b) => b.key === "layout-clear");
+      if (clear) clear.disabled = status === "all" && q === "";
+    });
   }
 
   /** The plugin's surface/act. Throws the plugin's refusal as Aborted, like the daemon. */
@@ -373,6 +429,18 @@ class DemoInstance {
       case "click:clear-log":
         this.buildLog = "";
         break;
+      case "submit:layout-filter":
+        this.layoutFilter = { ...this.layoutFilter, query: typeof values.q === "string" ? values.q : "" };
+        break;
+      case "click:layout-status":
+        this.layoutFilter = { ...this.layoutFilter, status: el.data ?? "" };
+        break;
+      case "click:layout-clear":
+        this.layoutFilter = { status: "", query: "", resets: this.layoutFilter.resets + 1 };
+        break;
+      case "click:layout-rerun":
+        toast("build #6 queued again");
+        return;
       case "change:project-changed":
       case "click:stage":
       case "click:open-run":

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { CircleAlert, Puzzle, RotateCcw, TriangleAlert } from "lucide-react";
-import type { PluginStateView } from "@/api/plugin";
+import type { PluginStateView, ViewNode } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,10 @@ import { useShowState } from "@/surfaces/plugin";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
 import { NodeList } from "./NodeList";
+import { SurfaceFrame } from "./SurfaceFrame";
 import { ViewTabsBar } from "./ViewTabsBar";
+
+const NO_NODES: readonly ViewNode[] = [];
 
 /** The plugin and surface ids a kind names (plugin.<plugin>.<surface>). */
 function parseKind(kind: string): { plugin: string; surface: string } {
@@ -76,10 +79,12 @@ const downWords: Partial<Record<PluginStateView, string>> = {
 
 /**
  * One plugin surface tab (docs/notes/plugins-5-gui.md): holds the instance open while the
- * tab shows (one WatchSurface), and draws its view: the header and the plugin's tabs
- * pinned, the body's nodes scrolling under them, and the host's states around it
+ * tab shows (one WatchSurface), and draws its view: the header, the plugin's tabs and the
+ * view's toolbar pinned at the top, its footer pinned at the bottom, the body's nodes
+ * scrolling between them (the surface's own scroll area, [data-scroll-root]: fill nodes
+ * fill it and live nodes count as on screen in it), and the host's states around it
  * (opening, not responding, the plugin down with its last view dimmed, failed, not
- * available here).
+ * available here). docs/notes/plugins-layout-3-chrome.md has the strips.
  */
 export function PluginSurface({ tab }: { tab: Tab }) {
   const panelKey = useCurrentPanelKey() ?? "";
@@ -175,28 +180,36 @@ export function PluginSurface({ tab }: { tab: Tab }) {
 
   return (
     <ViewContext.Provider value={ctx}>
-      {/* @container: the header, tabs and rows adapt to the panel's width (down to 280px). */}
+      {/* @container: the header, tabs, strips and rows adapt to the panel's width (down to 280px). */}
       <div
-        // grow: the body's list is the scroll area's box (a flex spacer reaches its bottom).
-        className="@container flex min-w-0 grow flex-col pb-4"
+        className="@container flex min-h-0 min-w-0 flex-1 flex-col"
         data-testid="plugin-surface"
         data-kind={tab.kind}
         data-phase={phase}
         data-version={version || undefined}
         data-host-rendered={hostRendered || undefined}
       >
-        <div className="sticky top-0 z-10 bg-pane">
-          <SurfaceHeader header={view?.header} fallbackTitle={title} icon={icon} note={view ? undefined : show === "unavailable" ? undefined : "Loading…"} />
-          {view?.tabs && view.tabs.items.length > 0 && <ViewTabsBar tabs={view.tabs} />}
-        </div>
-        {banner}
-        {view ? (
-          <div className={cn("flex grow flex-col px-4 pt-3 @max-[340px]:px-3", down && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-body" data-stale={down || undefined}>
-            <NodeList nodes={view.nodes} box />
-          </div>
-        ) : show !== "unavailable" && !down && error === null ? (
-          <Opening />
-        ) : null}
+        <SurfaceFrame
+          top={
+            <>
+              <SurfaceHeader header={view?.header} fallbackTitle={title} icon={icon} note={view ? undefined : show === "unavailable" ? undefined : "Loading…"} />
+              {view?.tabs && view.tabs.items.length > 0 && <ViewTabsBar tabs={view.tabs} />}
+            </>
+          }
+          toolbar={view?.toolbar ?? NO_NODES}
+          footer={view?.footer ?? NO_NODES}
+          stale={down}
+        >
+          {banner}
+          {view ? (
+            // grow: the body's list is the scroll area's box (a flex spacer reaches its bottom).
+            <div className={cn("flex grow flex-col px-4 pt-3 @max-[340px]:px-3", down && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-body" data-stale={down || undefined}>
+              <NodeList nodes={view.nodes} box />
+            </div>
+          ) : show !== "unavailable" && !down && error === null ? (
+            <Opening />
+          ) : null}
+        </SurfaceFrame>
       </div>
     </ViewContext.Provider>
   );

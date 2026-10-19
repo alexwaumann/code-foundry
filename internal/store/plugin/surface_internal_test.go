@@ -19,6 +19,13 @@ const every = `{
   "header": {"title": "T", "icon": "sparkles", "pill": {"label": "ok", "tone": "ok"}, "subline": "s",
     "actions": [{"key": "h1", "label": "Refresh", "icon": "refresh-cw", "iconOnly": true, "action": {"event": "refresh"}}]},
   "tabs": {"items": [{"key": "ta", "label": "A"}, {"key": "tb", "label": "B", "badge": {"label": "1"}}], "active": "ta"},
+  "toolbar": [
+    {"key": "tq", "form": {"fields": [{"key": "tqf", "name": "q", "input": {"placeholder": "Filter"}}],
+      "submit": {"key": "tqs", "label": "Filter", "icon": "search", "iconOnly": true, "action": {"event": "filter"}}}},
+    {"key": "tc", "chips": {"chips": [{"key": "tc1", "label": "All", "selected": true, "action": {"event": "status", "data": "all"}}]}}],
+  "footer": [
+    {"key": "ft", "text": {"content": "3 runs", "size": "sm"}},
+    {"key": "fa", "actions": {"align": "end", "buttons": [{"key": "fb", "label": "Run", "action": {"command": {"name": "plugin.p.run"}}}]}}],
   "nodes": [
     {"key": "t", "text": {"content": {"spans": [{"text": "x", "strong": true}, {"time": {"at": "2026-10-18T00:00:00Z", "style": "elapsed"}}, {"duration": {"ms": 1000}}, {"text": "l", "url": "https://x.example"}]}}},
     {"key": "m", "markdown": {"source": "**b**"}},
@@ -62,7 +69,8 @@ const every = `{
       {"key": "grpt", "text": {"content": "inline"}},
       {"key": "grpc", "chips": {"chips": [{"key": "gc", "label": "Lint", "action": {"event": "chip"}}]}},
       {"key": "grpa", "actions": {"buttons": [{"key": "gpb", "label": "In a group", "action": {"event": "line"}}]}},
-      {"key": "grpp", "progress": {"value": 0.25}}]}}
+      {"key": "grpp", "progress": {"value": 0.25}}]}},
+    {"key": "ct", "container": {"width": "narrow", "children": [{"key": "ct1", "text": {"content": "centred"}}]}}
   ]
 }`
 
@@ -73,7 +81,7 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if len(v.Nodes) != 21 || !json.Valid(canon) {
+	if len(v.Nodes) != 22 || len(v.Toolbar) != 2 || len(v.Footer) != 2 || !json.Valid(canon) {
 		t.Fatalf("nodes %d, canon %s", len(v.Nodes), canon)
 	}
 	idx := buildIndex(v)
@@ -83,7 +91,8 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	}
 	want := map[string]string{"h1": "click", "ta": "tab", "tb": "tab", "r1": "click", "r1b": "click", "c1": "click", "b1": "click",
 		"b2": "command", "b3": "command", "b4": "open_url", "b5": "copy", "f3": "change", "fs": "submit", "fr": "click", "cb": "click",
-		"gb": "click", "gc": "click", "gpb": "click"}
+		"gb": "click", "gc": "click", "gpb": "click",
+		"tqs": "submit", "tc1": "click", "fb": "command"}
 	if fmt.Sprint(kinds) != fmt.Sprint(want) {
 		t.Errorf("elements\n got %v\nwant %v", kinds, want)
 	}
@@ -119,7 +128,7 @@ func TestValidateViewRefuses(t *testing.T) {
 		{"store without secrets", every, &pluginsdk.Permissions{Commands: []string{"thread.send"}}, "store needs"},
 		{"deep", mod(`"children": [{"key": "s2", "text": {"content": "deep"}}]`,
 			`"children": [{"key": "s2", "section": {"children": [{"key": "s3", "columns": {"items": [{"key": "s3a", "children": [{"key": "s4", "pane": {"children": [{"key": "s5", "text": {"content": "x"}}]}}]}, {"key": "s3b", "children": []}]}}]}}]`), nil,
-			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane, grid), at most 4"},
+			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane, grid, container), at most 4"},
 		{"one column", `{"nodes": [{"key": "c", "columns": {"items": [{"key": "c1", "children": []}]}}]}`, nil, "1 columns, want 2 to 4"},
 		{"pane min above height", mod(`"height": 300, "minHeight": 200`, `"height": 300, "minHeight": 400`), nil, "400 px is above the pane's height (300 px)"},
 		{"options with a source", mod(`"select": {"optionsSource": "projects"}`, `"select": {"optionsSource": "projects", "options": [{"key": "o9", "value": "v", "label": "L"}]}`), nil, "fills the options"},

@@ -843,7 +843,7 @@ func (in *instance) renderLocked() []byte {
 	if len(in.logs) > 0 {
 		var v ui.View
 		if err := json.Unmarshal(in.base, &v); err == nil {
-			walkNodes(v.Nodes, func(n *ui.Node) {
+			walkView(&v, func(n *ui.Node) {
 				if n.Log == nil {
 					return
 				}
@@ -861,8 +861,16 @@ func (in *instance) renderLocked() []byte {
 	return out
 }
 
+// walkView calls fn for every node of the view: the toolbar's, the body's and the
+// footer's (ui.View.NodeLists), containers' children included.
+func walkView(v *ui.View, fn func(n *ui.Node)) {
+	for _, nodes := range v.NodeLists() {
+		walkNodes(nodes, fn)
+	}
+}
+
 // walkNodes calls fn for every node, containers' children included (sections, columns,
-// panes: ui.Node.Children), parents before their children.
+// panes, containers: ui.Node.Children), parents before their children.
 func walkNodes(nodes []ui.Node, fn func(n *ui.Node)) {
 	for i := range nodes {
 		fn(&nodes[i])
@@ -1004,7 +1012,7 @@ func (in *instance) countLocked(now time.Time) bool {
 
 func hasLogContent(v *ui.View) bool {
 	has := false
-	walkNodes(v.Nodes, func(n *ui.Node) {
+	walkView(v, func(n *ui.Node) {
 		if n.Log != nil && (n.Log.Text != "" || len(n.Log.Lines) > 0) {
 			has = true
 		}
@@ -1016,7 +1024,7 @@ func hasLogContent(v *ui.View) bool {
 // lines replaces its buffer, one with neither keeps it, and a node gone drops it.
 func (in *instance) installLogsLocked(v *ui.View) {
 	next := map[string]*logBuf{}
-	walkNodes(v.Nodes, func(n *ui.Node) {
+	walkView(v, func(n *ui.Node) {
 		if n.Log == nil {
 			return
 		}
@@ -1057,11 +1065,12 @@ func (in *instance) reject(displayName string, errs []string, dev bool) {
 	if in.view != nil {
 		prev := *in.view
 		keys := map[string]bool{}
-		walkNodes(prev.Nodes, func(n *ui.Node) { keys[n.Key] = true })
+		walkView(&prev, func(n *ui.Node) { keys[n.Key] = true })
 		for keys[notice.Key] {
 			notice.Key += "-"
 		}
-		v = ui.View{Header: prev.Header, Tabs: prev.Tabs, Nodes: append([]ui.Node{notice}, prev.Nodes...)}
+		v = prev
+		v.Nodes = append([]ui.Node{notice}, prev.Nodes...)
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

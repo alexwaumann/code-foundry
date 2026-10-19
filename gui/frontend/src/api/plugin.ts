@@ -393,6 +393,15 @@ export interface GroupData {
   noWrap?: boolean;
 }
 
+/**
+ * Caps its nodes' width and centres them: "narrow" at most 680 px, "wide" 1080 px, "full"
+ * (absent) no cap (components/plugin/layout.ts containerMaxWidth).
+ */
+export interface ContainerData {
+  width?: "narrow" | "wide" | "full";
+  children: ViewNode[];
+}
+
 /** Each node kind's data, by the JSON field that names the kind. */
 export interface NodeData {
   text: TextData;
@@ -415,21 +424,40 @@ export interface NodeData {
   divider: DividerData;
   spacer: SpacerData;
   group: GroupData;
+  container: ContainerData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
 
-/** One version of a surface's view. */
+/**
+ * One version of a surface's view: the header, tabs, and the active tab's toolbar, body
+ * nodes and footer. The toolbar and footer are strips pinned around the scrolling body
+ * (components/plugin/ToolbarBar, FooterBar): up to 6 text, chips, actions, progress or
+ * form nodes each; absent when the plugin sends none.
+ */
 export interface PluginViewModel {
   header?: ViewHeader;
   tabs?: ViewTabs;
+  toolbar?: ViewNode[];
   nodes: ViewNode[];
+  footer?: ViewNode[];
+}
+
+/** Which of a view's node lists: the toolbar, the body or the footer. */
+export type ViewList = "toolbar" | "nodes" | "footer";
+
+/** The view's node lists in order (pluginsdk/ui View.NodeLists). Every walk over a view starts here, then goes through childLists. */
+export const VIEW_LISTS: readonly ViewList[] = ["toolbar", "nodes", "footer"];
+
+/** Every top-level node of the view: the toolbar's, the body's and the footer's. */
+export function viewNodes(v: PluginViewModel): ViewNode[] {
+  return VIEW_LISTS.flatMap((l) => v[l] ?? []);
 }
 
 /** A node's kind (its one kind field), or null for a node this GUI does not know. */
@@ -440,8 +468,8 @@ export function nodeKind(n: ViewNode): NodeKind | null {
 
 /**
  * The node lists a node holds (a section's children, each column's, a pane's, each grid
- * item's, a group's items), in order; empty for any other node. Every walk over a view's
- * nodes goes through this.
+ * item's, a group's items, a container's), in order; empty for any other node. Every walk
+ * over a view's nodes goes through this (from each of VIEW_LISTS).
  */
 export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
   if (n.section) return [n.section.children];
@@ -449,6 +477,7 @@ export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
   if (n.pane) return [n.pane.children];
   if (n.grid) return n.grid.items.map((it) => it.children);
   if (n.group) return [n.group.items];
+  if (n.container) return [n.container.children];
   return [];
 }
 
@@ -467,6 +496,7 @@ export function withChildLists(n: ViewNode, lists: readonly (readonly ViewNode[]
     return { ...n, grid: { ...n.grid, items } };
   }
   if (n.group) return { ...n, group: { ...n.group, items: list(0, n.group.items) } };
+  if (n.container) return { ...n, container: { ...n.container, children: list(0, n.container.children) } };
   return n;
 }
 

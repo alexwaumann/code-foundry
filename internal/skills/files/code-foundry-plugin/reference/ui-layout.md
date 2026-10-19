@@ -1,13 +1,15 @@
-# Layout: columns, panes, grids and inline nodes
+# Layout: columns, panes, grids, inline nodes, containers, toolbar and footer
 
 Container nodes arrange other nodes: **columns** (side by side), **pane** (a box with its
-own height and scroll) and **grid** (cards in as many columns as fit). **divider**,
-**spacer** and **group** (leaves on one line) space and line up nodes without a
-container. A surface shows in the side panel (about 360 px wide, the user can widen it)
-and, later, in pages of the main pane: one view serves both, so every container says how
-it degrades to one column. Check `h.HasCapability("view.node.columns")`
-(`view.node.pane`, `view.node.grid`, `view.node.divider`, `view.node.spacer`,
-`view.node.group`) before sending them: an older host refuses the view.
+own height and scroll), **grid** (cards in as many columns as fit) and **container** (a
+capped, centred width). **divider**, **spacer** and **group** (leaves on one line) space
+and line up nodes without a container. Two view slots pin nodes around the scrolling
+body: the **toolbar** and the **footer**. A surface shows in the side panel (about 360 px
+wide, the user can widen it) and, later, in pages of the main pane: one view serves both,
+so every container says how it degrades to one column. Check
+`h.HasCapability("view.node.columns")` (`view.node.pane`, `view.node.grid`,
+`view.node.divider`, `view.node.spacer`, `view.node.group`, `view.node.container`,
+`view.toolbar`, `view.footer`) before sending them: an older host refuses the view.
 
 ## columns
 
@@ -148,6 +150,68 @@ line.Group.NoWrap = true // the default wraps
   An actions bar's own `align` takes only `start` or `end`.
 - A group is not a container: its items sit at its depth. They count as elements.
 
+## container
+
+```json
+{"key": "page", "container": {"width": "narrow", "children": [{"key": "intro", "markdown": {"source": "…"}}]}}
+```
+
+```go
+page := ui.NewContainer("page", ui.ContainerNarrow, introNode, formNode) // ui.ContainerWide, ui.ContainerFull
+```
+
+`width`: `narrow` is at most 680 px, `wide` at most 1080 px, both centred; `full` (the
+default) has no cap. The side panel is narrower than either, so there every container is
+full width; on a page (or a widened panel) a narrow container keeps text and forms at
+reading width and a wide one is the page's main column. It draws nothing and spaces its
+nodes like the list around it. It is a container for the depth limit; fill looks past it.
+
+## toolbar and footer
+
+```json
+{"header": {"title": "Runs"},
+ "toolbar": [
+   {"key": "search", "form": {"fields": [{"key": "search-q", "name": "q", "label": "Filter runs", "input": {"placeholder": "Filter runs"}}],
+     "submit": {"key": "search-go", "label": "Filter", "icon": "search", "iconOnly": true, "action": {"event": "filter"}}}},
+   {"key": "status", "chips": {"chips": [{"key": "st-all", "label": "All", "selected": true, "action": {"event": "status", "data": "all"}},
+     {"key": "st-failed", "label": "Failed", "status": "failed", "action": {"event": "status", "data": "failed"}}]}}],
+ "nodes": [],
+ "footer": [
+   {"key": "count", "text": {"content": "2 of 6 runs", "size": "sm"}},
+   {"key": "bar", "actions": {"align": "end", "buttons": [{"key": "rerun", "label": "Run again", "style": "attention", "action": {"event": "rerun"}}]}}]}
+```
+
+```go
+submit := ui.EventButton("search-go", "Filter", "filter").WithIcon("search").AsIconOnly()
+search := ui.NewForm("search", &submit, ui.TextField("search-q", "q", "Filter runs").WithPlaceholder("Filter runs").WithValue(query))
+v := ui.View{Header: h, Toolbar: []ui.Node{search, statusChips}, Nodes: body,
+	Footer: []ui.Node{countText, ui.Node{Key: "bar", Actions: &ui.Actions{Align: ui.AlignEnd, Buttons: buttons}}}}
+```
+
+- The **toolbar** sits under the header and the plugin's tabs, the **footer** at the
+  bottom of the surface; the body scrolls between them and never under them. Each has a
+  hairline toward the body and the panel's padding.
+- **Up to 6 nodes each**, of these kinds only: `text`, `chips`, `actions`, `progress`,
+  `form` whose fields are inputs, toggles and dropdown selects (no fieldsets, no
+  `"style": "list"` selects), `divider` without a label (a vertical hairline between
+  neighbours in the row), `spacer` (`size` px across; `flex: true` takes the row's free
+  width, so what follows sits at its end) and `group`. Anything else is refused
+  (`toolbar[1]: a list node cannot be in the toolbar (…)`). Their nodes and elements count
+  toward the view's 400 and share its keys.
+- **One row that wraps**: a form and a progress bar take the free width, an end-aligned
+  actions bar goes to the row's end, text and chips are as wide as their content; what
+  does not fit moves to the next line (in the panel, a search field and four chips are two
+  lines). In a strip a form's text inputs and selects show no label or description (the
+  label names the control for screen readers: give a `placeholder`), a toggle shows its
+  label beside it; errors show under the control and the form's own error under the row.
+  Drafts, Enter to submit, Escape, `busy` and `resetToken` work as in the body.
+- **Per view tab**: the toolbar and footer are part of the view the plugin sends for the
+  active tab, like `nodes`. The host keeps nothing of them across tabs: a tab whose view
+  has none shows none, and a toolbar that belongs on every tab is sent with every tab's
+  view (its form drafts are still kept per tab).
+- Keep them short: the footer for a count and the actions on the whole view, the toolbar
+  for search and filters. Content that grows belongs in the body.
+
 ## What "fill" fills
 
 A thread, terminal or pane with `height: "fill"` takes the height of its **box** below
@@ -155,8 +219,9 @@ its own top:
 
 - its box is the nearest enclosing pane with a px or fill height; an auto pane, a
   section and a column are not boxes (fill looks past them);
-- with no such pane, the box is the surface's scrolling body (the panel), less its 16 px
-  bottom padding;
+- with no such pane, the box is the surface's scrolling body (the panel between the
+  toolbar and the footer, or the header and the panel's bottom), less its 16 px bottom
+  padding, so a fill node ends 16 px above the footer;
 - a fill thread or terminal is never under 240 px, a fill pane never under its
   `minHeight` (240 px when unset): when its box has less room, the box scrolls;
 - two fill nodes in one box do not share it: the first takes the rest, the second is
@@ -171,13 +236,15 @@ grows to match.
 ## Limits
 
 - 2..4 columns; weight 1..6; width 160..640 px; pane height 120..1600 px or auto or fill;
-  minHeight 0 or 120..1600 px.
+  minHeight 0 or 120..1600 px; container width narrow (680 px), wide (1080 px) or full.
 - Grid: 1..24 items, minWidth 160..480 px, at most 6 columns, span 1..2. Group: 1..8
-  items. Spacer: size 4..64 px. Divider label: 200 characters.
-- A node sits inside at most 4 containers (section, columns, pane, grid, in any mix):
-  `section > columns > pane > section > node` is the deepest. A column is part of its
-  columns node and a grid item of its grid, not a level; a group is no level.
-- Columns, grid items and group items count as elements toward the view's 400.
+  items. Spacer: size 4..64 px. Divider label: 200 characters. Toolbar and footer: 6
+  nodes each.
+- A node sits inside at most 4 containers (section, columns, pane, grid, container, in
+  any mix): `section > columns > pane > section > node` is the deepest. A column is part
+  of its columns node and a grid item of its grid, not a level; a group is no level.
+- Columns, grid items, group items and the toolbar's and footer's nodes count as
+  elements toward the view's 400.
 - Thread and terminal nodes inside panes and columns are live streams like any others: the
   app keeps at most 2 live at once across plugin views (`primitives.md`, thread and
   terminal), so a layout with three threads shows the third paused with Attach.
@@ -188,10 +255,14 @@ grows to match.
   side by side on a page, the pane over the facts in the panel.
 - **Summary, then detail on a page**: `columns(collapse first)[ col(summary), col(weight 2:
   pane(fill, noScroll: thread(fill))) ]`: the panel shows the summary only.
-- **A list that must not push the actions off screen**: `pane(400: list)` then the actions
-  bar after it.
+- **A list that must not push the actions off screen**: the actions bar in the `footer`
+  (or `pane(400: list)` then the bar after it).
 - **Cards**: `grid[ item(section card), item(span 2: section card), ... ]`: one column in
   the panel, a dashboard on a page.
 - **A status line**: `group(between)[ text, actions ]` instead of a text and an actions
   bar on two lines.
 - **Actions at the bottom of a box**: `pane(fill)[ list, spacer(flex), actions ]`.
+- **Search and filter a list**: `toolbar[ form(input q, submit icon-only), chips(status) ]`
+  over the list in the body, the count in the `footer`.
+- **A page's reading column**: `container(narrow)[ markdown, form ]`; the panel shows it
+  full width.

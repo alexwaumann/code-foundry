@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PluginViewModel, ViewNode } from "@/api/plugin";
+import { viewNodes, type PluginViewModel, type ViewNode } from "@/api/plugin";
 import { demoView } from "@/test/pluginFixtures";
 import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formHasErrors, formsOf, LOG_MAX_LINES, reconcileResets, settleSubmits, unknownNodes } from "./pluginSurfaces";
 
@@ -45,17 +45,30 @@ describe("logs", () => {
     expect(lines.truncated).toBe(true);
   });
 
-  it("finds a log inside a pane inside a column, keeping the other lists as they were", () => {
+  it("finds a log inside a pane inside a column inside a container, keeping the other lists as they were", () => {
     const v = demoView("layout");
     const out = appendToView(v, "layout-log", "", [{ text: "step 25  ok" }]);
-    const left = out.nodes[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log;
+    const page = (x: PluginViewModel) => x.nodes[0]?.container?.children ?? [];
+    const left = page(out)[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log;
     expect(left?.lines?.at(-1)).toEqual({ text: "step 25  ok" });
     expect(left?.lines).toHaveLength(25);
-    // Only the path to the log is new: the other column and the next node keep their identity.
-    expect(out.nodes[1]?.columns?.items[1]).toBe(v.nodes[1]?.columns?.items[1]);
-    expect(out.nodes[2]).toBe(v.nodes[2]);
-    expect(v.nodes[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log?.lines).toHaveLength(24);
+    // Only the path to the log is new: the other column, the next node and the strips keep their identity.
+    expect(page(out)[1]?.columns?.items[1]).toBe(page(v)[1]?.columns?.items[1]);
+    expect(page(out)[2]).toBe(page(v)[2]);
+    expect(out.toolbar).toBe(v.toolbar);
+    expect(out.footer).toBe(v.footer);
+    expect(page(v)[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log?.lines).toHaveLength(24);
     expect(appendToView(v, "layout-pane", "x", [])).toBe(v);
+    // A key in a strip that is no log leaves the view alone too.
+    expect(appendToView(v, "layout-count", "x", [])).toBe(v);
+  });
+
+  it("finds a log in the toolbar or footer lists (the host walks every list), keeping the body", () => {
+    const v: PluginViewModel = { toolbar: [{ key: "t", text: { content: "t" } }], nodes: [{ key: "b", text: { content: "b" } }], footer: [{ key: "l", log: { text: "" } }] };
+    const out = appendToView(v, "l", "x", []);
+    expect(out.footer?.[0]?.log?.text).toBe("x");
+    expect(out.nodes).toBe(v.nodes);
+    expect(out.toolbar).toBe(v.toolbar);
   });
 
   it("finds a log inside a grid item, keeping the other items as they were", () => {
@@ -127,6 +140,25 @@ describe("drafts", () => {
     expect(formHasErrors({ fields: [{ key: "fs", fieldset: { fields: [{ key: "b", error: "x" }] } }] })).toBe(true);
   });
 
+  it("finds forms in the toolbar and footer: drafts reset and settle there as in the body", () => {
+    const v = demoView("layout");
+    expect(formsOf(viewNodes(v)).map((f) => f.key)).toEqual(["layout-search-form"]);
+    const dk = draftKeyOf("i", "layout", "layout-search-form");
+    let r = reconcileResets({}, {}, "i", v);
+    expect(r.resetTokens[dk]).toBe("0");
+    const drafts = { [dk]: { q: "fix" } };
+    const cleared: PluginViewModel = { ...v, toolbar: v.toolbar?.map((n) => (n.form ? { ...n, form: { ...n.form, resetToken: "1" } } : n)) };
+    r = reconcileResets(drafts, r.resetTokens, "i", cleared);
+    expect(r.drafts).toEqual({});
+    // A footer form's submit settles on the next view without errors.
+    const footed: PluginViewModel = { nodes: [], footer: [{ key: "f", form: { fields: [{ key: "a", name: "a", input: {} }] } }] };
+    const fk = draftKeyOf("i", "", "f");
+    expect(settleSubmits({ [fk]: { a: "x" } }, { [fk]: 1 }, "i", footed, 2).drafts).toEqual({});
+    const failed: PluginViewModel = { nodes: [], footer: [{ key: "f", form: { fields: [{ key: "a", name: "a", input: {} }], error: "no" } }] };
+    expect(settleSubmits({ [fk]: { a: "x" } }, { [fk]: 1 }, "i", failed, 2).drafts).toEqual({ [fk]: { a: "x" } });
+    expect(unknownNodes(viewNodes({ toolbar: [{ key: "u" }], nodes: [], footer: [{ key: "w", container: { children: [{ key: "z" }] } }] }))).toEqual(["u", "z"]);
+  });
+
   it("lists forms at any depth", () => {
     expect(formsOf(demoView("form").nodes).map((f) => f.key)).toEqual(["settings"]);
     expect(formsOf([{ key: "s", section: { children: [{ key: "f", form: { fields: [] } }] } }]).map((f) => f.key)).toEqual(["f"]);
@@ -135,6 +167,7 @@ describe("drafts", () => {
       formsOf([{ key: "c", columns: { items: [{ key: "a", children: [form("f1")] }, { key: "b", children: [{ key: "p", pane: { children: [form("f2")] } }] }] } }]).map((f) => f.key),
     ).toEqual(["f1", "f2"]);
     expect(formsOf([{ key: "g", grid: { items: [{ key: "a", children: [form("f3")] }] } }]).map((f) => f.key)).toEqual(["f3"]);
+    expect(formsOf([{ key: "w", container: { width: "narrow", children: [form("f4")] } }]).map((f) => f.key)).toEqual(["f4"]);
   });
 
   it("names nodes of kinds this GUI does not know", () => {

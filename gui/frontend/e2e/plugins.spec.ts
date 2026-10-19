@@ -236,12 +236,85 @@ test("the layout tab: columns stack in the panel and sit side by side once it is
   await expect(detail.getByTestId("plugin-column")).toHaveCount(2);
   const thread = detail.getByTestId("plugin-thread");
   await expect(thread).toHaveAttribute("data-thread-id", "s-hello-assistant");
-  // The thread fills its fill pane, which fills the rest of the panel (at least its 320 px minHeight).
+  // The thread fills its fill pane, which fills the rest of the panel (at least its 320 px
+  // minHeight) above the footer: the body scrolls between the toolbar and the footer.
   const chat = detail.locator('[data-testid="plugin-pane"][data-key="layout-chat-pane"]');
   const c = await chat.boundingBox();
   const t = await thread.boundingBox();
   expect(c && c.height >= 320).toBe(true);
   expect(c && t && Math.abs(t.y + t.height - (c.y + c.height)) < 2).toBe(true);
+  const scroll = surface(page).getByTestId("plugin-scroll");
+  await scroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  const cAtEnd = await chat.boundingBox();
+  const foot = await surface(page).getByTestId("plugin-footer").boundingBox();
+  expect(cAtEnd && foot && Math.abs(foot.y - 16 - (cAtEnd.y + cAtEnd.height)) < 2).toBe(true);
+});
+
+test("the layout tab's toolbar and footer stay pinned while the body scrolls between them; the toolbar filters, the footer clears", async ({ page }) => {
+  await openDemo(page);
+  await tab(page, "layout").click();
+  const toolbar = surface(page).getByTestId("plugin-toolbar");
+  const footer = surface(page).getByTestId("plugin-footer");
+  await expect(toolbar).toBeVisible();
+  await expect(footer).toBeVisible();
+  // Under the plugin's tabs, at the bottom of the panel; a hairline toward the body.
+  const tabsBox = await surface(page).getByTestId("plugin-tabs").boundingBox();
+  const panelBody = await page.getByTestId("panel-body").boundingBox();
+  const tb = await toolbar.boundingBox();
+  const ft = await footer.boundingBox();
+  expect(tabsBox && tb && Math.abs(tb.y - (tabsBox.y + tabsBox.height)) < 1).toBe(true);
+  expect(panelBody && ft && Math.abs(ft.y + ft.height - (panelBody.y + panelBody.height)) < 1).toBe(true);
+  expect(await toolbar.evaluate((el) => [getComputedStyle(el).borderBottomWidth, getComputedStyle(el).borderTopWidth])).toEqual(["1px", "0px"]);
+  expect(await footer.evaluate((el) => [getComputedStyle(el).borderTopWidth, getComputedStyle(el).borderBottomWidth])).toEqual(["1px", "0px"]);
+  expect(await toolbar.evaluate((el) => getComputedStyle(el).paddingLeft)).toBe("16px");
+  // The search field, then the four chips (under it at the panel's default width).
+  const input = toolbar.getByTestId("plugin-input");
+  await expect(input).toHaveAttribute("placeholder", "Filter runs");
+  await expect(toolbar.getByTestId("plugin-chip")).toHaveCount(4);
+  // The body scrolls; the panel's own body does not, and the strips stay where they are.
+  const scroll = surface(page).getByTestId("plugin-scroll");
+  expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  expect(await page.getByTestId("panel-body").evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  const sb = await scroll.boundingBox();
+  expect(sb && tb && ft && Math.abs(sb.y - (tb.y + tb.height)) < 1 && Math.abs(sb.y + sb.height - ft.y) < 1).toBe(true);
+  await scroll.evaluate((el) => {
+    el.scrollTop = 400;
+  });
+  await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+  const tb2 = await toolbar.boundingBox();
+  const ft2 = await footer.boundingBox();
+  expect(tb && tb2 && tb2.y === tb.y).toBe(true);
+  expect(ft && ft2 && ft2.y === ft.y).toBe(true);
+
+  // Filter: Enter submits the toolbar's form; the runs and the footer's count follow.
+  const count = footer.locator('[data-testid="plugin-strip-item"][data-key="layout-count"]');
+  await expect(count).toHaveText("6 of 6 runs");
+  const clear = footer.locator('[data-testid="plugin-button"][data-key="layout-clear"]');
+  await expect(clear).toBeDisabled();
+  await input.fill("fix");
+  await input.press("Enter");
+  await expect(count).toHaveText("2 of 6 runs");
+  expect((await acts()).some((a) => a.startsWith("hello/demo/thread:s-3 layout-search "))).toBe(true);
+  await expect(surface(page).locator('[data-testid="plugin-row"][data-key^="layout-run-"]')).toHaveCount(2);
+  await toolbar.locator('[data-testid="plugin-chip"][data-key="layout-st-failed"]').click();
+  await expect(count).toHaveText("1 of 6 runs");
+  await expect(toolbar.locator('[data-testid="plugin-chip"][data-key="layout-st-failed"]')).toHaveAttribute("data-selected", "true");
+  await expect(input).toHaveValue("fix");
+  // Clear filter in the footer: every run again, the search's draft dropped by its reset token.
+  await expect(clear).toBeEnabled();
+  await clear.click();
+  await expect(count).toHaveText("6 of 6 runs");
+  await expect(input).toHaveValue("");
+  await expect(clear).toBeDisabled();
+  await expect(surface(page).locator('[data-testid="plugin-row"][data-key^="layout-run-"]')).toHaveCount(6);
+
+  // Another view tab brings its own strips (none).
+  await tab(page, "overview").click();
+  await expect(tab(page, "overview")).toHaveAttribute("aria-selected", "true");
+  await expect(surface(page).getByTestId("plugin-toolbar")).toHaveCount(0);
+  await expect(surface(page).getByTestId("plugin-footer")).toHaveCount(0);
 });
 
 test("the layout tab: the grid stacks in the panel and goes to columns as it widens; dividers, inline groups and a flex spacer", async ({ page }) => {
