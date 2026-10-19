@@ -32,7 +32,7 @@ func threadRead(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.read",
 		Title: "Read Thread",
 		Description: "Print a thread's latest items as a readable log, like thread.items: the last 20, or with since the ones " +
-			"after an item (oldest first, at most last). --json: {items, nextSince, more}; pass nextSince as since to read on.",
+			"after an item (oldest first, at most last). --json: {items, nextSince, more}.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{

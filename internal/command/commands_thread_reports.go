@@ -59,7 +59,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 		Name:  "thread.reports",
 		Title: "Show Thread Reports",
 		Description: "The reports of threads, for the thread that created them: one line each " +
-			"(`-`: no report yet; `(data)`: it has JSON data, see full). --json: one object each, reportData parsed.",
+			"(`-`: no report yet; `(data)`: it has JSON data, see full; `*`: from before its last message). --json: one object each.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{

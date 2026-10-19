@@ -65,7 +65,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Name:  "thread.mcp-reconnect",
 			Title: "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
-				"After logging in to a server with /mcp in an interactive claude (a shell in the bottom panel), this picks the login up.",
+				"It picks up a login made with /mcp in an interactive claude (a bottom-panel shell).",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
