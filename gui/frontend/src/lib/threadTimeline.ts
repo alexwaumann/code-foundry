@@ -20,7 +20,11 @@
  *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
  *   turns into the finished one in place (docs/notes/thread-fold-3-header.md);
  * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
- *   ends) stands alone between turns: it closes the turn before it and never folds.
+ *   ends) stands alone between turns: it closes the turn before it and never folds;
+ * - while the thread is on a turn, each run of work between two texts (steers, notes,
+ *   permission requests and questions) collapses into one strip row showing the latest
+ *   step and the run's step count (`stripRuns`, docs/notes/live-tool-strip.md). Finished
+ *   turns are unaffected.
  */
 import type { RequestStateView, ThreadItemKind, ToolStatusView } from "@/api/thread";
 
@@ -62,7 +66,16 @@ export type WorkNode =
   /** A user message sent while the turn ran (a steer); it stays visible when the turn folds. */
   | { type: "steer"; key: string; id: string }
   /** A system note on its own line between turns (an item of kind "note"). */
-  | { type: "system"; key: string; id: string };
+  | { type: "system"; key: string; id: string }
+  /**
+   * A run of work in the live turn collapsed into one row (stripRuns): its nodes in order
+   * (thinking included), the latest step (never thinking) and the step count. Keyed by the
+   * run's first item, so the key holds while the run grows.
+   */
+  | { type: "strip"; key: string; nodes: WorkNode[]; latest: StripStep; steps: number };
+
+/** A strip's latest step: a tool row (an Agent included) or an explore group. */
+export type StripStep = Extract<WorkNode, { type: "tool" } | { type: "group" }>;
 
 /** One row of the timeline (what the virtualizer lays out). */
 export type TimelineRow =
@@ -285,6 +298,11 @@ export interface TimelineOptions {
   /** The thread works (busy or starting) and no request waits: the open turn shows its live ("Working") header. */
   working: boolean;
   /**
+   * The thread is on its open turn (working, or waiting on the user mid-turn): that turn's
+   * runs of work collapse into strips (stripRuns). Absent: no strips.
+   */
+  strips?: boolean;
+  /**
    * Whether a finished turn (by its turn_end id) ended while the list was scrolled up: it
    * stays open until the list is pinned at the bottom again (stores/thread.ts
    * deferTurnFolds). The user's choice still wins. Absent: none.
@@ -314,6 +332,8 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   // The open turn while the thread works; none when the last turn ended (nothing runs
   // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
   const live = opts.working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
+  // The open turn the thread is on (also while a request waits): its work runs as strips.
+  const stripped = opts.strips && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
@@ -321,11 +341,62 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
-    for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
+    if (t === stripped) rows.push(...stripRuns(t.body));
+    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
   });
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
   if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
   return rows;
+}
+
+/**
+ * Work a strip collapses: tool rows without a permission request (an Agent included),
+ * explore groups, thinking. Everything else (text, steers, notes, questions, permission
+ * rows, a tool with a permission request attached) breaks the run and shows on its own.
+ */
+function inRun(n: WorkNode): boolean {
+  return (n.type === "tool" && n.permissionId === "") || n.type === "group" || n.type === "thinking";
+}
+
+/** The first item of a node: a group's first member and merged thinking's first item, so it holds as the node grows. */
+function firstItemId(n: WorkNode): string {
+  switch (n.type) {
+    case "group":
+    case "thinking":
+      return n.ids[0] ?? "";
+    case "strip":
+      return n.nodes[0] ? firstItemId(n.nodes[0]) : "";
+    default:
+      return n.id;
+  }
+}
+
+/**
+ * The live turn's body with each run of work (consecutive `inRun` nodes) of two steps or
+ * more as one strip row; a run of one step stays as its rows. Steps count as the header's
+ * do (a group or an Agent is one; thinking is none). The strip's key is its run's first
+ * item (`strip:<id>`), stable while the run grows, so its expanded state holds.
+ */
+export function stripRuns(body: readonly WorkNode[]): WorkNode[] {
+  const out: WorkNode[] = [];
+  let run: WorkNode[] = [];
+  const flush = () => {
+    const steps = run.filter((n): n is StripStep => n.type === "tool" || n.type === "group");
+    const latest = steps[steps.length - 1];
+    const first = run[0];
+    if (latest && first && steps.length >= 2) out.push({ type: "strip", key: `strip:${firstItemId(first)}`, nodes: run, latest, steps: steps.length });
+    else out.push(...run);
+    run = [];
+  };
+  for (const n of body) {
+    if (inRun(n)) run.push(n);
+    else {
+      flush();
+      out.push(n);
+    }
+  }
+  flush();
+  return out;
 }
 
 /**

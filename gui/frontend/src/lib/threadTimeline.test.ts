@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildTurns, decodeTimelineKey, groupLabel, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow } from "./threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, groupLabel, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 let n = 0;
 function item(kind: TimelineItem["kind"], over: Partial<TimelineItem> = {}): TimelineItem {
@@ -30,6 +30,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return r.id ? `header${r.folded ? `(folded ${String(r.steps)})` : ""}` : `live(${r.since},${String(r.steps)})`;
       case "note":
         return `note:${r.kind}`;
+      case "strip":
+        return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
       default:
         return `${r.type}:${r.id}`;
     }
@@ -322,6 +324,123 @@ describe("buildTurns / buildRows", () => {
   it("an empty thread has no rows, and a starting one only a live header", () => {
     expect(buildRows(buildTurns([]), open)).toEqual([]);
     expect(shape(buildRows(buildTurns([]), { fold: () => undefined, working: true }))).toEqual(["live(,0)"]);
+  });
+});
+
+describe("live tool strip (stripRuns)", () => {
+  /** The live turn with strips on. */
+  const live = { fold: () => undefined, working: true, strips: true };
+  const strips = (rows: readonly TimelineRow[]) => rows.filter((r): r is Extract<WorkNode, { type: "strip" }> => r.type === "strip");
+
+  // The live header's count is the turn's (text and thinking included); a strip's counts tools and groups only.
+  it.each<[string, () => TimelineItem[], string[]]>([
+    [
+      "text breaks a run; each run of two steps or more is one strip",
+      () => [user("u1"), tool("Bash"), tool("Edit"), text("a"), tool("Bash"), tool("Write"), tool("Bash")],
+      ["user:u1", "live(u1,6)", "strip(2)[tool:Bash tool:Edit]", "text:a", "strip(3)[tool:Bash tool:Write tool:Bash]"],
+    ],
+    ["a run of one step is not stripped", () => [user("u1"), tool("Bash"), text("a"), tool("Edit")], ["user:u1", "live(u1,3)", "tool:Bash", "text:a", "tool:Edit"]],
+    [
+      "thinking is absorbed into a run but is no step: one step and thinking stay rows",
+      () => [user("u1"), item("thinking"), tool("Bash"), item("thinking"), text("a"), item("thinking"), tool("Bash"), tool("Edit"), item("thinking")],
+      ["user:u1", "live(u1,8)", "thinking(1)", "tool:Bash", "thinking(1)", "text:a", "strip(2)[thinking(1) tool:Bash tool:Edit thinking(1)]"],
+    ],
+    [
+      "a group and an Agent count as one step each",
+      () => [user("u1"), tool("Read"), tool("Grep"), tool("Read"), tool("Agent", { toolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" })],
+      ["user:u1", "live(u1,2)", "strip(2)[group(Read,Grep,Read) tool:Agent[tool:Bash tool:Bash]]"],
+    ],
+    [
+      "a steer breaks a run",
+      () => [user("u1"), tool("Bash"), tool("Edit"), user("s1"), tool("Bash"), tool("Bash")],
+      ["user:u1", "live(u1,4)", "strip(2)[tool:Bash tool:Edit]", "steer:s1", "strip(2)[tool:Bash tool:Bash]"],
+    ],
+    [
+      "a tool with a permission request breaks out; the next call starts a new run",
+      () => [
+        user("u1"),
+        tool("Bash"),
+        tool("Edit"),
+        tool("Bash", { toolUseId: "tu-p", toolStatus: "running" }),
+        item("permission", { id: "p1", toolUseId: "tu-p", name: "Bash", requestState: "denied" }),
+        tool("Bash"),
+        tool("Bash"),
+      ],
+      ["user:u1", "live(u1,5)", "strip(2)[tool:Bash tool:Edit]", "tool:Bash+perm", "strip(2)[tool:Bash tool:Bash]"],
+    ],
+    [
+      "a permission row (denied before the tool ran) and a question break the run",
+      () => [
+        user("u1"),
+        tool("Bash"),
+        tool("Bash"),
+        item("permission", { id: "p2", toolUseId: "", name: "Write", requestState: "denied" }),
+        tool("Bash"),
+        tool("Bash"),
+        tool("AskUserQuestion", { toolUseId: "tu-q" }),
+        item("question", { id: "q1", toolUseId: "tu-q", requestState: "allowed" }),
+        tool("Bash"),
+        tool("Bash"),
+      ],
+      ["user:u1", "live(u1,8)", "strip(2)[tool:Bash tool:Bash]", "permission:p2", "strip(2)[tool:Bash tool:Bash]", "question:q1", "strip(2)[tool:Bash tool:Bash]"],
+    ],
+    [
+      "a failed tool stays inside the strip",
+      () => [user("u1"), tool("Bash", { toolStatus: "error" }), tool("Bash")],
+      ["user:u1", "live(u1,2)", "strip(2)[tool:Bash tool:Bash]"],
+    ],
+    [
+      "a note breaks a run",
+      () => [user("u1"), tool("Bash"), tool("Bash"), item("compaction"), tool("Bash"), tool("Bash")],
+      ["user:u1", "live(u1,4)", "strip(2)[tool:Bash tool:Bash]", "note:compaction", "strip(2)[tool:Bash tool:Bash]"],
+    ],
+  ])("%s", (_, items, want) => {
+    expect(shape(buildRows(buildTurns(items()), live))).toEqual(want);
+  });
+
+  it("the latest step is the last tool or group, never thinking", () => {
+    const items = [user("u1"), tool("Bash", { id: "b1" }), tool("Read", { id: "r1" }), tool("Grep", { id: "g1" }), item("thinking")];
+    const [s] = strips(buildRows(buildTurns(items), live));
+    expect(s?.latest).toMatchObject({ type: "group", ids: ["r1", "g1"] });
+    expect(s?.steps).toBe(2);
+  });
+
+  it("the key is the run's first item and holds while the run grows (a lone Read turning into a group included)", () => {
+    const items = [user("u1"), text("a"), tool("Read", { id: "r1" }), tool("Bash", { id: "b1" })];
+    const keyOf = (its: TimelineItem[]) => strips(buildRows(buildTurns(its), live)).map((r) => r.key);
+    expect(keyOf(items)).toEqual(["strip:r1"]);
+    expect(keyOf([...items, tool("Edit")])).toEqual(["strip:r1"]);
+    // The first node changes from a tool row to a group: the key stays its first item.
+    const reads = [user("u1"), tool("Read", { id: "r2" }), tool("Read"), tool("Bash")];
+    expect(keyOf(reads)).toEqual(["strip:r2"]);
+    const thinkingFirst = [user("u1"), item("thinking", { id: "th1" }), tool("Bash"), tool("Bash")];
+    expect(keyOf(thinkingFirst)).toEqual(["strip:th1"]);
+    expect(keyOf([...thinkingFirst, item("thinking"), tool("Bash")])).toEqual(["strip:th1"]);
+  });
+
+  it("stays on while a request waits (working is false); only the open turn gets strips", () => {
+    const items = [user("u1"), tool("Bash"), tool("Bash"), text("a"), end("e1"), user("u2"), tool("Bash"), tool("Edit"), tool("Bash", { toolUseId: "tu-p", toolStatus: "running" }), item("permission", { toolUseId: "tu-p", requestState: "pending" })];
+    const rows = buildRows(buildTurns(items), { fold: () => false, working: false, strips: true });
+    expect(shape(rows)).toEqual(["user:u1", "header", "tool:Bash", "tool:Bash", "final:a", "user:u2", "strip(2)[tool:Bash tool:Edit]", "tool:Bash+perm"]);
+  });
+
+  it("finished turns, a turn without strips on, and the subagent's nested rows are unchanged", () => {
+    const running = [user("u1"), tool("Bash"), tool("Edit"), text("a"), tool("Agent", { toolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" }), tool("Bash")];
+    expect(shape(buildRows(buildTurns(running), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,5)", "tool:Bash", "tool:Edit", "text:a", "tool:Agent[tool:Bash tool:Bash]", "tool:Bash"]);
+    const done = buildTurns([...running, text("b"), end("e1")]);
+    for (const fold of [() => undefined, () => false]) {
+      expect(buildRows(done, { fold, working: true, strips: true })).toEqual(buildRows(done, { fold, working: true }));
+    }
+    expect(shape(buildRows(done, { fold: () => false, working: false, strips: true }))).toEqual([
+      "user:u1",
+      "header",
+      "tool:Bash",
+      "tool:Edit",
+      "text:a",
+      "tool:Agent[tool:Bash tool:Bash]",
+      "tool:Bash",
+      "final:b",
+    ]);
   });
 });
 
