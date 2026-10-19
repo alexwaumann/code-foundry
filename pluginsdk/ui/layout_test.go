@@ -348,6 +348,9 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 		{layout, "GRID_MAX_SPAN", MaxGridSpan},
 		{layout, "SPACER_SIZE", SpacerSize},
 		{layout, "GROUP_GAP", GroupGap},
+		{layout, "MASTER_DETAIL_LIST_WIDTH", MasterDetailListWidth},
+		{layout, "MASTER_DETAIL_MIN_DETAIL", MasterDetailMinDetail},
+		{layout, "MASTER_DETAIL_GAP", MasterDetailGap},
 	} {
 		m := regexp.MustCompile(`export const ` + c.name + ` = (\d+);`).FindStringSubmatch(c.src)
 		if m == nil {
@@ -360,6 +363,9 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 	}
 	if want := fmt.Sprintf("export const GRID_MIN_WIDTH_RANGE = [%d, %d] as const;", MinGridMinWidth, MaxGridMinWidth); !strings.Contains(layout, want) {
 		t.Errorf("the GUI's grid min width range is not %q", want)
+	}
+	if want := fmt.Sprintf("export const MASTER_DETAIL_LIST_WIDTH_RANGE = [%d, %d] as const;", MinListWidth, MaxListWidth); !strings.Contains(layout, want) {
+		t.Errorf("the GUI's master-detail list width range is not %q", want)
 	}
 	if want := fmt.Sprintf("s >= %d && s <= %d ? s : SPACER_SIZE", MinSpacer, MaxSpacer); !strings.Contains(layout, want) {
 		t.Errorf("the GUI's spacer range is not %q", want)

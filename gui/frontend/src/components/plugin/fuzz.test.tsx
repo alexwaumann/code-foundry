@@ -91,7 +91,7 @@ afterEach(() => {
 });
 
 describe("mutated views", () => {
-  const tabs: DemoTab[] = ["overview", "form", "log", "assistant", "shell", "layout"];
+  const tabs: DemoTab[] = ["overview", "form", "log", "assistant", "shell", "layout", "run-list"];
   it("parse and render without throwing", () => {
     let rendered = 0;
     for (let seed = 1; seed <= 150; seed++) {
