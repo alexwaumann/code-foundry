@@ -11,7 +11,8 @@ import (
 )
 
 // Subscribe echoes the request as subscription "sub-1" (condition unspecified becomes
-// settled for a thread, finished for a run), with Fired and Existed as set.
+// settled for a thread, finished for a run, checks_done for a pull request, which is
+// kept as given), with Fired and Existed as set.
 func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -22,6 +23,12 @@ func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThr
 	if m.GetTargetRunId() != "" {
 		sub.Target, sub.TargetId, sub.Repeat = v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN, m.GetTargetRunId(), false
 		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FINISHED
+	}
+	if pr := m.GetTargetPullRequest(); pr != "" {
+		sub.Target, sub.TargetId = v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST, pr
+		if sub.Condition == v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED {
+			sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE
+		}
 	}
 	if sub.Condition == v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED {
 		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED
@@ -42,7 +49,7 @@ func (s *Thread) Unsubscribe(_ context.Context, r *connect.Request[v1.Unsubscrib
 	out := &v1.UnsubscribeThreadResponse{}
 	s.Subscriptions = slices.DeleteFunc(s.Subscriptions, func(sub *v1.ThreadSubscription) bool {
 		hit := sub.GetId() == m.GetSubscriptionId() || (m.GetSubscriptionId() == "" && sub.GetSubscriberThreadId() == m.GetSubscriberThreadId() &&
-			sub.GetTargetId() == m.GetTargetThreadId()+m.GetTargetRunId())
+			sub.GetTargetId() == m.GetTargetThreadId()+m.GetTargetRunId()+m.GetTargetPullRequest())
 		if hit {
 			out.Removed = append(out.Removed, sub)
 		}
