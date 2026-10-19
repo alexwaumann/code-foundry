@@ -64,9 +64,14 @@ func commandError(name string, err error) error {
 	switch {
 	case errors.As(err, &confirm):
 		out := connect.NewError(connect.CodeFailedPrecondition, err)
-		if d, derr := connect.NewErrorDetail(&v1.ConfirmationRequired{
-			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title,
-		}); derr == nil {
+		cr := &v1.ConfirmationRequired{
+			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title, Args: confirm.Args,
+		}
+		if res := confirm.Declined; res != nil {
+			js, _ := res.EncodeJSON()
+			cr.Declined = &v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode)}
+		}
+		if d, derr := connect.NewErrorDetail(cr); derr == nil {
 			out.AddDetail(d)
 		}
 		return out

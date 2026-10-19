@@ -269,8 +269,7 @@ func (m *Manager) Remove(ctx context.Context, o RemoveOptions) error {
 	}
 	if !o.Force {
 		if dirty := m.dirtyMembers(ctx, w); len(dirty) > 0 {
-			return fmt.Errorf("%w: uncommitted changes in %s; commit them or remove with --force",
-				ErrFailedPrecondition, strings.Join(dirty, ", "))
+			return classified{kind: ErrFailedPrecondition, err: &project.UncommittedError{Worktrees: dirty}}
 		}
 	}
 	var removed []Member
@@ -402,21 +401,16 @@ func (m *Manager) dropMembers(ctx context.Context, w *Workspace, drop ...Member)
 	return errors.Join(errs...)
 }
 
-// dirtyMembers refreshes each member's project and names the members whose
-// worktree has uncommitted changes.
-func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []string {
-	var out []string
+// dirtyMembers refreshes each member's project and returns the member worktrees
+// with uncommitted changes, with their status.
+func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []project.Worktree {
+	var out []project.Worktree
 	for _, mem := range w.Members {
 		if err := m.opts.Projects.Refresh(ctx, mem.ProjectID); err != nil {
 			continue // unregistered or failing: removal reports it
 		}
-		snap := m.opts.Projects.Snapshot()
-		if wt, ok := snap.Worktree(mem.ProjectID, mem.WorktreePath); ok && wt.Status.Dirty {
-			name := mem.ProjectID
-			if r, ok := snap.Project(mem.ProjectID); ok {
-				name = r.Name
-			}
-			out = append(out, name+" ("+mem.WorktreePath+")")
+		if wt, ok := m.opts.Projects.Snapshot().Worktree(mem.ProjectID, mem.WorktreePath); ok && wt.Status.HasUncommitted() {
+			out = append(out, wt)
 		}
 	}
 	return out

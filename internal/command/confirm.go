@@ -14,10 +14,22 @@ var ErrNeedsConfirmation = errors.New("confirmation required")
 
 // ConfirmError is returned by Invoke for a command with Confirm set when the caller did
 // not pass Confirmed(). Message is the rendered Confirm template.
+//
+// A command's Run may return one too, with Args set, after the user confirmed it once: a
+// second-stage confirmation (removing a worktree turned out to delete uncommitted work).
+// If the user agrees, the client invokes again with Args merged over its args and
+// confirmed set. Clients never accept one on the user's behalf: the CLI's --yes does
+// not, so an agent passes the flag (--force) itself.
 type ConfirmError struct {
 	Command string
 	Title   string
 	Message string
+	// Args are merged over the caller's args on the re-invoke (second stage only).
+	Args map[string]string
+	// Declined is what the command already did and answers when the user declines a
+	// second-stage confirmation; nil when declining leaves nothing done (the CLI's
+	// --yes then fails with Message).
+	Declined *Result
 }
 
 func (e *ConfirmError) Error() string { return e.Message }

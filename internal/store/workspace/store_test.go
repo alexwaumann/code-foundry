@@ -394,7 +394,7 @@ func TestRemove(t *testing.T) {
 			wantErr: ErrFailedPrecondition, errText: "thread s-1 is on WEB; thread b (s-2) is on API; archive them first", left: []string{"web", "api"},
 		},
 		{name: "dirty refused before anything is removed", dirty: "api", wantErr: ErrFailedPrecondition,
-			errText: "uncommitted changes in api (API)", left: []string{"web", "api"}},
+			errText: "uncommitted changes in API; commit them or remove with --force", left: []string{"web", "api"}},
 		{name: "dirty with force", dirty: "api", force: true, gone: true},
 		{name: "git refuses midway", gitDirt: true, wantErr: ErrFailedPrecondition, errText: "use --force", left: []string{"api"}},
 	}
@@ -419,6 +419,13 @@ func TestRemove(t *testing.T) {
 			err := h.m.Remove(context.Background(), RemoveOptions{Workspace: "x", Force: tt.force})
 			if !errors.Is(err, tt.wantErr) || (err != nil && !strings.Contains(err.Error(), subst.Replace(tt.errText))) {
 				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, subst.Replace(tt.errText))
+			}
+			if tt.dirty != "" && !tt.force {
+				// The dirty members, with their status, for the second-stage confirmation.
+				var ue *project.UncommittedError
+				if !errors.As(err, &ue) || len(ue.Worktrees) != 1 || ue.Worktrees[0].Path != h.wt(tt.dirty, "cf/x") || !ue.Worktrees[0].Status.Dirty {
+					t.Fatalf("err = %#v, want *project.UncommittedError naming %s", err, tt.dirty)
+				}
 			}
 			_, inSnap := h.m.Snapshot().Workspace(w.ID)
 			stored, inDB := h.open().Snapshot().Workspace(w.ID)

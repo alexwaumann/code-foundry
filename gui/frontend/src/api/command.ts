@@ -39,6 +39,14 @@ export interface ConfirmationView {
   command: string;
   title: string;
   message: string;
+  /**
+   * A second-stage confirmation's args (deleting uncommitted work: { force: "true" }):
+   * on yes, invoke again with them merged over the original args. Absent on a
+   * command's own (first) confirmation.
+   */
+  args?: Record<string, string>;
+  /** What the command already did, the result when the user declines a second stage. */
+  declined?: InvokeResultView;
 }
 
 /** What the user is looking at. Mirrors codefoundry.v1.UiContext; empty string = none. */
@@ -94,7 +102,11 @@ export function toCommandView(c: Command): CommandView {
 export function confirmationOf(err: unknown): ConfirmationView | null {
   if (!(err instanceof ConnectError)) return null;
   const [d] = err.findDetails(ConfirmationRequiredSchema);
-  return d ? { command: d.command, title: d.title, message: d.message } : null;
+  if (!d) return null;
+  const view: ConfirmationView = { command: d.command, title: d.title, message: d.message };
+  if (Object.keys(d.args).length > 0) view.args = { ...d.args };
+  if (d.declined) view.declined = { message: d.declined.message, resultJson: d.declined.resultJson };
+  return view;
 }
 
 /** Invoke failed because the daemon has no such command (an older daemon): NotFound. */

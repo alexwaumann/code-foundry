@@ -80,12 +80,18 @@ export function whenListed(ctx: UiContextView, timeoutMs = 3000): Promise<boolea
   });
 }
 
+/** How many confirmations one invoke asks at most (the command's own, then a second stage). */
+const MAX_CONFIRM_STAGES = 3;
+
 /**
  * Invokes a command; if the daemon wants it confirmed (ConfirmationRequired), opens the
  * confirm dialog (or the command's own presenter: confirmPresenter, e.g. the plugin
- * consent dialog) and invokes again with confirmed set when the user agrees. Resolves
- * null when the user declines; other errors reject. `caller` names who asked for it
- * (a plugin's InvokeCommand intent), shown in the dialog.
+ * consent dialog) and invokes again with confirmed set when the user agrees. A
+ * second-stage confirmation (one with args: deleting a worktree's uncommitted work)
+ * asks again and merges its args (force) into the re-invoke. Resolves null when the
+ * user declines (or a declined second stage's result: what the command already did);
+ * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
+ * intent), shown in the dialog.
  */
 export async function invokeConfirmed(
   name: string,
@@ -93,16 +99,23 @@ export async function invokeConfirmed(
   ctx: UiContextView = getUiContext(),
   caller?: string,
 ): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
-  try {
-    return await invokeCommand(name, ctx, args);
-  } catch (err) {
-    const confirm = confirmationOf(err);
-    if (!confirm) throw err;
-    const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
-    const ask = confirmPresenter(name) ?? requestConfirm;
-    const yes = await ask({ title, message: confirm.message, confirmLabel: title, command: name, args, ...(caller ? { caller } : {}) });
-    if (!yes) return null;
-    return await invokeCommand(name, ctx, args, undefined, { confirmed: true });
+  let callArgs = args;
+  let confirmed = false;
+  for (let stage = 0; ; stage++) {
+    try {
+      return await (confirmed ? invokeCommand(name, ctx, callArgs, undefined, { confirmed: true }) : invokeCommand(name, ctx, callArgs));
+    } catch (err) {
+      const confirm = confirmationOf(err);
+      if (!confirm || stage >= MAX_CONFIRM_STAGES) throw err;
+      // A second stage applies only to the command invoked (not one plugin.act ran for it).
+      if (confirm.args && confirm.command !== name) throw err;
+      const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
+      const ask = (confirm.args ? undefined : confirmPresenter(name)) ?? requestConfirm;
+      const yes = await ask({ title, message: confirm.message, confirmLabel: title, command: name, args: callArgs, ...(caller ? { caller } : {}) });
+      if (!yes) return confirm.declined ?? null;
+      confirmed = true;
+      if (confirm.args) callArgs = { ...callArgs, ...confirm.args };
+    }
   }
 }
 

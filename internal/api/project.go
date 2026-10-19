@@ -202,7 +202,7 @@ func projectError(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		code = connect.CodeDeadlineExceeded
 	}
-	return connect.NewError(code, err)
+	return withUncommittedDetail(connect.NewError(code, err), err)
 }
 
 func eventToProto(ev project.Event) *v1.ProjectEvent {

@@ -255,6 +255,10 @@ message CleanupWorktreesRequest {
   // Evaluate the current snapshot only: nothing is refreshed or removed, and removed
   // lists what would be.
   bool dry_run = 3;
+  // Also remove the worktrees kept only for their uncommitted changes (every other
+  // condition of the rule passes and nothing holds them), deleting those changes
+  // (`git worktree remove --force`). It relaxes no other condition.
+  bool force = 4;
 }
 
 message CleanupWorktreesResponse {
@@ -273,6 +277,8 @@ message RemovedWorktree {
   // Why it could go: "branch is in origin/main", "no commits since it was made", "a
   // rebased or squash-merged copy is in origin/main".
   string reason = 2;
+  // Removed with force: its uncommitted changes were deleted with it (or would be).
+  bool uncommitted = 3;
 }
 
 message SkippedWorktree {
@@ -281,6 +287,17 @@ message SkippedWorktree {
   // "not a Code Foundry worktree", "no commits yet, made less than 10 minutes ago",
   // "thread fix-x is on it"; or the removal's error.
   string reason = 2;
+  // Kept only for its uncommitted changes: CleanupWorktreesRequest.force removes it.
+  bool uncommitted = 3;
+}
+
+// UncommittedWork is the error detail (with FailedPrecondition) of a worktree removal
+// refused only because the worktrees have staged, modified, untracked or conflicted
+// files: ProjectService.RemoveWorktree, WorkspaceService.RemoveProject and
+// WorkspaceService.Remove without force. The worktrees carry their status counts, so a
+// client can ask the user whether to delete that work and retry with force.
+message UncommittedWork {
+  repeated Worktree worktrees = 1;
 }
 
 message ListRefsRequest {

@@ -64,3 +64,39 @@ func TestCommandInvokeConfirm(t *testing.T) {
 		t.Fatalf("confirmed invoke = %v, %v (ran %d)", res, err, ran)
 	}
 }
+
+// A second-stage confirmation from Run carries its args and declined result.
+func TestCommandInvokeSecondStage(t *testing.T) {
+	r := command.NewRegistry()
+	if err := r.Register(command.Command{
+		Name: "x.clean", Title: "Clean", Category: "X",
+		Args: []command.ArgSpec{{Name: "force", Type: command.Bool}},
+		Run: func(_ context.Context, _ command.Context, a command.Args) (command.Result, error) {
+			if a.Bool("force") {
+				return command.Result{Message: "forced"}, nil
+			}
+			return command.Result{}, &command.ConfirmError{
+				Command: "x.clean", Title: "Delete Uncommitted Work", Message: "Delete it?",
+				Args: map[string]string{"force": "true"}, Declined: &command.Result{Message: "kept 1", JSON: map[string]int{"kept": 1}},
+			}
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := NewCommand(r).Invoke(context.Background(), connect.NewRequest(&v1.InvokeCommandRequest{Name: "x.clean", Confirmed: true}))
+	var ce *connect.Error
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
+		t.Fatalf("err = %v, want FailedPrecondition", err)
+	}
+	var got *v1.ConfirmationRequired
+	for _, d := range ce.Details() {
+		if m, derr := d.Value(); derr == nil {
+			if cr, ok := m.(*v1.ConfirmationRequired); ok {
+				got = cr
+			}
+		}
+	}
+	if got == nil || got.GetArgs()["force"] != "true" || got.GetDeclined().GetMessage() != "kept 1" || got.GetDeclined().GetResultJson() != `{"kept":1}` {
+		t.Fatalf("detail = %v", got)
+	}
+}

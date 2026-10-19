@@ -254,6 +254,11 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 		f.mu.Unlock()
 		return fmt.Errorf("%w: cannot remove the main worktree", project.ErrInvalidArgument)
 	}
+	if !o.Force && r.Worktrees[i].Status.HasUncommitted() {
+		// As git refuses a worktree with modified or untracked files without --force.
+		defer f.mu.Unlock()
+		return &project.UncommittedError{Worktrees: []project.Worktree{r.Worktrees[i]}}
+	}
 	r.Worktrees = slices.Delete(slices.Clone(r.Worktrees), i, i+1)
 	f.projects[r.ID] = r
 	f.rebuild()

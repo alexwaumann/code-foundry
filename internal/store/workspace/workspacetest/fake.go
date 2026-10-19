@@ -33,6 +33,9 @@ type Fake struct {
 	MakeDirs bool
 	// Err, when set, is returned by every mutating method.
 	Err error
+	// Uncommitted, when set, makes RemoveProject and Remove without Force fail as the
+	// store does for members with uncommitted changes (*project.UncommittedError).
+	Uncommitted []project.Worktree
 	// Now is the clock for CreatedAt.
 	Now func() time.Time
 
@@ -178,6 +181,9 @@ func (f *Fake) RemoveProject(_ context.Context, o workspace.RemoveProjectOptions
 	if err != nil {
 		return workspace.Workspace{}, err
 	}
+	if err := f.uncommitted(o.Force); err != nil {
+		return workspace.Workspace{}, err
+	}
 	i := slices.IndexFunc(w.Members, func(m workspace.Member) bool { return m.ProjectID == o.Project })
 	if i < 0 {
 		return workspace.Workspace{}, fmt.Errorf("%w: %q is not a member of workspace %s", workspace.ErrNotFound, o.Project, w.Name)
@@ -185,6 +191,14 @@ func (f *Fake) RemoveProject(_ context.Context, o workspace.RemoveProjectOptions
 	w.Members = slices.Delete(slices.Clone(w.Members), i, i+1)
 	f.putLocked(w)
 	return w, nil
+}
+
+// uncommitted is the refusal of a removal without force while Uncommitted is set.
+func (f *Fake) uncommitted(force bool) error {
+	if force || len(f.Uncommitted) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: %w", workspace.ErrFailedPrecondition, &project.UncommittedError{Worktrees: f.Uncommitted})
 }
 
 // Remove implements workspace.Store.
@@ -203,6 +217,9 @@ func (f *Fake) Remove(_ context.Context, o workspace.RemoveOptions) error {
 	}
 	w, err := workspace.ResolveWorkspace(f.snap, workspace.Ref{Workspace: o.Workspace})
 	if err != nil {
+		return err
+	}
+	if err := f.uncommitted(o.Force); err != nil {
 		return err
 	}
 	delete(f.byID, w.ID)

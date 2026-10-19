@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"os"
 	"path/filepath"
@@ -315,6 +316,37 @@ func TestCleanupRealProject(t *testing.T) {
 	}
 	if _, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Path: filepath.Join(root, "nope")}); err == nil {
 		t.Errorf("cleanup of an unknown path succeeded")
+	}
+	for _, it := range res.Skipped {
+		if it.Uncommitted != (it.Worktree.Path == wt["dirty"]) {
+			t.Errorf("%s marked uncommitted = %v (only the dirty, otherwise removable one is)", it.Worktree.Path, it.Uncommitted)
+		}
+	}
+
+	// Removing the dirty worktree without force: git refuses and the error names the
+	// work, with its status read again.
+	var ue *UncommittedError
+	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: wt["dirty"]}); !errors.As(err, &ue) ||
+		len(ue.Worktrees) != 1 || ue.Worktrees[0].Path != wt["dirty"] || ue.Worktrees[0].Status.Untracked != 1 {
+		t.Fatalf("remove dirty without force: %v", err)
+	}
+
+	// Force removes it, deleting the scratch file; a dirty held worktree still stays.
+	writeFile(t, filepath.Join(wt["held"], "scratch.txt"), "wip\n")
+	forced, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold, Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(wantKept, wt["dirty"])
+	check("forced cleanup", forced, map[string]string{wt["dirty"]: "branch is in origin/main"}, wantKept)
+	if len(forced.Removed) != 1 || !forced.Removed[0].Uncommitted {
+		t.Errorf("forced removal = %+v, want the dirty one marked uncommitted", forced.Removed)
+	}
+	if _, err := os.Stat(wt["dirty"]); !os.IsNotExist(err) {
+		t.Errorf("dirty worktree still on disk: %v", err)
+	}
+	if _, err := os.Stat(wt["held"]); err != nil {
+		t.Errorf("held worktree removed: %v", err)
 	}
 }
 

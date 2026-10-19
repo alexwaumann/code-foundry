@@ -26,17 +26,17 @@ func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.
 		return nil, workspaceError(err)
 	}
 	res, err := project.Cleanup(ctx, h.store, project.CleanupOptions{
-		ProjectID: r.ID, Path: req.Msg.GetPath(), DryRun: req.Msg.GetDryRun(), Hold: h.cleanupHold,
+		ProjectID: r.ID, Path: req.Msg.GetPath(), DryRun: req.Msg.GetDryRun(), Force: req.Msg.GetForce(), Hold: h.cleanupHold,
 	})
 	if err != nil {
 		return nil, projectError(err)
 	}
 	out := &v1.CleanupWorktreesResponse{ProjectId: res.ProjectID}
 	for _, w := range res.Removed {
-		out.Removed = append(out.Removed, &v1.RemovedWorktree{Worktree: worktreeToProto(w.Worktree), Reason: w.Reason})
+		out.Removed = append(out.Removed, &v1.RemovedWorktree{Worktree: worktreeToProto(w.Worktree), Reason: w.Reason, Uncommitted: w.Uncommitted})
 	}
 	for _, s := range res.Skipped {
-		out.Skipped = append(out.Skipped, &v1.SkippedWorktree{Worktree: worktreeToProto(s.Worktree), Reason: s.Reason})
+		out.Skipped = append(out.Skipped, &v1.SkippedWorktree{Worktree: worktreeToProto(s.Worktree), Reason: s.Reason, Uncommitted: s.Uncommitted})
 	}
 	return connect.NewResponse(out), nil
 }

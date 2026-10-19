@@ -124,12 +124,15 @@ func TestWithGit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(apiWT, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// git refuses; the project store reads the status again and names the work.
+	var ue *project.UncommittedError
 	if _, err := m.RemoveProject(ctx, RemoveProjectOptions{Ref: Ref{Workspace: "login"}, Project: "api"}); !errors.Is(err, ErrFailedPrecondition) ||
-		!strings.Contains(err.Error(), "--force") {
+		!strings.Contains(err.Error(), "--force") || !errors.As(err, &ue) || len(ue.Worktrees) != 1 || ue.Worktrees[0].Status.Untracked != 1 {
 		t.Fatalf("remove dirty: %v", err)
 	}
 	// Remove of the whole workspace refuses before touching web.
-	if err := m.Remove(ctx, RemoveOptions{Workspace: "login"}); err == nil || !strings.Contains(err.Error(), "uncommitted changes in api") {
+	if err := m.Remove(ctx, RemoveOptions{Workspace: "login"}); err == nil || !strings.Contains(err.Error(), "uncommitted changes in "+apiWT) ||
+		!errors.As(err, &ue) || len(ue.Worktrees) != 1 || ue.Worktrees[0].Status.Untracked != 1 {
 		t.Fatalf("remove workspace with a dirty member: %v", err)
 	}
 	if _, err := os.Stat(webWT); err != nil {
