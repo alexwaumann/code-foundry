@@ -27,7 +27,7 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
 	"code-foundry-plugin/example/main_test.go", "code-foundry-plugin/example/Makefile",
 	"code-foundry-plugin/example/.gitignore", "code-foundry-plugin/example/.github/workflows/release.yml",
-	"code-foundry-plugin/example/.github/workflows/ci.yml", "code-foundry-plugin/example/scripts/registry-entry.go",
+	"code-foundry-plugin/example/.github/workflows/ci.yml", "code-foundry-plugin/example/scripts/registry-entry.go", "code-foundry-plugin/example/scripts/release.sh",
 	"code-foundry-plugin/example/README.md",
 }
 

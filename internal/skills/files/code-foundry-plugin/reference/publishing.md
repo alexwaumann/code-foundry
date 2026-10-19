@@ -21,11 +21,13 @@ plugin into files by concern: commands, surface, view, events, a poller or runne
 plugin.json          the manifest; its version is the release's
 main.go, *_test.go   the plugin and its tests (testdata/ for captured payloads)
 go.mod, go.sum       module github.com/<owner>/code-foundry-plugin-<name>, the SDK pinned
-Makefile             build, test, dist, registry-entry
+Makefile             build, test, check, dist, release, registry-entry
+scripts/release.sh   the release steps (make release), by hand or from release.yml
 scripts/registry-entry.go   used by make registry-entry (build-ignored)
 .gitignore           bin/, dist/, the binary `go build` names after the module
-.github/workflows/ci.yml       go vet + go test -race on pushes to main and pull requests
-.github/workflows/release.yml  tarballs + SHA256SUMS on a v<version> tag
+.github/workflows/ci.yml       make check (vet, race tests) on pushes to main and PRs
+.github/workflows/release.yml  make release on a pushed v<version> tag
+                     (no .github/ while the user has no runner: "Runners")
 README.md            the example's template filled in: what it does, how to install it,
                      its permissions and why, development
 ```
@@ -36,15 +38,37 @@ included), so a copy is the repository:
 ```
 git init && git add -A && git commit -m "<name> 0.1.0"
 gh repo create <owner>/code-foundry-plugin-<name> --public --source . --push
-gh run watch --exit-status $(gh run list --workflow ci.yml --limit 1 --json databaseId -q '.[0].databaseId')
+gh run watch --exit-status $(gh run list --workflow ci.yml --limit 1 --json databaseId -q '.[0].databaseId')   # with workflows
 ```
 
 When the user created the repository first, clone it, copy the example into the clone
 (the skill's step 1: keep its LICENSE) and commit and push instead of `git init` and `gh
 repo create`.
 
-The workflows use `actions/checkout@v5` and `actions/setup-go@v6` on `ubuntu-24.04`
-(cross-compiling for macOS; `go-version-file: go.mod`).
+## Runners
+
+Ask the user, before the first push, which GitHub Actions runner the repository may use
+(companies often allow only their own):
+
+- **GitHub's hosted runner**: keep the example's `runs-on: ubuntu-24.04`.
+- **A self-hosted or organization runner**: set `runs-on` in both `ci.yml` and
+  `release.yml` to the label(s) they name: `runs-on: [self-hosted, linux]`, or
+  `runs-on: { group: <runner group> }`. Either OS works (the tarballs cross-compile).
+  The runner needs `git`, `make`, `tar`, `shasum` and `gh` on its PATH and network
+  access to download Go (`actions/setup-go`, `go-version-file: go.mod`) and modules.
+- **Not known yet**: `rm -rf .github` (a workflow on a runner that does not exist only
+  queues and fails) and keep the README's by-hand path. The user, or you on their
+  machine, runs CI as `make check` before each push and releases with `make release`
+  ("The release"). Once they can name a runner, restore the two workflows from the
+  example (`cp -R {{cf.example}}/.github .`), set `runs-on`, and push.
+
+The workflows pin each action to a full commit SHA with its version as a comment
+(`uses: actions/checkout@<sha> # v5.1.0`): a tag can be moved, a commit cannot, and
+some organizations allow only pinned actions. Keep the pins when you edit them; to
+update one, `gh api repos/actions/<action>/git/ref/tags/<version>` gives the SHA (an
+annotated tag's `object.type` is `tag`: read `object.sha` from
+`gh api repos/actions/<action>/git/tags/<that sha>`). Organizations that restrict which
+actions run may need `actions/checkout` and `actions/setup-go` allowed.
 
 ## Versions
 
@@ -58,14 +82,26 @@ The workflows use `actions/checkout@v5` and `actions/setup-go@v6` on `ubuntu-24.
 
 ## The release
 
-`release.yml` runs on a pushed `v*` tag: `go test ./...`, checks the tag equals `v` +
-`plugin.json`'s version, runs `make dist`, and creates the GitHub release with the
-tarballs and `SHA256SUMS`.
+`make release` (`scripts/release.sh`, POSIX sh) is the one implementation: it checks
+the tag (the one on HEAD, or `$GITHUB_REF_NAME`) equals `v` + `plugin.json`'s version and
+the tree is clean, runs `go test ./...` and `make dist`, creates the GitHub release with
+the tarballs and `SHA256SUMS` (`gh release create --verify-tag`: the tag must be pushed),
+then runs `make registry-entry`. `make release DRY_RUN=1` stops before publishing.
+
+With workflows, `release.yml` runs it on a pushed `v*` tag:
 
 ```
 git commit -am "<name> 0.2.0" && git tag v0.2.0 && git push && git push origin v0.2.0
 gh run watch --exit-status $(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')
 gh release view v0.2.0
+```
+
+Without them, the same from the user's Mac (`gh` signed in with push rights):
+
+```
+make check
+git commit -am "<name> 0.2.0" && git tag v0.2.0 && git push && git push origin v0.2.0
+make release DRY_RUN=1 && make release
 ```
 
 `make dist` (run it locally first) builds, with `CGO_ENABLED=0`, one tarball per macOS
@@ -79,14 +115,14 @@ tar -tzf dist/<name>-<version>-darwin-arm64.tar.gz     # plugin.json, bin/<name>
 
 A local `make dist` does not reproduce CI's tarballs byte for byte (another Go
 toolchain, other file times), so the registry entry's hashes must come from the
-release's own `SHA256SUMS`, never a local one. To try a release by hand, unpack it into a
+release's own `SHA256SUMS`, never a local one (`make registry-entry` downloads it). To try a release by hand, unpack it into a
 folder **under the home directory** and `code-foundry plugin dev <folder> --yes`
 (`plugin dev` refuses folders elsewhere, `/tmp` included; a plugin linked from another
 folder before needs `--force`, which deletes that link's secrets, data and consent).
 
 ## The registry entry
 
-After the release workflow finished:
+After the release workflow finished (a `make release` by hand already ran it):
 
 ```
 make registry-entry          # REPO=owner/name if `gh repo view` cannot tell
