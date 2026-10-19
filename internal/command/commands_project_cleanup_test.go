@@ -160,10 +160,10 @@ func TestProjectCleanupConfirmListsWhatGoesAndStays(t *testing.T) {
 	hand := &v1.Worktree{ProjectId: "r1", Branch: "by-hand", Path: "/wt/by-hand"}
 	removed := []*v1.RemovedWorktree{
 		{Worktree: a, Reason: inMain},
-		{Worktree: b, Reason: "its changes are in origin/main (rebased or squash-merged)"},
+		{Worktree: b, Reason: "a rebased or squash-merged copy is in origin/main"},
 	}
 	kept := []*v1.SkippedWorktree{
-		{Worktree: c, Reason: "just made, no commits yet (kept for 10m0s)"},
+		{Worktree: c, Reason: "no commits yet, made less than 10 minutes ago"},
 		{Worktree: hand, Reason: "not a Code Foundry worktree"},
 	}
 	tests := []struct {
@@ -177,9 +177,9 @@ func TestProjectCleanupConfirmListsWhatGoesAndStays(t *testing.T) {
 			dry: &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: removed, Skipped: kept},
 			want: "Fetch, then remove 2 worktrees (branches are kept; each is checked again after the fetch):\n" +
 				"- cf/a at /wt/a: branch is in origin/main\n" +
-				"- cf/b at /wt/b: its changes are in origin/main (rebased or squash-merged)\n" +
+				"- cf/b at /wt/b: a rebased or squash-merged copy is in origin/main\n" +
 				"Keep 2:\n" +
-				"- cf/c at /wt/c: just made, no commits yet (kept for 10m0s)\n" +
+				"- cf/c at /wt/c: no commits yet, made less than 10 minutes ago\n" +
 				"- by-hand at /wt/by-hand: not a Code Foundry worktree",
 		},
 		{
@@ -197,7 +197,7 @@ func TestProjectCleanupConfirmListsWhatGoesAndStays(t *testing.T) {
 		{
 			name: "one path that stays", args: map[string]string{"project": "proj", "path": "/wt/c"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Skipped: kept[:1]},
-			want: "Fetch and check the worktree of cf/c at /wt/c again? Right now it is kept: just made, no commits yet (kept for 10m0s).",
+			want: "Fetch and check the worktree of cf/c at /wt/c again? Right now it is kept: no commits yet, made less than 10 minutes ago.",
 		},
 		{
 			name: "no worktrees at all", args: map[string]string{"project": "proj"},

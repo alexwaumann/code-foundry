@@ -27,8 +27,8 @@ func TestCleanupVerdict(t *testing.T) {
 	const (
 		inBase   = "branch is in origin/main"
 		noCommit = "no commits since it was made"
-		landed   = "its changes are in origin/main (rebased or squash-merged)"
-		fresh    = "just made, no commits yet (kept for 10m0s)"
+		landed   = "a rebased or squash-merged copy is in origin/main"
+		fresh    = "no commits yet, made less than 10 minutes ago"
 	)
 	tests := []struct {
 		name      string
@@ -236,14 +236,14 @@ func TestCleanupRealProject(t *testing.T) {
 	}
 	wantRemoved := map[string]string{
 		wt["merged"]:   "branch is in origin/main",
-		wt["rebased"]:  "its changes are in origin/main (rebased or squash-merged)",
-		wt["squashed"]: "its changes are in origin/main (rebased or squash-merged)",
+		wt["rebased"]:  "a rebased or squash-merged copy is in origin/main",
+		wt["squashed"]: "a rebased or squash-merged copy is in origin/main",
 	}
 	wantKept := map[string]string{
 		wt["dirty"]:    "uncommitted changes",
 		wt["unmerged"]: "1 commit not in origin/main",
 		wt["held"]:     "a live thread runs in it",
-		wt["fresh"]:    "just made, no commits yet (kept for 10m0s)",
+		wt["fresh"]:    "no commits yet, made less than 10 minutes ago",
 		byHand:         "not a Code Foundry worktree",
 		elsewhere:      "not a Code Foundry worktree",
 	}

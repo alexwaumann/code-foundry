@@ -1339,8 +1339,8 @@ func (x *CleanupWorktreesResponse) GetSkipped() []*SkippedWorktree {
 type RemovedWorktree struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Worktree *Worktree              `protobuf:"bytes,1,opt,name=worktree,proto3" json:"worktree,omitempty"`
-	// Why it could go: "branch is in origin/main", "no commits since it was made", "its
-	// changes are in origin/main (rebased or squash-merged)".
+	// Why it could go: "branch is in origin/main", "no commits since it was made", "a
+	// rebased or squash-merged copy is in origin/main".
 	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1394,8 +1394,8 @@ type SkippedWorktree struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Worktree *Worktree              `protobuf:"bytes,1,opt,name=worktree,proto3" json:"worktree,omitempty"`
 	// Why it was kept, e.g. "uncommitted changes", "2 commits not in origin/main",
-	// "not a Code Foundry worktree", "just made, no commits yet (kept for 10m0s)", "thread
-	// fix-x is on it"; or the removal's error.
+	// "not a Code Foundry worktree", "no commits yet, made less than 10 minutes ago",
+	// "thread fix-x is on it"; or the removal's error.
 	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

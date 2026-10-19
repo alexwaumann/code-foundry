@@ -47,9 +47,9 @@ func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
 	case st.BaseRef == "":
 		return false, "no remote default branch to compare with"
 	case justMade(w, now):
-		return false, "just made, no commits yet (kept for " + FreshFor.String() + ")"
+		return false, "no commits yet, made less than " + strconv.Itoa(int(FreshFor/time.Minute)) + " minutes ago"
 	case st.BaseAhead > 0 && st.BaseMerged:
-		return true, "its changes are in " + st.BaseRef + " (rebased or squash-merged)"
+		return true, "a rebased or squash-merged copy is in " + st.BaseRef
 	case st.BaseAhead > 0:
 		n := "commits"
 		if st.BaseAhead == 1 {

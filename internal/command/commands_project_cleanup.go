@@ -60,11 +60,9 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 	return r.Register(Command{
 		Name:  "project.worktree.cleanup",
 		Title: "Clean Up Merged Worktrees",
-		Description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>: " +
-			"made by Code Foundry (not one added by hand under its worktrees directory), no uncommitted changes, " +
-			"its branch merged (or a rebased or squash-merged copy of its changes), not made in the last 10 minutes " +
-			"with no commit since, no thread (archived ones aside), terminal or workspace on it. " +
-			"Without --yes it lists what would be removed and what is kept, with why. Branches are kept.",
+		Description: "Fetch, then remove the project's worktrees (or one) whose work is in origin/<default>: " +
+			"made by Code Foundry (not by hand), clean, merged (or a rebased/squashed copy), not new and empty (10 min), " +
+			"no thread (archived aside), terminal or workspace on it. Without --yes: lists what goes and stays. Branches are kept.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project name or id"},
