@@ -30,8 +30,8 @@ dist:
 	done
 	cd dist && shasum -a 256 *.tar.gz > SHA256SUMS && cat SHA256SUMS
 
-## registry-entry: dist/<name>.json, the plugin's entry for the registry
-## (plugins/<name>.json in alexwaumann/code-foundry-plugins), from plugin.json and the
+## registry-entry: dist/<name>.json, the plugin's entry for a registry
+## (its plugins/<name>.json), from plugin.json and the
 ## SHA256SUMS of the GitHub release v<version> (not a local make dist: CI's tarballs
 ## differ byte for byte). Run it after the release workflow finished.
 registry-entry:
