@@ -62,7 +62,7 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("- Do not poll. `code-foundry thread wait <id>` blocks until a thread has answered its latest message and is idle;")
 	p("  `code-foundry thread send --id <id> \"...\" --wait` sends and returns once Claude has answered. Or end your")
 	p("  turn: a `[code-foundry wake]` message arrives when a thread you subscribed to (`--notify`, `thread subscribe`)")
-	p("  settles.")
+	p("  settles (wakes at once: one message; a lead's `progress` while workers run: none).")
 	p("- `code-foundry thread read <id>` prints a thread's last items; `--since <nextSince>` (from `--json`) reads on.")
 	p("  `thread get <id>` has its status, brief, labels and report.")
 	p("- `thread list` leaves archived threads out (`--archived` or `--all` includes them; the other filters still apply)")
@@ -87,8 +87,7 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("- `code-foundry plugin list`: installed plugins; their commands are `plugin <name> <command>`.")
 	p("- `code-foundry events --json [--source thread-list] [--since <seq> --since-epoch <epoch>]`: the daemon's events")
 	p("  as JSON lines, resumable; for watching many threads at once.")
-	p("- The API is Connect (protobuf) over the daemon's socket; `--json` answers use the field names of the")
-	p("  code-foundry repository's `proto/codefoundry/v1`.")
+	p("- The API: Connect over the daemon's socket; protos: code-foundry's `proto/codefoundry/v1`.")
 }
 
 // InPluginNamespace reports whether c is a plugin.* command (the plugin management verbs

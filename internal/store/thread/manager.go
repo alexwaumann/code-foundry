@@ -108,6 +108,10 @@ type Options struct {
 	// WakeLimit is how many wakes a subscriber gets per rolling WakeWindow at most
 	// (subscriptions_fire.go). Default WakeLimit (the package constant).
 	WakeLimit int
+	// WakeBatch is how long a thread wake waits for others to the same subscriber to
+	// join it in one message (subscriptions_batch.go). Default WakeBatchWindow (1s);
+	// negative: no batching, each wake goes alone and at once.
+	WakeBatch time.Duration
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// and before a RunIn move (set_cwd refuses an untrusted folder). For tests.
 	DisablePreTrust bool
@@ -219,6 +223,9 @@ func (o Options) withDefaults() (Options, error) {
 	}
 	if o.WakeLimit <= 0 {
 		o.WakeLimit = WakeLimit
+	}
+	if o.WakeBatch == 0 {
+		o.WakeBatch = WakeBatchWindow
 	}
 	return o, nil
 }

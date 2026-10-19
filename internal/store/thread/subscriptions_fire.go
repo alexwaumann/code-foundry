@@ -32,6 +32,11 @@ import (
 //	[code-foundry wake] Thread "Add LICENSE" (s-…) needs attention: finished without a report.
 //	[code-foundry wake] Thread "Docs lead" (s-…) needs attention: finished; 2 of its 3 child threads still working.
 //
+// A turn that went on talking after filing its report ends "said more after its report"
+// and has "last_message" too. A wake about one of the subscriber's own children counts
+// its siblings, and thread wakes firing together go as one message; a lead only waiting
+// on its workers wakes no one (subscriptions_batch.go).
+//
 // The item keeps the header without its prefix (WakeTitle) and the JSON (WakeJSON), so
 // the GUI can draw it as a "Woken by …" row. The rate limit: a subscriber gets at most
 // Options.WakeLimit (WakeLimit, 60) wakes per rolling WakeWindow (in memory; a daemon
@@ -60,18 +65,26 @@ const (
 	maxHeaderSummary = 120
 )
 
-// wakeQueue is a subscriber's waiting deliveries; running while its drain goroutine runs.
+// wakeQueue is a subscriber's waiting deliveries; running while its drain goroutine runs;
+// holding while drain holds a thread wake open for others to join it (batchLocked).
 type wakeQueue struct {
 	items   []delivery
 	running bool
+	holding bool
 }
 
 // delivery is a wake to send, or (limit) the wake limit to tell. msg makes the message
-// when it is sent, off the locks (a thread wake reads its target's items then).
+// when it is sent, off the locks; a thread wake has thread instead (it reads its
+// target's items then, and may join others in one message: subscriptions_batch.go).
 type delivery struct {
-	sub   string // the subscription, for the log
-	msg   func(context.Context) Message
-	limit bool
+	sub    string // the subscription, for the log
+	msg    func(context.Context) Message
+	thread func(context.Context) threadWakePart
+	limit  bool
+	// queued is when it was queued (the monotonic clock: the batch window); slot is its
+	// wake limit slot (Options.Now), zero when it joins a batch that has one.
+	queued time.Time
+	slot   time.Time
 }
 
 // fireLocked fires r: unless the subscriber is over the wake limit, it counts the fire
@@ -80,9 +93,9 @@ type delivery struct {
 // down) leaves r as it was. Callers hold m.mu and
 // m.subs.mu, and keep or remove r themselves (firedLocked).
 func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Message) bool {
-	return m.fireLaterLocked(r, func(s Subscription, at time.Time) func(context.Context) Message {
+	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
 		msg := build(s, at)
-		return func(context.Context) Message { return msg }
+		return delivery{msg: func(context.Context) Message { return msg }}
 	})
 }
 
@@ -91,16 +104,16 @@ func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Mess
 // is sent (the items are not read under m.mu). Callers hold m.mu and m.subs.mu.
 func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
 	kids := m.childrenLocked(t.ID)
-	return m.fireLaterLocked(r, func(s Subscription, at time.Time) func(context.Context) Message {
-		return func(ctx context.Context) Message {
+	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
+		return delivery{thread: func(ctx context.Context) threadWakePart {
 			d := wakeDetail{children: kids}
 			if items, err := m.Items(ctx, t.ID); err != nil {
 				m.log.Warn("wake detail: read the thread's items", "thread", t.ID, "err", err)
 			} else {
 				d = wakeDetailOf(t, items.Items, kids)
 			}
-			return threadWake(s, t, at, d)
-		}
+			return threadWakePart{sub: s, t: t, at: at, d: d}
+		}}
 	})
 }
 
@@ -124,8 +137,10 @@ func (m *Manager) childrenLocked(id string) wakeChildren {
 	return c
 }
 
-// fireLaterLocked is fireLocked with a message made when it is sent.
-func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time) func(context.Context) Message) bool {
+// fireLaterLocked is fireLocked with the delivery build makes. A thread wake that will
+// join one already waiting for the subscriber (joinsBatchLocked) takes no wake limit
+// slot: a batch counts as one wake.
+func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time) delivery) bool {
 	s := m.subs
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	subscriber := r.s.SubscriberID
@@ -135,7 +150,9 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 		m.log.Info("wake not fired: the daemon is stopping", "thread", subscriber, "subscription", r.s.ID)
 		return false
 	}
-	if !s.allowLocked(subscriber, now, m.opts.WakeLimit) {
+	d := build(r.s, now)
+	joins := d.thread != nil && m.joinsBatchLocked(subscriber)
+	if !joins && !s.allowLocked(subscriber, now, m.opts.WakeLimit) {
 		m.log.Warn("wake dropped: the subscriber reached the wake limit", "thread", subscriber, "subscription", r.s.ID,
 			"target", r.s.TargetID, "limit", m.opts.WakeLimit, "window", WakeWindow.String())
 		if last, ok := s.noted[subscriber]; !ok || now.Sub(last) >= WakeWindow {
@@ -146,9 +163,13 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 	}
 	r.s.FiredCount++
 	r.s.LastFiredAt = now
-	m.enqueueLocked(subscriber, delivery{sub: r.s.ID, msg: build(r.s, now)})
+	d.sub, d.queued = r.s.ID, time.Now()
+	if !joins {
+		d.slot = now
+	}
+	m.enqueueLocked(subscriber, d)
 	m.log.Info("wake subscription fired", "subscription", r.s.ID, "subscriber", subscriber, "target", r.s.TargetID,
-		"condition", r.s.Condition, "fired_count", r.s.FiredCount)
+		"condition", r.s.Condition, "fired_count", r.s.FiredCount, "joins_batch", joins)
 	return true
 }
 
@@ -189,8 +210,10 @@ func (m *Manager) enqueueLocked(subscriber string, d delivery) {
 	go m.drain(subscriber)
 }
 
-// next pops subscriber's next delivery; false (and the queue gone) when it is empty.
-func (s *subscriptions) next(subscriber string) (delivery, bool) {
+// next pops subscriber's next delivery; false (and the queue gone) when it is empty. A
+// thread wake popped while batching is on holds the queue open (holding) for others to
+// join it (batchLocked).
+func (s *subscriptions) next(subscriber string, batching bool) (delivery, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	q := s.queues[subscriber]
@@ -200,6 +223,7 @@ func (s *subscriptions) next(subscriber string) (delivery, bool) {
 	}
 	d := q.items[0]
 	q.items = q.items[1:]
+	q.holding = batching && d.thread != nil
 	return d, true
 }
 
@@ -209,12 +233,16 @@ func (s *subscriptions) next(subscriber string) (delivery, bool) {
 func (m *Manager) drain(subscriber string) {
 	defer m.wg.Done()
 	for {
-		d, ok := m.subs.next(subscriber)
+		d, ok := m.subs.next(subscriber, m.opts.WakeBatch > 0)
 		if !ok {
 			return
 		}
 		if d.limit {
 			m.wakeLimitReached(subscriber)
+			continue
+		}
+		if d.thread != nil {
+			m.deliverThreadWakes(subscriber, m.collectBatch(subscriber, d))
 			continue
 		}
 		msg := d.msg(m.ctx)
@@ -307,14 +335,18 @@ type wakeThread struct {
 	Labels       []string    `json:"labels"`
 	Report       *wakeReport `json:"report"`
 	// ReportStale: the turn ended and the report does not describe it (none, or filed
-	// before the thread's last message); LastMessage is then the turn's last assistant
-	// text, one line, cut at maxLastMessage runes (a question asked in prose).
+	// before the thread's last message). LastMessage is then the turn's last assistant
+	// text, one line, cut at maxLastMessage runes (a question asked in prose); also with
+	// a current report when the turn said more after filing it (a caveat).
 	ReportStale bool   `json:"report_stale,omitempty"`
 	LastMessage string `json:"last_message,omitempty"`
 	// Pending is the request a "permission: …" or "question: …" reason describes.
 	Pending *wakePending `json:"pending,omitempty"`
 	// Children counts the threads it created that are not archived; nil for none.
 	Children *wakeChildren `json:"children,omitempty"`
+	// Siblings counts the subscriber's own children when this thread is one of them
+	// (subscriptions_batch.go); nil otherwise.
+	Siblings *wakeSiblings `json:"siblings,omitempty"`
 }
 
 // wakePending is a pending permission prompt or question: what `thread respond` needs.
@@ -391,10 +423,16 @@ type wakeDetail struct {
 	// noReport: the turn ended and the thread has no report; staleReport: its report was
 	// filed before its last message (a follow-up, a wake), so it describes an older turn.
 	noReport, staleReport bool
+	// saidMore: the turn ended with assistant text after its (current) report was
+	// filed: what it said may qualify the report.
+	saidMore bool
 	// lastMessage is the ended turn's last assistant text, when its report does not
-	// describe it (noReport, or staleReport).
+	// describe it (noReport, or staleReport) or it said more after it (saidMore).
 	lastMessage string
 	pending     *wakePending
+	// siblings counts the subscriber's children when the target is one of them; set
+	// when the wake is sent (subscriptions_batch.go).
+	siblings *wakeSiblings
 }
 
 // Wake detail bounds: the last assistant message (runes, one line) and a pending
@@ -405,12 +443,13 @@ const (
 )
 
 // wakeDetailOf reads a thread wake's detail from t's items: whether the report is
-// missing or older than the last user message (any origin: a follow-up or a wake), the
-// ended turn's last assistant text when so, and the request a "permission: …" or
-// "question: …" reason describes. Subagents' items are skipped.
+// missing or older than the last user message (any origin: a follow-up or a wake), or
+// was followed by more assistant text in the ended turn, the turn's last assistant text
+// when so, and the request a "permission: …" or "question: …" reason describes.
+// Subagents' items are skipped.
 func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	d := wakeDetail{children: kids}
-	var lastUser time.Time
+	var lastUser, lastAt time.Time
 	var last string
 	for _, it := range items {
 		if it.ParentToolUseID != "" {
@@ -418,19 +457,21 @@ func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 		}
 		switch it.Kind {
 		case KindUserMessage:
-			lastUser, last = it.CreatedAt, ""
+			lastUser, last, lastAt = it.CreatedAt, "", time.Time{}
 		case KindAssistantText:
 			if s := strings.TrimSpace(it.Text); s != "" {
-				last = s
+				last, lastAt = s, it.CreatedAt
 			}
 		}
 	}
 	hasReport := t.Report.Status != ReportNone
 	d.staleReport = hasReport && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
 	if Meets(CondIdle, t) {
-		// The turn ended: say when the report does not describe it, and what it said.
+		// The turn ended: say when the report does not describe it, or when the turn
+		// went on talking after filing it, and what it said last.
 		d.noReport = !hasReport
-		if d.noReport || d.staleReport {
+		d.saidMore = hasReport && !d.staleReport && last != "" && lastAt.After(t.Report.At)
+		if d.noReport || d.staleReport || d.saidMore {
 			d.lastMessage = oneLine(last, maxLastMessage)
 		}
 	}
@@ -502,10 +543,15 @@ func pendingInput(in string) any {
 
 // threadWake is the wake message of sub about thread t, fired at, with detail d.
 func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message {
+	return wakeMessage(joinSentences(threadWakeTitle(sub.Condition, t, d), siblingsSentence(d.siblings)), threadWakePayload(sub, t, at, d))
+}
+
+// threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.
+func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) wakeThreadPayload {
 	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
 		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
-		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending,
+		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending, Siblings: d.siblings,
 	}}
 	if p.Thread.Labels == nil {
 		p.Thread.Labels = []string{}
@@ -515,7 +561,7 @@ func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message 
 		kids := d.children
 		p.Thread.Children = &kids
 	}
-	return wakeMessage(threadWakeTitle(sub.Condition, t, d), p)
+	return p
 }
 
 // wakeReportOf is a report in a wake's JSON; nil for none.
@@ -534,7 +580,8 @@ func wakeReportOf(rep Report) *wakeReport {
 // `Thread "Fix the login" (s-1) needs attention: finished. Report: done — all good.`,
 // `Thread "Ask" (s-2) needs attention: finished without a report.` or
 // `Thread "Lead" (s-3) is idle: at prompt (report is from before its last message); 2 of
-// its 3 child threads still working.` The verb is the condition's, or for settled and
+// its 3 child threads still working.` or `Thread "Docs" (s-4) needs attention: finished,
+// said more after its report. Report: done — typos fixed.` The verb is the condition's, or for settled and
 // idle the status's. A report is quoted only while it is current (not staleReport).
 func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 	who := "Thread " + t.ID
@@ -570,6 +617,8 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		line += " (no report)"
 	case d.staleReport && Meets(CondIdle, t):
 		line += " (report is from before its last message)"
+	case d.saidMore:
+		line += ", said more after its report"
 	}
 	if k := d.children; k.Working > 0 {
 		if k.Total == 1 {

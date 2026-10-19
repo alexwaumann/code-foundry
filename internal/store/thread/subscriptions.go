@@ -34,7 +34,8 @@ import (
 // the daemon reports the run's end (ActionRunFinished), or at once when it already ended.
 //
 // The hook only decides and queues: wakes are delivered by one goroutine per subscriber
-// (drain), in order, never under m.mu. A one-shot subscription goes once it fired; a
+// (drain), in order, never under m.mu; thread wakes that fire within a second of each
+// other go as one message (subscriptions_batch.go). A one-shot subscription goes once it fired; a
 // repeat one stays. Subscriptions are persisted (thread_subscriptions, migration 0024)
 // and rehydrated by New, armed with the targets as loaded: nothing fires for what
 // happened while the daemon was stopped. Action runs live in the action store's memory,

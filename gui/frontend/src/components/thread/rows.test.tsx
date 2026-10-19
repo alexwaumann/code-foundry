@@ -285,6 +285,14 @@ describe("a message sent mid-turn (a steer)", () => {
     expect(c.querySelector('[data-testid="thread-steer"]')).toBeNull();
   });
 
+  it("a batch of wakes in one message: one wake note per wake", () => {
+    const one = (id: string, name: string) => ({ kind: "thread", thread: { id, name, status: "needs_attention", status_reason: "finished" } });
+    const wake = { title: "2 threads settled: …", json: JSON.stringify({ kind: "batch", wakes: [one("s-a", "Tests"), one("s-b", "Docs")] }) };
+    const c = show([...steered.slice(0, 2), { ...base, id: "w", ordinal: 3, kind: "user", text: "woken", attachments: [], composerText: "", wake }]);
+    const names = [...c.querySelectorAll('[data-testid="thread-wake-note-name"]')].map((n) => n.textContent);
+    expect(names).toEqual(["Tests", "Docs"]);
+  });
+
   it("an interrupted turn after a steer with no final text: one header that folds it, its first part red, nothing to copy", () => {
     const c = show([...steered, turnEndItem(interrupted)]);
     const header = c.querySelector('[data-testid="thread-turn-header"]');

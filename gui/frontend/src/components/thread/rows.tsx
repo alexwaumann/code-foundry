@@ -36,7 +36,7 @@ import { parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
-import { wakeLine, type WakeTone } from "@/lib/wake";
+import { wakeLines, type WakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type StripStep, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { agentReport, formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
@@ -742,14 +742,28 @@ const WAKE_ICONS: Readonly<Record<WakeTone, { icon: LucideIcon; cls: string; lab
 };
 
 /**
- * A message the daemon sent for a wake subscription (docs/notes/agents-4-wake.md), drawn
- * as a lineage note instead of a bubble (docs/notes/agents-3-lineage-gui.md): the tone's
- * icon, "Woken by <thread>: idle, finished", the report's summary, the age, and the
- * payload as a JSON block once expanded. The thread's name is a link while it exists
+ * A message the daemon sent for a wake subscription (docs/notes/agents-4-wake.md): one
+ * note per wake, several when the daemon sent a batch of thread wakes as one message
+ * (docs/notes/orch-wakes-content.md).
+ */
+function WakeNotes({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
+  const lines = useMemo(() => wakeLines(wake), [wake]);
+  return (
+    <>
+      {lines.map((line, i) => (
+        <WakeNoteRow key={i} line={line} atMs={atMs} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * A wake drawn as a lineage note instead of a bubble (docs/notes/agents-3-lineage-gui.md):
+ * the tone's icon, "Woken by <thread>: idle, finished", the report's summary, the age, and
+ * the payload as a JSON block once expanded. The thread's name is a link while it exists
  * (its current name; the payload's otherwise); an action run's name is plain text.
  */
-function WakeNoteRow({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
-  const line = useMemo(() => wakeLine(wake), [wake]);
+function WakeNoteRow({ line, atMs }: { line: WakeLine; atMs: number | null }) {
   const exists = useThreadsStore((s) => line.threadId !== "" && line.threadId in s.byId);
   const current = useThreadsStore((s) => (line.threadId ? (s.byId[line.threadId]?.name ?? "") : ""));
   const name = current || line.name;
@@ -804,7 +818,7 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
-  if (it.wake) return <WakeNoteRow wake={it.wake} atMs={it.createdAtMs} />;
+  if (it.wake) return <WakeNotes wake={it.wake} atMs={it.createdAtMs} />;
   return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />;
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wakeLine } from "./wake";
+import { wakeLine, wakeLines } from "./wake";
 
 const thread = (t: Record<string, unknown>) => JSON.stringify({ kind: "thread", subscription_id: "sub-1", condition: "settled", fired_at: "2026-10-17T09:01:08.732Z", thread: { id: "s-c", name: "Child", ...t } });
 const run = (r: Record<string, unknown>) => JSON.stringify({ kind: "action_run", subscription_id: "sub-2", condition: "finished", run: { id: "r-1", action_name: "Slow", ...r } });
@@ -33,5 +33,31 @@ describe("wakeLine", () => {
     expect(l).toMatchObject({ tone: "ok", threadId: "", name: "", detail: "", summary: 'Thread "X" (s-1) is idle: finished.' });
     // The raw text as the body when it does not parse as an object.
     expect(l.json).toBe(body);
+  });
+
+  it("a batch: one line per wake, each with its own payload", () => {
+    const one = (id: string, t: Record<string, unknown>) => ({ kind: "thread", subscription_id: `sub-${id}`, condition: "settled", thread: { id, name: id.toUpperCase(), ...t } });
+    const json = JSON.stringify({
+      kind: "batch",
+      wakes: [one("s-a", { status: "needs_attention", status_reason: "finished", report: { status: "done", summary: "ok" } }), one("s-b", { status: "needs_attention", status_reason: "permission: Bash" })],
+    });
+    const lines = wakeLines({ title: "2 threads settled: …", json });
+    expect(lines).toMatchObject([
+      { tone: "ok", threadId: "s-a", name: "S-A", detail: "idle, finished", summary: "ok" },
+      { tone: "attention", threadId: "s-b", name: "S-B", detail: "needs attention, permission: Bash" },
+    ]);
+    expect(JSON.parse(lines[1]?.json ?? "")).toMatchObject({ subscription_id: "sub-s-b" });
+    expect(wakeLine({ title: "t", json })).toMatchObject({ threadId: "s-a" });
+  });
+
+  it.each([
+    ["an empty batch", '{"kind":"batch","wakes":[]}'],
+    ["a batch of non-objects", '{"kind":"batch","wakes":[1]}'],
+  ])("%s: one line with the header", (_n, json) => {
+    expect(wakeLines({ title: "the header", json })).toMatchObject([{ threadId: "", summary: "the header" }]);
+  });
+
+  it("a single wake is one line", () => {
+    expect(wakeLines({ title: "t", json: thread({ status: "idle" }) })).toHaveLength(1);
   });
 });

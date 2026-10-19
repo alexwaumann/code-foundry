@@ -112,8 +112,11 @@ func (e *env) open(mutate ...func(*Options)) {
 		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Tick:           20 * time.Millisecond,
 		StatusDebounce: 10 * time.Millisecond,
-		StartTimeout:   5 * time.Second,
-		CloseTimeout:   2 * time.Second,
+		// Each wake alone and at once (the tests count them); batching has its own
+		// (subscriptions_batch_test.go).
+		WakeBatch:    -1,
+		StartTimeout: 5 * time.Second,
+		CloseTimeout: 2 * time.Second,
 		Namer: func(_ context.Context, msg string) (string, error) {
 			e.mu.Lock()
 			e.named = append(e.named, msg)
