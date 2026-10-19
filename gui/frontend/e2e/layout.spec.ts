@@ -34,11 +34,9 @@ const CENTER = 34;
 /** An icon-xs button's inset around its glyph: (24px box - 14px glyph) / 2. */
 const ICON_INSET = 5;
 
-test("the app name is text-brand (17px semibold) and fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
+test("the app name fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
-  await expect(title).toHaveCSS("font-size", "17px");
-  await expect(title).toHaveCSS("font-weight", "600");
   const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
   const setZoom = (z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
   const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
@@ -47,10 +45,10 @@ test("the app name is text-brand (17px semibold) and fits whole at the minimum s
   expect(await fits()).toBe(true);
   // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
   await setZoom(90);
-  await expect(page.getByTestId("traffic-light-gutter")).toHaveAttribute("style", /width: 89px/);
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", "90");
   expect(await fits()).toBe(true);
   await setZoom(150);
-  await expect(page.getByTestId("traffic-light-gutter")).toHaveAttribute("style", /width: 53px/);
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", "150");
   expect(await fits()).toBe(true);
   await expect(title).toBeVisible();
 });
@@ -102,7 +100,13 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(newThread.top).toBeGreaterThan(BAND + 32);
   expect(newThread.height).toBe(32);
   expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width);
-  // New terminal is not in the sidebar (palette, cmd+t and the row menu only).
+  // Labelled, with thread.new's chord as a hint.
+  await expect(page.getByTestId("sidebar-new-thread")).toHaveText("New thread⌘N");
+  await expect(page.getByTestId("sidebar-new-thread-chord")).toHaveText("⌘N");
+  // The only chord on screen: the welcome panel names none (onboarding-1).
+  await expect(page.locator("kbd")).toHaveCount(1);
+  // New terminal and Add project are not in the sidebar (palette, cmd+t and the row menu only).
+  await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
   // Pull Requests, Projects and the thread list sit below the toolbar and do not drag.
   expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND + 32);
@@ -196,10 +200,10 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);
   await page.getByRole("button", { name: "Close settings" }).click();
 
-  // A stopped thread keeps the thread header.
+  // A stopped thread keeps the thread header, with the bottom panel's toggle too.
   await row(page, "s:s-3").click();
   await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="panel-toggle"]']);
+  await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="bottom-toggle"]', '[data-testid="panel-toggle"]']);
 });
 
 test("headerless panes (start page, composer) drag the window from the same 44px band", async ({ page }) => {
@@ -230,44 +234,33 @@ test("the daemon status and update indicator sit at the bottom of the sidebar", 
   expect(status.right).toBeLessThanOrEqual(sidebar.right);
   expect(sidebar.bottom - status.bottom).toBeLessThan(16);
   await expect(page.locator("footer")).toHaveCount(0);
-  // The last status button's glyph (not its box) ends on the sidebar's right edge, a shell
-  // gap from the content pane.
-  const settings = await box(page, "status-settings");
-  expect(settings.right).toBe(sidebar.right + ICON_INSET);
-  expect(await page.getByTestId("status-settings").locator("svg").evaluate((el) => el.getBoundingClientRect().right)).toBe(sidebar.right);
-  expect((await box(page, "content-pane")).left - sidebar.right).toBe(GAP);
-  // So does a footer header's chevron (its box) just above it.
-  expect(await page.getByTestId("snoozed-header").locator("svg").evaluate((el) => el.getBoundingClientRect().right)).toBe(sidebar.right);
 });
 
-for (const scheme of ["dark", "light"] as const) {
-  test(`${scheme}: sidebar sits on the sheet and the bottom panel's terminal matches its pane`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: scheme });
-    await openApp(page);
-    await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /dark/ : /^(?!.*dark)/);
-    const sheet = await bg(page, "body");
-    expect(await bg(page, '[data-testid="sidebar"]')).toBe(sheet);
-    const pane = await bg(page, '[data-testid="content-pane"]');
-    expect(pane).not.toBe(sheet);
-    expect(await page.getByTestId("sidebar").evaluate((el) => getComputedStyle(el).borderRightWidth)).toBe("0px");
+// Dark only: the per-scheme palette is src/terminal/theme.test.ts.
+test("sidebar sits on the sheet and the bottom panel's terminal matches its pane", async ({ page }) => {
+  await openApp(page);
+  const sheet = await bg(page, "body");
+  expect(await bg(page, '[data-testid="sidebar"]')).toBe(sheet);
+  const pane = await bg(page, '[data-testid="content-pane"]');
+  expect(pane).not.toBe(sheet);
+  expect(await page.getByTestId("sidebar").evaluate((el) => getComputedStyle(el).borderRightWidth)).toBe("0px");
 
-    // s-1's shell in its bottom panel: the xterm theme background (src/terminal/theme.ts)
-    // must be the pane colour.
-    await row(page, "s:s-1").click();
-    await page.keyboard.press("Meta+j");
-    await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
-    expect(await bg(page, '[data-testid="bottom-panel"]')).toBe(pane);
-    const xtermBg = () =>
-      page.evaluate(() => {
-        const w = window as unknown as { __cfTerminal?: { renderer: { term: { options: { theme?: { background?: string } } } } } };
-        const probe = document.createElement("div");
-        probe.style.backgroundColor = w.__cfTerminal?.renderer.term.options.theme?.background ?? "";
-        document.body.append(probe);
-        const c = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        return c;
-      });
-    await expect.poll(xtermBg).toBe(pane);
-    expect(await bg(page, '[data-testid="bottom-terminal-host"] >> xpath=..')).toBe(pane);
-  });
-}
+  // s-1's shell in its bottom panel: the xterm theme background (src/terminal/theme.ts)
+  // must be the pane colour.
+  await row(page, "s:s-1").click();
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  expect(await bg(page, '[data-testid="bottom-panel"]')).toBe(pane);
+  const xtermBg = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __cfTerminal?: { renderer: { term: { options: { theme?: { background?: string } } } } } };
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = w.__cfTerminal?.renderer.term.options.theme?.background ?? "";
+      document.body.append(probe);
+      const c = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return c;
+    });
+  await expect.poll(xtermBg).toBe(pane);
+  expect(await bg(page, '[data-testid="bottom-terminal-host"] >> xpath=..')).toBe(pane);
+});

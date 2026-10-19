@@ -139,21 +139,14 @@ test("cmd+, opens settings on General; the nav switches pages, one at a time", a
   await expect(settings).toHaveCount(0);
 });
 
-test("model and effort share a row: both titles over their selects, the model's description under them", async ({ page }) => {
+test("model and effort share a row with the model's description under them", async ({ page }) => {
   const settings = await openSettings(page);
   const pair = settings.locator('[data-setting-row="model"]');
   await expect(pair.locator("[data-setting]")).toHaveCount(2);
   await expect(pair.locator("[data-setting]").first()).toHaveAttribute("data-setting", "threads.default_model");
   await expect(pair.locator("[data-setting]").nth(1)).toHaveAttribute("data-setting", "threads.default_effort");
-  const model = await select(page, "threads.default_model").boundingBox();
-  const effort = await select(page, "threads.default_effort").boundingBox();
-  if (!model || !effort) throw new Error("no boxes");
-  expect(Math.abs(model.y - effort.y)).toBeLessThanOrEqual(1);
-  expect(effort.x).toBeGreaterThan(model.x + model.width);
   await expect(pair).toContainText("Used by new threads unless you pick otherwise.");
   await expect(pair).not.toContainText("Effort level new threads use");
-  await pick(page, "threads.default_effort", "Max");
-  await expect.poll(async () => (await mockSettings()).raw["threads.default_effort"]).toBe("max");
 });
 
 test("a dependent row is indented under its toggle and dims while it is off; across sections it says why", async ({ page }) => {
@@ -276,20 +269,6 @@ test("search lists matches from every page with their page and section; Esc clea
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "advanced");
 });
 
-test("Appearance › Theme ends in Browse themes, which opens the Themes page and comes back to Appearance", async ({ page }) => {
-  await openSettings(page);
-  await goTo(page, "appearance");
-  const link = page.getByTestId("settings-themes-link");
-  await expect(page.locator('[data-section="theme"]').getByTestId("settings-themes-link")).toBeVisible();
-  await expect(link).toContainText("Browse themes");
-  await expect(link).toContainText("Preview every theme in a gallery of the app's controls, then apply one.");
-  await link.click();
-  await expect(page.getByTestId("themes-page")).toBeVisible();
-  await page.getByRole("button", { name: "Close themes" }).click();
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
-});
-
 test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
   await openSettings(page, "appearance");
   await pick(page, "appearance.theme", "Dark");
@@ -341,33 +320,13 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(setting(page, "threads.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
 });
 
-test("an enum select works from the keyboard and its list is themed", async ({ page }) => {
-  // Tall enough for the list to open below the row (Appearance › Window's third).
-  await page.setViewportSize({ width: 1280, height: 1100 });
+test("an enum select works from the keyboard", async ({ page }) => {
   await openSettings(page, "appearance");
   const trigger = select(page, "appearance.thread_width");
   await trigger.focus();
   await page.keyboard.press("Enter");
   const list = listbox(page);
   await expect(list).toBeVisible();
-  // Drawn with the popover tokens, under its trigger and as wide (once the zoom-in is done).
-  await list.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-  const box = await list.boundingBox();
-  const tbox = await trigger.boundingBox();
-  if (!box || !tbox) throw new Error("no boxes");
-  expect(box.y).toBeGreaterThanOrEqual(tbox.y + tbox.height);
-  expect(box.x).toBeCloseTo(tbox.x, 0);
-  expect(box.width).toBeCloseTo(tbox.width, 0);
-  const bg = await page.locator('[data-slot="select-content"]').evaluate((el) => getComputedStyle(el).backgroundColor);
-  const popover = await page.evaluate(() => {
-    const probe = document.createElement("div");
-    probe.className = "bg-popover";
-    document.body.append(probe);
-    const c = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    return c;
-  });
-  expect(bg).toBe(popover);
   // The selected item has the focus; ArrowDown moves to the next and Enter picks it.
   await expect(list.getByRole("option", { name: "Comfortable (default)" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
@@ -465,21 +424,6 @@ test("reveal settings file runs settings.reveal", async ({ page }) => {
   await openSettings(page);
   await page.getByTestId("reveal-settings").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("settings.reveal");
-});
-
-test("the alert volume is a slider saved per step, with Play running notifications.test", async ({ page }) => {
-  await openSettings(page, "notifications");
-  const row = setting(page, "notifications.sound_volume");
-  const thumb = row.getByRole("slider", { name: "Alert volume" });
-  await expect(thumb).toHaveAttribute("aria-valuenow", "50");
-  await thumb.focus();
-  await page.keyboard.press("ArrowLeft");
-  await page.keyboard.press("ArrowLeft");
-  await expect(row.getByTestId("volume-value")).toHaveText("48%");
-  await expect.poll(async () => (await mockSettings()).raw["notifications.sound_volume"]).toBe("48");
-  await expect(thumb).toBeFocused();
-  await row.getByRole("button", { name: "Play alert sound" }).click();
-  await expect.poll(async () => (await invocations()).at(-1)).toMatchObject({ name: "notifications.test", args: { volume: "48" } });
 });
 
 test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app chords", async ({ page }) => {

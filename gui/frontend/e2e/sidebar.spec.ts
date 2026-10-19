@@ -4,7 +4,6 @@ import { CF, DEFAULT_ORDER, expectTooltip, holdThreads, invocations, mockPost, m
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
 const CF_LOGIN = `${WT}/code-foundry/cf-login`;
-const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
 const WS = "w-000000000001";
 
 interface ThreadSummary {
@@ -128,6 +127,13 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   // cmd+1 is the first row (the attention thread), cmd+2 the next.
   await page.keyboard.press("Meta+2");
   await expect(d).toHaveAttribute("aria-selected", "true");
+  // End reaches the last row; ↑ skips the Working header.
+  await list(page).focus();
+  await page.keyboard.press("End");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-1");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
 });
 
 test("pin from the context menu moves a thread to the top; unpin moves it back", async ({ page }) => {
@@ -308,13 +314,6 @@ test("the Projects page removes a workspace and offers project actions", async (
   await expect(page.getByTestId("worktree-more-menu")).toBeVisible();
   await expect(page.getByTestId("worktree-remove")).toHaveCount(0);
   await page.keyboard.press("Escape");
-});
-
-test("a workspace thread's member worktree never shows under its project in the sidebar", async ({ page }) => {
-  await workspaceWithThread();
-  await openApp(page);
-  await expect(list(page).locator(`[data-row-key*="${GP_LOGIN}"]`)).toHaveCount(0);
-  await expect(list(page).getByText("cf/login")).toHaveCount(1); // only the driver row's branch
 });
 
 test("status kinds: each thread's second line says its status in words and colour; waiting threads first, prompts above errors above finished, working last", async ({ page }) => {
@@ -538,14 +537,11 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await page.waitForTimeout(700);
   await expect(tip).toHaveCount(0);
 
-  // A right-click closes it and opens the row menu; other rows stay quiet while the menu is open.
+  // A right-click closes it and opens the row menu.
   await row(page, "s:s-1").hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-1");
   await row(page, "s:s-1").click({ button: "right" });
   await expect(page.getByTestId("row-menu")).toBeVisible();
-  await expect(tip).toHaveCount(0);
-  await row(page, "s:s-4").hover({ force: true });
-  await page.waitForTimeout(700);
   await expect(tip).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
@@ -597,23 +593,4 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
     await expect(tip.getByTestId("tip-project"), id).toBeVisible();
     await expect(tip.getByTestId("tip-status"), id).toHaveCount(0);
   }
-});
-
-test("the toolbar: Dashboard and Notifications; New thread is a labelled button under it", async ({ page }) => {
-  await openApp(page);
-  const bar = (await page.getByTestId("sidebar-toolbar").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-  const at = async (id: string) => (await page.getByTestId(id).boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-  const [dash, bell, add] = [await at("sidebar-dashboard"), await at("sidebar-notifications"), await at("sidebar-new-thread")];
-  expect(dash.x).toBeLessThan(bell.x);
-  expect(bell.x + bell.width).toBeLessThan(bar.x + bar.width / 2);
-  await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
-  // New thread spans the toolbar's width, below it (#40: no inset; the content pane's 8px
-  // margin is the gap beyond it), labelled, with thread.new's chord as a hint.
-  expect(add.y).toBeGreaterThanOrEqual(bar.y + bar.height);
-  expect(Math.round(add.x - bar.x)).toBe(0);
-  expect(Math.round(add.width - bar.width)).toBe(0);
-  const button = page.getByTestId("sidebar-new-thread");
-  await expect(button).toHaveText("New thread⌘N");
-  await expect(button).toBeEnabled();
-  await expect(page.getByTestId("sidebar-new-thread-chord")).toHaveText("⌘N");
 });

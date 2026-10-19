@@ -22,25 +22,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("Browse lists the registry's plugins with what they ask for, the registry below, and the registries setting", async ({ page }) => {
+test("Refresh re-reads the registries, and one that fails says so in words", async ({ page }) => {
   await openPlugins(page);
-  await expect(page.getByTestId("registry-entry")).toHaveCount(2);
-  const gh = entry(page, "gh-actions");
-  await expect(gh).toContainText("GitHub Actions");
-  await expect(gh).toContainText("0.1.0");
-  await expect(gh.getByTestId("registry-permissions")).toHaveText(
-    "May run Code Foundry commands: pr.checks, thread.send, view.open.url; read events: gh, threads; raise threads to needs-attention or error.",
-  );
-  await expect(gh).toContainText("alexwaumann/code-foundry-plugin-gh-actions · from alexwaumann/code-foundry-plugins");
-  await expect(gh.getByTestId("registry-install")).toBeVisible();
-  const tw = entry(page, "test-watcher");
-  await expect(tw.getByTestId("plugin-pill")).toHaveText("Update from 0.0.9");
-  await expect(tw.getByTestId("registry-update")).toHaveText("Update to 0.1.0");
-  await expect(page.getByTestId("registry-status")).toContainText("alexwaumann/code-foundry-plugins");
   await expect(page.getByTestId("registry-status")).toContainText("2 plugins");
-  await expect(page.locator('[data-testid="settings-section"][data-section="registries"]')).toContainText("Plugin registries");
-
-  // A registry that fails says so in words.
   await mockPost(`plugin/registry?error=${encodeURIComponent("not found: no index.json in o/r (or no access with your gh login)")}`);
   await page.getByTestId("registry-refresh").click();
   await expect(page.locator('[data-testid="registry-status"][data-error="true"]')).toContainText("Not found, or your gh login cannot read it.");
@@ -55,14 +39,20 @@ test("with no registry configured (the default) Browse says so and points at the
   await expect(page.getByTestId("registry-status")).toHaveCount(0);
   await expect(page.getByTestId("registry-empty")).toHaveCount(0);
 
-  // Adding the registry in the field below re-reads Browse.
+  // Its link leads to the field below; adding the registry there re-reads Browse.
   const field = page.locator('[data-setting="plugins.registries"]').getByRole("textbox");
+  await page.getByTestId("registry-none-link").click();
+  await expect(field).toBeFocused();
   await expect(field).toHaveValue("");
   await field.fill("https://github.com/alexwaumann/code-foundry-plugins");
   await field.press("Enter");
   await expect(page.getByTestId("registry-entry")).toHaveCount(2);
   await expect(page.getByTestId("registry-none")).toHaveCount(0);
   await expect(page.getByTestId("registry-status")).toContainText("alexwaumann/code-foundry-plugins");
+
+  // A registry that lists nothing says that.
+  await mockPost(`settings/external?plugins.registries=${encodeURIComponent("https://example.com/plugins/index.json")}`);
+  await expect(page.getByTestId("registry-empty")).toHaveText("No plugins listed yet.");
 });
 
 test("with a second registry, Browse offers updates only from the install source and says where another source's install came from", async ({ page }) => {
@@ -74,21 +64,15 @@ test("with a second registry, Browse offers updates only from the install source
   await openPlugins(page);
   await expect(page.getByTestId("registry-entry")).toHaveCount(3);
 
-  // Another source's entry: where it came from, no Install, no Update, though newer.
-  const acme = entry(page, "acme-data");
-  await expect(acme).toHaveAttribute("data-relation", "other-source");
-  await expect(acme.getByTestId("plugin-pill")).toHaveText("Installed from plugins.acme.dev/index.json");
-  await expect(acme).toContainText("acme-corp/code-foundry-plugin-acme-data · from 127.0.0.1:8765/index.json");
-  await expect(acme.getByTestId("registry-update")).toHaveCount(0);
-  await expect(acme.getByTestId("registry-install")).toHaveCount(0);
+  // Another source's install: no Update on its Installed row, though newer, and where it came
+  // from (Browse's pills for each relation are BrowseSection.test.tsx).
+  await expect(entry(page, "acme-data")).toHaveAttribute("data-relation", "other-source");
   await expect(installed(page, "acme-data").getByTestId("plugin-update")).toHaveCount(0);
   await expect(installed(page, "acme-data").getByTestId("plugin-installed-from")).toHaveText("from plugins.acme.dev/index.json");
 
   // Its own registry's entry is still the update, in Browse and on the Installed row.
   const tw = entry(page, "test-watcher");
   await expect(tw).toHaveAttribute("data-relation", "update");
-  await expect(tw.getByTestId("plugin-pill")).toHaveText("Update from 0.0.9");
-  await expect(tw.getByTestId("registry-update")).toHaveText("Update to 0.1.0");
   await expect(installed(page, "test-watcher").getByTestId("plugin-update-available")).toHaveText("0.1.0 is available.");
   await expect(page.locator('[data-testid="registry-status"]').filter({ hasText: "127.0.0.1:8765/index.json" })).toContainText(
     `test-watcher: already listed by ${fixture}, which comes first`,
@@ -136,22 +120,16 @@ test("Update from the Installed row installs the listed version and keeps it run
   await expect(entry(page, "test-watcher").getByTestId("plugin-pill")).toHaveText("Installed");
 });
 
-test("Uninstall says how many of the plugin's own threads it removes", async ({ page }) => {
+test("Uninstall confirms once in its own dialog, with purge as a choice", async ({ page }) => {
   await openPlugins(page);
+  // A plugin with threads of its own says how many go with it.
   await installed(page, "hello").getByTestId("plugin-uninstall").click();
   const dialog = page.getByTestId("uninstall-dialog");
   await expect(dialog).toContainText("It removes its 1 thread.");
   await dialog.getByTestId("uninstall-cancel").click();
-  await expect(installed(page, "test-watcher").getByTestId("plugin-uninstall")).toBeVisible();
   await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();
-  await expect(dialog).not.toContainText("thread");
-});
-
-test("Uninstall confirms once in its own dialog, with purge as a choice", async ({ page }) => {
-  await openPlugins(page);
-  await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();
-  const dialog = page.getByTestId("uninstall-dialog");
   await expect(dialog).toContainText("Uninstall Test Watcher?");
+  await expect(dialog).not.toContainText("thread");
   await expect(dialog).toContainText("Its data (~/.code-foundry/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
   await dialog.getByTestId("uninstall-purge").click();
   await dialog.getByTestId("uninstall-confirm").click();

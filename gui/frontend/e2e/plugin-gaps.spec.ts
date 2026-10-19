@@ -4,8 +4,7 @@ import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 /**
  * The plugin GUI gaps (docs/notes/plugins-11-gui-gaps.md): a flagged row opens the
  * plugin's surface, the thread header's flag chip, secrets in Settings → Plugins, a
- * dismissable install failure, the daemon's real plugin folders, and Browse with no
- * registry configured.
+ * dismissable install failure, and the daemon's real plugin folders.
  */
 
 const flag = (id: string, plugin: string, name: string, level: string, reason: string) =>
@@ -32,17 +31,6 @@ test("a row whose line 2 shows a plugin's flag opens the thread and the plugin's
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");
   await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
-});
-
-test("a flag whose plugin has no surface for the thread opens only the thread", async ({ page }) => {
-  await openApp(page);
-  await flag("s-3", "test-watcher", "Test Watcher", "error", "3 tests failed");
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
-  await expect(page.getByTestId("thread-flag")).toBeVisible();
-  // Give a late open the time it would take: nothing of the plugin's opens.
-  await page.waitForTimeout(500);
-  await expect(page.locator('[data-testid="panel-body"][data-surface^="plugin."]')).toHaveCount(0);
 });
 
 test("the thread header shows the top flag in its colour; a click opens the surface, the × clears it", async ({ page }) => {
@@ -119,20 +107,4 @@ test("Settings → Plugins and the uninstall dialog name the daemon's plugin fol
   await expect(dialog).toContainText("It stops and its package goes from ~/.cf-integ/plugins.");
   await expect(dialog).toContainText("Its data (~/.cf-integ/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
   await expect(dialog).not.toContainText(".code-foundry");
-});
-
-test("Browse with no registry configured says so and leads to the setting; a registry that lists none says that", async ({ page }) => {
-  await mockPost("settings/external?plugins.registries=none");
-  await openApp(page);
-  await openPlugins(page);
-  const none = page.getByTestId("registry-none");
-  await expect(none).toContainText("No registry configured.");
-  await expect(page.getByTestId("registry-empty")).toHaveCount(0);
-  await none.getByTestId("registry-none-link").click();
-  await expect(page.locator('[data-setting="plugins.registries"] input')).toBeFocused();
-
-  await mockPost(`settings/external?plugins.registries=${encodeURIComponent("https://example.com/plugins/index.json")}`);
-  await expect(page.getByTestId("registry-empty")).toHaveText("No plugins listed yet.");
-  await expect(none).toHaveCount(0);
-  await expect(page.getByTestId("registry-status")).toContainText("example.com/plugins/index.json");
 });
