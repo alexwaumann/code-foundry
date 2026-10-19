@@ -377,3 +377,41 @@ test("Back from a row far down a long (virtualized) list focuses that row; the f
   expect.soft(stolen, "BUG md-6: the owed focus jumped to the row the plugin selected").toBe(false);
   expect(back.focused, "BUG md-4: Back did not focus the chosen row").toBe(true);
 });
+
+test("two flex spacers in one fill pane share its free height; a flex spacer in a strip without a form takes the free width", async ({ page }) => {
+  await openDemo(page);
+  await showView(page, {
+    view: {
+      nodes: [
+        {
+          key: "box",
+          pane: {
+            height: 400,
+            children: [
+              { key: "a", text: { content: "a" } },
+              { key: "s1", spacer: { flex: true } },
+              { key: "b", text: { content: "b" } },
+              { key: "s2", spacer: { flex: true } },
+              { key: "c", text: { content: "c" } },
+            ],
+          },
+        },
+      ],
+      toolbar: [
+        { key: "tt", text: { content: "3 runs" } },
+        { key: "tsp", spacer: { flex: true } },
+        { key: "tbar", actions: { buttons: [{ key: "tb1", label: "Run", action: { event: "run" } }] } },
+      ],
+    },
+  });
+  const h = async (k: string) => (await surface(page).locator(`[data-testid="plugin-spacer"][data-key="${k}"]`).boundingBox())?.height ?? 0;
+  const [h1, h2] = [await h("s1"), await h("s2")];
+  expect(h1).toBeGreaterThan(100);
+  expect(Math.abs(h1 - h2)).toBeLessThan(2);
+  const c = await surface(page).locator('[data-testid="plugin-text"]').filter({ hasText: /^c$/ }).boundingBox();
+  const box = await surface(page).locator('[data-testid="plugin-pane"][data-key="box"]').boundingBox();
+  expect(c && box && Math.abs(c.y + c.height - (box.y + box.height)) < 2).toBe(true);
+  const bar = await surface(page).locator('[data-testid="plugin-strip-item"][data-key="tbar"]').boundingBox();
+  const tb = await surface(page).getByTestId("plugin-toolbar").boundingBox();
+  expect(bar && tb && Math.abs(bar.x + bar.width - (tb.x + tb.width - 16)) < 2).toBe(true);
+});
