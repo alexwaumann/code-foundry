@@ -100,7 +100,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
-| `terminal/read` | request | `{terminalId, maxBytes}` → `{text, truncated}`: its screen as plain text | `ReadTerminal` | `terminals` |
+| `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (`lines` counted; capability `terminal.scrollback`) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
 serve answers -32601.
