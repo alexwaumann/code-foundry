@@ -250,6 +250,9 @@ type record struct {
 	// reserved is set while a stopped thread starts and has no runner yet (reserve in
 	// lifecycle.go); it is closed when the start resolves.
 	reserved chan struct{}
+	// envPrint fingerprints the spawn extras the running process got (envstale.go);
+	// nil while no process runs. Replaced, never mutated.
+	envPrint *extrasPrint
 }
 
 var _ Store = (*Manager)(nil)
@@ -735,7 +738,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	argv, env := m.claudeCommand(ctx, s, l, grants{}, true)
+	argv, env, extras := m.claudeCommand(ctx, s, l, grants{}, true)
 	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
 		return err
 	}
@@ -750,6 +753,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 	rec.run = r
 	rec.release()
+	rec.spawnedWith(extras)
 	rec.s.State = StateStarting
 	// The fresh process owns status from here: the persisted one is cleared, or, with a
 	// message waiting for the handshake, the thread is on that turn already.
@@ -779,7 +783,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // is the first user message). g is what the conversation's allow-for-thread answers
 // granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
 // briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
-func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string) {
+// x is the extras it applied, for the staleness fingerprint (envstale.go).
+func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: g.allow, disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
 	if m.opts.SkillsDir != "" {
@@ -809,7 +814,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 			m.log.Warn("workspace of thread not found; starting without its members", "thread", s.ID, "workspace", s.WorkspaceID)
 		}
 	}
-	x := m.extras(ctx, spawnInfoOf(s, members, wait))
+	x = m.extras(ctx, spawnInfoOf(s, members, wait))
 	sa.addDirs = append(sa.addDirs, x.AddDirs...)
 	for _, d := range s.SpawnAddDirs { // the thread's own, after the plugins' (owner.go)
 		if !slices.Contains(sa.addDirs, d) && isDir(d) {
@@ -828,7 +833,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	if p := prependPath(env, x.PathPrepend, os.Getenv("PATH")); p != "" {
 		env = append(env, p)
 	}
-	return l.argv(m.opts.Claude, sa), env
+	return l.argv(m.opts.Claude, sa), env, x
 }
 
 // Rename sets a user-chosen name and disables auto-naming.
@@ -960,6 +965,9 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
 			rec.run = nil
+			// The process is gone: the next spawn gets the current extras.
+			rec.envPrint = nil
+			rec.s.PluginEnvStale, rec.s.PluginEnvChange = false, ""
 		}
 		fn(&rec.s)
 	})

@@ -115,6 +115,9 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	if l := flagsLine(s); l != "" {
 		lines = append(lines, l)
 	}
+	if l := pluginEnvLine(s); l != "" { // commands_thread_restart.go
+		lines = append(lines, l)
+	}
 	cost := "cost: " + formatUSD(s.GetCostUsd())
 	if s.GetUnpriced() {
 		cost += " (some usage unpriced)"

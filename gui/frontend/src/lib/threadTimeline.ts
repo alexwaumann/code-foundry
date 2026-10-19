@@ -239,9 +239,12 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
       // Sent while the turn runs (it has work and no turn_end yet): a steer. Claude picks
       // it up mid-turn and the turn ends with one turn_end, so it stays in the turn's
       // body. Unless the turn's process ended (an error item is the turn's last: Claude
-      // stopped or did not start), which no turn_end will follow: a new turn then.
+      // stopped or did not start), which no turn_end will follow: a new turn then. Nor
+      // after the daemon's own notes with no user message before them ("Restarted
+      // Claude", "Set effort to high": a restart between turns): no turn runs there.
       const last = cur?.items[cur.items.length - 1];
-      if (cur && last && last.kind !== "error") {
+      const notesOnly = cur !== null && cur.user.length === 0 && cur.items.every((x) => x.kind === "commandOutput");
+      if (cur && last && last.kind !== "error" && !notesOnly) {
         cur.items.push(it);
         continue;
       }

@@ -640,9 +640,21 @@ type Thread struct {
 	// not in the sidebar, attention counts, dock alerts, the Threads panel or lineage, and
 	// left out of a filtered List unless filter.all or filter.owner asks for them. Their
 	// usage still counts. Set once at Create. Empty for the user's threads.
-	Owner         string `protobuf:"bytes,55,opt,name=owner,proto3" json:"owner,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Owner string `protobuf:"bytes,55,opt,name=owner,proto3" json:"owner,omitempty"`
+	// The plugins' session environment for the thread's scope changed since its running
+	// Claude process started (a plugin pushed new values, or was enabled, disabled or
+	// removed): the process still has the old one, and ThreadService.Restart applies the
+	// new one. The daemon compares a fingerprint of what the process got (keys, hashed
+	// values, PATH entries, add-dirs); setting the same values again is no change. Cleared
+	// by the next spawn or restart and when the process ends. Never set on a thread that
+	// is not running. Not persisted. See docs/notes/plugins-env-restart.md.
+	PluginEnvStale bool `protobuf:"varint,56,opt,name=plugin_env_stale,json=pluginEnvStale,proto3" json:"plugin_env_stale,omitempty"`
+	// With plugin_env_stale, what changed, by plugin display name and variable names,
+	// never values: "GitHub Actions added 2 variables", "Hello removed CF_HELLO". Empty
+	// otherwise.
+	PluginEnvChange string `protobuf:"bytes,57,opt,name=plugin_env_change,json=pluginEnvChange,proto3" json:"plugin_env_change,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1042,6 +1054,20 @@ func (x *Thread) GetFlags() []*ThreadFlag {
 func (x *Thread) GetOwner() string {
 	if x != nil {
 		return x.Owner
+	}
+	return ""
+}
+
+func (x *Thread) GetPluginEnvStale() bool {
+	if x != nil {
+		return x.PluginEnvStale
+	}
+	return false
+}
+
+func (x *Thread) GetPluginEnvChange() string {
+	if x != nil {
+		return x.PluginEnvChange
 	}
 	return ""
 }
@@ -4096,7 +4122,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8d\x12\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe3\x12\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -4160,7 +4186,9 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"budget_usd\x183 \x01(\x01R\tbudgetUsd\x120\n" +
 	"\x05flags\x186 \x03(\v2\x1a.codefoundry.v1.ThreadFlagR\x05flags\x12\x14\n" +
-	"\x05owner\x187 \x01(\tR\x05ownerJ\x04\b\t\x10\n" +
+	"\x05owner\x187 \x01(\tR\x05owner\x12(\n" +
+	"\x10plugin_env_stale\x188 \x01(\bR\x0epluginEnvStale\x12*\n" +
+	"\x11plugin_env_change\x189 \x01(\tR\x0fpluginEnvChangeJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xf5\x01\n" +
 	"\n" +
 	"ThreadFlag\x12\x16\n" +

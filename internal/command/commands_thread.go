@@ -58,6 +58,8 @@ type ThreadBackend interface {
 	SubscriptionBackend
 	// FlagsBackend backs thread.flag.clear (commands_thread_flags.go).
 	FlagsBackend
+	// RestartBackend backs thread.restart (commands_thread_restart.go).
+	RestartBackend
 }
 
 var (

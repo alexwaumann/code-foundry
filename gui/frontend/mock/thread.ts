@@ -623,6 +623,23 @@ export class MockThreadLogs {
   }
 
   /**
+   * thread.restart on a running thread (docs/notes/plugins-env-restart.md): a running turn
+   * is interrupted first, then after a short "restart" the timeline says "Restarted Claude"
+   * (the daemon's RestartNote); the conversation is the same.
+   */
+  restart(id: string): void {
+    const l = this.log(id);
+    if (this.world.statusOf(id) === ThreadStatus.BUSY || l.pending.length > 0) {
+      this.generation++;
+      this.finish(id, { interrupted: true });
+    }
+    const gen = this.generation;
+    setTimeout(() => {
+      if (gen === this.generation) this.append(id, this.item(id, { case: "commandOutput", value: { text: "Restarted Claude" } }));
+    }, 300);
+  }
+
+  /**
    * thread.set-effort: at once when idle (after a short "restart"), else when the turn ends.
    * A stopped thread just keeps it for its next start, like the daemon (nothing restarts).
    */

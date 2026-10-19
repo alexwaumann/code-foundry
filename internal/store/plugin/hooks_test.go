@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -214,16 +215,23 @@ func TestPluginHooks(t *testing.T) {
 	e := newEnv(t, func(o *plugin.Options) { o.Flags, o.Events, o.Home = flags, feed, "" })
 	e.install(e.opts.Dir, "hooks", "pushenv", hooksManifest("hooks"))
 	m := e.start()
+	envEvents := bus.Subscribe[plugin.Event](m.Bus(), 1024)
+	defer envEvents.Close()
 	if _, err := m.Enable(context.Background(), "hooks", true); err != nil {
 		t.Fatal(err)
 	}
 	e.waitState("hooks", plugin.StateRunning)
 
-	// The session environment: pushed in Init, PATH refused with an issue.
+	// The session environment: pushed in Init, PATH refused with an issue. Sources say
+	// whose it is (the thread store's staleness fingerprint), and the push is announced.
 	c := m.SessionEnvironment(context.Background(), plugin.SpawnScope{ThreadID: "t1", ProjectID: "p1"}, true)
 	if !slices.Equal(c.Env, []string{"CF_HELLO=1"}) {
 		t.Fatalf("SessionEnvironment = %+v", c)
 	}
+	if len(c.Sources) != 1 || c.Sources[0].Plugin != "hooks" || c.Sources[0].DisplayName != "Hooks hooks" || !slices.Equal(c.Sources[0].Env, []string{"CF_HELLO=1"}) {
+		t.Errorf("Sources = %+v", c.Sources)
+	}
+	e.eventually("EnvironmentChanged for the push", func() bool { return sawEnvChanged(envEvents, "hooks") })
 	envs, _ := m.Environments("hooks")
 	if len(envs) != 1 || len(envs[0].Issues) != 1 || !strings.Contains(envs[0].Issues[0], "PATH is reserved") {
 		t.Errorf("Environments = %+v", envs)
@@ -271,9 +279,13 @@ func TestPluginHooks(t *testing.T) {
 		t.Errorf("a re-set flag is a debug line:\n%s", logs)
 	}
 
-	// Disabling drops the contribution and clears the flags.
+	// Disabling drops the contribution (announced) and clears the flags.
+	sawEnvChanged(envEvents, "hooks") // drained
 	if _, err := m.Disable(context.Background(), "hooks"); err != nil {
 		t.Fatal(err)
+	}
+	if !sawEnvChanged(envEvents, "hooks") {
+		t.Error("no EnvironmentChanged when the plugin was disabled")
 	}
 	if k := e.envKeys(""); k != "" {
 		t.Errorf("after disable: env %q", k)
@@ -341,4 +353,19 @@ func TestSessionEnvironmentPersistsAndWaits(t *testing.T) {
 		t.Errorf("saved environments after removal: %d, %v", n, err)
 	}
 	_ = m
+}
+
+// sawEnvChanged drains sub and reports whether it held an EnvironmentChanged for name.
+func sawEnvChanged(sub *bus.Subscription[plugin.Event], name string) bool {
+	saw := false
+	for {
+		select {
+		case ev := <-sub.C():
+			if c, ok := ev.(plugin.EnvironmentChanged); ok && c.Plugin == name {
+				saw = true
+			}
+		default:
+			return saw
+		}
+	}
 }

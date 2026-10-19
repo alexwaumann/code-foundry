@@ -28,6 +28,9 @@ type SpawnInfo struct {
 	// Wait allows a short wait for a contributor still starting (spawn: true; the effort
 	// restart runs on the runner goroutine and passes false: it must never block).
 	Wait bool
+	// Probe: not a spawn but the staleness check (envstale.go), which compares what a
+	// running process got with what a spawn would get now. Never waits; no log lines.
+	Probe bool
 }
 
 // SpawnExtras is a contribution: environment entries ("KEY=VALUE", merged after the
@@ -37,6 +40,19 @@ type SpawnExtras struct {
 	Env         []string
 	PathPrepend []string
 	AddDirs     []string
+	// Sources are the same entries by contributor (a plugin), for the staleness
+	// fingerprint and its summary (envstale.go); the store hashes the values and never
+	// keeps them. Without Sources, a contribution counts as one unnamed source.
+	Sources []ExtrasSource
+}
+
+// ExtrasSource is one contributor's part of SpawnExtras.
+type ExtrasSource struct {
+	// ID identifies the contributor (a plugin's name); Name is what the summary calls it
+	// (its display name).
+	ID, Name             string
+	Env                  []string // "KEY=VALUE"
+	PathPrepend, AddDirs []string
 }
 
 // SpawnExtrasFunc returns the extras for a spawn. It must return at once unless
@@ -51,6 +67,30 @@ func (m *Manager) SetSpawnExtras(fn SpawnExtrasFunc) {
 		return
 	}
 	m.spawnExtras.Store(&fn)
+}
+
+// SpawnInfo is the SpawnInfo a spawn of thread id would pass now (no wait), for others
+// that start processes in the thread's scope: its bottom-panel shells get the plugins'
+// environment through the daemon's terminal hook. False for an unknown thread.
+func (m *Manager) SpawnInfo(id string) (SpawnInfo, bool) {
+	s, ok := m.Snapshot().Thread(id)
+	if !ok {
+		return SpawnInfo{}, false
+	}
+	return spawnInfoOf(s, m.memberProjects(s), false), true
+}
+
+// memberProjects is the projects of s's workspace members (the cwd's included), as a
+// spawn passes them; nil for a project thread or a workspace that is gone.
+func (m *Manager) memberProjects(s Thread) []string {
+	if s.WorkspaceID == "" || m.opts.Workspaces == nil {
+		return nil
+	}
+	wl, ok := workspaceLaunch(m.opts.Workspaces.Snapshot(), s.WorkspaceID, s.WorktreePath, isDir)
+	if !ok {
+		return nil
+	}
+	return wl.projects
 }
 
 // spawnInfoOf is SpawnInfo for s (the workspace's members as snap has them).

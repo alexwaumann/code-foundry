@@ -86,6 +86,8 @@ type Manager struct {
 	mu     sync.RWMutex
 	actors map[string]*actor
 	closed bool
+	// extras is what others add to new terminals' environments (extras.go); nil: none.
+	extras atomic.Pointer[SpawnExtrasFunc]
 }
 
 var _ Store = (*Manager)(nil)
@@ -103,7 +105,7 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (Terminal, error) {
 	if err := ctx.Err(); err != nil {
 		return Terminal{}, err
 	}
-	cmd, info, err := m.prepare(spec)
+	cmd, info, err := m.prepare(spec, m.spawnEnv(ctx, spec))
 	if err != nil {
 		return Terminal{}, err
 	}
@@ -140,8 +142,9 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (Terminal, error) {
 	return info, nil
 }
 
-// prepare validates spec and builds the command and initial metadata.
-func (m *Manager) prepare(spec Spec) (*exec.Cmd, Terminal, error) {
+// prepare validates spec and builds the command (with env, spawnEnv) and initial
+// metadata.
+func (m *Manager) prepare(spec Spec, env []string) (*exec.Cmd, Terminal, error) {
 	if len(spec.Argv) == 0 || spec.Argv[0] == "" {
 		return nil, Terminal{}, fmt.Errorf("%w: empty argv", ErrInvalidSpec)
 	}
@@ -166,7 +169,6 @@ func (m *Manager) prepare(spec Spec) (*exec.Cmd, Terminal, error) {
 	if fi, err := os.Stat(cwd); err != nil || !fi.IsDir() {
 		return nil, Terminal{}, fmt.Errorf("%w: cwd %q is not a directory", ErrInvalidSpec, cwd)
 	}
-	env := mergeEnv(os.Environ(), defaultEnv, spec.Env)
 	path, err := lookPath(spec.Argv[0], env, isExecutable)
 	if err != nil {
 		return nil, Terminal{}, err

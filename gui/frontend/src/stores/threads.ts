@@ -42,9 +42,14 @@ interface ThreadsState extends ThreadsData {
 
 export const emptyThreads: ThreadsData = { byId: {}, order: [] };
 
-/** Structural equality, so unchanged threads keep their identity and rows don't re-render. */
+/**
+ * Structural equality, so unchanged threads keep their identity and rows don't re-render.
+ * Optional fields (owner, pluginEnvStale) count by presence too: one only b has is a change.
+ */
 export function sameThread(a: ThreadView, b: ThreadView): boolean {
-  return (Object.keys(a) as (keyof ThreadView)[]).every((k) => {
+  const keys = Object.keys(a) as (keyof ThreadView)[];
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) => {
     switch (k) {
       case "linkedPullRequests":
         return sameLinks(a[k], b[k]);

@@ -182,6 +182,15 @@ export interface ThreadView {
    * thread node shows them. Absent or "" for the user's.
    */
   owner?: string;
+  /**
+   * The plugins' session environment for the thread's scope changed since its running
+   * Claude process started: the header offers thread.restart
+   * (docs/notes/plugins-env-restart.md). `pluginEnvChange` says what, by plugin and
+   * variable names ("Hello removed CF_HELLO"). Both absent when the process is current
+   * or not running.
+   */
+  pluginEnvStale?: true;
+  pluginEnvChange?: string;
 }
 
 /** A plugin's flag on a thread. */
@@ -377,6 +386,7 @@ export function toThreadView(s: Thread): ThreadView {
     budgetUsd: s.budgetUsd,
     flags: s.flags.flatMap(toThreadFlagView),
     ...(s.owner ? { owner: s.owner } : {}),
+    ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),
   };
 }
 

@@ -95,16 +95,40 @@ func (r *runner) setEffort(effort string) Thread {
 // lost: connected, idle at the prompt, nothing pending, streaming or running (a
 // background agent's tool call keeps running across turns), no background shell
 // running (it dies with the process), no turn Claude is about to start for a background
-// end (wake.go), no send on its way.
+// end (wake.go), no send on its way. A user's restart (restart.go) only waits for the
+// prompt: it interrupts a running turn first and cuts background work off.
 func (r *runner) maybeRestart() {
 	st := r.st
-	if st.wantEffort == st.effort || st.restart != restartNone || r.closing || r.finished || !st.initialized ||
-		st.first != nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending {
+	if st.restart != restartNone || r.closing || r.finished || !st.initialized || st.first != nil {
 		return
+	}
+	user := st.wantRestart
+	switch {
+	case user && !st.sd.AtPrompt():
+		r.interruptForRestart()
+		return
+	case user:
+	case st.wantEffort == st.effort || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
+		return
+	}
+	r.beginRestart(user)
+}
+
+// beginRestart closes the old process's stdin; respawn follows its exit (maybeExited).
+func (r *runner) beginRestart(user bool) {
+	st := r.st
+	st.wantRestart, st.restartInterrupted, st.userRestart = false, false, user
+	if st.restartForce != nil {
+		st.restartForce.Stop()
+		st.restartForce = nil
 	}
 	st.restart = restartClosing
 	st.setSwapping(true)
-	r.log().info("restarting claude for an effort change", "from", st.effort, "to", st.wantEffort, "pid", st.proc.Pid())
+	if user {
+		r.log().info("restarting claude for the user", "effort", st.wantEffort, "pid", st.proc.Pid(), "at_prompt", st.sd.AtPrompt())
+	} else {
+		r.log().info("restarting claude for an effort change", "from", st.effort, "to", st.wantEffort, "pid", st.proc.Pid())
+	}
 	conn := st.conn
 	go func() { _ = conn.CloseStdin() }()
 	// Not gone after CloseTimeout: SIGTERM, then SIGKILL (closeNext).
@@ -128,6 +152,11 @@ func (r *runner) respawn() {
 	// Anything the old process still asked on its way out died with it.
 	clear(st.pending)
 	st.sd.pending = nil
+	if st.sd.busy || st.sd.compacting {
+		// A user's restart that went ahead mid-turn (restart.go): that turn is over.
+		closeOpenTurn(st.proj.w, r.m.opts.Now())
+		st.sd.busy, st.sd.compacting = false, false
+	}
 	closeUnfinished(st.proj.w, "Claude restarted")
 	// Subagents and shells run inside the old process; the new one reports them stopped.
 	r.endRuns(orphanRestarted)
@@ -144,13 +173,16 @@ func (r *runner) respawn() {
 	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
-	argv, env := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
+	argv, env, extras := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
 		Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},
 	})
 	if err != nil {
 		msg := "Claude did not restart for the effort change: " + err.Error()
+		if st.userRestart {
+			msg = "Claude did not restart: " + err.Error()
+		}
 		r.log().warn("restart claude", "err", err)
 		st.restart = restartNone
 		st.setSwapping(false)
@@ -164,9 +196,15 @@ func (r *runner) respawn() {
 	st.connMu.Lock()
 	st.proc, st.conn = proc, proc.Conn()
 	st.connMu.Unlock()
+	// The new process has the current extras: no longer stale (envstale.go).
+	r.m.update(r.id, false, func(rec *record) {
+		if rec.run == r {
+			rec.spawnedWith(extras)
+		}
+	})
 	st.events = st.conn.Events()
 	st.initialized, st.outputEnded, st.exited, st.commandsPushed = false, false, false, false
-	st.effort = s.Effort
+	st.restartFrom, st.effort = st.effort, s.Effort
 	st.restart = restartStarting
 	r.startedAt = r.m.opts.Now()
 	st.restartTimer = time.NewTimer(r.m.opts.StartTimeout)
@@ -189,7 +227,13 @@ func (r *runner) onRestarted() {
 	if label == "" {
 		label = "Claude's default"
 	}
-	st.proj.w.add(Item{ID: st.proj.nextID("effort"), Kind: KindCommandOutput, Text: "Set effort to " + label})
+	if st.userRestart {
+		st.userRestart = false
+		st.proj.w.add(Item{ID: st.proj.nextID("restart"), Kind: KindCommandOutput, Text: RestartNote})
+	}
+	if st.effort != st.restartFrom {
+		st.proj.w.add(Item{ID: st.proj.nextID("effort"), Kind: KindCommandOutput, Text: "Set effort to " + label})
+	}
 	r.m.update(r.id, false, func(rec *record) { rec.s.EffortPending = st.wantEffort != st.effort })
 	held := st.held
 	st.held = nil

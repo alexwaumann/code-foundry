@@ -145,6 +145,15 @@ service ThreadService {
   // meanwhile). The row records the effort for later spawns either way; a thread that is
   // not running only records it.
   rpc SetEffort(SetThreadEffortRequest) returns (SetThreadEffortResponse) {}
+  // Restart restarts a running thread's Claude process with the same conversation
+  // (--resume), the way an effort change does, so it picks up what changed outside the
+  // conversation, such as a plugin's session environment (Thread.plugin_env_stale). A
+  // running turn is interrupted first (a pending permission request or question with
+  // it); the thread's background agents and shells stop with the old process. Messages
+  // sent meanwhile go to the new process. A thread whose Claude is not running is left
+  // as it is (restarted false): its next message starts Claude with the current
+  // environment anyway. See docs/notes/plugins-env-restart.md.
+  rpc Restart(RestartThreadRequest) returns (RestartThreadResponse) {}
   // McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
   // (mcp_status) at the start of every turn, again every few seconds while a server is
   // still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -743,6 +752,16 @@ message SetThreadEffortRequest {
 message SetThreadEffortResponse {
   // effort_pending is set when the restart waits for the running turn.
   Thread thread = 1;
+}
+
+message RestartThreadRequest {
+  string id = 1;
+}
+
+message RestartThreadResponse {
+  Thread thread = 1;
+  // False when Claude was not running for the thread (nothing to restart).
+  bool restarted = 2;
 }
 
 message McpStatusRequest {

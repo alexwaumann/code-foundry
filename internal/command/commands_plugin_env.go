@@ -10,7 +10,8 @@ import (
 )
 
 // plugin.env (docs/notes/plugins-3-events-flags-env.md): what plugins contribute to new
-// Claude threads (session/setEnvironment), as applied, with the issues found.
+// Claude threads (session/setEnvironment), as applied, with the issues found; new
+// bottom-panel shells get the env and PATH entries too (plugins-env-restart.md).
 
 // PluginEnvBackend is the slice of PluginService plugin.env needs.
 type PluginEnvBackend interface {
@@ -21,9 +22,9 @@ func pluginEnvCmd(b PluginBackend) Command {
 	return Command{
 		Name:  "plugin.env",
 		Title: "Show Plugin Session Environment",
-		Description: "Print what plugins add to new Claude threads: environment variables (names only: a value may be a " +
-			"secret), PATH entries and --add-dir directories, which projects get them, and what was refused or lost to " +
-			"another plugin. One plugin's with a name.",
+		Description: "Print what plugins add to new Claude threads (and, without the --add-dir directories, to new shells): " +
+			"environment variables (names only: a value may be a secret), PATH entries and --add-dir directories, which " +
+			"projects get them, and what was refused or lost to another plugin. One plugin's with a name.",
 		Category:     "Plugin",
 		NoKeybinding: true,
 		Args:         []ArgSpec{{Name: "name", Type: String, Positional: true, Description: "Plugin name (default: every plugin)"}},
@@ -72,5 +73,11 @@ func formatPluginEnvs(name string, envs []*v1.PluginEnvironment) string {
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
-	return strings.Join(blocks, "\n\n")
+	return strings.Join(append(blocks, pluginEnvApplies), "\n\n")
 }
+
+// pluginEnvApplies closes plugin.env's listing: who gets the contribution, and when
+// (docs/notes/plugins-env-restart.md).
+const pluginEnvApplies = "New threads in scope get this, and new bottom-panel shells in scope get the env and PATH " +
+	"entries too. Running threads and shells keep what they started with; a thread shows \"Plugin environment changed\" " +
+	"until restarted (thread restart <id>)."

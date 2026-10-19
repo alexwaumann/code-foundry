@@ -165,8 +165,10 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer func() { _ = plugins.Close() }()
 	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins).WithDirs(p.Plugins(), p.PluginData())
-	// Every claude spawn gets the plugins' session environments (plugin_hooks.go).
+	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
+	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
+	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
 	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
@@ -230,6 +232,7 @@ func Run(ctx context.Context, opts Options) error {
 	applyPluginRegistries(st.settings, plugins)
 	defer startPluginUpdateChecks(ctx, log.With("component", "plugins"), events, st.update, plugins)()
 	defer startPluginContexts(ctx, events, plugins)()
+	defer startPluginEnvWatch(ctx, events, st.thread)()
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)

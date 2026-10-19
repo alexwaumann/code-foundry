@@ -276,8 +276,12 @@ dev` loop.
   `--settle`; `plugin act` prints only the version and cannot press command buttons (PR 4).
 * No event tells a plugin a secret was deleted or consent changed; command args in views
   have no limit of their own (PR 4).
-* A running thread keeps the env it spawned with (no "restart to pick up"); bottom-panel
-  shells get no session environment (PRs 3, 5, 6).
+* ~~A running thread keeps the env it spawned with (no "restart to pick up"); bottom-panel
+  shells get no session environment (PRs 3, 5, 6).~~ Closed by `cf/plugins-env-restart`
+  (docs/notes/plugins-env-restart.md): a running thread whose scope's contribution changed
+  is `plugin_env_stale` (header line, `thread get`), `thread restart` applies it with the
+  same conversation, and new bottom-panel shells get the env and PATH entries. Running
+  shells and action terminals still keep or get nothing.
 * Plugin threads' cwd pre-trust and every thread's trust write the real `~/.claude.json`,
   and secrets go to the login Keychain, even from an isolated home (PRs 2, 6; seen here).
 * Every `host/invoke` is a host log line: gh-actions' sweep writes about three

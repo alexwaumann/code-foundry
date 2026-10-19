@@ -102,6 +102,8 @@ const (
 	ThreadServiceSetPermissionModeProcedure = "/codefoundry.v1.ThreadService/SetPermissionMode"
 	// ThreadServiceSetEffortProcedure is the fully-qualified name of the ThreadService's SetEffort RPC.
 	ThreadServiceSetEffortProcedure = "/codefoundry.v1.ThreadService/SetEffort"
+	// ThreadServiceRestartProcedure is the fully-qualified name of the ThreadService's Restart RPC.
+	ThreadServiceRestartProcedure = "/codefoundry.v1.ThreadService/Restart"
 	// ThreadServiceMcpStatusProcedure is the fully-qualified name of the ThreadService's McpStatus RPC.
 	ThreadServiceMcpStatusProcedure = "/codefoundry.v1.ThreadService/McpStatus"
 	// ThreadServiceMcpReconnectProcedure is the fully-qualified name of the ThreadService's
@@ -243,6 +245,15 @@ type ThreadServiceClient interface {
 	// meanwhile). The row records the effort for later spawns either way; a thread that is
 	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// Restart restarts a running thread's Claude process with the same conversation
+	// (--resume), the way an effort change does, so it picks up what changed outside the
+	// conversation, such as a plugin's session environment (Thread.plugin_env_stale). A
+	// running turn is interrupted first (a pending permission request or question with
+	// it); the thread's background agents and shells stop with the old process. Messages
+	// sent meanwhile go to the new process. A thread whose Claude is not running is left
+	// as it is (restarted false): its next message starts Claude with the current
+	// environment anyway. See docs/notes/plugins-env-restart.md.
+	Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -465,6 +476,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
 			connect.WithClientOptions(opts...),
 		),
+		restart: connect.NewClient[v1.RestartThreadRequest, v1.RestartThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceRestartProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Restart")),
+			connect.WithClientOptions(opts...),
+		),
 		mcpStatus: connect.NewClient[v1.McpStatusRequest, v1.McpStatusResponse](
 			httpClient,
 			baseURL+ThreadServiceMcpStatusProcedure,
@@ -519,6 +536,7 @@ type threadServiceClient struct {
 	setModel          *connect.Client[v1.SetThreadModelRequest, v1.SetThreadModelResponse]
 	setPermissionMode *connect.Client[v1.SetThreadPermissionModeRequest, v1.SetThreadPermissionModeResponse]
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
+	restart           *connect.Client[v1.RestartThreadRequest, v1.RestartThreadResponse]
 	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
@@ -679,6 +697,11 @@ func (c *threadServiceClient) SetEffort(ctx context.Context, req *connect.Reques
 	return c.setEffort.CallUnary(ctx, req)
 }
 
+// Restart calls codefoundry.v1.ThreadService.Restart.
+func (c *threadServiceClient) Restart(ctx context.Context, req *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error) {
+	return c.restart.CallUnary(ctx, req)
+}
+
 // McpStatus calls codefoundry.v1.ThreadService.McpStatus.
 func (c *threadServiceClient) McpStatus(ctx context.Context, req *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {
 	return c.mcpStatus.CallUnary(ctx, req)
@@ -825,6 +848,15 @@ type ThreadServiceHandler interface {
 	// meanwhile). The row records the effort for later spawns either way; a thread that is
 	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// Restart restarts a running thread's Claude process with the same conversation
+	// (--resume), the way an effort change does, so it picks up what changed outside the
+	// conversation, such as a plugin's session environment (Thread.plugin_env_stale). A
+	// running turn is interrupted first (a pending permission request or question with
+	// it); the thread's background agents and shells stop with the old process. Messages
+	// sent meanwhile go to the new process. A thread whose Claude is not running is left
+	// as it is (restarted false): its next message starts Claude with the current
+	// environment anyway. See docs/notes/plugins-env-restart.md.
+	Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -1043,6 +1075,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceRestartHandler := connect.NewUnaryHandler(
+		ThreadServiceRestartProcedure,
+		svc.Restart,
+		connect.WithSchema(threadServiceMethods.ByName("Restart")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceMcpStatusHandler := connect.NewUnaryHandler(
 		ThreadServiceMcpStatusProcedure,
 		svc.McpStatus,
@@ -1125,6 +1163,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSetPermissionModeHandler.ServeHTTP(w, r)
 		case ThreadServiceSetEffortProcedure:
 			threadServiceSetEffortHandler.ServeHTTP(w, r)
+		case ThreadServiceRestartProcedure:
+			threadServiceRestartHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpStatusProcedure:
 			threadServiceMcpStatusHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpReconnectProcedure:
@@ -1262,6 +1302,10 @@ func (UnimplementedThreadServiceHandler) SetPermissionMode(context.Context, *con
 
 func (UnimplementedThreadServiceHandler) SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetEffort is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Restart is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {

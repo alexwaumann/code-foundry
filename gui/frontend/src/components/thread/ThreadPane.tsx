@@ -10,6 +10,7 @@ import { useShownRun } from "@/stores/subagentView";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
+import { EnvStaleNote } from "./EnvStaleNote";
 import { FlagChip } from "./FlagChip";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
@@ -80,6 +81,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
         <PaneHeader className="gap-2 px-3" data-testid="thread-header">
           <ThreadTitle id={threadId} />
           <FlagChip id={threadId} />
+          <EnvStaleNote id={threadId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
             <HeaderActions threadId={threadId} />
           </span>
