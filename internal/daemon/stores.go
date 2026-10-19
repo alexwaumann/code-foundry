@@ -209,6 +209,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// A thread whose worktree a cleanup removed gets it back under this root when it
 		// starts again (recreate.go).
 		WorktreeRoot: p.Worktrees(),
+		// Each thread's TMPDIR is <home>/tmp/<thread id> (childcontext.go).
+		TmpRoot: p.Tmp(),
 		// Wake subscriptions to action runs read them here (wake.go).
 		ActionRun: actionRunForWake(s.action),
 		// Wake subscriptions to pull requests read the GitHub store's cache and keep

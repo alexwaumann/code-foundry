@@ -147,6 +147,18 @@ describe("Created by note", () => {
   it("a user message without wake stays a bubble", () => {
     const el = show([user]);
     expect(q(el, "thread-wake-note")).toBeNull();
+    expect(q(el, "thread-resume-note")).toBeNull();
+  });
+
+  it("a resume note: one line above the message, without its prefix (orch-child-context)", () => {
+    const resumeNote = "[code-foundry] Your previous turn was stopped by Code Foundry at its $0.50 spending limit (now $1.00), not rejected by anyone.";
+    const el = show([{ ...user, resumeNote }]);
+    expect(q(el, "thread-resume-note-text")?.textContent).toBe("Your previous turn was stopped by Code Foundry at its $0.50 spending limit (now $1.00), not rejected by anyone.");
+    expect(el.querySelector(".bubble")).not.toBeNull();
+    const json = JSON.stringify({ kind: "thread", thread: { id: "p", status: "idle" } });
+    const woken = show([{ ...user, id: "w", text: "x", resumeNote, wake: { title: "Thread p is idle.", json } }]);
+    expect(q(woken, "thread-resume-note")).not.toBeNull();
+    expect(q(woken, "thread-wake-note")).not.toBeNull();
   });
 
   it("a fork's note stays the centered divider", () => {

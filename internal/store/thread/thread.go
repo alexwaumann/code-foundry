@@ -249,6 +249,10 @@ type Thread struct {
 	// budget stop last fired for (0 = armed; budget.go). Persisted.
 	BudgetUSD    float64
 	BudgetHitUSD float64
+	// ResumeNote is the note the next message to Claude starts with, after something
+	// other than the user stopped its turn (resumenote.go); the zero value when none.
+	// Persisted.
+	ResumeNote ResumeNote
 	// Flags are the plugins' flags on the thread (flags.go): one per source, errors
 	// first, then newest first. Persisted (thread_flags). Copy on write.
 	Flags []Flag
@@ -498,8 +502,11 @@ type Store interface {
 	Send(ctx context.Context, id string, msg Message) (Item, error)
 	// Respond answers a pending permission request or question.
 	Respond(ctx context.Context, id, requestID string, d Decision) (Item, error)
-	// Interrupt stops the running turn; a no-op when the thread is not running.
-	Interrupt(ctx context.Context, id string) error
+	// Interrupt stops the running turn; a no-op when the thread is not running. by is
+	// the thread that asked for it (the CLI's $CODE_FOUNDRY_THREAD), empty for the user:
+	// a turn another thread stopped leaves a resume note for the next message
+	// (resumenote.go).
+	Interrupt(ctx context.Context, id, by string) error
 	// SetModel switches the model of a running thread and records it for later
 	// spawns; on a thread that is not running it only records it.
 	SetModel(ctx context.Context, id, model string) (Thread, error)

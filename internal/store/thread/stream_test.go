@@ -326,7 +326,7 @@ func TestRenderedControls(t *testing.T) {
 	re.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	// No prompt: idle at the prompt once initialized.
 	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
-	if err := re.m.Interrupt(re.ctx(), s.ID); err != nil {
+	if err := re.m.Interrupt(re.ctx(), s.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	re.waitSent("interrupt", func(m map[string]any) bool {

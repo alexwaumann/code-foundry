@@ -134,6 +134,10 @@ func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments"
 // removed.
 func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 
+// Tmp holds one directory per thread, named by its id: that thread's claude gets it as
+// TMPDIR (internal/store/thread childcontext.go). Removed with the thread.
+func (p Paths) Tmp() string { return filepath.Join(p.home, "tmp") }
+
 // Plugins is where plugin packages live: <Plugins>/<name>/plugin.json, a directory or,
 // for `plugin dev`, a symlink to the author's folder (internal/store/plugin).
 func (p Paths) Plugins() string { return filepath.Join(p.home, "plugins") }

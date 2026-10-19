@@ -839,7 +839,12 @@ type UserMessageItem struct {
 	WakeTitle string `protobuf:"bytes,5,opt,name=wake_title,json=wakeTitle,proto3" json:"wake_title,omitempty"`
 	// WAKE only: the JSON payload of the fenced block (kind, subscription_id, condition,
 	// fired_at, and the thread or the run).
-	WakeJson      string `protobuf:"bytes,6,opt,name=wake_json,json=wakeJson,proto3" json:"wake_json,omitempty"`
+	WakeJson string `protobuf:"bytes,6,opt,name=wake_json,json=wakeJson,proto3" json:"wake_json,omitempty"`
+	// The resume note Claude got before the text, when something other than the user
+	// (the budget stop, another thread's interrupt, an app restart) stopped its previous
+	// turn: one line starting "[code-foundry] " (docs/notes/orch-child-context.md).
+	// Empty for most messages.
+	ResumeNote    string `protobuf:"bytes,7,opt,name=resume_note,json=resumeNote,proto3" json:"resume_note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -912,6 +917,13 @@ func (x *UserMessageItem) GetWakeTitle() string {
 func (x *UserMessageItem) GetWakeJson() string {
 	if x != nil {
 		return x.WakeJson
+	}
+	return ""
+}
+
+func (x *UserMessageItem) GetResumeNote() string {
+	if x != nil {
+		return x.ResumeNote
 	}
 	return ""
 }
@@ -3474,8 +3486,12 @@ func (x *RespondThreadResponse) GetItem() *ThreadItem {
 }
 
 type InterruptThreadRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
+	// user. A turn another thread stopped leaves a resume note: the next message Claude
+	// gets starts with a line saying who stopped it (docs/notes/orch-child-context.md).
+	ByThreadId    string `protobuf:"bytes,2,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3513,6 +3529,13 @@ func (*InterruptThreadRequest) Descriptor() ([]byte, []int) {
 func (x *InterruptThreadRequest) GetThreadId() string {
 	if x != nil {
 		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *InterruptThreadRequest) GetByThreadId() string {
+	if x != nil {
+		return x.ByThreadId
 	}
 	return ""
 }
@@ -4518,7 +4541,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"compaction\x12J\n" +
 	"\x0ecommand_output\x18\x13 \x01(\v2!.codefoundry.v1.CommandOutputItemH\x00R\rcommandOutput\x12.\n" +
 	"\x04note\x18\x14 \x01(\v2\x18.codefoundry.v1.NoteItemH\x00R\x04noteB\t\n" +
-	"\apayload\"\xdf\x01\n" +
+	"\apayload\"\x80\x02\n" +
 	"\x0fUserMessageItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
 	"\vattachments\x18\x02 \x03(\tR\vattachments\x12#\n" +
@@ -4526,7 +4549,9 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x06origin\x18\x04 \x01(\x0e2\x1d.codefoundry.v1.MessageOriginR\x06origin\x12\x1d\n" +
 	"\n" +
 	"wake_title\x18\x05 \x01(\tR\twakeTitle\x12\x1b\n" +
-	"\twake_json\x18\x06 \x01(\tR\bwakeJson\"'\n" +
+	"\twake_json\x18\x06 \x01(\tR\bwakeJson\x12\x1f\n" +
+	"\vresume_note\x18\a \x01(\tR\n" +
+	"resumeNote\"'\n" +
 	"\x11AssistantTextItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\"\n" +
 	"\fThinkingItem\x12\x12\n" +
@@ -4748,9 +4773,11 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"G\n" +
 	"\x15RespondThreadResponse\x12.\n" +
-	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\"5\n" +
+	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\"W\n" +
 	"\x16InterruptThreadRequest\x12\x1b\n" +
-	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\x19\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12 \n" +
+	"\fby_thread_id\x18\x02 \x01(\tR\n" +
+	"byThreadId\"\x19\n" +
 	"\x17InterruptThreadResponse\"J\n" +
 	"\x15SetThreadModelRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
