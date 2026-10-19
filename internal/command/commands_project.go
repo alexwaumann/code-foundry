@@ -140,18 +140,24 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Description: "Remove a worktree from disk, optionally deleting its branch.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				projectArg,
+				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: the project the worktree is registered in)"},
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 			},
-			When:           func(c Context) bool { return hasWorktree(c) && !notGit(c) },
-			WhyUnavailable: notGit.whyNotGit,
+			// The project may be left out: the path names it (W4 finding 2: inside a
+			// thread, --path alone was "not available in this context").
+			When:           func(c Context) bool { return hasActiveWorktree(c) && !notGit(c) },
+			WhyUnavailable: whyNoWorktree(notGit),
 			Confirm:        "Remove worktree {path}? This deletes files on disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
+				project, err := worktreeProject(ctx, b, a.String("project"), path)
+				if err != nil {
+					return Result{}, err
+				}
 				if _, err := b.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{
-					ProjectId:    a.String("project"),
+					ProjectId:    project,
 					Path:         path,
 					DeleteBranch: a.Bool("delete-branch"),
 					Force:        a.Bool("force"),

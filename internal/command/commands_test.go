@@ -126,6 +126,7 @@ func TestAvailability(t *testing.T) {
 		{"project.worktree.new", command.Context{ActiveProjectID: "r1"}, true},
 		{"project.worktree.remove", command.Context{ActiveProjectID: "r1"}, false},
 		{"project.worktree.remove", command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, true},
+		{"project.worktree.remove", command.Context{ActiveWorktreePath: "/wt"}, true}, // the path names the project
 		{"project.refresh", command.Context{}, true},
 		// A project without git: its one checkout, no worktrees, Initialize Git.
 		{"project.worktree.new", command.Context{ActiveProjectID: "plain"}, false},
