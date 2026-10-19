@@ -35,11 +35,11 @@ const (
 	DefaultSurfaceGrace     = 10 * time.Minute
 	DefaultFirstViewTimeout = 10 * time.Second
 	DefaultCoalesce         = 100 * time.Millisecond
+	DefaultActTimeout       = 10 * time.Second
 )
 
 const (
 	surfaceOpenTimeout = 5 * time.Second
-	surfaceActTimeout  = 10 * time.Second
 	// A plugin sending more than floodRate views a second for floodSeconds seconds is
 	// throttled to one a second.
 	floodRate         = 50

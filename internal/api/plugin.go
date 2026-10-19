@@ -282,7 +282,7 @@ func pluginError(err error) error {
 		code = connect.CodeInvalidArgument
 	case errors.Is(err, plugin.ErrFailedPrecondition):
 		code = connect.CodeFailedPrecondition
-	case errors.Is(err, plugin.ErrClosed):
+	case errors.Is(err, plugin.ErrClosed), errors.Is(err, plugin.ErrUnavailable):
 		code = connect.CodeUnavailable
 	case errors.Is(err, context.Canceled):
 		code = connect.CodeCanceled

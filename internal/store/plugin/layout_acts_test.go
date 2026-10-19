@@ -1,6 +1,7 @@
 package plugin_test
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -101,3 +102,20 @@ func TestActsOnRecentVersions(t *testing.T) {
 }
 
 func strconvU(v uint64) string { return strconv.FormatUint(v, 10) }
+
+// An act the plugin does not answer in time is a deadline exceeded, and one it stops
+// while handling is unavailable (the API maps both: plugin_surface_test.go), each with
+// its own words; neither is an internal error (finding live #11: the GUI saw HTTP 500).
+func TestActTimeoutAndStop(t *testing.T) {
+	e := newSurfEnv(t, func(o *plugin.Options) { o.ActTimeout = 300 * time.Millisecond })
+	w := e.watch("panel", s1)
+	w.view("first view", contains("count 0"))
+	_, err := e.act(w.key, plugin.ActRequest{Key: "hang"})
+	if !errors.Is(err, context.DeadlineExceeded) || err.Error() != "plugin surf did not answer within 300ms" {
+		t.Errorf("an unanswered act: %v", err)
+	}
+	_, err = e.act(w.key, plugin.ActRequest{Key: "exit"})
+	if !errors.Is(err, plugin.ErrUnavailable) || err.Error() != "plugin surf stopped while handling the action" {
+		t.Errorf("an act the plugin stops on: %v", err)
+	}
+}

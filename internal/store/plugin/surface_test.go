@@ -55,6 +55,7 @@ func (p *panel) view() ui.View {
 		ui.NewActions("bar", ui.EventButton("inc", "Inc", "inc"), ui.EventButton("append", "Append", "append"),
 			ui.EventButton("bad", "Bad", "bad"), ui.EventButton("flood", "Flood", "flood"), ui.EventButton("fail", "Fail", "fail"),
 			ui.CommandButton("cmd", "Cmd", "plugin.surf.on", nil)),
+		ui.NewActions("bar2", ui.EventButton("hang", "Hang", "hang"), ui.EventButton("exit", "Exit", "exit")),
 		form,
 		{Key: "out", Log: &ui.Log{}},
 		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "pr1",
@@ -62,7 +63,7 @@ func (p *panel) view() ui.View {
 	}}
 }
 
-func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
+func (p *panel) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	if act.Context.ThreadID != "" {
 		p.h.Log().Info("act", "viewer", act.Context.ThreadID)
 	}
@@ -105,6 +106,14 @@ func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 		return nil
 	case "fail":
 		return errors.New("it broke")
+	case "hang": // past the host's act timeout
+		select {
+		case <-ctx.Done():
+		case <-time.After(5 * time.Second):
+		}
+		return nil
+	case "exit": // the plugin stops while it has the act
+		os.Exit(3)
 	}
 	return p.h.UpdateView(p.inst, p.view())
 }
@@ -424,7 +433,7 @@ func TestSurfaceActs(t *testing.T) {
 		{"host action", plugin.ActRequest{Key: "cmd"}, plugin.ErrInvalidArgument, "command action: the host runs it"},
 		{"wrong action", plugin.ActRequest{Key: "inc", Action: "save"}, plugin.ErrInvalidArgument, `not "save"`},
 		{"plugin error", plugin.ActRequest{Key: "fail"}, plugin.ErrPluginRefused, "it broke"},
-		{"old version", plugin.ActRequest{Key: "inc", Version: 999}, plugin.ErrFailedPrecondition, "is gone"},
+		{"old version", plugin.ActRequest{Key: "inc", Version: 999}, plugin.ErrFailedPrecondition, "the view changed"},
 		{"values too big", plugin.ActRequest{Action: "save", Values: map[string]any{"name": strings.Repeat("x", ui.MaxActValues)}},
 			plugin.ErrInvalidArgument, "values are over 65536 bytes"},
 	}
@@ -436,7 +445,7 @@ func TestSurfaceActs(t *testing.T) {
 			}
 		})
 	}
-	// An older version still acts while it is among the last few.
+	// An older version still acts while it is kept (keptFor after it was replaced).
 	if ver, err := e.act(w.key, plugin.ActRequest{Key: "inc", Version: first.Version}); err != nil || ver != first.Version {
 		t.Errorf("act on version %d: %d, %v", first.Version, ver, err)
 	}
@@ -444,7 +453,7 @@ func TestSurfaceActs(t *testing.T) {
 		t.Errorf("unknown instance: %v", err)
 	}
 	elements := e.m.SurfaceElements(w.key, 0)
-	if len(elements) != 11 || elements[0].Key != "inc" || elements[6].Kind != "submit" || elements[6].Form != "form" || elements[7].Kind != "select" {
+	if len(elements) != 13 || elements[0].Key != "inc" || elements[8].Kind != "submit" || elements[8].Form != "form" || elements[9].Kind != "select" {
 		t.Errorf("elements %+v", elements)
 	}
 }

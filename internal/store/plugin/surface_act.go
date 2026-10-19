@@ -575,7 +575,8 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		}
 	}
 	m.surfLog(in.plugin, "%s %s on %s (version %d)", act.Kind, act.Key, key, ver)
-	cctx, cancel := context.WithTimeout(ctx, surfaceActTimeout)
+	timeout := m.opts.ActTimeout
+	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := conn.Call(cctx, pluginsdk.MethodSurfaceAct, act, nil); err != nil {
 		var perr *pluginsdk.Error
@@ -583,9 +584,9 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		case errors.As(err, &perr):
 			return ver, fmt.Errorf("%w: %s", ErrPluginRefused, perr.Message)
 		case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
-			return ver, fmt.Errorf("plugin %s did not answer within %s", in.plugin, surfaceActTimeout)
+			return ver, causedError{fmt.Sprintf("plugin %s did not answer within %s", in.plugin, timeout), context.DeadlineExceeded}
 		case errors.Is(err, pluginsdk.ErrClosed):
-			return ver, fmt.Errorf("plugin %s stopped while handling the action", in.plugin)
+			return ver, causedError{fmt.Sprintf("plugin %s stopped while handling the action", in.plugin), ErrUnavailable}
 		}
 		return ver, fmt.Errorf("plugin %s: %w", in.plugin, err)
 	}

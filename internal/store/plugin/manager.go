@@ -102,9 +102,9 @@ type Options struct {
 	// commands, host/invoke with confirm "ask", toasts); nil sends none.
 	Facts   FactSource
 	Emitter command.Emitter
-	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout and
-	// DefaultCoalesce.
-	SurfaceGrace, FirstViewTimeout, CoalesceInterval time.Duration
+	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout,
+	// DefaultCoalesce and DefaultActTimeout (how long an act waits for the plugin).
+	SurfaceGrace, FirstViewTimeout, CoalesceInterval, ActTimeout time.Duration
 
 	// Registry reads the plugin registries for install, update and browse (install.go,
 	// updates.go); nil refuses installing from a registry or a release.
@@ -133,6 +133,7 @@ func (o *Options) defaults() {
 	d(&o.SurfaceGrace, DefaultSurfaceGrace)
 	d(&o.FirstViewTimeout, DefaultFirstViewTimeout)
 	d(&o.CoalesceInterval, DefaultCoalesce)
+	d(&o.ActTimeout, DefaultActTimeout)
 	if o.CrashLimit <= 0 {
 		o.CrashLimit = DefaultCrashLimit
 	}

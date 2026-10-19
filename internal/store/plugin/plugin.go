@@ -42,7 +42,20 @@ var (
 	ErrInvalidArgument    = errors.New("invalid argument")
 	ErrFailedPrecondition = errors.New("failed precondition")
 	ErrClosed             = errors.New("plugin store closed")
+	// ErrUnavailable: the plugin went away while it had the request (it stopped or
+	// crashed); trying again once it is back may work.
+	ErrUnavailable = errors.New("unavailable")
 )
+
+// causedError has its own words and Is its cause (a sentinel or a context error)
+// without saying it: the message reaches the user as it is.
+type causedError struct {
+	msg   string
+	cause error
+}
+
+func (e causedError) Error() string { return e.msg }
+func (e causedError) Unwrap() error { return e.cause }
 
 // State is where a plugin is in its lifecycle.
 type State int
