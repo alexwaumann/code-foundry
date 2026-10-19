@@ -96,6 +96,17 @@ test("Update from the Installed row installs the listed version and keeps it run
   await expect(entry(page, "test-watcher").getByTestId("plugin-pill")).toHaveText("Installed");
 });
 
+test("Uninstall says how many of the plugin's own threads it removes", async ({ page }) => {
+  await openPlugins(page);
+  await installed(page, "hello").getByTestId("plugin-uninstall").click();
+  const dialog = page.getByTestId("uninstall-dialog");
+  await expect(dialog).toContainText("It removes its 1 thread.");
+  await dialog.getByTestId("uninstall-cancel").click();
+  await expect(installed(page, "test-watcher").getByTestId("plugin-uninstall")).toBeVisible();
+  await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();
+  await expect(dialog).not.toContainText("thread");
+});
+
 test("Uninstall confirms once in its own dialog, with purge as a choice", async ({ page }) => {
   await openPlugins(page);
   await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();

@@ -37,7 +37,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
             <DialogTitle>Uninstall {displayName}?</DialogTitle>
             <DialogDescription className="break-words">
               {p?.dev ? `It stops and its link goes from ${dir}; your folder stays.` : `It stops and its package goes from ${dir}.`}{" "}
-              {threads > 0 ? `It removes its ${threads === 1 ? "1 thread" : `${threads} threads`}. ` : ""}
+              {threads > 0 ? `It removes its ${threads === 1 ? "1 thread" : `${String(threads)} threads`}. ` : ""}
               {purge ? "" : `${its} and the consent you gave stay for a reinstall.`}
             </DialogDescription>
             <Label className="items-start gap-2 text-body-sm font-normal">
