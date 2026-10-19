@@ -211,6 +211,68 @@ describe("the backdrop row", () => {
     expect(screen.getByTestId("backdrop-add").hasAttribute("disabled")).toBe(true);
   });
 
+  const options = () => {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Backdrop" }), { key: "Enter" });
+    const out = screen.getAllByRole("option").map((o) => o.textContent);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    return out;
+  };
+  const shown = () => screen.getByRole("combobox", { name: "Backdrop" }).getAttribute("data-value");
+
+  it.each([
+    { name: "no images: no Custom", images: [] as string[], backdrop: "forest", file: "", want: ["Forest (default)", "None"], value: "forest" },
+    { name: "an image: Custom listed", images: [A], backdrop: "forest", file: "", want: ["Forest (default)", "None", "Custom"], value: "forest" },
+    { name: "custom with no file and no images shows Forest", images: [], backdrop: "custom", file: "", want: ["Forest (default)", "None"], value: "forest" },
+    { name: "custom with its image gone shows Forest", images: [B], backdrop: "custom", file: A, want: ["Forest (default)", "None", "Custom"], value: "forest" },
+    { name: "custom with its image listed", images: [A], backdrop: "custom", file: A, want: ["Forest (default)", "None", "Custom"], value: "custom" },
+  ])("$name", async ({ images, backdrop, file, want, value }) => {
+    daemon.images = images.map((n, i) => img(n, i));
+    setValues(backdrop, file);
+    await renderRow();
+    await waitFor(() => {
+      expect(shown()).toBe(value);
+    });
+    expect(options()).toEqual(want);
+  });
+
+  it("removing the shown image shows Forest and drops Custom when it was the last", async () => {
+    daemon.images = [img(A, 1)];
+    daemon.removeBackdrop.mockImplementation((name) => {
+      daemon.images = daemon.images.filter((b) => b.name !== name);
+      return Promise.resolve();
+    });
+    await renderRow();
+    await screen.findAllByTestId("backdrop-thumb");
+    expect(shown()).toBe("custom");
+    fireEvent.click(screen.getByRole("button", { name: "Remove image 1" }));
+    // The list comes back before the daemon's fallback snapshot: Forest already.
+    await waitFor(() => {
+      expect(screen.queryByTestId("backdrop-gallery")).toBeNull();
+    });
+    expect(shown()).toBe("forest");
+    expect(options()).toEqual(["Forest (default)", "None"]);
+    // Then the snapshot (the daemon cleared the file and fell back) changes nothing shown.
+    act(() => {
+      setValues("forest", "", 2);
+    });
+    expect(shown()).toBe("forest");
+    expect(save.fn).not.toHaveBeenCalled();
+  });
+
+  it("removing another image keeps the shown one", async () => {
+    daemon.removeBackdrop.mockImplementation((name) => {
+      daemon.images = daemon.images.filter((b) => b.name !== name);
+      return Promise.resolve();
+    });
+    await renderRow();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove image 2" }));
+    await waitFor(() => {
+      expect(screen.getAllByTestId("backdrop-thumb")).toHaveLength(1);
+    });
+    expect(shown()).toBe("custom");
+    expect(save.fn).not.toHaveBeenCalled();
+  });
+
   it("with no images there is no gallery, only the button", async () => {
     daemon.images = [];
     setValues("forest", "");

@@ -18,11 +18,16 @@ const DEFAULT_BACKDROP = "forest";
  * composer). Absolutely positioned and inert: put it first in a `relative` container
  * and give the content `relative` so it paints above. Renders nothing for
  * appearance.backdrop = none. Custom shows the image appearance.backdrop_file names, once
- * it has loaded (nothing meanwhile, and nothing when it is gone).
+ * it has loaded (nothing meanwhile); with no file named, or the file gone, it falls back
+ * to the default's art.
  */
 export function Backdrop() {
   const choice = useSettingValue(KEYS.backdrop) ?? DEFAULT_BACKDROP;
   if (choice === CUSTOM_BACKDROP) return <CustomBackdrop />;
+  return <BundledBackdrop choice={choice} />;
+}
+
+function BundledBackdrop({ choice }: { choice: string }) {
   const art = ART[choice];
   if (!art) return null;
   return <BackdropArt choice={choice} narrow={art.narrow} wide={art.wide} />;
@@ -31,8 +36,9 @@ export function Backdrop() {
 /** The user's image, one picture for both aspect ratios. */
 function CustomBackdrop() {
   const name = useSettingValue(KEYS.backdropFile) ?? "";
-  const { url } = useBackdropUrl(name);
-  if (!url) return null;
+  const { url, loading } = useBackdropUrl(name);
+  if (loading) return null;
+  if (!url) return <BundledBackdrop choice={DEFAULT_BACKDROP} />;
   return <BackdropArt choice={CUSTOM_BACKDROP} narrow={url} wide={url} />;
 }
 
