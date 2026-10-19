@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -86,5 +87,57 @@ func TestScrubEndpointEnv(t *testing.T) {
 	}
 	if strings.Contains(logs.String(), "other-daemon") || !strings.Contains(logs.String(), "CODE_FOUNDRY_TOKEN") {
 		t.Errorf("log = %q", logs.String())
+	}
+}
+
+func TestPathWithCLIDir(t *testing.T) {
+	tests := []struct {
+		name, path, bin string
+		want, wantDir   string
+	}{
+		{"no CLI", "/usr/bin:/bin", "", "/usr/bin:/bin", ""},
+		{"prepended", "/usr/bin:/bin", "/opt/cf/code-foundry", "/opt/cf:/usr/bin:/bin", "/opt/cf"},
+		{"already on PATH", "/usr/bin:/opt/cf:/bin", "/opt/cf/code-foundry", "/usr/bin:/opt/cf:/bin", ""},
+		{"on PATH unclean", "/usr/bin:/opt/cf/:/bin", "/opt/cf/code-foundry", "/usr/bin:/opt/cf/:/bin", ""},
+		{"empty PATH", "", "/opt/cf/code-foundry", "/opt/cf", "/opt/cf"},
+		{"empty entries ignored", "::/bin", "/opt/cf/code-foundry", "/opt/cf:::/bin", "/opt/cf"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, dir := pathWithCLIDir(tt.path, tt.bin)
+			if got != tt.want || dir != tt.wantDir {
+				t.Errorf("pathWithCLIDir(%q, %q) = %q, %q; want %q, %q", tt.path, tt.bin, got, dir, tt.want, tt.wantDir)
+			}
+		})
+	}
+}
+
+func TestPathWithCLIDirRelative(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, dir := pathWithCLIDir("/bin", "bin/code-foundry")
+	if want := filepath.Join(wd, "bin"); dir != want || got != want+":/bin" {
+		t.Errorf("got %q, %q; want dir %q", got, dir, want)
+	}
+}
+
+func TestAddCLIToPath(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv(paths.EnvBin, "/opt/cf/code-foundry")
+	var logs bytes.Buffer
+	if dir := addCLIToPath(slog.New(slog.NewTextHandler(&logs, nil))); dir != "/opt/cf" {
+		t.Errorf("added %q", dir)
+	}
+	if got := os.Getenv("PATH"); got != "/opt/cf:/usr/bin:/bin" {
+		t.Errorf("PATH = %q", got)
+	}
+	// A second call (a daemon restart in-process) adds nothing.
+	if dir := addCLIToPath(slog.New(slog.NewTextHandler(&logs, nil))); dir != "" {
+		t.Errorf("second call added %q", dir)
+	}
+	if got := os.Getenv("PATH"); got != "/opt/cf:/usr/bin:/bin" {
+		t.Errorf("PATH after second call = %q", got)
 	}
 }
