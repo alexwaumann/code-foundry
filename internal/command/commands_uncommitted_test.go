@@ -199,7 +199,7 @@ func TestProjectCleanupAsksAboutUncommittedWork(t *testing.T) {
 	wantSecond := "Removed 1 worktree: cf/a.\n\n" +
 		"The work of 1 more worktree is in the default branch, but it has uncommitted work:\n" +
 		"- cf/d at /wt/d: 2 modified, 1 untracked\n\n" +
-		"Remove them too and delete that work for good? Branches are kept."
+		"Remove it too and delete that work for good? Its branch is kept."
 	if ce.Message != wantSecond || !maps.Equal(ce.Args, map[string]string{"force": "true"}) || ce.Title != "Delete Uncommitted Work" {
 		t.Errorf("second = %+v\nwant message %q", ce, wantSecond)
 	}

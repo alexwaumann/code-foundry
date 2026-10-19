@@ -123,7 +123,7 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 func (cl *cli) notAnsweredByYes(name string, cr *v1.ConfirmationRequired) (*v1.InvokeCommandResponse, error) {
 	flags := argFlags(cr.GetArgs())
 	if d := cr.GetDeclined(); d != nil {
-		fmt.Fprintf(cl.stderr, "code-foundry %s: not asked without a terminal, so nothing more was done (--yes does not answer it; %s does):\n%s\n",
+		fmt.Fprintf(cl.stderr, "code-foundry %s: this was not asked, so nothing more was done (--yes does not answer it; %s does):\n%s\n",
 			name, flags, cr.GetMessage())
 		return d, nil
 	}

@@ -251,7 +251,11 @@ func cleanupForcePrompt(res *v1.CleanupWorktreesResponse, dirty []*v1.Worktree, 
 	for _, w := range dirty {
 		writeWorkLine(&b, w)
 	}
-	b.WriteString("\n\nRemove them too and delete that work for good? Branches are kept.")
+	if len(dirty) == 1 {
+		b.WriteString("\n\nRemove it too and delete that work for good? Its branch is kept.")
+	} else {
+		b.WriteString("\n\nRemove them too and delete that work for good? Branches are kept.")
+	}
 	return b.String()
 }
 
