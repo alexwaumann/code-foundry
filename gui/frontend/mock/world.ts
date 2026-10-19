@@ -138,6 +138,12 @@ interface MockThread {
   flags: MockFlag[];
   /** "plugin:<name>" for a plugin's own thread (hidden from the user's lists); "" for the user's. */
   owner: string;
+  /**
+   * Thread.plugin_env_change while plugin_env_stale (POST /__mock/thread/envstale): a plugin's
+   * session environment changed since the running process started; "" when current.
+   * thread.restart and the process's end clear it (docs/notes/plugins-env-restart.md).
+   */
+  pluginEnvChange: string;
 }
 
 /** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
@@ -1188,6 +1194,7 @@ export class World {
       held: false,
       flags: [],
       owner: "",
+      pluginEnvChange: "",
       ...o,
       state,
     };
@@ -1227,6 +1234,7 @@ export class World {
       pinned: s.pinned,
       flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.owner ? { owner: s.owner } : {}),
+      ...(s.pluginEnvChange ? { pluginEnvStale: true, pluginEnvChange: s.pluginEnvChange } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       effortPending: s.effortPending,
@@ -1269,6 +1277,7 @@ export class World {
     s.disconnectReason = reason;
     s.exitCode = code;
     s.settleIn = 0;
+    s.pluginEnvChange = ""; // the next start gets the current environment
     // A stop while starting: the queued reply never comes (the daemon drops it with the process).
     s.onReady = [];
     s.lastActivityAt = new Date();
@@ -1329,6 +1338,24 @@ export class World {
       s.flags = [...rest, { ...f, level: f.level, setAt: new Date() }].sort((a, b) => b.level - a.level || b.setAt.getTime() - a.setAt.getTime());
     }
     this.publishThread(s);
+  }
+
+  /** A plugin's session environment changed (or, with "", is current again) for a running thread. */
+  setPluginEnvChange(id: string, change: string): void {
+    const s = this.thread(id);
+    if (change && s.state !== ThreadState.CONNECTED) throw new CommandError("unavailable", "only a running thread can be stale");
+    s.pluginEnvChange = change;
+    this.publishThread(s);
+  }
+
+  /** ThreadService.Restart: a running thread restarts with the current environment; any other is left as it is. */
+  restartThread(id: string): boolean {
+    const s = this.thread(id);
+    if (s.state !== ThreadState.CONNECTED && s.state !== ThreadState.STARTING) return false;
+    this.logs.restart(id);
+    s.pluginEnvChange = "";
+    this.publishThread(s);
+    return true;
   }
 
   /** ThreadService.ClearFlags: one plugin's flag, or every one with plugin empty; NOT_FOUND when there is none to clear. */
@@ -2566,6 +2593,35 @@ export class World {
           const id = args.id || (ctx?.activeThreadId ?? "");
           const n = this.clearFlags(id, args.plugin ?? "");
           return `cleared ${String(n)} ${n === 1 ? "flag" : "flags"} on thread ${id}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.restart",
+          title: "Restart Claude",
+          category: "Thread",
+          description:
+            "Restart a thread's Claude process with the same conversation, so it picks up what changed outside it, such as a plugin's environment. A running turn is interrupted; background agents and shells stop. A thread whose Claude is not running is left as it is: its next message starts Claude afresh.",
+          keybindings: [],
+          args: [{ name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" }],
+          // Like the daemon: only a restart that cuts something off asks.
+          confirmIf: (ctx, args) => {
+            const s = args.id ? this.threads.get(args.id) : activeThread(ctx);
+            return s !== undefined && this.interrupts(s).why !== "";
+          },
+          confirm: (ctx, args) => {
+            const s = args.id ? this.threads.get(args.id) : activeThread(ctx);
+            const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
+            const q = `Restart Claude for ${s?.name || (s?.id ?? "")}? The conversation continues`;
+            return ends === "ends the turn" ? `${q}; the current turn is interrupted.` : `${q}, but ${why}; restarting ${ends}.`;
+          },
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const id = args.id || (ctx?.activeThreadId ?? "");
+          const s = this.thread(id);
+          if (!this.restartThread(id)) return `Claude is not running for thread ${s.name || id} (${id}); its next message starts it with the current environment`;
+          return `restarting Claude for thread ${s.name || id} (${id}); the conversation continues`;
         },
       },
       {

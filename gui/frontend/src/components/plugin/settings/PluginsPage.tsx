@@ -40,7 +40,11 @@ function useEnvironments(): Readonly<Record<string, PluginEnvironmentView>> {
   return envs;
 }
 
-/** What a plugin adds to new threads: env, PATH, add-dirs, who gets it; running threads keep what they spawned with. */
+/**
+ * What a plugin adds to new threads: env, PATH, add-dirs, who gets it. New shells get the
+ * env and PATH too; a running thread says so in its header until restarted
+ * (docs/notes/plugins-env-restart.md).
+ */
 function EnvSummary({ env }: { env: PluginEnvironmentView }) {
   const projects = useProjectsStore((s) => s.byId);
   const projectName = (id: string) => projects[id]?.name ?? id;
@@ -71,7 +75,7 @@ function EnvSummary({ env }: { env: PluginEnvironmentView }) {
           {i}
         </p>
       ))}
-      <p className="text-caption-sm">New threads get this; running threads keep what they spawned with.</p>
+      <p className="text-caption-sm">New threads get this, and new shells all but the --add-dir folders. A running thread shows “Plugin environment changed” until you restart it.</p>
     </div>
   );
 }

@@ -112,7 +112,7 @@ _ = h.ClearContext("failing", pluginsdk.ForThread(id))
 - A notification: a refusal only shows in the plugin's log. Facts belong to the process:
   after a restart there are none, so set them again in Init.
 
-## SetEnvironment: what new Claude threads get (permission `sessionEnv`)
+## SetEnvironment: what new Claude threads and shells get (permission `sessionEnv`)
 
 ```go
 res, err := h.SetEnvironment(ctx, pluginsdk.Environment{
@@ -125,8 +125,13 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
 ```
 
 - Pushed, not asked for: push in Init and again whenever it changes; the last push is
-  kept across restarts. An empty `Environment{}` withdraws it. Running threads keep what
-  they started with; new threads (and restarts) get the new one.
+  kept across restarts. An empty `Environment{}` withdraws it. New threads get the new
+  one. A running thread keeps what it started with: its header shows "Plugin environment
+  changed · Restart to apply" (only when what it would get really differs: pushing the
+  same values again changes nothing), and the user restarts Claude for it
+  (`thread restart`, the same conversation). New bottom-panel shells in scope get the
+  `Env` and `PathPrepend` too (not `AddDirs`); running shells keep theirs. Do not push on
+  a timer: every real change asks the user to restart their threads.
 - `Env`: names `[A-Za-z_][A-Za-z0-9_]*`, text values up to 8 KiB, at most 64. Reserved,
   in any case (`path` is `PATH` to a shell): `PATH`, `HOME`, `SHELL`, `USER`, `TMPDIR`,
   `CLAUDECODE`, `CLAUDE_CONFIG_DIR`, `CLAUDE_EFFORT` and anything starting

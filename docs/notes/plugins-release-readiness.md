@@ -417,7 +417,7 @@ Every gap in `docs/notes/plugins-integration.md`'s "Known gaps" that is now fixe
 | gh event cadence: gh events fire only on a poll change, the poll slows to 15 min without a GUI, `pr.checks` refreshes by age (60 s), `threadList` has no PR fields | Covered by the planned granular gh store events (per-PR lifecycle and detail-diff events, `gh-granular-events-plan`); patching the plugin bridge first would be redone there |
 | No per-file worktree events (plugins poll fingerprints) | FSEvents per thread worktree exists in the project store; exposing it to plugins is a feature, not a fix |
 | Keychain items readable by any process of the user without a prompt | Items trust `/usr/bin/security`, which the daemon writes through. A daemon-only ACL needs Security.framework and a signed binary (an unsigned binary's ACL breaks on every update). Revisit when the binary is signed |
-| A running thread keeps the environment it spawned with | Needs a thread `started_at` and a "restart to pick up" affordance; the static line in Settings says so |
+| ~~A running thread keeps the environment it spawned with~~ | Done in `cf/plugins-env-restart`: `plugin_env_stale` + header line + `thread restart`; shells get the env too (docs/notes/plugins-env-restart.md) |
 | Bottom-panel shells get no session environment | The environment hook is for Claude sessions; shells are the user's |
 | A plugin terminal opened in the bottom panel is window-local, forgotten on reload | Bottom-panel persistence is its own feature (owner labels already exist) |
 | Usage counts plugin threads but does not group them by plugin; no cost column in `plugin threads` | Usage page change, not plugin correctness |

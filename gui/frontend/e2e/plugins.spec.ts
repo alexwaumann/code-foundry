@@ -169,7 +169,7 @@ test("Settings → Plugins lists them; enabling one asks for consent with its pe
   await expect(hello.getByTestId("plugin-process")).toHaveText("pid 48213");
   await expect(hello.getByTestId("plugin-env")).toContainText("CF_HELLO");
   await expect(hello.getByTestId("plugin-env")).not.toContainText("CF_HELLO=");
-  await expect(hello.getByTestId("plugin-env")).toContainText("running threads keep what they spawned with");
+  await expect(hello.getByTestId("plugin-env")).toContainText("A running thread shows “Plugin environment changed” until you restart it.");
   await expect(rows.and(page.locator('[data-plugin="crasher"]')).getByTestId("plugin-last-error")).toHaveText("exited with status 1: crasher: cannot read config");
 
   await hello.getByTestId("plugin-logs-open").click();

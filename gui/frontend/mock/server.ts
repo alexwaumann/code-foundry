@@ -27,6 +27,8 @@
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; World.addLineage)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
+ *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
+ *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (thread.snooze as the CLI's
@@ -681,7 +683,7 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale}?id=…[&status=…][&reason=…&code=…].
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
@@ -719,6 +721,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         break;
       case "wake":
         world.wakeThread(id);
+        break;
+      case "envstale":
+        world.setPluginEnvChange(id, q.get("change") ?? "");
         break;
       case "flag": {
         const level = flagLevels[q.get("level") ?? "attention"];
@@ -789,7 +794,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
