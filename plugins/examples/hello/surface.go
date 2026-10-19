@@ -15,7 +15,8 @@ import (
 
 // The demo surface shows every v1 node kind across six tabs (Overview, Form, Log,
 // Assistant and Shell with the plugin's own thread and terminal, owned.go, and Layout
-// with columns, panes, a grid, dividers, spacers and groups, layout.go):
+// with columns, panes, a grid, dividers, spacers, groups, a container, a toolbar and a
+// footer, layout.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks
@@ -40,6 +41,7 @@ type demo struct {
 	started time.Time
 	build   int
 	ownErr  error // why the Assistant or Shell tab has nothing to show
+	filter  layoutFilter
 }
 
 // demoFactory opens demo instances sharing own.
@@ -102,7 +104,7 @@ func (d *demo) viewLocked() ui.View {
 	if !d.running {
 		tabs.Items[2].Badge = nil
 	}
-	var nodes []ui.Node
+	var nodes, toolbar, footer []ui.Node
 	switch d.tab {
 	case "form":
 		nodes = d.formNodes()
@@ -116,11 +118,12 @@ func (d *demo) viewLocked() ui.View {
 		nodes = shellNodes(id, d.ownErr)
 	case "layout":
 		id, _ := d.own.ids()
-		nodes = layoutNodes(id, d.ownErr)
+		nodes = layoutNodes(id, d.ownErr, d.filter)
+		toolbar, footer = layoutChrome(d.filter)
 	default:
 		nodes = d.overviewNodes(pin)
 	}
-	return ui.View{Header: header, Tabs: tabs, Nodes: nodes}
+	return ui.View{Header: header, Tabs: tabs, Toolbar: toolbar, Nodes: nodes, Footer: footer}
 }
 
 func (d *demo) overviewNodes(pin string) []ui.Node {
@@ -285,6 +288,16 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		return d.render()
 	case "click:reset":
 		d.saved = nil
+	case "submit:layout-filter":
+		d.filter.query, _ = act.Values["q"].(string)
+	case "click:layout-status":
+		d.filter.status = act.Data
+	case "click:layout-clear":
+		d.filter = layoutFilter{resets: d.filter.resets + 1}
+	case "click:layout-rerun":
+		d.mu.Unlock()
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #6 queued again")
+		return nil
 	case "click:start-log":
 		if !d.running {
 			d.running, d.build, d.tab = true, d.build+1, "log"

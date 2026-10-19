@@ -2,17 +2,87 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// layoutNodes is the demo's Layout tab: the layout nodes. Two columns (a pane with a log
-// and a list beside markdown and facts) that stack in the side panel; a grid of cards (one
-// column in the panel, more as it widens) under a labelled divider; inline groups; a card
-// whose pane holds a flex spacer that keeps its bar at the bottom; a fixed spacer; and a
+// layoutRun is one of the Layout tab's runs.
+type layoutRun struct {
+	n             int
+	glyph         ui.Status
+	branch, state string // state: the status chip that shows it
+}
+
+var layoutRuns = []layoutRun{
+	{6, ui.StatusRunning, "main", "running"},
+	{5, ui.StatusFailed, "cf/fix", "failed"},
+	{4, ui.StatusOK, "main", "ok"},
+	{3, ui.StatusFailed, "cf/retry", "failed"},
+	{2, ui.StatusOK, "cf/fix", "ok"},
+	{1, ui.StatusOK, "main", "ok"},
+}
+
+// layoutFilter is what the Layout tab's toolbar filters the runs by: a status ("" or
+// "all" for every run) and text in the title or branch.
+type layoutFilter struct {
+	status, query string
+	resets        int // the search form's reset token: Clear filter drops its draft
+}
+
+func (f layoutFilter) active() bool { return (f.status != "" && f.status != "all") || f.query != "" }
+
+func (f layoutFilter) match(r layoutRun) bool {
+	if f.status != "" && f.status != "all" && r.state != f.status {
+		return false
+	}
+	q := strings.ToLower(strings.TrimSpace(f.query))
+	return q == "" || strings.Contains(strings.ToLower(fmt.Sprintf("build #%d %s", r.n, r.branch)), q)
+}
+
+// layoutChrome is the Layout tab's toolbar (a search field and status chips that filter
+// the runs) and footer (the count and an actions bar), pinned around its scrolling body.
+func layoutChrome(f layoutFilter) (toolbar, footer []ui.Node) {
+	q := ui.TextField("layout-q", "q", "Filter runs").WithPlaceholder("Filter runs").WithValue(f.query)
+	submit := ui.EventButton("layout-search", "Filter", "layout-filter").WithIcon("search").AsIconOnly()
+	search := ui.NewForm("layout-search-form", &submit, q)
+	search.Form.ResetToken = fmt.Sprint(f.resets)
+	count := map[string]int{"all": len(layoutRuns)}
+	for _, r := range layoutRuns {
+		count[r.state]++
+	}
+	chip := func(key, label string, st ui.Status) ui.Chip {
+		on := f.status == key || (key == "all" && f.status == "")
+		return ui.Chip{Key: "layout-st-" + key, Label: label, Status: st, Meta: ui.Plain(fmt.Sprint(count[key])), Selected: on,
+			Action: ui.EventAction("layout-status", key)}
+	}
+	chips := ui.NewChips("layout-status",
+		chip("all", "All", ui.StatusNone), chip("running", "Running", ui.StatusRunning),
+		chip("failed", "Failed", ui.StatusFailed), chip("ok", "Passed", ui.StatusOK))
+	shown := 0
+	for _, r := range layoutRuns {
+		if f.match(r) {
+			shown++
+		}
+	}
+	summary := ui.Node{Key: "layout-count", Text: &ui.Text{Size: ui.TextSm, Content: ui.Plain(fmt.Sprintf("%d of %d runs", shown, len(layoutRuns)))}}
+	clear := ui.EventButton("layout-clear", "Clear filter", "layout-clear")
+	clear.Disabled = !f.active()
+	bar := ui.Node{Key: "layout-footer-bar", Actions: &ui.Actions{Align: ui.AlignEnd, Buttons: []ui.Button{
+		clear, ui.EventButton("layout-rerun", "Run again", "layout-rerun").WithIcon("rotate-ccw").WithStyle(ui.ButtonAttention),
+	}}}
+	return []ui.Node{search, chips}, []ui.Node{summary, bar}
+}
+
+// layoutNodes is the demo's Layout tab: the layout nodes, in a wide container (a page's
+// main column; the panel is narrower). Two columns (a pane with a log and the runs the
+// toolbar filters, beside markdown and facts) that stack in the side panel; a grid of
+// cards (one column in the panel, more as it widens) under a labelled divider; inline
+// groups; a card whose pane holds a flex spacer that keeps its bar at the bottom; a fixed
+// spacer; and a
 // collapse-first pair whose second column (the assistant thread in a fill pane) shows only
 // where the columns fit side by side.
-func layoutNodes(threadID string, err error) []ui.Node {
+func layoutNodes(threadID string, err error, f layoutFilter) []ui.Node {
 	intro := ui.NewText("layout-intro", ui.Plain("Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in the side panel."))
 	lines := make([]ui.LogLine, 0, 24)
 	for i := 1; i <= 24; i++ {
@@ -25,11 +95,13 @@ func layoutNodes(threadID string, err error) []ui.Node {
 		}
 		lines = append(lines, ln)
 	}
-	runs := ui.Node{Key: "layout-runs", List: &ui.List{Dense: true, Rows: []ui.Row{
-		{Key: "layout-run-3", Glyph: ui.StatusGlyph(ui.StatusRunning), Title: "Build #3", Trailing: ui.Plain("main")},
-		{Key: "layout-run-2", Glyph: ui.StatusGlyph(ui.StatusFailed), Title: "Build #2", Trailing: ui.Plain("cf/fix")},
-		{Key: "layout-run-1", Glyph: ui.StatusGlyph(ui.StatusOK), Title: "Build #1", Trailing: ui.Plain("main")},
-	}}}
+	rows := []ui.Row{}
+	for _, r := range layoutRuns {
+		if f.match(r) {
+			rows = append(rows, ui.Row{Key: fmt.Sprintf("layout-run-%d", r.n), Glyph: ui.StatusGlyph(r.glyph), Title: fmt.Sprintf("Build #%d", r.n), Trailing: ui.Plain(r.branch)})
+		}
+	}
+	runs := ui.Node{Key: "layout-runs", List: &ui.List{Dense: true, Rows: rows, EmptyText: "No runs match the filter"}}
 	main := ui.NewColumns("layout-cols",
 		ui.NewColumn("layout-left",
 			ui.NewPane("layout-pane", ui.HeightPx(320),
@@ -38,7 +110,7 @@ func layoutNodes(threadID string, err error) []ui.Node {
 			),
 		).WithWeight(2),
 		ui.NewColumn("layout-right",
-			ui.NewMarkdown("layout-md", "**Columns** take a weight (1 to 6) or a fixed width. A **pane** is a box with its own height and scroll: the log and the runs beside this scroll inside theirs."),
+			ui.NewMarkdown("layout-md", "**Columns** take a weight (1 to 6) or a fixed width. A **pane** is a box with its own height and scroll: the log and the runs beside this scroll inside theirs. The **toolbar** and **footer** stay pinned while the body scrolls between them; the toolbar filters the runs."),
 			ui.NewPairs("layout-facts",
 				ui.NewPair("layout-f-cols", "Columns", ui.Plain("2 to 4")),
 				ui.NewPair("layout-f-min", "Side by side", ui.Plain("240 px a column")),
@@ -59,9 +131,9 @@ func layoutNodes(threadID string, err error) []ui.Node {
 	detail := ui.NewColumns("layout-detail", ui.NewColumn("layout-detail-summary", summary), ui.NewColumn("layout-detail-chat", chat).WithWeight(2))
 	detail.Columns.Collapse = ui.CollapseFirst
 	groups := layoutGroups()
-	return []ui.Node{intro, main, ui.NewDivider("layout-grid-rule", "Grid"), layoutGrid(),
+	return []ui.Node{ui.NewContainer("layout-page", ui.ContainerWide, intro, main, ui.NewDivider("layout-grid-rule", "Grid"), layoutGrid(),
 		ui.NewDivider("layout-group-rule", "Inline groups"), groups[0], groups[1],
-		ui.NewDivider("layout-rule", ""), layoutPushed(), ui.NewSpacer("layout-gap", 24), detail}
+		ui.NewDivider("layout-rule", ""), layoutPushed(), ui.NewSpacer("layout-gap", 24), detail)}
 }
 
 // layoutGrid is a grid of five cards, 200 px a column at least; the deploy card spans two.
