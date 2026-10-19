@@ -6,14 +6,14 @@ interrupted a busy child (`error (interrupted)`, "daemon stopped"), its settle w
 dropped on purpose ("wake not fired: the daemon is stopping"), and the restarted daemon
 armed the subscriptions with the targets as loaded, so nothing ever told the
 orchestrator: its "I'll tell you when it's done" never came. Daemon wake engine
-(`internal/store/thread/subscriptions_restart.go`), migration 0036, one call in the
+(`internal/store/thread/subscriptions_restart.go`), migration 0037, one call in the
 daemon, the GUI's wake note. Follows `agents-4-wake.md`, `wake-detail.md` and
 `orch-wakes-content.md`.
 
 ## What changed
 
 * **Suppressed wakes are recorded.** A thread wake that fires while the Manager is
-  closed (`fireLaterLocked`) sets `thread_subscriptions.suppressed_at` (migration 0036,
+  closed (`fireLaterLocked`) sets `thread_subscriptions.suppressed_at` (migration 0037,
   `Subscription.SuppressedAt`) and is logged `wake not fired: the daemon is stopping; it
   goes at the next start`. Run, pull request and plugin wakes are still only logged
   (runs do not outlive the daemon; the others keep working after a start).
