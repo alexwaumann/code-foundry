@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 
-/** Inline live streams (thread and terminal nodes) held at once, across every surface. */
+/** Inline live streams (thread and terminal nodes) held at once, across every surface (pluginsdk/ui MaxLiveNodes). */
 export const INLINE_LIVE_MAX = 2;
 
 export interface InlineLiveState {

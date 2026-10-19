@@ -309,7 +309,10 @@ export interface FormNodeData {
   resetToken?: string;
 }
 
-/** A thread or terminal node's height: "auto" (the default), "fill" (the rest of the panel) or pixels. */
+/**
+ * A thread, terminal or pane node's height: "auto" (the default), "fill" (the rest of its
+ * box: the nearest pane with a px or fill height, else the surface's scroll area) or pixels.
+ */
 export type NodeHeight = "auto" | "fill" | number;
 
 /** The plugin's own Claude thread, inline: the thread view and (unless readOnly) its composer. */
@@ -330,6 +333,31 @@ export interface TerminalData {
   actions?: ViewButton[];
 }
 
+/** One column of a columns node: a weight (1..6, absent = 1) or a fixed width in px, and its nodes. */
+export interface ColumnData {
+  key: string;
+  weight?: number;
+  width?: number;
+  children: ViewNode[];
+}
+
+/**
+ * 2 to 4 columns side by side where they fit (components/plugin/layout.ts), else degraded:
+ * "stack" (the default: in order, one under another) or "first" (only the first column).
+ */
+export interface ColumnsData {
+  items: ColumnData[];
+  collapse?: "stack" | "first";
+}
+
+/** A box of nodes with its own height and scroll (noScroll cuts instead); minHeight in px. */
+export interface PaneData {
+  height?: NodeHeight;
+  minHeight?: number;
+  noScroll?: boolean;
+  children: ViewNode[];
+}
+
 /** Each node kind's data, by the JSON field that names the kind. */
 export interface NodeData {
   text: TextData;
@@ -346,12 +374,14 @@ export interface NodeData {
   form: FormNodeData;
   thread: ThreadData;
   terminal: TerminalData;
+  columns: ColumnsData;
+  pane: PaneData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
@@ -367,6 +397,30 @@ export interface PluginViewModel {
 export function nodeKind(n: ViewNode): NodeKind | null {
   for (const k of NODE_KINDS) if (n[k] !== undefined) return k;
   return null;
+}
+
+/**
+ * The node lists a container holds (a section's children, each column's, a pane's), in
+ * order; empty for any other node. Every walk over a view's nodes goes through this.
+ */
+export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
+  if (n.section) return [n.section.children];
+  if (n.columns) return n.columns.items.map((c) => c.children);
+  if (n.pane) return [n.pane.children];
+  return [];
+}
+
+/** A container node with its lists replaced (same order and count as childLists gives). */
+export function withChildLists(n: ViewNode, lists: readonly (readonly ViewNode[])[]): ViewNode {
+  const list = (i: number, old: ViewNode[]) => (lists[i] as ViewNode[] | undefined) ?? old;
+  if (n.section) return { ...n, section: { ...n.section, children: list(0, n.section.children) } };
+  if (n.columns) {
+    // A column whose list did not change keeps its identity.
+    const items = n.columns.items.map((c, i) => (list(i, c.children) === c.children ? c : { ...c, children: list(i, c.children) }));
+    return { ...n, columns: { ...n.columns, items } };
+  }
+  if (n.pane) return { ...n, pane: { ...n.pane, children: list(0, n.pane.children) } };
+  return n;
 }
 
 /** Parses a view's JSON; null when it is not a view (no nodes array). */

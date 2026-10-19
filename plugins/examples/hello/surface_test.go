@@ -61,13 +61,13 @@ func TestDemoSurface(t *testing.T) {
 			for k := range m {
 				kinds[k] = true
 			}
-			if n.Section != nil {
-				walk(n.Section.Children)
+			for _, ch := range n.Children() {
+				walk(ch)
 			}
 		}
 	}
 	walk(v.Nodes)
-	for _, tab := range []string{"form", "log", "assistant", "shell"} {
+	for _, tab := range []string{"form", "log", "assistant", "shell", "layout"} {
 		if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Kind: pluginsdk.ActTab, Action: "tab", Key: tab, Value: tab}); err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func TestDemoSurface(t *testing.T) {
 		}
 		walk(view(t, h).Nodes)
 	}
-	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal"} {
+	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane"} {
 		if !kinds[k] {
 			t.Errorf("the demo has no %s node", k)
 		}

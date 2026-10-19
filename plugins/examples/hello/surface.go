@@ -13,8 +13,9 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo surface shows every v1 node kind across five tabs (Overview, Form, Log, and
-// Assistant and Shell with the plugin's own thread and terminal; owned.go):
+// The demo surface shows every v1 node kind across six tabs (Overview, Form, Log,
+// Assistant and Shell with the plugin's own thread and terminal, owned.go, and Layout
+// with columns and panes, layout.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks
@@ -56,7 +57,7 @@ func demoFactory(own *owned) pluginsdk.SurfaceFactory {
 func (d *demo) prepare(ctx context.Context, tab string) {
 	var err error
 	switch tab {
-	case "assistant":
+	case "assistant", "layout":
 		_, err = d.own.assistant(ctx, d.h)
 	case "shell":
 		_, err = d.own.shell(ctx, d.h)
@@ -96,7 +97,7 @@ func (d *demo) viewLocked() ui.View {
 		},
 	}
 	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"),
-		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"))
+		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"))
 	tabs.Items[2].Badge = ui.NewPill("live", ui.ToneAttention)
 	if !d.running {
 		tabs.Items[2].Badge = nil
@@ -113,6 +114,9 @@ func (d *demo) viewLocked() ui.View {
 	case "shell":
 		_, id := d.own.ids()
 		nodes = shellNodes(id, d.ownErr)
+	case "layout":
+		id, _ := d.own.ids()
+		nodes = layoutNodes(id, d.ownErr)
 	default:
 		nodes = d.overviewNodes(pin)
 	}

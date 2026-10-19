@@ -204,3 +204,24 @@ func NewThread(key, threadID string) Node { return Node{Key: key, Thread: &Threa
 func NewTerminal(key, terminalID string) Node {
 	return Node{Key: key, Terminal: &Terminal{TerminalID: terminalID}}
 }
+
+// NewColumns returns a columns node of 2 to 4 columns that stacks them in order when its
+// container is too narrow (always in the side panel).
+func NewColumns(key string, columns ...Column) Node {
+	return Node{Key: key, Columns: &Columns{Items: columns}}
+}
+
+// NewColumn returns a column of weight 1 (see Column.Weight and Column.Width).
+func NewColumn(key string, children ...Node) Column { return Column{Key: key, Children: children} }
+
+// WithWeight returns c sharing the free width by weight (1..6).
+func (c Column) WithWeight(w int) Column { c.Weight, c.Width = w, 0; return c }
+
+// WithWidth returns c with a fixed width in px (160..640).
+func (c Column) WithWidth(px int) Column { c.Width, c.Weight = px, 0; return c }
+
+// NewPane returns a pane of the given height (HeightAuto, HeightFill, HeightPx(n)) that
+// scrolls its nodes when they are taller.
+func NewPane(key string, height Height, children ...Node) Node {
+	return Node{Key: key, Pane: &Pane{Height: height, Children: children}}
+}

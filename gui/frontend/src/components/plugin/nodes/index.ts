@@ -2,6 +2,7 @@
 import type { NodeRenderers } from "../registry";
 import { ActionsNode } from "./ActionsNode";
 import { ChipsNode } from "./ChipsNode";
+import { ColumnsNode } from "./ColumnsNode";
 import { EmptyNode } from "./EmptyNode";
 import { FormNode } from "./FormNode";
 import { ListNode } from "./ListNode";
@@ -9,6 +10,7 @@ import { LogNode } from "./LogNode";
 import { MarkdownNode } from "./MarkdownNode";
 import { NoticeNode } from "./NoticeNode";
 import { PairsNode } from "./PairsNode";
+import { PaneNode } from "./PaneNode";
 import { ProgressNode } from "./ProgressNode";
 import { SectionNode } from "./SectionNode";
 import { TerminalNode } from "./TerminalNode";
@@ -30,4 +32,6 @@ export const renderers: NodeRenderers = {
   form: FormNode,
   thread: ThreadNode,
   terminal: TerminalNode,
+  columns: ColumnsNode,
+  pane: PaneNode,
 };

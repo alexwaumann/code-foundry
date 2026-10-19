@@ -1,0 +1,320 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T09:02:16.311761-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-f20aac336477",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
+      },
+      {
+        "key": "layout",
+        "label": "Layout"
+      }
+    ],
+    "active": "layout"
+  },
+  "nodes": [
+    {
+      "key": "layout-intro",
+      "text": {
+        "content": "Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in the side panel."
+      }
+    },
+    {
+      "key": "layout-cols",
+      "columns": {
+        "items": [
+          {
+            "key": "layout-left",
+            "weight": 2,
+            "children": [
+              {
+                "key": "layout-pane",
+                "pane": {
+                  "height": 320,
+                  "children": [
+                    {
+                      "key": "layout-log",
+                      "log": {
+                        "lines": [
+                          {
+                            "text": "step 01  ok"
+                          },
+                          {
+                            "text": "step 02  ok"
+                          },
+                          {
+                            "text": "step 03  ok"
+                          },
+                          {
+                            "text": "step 04  ok"
+                          },
+                          {
+                            "text": "step 05  ok"
+                          },
+                          {
+                            "text": "step 06  ok"
+                          },
+                          {
+                            "text": "step 07  ok"
+                          },
+                          {
+                            "text": "step 08  ok"
+                          },
+                          {
+                            "text": "step 09  retrying flaky test",
+                            "tone": "attention"
+                          },
+                          {
+                            "text": "step 10  ok"
+                          },
+                          {
+                            "text": "step 11  ok"
+                          },
+                          {
+                            "text": "step 12  ok"
+                          },
+                          {
+                            "text": "step 13  ok"
+                          },
+                          {
+                            "text": "step 14  ok"
+                          },
+                          {
+                            "text": "step 15  ok"
+                          },
+                          {
+                            "text": "step 16  ok"
+                          },
+                          {
+                            "text": "step 17  cache miss",
+                            "tone": "muted"
+                          },
+                          {
+                            "text": "step 18  ok"
+                          },
+                          {
+                            "text": "step 19  ok"
+                          },
+                          {
+                            "text": "step 20  ok"
+                          },
+                          {
+                            "text": "step 21  ok"
+                          },
+                          {
+                            "text": "step 22  ok"
+                          },
+                          {
+                            "text": "step 23  ok"
+                          },
+                          {
+                            "text": "step 24  ok"
+                          }
+                        ],
+                        "title": "build 3"
+                      }
+                    },
+                    {
+                      "key": "layout-runs",
+                      "list": {
+                        "rows": [
+                          {
+                            "key": "layout-run-3",
+                            "glyph": {
+                              "status": "running"
+                            },
+                            "title": "Build #3",
+                            "trailing": "main"
+                          },
+                          {
+                            "key": "layout-run-2",
+                            "glyph": {
+                              "status": "failed"
+                            },
+                            "title": "Build #2",
+                            "trailing": "cf/fix"
+                          },
+                          {
+                            "key": "layout-run-1",
+                            "glyph": {
+                              "status": "ok"
+                            },
+                            "title": "Build #1",
+                            "trailing": "main"
+                          }
+                        ],
+                        "dense": true
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-right",
+            "children": [
+              {
+                "key": "layout-md",
+                "markdown": {
+                  "source": "**Columns** take a weight (1 to 6) or a fixed width. A **pane** is a box with its own height and scroll: the log and the runs beside this scroll inside theirs."
+                }
+              },
+              {
+                "key": "layout-facts",
+                "pairs": {
+                  "items": [
+                    {
+                      "key": "layout-f-cols",
+                      "label": "Columns",
+                      "value": "2 to 4"
+                    },
+                    {
+                      "key": "layout-f-min",
+                      "label": "Side by side",
+                      "value": "240 px a column"
+                    },
+                    {
+                      "key": "layout-f-gap",
+                      "label": "Gap",
+                      "value": "12 px"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "layout-detail",
+      "columns": {
+        "items": [
+          {
+            "key": "layout-detail-summary",
+            "children": [
+              {
+                "key": "layout-summary",
+                "text": {
+                  "content": {
+                    "spans": [
+                      {
+                        "text": "The assistant's thread is the second column here: "
+                      },
+                      {
+                        "text": "collapse: first",
+                        "mono": true
+                      },
+                      {
+                        "text": " drops it where the columns stack."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-detail-chat",
+            "weight": 2,
+            "children": [
+              {
+                "key": "layout-chat-pane",
+                "pane": {
+                  "height": "fill",
+                  "minHeight": 320,
+                  "noScroll": true,
+                  "children": [
+                    {
+                      "key": "layout-thread",
+                      "thread": {
+                        "threadId": "s-85cf5166e109",
+                        "placeholder": "Message the assistant…",
+                        "height": "fill"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "collapse": "first"
+      }
+    }
+  ]
+}

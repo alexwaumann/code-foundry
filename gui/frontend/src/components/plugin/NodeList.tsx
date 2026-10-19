@@ -1,5 +1,6 @@
 import { nodeKind, type NodeKind, type ViewNode } from "@/api/plugin";
 import { cn } from "@/lib/utils";
+import { InnerList, listGap } from "./list";
 import { renderers } from "./nodes/index";
 import type { NodeRenderer } from "./registry";
 
@@ -19,12 +20,14 @@ function NodeView({ node }: { node: ViewNode }) {
 }
 
 /** A list of view nodes: 12 px apart at the top level, 6 px inside sections and cards. */
-export function NodeList({ nodes, inner = false }: { nodes: readonly ViewNode[]; inner?: boolean }) {
+export function NodeList({ nodes, inner = false, className }: { nodes: readonly ViewNode[]; inner?: boolean; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col", inner ? "gap-1.5" : "gap-3")}>
-      {nodes.map((n) => (
-        <NodeView key={n.key} node={n} />
-      ))}
-    </div>
+    <InnerList.Provider value={inner}>
+      <div className={cn("flex min-w-0 flex-col", listGap(inner), className)}>
+        {nodes.map((n) => (
+          <NodeView key={n.key} node={n} />
+        ))}
+      </div>
+    </InnerList.Provider>
   );
 }

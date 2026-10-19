@@ -12,8 +12,10 @@ import { toast } from "sonner";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import {
   actOnSurface,
+  childLists,
   nodeKind,
   watchSurface,
+  withChildLists,
   type FieldValue,
   type FormNodeData,
   type LogData,
@@ -130,11 +132,16 @@ function mapNode(nodes: readonly ViewNode[], key: string, f: (n: ViewNode) => Vi
       out[i] = f(n);
       return out;
     }
-    if (n.section) {
-      const children = mapNode(n.section.children, key, f);
+    const lists = childLists(n);
+    for (let j = 0; j < lists.length; j++) {
+      const children = mapNode(lists[j] ?? [], key, f);
       if (children) {
         const out = [...nodes];
-        out[i] = { ...n, section: { ...n.section, children } };
+        // The other lists keep their identity (memoized renderers skip them).
+        out[i] = withChildLists(
+          n,
+          lists.map((l, k) => (k === j ? children : l)),
+        );
         return out;
       }
     }
@@ -169,9 +176,9 @@ export function applySurfaceUpdate(e: SurfaceEntry, u: SurfaceUpdateView): Surfa
   }
 }
 
-/** Every form in a view's body (sections included), by key. */
+/** Every form in a view's body (inside sections, columns and panes too), by key. */
 export function formsOf(nodes: readonly ViewNode[]): { key: string; form: FormNodeData }[] {
-  return nodes.flatMap((n) => (n.form ? [{ key: n.key, form: n.form }] : n.section ? formsOf(n.section.children) : []));
+  return nodes.flatMap((n) => (n.form ? [{ key: n.key, form: n.form }] : childLists(n).flatMap((l) => formsOf(l))));
 }
 
 /**
@@ -239,7 +246,7 @@ export function settleSubmits(
 
 /** Whether any node of the view is of a kind this GUI does not know (shown as a notice). */
 export function unknownNodes(nodes: readonly ViewNode[]): string[] {
-  return nodes.flatMap((n) => (nodeKind(n) === null ? [n.key] : n.section ? unknownNodes(n.section.children) : []));
+  return nodes.flatMap((n) => (nodeKind(n) === null ? [n.key] : childLists(n).flatMap((l) => unknownNodes(l))));
 }
 
 // ---------------------------------------------------------------------------------------

@@ -100,6 +100,8 @@ func TestBuilders(t *testing.T) {
 			NewFieldset("f5", "Group", ToggleField("f6", "a", "A", false))),
 		NewThread("th", "t-1"),
 		NewTerminal("term", "term-1"),
+		NewColumns("cols", NewColumn("col-a", NewText("col-a-text", Plain("a"))).WithWeight(2),
+			NewColumn("col-b", NewPane("pane", HeightFill, NewLog("pane-log", "x\n"))).WithWidth(320)),
 	)
 	v.Tabs = NewTabs("a", NewTab("a", "A"), NewTab("b", "B"))
 	if err := v.Validate(); err != nil {
@@ -153,8 +155,8 @@ func TestValidateRejects(t *testing.T) {
 			v.Header = &Header{Actions: []Button{EventButton("a", "A", "a"), EventButton("b", "B", "b"), EventButton("c", "C", "c")}}
 		}, "at most 2"},
 		{"too deep", func(v *View) {
-			v.Nodes = []Node{NewSection("s1", "", NewSection("s2", "", NewSection("s3", "", NewText("t", Plain("x")))))}
-		}, "nested deeper"},
+			v.Nodes = []Node{NewSection("s1", "", NewSection("s2", "", NewSection("s3", "", NewSection("s4", "", NewSection("s5", "", NewText("t", Plain("x")))))))}
+		}, "nodes[0].section.children[0].section.children[0].section.children[0].section.children[0].section.children[0]: inside 5 containers (section, columns, pane), at most 4"},
 		{"too many logs", func(v *View) {
 			for i := range 5 {
 				v.Nodes = append(v.Nodes, NewLog("log"+string(rune('a'+i)), "x"))

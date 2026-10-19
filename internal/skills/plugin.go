@@ -107,7 +107,8 @@ func viewLimits() string {
 	}
 	rows := [][2]string{
 		{"Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs)", n(ui.MaxElements)},
-		{"Nesting depth (section > section > node)", n(ui.MaxDepth)},
+		{"Containers (section, columns, pane) a node sits inside", n(ui.MaxDepth)},
+		{"Columns in a columns node: least / most", n(ui.MinColumns, ui.MaxColumns)},
 		{"Encoded view without log text (bytes)", n(ui.MaxViewBytes)},
 		{"Log nodes per view", n(ui.MaxLogNodes)},
 		{"Log text per render or per append (bytes)", n(ui.MaxLogText)},

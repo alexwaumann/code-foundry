@@ -77,6 +77,10 @@
       {
         "key": "shell",
         "label": "Shell"
+      },
+      {
+        "key": "layout",
+        "label": "Layout"
       }
     ],
     "active": "shell"
