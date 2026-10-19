@@ -346,7 +346,7 @@ it, it is cut early, so keep it to a few words): `card` draws a box, `tone` `att
 or `error` colours the title (and a card's border), `collapsible` + `collapsed` (initial;
 the user's toggle wins), `stale` dims last-known data while the backend is unreachable.
 Up to 2 buttons sit at the end of the title row, after the pill. A node sits inside at
-most 4 containers (section, columns, pane).
+most 4 containers (section, columns, pane, grid).
 
 ### form
 
@@ -466,12 +466,14 @@ view, or let the user pick which, switching with tabs or chips rather than stack
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; `reference/host-api.md` has the calls that make them.
 
-### columns and pane
+### columns, pane, grid, divider, spacer, group
 
-Layout containers: `columns` puts 2 to 4 columns side by side where they fit (240 px a
+Layout nodes: `columns` puts 2 to 4 columns side by side where they fit (240 px a
 column) and stacks them, or keeps only the first, where they do not (the side panel);
-`pane` is a box with its own height (auto, px, fill) and scroll. Both are in
-`reference/ui-layout.md`, with what `fill` means inside them.
+`pane` is a box with its own height (auto, px, fill) and scroll; `grid` puts cards in as
+many equal columns as fit; `divider` is a hairline (with a label); `spacer` is extra
+space (or, `flex`, pushes what follows to a box's bottom); `group` puts text, chips,
+actions and progress on one line. All in `reference/ui-layout.md`.
 
 ## Acts
 
