@@ -513,6 +513,13 @@ message StageAttachmentRequest {
   // path (<32 hex>-<N>p.pdf, or <32 hex>-~<N>p.pdf for an estimate), so every
   // message that sends the PDF agrees on it.
   uint32 pages = 4;
+  // Absolute path of a file to stage instead of `data`; `mime_type` and `name` may be
+  // empty, the daemon sniffs the type and takes the name from the path. Exactly one of
+  // `data` and `path` is set. The daemon reads the file as its own user: a relative
+  // path or a directory is INVALID_ARGUMENT, a missing file NOT_FOUND, and content of
+  // an unsupported type fails like an unsupported `mime_type`. Types, size limits and
+  // page handling are those of `data`.
+  string path = 5;
 }
 
 message StageAttachmentResponse {

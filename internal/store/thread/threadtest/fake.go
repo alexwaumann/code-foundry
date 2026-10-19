@@ -6,6 +6,7 @@ package threadtest
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -266,6 +267,22 @@ func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []
 	}
 	f.staged++
 	return fmt.Sprintf("/attachments/%d-%s", f.staged, name), nil
+}
+
+// StageAttachmentFile records "StageAttachmentFile <path> <mime>" (and " pages=<n>"
+// when pages is set) and returns /attachments/<N>-<base of path>.
+func (f *Fake) StageAttachmentFile(_ context.Context, path, mimeType string, pages int) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	call := fmt.Sprintf("StageAttachmentFile %s %s", path, mimeType)
+	if pages > 0 {
+		call += fmt.Sprintf(" pages=%d", pages)
+	}
+	if err := f.record(call); err != nil {
+		return "", err
+	}
+	f.staged++
+	return fmt.Sprintf("/attachments/%d-%s", f.staged, filepath.Base(path)), nil
 }
 
 // ReadAttachment records "ReadAttachment <path>" and returns "data:<path>" as image/png.

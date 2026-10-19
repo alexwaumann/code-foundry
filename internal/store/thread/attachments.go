@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -69,26 +70,78 @@ func maxAttachmentBytes(mimeType string) int {
 // sniff as an accepted type too (the stored extension follows the content). The size
 // limit is the content's: MaxPDFAttachmentBytes for a PDF, else MaxAttachmentBytes.
 func attachmentType(mimeType string, data []byte) (string, error) {
+	declared, err := declaredAttachmentType(mimeType)
+	if err != nil {
+		return "", err
+	}
+	return contentAttachmentType(declared, data, int64(len(data)))
+}
+
+// declaredAttachmentType parses a declared MIME type and checks it is accepted.
+func declaredAttachmentType(mimeType string) (string, error) {
 	declared, _, err := mime.ParseMediaType(mimeType)
 	if err != nil || AttachmentTypes[declared] == "" {
-		return "", fmt.Errorf("%w: attachment type %q (want image/png, image/jpeg, image/gif, image/webp or application/pdf)", ErrInvalidArgument, mimeType)
+		return "", unsupportedAttachmentType(mimeType)
 	}
-	if len(data) == 0 {
+	return declared, nil
+}
+
+// unsupportedAttachmentType is the error for a type outside AttachmentTypes, declared
+// by the client or (for a file staged by path) sniffed from the content.
+func unsupportedAttachmentType(mimeType string) error {
+	return fmt.Errorf("%w: attachment type %q (want image/png, image/jpeg, image/gif, image/webp or application/pdf)", ErrInvalidArgument, mimeType)
+}
+
+// contentAttachmentType sniffs content of size bytes from head, its first bytes (at
+// least the first 512 when there are that many, all http.DetectContentType reads),
+// checks the type is accepted and the size within its limit, and returns the
+// extension to store it with. declared is the client's type, or "" when it gave none
+// (a file staged by path), in which case unsupported content gets the
+// unsupported-type error.
+func contentAttachmentType(declared string, head []byte, size int64) (string, error) {
+	if size == 0 {
 		return "", fmt.Errorf("%w: attachment is empty", ErrInvalidArgument)
 	}
-	sniffed := http.DetectContentType(data)
+	sniffed := http.DetectContentType(head)
 	ext := AttachmentTypes[sniffed]
-	if ext == "" {
+	switch {
+	case ext == "" && declared == "":
+		return "", unsupportedAttachmentType(sniffed)
+	case ext == "":
 		return "", fmt.Errorf("%w: attachment declared %s but its content is %s", ErrInvalidArgument, declared, sniffed)
 	}
-	if limit := maxAttachmentBytes(sniffed); len(data) > limit {
-		what := "an image"
-		if sniffed == pdfType {
-			what = "a PDF"
-		}
-		return "", fmt.Errorf("%w: attachment is %d bytes; the limit for %s is %d MiB", ErrInvalidArgument, len(data), what, limit>>20)
+	if size > attachmentLimit(ext) {
+		return "", attachmentTooLarge(ext, size)
 	}
 	return ext, nil
+}
+
+// attachmentLimit is the size limit for a stored extension: MaxPDFAttachmentBytes for
+// a PDF, else MaxAttachmentBytes.
+func attachmentLimit(ext string) int64 {
+	if ext == ".pdf" {
+		return MaxPDFAttachmentBytes
+	}
+	return MaxAttachmentBytes
+}
+
+// attachmentTooLarge is the error for size bytes of a type (by its stored extension)
+// over its limit.
+func attachmentTooLarge(ext string, size int64) error {
+	what := "an image"
+	if ext == ".pdf" {
+		what = "a PDF"
+	}
+	return fmt.Errorf("%w: attachment is %d bytes; the limit for %s is %d MiB", ErrInvalidArgument, size, what, attachmentLimit(ext)>>20)
+}
+
+// attachmentsDir is Options.AttachmentsDir, or ErrFailedPrecondition when attachments
+// are not enabled.
+func (m *Manager) attachmentsDir() (string, error) {
+	if m.opts.AttachmentsDir == "" {
+		return "", fmt.Errorf("%w: attachments are not enabled", ErrFailedPrecondition)
+	}
+	return m.opts.AttachmentsDir, nil
 }
 
 // StageAttachment writes an image or PDF under Options.AttachmentsDir and returns its
@@ -96,11 +149,92 @@ func attachmentType(mimeType string, data []byte) (string, error) {
 // when N is the size estimate (settlePDFPages, with pages as the client's hint). The
 // count is settled here once, so every message that sends the file agrees with it.
 func (m *Manager) StageAttachment(ctx context.Context, name, mimeType string, data []byte, pages int) (string, error) {
-	dir := m.opts.AttachmentsDir
-	if dir == "" {
-		return "", fmt.Errorf("%w: attachments are not enabled", ErrFailedPrecondition)
+	if _, err := m.attachmentsDir(); err != nil {
+		return "", err
 	}
 	ext, err := attachmentType(mimeType, data)
+	if err != nil {
+		return "", err
+	}
+	return m.stageAttachment(ctx, name, ext, pages, func(w io.Writer) (int64, error) {
+		n, err := w.Write(data)
+		return int64(n), err
+	})
+}
+
+// StageAttachmentFile stages the file at path like StageAttachment stages bytes: the
+// same types (sniffed from the content; mimeType, when set, is checked like
+// StageAttachment's), limits, page count and naming. path must be absolute (else
+// ErrInvalidArgument) and name a regular file (ErrNotFound when missing,
+// ErrInvalidArgument for a directory or anything else). The size limit is checked
+// before the copy, which streams; a file that grows past it meanwhile is refused too.
+func (m *Manager) StageAttachmentFile(ctx context.Context, path, mimeType string, pages int) (string, error) {
+	if _, err := m.attachmentsDir(); err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("%w: attachment path %q is not absolute", ErrInvalidArgument, path)
+	}
+	declared := ""
+	if mimeType != "" {
+		var err error
+		if declared, err = declaredAttachmentType(mimeType); err != nil {
+			return "", err
+		}
+	}
+	// Stat before opening: opening a FIFO would block.
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "", attachmentFileError(path, err)
+	}
+	if fi.IsDir() {
+		return "", fmt.Errorf("%w: attachment %q is a directory", ErrInvalidArgument, path)
+	}
+	if !fi.Mode().IsRegular() {
+		return "", fmt.Errorf("%w: attachment %q is not a regular file", ErrInvalidArgument, path)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", attachmentFileError(path, err)
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, 512)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", attachmentFileError(path, err)
+	}
+	ext, err := contentAttachmentType(declared, head[:n], fi.Size())
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return "", attachmentFileError(path, err)
+	}
+	limit := attachmentLimit(ext)
+	return m.stageAttachment(ctx, filepath.Base(path), ext, pages, func(w io.Writer) (int64, error) {
+		n, err := io.Copy(w, io.LimitReader(f, limit+1))
+		if err == nil && n > limit {
+			err = attachmentTooLarge(ext, n)
+		}
+		return n, err
+	})
+}
+
+// attachmentFileError maps an error reading a file staged by path: ErrNotFound when it
+// does not exist, else ErrInvalidArgument (not readable by the daemon's user).
+func attachmentFileError(path string, err error) error {
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: attachment %q does not exist", ErrNotFound, path)
+	}
+	return fmt.Errorf("%w: attachment %q: %w", ErrInvalidArgument, path, err)
+}
+
+// stageAttachment creates a fresh file in the attachments directory, fills it with
+// write and, for a PDF, settles the page count into its name (StageAttachment's
+// naming). ext is the checked extension; name is only logged. A failed write removes
+// the file; its ErrInvalidArgument (a limit) is returned as is.
+func (m *Manager) stageAttachment(ctx context.Context, name, ext string, pages int, write func(io.Writer) (int64, error)) (string, error) {
+	dir, err := m.attachmentsDir()
 	if err != nil {
 		return "", err
 	}
@@ -117,9 +251,13 @@ func (m *Manager) StageAttachment(ctx context.Context, name, mimeType string, da
 	if err != nil {
 		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
-	if _, err := f.Write(data); err != nil {
+	size, err := write(f)
+	if err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
+		if errors.Is(err, ErrInvalidArgument) {
+			return "", err
+		}
 		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
 	if err := f.Close(); err != nil {
@@ -127,16 +265,16 @@ func (m *Manager) StageAttachment(ctx context.Context, name, mimeType string, da
 		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
 	if ext != ".pdf" {
-		m.log.Info("attachment staged", "path", path, "name", name, "bytes", len(data))
+		m.log.Info("attachment staged", "path", path, "name", name, "bytes", size)
 		return path, nil
 	}
-	n, exact := settlePDFPages(ctx, path, int64(len(data)), pages)
+	n, exact := settlePDFPages(ctx, path, size, pages)
 	counted := filepath.Join(dir, pdfFileName(stem, n, exact))
 	if err := os.Rename(path, counted); err != nil {
 		_ = os.Remove(path)
 		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
-	m.log.Info("attachment staged", "path", counted, "name", name, "bytes", len(data), "pages", n, "exact", exact, "hint", pages)
+	m.log.Info("attachment staged", "path", counted, "name", name, "bytes", size, "pages", n, "exact", exact, "hint", pages)
 	return counted, nil
 }
 

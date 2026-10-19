@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -176,6 +178,98 @@ func TestStageAttachmentPDFPages(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestStageAttachmentFile: a file staged by path gets the bytes path's sniffing,
+// limits, page count and naming; the path must be absolute and name a regular file.
+func TestStageAttachmentFile(t *testing.T) {
+	noPdfinfo(t)
+	dir := filepath.Join(t.TempDir(), "attachments")
+	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
+	src := t.TempDir()
+	write := func(name string, data []byte) string {
+		t.Helper()
+		p := filepath.Join(src, name)
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	// sparse is a file of size bytes starting with head, without writing them all.
+	sparse := func(name string, head []byte, size int64) string {
+		t.Helper()
+		p := write(name, head)
+		if err := os.Truncate(p, size); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	fifo := filepath.Join(src, "fifo")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		path    string
+		mime    string
+		pages   int
+		want    string // the staged file name's pattern after the 32 hex stem
+		wantErr error
+		errText string
+	}{
+		{name: "png", path: write("shot.png", pngData), want: `\.png`},
+		{name: "jpeg named .png", path: write("photo.png", jpegData), want: `\.jpg`},
+		{name: "no extension", path: write("README", gifData), want: `\.gif`},
+		{name: "declared type checked", path: write("w.webp", webpData), mime: "image/webp", want: `\.webp`},
+		{name: "pdf with the hint", path: write("doc.pdf", testPDF(3, 0)), pages: 3, want: `-3p\.pdf`},
+		{name: "pdf estimate", path: write("big.pdf", testPDF(3, 250<<10)), want: `-~3p\.pdf`},
+		{name: "pdf over the image limit", path: sparse("large.pdf", pdfData, MaxAttachmentBytes+1), want: `-~103p\.pdf`},
+		{name: "text", path: write("notes.txt", []byte("hello, plain text")), wantErr: ErrInvalidArgument, errText: `attachment type "text/plain; charset=utf-8" (want image/png`},
+		{name: "svg", path: write("logo.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`)), wantErr: ErrInvalidArgument, errText: `attachment type "text/plain; charset=utf-8"`},
+		{name: "declared mismatch", path: write("a.png", []byte("#!/bin/sh\n")), mime: "image/png", wantErr: ErrInvalidArgument, errText: "declared image/png but its content is"},
+		{name: "declared unsupported", path: write("b.png", pngData), mime: "text/plain", wantErr: ErrInvalidArgument, errText: `attachment type "text/plain"`},
+		{name: "image over cap", path: sparse("huge.png", pngData, MaxAttachmentBytes+1), wantErr: ErrInvalidArgument, errText: "the limit for an image is 10 MiB"},
+		{name: "pdf over cap", path: sparse("huge.pdf", pdfData, MaxPDFAttachmentBytes+1), wantErr: ErrInvalidArgument, errText: "the limit for a PDF is 20 MiB"},
+		{name: "empty", path: write("empty.png", nil), wantErr: ErrInvalidArgument, errText: "attachment is empty"},
+		{name: "missing", path: filepath.Join(src, "gone.png"), wantErr: ErrNotFound},
+		{name: "relative", path: "shot.png", wantErr: ErrInvalidArgument, errText: "not absolute"},
+		{name: "directory", path: src, wantErr: ErrInvalidArgument, errText: "is a directory"},
+		{name: "fifo", path: fifo, wantErr: ErrInvalidArgument, errText: "not a regular file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := e.m.StageAttachmentFile(e.ctx(), tt.path, tt.mime, tt.pages)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) || !strings.Contains(fmt.Sprint(err), tt.errText) {
+					t.Fatalf("err = %v, want %v containing %q", err, tt.wantErr, tt.errText)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if filepath.Dir(p) != dir || !regexp.MustCompile(`^[0-9a-f]{32}`+tt.want+`$`).MatchString(filepath.Base(p)) {
+				t.Fatalf("path = %q, want …%s", p, tt.want)
+			}
+			want, _ := os.ReadFile(tt.path)
+			got, err := os.ReadFile(p)
+			if err != nil || !bytes.Equal(got, want) {
+				t.Fatalf("staged %d bytes, %v; want %d", len(got), err, len(want))
+			}
+			if fi, err := os.Stat(p); err != nil || fi.Mode().Perm() != 0o600 {
+				t.Errorf("staged file = %v, %v", fi, err)
+			}
+		})
+	}
+	// Refusals leave nothing behind: only the seven staged files are there.
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 7 {
+		t.Errorf("attachments dir has %d entries, %v; want 7", len(entries), err)
+	}
+
+	off := newEnv(t)
+	if _, err := off.m.StageAttachmentFile(off.ctx(), write("c.png", pngData), "", 0); !errors.Is(err, ErrFailedPrecondition) {
+		t.Errorf("staging without a dir: %v", err)
+	}
 }
 
 func TestStagedPDFPages(t *testing.T) {

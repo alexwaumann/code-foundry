@@ -2040,7 +2040,14 @@ type StageAttachmentRequest struct {
 	// page per 100 KiB. The count is settled once, here, and recorded in the returned
 	// path (<32 hex>-<N>p.pdf, or <32 hex>-~<N>p.pdf for an estimate), so every
 	// message that sends the PDF agrees on it.
-	Pages         uint32 `protobuf:"varint,4,opt,name=pages,proto3" json:"pages,omitempty"`
+	Pages uint32 `protobuf:"varint,4,opt,name=pages,proto3" json:"pages,omitempty"`
+	// Absolute path of a file to stage instead of `data`; `mime_type` and `name` may be
+	// empty, the daemon sniffs the type and takes the name from the path. Exactly one of
+	// `data` and `path` is set. The daemon reads the file as its own user: a relative
+	// path or a directory is INVALID_ARGUMENT, a missing file NOT_FOUND, and content of
+	// an unsupported type fails like an unsupported `mime_type`. Types, size limits and
+	// page handling are those of `data`.
+	Path          string `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2101,6 +2108,13 @@ func (x *StageAttachmentRequest) GetPages() uint32 {
 		return x.Pages
 	}
 	return 0
+}
+
+func (x *StageAttachmentRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
 }
 
 type StageAttachmentResponse struct {
@@ -4751,12 +4765,13 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\fNewWorkspace\x12\x1a\n" +
 	"\bprojects\x18\x01 \x03(\tR\bprojects\x12\x19\n" +
 	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"s\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\x87\x01\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x14\n" +
-	"\x05pages\x18\x04 \x01(\rR\x05pages\"-\n" +
+	"\x05pages\x18\x04 \x01(\rR\x05pages\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\"-\n" +
 	"\x17StageAttachmentResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"+\n" +
 	"\x15ReadAttachmentRequest\x12\x12\n" +
