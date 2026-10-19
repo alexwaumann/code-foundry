@@ -505,7 +505,7 @@ function routes(router: ConnectRouter): void {
       const ref = req.ref;
       return tracked("PluginService/WatchSurface", world.plugins.watch(ref, ctx.signal));
     },
-    act: (req) => ({ version: world.plugins.act(req) }),
+    act: async (req) => ({ version: await world.plugins.act(req) }),
   });
 
   router.service(EventService, {
