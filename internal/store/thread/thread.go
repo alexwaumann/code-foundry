@@ -475,6 +475,12 @@ type Store interface {
 	// count is part of the returned file name. name is the user's file name, used
 	// only in logs.
 	StageAttachment(ctx context.Context, name, mimeType string, data []byte, pages int) (string, error)
+	// StageAttachmentFile stages the file at an absolute path the same way, reading
+	// it as the daemon's user: the type is sniffed from the content (mimeType may be
+	// empty; when set it is checked like StageAttachment's) and the name taken from the
+	// path. A relative path or a directory is ErrInvalidArgument, a missing file
+	// ErrNotFound; unsupported content fails like an unsupported mimeType.
+	StageAttachmentFile(ctx context.Context, path, mimeType string, pages int) (string, error)
 	// ReadAttachment returns a staged attachment's content and MIME type (a thread's
 	// user message shows its images and PDFs). ErrNotFound once reaped.
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)

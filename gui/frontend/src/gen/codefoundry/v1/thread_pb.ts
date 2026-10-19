@@ -2700,7 +2700,8 @@ export const ThreadService: GenService<{
   },
   /**
    * StageAttachment stores an image or PDF a message refers to and returns its path.
-   * Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
+   * The file comes as bytes or as an absolute path the daemon reads (a file dropped on
+   * or picked in the GUI). Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
    * pages)" line per attachment and send its content as an image or document block; a
    * PDF over 10 pages goes only as its path, and Claude reads it with its Read tool.
    * Only image types and PDFs are accepted, with size limits (images 10 MiB, PDFs

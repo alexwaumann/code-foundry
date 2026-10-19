@@ -202,6 +202,48 @@ func TestThreadStageAttachment(t *testing.T) {
 	}
 }
 
+// TestThreadStageAttachmentPath: a path goes to StageAttachmentFile with the declared
+// type and the hint, data and path together are refused, and store errors keep their
+// codes.
+func TestThreadStageAttachmentPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		req      *v1.StageAttachmentRequest
+		storeErr error
+		wantCode connect.Code // 0: success
+		wantCall string
+		wantPath string
+	}{
+		{name: "path", req: &v1.StageAttachmentRequest{Path: "/Users/me/Desktop/shot.png"}, wantCall: "StageAttachmentFile /Users/me/Desktop/shot.png ", wantPath: "/attachments/1-shot.png"},
+		{name: "path with type and hint", req: &v1.StageAttachmentRequest{Path: "/tmp/doc.pdf", MimeType: "application/pdf", Pages: 3}, wantCall: "StageAttachmentFile /tmp/doc.pdf application/pdf pages=3", wantPath: "/attachments/1-doc.pdf"},
+		{name: "data and path", req: &v1.StageAttachmentRequest{Path: "/tmp/a.png", Data: []byte("abc")}, wantCode: connect.CodeInvalidArgument},
+		{name: "missing", req: &v1.StageAttachmentRequest{Path: "/tmp/gone.png"}, storeErr: fmt.Errorf("%w: attachment does not exist", thread.ErrNotFound), wantCode: connect.CodeNotFound},
+		{name: "unsupported", req: &v1.StageAttachmentRequest{Path: "/tmp/a.txt"}, storeErr: fmt.Errorf("%w: attachment type", thread.ErrInvalidArgument), wantCode: connect.CodeInvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newThreadServer(t)
+			fake.Err = tt.storeErr
+			res, err := c.StageAttachment(context.Background(), connect.NewRequest(tt.req))
+			if tt.wantCode != 0 {
+				if connect.CodeOf(err) != tt.wantCode {
+					t.Fatalf("err = %v, want %v", err, tt.wantCode)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Msg.GetPath() != tt.wantPath {
+				t.Errorf("path = %q, want %q", res.Msg.GetPath(), tt.wantPath)
+			}
+			if calls := fake.Calls(); len(calls) != 1 || calls[0] != tt.wantCall {
+				t.Errorf("calls = %q, want %q", calls, tt.wantCall)
+			}
+		})
+	}
+}
+
 func TestThreadReadAttachment(t *testing.T) {
 	fake, c := newThreadServer(t)
 	res, err := c.ReadAttachment(context.Background(), connect.NewRequest(&v1.ReadAttachmentRequest{Path: "/attachments/1-shot.png"}))
