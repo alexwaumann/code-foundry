@@ -110,8 +110,8 @@ go-lint: gui-dist-stub ghostty-vt
 FUZZTIME ?= 30s
 FUZZ_TARGETS := \
 	pluginsdk:.:FuzzSplitter pluginsdk:.:FuzzConn pluginsdk:.:FuzzParseManifest pluginsdk:.:FuzzMatchCommand \
-	pluginsdk:./ui:FuzzView \
-	.:./internal/store/plugin:FuzzValidateView .:./internal/store/plugin:FuzzViewMutate \
+	pluginsdk:./ui:FuzzView pluginsdk:./ui:FuzzGeneratedView \
+	.:./internal/store/plugin:FuzzValidateView .:./internal/store/plugin:FuzzViewMutate .:./internal/store/plugin:FuzzGeneratedViewInTheDaemon \
 	.:./internal/store/plugin:FuzzPredicate .:./internal/store/plugin:FuzzActValues \
 	.:./internal/store/plugin:FuzzValidateEnvironment .:./internal/store/plugin:FuzzManifestCommands .:./internal/store/plugin:FuzzOwnedParams \
 	.:./internal/store/plugin/registry:FuzzParseIndex .:./internal/store/plugin/registry:FuzzVersion \

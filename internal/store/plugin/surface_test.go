@@ -99,7 +99,8 @@ func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 		return errors.New("it broke")
 	case "select", "tab":
 		p.mu.Lock()
-		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q", act.Kind, act.Action, act.Key, act.Value, act.Node)
+		vals, _ := json.Marshal(act.Values)
+		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q values=%s version=%d", act.Kind, act.Action, act.Key, act.Value, act.Node, vals, act.Version)
 		p.mu.Unlock()
 	}
 	return p.h.UpdateView(p.inst, p.view())
