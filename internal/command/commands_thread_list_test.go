@@ -62,10 +62,10 @@ func TestThreadList(t *testing.T) {
 			wantFilter: &v1.ThreadFilter{IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION,
 				State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a", "b"}},
 			wantLines: []string{"no threads"}},
-		{name: "all", args: map[string]string{"all": "true"}, wantFilter: &v1.ThreadFilter{All: true, Limit: 50}, wantLines: []string{"no threads"}},
+		{name: "all", args: map[string]string{"all": "true"}, wantFilter: &v1.ThreadFilter{All: true, IncludeRemoved: true, Limit: 50}, wantLines: []string{"no threads"}},
 		// --all composes: the other filters go to the daemon with it.
 		{name: "all with filters", args: map[string]string{"all": "true", "label": "x", "status": "error"}, threads: []*v1.Thread{home},
-			wantFilter: &v1.ThreadFilter{All: true, Status: v1.ThreadStatus_THREAD_STATUS_ERROR, Labels: []string{"x"}, Limit: 50},
+			wantFilter: &v1.ThreadFilter{All: true, IncludeRemoved: true, Status: v1.ThreadStatus_THREAD_STATUS_ERROR, Labels: []string{"x"}, Limit: 50},
 			wantLines:  []string{"s-000000000001  error (interrupted)  notes  no project  3d  [archived]"}},
 		{name: "empty says archived threads are left out", wantFilter: &v1.ThreadFilter{Limit: 50},
 			wantLines: []string{"no threads (archived threads are left out; --archived includes them)"}},

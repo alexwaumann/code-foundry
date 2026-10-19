@@ -26,12 +26,15 @@ func TestThreadWait(t *testing.T) {
 		start thread.Thread
 		args  map[string]string
 		// later are put one by one once the wait is under way.
-		later    []thread.Thread
-		remove   bool
-		wantMsg  string
-		wantCode connect.Code // 0: no error
-		wantErr  string
-		invalid  bool
+		later []thread.Thread
+		// remove removes the thread while the wait runs; removed before it starts.
+		remove, removed bool
+		// wantRemoved: the answer is the removed result (exit 1), message starting so.
+		wantRemoved string
+		wantMsg     string
+		wantCode    connect.Code // 0: no error
+		wantErr     string
+		invalid     bool
 	}{
 		{
 			name: "already idle returns at once", start: with(thread.StateConnected, thread.StatusIdle, "at prompt"),
@@ -79,7 +82,11 @@ func TestThreadWait(t *testing.T) {
 		},
 		{
 			name: "removed while waiting", start: working, args: map[string]string{"id": "s1"}, remove: true,
-			wantCode: connect.CodeNotFound, wantErr: "thread s1 was removed",
+			wantRemoved: "thread s1 fix was removed at ",
+		},
+		{
+			name: "removed before the wait", start: working, args: map[string]string{"id": "s1"}, removed: true,
+			wantRemoved: "thread s1 fix was removed at ",
 		},
 		{name: "unknown thread", start: working, args: map[string]string{"id": "s9"}, wantCode: connect.CodeNotFound, wantErr: "thread s9 not found"},
 		{name: "for is not a duration", start: working, args: map[string]string{"id": "s1", "for": "soon"}, invalid: true},
@@ -93,6 +100,11 @@ func TestThreadWait(t *testing.T) {
 			fake.Put(tt.start)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+			if tt.removed {
+				if err := fake.Remove(ctx, "s1"); err != nil {
+					t.Fatal(err)
+				}
+			}
 			type answer struct {
 				res command.Result
 				err error
@@ -131,6 +143,12 @@ func TestThreadWait(t *testing.T) {
 				return
 			case a.err != nil:
 				t.Fatal(a.err)
+			case tt.wantRemoved != "":
+				r, ok := a.res.JSON.(command.ThreadReport)
+				if !strings.HasPrefix(a.res.Message, tt.wantRemoved) || a.res.ExitCode != 1 || !ok || !r.Removed || r.Status != "removed" {
+					t.Fatalf("result = %q (exit %d, JSON %#v), want %q... exit 1 removed", a.res.Message, a.res.ExitCode, a.res.JSON, tt.wantRemoved)
+				}
+				return
 			}
 			if a.res.Message != tt.wantMsg {
 				t.Errorf("message = %q, want %q", a.res.Message, tt.wantMsg)

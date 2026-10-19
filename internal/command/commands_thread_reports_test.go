@@ -26,10 +26,16 @@ func TestThreadReports(t *testing.T) {
 		ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED, ReportSummary: "needs a token"}
 	silent := &v1.Thread{Id: "s-000000000003", Status: v1.ThreadStatus_THREAD_STATUS_BUSY, CreatedBy: "s-7754a478e649"}
 	children := []*v1.Thread{done, blocked, silent}
+	gone := []*v1.RemovedThread{
+		{Id: "s-00000000000a", Name: "Add persistence", CreatedBy: "s-7754a478e649", RemovedAt: at,
+			ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_DONE, ReportSummary: "c6b0cb6", ReportData: `{"n": 1}`},
+		{Id: "s-00000000000b", CreatedBy: "s-7754a478e649", RemovedAt: at},
+	}
 	tests := []struct {
 		name       string
 		args       map[string]string
 		threads    []*v1.Thread
+		removed    []*v1.RemovedThread
 		wantFilter *v1.ThreadFilter
 		wantMsg    string
 		wantIDs    []string // the --json answer's ids
@@ -59,7 +65,19 @@ func TestThreadReports(t *testing.T) {
 			wantMsg: "s-867564981c98  done     Fix the login  Fixed the redirect (data)\ns-000000000002  blocked  Docs           needs a token"},
 		// all keeps the other filters: ThreadFilter.all would drop them.
 		{name: "all and labels", args: map[string]string{"all": "true", "label": "bug, auth", "created-by": "user"},
-			wantFilter: &v1.ThreadFilter{IncludeArchived: true, CreatedBy: "user", Labels: []string{"bug", "auth"}}, wantMsg: "no threads", wantIDs: []string{}},
+			wantFilter: &v1.ThreadFilter{IncludeArchived: true, IncludeRemoved: true, CreatedBy: "user", Labels: []string{"bug", "auth"}}, wantMsg: "no threads", wantIDs: []string{}},
+		{name: "all lists removed threads after the others", args: map[string]string{"all": "true"}, threads: []*v1.Thread{blocked}, removed: gone,
+			wantFilter: &v1.ThreadFilter{IncludeArchived: true, IncludeRemoved: true},
+			wantMsg: "s-000000000002  blocked  Docs             needs a token\n" +
+				"s-00000000000a  removed  Add persistence  last report done: c6b0cb6 (data)\n" +
+				"s-00000000000b  removed  (unnamed)        no report",
+			wantIDs: []string{"s-000000000002", "s-00000000000a", "s-00000000000b"}},
+		{name: "the status filter applies to removed threads' reports", args: map[string]string{"all": "true", "status": "done"}, removed: gone,
+			wantFilter: &v1.ThreadFilter{IncludeArchived: true, IncludeRemoved: true},
+			wantMsg:    "s-00000000000a  removed  Add persistence  last report done: c6b0cb6 (data)", wantIDs: []string{"s-00000000000a"}},
+		{name: "archived alone leaves removed threads out", args: map[string]string{"archived": "true"}, removed: gone,
+			wantFilter: &v1.ThreadFilter{IncludeArchived: true},
+			wantMsg:    "no threads (removed threads are left out; --all includes them)", wantIDs: []string{}},
 		{name: "empty says archived threads are left out", wantFilter: &v1.ThreadFilter{},
 			wantMsg: "no threads (archived threads are left out; --archived includes them)", wantIDs: []string{}},
 		{name: "created-by an unknown suffix", args: map[string]string{"created-by": "ffff"}, wantCode: connect.CodeNotFound},
@@ -69,7 +87,7 @@ func TestThreadReports(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := command.NewRegistry()
-			b := &commandtest.Thread{Others: tt.threads}
+			b := &commandtest.Thread{Others: tt.threads, Removed: tt.removed}
 			if err := command.RegisterThreadReports(reg, b); err != nil {
 				t.Fatal(err)
 			}

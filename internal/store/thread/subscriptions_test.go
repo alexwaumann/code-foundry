@@ -32,6 +32,9 @@ func TestMeets(t *testing.T) {
 		{th(StateDisconnected, StatusUnknown, ""), map[Condition]bool{CondSettled: true, CondIdle: true, CondDisconnected: true}},
 		{th(StateDisconnected, StatusNeedsAttention, ReasonSnoozeEnded), map[Condition]bool{CondSettled: true, CondIdle: true, CondAttention: true, CondDisconnected: true}},
 		{th(StateClosing, StatusBusy, "working"), nil},
+		// Being removed: the closing snapshot meets nothing (tombstones.go).
+		{Thread{State: StateClosing, Status: StatusIdle, StatusReason: "at prompt", Removing: true}, nil},
+		{Thread{State: StateDisconnected, Status: StatusError, StatusReason: ReasonInterrupted, Removing: true}, nil},
 	}
 	for _, tt := range tests {
 		for _, c := range append(slices.Clone(ThreadConditions), CondFinished) {
