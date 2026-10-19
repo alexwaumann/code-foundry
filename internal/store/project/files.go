@@ -24,7 +24,8 @@ import (
 // collector, keyed by the worktree's jobFiles key, and triggers that key on treeDeb: the
 // same 1 s window as the worktree's status job. When the window closes the files job
 // takes what was collected, decides each path's op from its events and what is on disk
-// now, drops gitignored paths with one `git check-ignore --stdin -z`, and publishes one
+// now, leaves out paths that came and went within the window unseen (save temp files),
+// drops gitignored paths with one `git check-ignore --stdin -z`, and publishes one
 // WorktreeFilesChanged. Idle worktrees collect nothing; their status jobs run as before.
 
 // FileOp is what happened to a path within one window, judged by what is there when the
@@ -36,7 +37,8 @@ const (
 	FileCreated FileOp = iota + 1
 	// FileModified: the path exists and was there before (written, replaced, touched).
 	FileModified
-	// FileRemoved: the path is gone (removed, or renamed away).
+	// FileRemoved: the path is gone (removed, or renamed away) and was there before the
+	// window, or was reported as existing.
 	FileRemoved
 	// FileRenamed: the path exists and was renamed onto (mv), not reported before.
 	FileRenamed
@@ -200,13 +202,19 @@ func treeFile(root, path string) (string, bool) {
 // it exists when the window closes, whether this worktree reported it as existing
 // recently (seen), and whether the file there now is new (fresh: born at about its
 // first event, or with a birth time equal to its mtime, which is what an extracted or
-// copied file whose mtime was set into the past has).
+// copied file whose mtime was set into the past has). 0 leaves the path out: it was
+// created and is gone again, and was never reported, so no consumer saw it exist (the
+// temp file of an atomic save, `sed -i` or an untar, renamed onto the real name).
 //
 // FSEvents item flags are cumulative: an edit of a file created half a minute ago still
 // carries ItemCreated. So a seen path is modified whatever its flags say, and a create
-// flag counts only for a fresh file.
+// flag counts only for a fresh file. A file created that long ago, never reported
+// (the worktree went live since) and removed now is left out too: gone, it has no
+// birth time to tell.
 func fileOpFor(o op, exists, seen, fresh bool) FileOp {
 	switch {
+	case !exists && !seen && o.has(opCreate):
+		return 0
 	case !exists:
 		return FileRemoved
 	case seen:
@@ -219,7 +227,9 @@ func fileOpFor(o op, exists, seen, fresh bool) FileOp {
 	return FileModified
 }
 
-// dirOpFor is fileOpFor for a directory: only one removed or renamed in is listed.
+// dirOpFor is fileOpFor for a directory: only one removed or renamed in is listed. A
+// directory is never reported as existing, so resolveFiles leaves out one created and
+// gone (transient) only when nothing under it is listed either.
 func dirOpFor(o op, exists bool) (FileOp, bool) {
 	switch {
 	case !exists:
@@ -255,10 +265,11 @@ func lstatFile(path string) fileStat {
 }
 
 // resolveFiles turns what a window collected into changes, sorted by path, and updates
-// seen (paths reported existing are remembered at now, removed ones forgotten). stat
+// seen (paths reported existing are remembered at now, gone ones forgotten). stat
 // reports a worktree-relative path's state on disk.
 func resolveFiles(p *pendingFiles, seen map[string]time.Time, now time.Time, stat func(rel string) fileStat) []ChangedFile {
 	out := make([]ChangedFile, 0, len(p.paths))
+	transient := map[string]bool{} // directories created and gone ("x/")
 	for rel, f := range p.paths {
 		st := stat(rel)
 		dir := st.dir
@@ -268,21 +279,39 @@ func resolveFiles(p *pendingFiles, seen map[string]time.Time, now time.Time, sta
 		if dir {
 			if op, ok := dirOpFor(f.ops, st.exists); ok {
 				out = append(out, ChangedFile{Path: rel + "/", Op: op})
+				if !st.exists && f.ops.has(opCreate) {
+					transient[rel+"/"] = true
+				}
 			}
 			continue
 		}
 		_, known := seen[rel]
 		fresh := !st.birth.IsZero() && (!st.birth.Before(f.first.Add(-bornSlack)) || st.birth.Equal(st.mtime))
 		op := fileOpFor(f.ops, st.exists, known, fresh)
-		if op == FileRemoved {
+		if op == 0 || op == FileRemoved {
 			delete(seen, rel)
 		} else {
 			seen[rel] = now
 		}
-		out = append(out, ChangedFile{Path: rel, Op: op})
+		if op != 0 {
+			out = append(out, ChangedFile{Path: rel, Op: op})
+		}
 	}
 	slices.SortFunc(out, func(a, b ChangedFile) int { return strings.Compare(a.Path, b.Path) })
-	return out
+	if len(transient) == 0 {
+		return out
+	}
+	// Sorted, a directory's entries follow it: walking back, a transient one stays only
+	// when the entry kept after it is under it.
+	kept := make([]ChangedFile, 0, len(out))
+	for _, c := range slices.Backward(out) {
+		if transient[c.Path] && (len(kept) == 0 || !strings.HasPrefix(kept[len(kept)-1].Path, c.Path)) {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	slices.Reverse(kept)
+	return kept
 }
 
 // capFiles cuts files to MaxChangedFiles; truncated is true when it cut or overflow.

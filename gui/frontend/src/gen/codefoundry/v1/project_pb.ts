@@ -790,7 +790,9 @@ export const ProjectEventSchema: GenMessage<ProjectEvent> = /*@__PURE__*/
  * that is not archived or snoozed. Idle worktrees still refresh their status
  * (worktree_updated) but send no file lists. Paths under a .git directory, inside a
  * submodule, and gitignored ones (git check-ignore: a tracked file is never ignored)
- * are left out; a window where every path was ignored sends nothing.
+ * are left out, and so is a path created and gone within the window that was never
+ * listed as existing (the temp file of an atomic save or `sed -i`, renamed onto the
+ * real name); a window where every path was left out sends nothing.
  *
  * @generated from message codefoundry.v1.WorktreeFilesChanged
  */
@@ -1748,7 +1750,7 @@ export enum FileOp {
   MODIFIED = 2,
 
   /**
-   * Gone (deleted, or renamed away).
+   * Gone (deleted, or renamed away), and was there before the window or was listed.
    *
    * @generated from enum value: FILE_OP_REMOVED = 3;
    */

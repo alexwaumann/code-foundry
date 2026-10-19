@@ -303,7 +303,9 @@ message ProjectEvent {
 // that is not archived or snoozed. Idle worktrees still refresh their status
 // (worktree_updated) but send no file lists. Paths under a .git directory, inside a
 // submodule, and gitignored ones (git check-ignore: a tracked file is never ignored)
-// are left out; a window where every path was ignored sends nothing.
+// are left out, and so is a path created and gone within the window that was never
+// listed as existing (the temp file of an atomic save or `sed -i`, renamed onto the
+// real name); a window where every path was left out sends nothing.
 message WorktreeFilesChanged {
   string project_id = 1;
   // The worktree's root.
@@ -328,7 +330,7 @@ enum FileOp {
   FILE_OP_CREATED = 1;
   // Exists, and was there before.
   FILE_OP_MODIFIED = 2;
-  // Gone (deleted, or renamed away).
+  // Gone (deleted, or renamed away), and was there before the window or was listed.
   FILE_OP_REMOVED = 3;
   // Exists, and was renamed onto this path.
   FILE_OP_RENAMED = 4;
