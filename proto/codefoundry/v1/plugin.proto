@@ -583,6 +583,26 @@ message PluginIndexArtifact {
   string sha256 = 3;
 }
 
+// How a Browse entry stands to the installed plugin of its name: the daemon's decision,
+// the same one behind Plugin.update_available and `plugin update --check`
+// (docs/notes/plugins-browse-offer.md). An entry offers Install only when NOT_INSTALLED
+// and Update only when UPDATE.
+enum PluginIndexRelation {
+  PLUGIN_INDEX_RELATION_UNSPECIFIED = 0;
+  // No plugin of the name is installed.
+  PLUGIN_INDEX_RELATION_NOT_INSTALLED = 1;
+  // Installed from this entry's source, at its version or newer.
+  PLUGIN_INDEX_RELATION_INSTALLED = 2;
+  // Installed from this entry's source, older.
+  PLUGIN_INDEX_RELATION_UPDATE = 3;
+  // A dev link of the name.
+  PLUGIN_INDEX_RELATION_DEV = 4;
+  // Installed from another source (installed_from): another registry, another
+  // repository's releases, or put in the plugins folder by hand. This entry would take
+  // the name over, which only `plugin install --force` does.
+  PLUGIN_INDEX_RELATION_OTHER_SOURCE = 5;
+}
+
 // PluginIndexEntry is a plugin a registry lists (its latest version).
 message PluginIndexEntry {
   string name = 1;
@@ -603,8 +623,12 @@ message PluginIndexEntry {
   bool available = 11;
   // The plugin of that name as installed; unset when it is not.
   Plugin installed = 12;
-  // installed is older than version.
+  // relation is UPDATE: installed is older than version and from this entry's source.
   bool update_available = 13;
+  PluginIndexRelation relation = 14;
+  // Where the installed plugin came from, short (a registry URL without its scheme,
+  // owner/repo, "the plugins folder"); set only when relation is OTHER_SOURCE.
+  string installed_from = 15;
 }
 
 message BrowsePluginsRequest {
@@ -683,6 +707,10 @@ message PluginUpdate {
   string error = 6;
   // Why an enabled plugin was left disabled: the new version asks for more permissions.
   string disabled_reason = 7;
+  // Set when this is no update: registry lists version, newer, but the plugin was
+  // installed from installed_from (short, as PluginIndexEntry.installed_from), so it is
+  // not offered and not installed (`plugin install <name> --force` switches source).
+  string installed_from = 8;
 }
 
 message UpdatePluginsResponse {

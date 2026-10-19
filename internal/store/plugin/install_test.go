@@ -362,9 +362,10 @@ func TestInstallFromGitHubRelease(t *testing.T) {
 	if p, _ := m.Snapshot().Plugin("gh-plugin"); p.Installed.SHA256 != "" || !p.Enabled {
 		t.Errorf("after reinstall: %+v (record %+v)", p, p.Installed)
 	}
-	// A registry entry of another repository with the same name is no update for it.
+	// A registry entry of another repository with the same name is no update for it: the
+	// check names it as installed from o/ghp.
 	g.publish(g.build("gh-plugin", "0.3.0", basePerms), basePerms) // repo o/gh-plugin
-	if ups, err := m.CheckUpdates(ctx, true); err != nil || len(ups) != 0 {
+	if ups, err := m.CheckUpdates(ctx, true); err != nil || len(ups) != 1 || ups[0].InstalledFrom != "o/ghp" || ups[0].Version != "0.3.0" {
 		t.Errorf("updates = %+v, %v", ups, err)
 	}
 

@@ -17,7 +17,7 @@ import (
 )
 
 // ghRelease serves r as the latest release of repo (with a checksums file) on the rig's
-// fake gh.
+// fake gh, also by its tag.
 func (g *regRig) ghRelease(repo string, r pack.Result) {
 	g.t.Helper()
 	dir := g.t.TempDir()
@@ -30,6 +30,7 @@ func (g *regRig) ghRelease(repo string, r pack.Result) {
 		assets = append(assets, fmt.Sprintf(`{"name":%q,"url":"https://github.com/%s/releases/download/%s/%s"}`, a, repo, tag, a))
 	}
 	g.gh.Releases[repo+"@"] = fmt.Sprintf(`{"tagName":%q,"assets":[%s]}`, tag, strings.Join(assets, ","))
+	g.gh.Releases[repo+"@"+tag] = g.gh.Releases[repo+"@"]
 	g.gh.Assets[repo+"/"+tag+"/"+r.Base] = r.File
 	g.gh.Assets[repo+"/"+tag+"/checksums.txt"] = filepath.Join(dir, "checksums.txt")
 }
@@ -225,15 +226,74 @@ func TestNoUpdateFromAnotherRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.SetRegistries(locs)
-	ups, err := m.CheckUpdates(ctx, true)
-	if err != nil || len(ups) != 0 {
-		t.Fatalf("offers = %+v, %v", ups, err)
+	// Browse says where hello came from instead of offering the other registry's.
+	br, err := m.Browse(ctx, false)
+	if err != nil || len(br.Entries) != 1 {
+		t.Fatalf("browse = %+v, %v", br, err)
 	}
-	if ups, err := m.Update(ctx, "", false, false); err != nil || len(ups) != 0 {
+	if e := br.Entries[0]; e.Registry != g.srv.URL+"/index2.json" || e.Relation != plugin.RelationOtherSource ||
+		e.InstalledFrom != strings.TrimPrefix(g.srv.URL, "http://")+"/index.json" {
+		t.Errorf("entry: %s from %s, relation %s, installed from %q", e.Version, e.Registry, e.Relation, e.InstalledFrom)
+	}
+	// The update check names it, as no offer.
+	ups, err := m.CheckUpdates(ctx, true)
+	want := plugin.PluginUpdate{Name: "hello", Current: "0.1.0", Version: "0.5.0", Registry: g.srv.URL + "/index2.json",
+		InstalledFrom: strings.TrimPrefix(g.srv.URL, "http://") + "/index.json"}
+	if err != nil || len(ups) != 1 || ups[0] != want {
+		t.Fatalf("check = %+v, %v; want %+v", ups, err, want)
+	}
+	if p, _ := m.Snapshot().Plugin("hello"); p.Update != nil {
+		t.Fatalf("offer = %+v", p.Update)
+	}
+	if ups, err := m.Update(ctx, "", false, false); err != nil || len(ups) != 1 || ups[0].Updated || ups[0].Error != "" {
 		t.Fatalf("update = %+v, %v", ups, err)
 	}
 	if p, _ := m.Snapshot().Plugin("hello"); p.Manifest.Version != "0.1.0" {
 		t.Fatalf("version = %s", p.Manifest.Version)
+	}
+}
+
+// TestUpdateFromARegistryEntryOfTheReleaseRepo: a plugin installed straight from
+// owner/repo is offered the version a registry entry of that repository lists, and the
+// update installs that repository's release: the same source, so no takeover (its
+// consent, secret and data stay) and it stays a release install.
+func TestUpdateFromARegistryEntryOfTheReleaseRepo(t *testing.T) {
+	g := newRegRig(t)
+	ctx := context.Background()
+	g.ghRelease("o/hello", g.build("hello", "0.1.0", basePerms))
+	m := g.start()
+	if _, err := m.Install(ctx, plugin.InstallRequest{Ref: "o/hello", Enable: true, Consent: true}); err != nil {
+		t.Fatal(err)
+	}
+	g.waitState("hello", plugin.StateRunning)
+	if r, err := g.invoke("plugin.hello.remember", map[string]string{"word": "swordfish"}, command.Context{}); err != nil || r.Message != "remembered" {
+		t.Fatalf("remember = %+v, %v", r, err)
+	}
+	if err := os.WriteFile(filepath.Join(g.opts.DataDir, "hello", "state"), []byte("kept"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := g.build("hello", "0.2.0", basePerms)
+	g.publish(r, basePerms) // repo o/hello
+	g.ghRelease("o/hello", r)
+
+	br, err := m.Browse(ctx, true)
+	if err != nil || len(br.Entries) != 1 || br.Entries[0].Relation != plugin.RelationUpdate || br.Entries[0].InstalledFrom != "" {
+		t.Fatalf("browse = %+v, %v", br, err)
+	}
+	if p, _ := m.Snapshot().Plugin("hello"); p.Update == nil || p.Update.Ref != "o/hello@v0.2.0" || p.Update.Registry != g.srv.URL+"/index.json" {
+		t.Fatalf("offer = %+v", p.Update)
+	}
+	ups, err := m.Update(ctx, "hello", false, false)
+	if err != nil || len(ups) != 1 || !ups[0].Updated || ups[0].Error != "" || ups[0].Version != "0.2.0" {
+		t.Fatalf("update = %+v, %v", ups, err)
+	}
+	p := g.waitState("hello", plugin.StateRunning)
+	if p.Manifest.Version != "0.2.0" || p.Installed == nil || p.Installed.Kind != plugin.KindGitHub || p.Installed.Source != "o/hello" || p.Update != nil {
+		t.Fatalf("after the update: %s, record %+v, offer %+v", p.Manifest.Version, p.Installed, p.Update)
+	}
+	g.assertSecretKept(ctx, m)
+	if br, _ := m.Browse(ctx, false); br.Entries[0].Relation != plugin.RelationInstalled {
+		t.Errorf("relation after the update = %s", br.Entries[0].Relation)
 	}
 }
 

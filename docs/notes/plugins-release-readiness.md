@@ -525,7 +525,7 @@ Every gap in `docs/notes/plugins-integration.md`'s "Known gaps" that is now fixe
 * Browse shows "Update from 0.1.1" for another registry's entry of an installed name,
   which `plugin install`/the Update button then refuses as a takeover and `plugin update`
   ignores; Browse should offer updates only from the install's own registry (seen with the
-  loopback registry).
+  loopback registry). Done: `docs/notes/plugins-browse-offer.md`.
 * Consent text says "under code-foundry-plugin" for every home; an isolated home writes
   under `code-foundry-plugin-<hash>` (cosmetic; the text is the SDK's static line).
 * `plugin dev` checks for an installed package before the install-source binding, so

@@ -1,7 +1,7 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { BrowsePluginsResponseSchema, InstallPluginResponseSchema, PluginEventSchema, PluginInstallPhase, PluginSchema } from "@/gen/codefoundry/v1/plugin_pb";
+import { BrowsePluginsResponseSchema, InstallPluginResponseSchema, PluginEventSchema, PluginIndexRelation, PluginInstallPhase, PluginSchema } from "@/gen/codefoundry/v1/plugin_pb";
 import { installOutcome, toBrowse, toPluginEventView, toPluginView } from "./plugin";
 
 describe("registry mapping", () => {
@@ -21,8 +21,16 @@ describe("registry mapping", () => {
             permissionLines: ["run Code Foundry commands: thread.send"],
             installed: { name: "gh-actions", version: "0.0.9" },
             updateAvailable: true,
+            relation: PluginIndexRelation.UPDATE,
           },
           { name: "solo", version: "1.0.0" },
+          {
+            name: "acme-data",
+            version: "1.3.0",
+            installed: { name: "acme-data", version: "1.2.0" },
+            relation: PluginIndexRelation.OTHER_SOURCE,
+            installedFrom: "plugins.acme.dev/index.json",
+          },
         ],
         registries: [{ url: "https://github.com/o/reg", fetchedAt: timestampFromMs(5000), cached: true, plugins: 2, error: "", issues: ["x"] }],
       }),
@@ -32,12 +40,15 @@ describe("registry mapping", () => {
       name: "gh-actions",
       displayName: "gh-actions",
       installedVersion: "0.0.9",
-      installedDev: false,
-      updateAvailable: true,
+      relation: "update",
+      installedFrom: "",
       permissionLines: ["run Code Foundry commands: thread.send"],
     });
     expect(v.entries[0]?.permissions.threadStatus).toBe(true);
-    expect(v.entries[1]).toMatchObject({ installedVersion: null, available: false, updateAvailable: false });
+    // A daemon that left the relation unset (nothing installed) maps to not-installed.
+    expect(v.entries[1]).toMatchObject({ installedVersion: null, available: false, relation: "not-installed" });
+    // Another source's entry: the daemon's decision and where it came from, newer or not.
+    expect(v.entries[2]).toMatchObject({ installedVersion: "1.2.0", relation: "other-source", installedFrom: "plugins.acme.dev/index.json" });
     expect(v.registries).toEqual([{ url: "https://github.com/o/reg", fetchedAtMs: 5000, cached: true, error: "", plugins: 2, issues: ["x"] }]);
   });
 

@@ -422,6 +422,9 @@ function seedPlugins(): MockPlugin[] {
       permissions: { commands: ["thread.send"], events: [], threadStatus: false, sessionEnv: true, secrets: true },
       commands: [],
       surfaces: [{ id: "access", title: "Data access", icon: "database", scope: "global" }],
+      // Acme's own registry, which the mock does not configure; the loopback registry lists
+      // another acme-data (mock/pluginRegistry.ts LOOPBACK_REGISTRY).
+      install: { kind: "registry", source: "https://plugins.acme.dev/index.json" },
     },
     {
       name: "crasher",
@@ -547,7 +550,7 @@ export class MockPlugins {
     registries: () => this.deps.registries(),
     installed: (name) => {
       const p = this.plugins.get(name);
-      return p ? { version: p.version, dev: p.dev, installed: true } : null;
+      return p ? { version: p.version, dev: p.dev, install: p.install } : null;
     },
     install: (spec) => {
       this.install(spec);
@@ -557,6 +560,9 @@ export class MockPlugins {
     },
     publish: (ev) => {
       this.deps.publish(ev);
+    },
+    republish: () => {
+      for (const p of this.plugins.values()) this.changed(p);
     },
   });
 
@@ -678,7 +684,7 @@ export class MockPlugins {
       })),
       logPath: `/Users/dev/.code-foundry/logs/plugins/${p.name}.log`,
       ...(p.install ? { install: { kind: p.install.kind, source: p.install.source, version: p.version, sha256: "", installedAt: timestampFromDate(p.startedAt) } } : {}),
-      ...this.registry.offer(p.name, p.version, p.dev),
+      ...this.registry.offer(p.name),
     };
   }
 

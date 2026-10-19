@@ -19,7 +19,8 @@ func TestPluginRegistryCommands(t *testing.T) {
 	browse := &v1.BrowsePluginsResponse{Platform: "darwin/arm64",
 		Entries: []*v1.PluginIndexEntry{
 			{Name: "hello", DisplayName: "Hello", Version: "0.1.1", Description: "Greets.", Available: true, Registry: "https://github.com/o/reg",
-				Permissions: &v1.PluginPermissions{Secrets: true}, PermissionLines: []string{"keep secrets"}, Installed: hello, UpdateAvailable: true},
+				Permissions: &v1.PluginPermissions{Secrets: true}, PermissionLines: []string{"keep secrets"}, Installed: hello, UpdateAvailable: true,
+				Relation: v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_UPDATE},
 			{Name: "jobs", DisplayName: "Jobs", Version: "1.0.0", Permissions: &v1.PluginPermissions{}},
 		},
 		Registries: []*v1.PluginRegistry{{Url: "https://github.com/o/reg", Plugins: 2, Cached: true, FetchedAt: timestamppb.Now()},
@@ -41,6 +42,12 @@ func TestPluginRegistryCommands(t *testing.T) {
 	}{
 		{name: "browse", cmd: "plugin.browse", args: map[string]string{"refresh": "true"}, want: &v1.BrowsePluginsRequest{Refresh: true},
 			wantMsg: []string{"NAME   VERSION                        INSTALLED       PERMISSIONS  DESCRIPTION\nhello  0.1.1                          0.1.0 (update)  secrets      Greets.\njobs   1.0.0 (no darwin/arm64 build)  -               -\n", "registry https://github.com/o/reg: 2 plugin(s), fetched", "(cached)", "  error: HTTP 502", "  issue: plugins[0]: bad"}},
+		{name: "browse names another source's install", cmd: "plugin.browse",
+			browse: &v1.BrowsePluginsResponse{Platform: "darwin/arm64", Registries: []*v1.PluginRegistry{{Url: "https://github.com/o/reg"}},
+				Entries: []*v1.PluginIndexEntry{{Name: "acme", Version: "2.0.0", Available: true, Permissions: &v1.PluginPermissions{},
+					Installed: &v1.Plugin{Name: "acme", Version: "1.0.0"}, Relation: v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_OTHER_SOURCE,
+					InstalledFrom: "127.0.0.1:8765/index.json"}}},
+			wantMsg: []string{"acme  2.0.0    1.0.0 (installed from 127.0.0.1:8765/index.json)  -"}},
 		{name: "browse with no registry configured", cmd: "plugin.browse", browse: &v1.BrowsePluginsResponse{Platform: "darwin/arm64"},
 			wantMsg: []string{"no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>"}},
 		{name: "browse an empty registry", cmd: "plugin.browse",
@@ -64,6 +71,18 @@ func TestPluginRegistryCommands(t *testing.T) {
 		{name: "update check", cmd: "plugin.update", args: map[string]string{"check": "true"}, want: &v1.UpdatePluginsRequest{Check: true},
 			update:  &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{{Name: "hello", CurrentVersion: "0.1.0", Version: "0.1.1", Registry: "r"}}},
 			wantMsg: []string{"NAME   INSTALLED  AVAILABLE  REGISTRY\nhello  0.1.0      0.1.1      r\ninstall with: code-foundry plugin update [<name>]"}},
+		{name: "update check with another source's newer version", cmd: "plugin.update", args: map[string]string{"check": "true"},
+			update: &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{
+				{Name: "hello", CurrentVersion: "0.1.0", Version: "0.1.1", Registry: "r"},
+				{Name: "acme", CurrentVersion: "1.0.0", Version: "2.0.0", Registry: "https://github.com/o/reg", InstalledFrom: "127.0.0.1:8765/index.json"},
+			}},
+			wantMsg: []string{"NAME   INSTALLED  AVAILABLE  REGISTRY\nhello  0.1.0      0.1.1      r\ninstall with: code-foundry plugin update [<name>]\n" +
+				"not offered: acme 2.0.0 from https://github.com/o/reg (installed from 127.0.0.1:8765/index.json; `code-foundry plugin install acme --force` switches to it, deleting its secrets, data and consent)"}},
+		{name: "update with only another source's", cmd: "plugin.update", args: map[string]string{"name": "acme"},
+			update: &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{
+				{Name: "acme", CurrentVersion: "1.0.0", Version: "2.0.0", Registry: "https://github.com/o/reg", InstalledFrom: "127.0.0.1:8765/index.json"},
+			}},
+			wantMsg: []string{"every plugin is up to date\nnot offered: acme 2.0.0 from https://github.com/o/reg (installed from 127.0.0.1:8765/index.json;"}},
 		{name: "update none", cmd: "plugin.update", wantMsg: []string{"every plugin is up to date"}},
 		{name: "update", cmd: "plugin.update", args: map[string]string{"name": "hello"}, want: &v1.UpdatePluginsRequest{Name: "hello"},
 			update: &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{

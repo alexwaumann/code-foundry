@@ -12,6 +12,7 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { fromJsonString, type JsonObject } from "@bufbuild/protobuf";
 import {
+  PluginIndexRelation,
   PluginInstallPhase,
   PluginService,
   PluginState,
@@ -832,9 +833,27 @@ export interface IndexEntryView {
   available: boolean;
   /** The installed version, null when it is not installed. */
   installedVersion: string | null;
-  installedDev: boolean;
-  updateAvailable: boolean;
+  /** The daemon's decision of what the row offers: Install only when not-installed, Update only when update. */
+  relation: EntryRelation;
+  /** Where the installed plugin came from, short ("127.0.0.1:8765/index.json", "o/repo"); set only for other-source. */
+  installedFrom: string;
 }
+
+/**
+ * How an entry stands to the installed plugin of its name (PluginIndexRelation): not
+ * installed; installed (or updatable) from this entry's own source; a dev link; or
+ * installed from another source, which this entry neither installs over nor updates.
+ */
+export type EntryRelation = "not-installed" | "installed" | "update" | "dev" | "other-source";
+
+const entryRelations: Record<PluginIndexRelation, EntryRelation> = {
+  [PluginIndexRelation.UNSPECIFIED]: "not-installed",
+  [PluginIndexRelation.NOT_INSTALLED]: "not-installed",
+  [PluginIndexRelation.INSTALLED]: "installed",
+  [PluginIndexRelation.UPDATE]: "update",
+  [PluginIndexRelation.DEV]: "dev",
+  [PluginIndexRelation.OTHER_SOURCE]: "other-source",
+};
 
 export function toIndexEntry(e: PluginIndexEntry): IndexEntryView {
   return {
@@ -848,8 +867,8 @@ export function toIndexEntry(e: PluginIndexEntry): IndexEntryView {
     registry: e.registry,
     available: e.available,
     installedVersion: e.installed ? e.installed.version : null,
-    installedDev: e.installed?.dev ?? false,
-    updateAvailable: e.updateAvailable,
+    relation: entryRelations[e.relation],
+    installedFrom: e.installedFrom,
   };
 }
 
