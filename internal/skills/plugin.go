@@ -106,9 +106,10 @@ func viewLimits() string {
 		return strings.Join(out, " / ")
 	}
 	rows := [][2]string{
-		{"Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs)", n(ui.MaxElements)},
+		{"Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs)", n(ui.MaxElements)},
 		{"Containers (section, columns, pane, grid, container, masterDetail, tabs) a node sits inside", n(ui.MaxDepth)},
-		{"Columns in a columns node: least / most", n(ui.MinColumns, ui.MaxColumns)},
+		{"Columns in a columns node: least / most; a column's weight: most; its width: least / most (px)", n(ui.MinColumns, ui.MaxColumns) + "; " + n(ui.MaxColumnWeight) + "; " + n(ui.MinColumnWidth, ui.MaxColumnWidth)},
+		{"A px height (thread, terminal, pane) and a pane's minHeight: least / most (px)", n(ui.MinHeightPx, ui.MaxHeightPx)},
 		{"Grid: items / least and most minWidth (px) / columns / an item's span", n(ui.MaxGridItems, ui.MinGridMinWidth, ui.MaxGridMinWidth, ui.MaxGridColumns, ui.MaxGridSpan)},
 		{"Items in a group", n(ui.MaxGroupItems)},
 		{"Spacer size: least / most (px)", n(ui.MinSpacer, ui.MaxSpacer)},
@@ -126,7 +127,8 @@ func viewLimits() string {
 		{"Text content / markdown (bytes)", n(ui.MaxTextContent, ui.MaxMarkdown)},
 		{"Notice detail / event data / copy text (bytes)", n(ui.MaxNoticeDetail, ui.MaxEventData, ui.MaxCopy)},
 		{"Select options", n(ui.MaxOptions)},
-		{"Buttons in a header / row / notice / section / empty state / actions bar", n(ui.MaxHeaderButtons, ui.MaxRowButtons, ui.MaxNoticeButtons, ui.MaxSectionButton, ui.MaxEmptyButtons, ui.MaxBarButtons)},
+		{"Buttons in a header / row / notice / section / empty state / terminal / actions bar", n(ui.MaxHeaderButtons, ui.MaxRowButtons, ui.MaxNoticeButtons, ui.MaxSectionButton, ui.MaxEmptyButtons, ui.MaxTerminalButtons, ui.MaxBarButtons)},
+		{"An input's pattern (characters)", n(ui.MaxPattern)},
 		{"A command action's args: count / names and values together (bytes) / one value (bytes)", n(ui.MaxCommandArgs, ui.MaxCommandArgsBytes, ui.MaxCommandArgValue)},
 		{"An action's form values as the host gets them (bytes, encoded)", n(ui.MaxActValues)},
 	}
