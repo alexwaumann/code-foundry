@@ -25,6 +25,18 @@ func setAttended(e *env, att *atomic.Bool, v bool) {
 	e.m.AttendedChanged(v)
 }
 
+// openViewer opens a viewer on thread id (WatchItems) and returns what closes it; the
+// test's end closes it too.
+func openViewer(t *testing.T, e *env, id string) func() {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	if _, err := e.m.WatchItems(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	return cancel
+}
+
 func isFinishedStatus(s Thread) bool {
 	return s.Status == StatusNeedsAttention && s.StatusReason == "finished"
 }
@@ -61,17 +73,12 @@ func TestAttendedAcknowledge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e, att := attendedEnv(t, tt.attended)
-			var cancel context.CancelFunc = func() {}
-			defer func() { cancel() }()
+			cancel := func() {}
 			s := e.create(CreateOptions{InitialPrompt: "a table please"})
 			for _, st := range tt.steps {
 				switch st {
 				case watch:
-					var ctx context.Context
-					ctx, cancel = context.WithCancel(context.Background())
-					if _, err := e.m.WatchItems(ctx, s.ID); err != nil {
-						t.Fatal(err)
-					}
+					cancel = openViewer(t, e, s.ID)
 				case unwatch:
 					cancel()
 					deadline := time.Now().Add(5 * time.Second)
@@ -133,16 +140,11 @@ func TestAttendedUntilSeenFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e, att := attendedEnv(t, tt.attended)
 			s := e.stopped("flagged")
-			var cancel context.CancelFunc = func() {}
-			defer func() { cancel() }()
+			cancel := func() {}
 			for _, st := range tt.steps {
 				switch st {
 				case watch:
-					var ctx context.Context
-					ctx, cancel = context.WithCancel(context.Background())
-					if _, err := e.m.WatchItems(ctx, s.ID); err != nil {
-						t.Fatal(err)
-					}
+					cancel = openViewer(t, e, s.ID)
 				case unwatch:
 					cancel()
 					deadline := time.Now().Add(5 * time.Second)

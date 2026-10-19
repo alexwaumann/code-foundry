@@ -78,6 +78,8 @@ gen/go/                    generated Go (connect-go + protobuf-go)
 gui/frontend/src/gen/      generated TS (protobuf-es + connect-es)
 internal/
   daemon/                  bootstrap, listeners (UDS + loopback), token file, lifecycle
+  presence/                whether the user is looking at the app (GUI clients' visibility
+                           and focus), with ordered subscribers
   api/                     Connect service handlers. Thin. One file per service.
   bus/                     typed in-process event bus (generic pub/sub, bounded, non-blocking)
   command/                 command registry: name, arg schema, when-predicate, handler
@@ -178,7 +180,8 @@ Services (v1):
   persisted (`docs/notes/thread-status-persistence.md`).
 * `ThreadService` — the conversation: ListItems, Watch (server stream: an items
   snapshot, then appended/updated items, text deltas and pending-request changes, all
-  seq-ordered; an open Watch marks the thread's turns seen),
+  seq-ordered; an open Watch marks the thread's turns seen while a GUI window is
+  visible and key, `docs/notes/alerts-foreground.md`),
   Send (also while busy; a stopped thread starts with the message), Respond (a permission request or AskUserQuestion: allow,
   allow for session, deny with a reason, answers), Interrupt, SetModel,
   SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
@@ -247,9 +250,12 @@ Services (v1):
   (`code-foundry events --since`; `docs/notes/agents-1-wait-events.md`). Every event
   carries the daemon's `epoch` (drawn at startup); a `since_epoch` of another daemon
   starts over with snapshots (`docs/notes/agents-5-cli.md`). The GUI opens it as
-  `client_kind` GUI with a per-stream `client_id` and its visibility, and updates that
-  with SetClientState; the registry of GUI clients paces the GitHub poll
-  (`docs/notes/gh-poll-tiers.md`).
+  `client_kind` GUI with a per-stream `client_id`, its visibility and focus, and updates
+  them with SetClientState. The registry of GUI clients writes the daemon's presence
+  (`internal/presence`: none, background or foreground, and attended when a window is
+  visible and key), which any store can read and subscribe to: its kind paces the
+  GitHub poll (`docs/notes/gh-poll-tiers.md`), attended decides whether an open thread
+  view counts as seen (`docs/notes/alerts-foreground.md`).
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The
