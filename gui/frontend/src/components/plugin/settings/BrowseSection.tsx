@@ -63,27 +63,29 @@ function EntryRow({ name, className }: { name: string; className?: string | unde
         </p>
         <Progress name={e.name} />
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {action === "install" && (
-          <Button
-            variant="outline"
-            size="xs"
-            className={mainAction}
-            disabled={!e.available || busy !== undefined}
-            onClick={() => void installPlugin(e.name)}
-            data-testid="registry-install"
-          >
-            {busy === "install" ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
-            Install
-          </Button>
-        )}
-        {action === "update" && (
-          <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(e.name)} data-testid="registry-update">
-            {busy === "update" ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUpCircle aria-hidden />}
-            Update to {e.version}
-          </Button>
-        )}
-      </div>
+      {action !== null && (
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {action === "install" && (
+            <Button
+              variant="outline"
+              size="xs"
+              className={mainAction}
+              disabled={!e.available || busy !== undefined}
+              onClick={() => void installPlugin(e.name)}
+              data-testid="registry-install"
+            >
+              {busy === "install" ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
+              Install
+            </Button>
+          )}
+          {action === "update" && (
+            <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(e.name)} data-testid="registry-update">
+              {busy === "update" ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUpCircle aria-hidden />}
+              Update to {e.version}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
