@@ -28,7 +28,9 @@ export class MockBackdrops {
   /** "import <path>", "remove <name>", "read <name>". */
   calls: string[] = [];
 
-  constructor(private readonly settings: MockSettings) {}
+  constructor(private readonly settings: MockSettings) {
+    settings.backdropExists = (name) => this.images.some((b) => b.name === name);
+  }
 
   reset(): void {
     this.images = [];

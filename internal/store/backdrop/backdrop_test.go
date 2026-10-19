@@ -423,3 +423,35 @@ func TestWebpSize(t *testing.T) {
 		})
 	}
 }
+
+// With its image removed, custom is refused until one is added again, and the import
+// selects it.
+func TestCustomNeedsAnImage(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	a, err := f.store.Import(ctx, f.write(t, "a.png", pngBytes(t, 4, 4)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.store.Remove(ctx, a.Name); err != nil {
+		t.Fatal(err)
+	}
+	for _, partial := range []map[string]string{
+		{settings.KeyBackdrop: settings.BackdropCustom},
+		{settings.KeyBackdrop: settings.BackdropCustom, settings.KeyBackdropFile: a.Name},
+	} {
+		var ve *settings.ValidationError
+		if _, err := f.settings.Update(ctx, partial); !errors.As(err, &ve) {
+			t.Fatalf("Update(%v) = %v, want a ValidationError", partial, err)
+		}
+	}
+	if f.value(settings.KeyBackdrop) != settings.BackdropForest {
+		t.Fatalf("backdrop = %q, want forest", f.value(settings.KeyBackdrop))
+	}
+	if _, err := f.store.Import(ctx, f.write(t, "a.png", pngBytes(t, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	if f.value(settings.KeyBackdrop) != settings.BackdropCustom || f.value(settings.KeyBackdropFile) != a.Name {
+		t.Fatalf("after re-adding: %q %q", f.value(settings.KeyBackdrop), f.value(settings.KeyBackdropFile))
+	}
+}
