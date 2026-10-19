@@ -144,12 +144,14 @@ type Store struct {
 	full     fullCache    // pull request detail panel cache (pr_detail.go)
 	owners   ownersCache  // publish owners (owners.go)
 	prFiles  prFilesCache // pull request diffs and files (pr_files.go)
+	moved    movedDetails // when the poll saw a pull request move (detail_moved.go)
 
 	// Worker goroutine only.
-	lastEnd     time.Time      // when the previous request finished
-	searchFirst map[string]int // per-section search size after 502/504 shrinking
-	detailBatch int            // open PRs per detail request after 502/504 shrinking
-	recheck     map[string]int // PR id -> detail refetches left while mergeable is UNKNOWN
+	lastEnd     time.Time       // when the previous request finished
+	searchFirst map[string]int  // per-section search size after 502/504 shrinking
+	detailBatch int             // open PRs per detail request after 502/504 shrinking
+	recheck     map[string]int  // PR id -> detail refetches left while mergeable is UNKNOWN
+	appearing   map[string]bool // PR ids whose appearance waits for their detail (pr_changes.go)
 	failingKey  map[string]string
 	searchAsID  string // node id of Options.SearchAs
 	cycle       cycleStats
@@ -211,6 +213,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		searchFirst: map[string]int{},
 		detailBatch: opts.DetailBatch,
 		recheck:     map[string]int{},
+		appearing:   map[string]bool{},
 		failingKey:  map[string]string{},
 		wake:        make(chan struct{}, 1),
 	}
@@ -364,7 +367,7 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 	if err != nil {
 		s.log.Warn("gh cache read failed", "err", err)
 	}
-	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL {
+	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL && !s.moved.movedSince(fullKey{key, number}, cached.FetchedAt) {
 		return cached, nil
 	}
 	res := s.submit(ctx, &job{kind: jobPullRequest, slug: key, number: number})

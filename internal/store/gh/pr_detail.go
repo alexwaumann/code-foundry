@@ -393,6 +393,7 @@ func (s *Store) staleFullDetails(fps []prFingerprint) {
 // clients to re-read.
 func (s *Store) invalidateFull(k fullKey) {
 	s.full.markStale(k)
+	s.moved.mark(k, s.opts.Now(), s.opts.DetailTTL)
 	publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 }
 
