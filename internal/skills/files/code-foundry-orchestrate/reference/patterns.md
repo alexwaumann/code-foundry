@@ -6,16 +6,14 @@ Every command runs in your Bash tool.
 
 ## 1. One child, and wait for it
 
-Start with cleanup, then one thread in a new worktree. Without `--notify`, since you
-wait in this turn.
+One thread in a new worktree. Without `--notify`, since you wait in this turn.
 
 ```
-code-foundry project worktree cleanup 4e1f0a7b9c2d --yes
 code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
   --name "Fix the login redirect" \
   --brief "After login users land on / instead of the page they asked for" \
   --labels bug,auth --request-id fix-login-redirect \
-  --prompt "After login, redirect to the page the user first asked for (the next query parameter). Add a test. Run the test suite, commit, push and open a PR. Then run: code-foundry thread report done \"<one-line summary>\" --data '{\"pr\": \"<url>\"}'"
+  --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR. Then run: code-foundry thread report done \"<one-line summary>\" --data '{\"branch\": \"<branch>\", \"pr\": \"<url>\"}'"
 # created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/cf/fix-the-login-redirect
 
 code-foundry thread wait 7d10 --for 1h
@@ -39,7 +37,6 @@ task (a retry after an error then returns the thread made the first time), `--no
 on each, then end your turn.
 
 ```
-code-foundry project worktree cleanup 8c3d5e7f9a1b --yes
 code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Bump the router" \
   --brief "react-router 7 to 7.4" --labels deps,batch-1018 --notify \
   --request-id batch-1018-router --budget 5 --prompt "..."
@@ -51,8 +48,10 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Fix the do
   --request-id batch-1018-docs --budget 5 --prompt "..."
 ```
 
-Each settled child sends you a `[code-foundry wake]` message, which starts a turn.
-On each, look at the whole batch rather than only the one that woke you:
+Then end your turn (no `thread wait`). Each settled child sends you a `[code-foundry
+wake]` message, which starts a turn. On each, look at the whole batch rather than only
+the one that woke you, and reply to the user only when the batch is done or a child
+needs them; otherwise end the turn with one short line:
 
 ```
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
@@ -62,9 +61,13 @@ code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018 --status none
 ```
 
-A child without a report that is no longer working needs a look (`thread read <id>`).
-When every child has reported, summarise for the user (one line per child with its
-PR), then archive the done ones in one call:
+A child without a report that is no longer working needs a look (`thread read <id>`):
+it may be asking you something in prose. Answer with `thread send --id <id> "..."`
+without `--wait` and end the turn; its subscription wakes you again.
+When every child has reported, check which branches touch the same files
+(`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
+(one line per child with its PR and any overlap). Leave the threads open: the user may
+review or steer them. Archive them in one call once the user accepts the work:
 
 ```
 code-foundry thread archive --ids 5e4f,5e6f --yes
@@ -82,7 +85,11 @@ code-foundry thread read 5e6f --last 10
 ```
 
 `send --wait` returns once the child has answered this message, not an earlier turn.
-Repeat until the PR is right, then tell the user it is ready to merge. When the user says
+To follow up with several children at once, send to each without `--wait` and end your
+turn (their `--notify` subscriptions wake you), or run the `send --wait` calls in
+parallel; do not `thread send` then plain `thread wait` (it returns the old status).
+Inside a wake turn of a `--notify` batch, always the first: a `send --wait` there holds
+back the other children's wakes. Repeat until the PR is right, then tell the user it is ready to merge. When the user says
 it merged, clean up:
 
 ```
