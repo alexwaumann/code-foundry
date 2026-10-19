@@ -179,6 +179,7 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if o.confirmed {
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
 	}
+	eff.CallerThreadID = uctx.ActiveThreadID
 	return c.Run(ctx, eff, args)
 }
 

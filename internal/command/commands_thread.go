@@ -106,7 +106,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					waitForArg.Default),
 			},
 			When: hasThread,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				var limit time.Duration
 				if a.Bool("wait") {
 					var err error
@@ -129,8 +129,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				if n := item.GetOrdinal(); n > 0 {
 					sent += fmt.Sprintf(" (#%d)", n)
 					if !a.Bool("wait") {
-						// The wait for Claude's answer to this message, ready to paste.
-						sent += fmt.Sprintf("; wait with: code-foundry thread wait %s --after %d", id, n)
+						sent += "; " + sendNext(ctx, b, uctx.CallerThreadID, id, n)
 					}
 				}
 				if !a.Bool("wait") {
@@ -325,6 +324,32 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		threadUnsubscribe(b),
 		threadSubscriptions(b),
 	)
+}
+
+// sendNext is what thread.send tells its caller to do next about message n to thread
+// id: end its turn when it holds a wake subscription that the answer meets (settled,
+// idle or attention; E3, W2: the wait hint contradicted --notify), else the wait for
+// the answer, ready to paste. A failed look-up gives the wait hint.
+func sendNext(ctx context.Context, b SubscriptionBackend, caller, id string, n int64) string {
+	if caller != "" && caller != id {
+		res, err := b.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: caller}))
+		if err == nil {
+			for _, s := range res.Msg.GetSubscriptions() {
+				if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD && s.GetTargetId() == id &&
+					slices.Contains(answerConditions, s.GetCondition()) {
+					return "you are subscribed (" + s.GetId() + "): end your turn; it wakes you"
+				}
+			}
+		}
+	}
+	return fmt.Sprintf("wait with: code-foundry thread wait %s --after %d", id, n)
+}
+
+// answerConditions are the wake conditions a thread's answer to a message meets.
+var answerConditions = []v1.ThreadSubscriptionCondition{
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_IDLE,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_ATTENTION,
 }
 
 // stillPending is thread.respond's tail: "nothing pending", or "1 more pending:

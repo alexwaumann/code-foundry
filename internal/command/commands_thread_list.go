@@ -92,7 +92,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			markCaller(res.Msg.GetThreads(), uctx.ActiveThreadID)
+			markCaller(res.Msg.GetThreads(), uctx.CallerThreadID)
 			msg := formatThreadList(res.Msg.GetThreads(), res.Msg.GetRemoved(), projects.Msg.GetProjects(), names, f, time.Now())
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},

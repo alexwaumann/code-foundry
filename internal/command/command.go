@@ -84,6 +84,10 @@ type Context struct {
 	// workspace, or the workspace a composer or page is for). Empty for a project
 	// thread and, unless --context-workspace is given, from the CLI.
 	ActiveWorkspaceID string
+	// CallerThreadID is ActiveThreadID as the caller sent it, before Invoke overlaid an
+	// explicit thread arg (--id): the thread a CLI call runs in ($CODE_FOUNDRY_THREAD),
+	// or the GUI's active thread. Invoke sets it for Run; When does not see it.
+	CallerThreadID string
 }
 
 // ContextField names a Context field an argument can default from.
