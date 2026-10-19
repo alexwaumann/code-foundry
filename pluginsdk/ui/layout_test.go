@@ -51,7 +51,7 @@ func withKind(key, k string) Node {
 // pass as a second kind, or fail alone.
 func TestEveryKindIsOneKind(t *testing.T) {
 	kinds := nodeKinds()
-	if len(kinds) != 21 {
+	if len(kinds) != 23 {
 		t.Errorf("%d kinds: %v (a new kind needs its validation, GUI renderer and docs)", len(kinds), kinds)
 	}
 	for _, k := range kinds {
@@ -84,6 +84,12 @@ var containers = map[string]func(key string, child Node) Node{
 	},
 	"pane":      func(key string, child Node) Node { return NewPane(key, HeightAuto, child) },
 	"container": func(key string, child Node) Node { return NewContainer(key, ContainerNarrow, child) },
+	"masterDetail": func(key string, child Node) Node {
+		return NewMasterDetail(key, List{Rows: []Row{NewRow(key+"-r", "Run")}}, key+"-r", child)
+	},
+	"tabs": func(key string, child Node) Node {
+		return NewTabsNode(key, NewTabs(key+"-a", NewTab(key+"-a", "A"), NewTab(key+"-b", "B")), child)
+	},
 	"grid": func(key string, child Node) Node {
 		return NewGrid(key, NewGridItem(key+"-a", child), NewGridItem(key+"-b"))
 	},
@@ -146,7 +152,7 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("%d %s deep: %v", MaxDepth, k, err)
 			}
 			err := (View{Nodes: []Node{nest(append(at, k))}}).Validate()
-			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container), at most %d", MaxDepth+1, MaxDepth)) {
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container, masterDetail, tabs), at most %d", MaxDepth+1, MaxDepth)) {
 				t.Errorf("%d %s deep: %v", MaxDepth+1, k, err)
 			}
 			// Children reaches the leaf through every level.

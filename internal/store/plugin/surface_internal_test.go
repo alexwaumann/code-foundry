@@ -128,7 +128,7 @@ func TestValidateViewRefuses(t *testing.T) {
 		{"store without secrets", every, &pluginsdk.Permissions{Commands: []string{"thread.send"}}, "store needs"},
 		{"deep", mod(`"children": [{"key": "s2", "text": {"content": "deep"}}]`,
 			`"children": [{"key": "s2", "section": {"children": [{"key": "s3", "columns": {"items": [{"key": "s3a", "children": [{"key": "s4", "pane": {"children": [{"key": "s5", "text": {"content": "x"}}]}}]}, {"key": "s3b", "children": []}]}}]}}]`), nil,
-			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane, grid, container), at most 4"},
+			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane, grid, container, masterDetail, tabs), at most 4"},
 		{"one column", `{"nodes": [{"key": "c", "columns": {"items": [{"key": "c1", "children": []}]}}]}`, nil, "1 columns, want 2 to 4"},
 		{"pane min above height", mod(`"height": 300, "minHeight": 200`, `"height": 300, "minHeight": 400`), nil, "400 px is above the pane's height (300 px)"},
 		{"options with a source", mod(`"select": {"optionsSource": "projects"}`, `"select": {"optionsSource": "projects", "options": [{"key": "o9", "value": "v", "label": "L"}]}`), nil, "fills the options"},
