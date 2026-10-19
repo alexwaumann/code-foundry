@@ -89,6 +89,7 @@ func (h *Plugin) Dev(ctx context.Context, req *connect.Request[v1.DevPluginReque
 	}
 	return connect.NewResponse(&v1.DevPluginResponse{
 		Plugin: pluginToProto(res.Plugin), NeedsConsent: res.NeedsConsent, ConsentText: res.Consent,
+		RemovedThreadIds: res.RemovedThreads,
 	}), nil
 }
 

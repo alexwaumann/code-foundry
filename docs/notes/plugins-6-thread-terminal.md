@@ -61,6 +61,8 @@ acting panel's context.
   concurrently, 20 s bound), and `Start`'s sweep archives the live threads of plugins
   that are not enabled. A crash or restart keeps both; terminals end with the daemon like
   every shell (the GUI loses them on reconnect). A later `thread/send` unarchives.
+  (Since `docs/notes/plugins-plugin-threads-remove.md`, uninstall and a forced takeover
+  remove the threads instead; disable and a package gone by hand still archive.)
 * **Terminals.** Labels `kind=plugin`, `plugin=<name>`, `title=<title>`. They are not
   panel terminals (`termlabel.IsPanel`): the shell reaper and `terminal.close` leave them
   alone, and an exited one stays until the plugin closes it. "Open in bottom panel" adds

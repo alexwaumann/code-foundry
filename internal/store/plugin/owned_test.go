@@ -112,6 +112,7 @@ type fakeOwned struct {
 	owners    map[string]string // thread id → owner
 	specs     map[string]plugin.ThreadSpec
 	sends     []string
+	removed   []string
 	terms     []pluginsdk.PluginTerminal
 	termOwner map[string]string
 	termSpecs map[string]plugin.TerminalSpec
@@ -153,6 +154,27 @@ func (f *fakeOwned) Archive(_ context.Context, id string) error {
 		}
 	}
 	return nil
+}
+
+// Remove drops the thread, as the thread store's Remove does once Claude stopped.
+func (f *fakeOwned) Remove(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.owners[id]; !ok {
+		return fmt.Errorf("%w: no thread %s", plugin.ErrNotFound, id)
+	}
+	f.threads = slices.DeleteFunc(f.threads, func(t pluginsdk.PluginThread) bool { return t.ThreadID == id })
+	delete(f.owners, id)
+	f.removed = append(f.removed, id)
+	return nil
+}
+
+// add puts a thread of owner in the store.
+func (f *fakeOwned) add(owner string, t pluginsdk.PluginThread) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threads = append(f.threads, t)
+	f.owners[t.ThreadID] = owner
 }
 
 func (f *fakeOwned) Owner(id string) (string, bool) {

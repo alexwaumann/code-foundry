@@ -717,7 +717,8 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 		}
 		return EnableResult{Plugin: p, NeedsConsent: needs, Consent: text}, nil
 	}
-	if _, err := m.claimLocked(ctx, name, origin, force); err != nil {
+	took, err = m.claimLocked(ctx, name, origin, force)
+	if err != nil {
 		return EnableResult{}, err
 	}
 	if err := m.linkOverPackage(name, real, link); err != nil {
@@ -734,7 +735,11 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	if err := m.reloadLocked(ctx); err != nil {
 		return EnableResult{}, err
 	}
-	return m.enableLocked(ctx, name, true)
+	res, err := m.enableLocked(ctx, name, true)
+	if took != nil {
+		res.RemovedThreads = took.removed
+	}
+	return res, err
 }
 
 // linkDir points link at target, replacing an existing symlink atomically.

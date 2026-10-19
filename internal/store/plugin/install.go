@@ -114,6 +114,8 @@ type InstallResult struct {
 	// NeedsConsent: Enable was asked but the user has to consent first (Consent text).
 	NeedsConsent bool
 	Consent      string
+	// RemovedThreads are the ids of the threads of the plugin a forced takeover replaced.
+	RemovedThreads []string
 }
 
 // UninstallResult is Uninstall's answer.
@@ -122,6 +124,8 @@ type UninstallResult struct {
 	Removed string
 	// Purged lists what --purge deleted, in words.
 	Purged []string
+	// RemovedThreads are the ids of the plugin's threads, removed.
+	RemovedThreads []string
 }
 
 // installState is the store's install bookkeeping. Lock order: Manager.mu before mu.
@@ -478,7 +482,8 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 		return InstallResult{}, err
 	}
 	if took != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", p.name, originWords(took.from), andList(took.what)))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: %s", p.name, originWords(took.from), took.done()))
+		res.RemovedThreads = took.removed
 	}
 	if err := swapPackage(pkg, link, filepath.Join(work, "old")); err != nil {
 		return InstallResult{}, err
@@ -634,7 +639,8 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 		return InstallResult{}, err
 	}
 	if took != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", name, originWords(took.from), andList(took.what)))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: %s", name, originWords(took.from), took.done()))
+		res.RemovedThreads = took.removed
 		req.Consent = false
 	}
 	if cur, ok := m.Snapshot().Plugin(name); ok {
@@ -687,8 +693,9 @@ func (m *Manager) linkOverPackage(name, real, link string) error {
 	return linkDir(real, link)
 }
 
-// Uninstall disables a plugin, stops it and removes its package (a dev link is removed,
-// never the folder it points at). purge also deletes its data dir, its secrets (the
+// Uninstall disables a plugin, stops it, removes its threads (the thread store's Remove,
+// as thread.remove) and its package (a dev link is removed, never the folder it points
+// at). purge also deletes its data dir, its secrets (the
 // Keychain items and their names), its logs, and the user's choices about it (enabled,
 // consent); without purge those stay, so a reinstall picks up where it left off (still
 // disabled).
@@ -732,7 +739,7 @@ func (m *Manager) Uninstall(ctx context.Context, name string, purge bool) (Unins
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
 	}
-	m.forget(ctx, name, logs)
+	res.RemovedThreads = m.discard(ctx, name, logs)
 	link := filepath.Join(m.opts.Dir, name)
 	if fi, err := os.Lstat(link); err == nil {
 		if fi.Mode()&fs.ModeSymlink != 0 {

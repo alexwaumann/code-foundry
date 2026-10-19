@@ -79,6 +79,13 @@ func (p pluginThreads) Archive(ctx context.Context, id string) error {
 	return ownedErr(err)
 }
 
+// Remove is thread.remove's removal (the thread store's Remove): Claude stops first,
+// then the thread, its items and its shells go; the usage moves to the retired ledger,
+// and the Removed event drops it from every client.
+func (p pluginThreads) Remove(ctx context.Context, id string) error {
+	return ownedErr(p.threads.Remove(ctx, id))
+}
+
 func (p pluginThreads) Owner(id string) (string, bool) {
 	t, ok := p.threads.Snapshot().Thread(id)
 	return t.Owner, ok

@@ -18,6 +18,7 @@ func (ownersOnly) Create(context.Context, string, ThreadSpec) (pluginsdk.PluginT
 }
 func (ownersOnly) Send(context.Context, string, string) error { return nil }
 func (ownersOnly) Archive(context.Context, string) error      { return nil }
+func (ownersOnly) Remove(context.Context, string) error       { return nil }
 func (ownersOnly) Owned(string) []pluginsdk.PluginThread      { return nil }
 func (ownersOnly) LiveOwners() []string                       { return nil }
 

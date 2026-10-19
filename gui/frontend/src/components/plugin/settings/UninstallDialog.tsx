@@ -6,12 +6,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Label } from "@/components/ui/label";
 import { uninstallPlugin } from "@/stores/pluginRegistry";
 import { usePlugin, usePluginsStore } from "@/stores/plugins";
+import { useThreadsStore } from "@/stores/threads";
 import { pluginDataDirWords, pluginsDirWords } from "./dirs";
 
 /**
  * Asks before uninstalling a plugin, with the choice to delete what it keeps too (plugin
  * uninstall --purge: its data folder, its secrets in the Keychain, its logs and the
- * consent given). The command is then run without asking again.
+ * consent given). The command is then run without asking again. The plugin's own threads
+ * are removed either way, and the dialog says how many.
  */
 export function UninstallDialog({ name, onClose }: { name: string; onClose: () => void }) {
   const p = usePlugin(name);
@@ -20,6 +22,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
   const dir = usePluginsStore((s) => pluginsDirWords(s.dirs));
   const dataDir = usePluginsStore((s) => pluginDataDirWords(s.dirs, name));
   const its = dataDir ? `Its data (${dataDir}), secrets` : "Its data, secrets";
+  const threads = useThreadsStore((s) => ownedBy(s.owned, s.byId, name));
   return (
     <Dialog
       open
@@ -34,6 +37,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
             <DialogTitle>Uninstall {displayName}?</DialogTitle>
             <DialogDescription className="break-words">
               {p?.dev ? `It stops and its link goes from ${dir}; your folder stays.` : `It stops and its package goes from ${dir}.`}{" "}
+              {threads > 0 ? `It removes its ${threads === 1 ? "1 thread" : `${String(threads)} threads`}. ` : ""}
               {purge ? "" : `${its} and the consent you gave stay for a reinstall.`}
             </DialogDescription>
             <Label className="items-start gap-2 text-body-sm font-normal">
@@ -70,4 +74,10 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
       </DialogContent>
     </Dialog>
   );
+}
+
+/** How many of the owned threads belong to plugin name (archived ones too). */
+function ownedBy(owned: readonly string[] | undefined, byId: Readonly<Record<string, { owner?: string }>>, name: string): number {
+  const owner = `plugin:${name}`;
+  return owned?.filter((id) => byId[id]?.owner === owner).length ?? 0;
 }

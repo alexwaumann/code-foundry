@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // An owned thread runs in its own cwd under home, keeps its owner across a restart, and
@@ -79,6 +81,42 @@ func TestCreateOwnedRefuses(t *testing.T) {
 	for _, tt := range tests {
 		if _, err := e.m.Create(e.ctx(), tt.o); !errors.Is(err, ErrInvalidArgument) {
 			t.Errorf("%s: Create = %v, want %v", tt.name, err, ErrInvalidArgument)
+		}
+	}
+}
+
+// A plugin's thread removed in the middle of a turn (its plugin was uninstalled or taken
+// over: the plugin store calls Remove, as thread.remove does) stops Claude first, then
+// goes, Removed telling every client.
+func TestRemoveOwnedThreadMidTurn(t *testing.T) {
+	e := newFixtureEnv(t, "write-allow")
+	cwd := filepath.Join(e.home, "plugin-data", "hello")
+	if err := os.MkdirAll(cwd, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s := e.create(CreateOptions{NoProject: true, Owner: "plugin:hello", Cwd: cwd, InitialPrompt: "write it"})
+	e.waitFor(s.ID, "asking mid-turn", func(s Thread) bool { return s.Status == StatusNeedsAttention && s.State == StateConnected })
+	pid := e.pid(s.ID)
+	if err := e.m.Remove(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+		t.Errorf("claude (pid %d) still runs after Remove: %v", pid, err)
+	}
+	if _, err := e.m.Get(e.ctx(), s.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Get after Remove = %v", err)
+	}
+	if got := e.m.Snapshot().Owned("plugin:hello"); len(got) != 0 {
+		t.Errorf("Owned after Remove = %+v", got)
+	}
+	for {
+		select {
+		case ev := <-e.events.C():
+			if r, ok := ev.(Removed); ok && r.ID == s.ID {
+				return
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("no Removed event")
 		}
 	}
 }
