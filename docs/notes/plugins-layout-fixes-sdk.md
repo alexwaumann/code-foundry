@@ -54,6 +54,12 @@ test (`pluginsdk/ui/regress_test.go`,
   fieldset change), so a plugin built on this SDK refuses those views itself. The host
   enforces the rules either way. Tag `pluginsdk/vX.Y.Z` when the series is released.
 
+* **Acting before the open is answered.** The first view arrives while the plugin is
+  still handling `surface/open`, and until the open is answered the host refuses an act
+  as "not open". `TestActTimeoutAndStop` hit this on main's CI under `-race` (#237's
+  merge). The act tests now wait for the open with `waitOpen`. A person cannot click
+  that fast, so the host was left as it is.
+
 ## End to end
 
 An isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-fix-sdk/home`, `--dev`, `claude_path` set to
