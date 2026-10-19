@@ -67,6 +67,10 @@ blamed the archive step and "records that seem to disappear".
 
 ## Gotchas
 
+* The agent guide (`internal/guide`, built from the command descriptions) was at 28,996
+  of its 29,000-byte cap. So the help only changes in two places: `thread.wait` "Exits 1
+  on timeout or removal." and `thread.reports --all` "Archived and removed too". The
+  guide is now at 28,999. The next help text that grows has to cut something first.
 * `defer m.mu.Unlock()` and the deferred `setRemoving(false)` in `Remove`: the defers run
   LIFO, so the unlock comes first and `setRemoving` can take the lock.
 * Claude Code blocks a standalone `sleep 120` in Bash ("use Monitor"). The first
