@@ -38,3 +38,32 @@ func TestThreadSubscriptionsMigration(t *testing.T) {
 		t.Errorf("rows after the subscriber went = %d, %v", n, err)
 	}
 }
+
+// Migration 0034 adds thread_subscriptions.args, '{}' for rows that do not give it.
+func TestThreadSubscriptionArgsMigration(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if _, err := db.ExecContext(ctx, `INSERT INTO threads (id, worktree_path, created_at, state) VALUES ('s1', '/w', 1, 4)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO thread_subscriptions (id, subscriber_thread_id, target_kind, target_id, condition, created_at)
+			VALUES ('sub-1', 's1', 'thread', 's2', 'settled', 1)`,
+		`INSERT INTO thread_subscriptions (id, subscriber_thread_id, target_kind, target_id, condition, created_at, args)
+			VALUES ('sub-2', 's1', 'plugin', 'hello/tick', 'fired', 1, '{"every":"2s"}')`,
+	} {
+		if _, err := db.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for id, want := range map[string]string{"sub-1": "{}", "sub-2": `{"every":"2s"}`} {
+		var args string
+		if err := db.QueryRowContext(ctx, `SELECT args FROM thread_subscriptions WHERE id = ?`, id).Scan(&args); err != nil || args != want {
+			t.Errorf("%s args = %q, %v; want %q", id, args, err, want)
+		}
+	}
+}

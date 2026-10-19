@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -15,8 +16,9 @@ import (
 // is set when a thread target already meets the condition, as the store would.
 
 // Subscribe records "Subscribe <subscriber> <kind> <target> <condition> repeat=<bool>"
-// and keeps the subscription as "sub-<n>". A run target is accepted whatever its id; a
-// pull request is normalised (thread.ParsePullRequestTarget) and never fires.
+// (and " args=k=v,…" for a plugin target) and keeps the subscription as "sub-<n>". A run
+// target is accepted whatever its id, a plugin target with the args as given; a pull
+// request is normalised (thread.ParsePullRequestTarget) and never fires.
 func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.SubscribeResult, error) {
 	kind, target, cond := thread.TargetThread, strings.TrimSpace(o.TargetThreadID), cmp.Or(o.Condition, thread.CondSettled)
 	if run := strings.TrimSpace(o.TargetRunID); run != "" {
@@ -29,14 +31,19 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 			return thread.SubscribeResult{}, err
 		}
 	}
+	call := fmt.Sprintf("Subscribe %s %s %s %s repeat=%t", o.SubscriberID, kind, target, cond, o.Repeat)
+	if plugin := strings.TrimSpace(o.TargetPlugin); plugin != "" {
+		kind, target, cond = thread.TargetPlugin, plugin, thread.CondFired
+		call = fmt.Sprintf("Subscribe %s %s %s %s repeat=%t args=%s", o.SubscriberID, kind, target, cond, o.Repeat, formatArgs(o.Args))
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.record(fmt.Sprintf("Subscribe %s %s %s %s repeat=%t", o.SubscriberID, kind, target, cond, o.Repeat)); err != nil {
+	if err := f.record(call); err != nil {
 		return thread.SubscribeResult{}, err
 	}
 	targets := 0
-	for _, t := range []string{o.TargetThreadID, o.TargetRunID, o.TargetPullRequest} {
-		if t != "" {
+	for _, t := range []string{o.TargetThreadID, o.TargetRunID, o.TargetPullRequest, o.TargetPlugin} {
+		if strings.TrimSpace(t) != "" {
 			targets++
 		}
 	}
@@ -69,7 +76,7 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 	f.nextSub++
 	sub := thread.Subscription{
 		ID: fmt.Sprintf("sub-%d", f.nextSub), SubscriberID: o.SubscriberID, TargetKind: kind, TargetID: target, Condition: cond,
-		Repeat: o.Repeat && kind != thread.TargetActionRun, CreatedAt: f.Now(),
+		Repeat: o.Repeat && kind != thread.TargetActionRun, CreatedAt: f.Now(), Args: maps.Clone(o.Args),
 	}
 	if fired {
 		sub.FiredCount, sub.LastFiredAt = 1, sub.CreatedAt
@@ -82,7 +89,7 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 
 // Unsubscribe records "Unsubscribe <id>" or "Unsubscribe <subscriber> <target>".
 func (f *Fake) Unsubscribe(_ context.Context, o thread.UnsubscribeOptions) ([]thread.Subscription, error) {
-	target := o.TargetThreadID + o.TargetRunID
+	target := o.TargetThreadID + o.TargetRunID + o.TargetPlugin
 	if o.TargetPullRequest != "" {
 		target, _ = thread.ParsePullRequestTarget(o.TargetPullRequest)
 	}
@@ -126,6 +133,9 @@ func (f *Fake) Subscriptions(_ context.Context, subscriber string) ([]thread.Sub
 			s.SubscriberName = t.Name
 		}
 		s.TargetStatus = "gone"
+		if s.TargetKind == thread.TargetPlugin {
+			s.TargetName, s.TargetStatus = s.TargetID, "running"
+		}
 		if t, ok := f.byID[s.TargetID]; ok {
 			s.TargetName, s.TargetStatus = t.Name, t.Status.String()
 		}
@@ -139,4 +149,16 @@ func (f *Fake) PutSubscription(s thread.Subscription) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.subs = append(f.subs, s)
+}
+
+// formatArgs is a plugin target's args as "k=v,…", sorted ("-" for none).
+func formatArgs(args map[string]string) string {
+	if len(args) == 0 {
+		return "-"
+	}
+	var parts []string
+	for _, k := range slices.Sorted(maps.Keys(args)) {
+		parts = append(parts, k+"="+args[k])
+	}
+	return strings.Join(parts, ",")
 }
