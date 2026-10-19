@@ -228,11 +228,29 @@ func (h *Host) CloseTerminal(ctx context.Context, terminalID string) error {
 }
 
 // ReadTerminal returns the plain text on one of the plugin's terminals' screen (its rows,
-// not the scrollback): at most maxBytes (0: 64 KiB), the end of it when longer. Read it
-// when Plugin.OnTerminalExit says the run ended, or while it runs to show progress.
+// not the scrollback; ReadTerminalWith reads that): at most maxBytes (0: 64 KiB), the end
+// of it when longer. Read it when Plugin.OnTerminalExit says the run ended, or while it
+// runs to show progress.
 func (h *Host) ReadTerminal(ctx context.Context, terminalID string, maxBytes int) (TerminalReadResult, error) {
 	var res TerminalReadResult
 	err := h.conn.Call(ctx, MethodTerminalRead, TerminalReadParams{TerminalID: terminalID, MaxBytes: maxBytes}, &res)
+	return res, err
+}
+
+// ReadTerminalOptions are ReadTerminalWith's options. Scrollback reads the history
+// above the screen too; MaxBytes bounds the text (0: 64 KiB for the screen, 1 MiB with
+// Scrollback), the end of it when longer.
+type ReadTerminalOptions struct {
+	Scrollback bool
+	MaxBytes   int
+}
+
+// ReadTerminalWith is ReadTerminal with options: with Scrollback, the whole output the
+// terminal kept (its scrollback, then its screen) as plain text, oldest line first. Read
+// it when Plugin.OnTerminalExit says the run ended for the run's whole output.
+func (h *Host) ReadTerminalWith(ctx context.Context, terminalID string, o ReadTerminalOptions) (TerminalReadResult, error) {
+	var res TerminalReadResult
+	err := h.conn.Call(ctx, MethodTerminalRead, TerminalReadParams{TerminalID: terminalID, MaxBytes: o.MaxBytes, Scrollback: o.Scrollback}, &res)
 	return res, err
 }
 

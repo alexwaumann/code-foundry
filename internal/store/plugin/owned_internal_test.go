@@ -31,6 +31,9 @@ func (termOwners) Create(context.Context, string, TerminalSpec) (pluginsdk.Plugi
 func (termOwners) Close(context.Context, string) error          { return nil }
 func (termOwners) Owned(string) []pluginsdk.PluginTerminal      { return nil }
 func (termOwners) Text(context.Context, string) (string, error) { return "", nil }
+func (termOwners) Scrollback(context.Context, string) (string, error) {
+	return "", nil
+}
 
 func TestTailText(t *testing.T) {
 	tests := []struct {

@@ -131,4 +131,17 @@ func TestTerminalExitAndRead(t *testing.T) {
 	if _, err := host.ReadTerminal(ctx, "t-other", 0); !errors.As(err, &perr) || perr.Code != pluginsdk.CodeNotFound {
 		t.Errorf("another terminal: %v", err)
 	}
+
+	// With scrollback: SetTerminalScrollback's text, its lines counted; the reads recorded.
+	h.SetTerminalScrollback(term, "=== RUN TestAdd\nok  example.com/calc\nFAIL example.com/x")
+	if r, err := host.ReadTerminalWith(ctx, term, pluginsdk.ReadTerminalOptions{Scrollback: true}); err != nil || r.Text != "=== RUN TestAdd\nok  example.com/calc\nFAIL example.com/x" || r.Lines != 3 || r.Truncated {
+		t.Errorf("read scrollback = %+v, %v", r, err)
+	}
+	if r, err := host.ReadTerminalWith(ctx, term, pluginsdk.ReadTerminalOptions{}); err != nil || r.Text != "ok  example.com/calc\nFAIL example.com/x" || r.Lines != 0 {
+		t.Errorf("read screen with options = %+v, %v", r, err)
+	}
+	reads := h.TerminalReads()
+	if len(reads) != 5 || !reads[3].Scrollback || reads[4].Scrollback || reads[1].MaxBytes != 18 {
+		t.Errorf("reads = %+v", reads)
+	}
 }

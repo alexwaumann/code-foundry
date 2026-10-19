@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -24,6 +25,8 @@ type owned struct {
 	terminals []pluginsdk.PluginTerminal
 	termSpecs []pluginsdk.TerminalCreateParams
 	termText  map[string]string
+	termSB    map[string]string
+	termReads []pluginsdk.TerminalReadParams
 }
 
 func (h *Host) handleOwned(_ context.Context, method string, params json.RawMessage) (any, bool, error) {
@@ -141,20 +144,32 @@ func (h *Host) handleOwned(_ context.Context, method string, params json.RawMess
 		if err != nil {
 			return nil, true, err
 		}
-		h.mu.Lock()
-		own := slices.ContainsFunc(h.own.terminals, func(t pluginsdk.PluginTerminal) bool { return t.TerminalID == p.TerminalID })
-		text := h.own.termText[p.TerminalID]
-		h.mu.Unlock()
+		var own bool
+		var text string
+		h.record(func() {
+			h.own.termReads = append(h.own.termReads, p)
+			own = slices.ContainsFunc(h.own.terminals, func(t pluginsdk.PluginTerminal) bool { return t.TerminalID == p.TerminalID })
+			text = h.own.termText[p.TerminalID]
+			if sb, ok := h.own.termSB[p.TerminalID]; ok && p.Scrollback {
+				text = sb
+			}
+		})
 		if !own {
 			return nil, true, pluginsdk.NewError(pluginsdk.CodeNotFound, "terminal %s is not one of the plugin's terminals", p.TerminalID)
 		}
 		max := p.MaxBytes
-		if max <= 0 {
+		switch {
+		case p.Scrollback && (max <= 0 || max > 1<<20):
+			max = 1 << 20
+		case max <= 0:
 			max = 64 << 10
 		}
 		res := pluginsdk.TerminalReadResult{Text: text}
 		if len(text) > max {
 			res.Text, res.Truncated = text[len(text)-max:], true
+		}
+		if p.Scrollback && res.Text != "" {
+			res.Lines = strings.Count(res.Text, "\n") + 1
 		}
 		return res, true, nil
 	default: // MethodTerminalList
@@ -229,6 +244,26 @@ func (h *Host) ExitTerminal(id string, code int) {
 		}
 	})
 	_ = h.conn.Notify(pluginsdk.MethodTerminalExited, pluginsdk.TerminalExited{TerminalID: id, ExitCode: code})
+}
+
+// SetTerminalScrollback sets what terminal/read with scrollback answers for one of the
+// plugin's terminals (its scrollback and screen as plain text); without it, such a read
+// answers SetTerminalText's text.
+func (h *Host) SetTerminalScrollback(id, text string) {
+	h.record(func() {
+		if h.own.termSB == nil {
+			h.own.termSB = map[string]string{}
+		}
+		h.own.termSB[id] = text
+	})
+}
+
+// TerminalReads returns the terminal/read calls the plugin made, with their Scrollback
+// and MaxBytes.
+func (h *Host) TerminalReads() []pluginsdk.TerminalReadParams {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.own.termReads)
 }
 
 // SetTerminalText sets what terminal/read answers for one of the plugin's terminals (its
