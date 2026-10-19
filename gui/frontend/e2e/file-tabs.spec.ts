@@ -5,8 +5,9 @@ import { CF, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
  * The File and Diff panel tabs (docs/notes/file-viewer-3-tabs.md) against the mock
  * daemon's files (mock/files.ts): a Changes row opens its Diff tab, Unified ↔ Split and the
  * scope switch, Open file to the File tab, Rendered ↔ Source, a TypeScript file at a line,
- * the HTML sandbox, an image, a binary, a folder, a missing file with Retry, a truncated
- * read, and a re-read when the worktree changes. SHOTS=<dir> saves screenshots.
+ * the HTML sandbox, an image, a PDF's pages, images and PDFs too large to show, a binary,
+ * a folder, a missing file with Retry, a truncated read, and a re-read when the worktree
+ * changes. SHOTS=<dir> saves screenshots.
  */
 
 const FEAT = `${CF}.worktrees/feat-sidebar`;
@@ -195,6 +196,50 @@ test("a TypeScript file at a line, the HTML sandbox, an image, a binary, a folde
 
   await openFile(page, "big.log");
   await expect(file(page).getByTestId("file-truncated")).toHaveText("Showing the first 1 MiB of 4.2 MB");
+});
+
+test("a PDF shows its pages; a 1.5 MB image comes back whole; an image or PDF over the read cap is too large to show", async ({ page }) => {
+  await openApp(page);
+  await worktreeTab(page, "s-1");
+
+  // docs/spec.pdf is 1.2 MB: whole only because the tab asks for 32 MiB (pdf.js cannot open a cut PDF).
+  await openFile(page, "docs/spec.pdf");
+  await expect(activeTab(page)).toHaveText("spec.pdf");
+  const pdf = file(page).getByTestId("file-pdf");
+  await expect(pdf.getByTestId("pdf-pages")).toHaveAttribute("data-pages", "3");
+  await expect(pdf.getByTestId("pdf-page")).toHaveCount(3);
+  await expect(pdf.locator('[data-testid="pdf-page"][data-page="1"]')).toHaveAttribute("data-rendered", "true");
+  const canvas = pdf.locator('[data-testid="pdf-page"][data-page="1"] canvas');
+  expect(await canvas.evaluate((c: HTMLCanvasElement) => c.width)).toBeGreaterThan(0);
+  await expect(file(page).getByTestId("file-meta")).toHaveText("3 pages · 1.2 MB · PDF");
+  await expect(file(page).getByTestId("file-mode")).toHaveCount(0);
+  await expect(file(page).getByTestId("file-wrap")).toHaveCount(0);
+  await expect(file(page).getByTestId("file-binary")).toHaveCount(0);
+  // The column fills the tab body and scrolls inside it.
+  const [tab, column] = await Promise.all([file(page).boundingBox(), pdf.getByTestId("pdf-pages").boundingBox()]);
+  expect(Math.abs((column?.y ?? 0) + (column?.height ?? 0) - ((tab?.y ?? 0) + (tab?.height ?? 0)))).toBeLessThanOrEqual(1);
+  expect(await pdf.getByTestId("pdf-pages").evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+  await openFile(page, "docs/photo.png");
+  await expect(file(page).getByTestId("file-image").locator("img")).toHaveJSProperty("naturalWidth", 2);
+  await expect(file(page).getByTestId("file-meta")).toHaveText("2 × 2 · 1.5 MB · PNG");
+
+  await openFile(page, "docs/huge.png");
+  const bigImage = file(page).getByTestId("file-image-too-large");
+  await expect(bigImage).toContainText("Image · 47.7 MB · too large to show");
+  await expect(bigImage.getByRole("button", { name: "Open in editor" })).toBeVisible();
+  await expect(bigImage.getByRole("button", { name: "Reveal in Finder" })).toBeVisible();
+  await expect(file(page).getByTestId("file-image")).toHaveCount(0);
+  await expect(file(page).getByTestId("file-truncated")).toHaveCount(0);
+
+  await openFile(page, "docs/huge.pdf");
+  const bigPdf = file(page).getByTestId("file-pdf-too-large");
+  await expect(bigPdf).toContainText("PDF · 47.7 MB · too large to show");
+  await expect(bigPdf.getByRole("button", { name: "Open in editor" })).toBeVisible();
+  await expect(bigPdf.getByRole("button", { name: "Reveal in Finder" })).toBeVisible();
+  await expect(file(page).getByTestId("file-meta")).toHaveText("47.7 MB · PDF");
+  await expect(file(page).getByTestId("file-pdf")).toHaveCount(0);
+  await expect(file(page).getByTestId("file-truncated")).toHaveCount(0);
 });
 
 test("a missing file says so and Retry reads again; the tab re-reads when the worktree changes", async ({ page }) => {

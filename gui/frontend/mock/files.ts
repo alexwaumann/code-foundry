@@ -1,8 +1,8 @@
 /**
  * FilesystemService.ReadFile and ProjectService.GetWorktreeFileDiff for the mock daemon
  * (the File and Diff panel tabs, docs/notes/file-viewer-3-tabs.md). A small fixed disk in
- * the code-foundry main worktree (a README, a TypeScript file, an HTML page, an image, a
- * binary, a folder, a 4 MB log), and every changed file of a worktree detail (mock/github.ts)
+ * the code-foundry main worktree (a README, a TypeScript file, an HTML page, images and PDFs
+ * under and over the 32 MiB read cap, a binary, a folder, a 4 MB log), and every changed file of a worktree detail (mock/github.ts)
  * on both sides: its old side derived from the new one by its status letter. Anything else is
  * not found.
  *
@@ -14,6 +14,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { ReadFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { HOME } from "./filesystem";
+import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
 type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
@@ -41,6 +42,15 @@ const enc = new TextEncoder();
 const PNG = Uint8Array.from(
   Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQIW2P8z8DwnwEIGBkZGRgYGAA2sAQB7sfJ5gAAAABJRU5ErkJggg==", "base64"),
 );
+/** The daemon's caps: at most 1 MiB of a text file, at most 32 MiB of anything else. */
+const TEXT_MAX = MiB;
+const READ_MAX = 32 * MiB;
+/** The 2×2 PNG grown past 1 MiB with bytes after its end, which decoders ignore: whole only under the larger cap. */
+const BIG_PNG = (() => {
+  const b = new Uint8Array(Math.round(1.5 * MiB));
+  b.set(PNG);
+  return b;
+})();
 
 const README_OLD = `# code-foundry
 
@@ -118,6 +128,12 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/src/app.ts`, text(APP_TS, "text/typescript")],
     [`${CF}/docs/preview.html`, text(PREVIEW_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
+    // Over 1 MiB, so they come back whole only because the File tab asks for more.
+    [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],
+    [`${CF}/docs/spec.pdf`, { data: Uint8Array.from(testPdf(3, Math.round(1.2 * MiB))), mime: "application/pdf", binary: true }],
+    // Over 32 MiB: only the first bytes would come back (the data stands in for them).
+    [`${CF}/docs/huge.png`, { data: PNG, mime: "image/png", binary: true, size: 50_000_000 }],
+    [`${CF}/docs/huge.pdf`, { data: Uint8Array.from(testPdf(1)), mime: "application/pdf", binary: true, size: 50_000_000 }],
     [`${CF}/bin/tool`, { data: Uint8Array.from([0x7f, 0x45, 0x4c, 0x46, 0, 0, 1]), mime: "application/octet-stream", binary: true, size: 2_400_000 }],
     [`${CF}/docs`, { data: new Uint8Array(), mime: "", dir: true, size: 192 }],
     [`${CF}/big.log`, { data: enc.encode("start of a long log\n".repeat(10)), mime: "text/plain; charset=utf-8", size: 4_400_000 }],
@@ -190,7 +206,9 @@ export class MockFiles {
     const modifiedAt = BigInt(Date.now() - 2 * 60_000);
     if (e.dir) return { resolvedPath: abs, isDir: true, size: BigInt(e.size ?? 0), modifiedAt };
     const size = e.size ?? e.data.length;
-    const limit = maxBytes === 0n || maxBytes > BigInt(MiB) ? MiB : Number(maxBytes);
+    // Zero is 1 MiB; text never more than 1 MiB, anything else up to 32 MiB.
+    const cap = e.binary ? READ_MAX : TEXT_MAX;
+    const limit = maxBytes === 0n ? TEXT_MAX : Number(maxBytes > BigInt(cap) ? BigInt(cap) : maxBytes);
     return {
       resolvedPath: abs,
       contents: e.data.slice(0, limit),
