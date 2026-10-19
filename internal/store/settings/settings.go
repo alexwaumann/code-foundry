@@ -79,6 +79,9 @@ type Appearance struct {
 	Density     string // compact, comfortable
 	ThreadWidth string // compact, comfortable, full
 	Backdrop    string // forest, none
+	// PanelKeepOpen keeps the side panel open on its new tab page when its last tab
+	// closes, instead of hiding it.
+	PanelKeepOpen bool
 }
 
 // Notifications configure the GUI's Dock badge and attention alerts. A bare executable
