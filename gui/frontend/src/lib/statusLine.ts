@@ -5,6 +5,7 @@
  */
 import type { ThreadView } from "@/api/threads";
 import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./thread";
+import { isWaiting } from "./waiting";
 
 /**
  * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)
@@ -15,6 +16,8 @@ import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./threa
  * - "error": "Error · <code or reason>" (red): Claude reported an error, or an error status other than interrupted
  * - "interrupted": "Interrupted while working · <ago>" (red): the process ended mid-turn
  * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
+ * - "waiting": "Waiting" (muted, an hourglass before it), then the place: the thread ended
+ *   its turn while child threads it subscribed to still work (lib/waiting); idle-like
  * - "flagAttention": "<plugin>: <reason>" (amber), "flagError": the same in red: a plugin's
  *   flag (docs/notes/plugins-3-events-flags-env.md). Claude's own prompts and errors win
  *   over a flag; a flag wins over a finished turn and over working.
@@ -29,6 +32,7 @@ export type StatusLineKind =
   | "error"
   | "interrupted"
   | "snoozeEnded"
+  | "waiting"
   | "flagAttention"
   | "flagError";
 
@@ -52,13 +56,14 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   error: "red",
   interrupted: "red",
   snoozeEnded: "amber",
+  waiting: "muted",
   flagAttention: "amber",
   flagError: "red",
 };
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
 export function showsPlace(kind: StatusLineKind): boolean {
-  return kind === "place" || kind === "working";
+  return kind === "place" || kind === "working" || kind === "waiting";
 }
 
 const PLACE: StatusLine = { kind: "place", detail: "", at: null };
@@ -74,6 +79,7 @@ export function statusLine(
     if (line.kind !== "finished" || !flag) return line;
   }
   if (flag) return { kind: flag.level === "error" ? "flagError" : "flagAttention", detail: `${flag.pluginName}: ${flag.reason}`, at: null };
+  if (isWaiting(s)) return { kind: "waiting", detail: "", at: null };
   return badge === "busy" ? { kind: "working", detail: "", at: null } : PLACE;
 }
 
@@ -108,6 +114,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   error: "Error",
   interrupted: "Interrupted while working",
   snoozeEnded: "Snooze ended",
+  waiting: "Waiting",
   flagAttention: "",
   flagError: "",
 };

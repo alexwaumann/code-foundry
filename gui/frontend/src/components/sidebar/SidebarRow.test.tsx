@@ -242,3 +242,14 @@ describe("SidebarRow created by a thread", () => {
     expect(glyph()?.nextElementSibling?.textContent).toBe("Old child");
   });
 });
+
+describe("SidebarRow waiting on its child threads", () => {
+  it("reads Waiting after a muted hourglass, then the place; idle-like, not amber or emerald", () => {
+    renderRow({ status: "idle", statusReason: "waiting on 2 child threads" });
+    expect(screen.getByTestId("row-place").textContent).toBe("Waiting · code-foundry @ main");
+    expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("waiting");
+    expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
+    expect(screen.getByTestId("row-status").className).toBe("");
+    expect(screen.getByTestId("row-waiting").getAttribute("class")).toContain("text-muted-foreground");
+  });
+});

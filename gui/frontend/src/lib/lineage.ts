@@ -162,6 +162,7 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
     case "flagError":
       return "error";
     case "place":
+    case "waiting": // on its own child threads: needs nothing (lib/waiting)
       return "idle";
   }
 }

@@ -223,13 +223,17 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 }
 
 // threadStatusWord is a thread's status as thread.list's --status names it, with the
-// reason for attention and error: "busy", "attention (finished)", "error (interrupted)".
+// reason for attention and error: "busy", "attention (finished)", "error (interrupted)";
+// an idle thread waiting on its child threads is "waiting (on 2 children)".
 func threadStatusWord(s *v1.Thread) string {
 	var w string
 	switch s.GetStatus() {
 	case v1.ThreadStatus_THREAD_STATUS_BUSY:
 		return "busy"
 	case v1.ThreadStatus_THREAD_STATUS_IDLE:
+		if w, ok := waitingWord(s.GetStatusReason()); ok {
+			return w
+		}
 		return "idle"
 	case v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION:
 		w = "attention"
