@@ -289,6 +289,9 @@ message Thread {
   // describes an older turn: the wake's report_stale rule. Set by ThreadService.Get with
   // with_detail only.
   bool report_stale = 60;
+  // How far below ThreadFilter.descendants_of the thread is (0: that thread, 1: a
+  // thread it created); set by a List with that filter only.
+  optional int32 depth = 61;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -583,6 +586,13 @@ message ThreadFilter {
   // apply; a status or state leaves every removed thread out; limit applies to them
   // separately. thread.reports --all and thread.list --all set it.
   bool include_removed = 11;
+  // Only this thread (by id) and the threads below it: those it created, those they
+  // created, and so on, at most 8 levels down; the other fields still apply. The answer
+  // is in tree order (each thread before the ones it created, siblings oldest first;
+  // limit still keeps the most recently active), with Thread.depth set and
+  // ListThreadsResponse.totals. Removed threads are not listed (include_removed adds
+  // none), but a removed thread's children are still below its creator.
+  string descendants_of = 12;
 }
 
 message ListThreadsResponse {
@@ -592,6 +602,15 @@ message ListThreadsResponse {
   // With ThreadFilter.include_removed: the matching removed threads, the most
   // recently removed first.
   repeated RemovedThread removed = 3;
+  // With ThreadFilter.descendants_of: the count and summed cost of the threads listed.
+  ThreadTotals totals = 4;
+}
+
+// ThreadTotals sums a list of threads (ListThreadsResponse.totals).
+message ThreadTotals {
+  int32 threads = 1;
+  // The sum of their Thread.cost_usd.
+  double cost_usd = 2;
 }
 
 // RemovedThread is what the daemon keeps of a thread removed within the last 24 hours,

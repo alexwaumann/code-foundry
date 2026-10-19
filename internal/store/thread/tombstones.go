@@ -151,9 +151,10 @@ func (m *Manager) ListRemoved(_ context.Context, o ListOptions) ([]RemovedThread
 
 // FilterRemoved returns the removed threads o selects, the most recently removed first,
 // at most o.Limit of them. A removed thread has no status or state: o.Status or o.State
-// leaves every one out. Archived or not does not apply.
+// leaves every one out, and so does o.DescendantsOf (a subtree lists live threads
+// only). Archived or not does not apply.
 func FilterRemoved(removed []RemovedThread, o ListOptions) []RemovedThread {
-	if o.Status != StatusUnknown || o.State != StateUnspecified {
+	if o.Status != StatusUnknown || o.State != StateUnspecified || o.DescendantsOf != "" {
 		return nil
 	}
 	o.IncludeArchived = true

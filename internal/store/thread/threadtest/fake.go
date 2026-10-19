@@ -457,10 +457,16 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 	return f.snap
 }
 
-// List filters the snapshot like the store (thread.FilterThreads), comparing Project and
-// Workspace as ids.
+// List filters the snapshot like the store (thread.FilterLineage, with the tombstones
+// in the lineage), comparing Project and Workspace as ids.
 func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, error) {
-	return thread.FilterThreads(f.Snapshot().Threads, o), nil
+	f.mu.Lock()
+	removed := make([]thread.RemovedThread, 0, len(f.removed))
+	for _, r := range f.removed {
+		removed = append(removed, r)
+	}
+	f.mu.Unlock()
+	return thread.FilterLineage(f.Snapshot().Threads, removed, o), nil
 }
 
 // PutItems replaces a thread's items (and pending requests, derived from the
