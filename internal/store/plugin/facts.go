@@ -346,8 +346,10 @@ func (n *availabilityNotifier) changed(m *Manager) {
 // Checks cache: the async pull request checks fact.
 const (
 	// checksFresh is how long fetched checks are used without a refresh; after it the
-	// stale value still answers while a refresh runs.
-	checksFresh = 60 * time.Second
+	// stale value still answers while a refresh runs. A safety net: the daemon
+	// invalidates an entry when the GitHub poll sees its pull request's head or checks
+	// move (InvalidatePullRequestChecks), so this only bounds a missed change.
+	checksFresh = 10 * time.Minute
 	// checksFetchTimeout bounds one fetch.
 	checksFetchTimeout = 30 * time.Second
 	// checksKeep bounds the cache: entries unused this long go first.
@@ -361,7 +363,10 @@ type checksEntry struct {
 	fetchedAt time.Time
 	usedAt    time.Time
 	fetching  bool
-	err       string
+	// again refetches once the running fetch ends: the entry was invalidated while it
+	// ran, so its answer may predate the change.
+	again bool
+	err   string
 }
 
 // checksCache holds the pull requests' checks the predicates asked for. A miss
@@ -436,6 +441,10 @@ func (c *checksCache) fetch(m *Manager, pr PullRequestRef, k string) {
 	first := !e.known
 	changed := first || !sameChecks(e.runs, runs)
 	e.fetching, e.known, e.fetchedAt = false, true, m.opts.Now()
+	if e.again {
+		e.again, e.fetching = false, true
+		go c.fetch(m, pr, k)
+	}
 	e.err = ""
 	if err != nil {
 		// Known and empty (unavailable), not unknown forever: tried again once stale.
@@ -454,6 +463,35 @@ func (c *checksCache) fetch(m *Manager, pr PullRequestRef, k string) {
 	if changed {
 		m.avail.changed(m)
 	}
+}
+
+// invalidate marks pr's checks stale and refetches them now (the next get would): an
+// entry exists only while predicates use it (checksKeep). The fetch publishes
+// AvailabilityChanged when the result differs. A pull request nobody asked about is
+// left alone.
+func (c *checksCache) invalidate(m *Manager, pr PullRequestRef) {
+	k := prKey(pr)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e := c.entries[k]
+	switch {
+	case e == nil:
+	case e.fetching:
+		e.again = true
+	default:
+		e.fetching = true
+		go c.fetch(m, pr, k)
+	}
+}
+
+// InvalidatePullRequestChecks tells the store a pull request's checks changed (the
+// daemon calls it on the gh store's events): the pr.checks fact refetches them if a
+// predicate uses them, and availability is re-announced when they differ.
+func (m *Manager) InvalidatePullRequestChecks(slug string, number int) {
+	if slug == "" || number <= 0 {
+		return
+	}
+	m.checks.invalidate(m, PullRequestRef{Slug: slug, Number: number})
 }
 
 // sameChecks compares what predicates read of two check lists.
