@@ -125,7 +125,7 @@ func checkView(t *testing.T, raw []byte) {
 }
 
 // requiredLists are the view model's lists without omitempty: viewers expect arrays.
-var requiredLists = []string{"nodes", "items", "rows", "chips", "buttons", "children", "fields"}
+var requiredLists = []string{"nodes", "items", "rows", "chips", "buttons", "children", "fields", "detail"}
 
 // nullList returns the path of a required list that is null in the view's JSON.
 func nullList(view []byte) string {

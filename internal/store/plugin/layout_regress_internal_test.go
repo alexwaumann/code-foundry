@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -156,4 +158,32 @@ func TestKeptVersions(t *testing.T) {
 	if len(in.index) != 2 || in.index[103] == nil || in.index[102] == nil {
 		t.Fatalf("a long-shown view replaced: %d kept", len(in.index))
 	}
+}
+
+// requiredLists (fuzz_test.go's null-list check) names every list of the view model
+// without omitempty: it lacked masterDetail's detail.
+func TestRequiredListsAreEveryRequiredList(t *testing.T) {
+	seen := map[reflect.Type]bool{}
+	var walk func(rt reflect.Type)
+	walk = func(rt reflect.Type) {
+		for rt.Kind() == reflect.Pointer || rt.Kind() == reflect.Slice || rt.Kind() == reflect.Map {
+			rt = rt.Elem()
+		}
+		if rt.Kind() != reflect.Struct || seen[rt] {
+			return
+		}
+		seen[rt] = true
+		for i := range rt.NumField() {
+			f := rt.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if f.Type.Kind() == reflect.Slice && name != "" && name != "-" && !strings.Contains(opts, "omitempty") && !slices.Contains(requiredLists, name) {
+				t.Errorf("%s.%s (%q) is a list without omitempty that requiredLists lacks", rt.Name(), f.Name, name)
+			}
+			walk(f.Type)
+		}
+	}
+	walk(reflect.TypeFor[ui.View]())
 }
