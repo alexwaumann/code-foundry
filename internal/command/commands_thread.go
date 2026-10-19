@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -194,6 +196,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					return Result{}, err
 				}
 				line := fmt.Sprintf("%s: %s", pending.GetSummary(), describeRequest(res.Msg.GetItem()))
+				if q := res.Msg.GetItem().GetQuestion(); q != nil && len(q.GetAnswers()) > 0 {
+					line = answeredLine(q.GetAnswers())
+				}
 				// What still waits on an answer, so a caller answering one request sees the
 				// next without a wake. Claude asks for parallel tool calls one after the
 				// other, the next a few ms after an answer (w2a: 15 ms), so a CLI caller
@@ -427,6 +432,17 @@ func parseAnswers(answer string, questions []string) (map[string]string, error) 
 	return map[string]string{questions[0]: answer}, nil
 }
 
+// answeredLine is thread.respond's line for an answered question: `answered "Which
+// color?": Blue`, the questions in order of their text (E3 item 6: "allowed (allow):
+// <question> = <label>" read as a permission).
+func answeredLine(answers map[string]string) string {
+	var parts []string
+	for _, q := range slices.Sorted(maps.Keys(answers)) {
+		parts = append(parts, strconv.Quote(q)+": "+answers[q])
+	}
+	return "answered " + strings.Join(parts, "; ")
+}
+
 // describeRequest is a resolved request's outcome, e.g. "allowed (allow_session)".
 func describeRequest(it *v1.ThreadItem) string {
 	r := it.GetPermission()
@@ -488,8 +504,12 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			u := it.GetUserMessage()
 			body = "you: " + line(u.GetText())
 			if u.GetOrigin() == v1.MessageOrigin_MESSAGE_ORIGIN_WAKE {
-				// The daemon's, for a wake subscription (commands_thread_subscribe.go).
+				// The daemon's, for a wake subscription (commands_thread_subscribe.go);
+				// full adds its JSON (E7: the title alone hid the report and pending).
 				body = "wake: " + line(u.GetWakeTitle())
+				if full && u.GetWakeJson() != "" {
+					body += "\n" + strings.TrimSpace(u.GetWakeJson())
+				}
 			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"

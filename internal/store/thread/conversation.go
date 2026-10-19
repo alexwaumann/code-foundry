@@ -144,7 +144,26 @@ func (m *Manager) Respond(ctx context.Context, id, requestID string, d Decision)
 	if r == nil {
 		return Item{}, fmt.Errorf("%w: no pending request %s on thread %s: Claude is not running", ErrFailedPrecondition, requestID, id)
 	}
-	return r.call(ctx, threadCmd{requestID: requestID, decision: d})
+	it, err := r.call(ctx, threadCmd{requestID: requestID, decision: d})
+	if err == nil {
+		// One line per answer, beside "claude asks" (E3: the log had none).
+		m.log.Info("request answered", "thread", id, "request", requestID, "decision", d.word())
+	}
+	return it, err
+}
+
+// word is the decision as thread.respond names it: allow, allow-session, deny, or
+// answer for a question's answers.
+func (d Decision) word() string {
+	switch {
+	case !d.Allow:
+		return "deny"
+	case len(d.Answers) > 0:
+		return "answer"
+	case d.ForSession:
+		return "allow-session"
+	}
+	return "allow"
 }
 
 // Interrupt implements Store. A thread that is not running has nothing to stop: a

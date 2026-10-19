@@ -8,6 +8,22 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
+// thread.respond names a question's answer as one (E3 item 6).
+func TestAnsweredLine(t *testing.T) {
+	tests := []struct {
+		answers map[string]string
+		want    string
+	}{
+		{map[string]string{"Which color?": "Blue"}, `answered "Which color?": Blue`},
+		{map[string]string{"Year?": "2026", "License?": "MIT"}, `answered "License?": MIT; "Year?": 2026`},
+	}
+	for _, tt := range tests {
+		if got := answeredLine(tt.answers); got != tt.want {
+			t.Errorf("answeredLine(%v) = %q, want %q", tt.answers, got, tt.want)
+		}
+	}
+}
+
 // thread.get marks a report made before the thread's last message (E6 §4.2, W4 finding 5).
 func TestThreadDetailStaleReport(t *testing.T) {
 	tests := []struct {
