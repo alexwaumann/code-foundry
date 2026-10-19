@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/api"
 	"github.com/alexwaumann/code-foundry/internal/bus"
@@ -180,6 +181,48 @@ func TestThreadCommands(t *testing.T) {
 			}
 			if calls := fake.Calls(); strings.Join(calls, "|") != strings.Join(tt.wantCalls, "|") {
 				t.Errorf("calls %q, want %q", calls, tt.wantCalls)
+			}
+		})
+	}
+}
+
+// thread.respond from the CLI names the request Claude asks next, a few ms after the
+// answer (parallel tool calls are asked one after the other; w2a finding 2). The GUI
+// (a view in its context) does not wait for it.
+func TestThreadRespondNamesTheNextRequest(t *testing.T) {
+	first := thread.Item{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Edit", Description: "README.md", State: thread.RequestPending}}
+	tests := []struct {
+		name string
+		uctx command.Context
+		want string
+	}{
+		{name: "cli", want: "Edit README.md: allowed (allow); 1 more pending: permission: Bash rm -r docs (request r2)"},
+		{name: "gui", uctx: command.Context{ActiveView: "thread", ActiveThreadID: "s1"}, want: "Edit README.md: allowed (allow); nothing pending"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, fake := newThreadRegistry(t)
+			fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, Status: thread.StatusNeedsAttention, StatusReason: "permission: Edit README.md"})
+			fake.PutItems("s1", first)
+			// Claude asks the next one once the first is answered.
+			go func() {
+				for !strings.Contains(strings.Join(fake.Calls(), "|"), "Respond s1 r1") {
+					time.Sleep(time.Millisecond)
+				}
+				time.Sleep(20 * time.Millisecond)
+				answered := first
+				r := *first.Request
+				r.State = thread.RequestAllowed
+				answered.Request = &r
+				fake.PutItems("s1", answered,
+					thread.Item{ID: "perm-r2", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r2", ToolName: "Bash", Description: "rm -r docs", State: thread.RequestPending}})
+			}()
+			res, err := reg.Invoke(context.Background(), tt.uctx, "thread.respond", map[string]string{"id": "s1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Message != tt.want {
+				t.Errorf("message %q, want %q", res.Message, tt.want)
 			}
 		})
 	}

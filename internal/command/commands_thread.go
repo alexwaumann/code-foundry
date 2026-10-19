@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -66,6 +67,10 @@ var (
 	_ ThreadBackend = codefoundryv1connect.ThreadServiceHandler(nil)
 	_ ThreadBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
+
+// respondSettle is how long thread.respond (from the CLI) waits for Claude's next
+// request or the turn's end before it names what is still pending.
+const respondSettle = 500 * time.Millisecond
 
 // ThreadDecisions are thread.respond's decision values.
 var ThreadDecisions = []string{"allow", "allow-session", "deny"}
@@ -150,7 +155,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "interrupt", Type: Bool, Description: "With deny: also stop the turn"},
 			},
 			When: hasThread,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				id := a.String("id")
 				items, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id}))
 				if err != nil {
@@ -187,7 +192,16 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				line := fmt.Sprintf("%s: %s", pending.GetSummary(), describeRequest(res.Msg.GetItem()))
 				// What still waits on an answer, so a caller answering one request sees the
-				// next without a wake (a thread can ask several at once).
+				// next without a wake. Claude asks for parallel tool calls one after the
+				// other, the next a few ms after an answer (w2a: 15 ms), so a CLI caller
+				// (no view in its context) gives the thread respondSettle to react first;
+				// the GUI shows the next prompt itself and does not wait.
+				if uctx.ActiveView == "" {
+					_, _ = b.Wait(ctx, connect.NewRequest(&v1.WaitThreadRequest{
+						Id: id, Until: v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION,
+						After: res.Msg.GetItem().GetId(), Timeout: durationpb.New(respondSettle),
+					}))
+				}
 				if after, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id})); err == nil {
 					line += "; " + stillPending(after.Msg.GetSnapshot().GetPending(), pending.GetRequestId())
 				}
