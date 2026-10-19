@@ -103,7 +103,8 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    types), not only whether git merges them. Tell the user what overlaps or conflicts.
 5. **Archive** a child once the user has accepted or merged its work, not after its
    first report (the user may steer it; archiving deletes your wakes on it). It keeps the
-   worktree and branch: `code-foundry thread archive --ids <id1>,<id2> --yes`.
+   worktree and branch: `code-foundry thread archive --ids <id1>,<id2> --yes`. A lead and
+   its team: `thread archive --descendants-of <lead> --include-root --yes`.
 6. **Clean up only after merge** (below).
 
 ## Leads (children that orchestrate)
@@ -119,7 +120,7 @@ sees every thread in the app's sidebar. You create and drive other threads with 
   when the lead's work is done or a worker needs someone. A lead's wake counts its
   `children` ("2 of its 3 child threads still working": not done). Its final report
   lists each worker's id, branch, status and every concern a worker raised; a parent
-  runs `thread reports --created-by <lead>` before presenting the result.
+  runs `thread reports --descendants-of <lead>` (with costs) before presenting it.
 
 ## Cleanup
 

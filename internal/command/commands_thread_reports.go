@@ -51,6 +51,9 @@ type ThreadReport struct {
 	RemovedAt *time.Time `json:"removedAt,omitempty"`
 	// CostUSD is what the thread cost (at removal, for a removed one); omitted at 0.
 	CostUSD float64 `json:"costUsd,omitempty"`
+	// Depth is how far below descendants-of the thread is (0: that thread); only with
+	// descendants-of.
+	Depth *int32 `json:"depth,omitempty"`
 }
 
 // RegisterThreadReports registers thread.reports.
@@ -58,7 +61,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 	return r.Register(Command{
 		Name:  "thread.reports",
 		Title: "Show Thread Reports",
-		Description: "The reports of threads, for the thread that created them: one line each " +
+		Description: "The reports of threads: one line each " +
 			"(`-`: no report yet; `(data)`: it has JSON data, see full; `*`: from before its last message). --json: one object each.",
 		Category:     "Thread",
 		NoKeybinding: true,
@@ -70,6 +73,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 			{Name: "all", Type: Bool, Description: "Archived and removed too"},
 			{Name: "full", Type: Bool, Description: "Print each report's JSON data"},
 			{Name: "limit", Type: Int, Description: "At most this many, most recently active first (0: all)"},
+			descendantsArg("only it and the threads below it, as a tree (each lead before its workers) with costs and a total line"),
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			limit := a.Int("limit")
@@ -83,7 +87,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 			// all here only adds the archived and removed threads: ThreadFilter.all would
 			// also drop created-by and labels, which this command is for.
 			f := &v1.ThreadFilter{IncludeArchived: a.Bool("archived") || a.Bool("all"), IncludeRemoved: a.Bool("all"), CreatedBy: by,
-				Labels: splitList(a.String("label"))}
+				Labels: splitList(a.String("label")), DescendantsOf: a.String("descendants-of")}
 			res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: f}))
 			if err != nil {
 				return Result{}, err
@@ -161,7 +165,7 @@ func threadReport(s *v1.Thread) ThreadReport {
 	r := ThreadReport{
 		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s.GetStatus()), ReportStatus: reportWord(s),
 		ReportSummary: s.GetReportSummary(), CreatedBy: s.GetCreatedBy(), Labels: slices.Clone(s.GetLabels()),
-		CostUSD: s.GetCostUsd(),
+		CostUSD: s.GetCostUsd(), Depth: s.Depth,
 	}
 	if r.Labels == nil {
 		r.Labels = []string{}
@@ -187,7 +191,9 @@ func threadStatusName(st v1.ThreadStatus) string {
 
 // formatThreadReports is thread.reports' text: one aligned line per thread, each with
 // its JSON data indented under it when full is set (else a "(data)" marker), or why
-// the list is empty.
+// the list is empty. With f.descendants_of the reports are a subtree in tree order:
+// each name indented for its depth (subtreeName), its cost before the summary, and a
+// total line.
 func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) string {
 	if len(reports) == 0 {
 		if !f.GetIncludeArchived() {
@@ -198,6 +204,8 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 		}
 		return "no threads"
 	}
+	tree := f.GetDescendantsOf() != ""
+	var cost float64
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 	for _, r := range reports {
@@ -229,6 +237,10 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 			st += "*"
 			summary = strings.TrimSpace(summary + " " + staleNote)
 		}
+		if tree {
+			name = subtreeName(name, r.depth()) + "\t" + formatUSD(r.CostUSD)
+			cost += r.CostUSD
+		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.ID, st, name, summary)
 	}
 	_ = tw.Flush()
@@ -245,7 +257,18 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 			}
 		}
 	}
+	if tree {
+		out = append(out, subtreeTotal(len(reports), cost))
+	}
 	return strings.Join(out, "\n")
+}
+
+// depth is r's Depth, 0 without one.
+func (r ThreadReport) depth() int32 {
+	if r.Depth == nil {
+		return 0
+	}
+	return *r.Depth
 }
 
 // oneLineText joins a text's lines with spaces.
