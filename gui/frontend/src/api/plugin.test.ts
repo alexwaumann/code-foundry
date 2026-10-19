@@ -40,6 +40,21 @@ describe("view model", () => {
     expect(withChildLists(t("x"), [[t("q")]])).toEqual(t("x"));
   });
 
+  it("lists a grid's items' nodes and a group's items, and replaces them", () => {
+    const t = (key: string): ViewNode => ({ key, text: { content: key } });
+    const grid: ViewNode = { key: "g", grid: { minWidth: 200, items: [{ key: "a", span: 2, children: [t("a1")] }, { key: "b", children: [t("b1"), t("b2")] }] } };
+    expect(childLists(grid).map((l) => l.map((n) => n.key))).toEqual([["a1"], ["b1", "b2"]]);
+    const group: ViewNode = { key: "l", group: { align: "between", items: [t("l1"), t("l2")] } };
+    expect(childLists(group).map((l) => l.map((n) => n.key))).toEqual([["l1", "l2"]]);
+    expect(childLists({ key: "d", divider: { label: "x" } })).toEqual([]);
+    expect(childLists({ key: "s", spacer: { flex: true } })).toEqual([]);
+    const swapped = withChildLists(grid, [grid.grid?.items[0]?.children ?? [], [t("y")]]);
+    expect(swapped.grid).toEqual({ minWidth: 200, items: [{ key: "a", span: 2, children: [t("a1")] }, { key: "b", children: [t("y")] }] });
+    // An item whose list did not change keeps its identity.
+    expect(swapped.grid?.items[0]).toBe(grid.grid?.items[0]);
+    expect(withChildLists(group, [[t("z")]]).group).toEqual({ align: "between", items: [t("z")] });
+  });
+
   it("refuses what is not a view", () => {
     expect(parseView("{")).toBeNull();
     expect(parseView('{"header":{}}')).toBeNull();

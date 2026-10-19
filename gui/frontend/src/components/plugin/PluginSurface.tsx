@@ -177,7 +177,8 @@ export function PluginSurface({ tab }: { tab: Tab }) {
     <ViewContext.Provider value={ctx}>
       {/* @container: the header, tabs and rows adapt to the panel's width (down to 280px). */}
       <div
-        className="@container flex min-w-0 flex-col pb-4"
+        // grow: the body's list is the scroll area's box (a flex spacer reaches its bottom).
+        className="@container flex min-w-0 grow flex-col pb-4"
         data-testid="plugin-surface"
         data-kind={tab.kind}
         data-phase={phase}
@@ -190,8 +191,8 @@ export function PluginSurface({ tab }: { tab: Tab }) {
         </div>
         {banner}
         {view ? (
-          <div className={cn("px-4 pt-3 @max-[340px]:px-3", down && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-body" data-stale={down || undefined}>
-            <NodeList nodes={view.nodes} />
+          <div className={cn("flex grow flex-col px-4 pt-3 @max-[340px]:px-3", down && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-body" data-stale={down || undefined}>
+            <NodeList nodes={view.nodes} box />
           </div>
         ) : show !== "unavailable" && !down && error === null ? (
           <Opening />

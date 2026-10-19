@@ -10,7 +10,8 @@ import type { NodeProps } from "../registry";
  * "auto" (absent) as tall as its nodes, at least minHeight; pixels as given; "fill" the rest
  * of its own box (components/plugin/height.ts), at least minHeight or FILL_MIN. A px or
  * fill pane is the box its fill nodes fill (data-fill-box, height.ts FILL_BOX_ATTR). Taller nodes scroll inside it, or are cut with
- * noScroll. It draws nothing of its own and lays its nodes out like the list around it.
+ * noScroll. It draws nothing of its own and lays its nodes out like the list around it;
+ * a sized pane's list is its box's own (list.ts BoxList: a flex spacer reaches its bottom).
  */
 export function PaneNode({ node, data }: NodeProps<"pane">) {
   const inner = useInnerList();
@@ -31,7 +32,7 @@ export function PaneNode({ node, data }: NodeProps<"pane">) {
       data-scroll={sized ? scroll : undefined}
       data-fill-box={sized || undefined}
     >
-      <NodeList nodes={data.children} inner={inner} />
+      <NodeList nodes={data.children} inner={inner} box={sized} />
     </div>
   );
 }

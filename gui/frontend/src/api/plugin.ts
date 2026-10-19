@@ -358,6 +358,41 @@ export interface PaneData {
   children: ViewNode[];
 }
 
+/** One cell of a grid: its nodes and a span (1..2, absent = 1; at most the grid's column count). */
+export interface GridItemData {
+  key: string;
+  span?: number;
+  children: ViewNode[];
+}
+
+/**
+ * Items in as many equal columns as fit the grid's width, at least minWidth px each
+ * (160..480, absent = 240), at most 6 (components/plugin/layout.ts gridColumns); one column
+ * stacks them like the list around it.
+ */
+export interface GridData {
+  minWidth?: number;
+  items: GridItemData[];
+}
+
+/** A hairline, or a hairline either side of a centred label. */
+export interface DividerData {
+  label?: string;
+}
+
+/** Extra space between neighbours: size px (4..64, absent = 12); flex grows to the free height of its box. */
+export interface SpacerData {
+  size?: number;
+  flex?: boolean;
+}
+
+/** Text, chips, actions and progress nodes on one line, 8 px apart, wrapping unless noWrap. */
+export interface GroupData {
+  items: ViewNode[];
+  align?: "start" | "center" | "end" | "between";
+  noWrap?: boolean;
+}
+
 /** Each node kind's data, by the JSON field that names the kind. */
 export interface NodeData {
   text: TextData;
@@ -376,12 +411,16 @@ export interface NodeData {
   terminal: TerminalData;
   columns: ColumnsData;
   pane: PaneData;
+  grid: GridData;
+  divider: DividerData;
+  spacer: SpacerData;
+  group: GroupData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
@@ -400,17 +439,20 @@ export function nodeKind(n: ViewNode): NodeKind | null {
 }
 
 /**
- * The node lists a container holds (a section's children, each column's, a pane's), in
- * order; empty for any other node. Every walk over a view's nodes goes through this.
+ * The node lists a node holds (a section's children, each column's, a pane's, each grid
+ * item's, a group's items), in order; empty for any other node. Every walk over a view's
+ * nodes goes through this.
  */
 export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
   if (n.section) return [n.section.children];
   if (n.columns) return n.columns.items.map((c) => c.children);
   if (n.pane) return [n.pane.children];
+  if (n.grid) return n.grid.items.map((it) => it.children);
+  if (n.group) return [n.group.items];
   return [];
 }
 
-/** A container node with its lists replaced (same order and count as childLists gives). */
+/** A node with its lists replaced (same order and count as childLists gives). */
 export function withChildLists(n: ViewNode, lists: readonly (readonly ViewNode[])[]): ViewNode {
   const list = (i: number, old: ViewNode[]) => (lists[i] as ViewNode[] | undefined) ?? old;
   if (n.section) return { ...n, section: { ...n.section, children: list(0, n.section.children) } };
@@ -420,6 +462,11 @@ export function withChildLists(n: ViewNode, lists: readonly (readonly ViewNode[]
     return { ...n, columns: { ...n.columns, items } };
   }
   if (n.pane) return { ...n, pane: { ...n.pane, children: list(0, n.pane.children) } };
+  if (n.grid) {
+    const items = n.grid.items.map((it, i) => (list(i, it.children) === it.children ? it : { ...it, children: list(i, it.children) }));
+    return { ...n, grid: { ...n.grid, items } };
+  }
+  if (n.group) return { ...n, group: { ...n.group, items: list(0, n.group.items) } };
   return n;
 }
 

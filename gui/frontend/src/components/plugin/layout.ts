@@ -1,10 +1,12 @@
 /**
- * The plugin view's layout containers (docs/notes/plugins-layout-1-columns-pane.md): how a
- * columns node decides between side by side and its collapse, and how wide its columns are.
- * The numbers are pluginsdk/ui's (ColumnMinWidth, ColumnGap; a Go test keeps them equal).
+ * The plugin view's layout nodes (docs/notes/plugins-layout-1-columns-pane.md,
+ * plugins-layout-2-grid-inline.md): how a columns node decides between side by side and its
+ * collapse, and how wide its columns are; how many columns a grid has and what an item
+ * spans; a spacer's size. The numbers are pluginsdk/ui's (ColumnMinWidth, ColumnGap,
+ * GridMinWidth, ...; a Go test keeps them equal).
  */
 import { useLayoutEffect, useState, type CSSProperties } from "react";
-import type { ColumnData, ColumnsData } from "@/api/plugin";
+import type { ColumnData, ColumnsData, GridData, GridItemData, SpacerData } from "@/api/plugin";
 
 /** The width a weighted column needs side by side; it never gets less. */
 export const COLUMN_MIN_WIDTH = 240;
@@ -50,6 +52,50 @@ export function columnStyle(c: ColumnData): CSSProperties {
   if (fixed !== null) return { flex: `0 0 ${String(fixed)}px`, width: fixed, minWidth: 0 };
   return { flex: `${String(columnWeight(c))} 1 0px`, minWidth: COLUMN_MIN_WIDTH };
 }
+
+/** A grid column's least width when the grid sets none. */
+export const GRID_MIN_WIDTH = 240;
+/** A grid's least column width the daemon takes, and the most. */
+export const GRID_MIN_WIDTH_RANGE = [160, 480] as const;
+/** The most columns a grid has, however wide. */
+export const GRID_MAX_COLUMNS = 6;
+/** The space between a grid's columns and rows (gap-3, like columns). */
+export const GRID_GAP = 12;
+/** The most columns an item spans. */
+export const GRID_MAX_SPAN = 2;
+
+/** A grid's least column width: its minWidth in range, else GRID_MIN_WIDTH. */
+export function gridMinWidth(data: GridData): number {
+  const w = data.minWidth;
+  return typeof w === "number" && Number.isFinite(w) && w >= GRID_MIN_WIDTH_RANGE[0] && w <= GRID_MIN_WIDTH_RANGE[1] ? w : GRID_MIN_WIDTH;
+}
+
+/**
+ * How many columns a grid `width` px wide has: max(1, floor((width + gap) / (minWidth +
+ * gap))), at most GRID_MAX_COLUMNS; 1 before it is measured (null), so it stacks.
+ */
+export function gridColumns(width: number | null, minWidth: number): number {
+  if (width === null) return 1;
+  return Math.min(GRID_MAX_COLUMNS, Math.max(1, Math.floor((width + GRID_GAP) / (minWidth + GRID_GAP))));
+}
+
+/** The columns an item spans in a grid of `columns`: its span (1..2, absent or out of range 1), at most the columns. */
+export function gridSpan(item: GridItemData, columns: number): number {
+  const s = item.span ?? 1;
+  return Math.min(columns, Number.isInteger(s) && s >= 1 && s <= GRID_MAX_SPAN ? s : 1);
+}
+
+/** A spacer's size when it sets none. */
+export const SPACER_SIZE = 12;
+
+/** A spacer's size in px: its size in 4..64, else SPACER_SIZE. */
+export function spacerSize(data: SpacerData): number {
+  const s = data.size;
+  return typeof s === "number" && Number.isInteger(s) && s >= 4 && s <= 64 ? s : SPACER_SIZE;
+}
+
+/** The space between a group's items (gap-2). */
+export const GROUP_GAP = 8;
 
 /**
  * The element's width in px, followed as it resizes (one ResizeObserver); null until it
