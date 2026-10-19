@@ -100,8 +100,6 @@ type streamState struct {
 	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
 	// the goroutine are refused meanwhile (connection).
 	swapping bool
-	// mcpChecked: the MCP servers were checked since spawn (mcp.go checkMcp).
-	mcpChecked bool
 	// commandsPushed: this process pushed its slash commands (slashcommands.go).
 	commandsPushed bool
 }

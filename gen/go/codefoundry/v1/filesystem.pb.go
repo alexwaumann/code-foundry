@@ -675,7 +675,9 @@ type ReadFileRequest struct {
 	BaseDir string `protobuf:"bytes,1,opt,name=base_dir,json=baseDir,proto3" json:"base_dir,omitempty"`
 	// Absolute, "~/"-prefixed, or relative to base_dir.
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	// Maximum bytes of contents. Zero means 1 MiB, which is also the limit.
+	// Maximum bytes of contents. Zero means 1 MiB. A text file (a text MIME type and no
+	// NUL in the first 8 KiB) is always capped at 1 MiB whatever this asks; any other
+	// file (images, PDFs, archives) is read up to this, at most 32 MiB.
 	MaxBytes      int64 `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -734,7 +736,8 @@ func (x *ReadFileRequest) GetMaxBytes() int64 {
 
 type ReadFileResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The first max_bytes of the file.
+	// The first max_bytes of the file (zero: 1 MiB), at most 1 MiB for text and 32 MiB
+	// for anything else.
 	Contents []byte `protobuf:"bytes,1,opt,name=contents,proto3" json:"contents,omitempty"`
 	// The file's full size in bytes.
 	Size int64 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`

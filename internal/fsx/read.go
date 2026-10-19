@@ -16,8 +16,11 @@ import (
 // File reads for the file viewer (FilesystemService.ReadFile).
 
 const (
-	// MaxReadBytes is ReadFile's default and largest read.
+	// MaxReadBytes is ReadFile's default read, and its largest read of a text file.
 	MaxReadBytes = 1 << 20
+	// MaxBinaryReadBytes is ReadFile's largest read of a file that is not text (an
+	// image or PDF the viewer shows whole).
+	MaxBinaryReadBytes = 32 << 20
 	// BinarySniff is how many leading bytes LooksBinary checks for NUL (git uses 8000).
 	BinarySniff = 8000
 )
@@ -42,18 +45,19 @@ type FileContents struct {
 	ModifiedAt time.Time
 }
 
-// ReadFile reads at most max bytes (zero or above MaxReadBytes: MaxReadBytes) of the
-// file at path: absolute, "~" or "~/..." (under root), or relative to baseDir, which
-// must then be absolute. The path, and the file its symlinks lead to, must be under
+// ReadFile reads at most maxBytes of the file at path. Zero means MaxReadBytes; a text
+// file (a text MIME type and no NUL in the first BinarySniff bytes) is capped at
+// MaxReadBytes and any other file at MaxBinaryReadBytes. path is absolute, "~" or
+// "~/..." (under root), or relative to baseDir, which must then be absolute. The path, and the file its symlinks lead to, must be under
 // root (a resolved root, see ResolveRoot); otherwise, and for a path that is not a
 // regular file or directory, the error wraps ErrInvalidArgument. A missing file is
 // NotFound and a directory IsDir, not errors.
-func ReadFile(root, baseDir, path string, max int64) (FileContents, error) {
-	if max < 0 {
-		return FileContents{}, fmt.Errorf("%w: max_bytes %d is negative", ErrInvalidArgument, max)
+func ReadFile(root, baseDir, path string, maxBytes int64) (FileContents, error) {
+	if maxBytes < 0 {
+		return FileContents{}, fmt.Errorf("%w: max_bytes %d is negative", ErrInvalidArgument, maxBytes)
 	}
-	if max == 0 || max > MaxReadBytes {
-		max = MaxReadBytes
+	if maxBytes == 0 {
+		maxBytes = MaxReadBytes
 	}
 	p, err := resolveReadPath(root, baseDir, path)
 	if err != nil {
@@ -94,14 +98,34 @@ func ReadFile(root, baseDir, path string, max int64) (FileContents, error) {
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
 	}
 	defer func() { _ = f.Close() }()
-	b, err := io.ReadAll(io.LimitReader(f, max))
-	if err != nil {
+	// The type, and so the cap, comes from the name and a head of the file, read before
+	// the rest so a large text file is not read only to be cut.
+	head := make([]byte, BinarySniff)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
+	}
+	head = head[:n]
+	out.MIMEType = DetectMIME(p, head)
+	out.Binary = LooksBinary(head) || !TextMIME(out.MIMEType)
+	limit := min(maxBytes, MaxBinaryReadBytes)
+	if !out.Binary {
+		limit = min(limit, MaxReadBytes)
+	}
+	b := head[:min(int64(n), limit)]
+	if int64(n) == BinarySniff && limit > int64(n) { // more of the file may be wanted
+		// Sized from the stat; a file that shrank since reads short, one that grew is
+		// cut at its stat size (Truncated compares against that size).
+		b = make([]byte, max(min(limit, out.Size), int64(n)))
+		copy(b, head)
+		m, err := io.ReadFull(f, b[n:])
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+			return FileContents{}, fmt.Errorf("fsx: read %s: %w", p, err)
+		}
+		b = b[:n+m]
 	}
 	out.Contents = b
 	out.Truncated = int64(len(b)) < out.Size
-	out.MIMEType = DetectMIME(p, b)
-	out.Binary = LooksBinary(b) || !TextMIME(out.MIMEType)
 	return out, nil
 }
 

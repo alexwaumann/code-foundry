@@ -333,7 +333,9 @@ export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
   path: string;
 
   /**
-   * Maximum bytes of contents. Zero means 1 MiB, which is also the limit.
+   * Maximum bytes of contents. Zero means 1 MiB. A text file (a text MIME type and no
+   * NUL in the first 8 KiB) is always capped at 1 MiB whatever this asks; any other
+   * file (images, PDFs, archives) is read up to this, at most 32 MiB.
    *
    * @generated from field: int64 max_bytes = 3;
    */
@@ -352,7 +354,8 @@ export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
  */
 export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
   /**
-   * The first max_bytes of the file.
+   * The first max_bytes of the file (zero: 1 MiB), at most 1 MiB for text and 32 MiB
+   * for anything else.
    *
    * @generated from field: bytes contents = 1;
    */
@@ -515,7 +518,8 @@ export const FilesystemService: GenService<{
    * directory. Symlinks are followed, and the file they lead to must be under the
    * home directory too: InvalidArgument otherwise (also for a relative path without
    * an absolute base_dir). A missing path is not_found and a directory is_dir, not
-   * errors. Contents are at most max_bytes (default and limit 1 MiB).
+   * errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
+   * capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.ReadFile
    */

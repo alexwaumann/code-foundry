@@ -139,6 +139,9 @@ type Options struct {
 	// IdleGrace is how long a process stays up at least before an idle stop. Default
 	// IdleGrace (the package constant).
 	IdleGrace time.Duration
+	// McpPollInterval is how often an unsettled MCP status is asked again (mcp.go
+	// settleMcp). Default 3s.
+	McpPollInterval time.Duration
 	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
 	// Default time.Now.
 	Now func() time.Time
@@ -201,6 +204,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.SnoozeCheckInterval, SnoozeCheckInterval)
 	def(&o.IdleCheckInterval, IdleCheckInterval)
 	def(&o.IdleGrace, IdleGrace)
+	def(&o.McpPollInterval, mcpPendingInterval)
 	if o.Now == nil {
 		o.Now = time.Now
 	}

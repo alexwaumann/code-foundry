@@ -37,6 +37,22 @@ func TestReadFile(t *testing.T) {
 	write(filepath.Join(proj, "blob"), []byte("a\x00b"))
 	big := bytes.Repeat([]byte("0123456789abcde\n"), MaxReadBytes/16+10)
 	write(filepath.Join(proj, "big.txt"), big)
+	small := bytes.Repeat([]byte("0123456789abcde\n"), 1000) // over BinarySniff, under 1 MiB
+	write(filepath.Join(proj, "small.txt"), small)
+	write(filepath.Join(proj, "notes"), big) // sniffed as text
+	// Large binaries are sparse: a PNG or NUL head, then a hole to the size.
+	sparse := func(name string, head []byte, size int64) {
+		t.Helper()
+		p := filepath.Join(proj, name)
+		write(p, head)
+		if err := os.Truncate(p, size); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sparse("photo.png", png, 3<<20)
+	sparse("wide.png", png, 2<<20)
+	sparse("huge.bin", []byte("\x00blob"), MaxBinaryReadBytes+10)
+	sparse("nul.txt", []byte("a\x00b"), 2<<20) // a text extension with a NUL is binary
 	write(filepath.Join(outside, "secret"), []byte("no"))
 	symlink := func(target, link string) {
 		t.Helper()
@@ -75,8 +91,24 @@ func TestReadFile(t *testing.T) {
 			want: FileContents{Path: filepath.Join(proj, "big.txt"), Size: int64(len(big)), Truncated: true, MIMEType: "text/plain"}},
 		{name: "truncated max", baseDir: proj, path: "big.txt", max: 20, wantLen: 20,
 			want: FileContents{Path: filepath.Join(proj, "big.txt"), Size: int64(len(big)), Truncated: true, MIMEType: "text/plain"}},
-		{name: "max above limit", baseDir: proj, path: "big.txt", max: 4 * MaxReadBytes, wantLen: MaxReadBytes,
+		{name: "text over cap with binary max", baseDir: proj, path: "big.txt", max: MaxBinaryReadBytes, wantLen: MaxReadBytes,
 			want: FileContents{Path: filepath.Join(proj, "big.txt"), Size: int64(len(big)), Truncated: true, MIMEType: "text/plain"}},
+		{name: "sniffed text over cap with binary max", baseDir: proj, path: "notes", max: MaxBinaryReadBytes, wantLen: MaxReadBytes,
+			want: FileContents{Path: filepath.Join(proj, "notes"), Size: int64(len(big)), Truncated: true, MIMEType: "text/plain; charset=utf-8"}},
+		{name: "text under cap with binary max", baseDir: proj, path: "small.txt", max: MaxBinaryReadBytes, wantLen: len(small),
+			want: FileContents{Path: filepath.Join(proj, "small.txt"), Size: int64(len(small)), MIMEType: "text/plain"}},
+		{name: "image whole with binary max", baseDir: proj, path: "photo.png", max: MaxBinaryReadBytes, wantLen: 3 << 20,
+			want: FileContents{Path: filepath.Join(proj, "photo.png"), Size: 3 << 20, MIMEType: "image/png", Binary: true}},
+		{name: "image whole with max above limit", baseDir: proj, path: "photo.png", max: 4 * MaxBinaryReadBytes, wantLen: 3 << 20,
+			want: FileContents{Path: filepath.Join(proj, "photo.png"), Size: 3 << 20, MIMEType: "image/png", Binary: true}},
+		{name: "image default max", baseDir: proj, path: "wide.png", wantLen: MaxReadBytes,
+			want: FileContents{Path: filepath.Join(proj, "wide.png"), Size: 2 << 20, Truncated: true, MIMEType: "image/png", Binary: true}},
+		{name: "image under head", baseDir: proj, path: "photo.png", max: 20, wantLen: 20,
+			want: FileContents{Path: filepath.Join(proj, "photo.png"), Size: 3 << 20, Truncated: true, MIMEType: "image/png", Binary: true}},
+		{name: "binary over limit", baseDir: proj, path: "huge.bin", max: 4 * MaxBinaryReadBytes, wantLen: MaxBinaryReadBytes,
+			want: FileContents{Path: filepath.Join(proj, "huge.bin"), Size: MaxBinaryReadBytes + 10, Truncated: true, MIMEType: "application/octet-stream", Binary: true}},
+		{name: "nul in text extension", baseDir: proj, path: "nul.txt", max: MaxBinaryReadBytes, wantLen: 2 << 20,
+			want: FileContents{Path: filepath.Join(proj, "nul.txt"), Size: 2 << 20, MIMEType: "text/plain", Binary: true}},
 		{name: "directory", baseDir: proj, path: "docs",
 			want: FileContents{Path: filepath.Join(proj, "docs"), IsDir: true}},
 		{name: "missing", baseDir: proj, path: "nope.md",

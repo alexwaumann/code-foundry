@@ -20,6 +20,9 @@
 // answers with its first mcp_status reply, and mcp_reconnect of a server takes that
 // server's entry from the last reply when it changed there, else answers with the
 // server's error (or "Server not found"). Without it mcp_status answers no servers.
+// CF_FAKE_CLAUDE_MCP_EMPTY=<n> makes a process's first n mcp_status answers list no
+// servers and CF_FAKE_CLAUDE_MCP_PENDING=<n> the n after those list every server pending
+// (Claude starting them in the background).
 //
 // Slash commands: CF_FAKE_CLAUDE_COMMANDS names a capture like
 // claudestream/testdata/commands.jsonl; initialize answers with its initialize reply's
@@ -369,10 +372,15 @@ type fakeMcp struct {
 	mu     sync.Mutex
 	now    []map[string]any
 	latest map[string]map[string]any
+	// empty and pending count down the answers still to list no servers, then every
+	// server pending (CF_FAKE_CLAUDE_MCP_EMPTY, CF_FAKE_CLAUDE_MCP_PENDING).
+	empty, pending int
 }
 
 func newFakeMcp(path string) (*fakeMcp, error) {
 	f := &fakeMcp{latest: map[string]map[string]any{}}
+	f.empty, _ = strconv.Atoi(os.Getenv("CF_FAKE_CLAUDE_MCP_EMPTY"))
+	f.pending, _ = strconv.Atoi(os.Getenv("CF_FAKE_CLAUDE_MCP_PENDING"))
 	if path == "" {
 		return f, nil
 	}
@@ -406,6 +414,18 @@ func newFakeMcp(path string) (*fakeMcp, error) {
 func (f *fakeMcp) servers() []map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	switch {
+	case f.empty > 0: // still starting them all
+		f.empty--
+		return []map[string]any{}
+	case f.pending > 0: // connecting: only what the configuration says
+		f.pending--
+		out := make([]map[string]any, 0, len(f.now))
+		for _, s := range f.now {
+			out = append(out, map[string]any{"name": s["name"], "status": "pending", "config": s["config"], "scope": s["scope"], "source": s["source"]})
+		}
+		return out
+	}
 	return slices.Clone(f.now)
 }
 

@@ -4,6 +4,10 @@ Update 2026-10-15 (`thread-lifecycle.md`): the MCP status is kept and persisted 
 thread is stopped; a refresh or a server reconnect starts a stopped thread without a
 prompt.
 
+Update 2026-10-18 (`binary-read-cap-and-mcp-settle.md`): a refresh or reconnect that
+starts Claude settles like a turn's check (the same polling), and an empty first answer
+shows the cached servers as connecting instead of "0 of 0 connected".
+
 Status: built on branch `t3code/mcp-panel` (follow-ups §2, `rendered-threads-followups.md`;
 design: `docs/sketches/mcp-panel/`, variant B). `make check` and `make gui-e2e` green; the
 daemon side exercised end to end with an isolated home and haiku (below). Mock screenshots
