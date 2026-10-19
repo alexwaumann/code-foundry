@@ -62,15 +62,18 @@ the subscriber's drain goroutine.
 * **GUI**: `wakeLines` gives one "Woken by …" line per wake of a batch, each with its
   own payload as the body; `UserRow` draws one `WakeNoteRow` per line. A single wake is
   drawn as before.
-* **Guide**: the "end your turn" convention now ends `settles (wakes that fire together
-  come as one; not a lead's fresh progress while its workers run).` The guide sat 36
-  bytes under its 29,000-byte cap; the Connect/proto line in "Discover more" was
-  shortened to make room.
-* **Skill (another PR owns it)**: the orchestrate skill's Leads section should say that a
-  lead's `progress` report with workers running does not wake its parent, that the
-  parent wakes when the lead settles without it (a `done`/`blocked` report, a stale or
-  missing report, a prompt), and that a wake may list several threads (`wakes` array,
-  siblings sentence: answer the whole batch).
+* **Guide**: the "end your turn" convention now ends `settles (wakes at once: one
+  message; a lead's progress while workers run: none).` The guide is at its
+  29,000-byte cap (`TestGuide`): main's skill-v3 PR used the headroom, so the
+  Connect/proto line in "Discover more" was cut to `The API: Connect over the daemon's
+  socket; protos: code-foundry's proto/codefoundry/v1.` to make room.
+* **Skill**: owned by the skill PR (#240, on main), whose Leads section already says the
+  daemon holds a lead's progress settle while its workers run. Two follow-ups for it:
+  that paragraph says the parent is woken "when a worker needs someone", but a worker's
+  prompt wakes the lead (its subscriber), not the parent, and the lead's own next settle
+  is held again while it has a fresh progress report and workers running; and the "look
+  at the whole batch, wakes can arrive seconds apart" line can now point at the batch
+  message (`N threads settled: …`, `wakes` array, the siblings sentence).
 
 ## Gotchas
 
