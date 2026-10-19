@@ -57,6 +57,17 @@ describe("wakeLine", () => {
     expect(wakeLines({ title: "the header", json })).toMatchObject([{ threadId: "", summary: "the header" }]);
   });
 
+  it("a restart: its notice is a line of its own, first", () => {
+    const notice = { kind: "restart", restarted_at: "2026-10-19T10:45:50.000Z", interrupted: [{ id: "s-a", name: "Tests", reason: "daemon stopped" }, { id: "s-b", name: "", reason: "daemon stopped" }], subscriptions: 2 };
+    const json = JSON.stringify({ kind: "batch", wakes: [notice, { kind: "thread", after_restart: true, thread: { id: "s-a", name: "Tests", status: "error", status_reason: "interrupted" } }] });
+    expect(wakeLines({ title: "The app restarted at 10:45 CDT; …", json })).toMatchObject([
+      { tone: "attention", threadId: "", name: "App restart", detail: "2 interrupted", summary: "Tests, s-b" },
+      { tone: "fail", threadId: "s-a", detail: "error, interrupted" },
+    ]);
+    expect(wakeLines({ title: "t", json: JSON.stringify({ ...notice, interrupted: [], own_turn_interrupted: true }) })).toMatchObject([{ tone: "attention", detail: "own turn interrupted", summary: "" }]);
+    expect(wakeLines({ title: "t", json: JSON.stringify({ ...notice, interrupted: [] }) })).toMatchObject([{ tone: "ok", detail: "", summary: "" }]);
+  });
+
   it("a single wake is one line", () => {
     expect(wakeLines({ title: "t", json: thread({ status: "idle" }) })).toHaveLength(1);
   });

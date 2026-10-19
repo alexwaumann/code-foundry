@@ -76,7 +76,11 @@ func TestPlanRestartWakes(t *testing.T) {
 		{"subscriber archived or removed", []Subscription{sub("s1", "gone", "a", CondSettled)}, nil, nil},
 		{"two subscriptions to one target: one fire, the oldest", []Subscription{
 			sub("s2", "p", "a", CondAttention),
-			func() Subscription { s := sub("s1", "p", "a", CondSettled); s.CreatedAt = t0.Add(-2 * time.Hour); return s }(),
+			func() Subscription {
+				s := sub("s1", "p", "a", CondSettled)
+				s.CreatedAt = t0.Add(-2 * time.Hour)
+				return s
+			}(),
 		}, []plan{{"p", []fire{{"s1", t0, true}}, []string{"a"}, 2, false}}, nil},
 		{"several children, every subscription counted", []Subscription{
 			sub("s1", "p", "a", CondSettled), suppressed(sub("s2", "p", "b", CondSettled)), sub("s3", "p", "d", CondSettled), pr,

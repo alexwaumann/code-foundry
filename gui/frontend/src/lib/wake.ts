@@ -3,7 +3,8 @@
  * note (docs/notes/agents-3-lineage-gui.md): who woke the thread, how it ended, a summary,
  * from the payload the daemon sent with it. A batch of thread wakes sent as one message
  * (`{"kind": "batch", "wakes": [...]}`, docs/notes/orch-wakes-content.md) is one line per
- * wake. Pure.
+ * wake. A daemon restart's notice (`{"kind": "restart", ...}`, alone or first in a batch,
+ * docs/notes/orch-restart-wakes.md) is a line of its own. Pure.
  */
 import type { WakeView } from "@/api/thread";
 
@@ -68,6 +69,20 @@ function runLine(r: Obj, json: string): WakeLine {
   };
 }
 
+function restartLine(p: Obj, json: string): WakeLine {
+  const cut = Array.isArray(p.interrupted) ? p.interrupted.map(obj).filter((t): t is Obj => t !== null) : [];
+  const self = p.own_turn_interrupted === true;
+  const detail = [cut.length > 0 ? `${String(cut.length)} interrupted` : "", self ? "own turn interrupted" : ""].filter(Boolean).join(", ");
+  return {
+    tone: cut.length > 0 || self ? "attention" : "ok",
+    threadId: "",
+    name: "App restart",
+    detail,
+    summary: cut.map((t) => str(t.name) || str(t.id)).join(", "),
+    json,
+  };
+}
+
 function parse(json: string): Obj | null {
   try {
     return obj(JSON.parse(json));
@@ -95,5 +110,6 @@ function lineOf(p: Obj | null, w: WakeView): WakeLine {
   if (thread) return threadLine(thread, json);
   const run = obj(p?.run);
   if (run) return runLine(run, json);
+  if (p?.kind === "restart") return restartLine(p, json);
   return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json };
 }
