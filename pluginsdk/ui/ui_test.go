@@ -102,6 +102,11 @@ func TestBuilders(t *testing.T) {
 		NewTerminal("term", "term-1"),
 		NewColumns("cols", NewColumn("col-a", NewText("col-a-text", Plain("a"))).WithWeight(2),
 			NewColumn("col-b", NewPane("pane", HeightFill, NewLog("pane-log", "x\n"))).WithWidth(320)),
+		NewGrid("grid", NewGridItem("cell-a", NewSection("card-a", "A", NewText("card-a-text", Plain("a")))).WithSpan(2), NewGridItem("cell-b")),
+		NewDivider("rule", "Next"),
+		NewSpacer("gap", 24),
+		NewFlexSpacer("push"),
+		NewGroup("line", AlignBetween, NewText("line-text", Plain("3 checks")), NewActions("line-bar", EventButton("line-go", "Go", "go"))),
 	)
 	v.Tabs = NewTabs("a", NewTab("a", "A"), NewTab("b", "B"))
 	if err := v.Validate(); err != nil {
@@ -156,7 +161,7 @@ func TestValidateRejects(t *testing.T) {
 		}, "at most 2"},
 		{"too deep", func(v *View) {
 			v.Nodes = []Node{NewSection("s1", "", NewSection("s2", "", NewSection("s3", "", NewSection("s4", "", NewSection("s5", "", NewText("t", Plain("x")))))))}
-		}, "nodes[0].section.children[0].section.children[0].section.children[0].section.children[0].section.children[0]: inside 5 containers (section, columns, pane), at most 4"},
+		}, "nodes[0].section.children[0].section.children[0].section.children[0].section.children[0].section.children[0]: inside 5 containers (section, columns, pane, grid), at most 4"},
 		{"too many logs", func(v *View) {
 			for i := range 5 {
 				v.Nodes = append(v.Nodes, NewLog("log"+string(rune('a'+i)), "x"))

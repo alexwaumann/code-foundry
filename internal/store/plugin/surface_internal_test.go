@@ -52,7 +52,17 @@ const every = `{
       {"key": "co1", "weight": 2, "children": [{"key": "co1a", "actions": {"buttons": [{"key": "cb", "label": "In a column", "action": {"event": "col"}}]}}]},
       {"key": "co2", "width": 320, "children": [{"key": "pa", "pane": {"height": 300, "minHeight": 200, "children": [
         {"key": "pg", "log": {"text": "in a pane\n"}}]}}]}]}},
-    {"key": "pf", "pane": {"height": "fill", "noScroll": true, "children": []}}
+    {"key": "pf", "pane": {"height": "fill", "noScroll": true, "children": []}},
+    {"key": "gr", "grid": {"minWidth": 200, "items": [
+      {"key": "gr1", "span": 2, "children": [{"key": "gr1a", "actions": {"buttons": [{"key": "gb", "label": "In a grid", "action": {"event": "cell"}}]}}]},
+      {"key": "gr2", "children": [{"key": "gl", "log": {"text": "in a grid\n"}}]}]}},
+    {"key": "dv", "divider": {"label": "Rule"}},
+    {"key": "sp", "spacer": {"size": 24, "flex": true}},
+    {"key": "grp", "group": {"align": "between", "noWrap": true, "items": [
+      {"key": "grpt", "text": {"content": "inline"}},
+      {"key": "grpc", "chips": {"chips": [{"key": "gc", "label": "Lint", "action": {"event": "chip"}}]}},
+      {"key": "grpa", "actions": {"buttons": [{"key": "gpb", "label": "In a group", "action": {"event": "line"}}]}},
+      {"key": "grpp", "progress": {"value": 0.25}}]}}
   ]
 }`
 
@@ -63,7 +73,7 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if len(v.Nodes) != 17 || !json.Valid(canon) {
+	if len(v.Nodes) != 21 || !json.Valid(canon) {
 		t.Fatalf("nodes %d, canon %s", len(v.Nodes), canon)
 	}
 	idx := buildIndex(v)
@@ -72,7 +82,8 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 		kinds[k] = idx.elements[k].kind
 	}
 	want := map[string]string{"h1": "click", "ta": "tab", "tb": "tab", "r1": "click", "r1b": "click", "c1": "click", "b1": "click",
-		"b2": "command", "b3": "command", "b4": "open_url", "b5": "copy", "f3": "change", "fs": "submit", "fr": "click", "cb": "click"}
+		"b2": "command", "b3": "command", "b4": "open_url", "b5": "copy", "f3": "change", "fs": "submit", "fr": "click", "cb": "click",
+		"gb": "click", "gc": "click", "gpb": "click"}
 	if fmt.Sprint(kinds) != fmt.Sprint(want) {
 		t.Errorf("elements\n got %v\nwant %v", kinds, want)
 	}
@@ -108,7 +119,7 @@ func TestValidateViewRefuses(t *testing.T) {
 		{"store without secrets", every, &pluginsdk.Permissions{Commands: []string{"thread.send"}}, "store needs"},
 		{"deep", mod(`"children": [{"key": "s2", "text": {"content": "deep"}}]`,
 			`"children": [{"key": "s2", "section": {"children": [{"key": "s3", "columns": {"items": [{"key": "s3a", "children": [{"key": "s4", "pane": {"children": [{"key": "s5", "text": {"content": "x"}}]}}]}, {"key": "s3b", "children": []}]}}]}}]`), nil,
-			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane), at most 4"},
+			"nodes[11].section.children[0].section.children[0].section.children[0].columns.items[0].children[0].pane.children[0]: inside 5 containers (section, columns, pane, grid), at most 4"},
 		{"one column", `{"nodes": [{"key": "c", "columns": {"items": [{"key": "c1", "children": []}]}}]}`, nil, "1 columns, want 2 to 4"},
 		{"pane min above height", mod(`"height": 300, "minHeight": 200`, `"height": 300, "minHeight": 400`), nil, "400 px is above the pane's height (300 px)"},
 		{"options with a source", mod(`"select": {"optionsSource": "projects"}`, `"select": {"optionsSource": "projects", "options": [{"key": "o9", "value": "v", "label": "L"}]}`), nil, "fills the options"},
@@ -328,5 +339,47 @@ func TestLayoutContainersWalked(t *testing.T) {
 	}
 	if out := string(in.renderLocked()); !strings.Contains(out, `"text":"one\ntwo\n"`) {
 		t.Errorf("render after the append: %s", out)
+	}
+}
+
+// Grids and groups are walked too: a grid item's nil children are [] in the canonical
+// form, buttons and chips in a group act, a log in a grid item takes appends, and a
+// group's refused item kind is refused here as in the SDK.
+func TestGridAndGroupWalked(t *testing.T) {
+	raw := `{"nodes": [
+	  {"key": "g", "grid": {"items": [{"key": "g1"}, {"key": "g2", "span": 2, "children": [
+	    {"key": "lg", "log": {"text": "one\n"}},
+	    {"key": "line", "group": {"items": [
+	      {"key": "st", "chips": {"chips": [{"key": "chip", "label": "Build", "action": {"event": "stage", "data": "build"}}]}},
+	      {"key": "bar", "actions": {"buttons": [{"key": "go", "label": "Go", "action": {"event": "go"}}]}}]}}]}]}},
+	  {"key": "d", "divider": {}},
+	  {"key": "s", "spacer": {"flex": true}}]}`
+	v, canon, errs := validateView(json.RawMessage(raw), "p", everyPerms)
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	if path := nullList(canon); path != "" || !strings.Contains(string(canon), `{"key":"g1","children":[]}`) || !strings.Contains(string(canon), `"divider":{}`) {
+		t.Fatalf("canonical form (null list %q): %s", path, canon)
+	}
+	idx := buildIndex(v)
+	if el, ok := idx.elements["go"]; !ok || el.actionName() != "go" {
+		t.Errorf("the button in a group in a grid item is not indexed: %+v", el)
+	}
+	if el, ok := idx.elements["chip"]; !ok || el.actionName() != "stage" {
+		t.Errorf("the chip in a group is not indexed: %+v", el)
+	}
+	in := newFuzzInstance()
+	if ver, _ := in.accept(v, canon, time.Unix(0, 0)); ver != 1 {
+		t.Fatalf("version %d", ver)
+	}
+	if _, err := in.appendLog(pluginsdk.ViewAppendParams{Instance: in.key, Key: "lg", Text: "two\n"}); err != nil {
+		t.Fatalf("append to a log in a grid item: %v", err)
+	}
+	if out := string(in.renderLocked()); !strings.Contains(out, `"text":"one\ntwo\n"`) {
+		t.Errorf("render after the append: %s", out)
+	}
+	bad := `{"nodes": [{"key": "line", "group": {"items": [{"key": "lg", "log": {"text": "x"}}]}}]}`
+	if _, _, errs := validateView(json.RawMessage(bad), "p", everyPerms); len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "a group holds text, chips, actions, progress nodes, not log") {
+		t.Errorf("a log in a group: %v", errs)
 	}
 }

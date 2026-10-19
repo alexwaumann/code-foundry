@@ -261,6 +261,307 @@
       }
     },
     {
+      "key": "layout-grid-rule",
+      "divider": {
+        "label": "Grid"
+      }
+    },
+    {
+      "key": "layout-grid",
+      "grid": {
+        "minWidth": 200,
+        "items": [
+          {
+            "key": "layout-cell-build",
+            "children": [
+              {
+                "key": "layout-cell-build-card",
+                "section": {
+                  "title": "Build",
+                  "card": true,
+                  "children": [
+                    {
+                      "key": "layout-build-facts",
+                      "pairs": {
+                        "items": [
+                          {
+                            "key": "layout-build-branch",
+                            "label": "Branch",
+                            "value": "main"
+                          },
+                          {
+                            "key": "layout-build-time",
+                            "label": "Took",
+                            "value": "4m 12s"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-cell-tests",
+            "children": [
+              {
+                "key": "layout-cell-tests-card",
+                "section": {
+                  "title": "Tests",
+                  "card": true,
+                  "children": [
+                    {
+                      "key": "layout-tests-chips",
+                      "chips": {
+                        "chips": [
+                          {
+                            "key": "layout-tests-unit",
+                            "label": "Unit",
+                            "status": "ok"
+                          },
+                          {
+                            "key": "layout-tests-e2e",
+                            "label": "e2e",
+                            "status": "running"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-cell-cover",
+            "children": [
+              {
+                "key": "layout-cell-cover-card",
+                "section": {
+                  "title": "Coverage",
+                  "card": true,
+                  "children": [
+                    {
+                      "key": "layout-cover",
+                      "progress": {
+                        "value": 0.82,
+                        "label": "Lines"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-cell-deploy",
+            "span": 2,
+            "children": [
+              {
+                "key": "layout-cell-deploy-card",
+                "section": {
+                  "title": "Deploy",
+                  "card": true,
+                  "children": [
+                    {
+                      "key": "layout-deploy-text",
+                      "text": {
+                        "content": "Rolling out to 2 of 4 regions. A span-2 card takes two columns where there are two."
+                      }
+                    },
+                    {
+                      "key": "layout-deploy",
+                      "progress": {
+                        "value": 0.5,
+                        "label": "Regions"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "key": "layout-cell-notes",
+            "children": [
+              {
+                "key": "layout-cell-notes-card",
+                "section": {
+                  "title": "Notes",
+                  "card": true,
+                  "children": [
+                    {
+                      "key": "layout-notes",
+                      "text": {
+                        "content": "Columns: as many 200 px ones as fit, at most 6."
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "layout-group-rule",
+      "divider": {
+        "label": "Inline groups"
+      }
+    },
+    {
+      "key": "layout-line",
+      "group": {
+        "items": [
+          {
+            "key": "layout-line-text",
+            "text": {
+              "content": {
+                "spans": [
+                  {
+                    "text": "3 of 4",
+                    "strong": true
+                  },
+                  {
+                    "text": " checks passed"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "layout-line-bar",
+            "actions": {
+              "buttons": [
+                {
+                  "key": "layout-line-rerun",
+                  "label": "Re-run",
+                  "action": {
+                    "event": "click"
+                  }
+                },
+                {
+                  "key": "layout-line-docs",
+                  "label": "Docs",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "align": "between"
+      }
+    },
+    {
+      "key": "layout-steps",
+      "group": {
+        "items": [
+          {
+            "key": "layout-steps-chips",
+            "chips": {
+              "chips": [
+                {
+                  "key": "layout-step-lint",
+                  "label": "Lint",
+                  "status": "ok"
+                },
+                {
+                  "key": "layout-step-test",
+                  "label": "Test",
+                  "status": "running"
+                }
+              ]
+            }
+          },
+          {
+            "key": "layout-steps-progress",
+            "progress": {
+              "value": 0.34
+            }
+          },
+          {
+            "key": "layout-steps-left",
+            "text": {
+              "content": {
+                "spans": [
+                  {
+                    "text": "about 2 min left",
+                    "tone": "muted"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "align": "start"
+      }
+    },
+    {
+      "key": "layout-rule",
+      "divider": {}
+    },
+    {
+      "key": "layout-push",
+      "section": {
+        "title": "Pinned to the bottom",
+        "card": true,
+        "children": [
+          {
+            "key": "layout-push-pane",
+            "pane": {
+              "height": 180,
+              "children": [
+                {
+                  "key": "layout-push-text",
+                  "text": {
+                    "content": "A flex spacer in a pane with a height pushes what follows it to the pane's bottom."
+                  }
+                },
+                {
+                  "key": "layout-push-spacer",
+                  "spacer": {
+                    "flex": true
+                  }
+                },
+                {
+                  "key": "layout-push-bar",
+                  "group": {
+                    "items": [
+                      {
+                        "key": "layout-push-actions",
+                        "actions": {
+                          "buttons": [
+                            {
+                              "key": "layout-push-go",
+                              "label": "Click",
+                              "action": {
+                                "event": "click"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "align": "end"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "layout-gap",
+      "spacer": {
+        "size": 24
+      }
+    },
+    {
       "key": "layout-detail",
       "columns": {
         "items": [

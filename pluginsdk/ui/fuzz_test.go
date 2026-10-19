@@ -53,7 +53,7 @@ func FuzzView(f *testing.F) {
 	})
 }
 
-// layoutSeed nests every container (section, columns, pane) to the depth limit, with a
+// layoutSeed nests section, columns and pane to the depth limit, with a
 // fill pane, a fixed and a weighted column, and live nodes in a pane.
 const layoutSeed = `{"nodes":[{"key":"s","section":{"title":"S","children":[
   {"key":"cols","columns":{"collapse":"first","items":[
@@ -64,10 +64,29 @@ const layoutSeed = `{"nodes":[{"key":"s","section":{"title":"S","children":[
       {"key":"th","thread":{"threadId":"s-1","height":"fill"}}]}}]},
     {"key":"c3","children":[{"key":"md","markdown":{"source":"**m**"}}]}]}}]}}]}`
 
+// gridSeed has a grid nested to the depth limit (with a span and a min width), a group of
+// every kind it holds at that depth, labelled and bare dividers, and fixed and flex
+// spacers in a box and outside one.
+const gridSeed = `{"nodes":[{"key":"g","grid":{"minWidth":200,"items":[
+  {"key":"g1","span":2,"children":[{"key":"s","section":{"card":true,"title":"Card","children":[
+    {"key":"p","pane":{"height":240,"children":[
+      {"key":"cols","columns":{"items":[{"key":"c1","children":[
+        {"key":"grp","group":{"align":"between","noWrap":true,"items":[
+          {"key":"gt","text":{"content":"3 checks"}},
+          {"key":"gc","chips":{"chips":[{"key":"gc1","label":"Build","status":"ok"}]}},
+          {"key":"ga","actions":{"buttons":[{"key":"gb","label":"Run","action":{"event":"run"}}]}},
+          {"key":"gp","progress":{"value":0.5}}]}}]},
+        {"key":"c2","children":[{"key":"sp-flex","spacer":{"flex":true}}]}]}},
+      {"key":"sp-box","spacer":{"size":64,"flex":true}},
+      {"key":"pa","actions":{"buttons":[{"key":"pb","label":"Go","action":{"event":"go"}}]}}]}}]}}]},
+  {"key":"g2","children":[]}]}},
+  {"key":"dv","divider":{"label":"Next"}},{"key":"dv2","divider":{}},
+  {"key":"sp","spacer":{"size":4}},{"key":"sp0","spacer":{}}]}`
+
 type viewSeed struct{ view, corrupt []byte }
 
 // viewSeeds are FuzzView's seeds: the hello demo's captured views, the walkthrough, a log,
-// a thread and the layout seed.
+// a thread, and the layout and grid seeds.
 func viewSeeds() []viewSeed {
 	var out []viewSeed
 	files, _ := filepath.Glob(filepath.FromSlash("../../internal/store/plugin/testdata/hello-demo/*.json"))
@@ -81,6 +100,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(`{"nodes":[{"key":"l","log":{"text":"x"}}]}`), []byte{0, 1}},
 		viewSeed{[]byte(`{"nodes":[{"key":"t","thread":{"threadId":"x","height":""}}]}`), []byte{}},
 		viewSeed{[]byte(layoutSeed), []byte{0, 0, 0, 2}},
+		viewSeed{[]byte(gridSeed), []byte{0, 0, 1}},
 	)
 }
 

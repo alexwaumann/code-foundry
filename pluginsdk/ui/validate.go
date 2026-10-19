@@ -15,9 +15,10 @@ import (
 // Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
-	MaxElements = 400 // nodes, columns, rows, chips, pairs, fields, options, buttons, tabs
-	// MaxDepth is how many containers (section, columns, pane) a node may sit inside:
-	// section > columns > pane > section > node. A column is part of its columns node.
+	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs
+	// MaxDepth is how many containers (section, columns, pane, grid) a node may sit
+	// inside: section > columns > pane > section > node. A column is part of its columns
+	// node, a grid item of its grid; a group is not a container (it holds leaves).
 	MaxDepth         = 4
 	MaxViewBytes     = 256 << 10 // encoded, log text excluded
 	MaxLabel         = 200
@@ -366,18 +367,19 @@ func (c *checker) height(path string, h Height) {
 func (c *checker) node(path string, n Node, depth int) {
 	c.key(path, n.Key)
 	if depth > MaxDepth {
-		c.bad(path, "inside %d containers (section, columns, pane), at most %d", depth, MaxDepth)
+		c.bad(path, "inside %d containers (section, columns, pane, grid), at most %d", depth, MaxDepth)
 	}
 	kinds := 0
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
-		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil} {
+		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil, n.Grid != nil,
+		n.Divider != nil, n.Spacer != nil, n.Group != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -421,7 +423,7 @@ func (c *checker) node(path string, n Node, depth int) {
 	case n.Actions != nil:
 		c.buttons(path+".actions.buttons", n.Actions.Buttons, MaxBarButtons)
 		if !slices.Contains([]Align{"", AlignStart, AlignEnd}, n.Actions.Align) {
-			c.bad(path+".actions.align", "unknown align %q", n.Actions.Align)
+			c.bad(path+".actions.align", "unknown align %q (start or end)", n.Actions.Align)
 		}
 	case n.Progress != nil:
 		p := path + ".progress"
@@ -478,7 +480,77 @@ func (c *checker) node(path string, n Node, depth int) {
 		c.columns(path+".columns", n.Columns, depth)
 	case n.Pane != nil:
 		c.pane(path+".pane", n.Pane, depth)
+	case n.Grid != nil:
+		c.grid(path+".grid", n.Grid, depth)
+	case n.Divider != nil:
+		c.str(path+".divider.label", n.Divider.Label, MaxLabel)
+	case n.Spacer != nil:
+		if sz := n.Spacer.Size; sz != 0 && (sz < MinSpacer || sz > MaxSpacer) {
+			c.bad(path+".spacer.size", "%d px is outside %d..%d (0 is %d)", sz, MinSpacer, MaxSpacer, SpacerSize)
+		}
+	case n.Group != nil:
+		c.group(path+".group", n.Group, depth)
 	}
+}
+
+// grid checks a grid node inside depth containers: its least column width, its item
+// count, and each item's key, span and nodes (one container deeper).
+func (c *checker) grid(path string, g *Grid, depth int) {
+	if w := g.MinWidth; w != 0 && (w < MinGridMinWidth || w > MaxGridMinWidth) {
+		c.bad(path+".minWidth", "%d px is outside %d..%d (0 is %d)", w, MinGridMinWidth, MaxGridMinWidth, GridMinWidth)
+	}
+	if n := len(g.Items); n < 1 || n > MaxGridItems {
+		c.bad(path+".items", "%d items, want 1 to %d", n, MaxGridItems)
+	}
+	for i, it := range g.Items {
+		p := fmt.Sprintf("%s.items[%d]", path, i)
+		c.key(p, it.Key)
+		if it.Span < 0 || it.Span > MaxGridSpan {
+			c.bad(p+".span", "%d is outside 1..%d (0 is 1)", it.Span, MaxGridSpan)
+		}
+		for j, ch := range it.Children {
+			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, depth+1)
+		}
+	}
+}
+
+// group checks a group node inside depth containers: its item count, align, and each
+// item, a leaf of a kind that sits on a line (at the group's own depth).
+func (c *checker) group(path string, g *Group, depth int) {
+	if n := len(g.Items); n < 1 || n > MaxGroupItems {
+		c.bad(path+".items", "%d items, want 1 to %d", n, MaxGroupItems)
+	}
+	if !slices.Contains([]Align{"", AlignStart, AlignCenter, AlignEnd, AlignBetween}, g.Align) {
+		c.bad(path+".align", "unknown align %q (start, center, end or between)", g.Align)
+	}
+	for i, it := range g.Items {
+		p := fmt.Sprintf("%s.items[%d]", path, i)
+		if k := it.kind(); k != "" && !slices.Contains(groupKinds, k) {
+			c.key(p, it.Key)
+			c.bad(p, "a group holds %s nodes, not %s", strings.Join(groupKinds, ", "), k)
+			continue
+		}
+		c.node(p, it, depth)
+	}
+}
+
+// groupKinds are the node kinds a Group holds: leaves that sit on a line.
+var groupKinds = []string{"text", "chips", "actions", "progress"}
+
+// kind is n's kind's JSON name when it has exactly one, else "".
+func (n Node) kind() string {
+	name := ""
+	v := reflect.ValueOf(n)
+	t := v.Type()
+	for i := range t.NumField() {
+		if f := v.Field(i); f.Kind() == reflect.Pointer && !f.IsNil() {
+			if name != "" {
+				return ""
+			}
+			name, _, _ = strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		}
+	}
+	return name
 }
 
 // columns checks a columns node inside depth containers: its count, collapse, and each
