@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, Hourglass, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -21,6 +21,7 @@ import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
+import { TipWaiting } from "./TipWaiting";
 import { openWorkspaceSurface } from "@/stores/workspacePanel";
 import { openLinkedPrsSurface } from "@/stores/linkedPrsPanel";
 import { prBadge } from "@/surfaces/linkedprsTarget";
@@ -204,6 +205,7 @@ function ThreadLine({ id }: { id: string }) {
           <AgentsRunning id={id} more={status || showsPlace(line.kind)} />
           {status && (
             <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
+              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-muted-foreground" aria-hidden data-testid="row-waiting" />}
               {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
             </span>
           )}
@@ -378,7 +380,7 @@ function TipMoving({ id }: { id: string }) {
 
 /**
  * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
- * time instead), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
+ * time instead; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
  * branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
@@ -405,6 +407,7 @@ function ThreadTipBody({ id }: { id: string }) {
         {name || id}
       </div>
       {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
+      {!snoozed && <TipWaiting id={id} />}
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">

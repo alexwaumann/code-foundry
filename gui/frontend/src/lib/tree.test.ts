@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { threadGroup } from "./thread";
 import { buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
 
 const W = [
@@ -55,6 +56,17 @@ describe("buildRows (the flat thread list)", () => {
     const rows = buildRows(all);
     expect(shape(rows)).toEqual([...s("s11", "s8", "s2"), ...s("s7", "s1", "s10", "s4"), ...s("s6"), ...s("s12", "s3"), "# Working 2", ...s("s9", "s5")]);
     expect(rows.map((r) => r.section)).toEqual(["pinned", "pinned", "pinned", "attention", "attention", "attention", "attention", "done", "idle", "idle", "working", "working", "working"]);
+  });
+
+  // A thread waiting on its child threads (lib/waiting) sorts with the idle ones, below
+  // finished turns and above Working: its group is threadGroup's.
+  it("sorts a thread waiting on its child threads with the idle ones", () => {
+    const waiting = threadGroup({ state: "connected", status: "idle", statusReason: "waiting on 2 child threads" });
+    const done = threadGroup({ state: "connected", status: "attention", statusReason: "finished" });
+    const child = threadGroup({ state: "connected", status: "busy", statusReason: "working" });
+    const rows = buildRows([thread("lead", { group: waiting }), thread("child", { group: child }), thread("other", { group: done }), thread("idle")]);
+    expect(shape(rows)).toEqual([...s("other"), ...s("idle", "lead"), "# Working 1", ...s("child")]);
+    expect(rows.map((r) => r.section)).toEqual(["done", "idle", "idle", "working", "working"]);
   });
 
   it("collapsed: the Working header stays with its count, its rows are gone", () => {

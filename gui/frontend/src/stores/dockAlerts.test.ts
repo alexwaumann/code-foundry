@@ -195,6 +195,8 @@ describe("attentionIds (the badge count)", () => {
       thread("busy", { status: "busy" }),
       thread("idle"),
       thread("starting", { state: "starting", status: "unknown" }),
+      thread("waiting", { status: "idle", statusReason: "waiting on 2 child threads" }),
+      thread("waiting-wake", { state: "disconnected", status: "idle", statusReason: "waiting" }),
     ]);
     expect(attentionIds(data).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt", "woken"]);
   });
@@ -292,6 +294,27 @@ describe("startDockAlerts", () => {
     now = 120_000;
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: now }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "badge 0", "badge 1", "bounce"]);
+  });
+
+  // A review loop's round (docs/notes/orch-waiting-status.md): the lead's turn ends while
+  // its child works, the child settles, the wake's turn runs; only the last turn's end,
+  // with nothing left to wait on, badges and bounces.
+  it("a turn waiting on its child threads neither badges nor bounces", () => {
+    settings({});
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("lead", { status: "busy" })]), epoch: s.epoch + 1 }));
+    now = 1000;
+    for (const over of [
+      { status: "idle", statusReason: "waiting on 1 child thread" },
+      { status: "idle", statusReason: "waiting" },
+      { status: "busy", statusReason: "working" },
+      { status: "idle", statusReason: "waiting on 1 child thread" },
+      { status: "busy", statusReason: "working" },
+    ] as const) {
+      useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("lead", over) }));
+    }
+    expect(calls).toEqual(["badge 0"]);
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("lead", { status: "attention", statusReason: "finished" }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "bounce"]);
   });
 
   it("plays the sound alone at the volume setting with the bounce off", () => {

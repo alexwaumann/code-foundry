@@ -30,6 +30,8 @@ describe("statusLine / statusText", () => {
     ["snooze ended, time unknown", "disconnected", "attention", "snooze ended", null, "snoozeEnded", "Snooze ended"],
     ["question after a restart", "disconnected", "attention", "question: Which density?", 1, "question", "Asked a question"],
     ["idle", "connected", "idle", "at prompt", 1, "place", ""],
+    ["waiting on child threads", "connected", "idle", "waiting on 2 child threads", 1, "waiting", "Waiting"],
+    ["waiting on a queued wake, stopped", "disconnected", "idle", "waiting", 1, "waiting", "Waiting"],
     ["unknown", "unknown", "unknown", "", null, "place", ""],
     // Whether Claude runs never shows: stopped reads as its status, starting as working,
     // stopping as the place (or its attention).
@@ -68,6 +70,7 @@ describe("statusLine / statusText", () => {
     ["error", false, "red"],
     ["interrupted", false, "red"],
     ["snoozeEnded", false, "amber"],
+    ["waiting", true, "muted"],
   ])("%s: place %s, tone %s", (kind, place, tone) => {
     expect(showsPlace(kind)).toBe(place);
     expect(statusTones[kind]).toBe(tone);
@@ -92,6 +95,7 @@ describe("tipStatusTone", () => {
     ["finished", "connected", "attention", "finished", NOW - 3 * MIN, null, "Finished 3 min ago"],
     ["busy", "connected", "busy", "working: Say hi", null, null, "Working"],
     ["idle", "connected", "idle", "at prompt", 1, null, ""],
+    ["waiting on child threads (its own row, TipWaiting)", "connected", "idle", "waiting on 2 child threads", 1, null, "Waiting"],
     ["stopped at its prompt", "disconnected", "idle", "at prompt", 1, null, ""],
     ["unknown", "unknown", "unknown", "", null, null, ""],
     ["starting", "starting", "unknown", "", null, null, "Working"],
