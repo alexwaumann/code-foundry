@@ -77,7 +77,11 @@ func labelList(s *v1.Thread) string {
 // names resolves the creator (threadNames): its current name, or the recorded one and
 // "removed".
 func threadDetail(s *v1.Thread, names map[string]string) string {
-	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s), "worktree: " + s.GetWorktreePath()}
+	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s)}
+	if p := s.GetPending(); p != nil {
+		lines = append(lines, "pending: "+pendingLine(p))
+	}
+	lines = append(lines, "worktree: "+s.GetWorktreePath())
 	if s.GetBranch() != "" {
 		// The branch the worktree was made for (what a recreation checks out again).
 		lines = append(lines, "branch: "+s.GetBranch())
@@ -128,6 +132,24 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	return strings.Join(append(lines, cost), "\n")
 }
 
+// pendingLine is thread.get's line for the pending request: `permission Bash (request
+// r1)`, `question "Which color?" [Red | Blue] (request r2)`; --json has the input.
+func pendingLine(p *v1.ThreadPendingDetail) string {
+	line := p.GetKind()
+	switch {
+	case len(p.GetQuestions()) > 1:
+		line += fmt.Sprintf(": %d questions", len(p.GetQuestions()))
+	case p.GetQuestion() != "":
+		line += " " + strconv.Quote(p.GetQuestion())
+		if len(p.GetOptions()) > 0 {
+			line += " [" + strings.Join(p.GetOptions(), " | ") + "]"
+		}
+	case p.GetTool() != "":
+		line += " " + p.GetTool()
+	}
+	return line + " (request " + p.GetRequestId() + ")"
+}
+
 func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
@@ -140,7 +162,7 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 		Args:         []ArgSpec{idArg},
 		When:         hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id"), WithDetail: true}))
 			if r, ok := removedFrom(err); ok {
 				return removedGetResult(r), nil
 			}

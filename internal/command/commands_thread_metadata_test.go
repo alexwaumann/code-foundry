@@ -82,7 +82,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 			others: []*v1.Thread{{Id: "s-1", Name: "Parent"}},
 			wantMsg: "thread child (s-2)\nstatus: needs attention (budget reached)\nworktree: /wt\ncreated by: Parent (s-1)\nbrief: say hi\n" +
 				"labels: a, b\nreport: done: all good\nreport data: {\"n\":1}\ncost: $1.50 of a $5.00 budget",
-			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2"}, &v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}}},
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2", WithDetail: true}, &v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}}},
 		// The creator is resolved by its id: its current name, the recorded one only
 		// once it is removed.
 		{name: "get shows a renamed creator's current name", cmd: "thread.get", args: map[string]string{"id": "s-2"},
