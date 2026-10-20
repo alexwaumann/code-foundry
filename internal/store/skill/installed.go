@@ -67,6 +67,21 @@ func (i Installed) ID() string {
 	return i.Name
 }
 
+// InstalledOf is what is installed of a marketplace entry: the plugin of its name from
+// its marketplace, the skill installed from its marketplace and path (whatever its
+// directory is called now). ok is false when nothing is.
+func (snap *Snapshot) InstalledOf(e marketplace.Entry) (Installed, bool) {
+	for _, in := range snap.Installed {
+		if in.Kind != e.Kind || in.Registry != e.Registry || e.Registry == "" {
+			continue
+		}
+		if e.Kind == marketplace.KindPlugin && in.Name == e.Name || e.Kind == marketplace.KindSkill && in.Path == e.Path {
+			return in, true
+		}
+	}
+	return Installed{}, false
+}
+
 // Offer is a newer version in the registry.
 type Offer struct {
 	Version     string

@@ -1,0 +1,227 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// SkillService reads the Skills marketplace (docs/notes/skills-1-registry.md … skills-3-api.md):
+// the Claude Code plugin marketplaces Claude Code has (`claude plugin marketplace list`),
+// each checkout's plugins (its .claude-plugin/marketplace.json) and standalone skills
+// (<tier>/skills/**/SKILL.md), and what is installed: Claude Code's plugins and the skill
+// directories in ~/.claude/skills and Code Foundry's disabled skills. It only reads.
+// Install, enable, disable, update, uninstall, remove, setup and refresh are the skill.*
+// commands (CommandService.Invoke), so palette, CLI and the Settings page run the same
+// thing with the same confirms.
+service SkillService {
+  // Search is Browse: the entries matching a query, best first, at most limit of them
+  // (the catalogue can be thousands; it never goes over the wire whole).
+  rpc Search(SearchSkillsRequest) returns (SearchSkillsResponse) {}
+  // Installed lists what is installed: marketplace plugins, skills Code Foundry
+  // installed (enabled or disabled), local skills and recorded skills whose directory
+  // is gone.
+  rpc Installed(ListInstalledSkillsRequest) returns (ListInstalledSkillsResponse) {}
+  // Registries lists the marketplaces as last read.
+  rpc Registries(ListSkillRegistriesRequest) returns (ListSkillRegistriesResponse) {}
+  // Watch sends the current epoch, then each new one: every read of the marketplaces
+  // and the installed state (start-up, the hourly refresh, each skill.* operation)
+  // publishes one, and an open page re-reads what it shows. The GUI gets the same
+  // events from EventService (EVENT_SOURCE_SKILL).
+  rpc Watch(WatchSkillsRequest) returns (stream SkillEvent) {}
+}
+
+enum SkillKind {
+  SKILL_KIND_UNSPECIFIED = 0;
+  // A Claude Code plugin the marketplace index lists (Claude Code installs it).
+  SKILL_KIND_PLUGIN = 1;
+  // A standalone skill directory (Code Foundry copies it into ~/.claude/skills).
+  SKILL_KIND_SKILL = 2;
+}
+
+enum SkillTier {
+  // Neither: a plugin outside enterprise/ and community/ (a public marketplace's).
+  SKILL_TIER_UNSPECIFIED = 0;
+  SKILL_TIER_ENTERPRISE = 1;
+  SKILL_TIER_COMMUNITY = 2;
+}
+
+// How a Browse entry stands to what is installed of it (the plugin of its name from its
+// marketplace; the skill installed from its marketplace and path).
+enum SkillEntryState {
+  SKILL_ENTRY_STATE_UNSPECIFIED = 0;
+  SKILL_ENTRY_STATE_NOT_INSTALLED = 1;
+  SKILL_ENTRY_STATE_ENABLED = 2;
+  SKILL_ENTRY_STATE_DISABLED = 3;
+}
+
+// SkillEntry is a plugin or skill a marketplace offers.
+message SkillEntry {
+  SkillKind kind = 1;
+  SkillTier tier = 2;
+  string name = 3;
+  // One line.
+  string description = 4;
+  // A plugin's plugin.json author, a skill's frontmatter owner; may be empty.
+  string by = 5;
+  // A plugin's index version; a skill's YYYYMMDD (UTC) of the last commit touching its
+  // directory. Empty when the checkout has no history.
+  string version = 6;
+  // A skill's frontmatter metadata.version, for display only.
+  string declared_version = 7;
+  // The last commit touching the entry's directory; unset without history.
+  google.protobuf.Timestamp last_updated = 8;
+  // The marketplace's name.
+  string registry = 9;
+  // The repo-relative directory ("" for a plugin whose source is another repository).
+  string path = 10;
+  repeated string keywords = 11;
+  // A plugin's skill names, sorted.
+  repeated string skills = 12;
+  // A skill's setup script, repo-relative; "" for none.
+  string setup_script = 13;
+  SkillEntryState state = 14;
+  // The installed version (state ENABLED or DISABLED).
+  string installed_version = 15;
+  // The version an update would bring; empty when there is no update.
+  string update_version = 16;
+}
+
+message SearchSkillsRequest {
+  // Words that must all match a name, description, keyword or by (case-insensitive
+  // substring); empty lists everything by name.
+  string query = 1;
+  // Only this tier or kind; UNSPECIFIED: any.
+  SkillTier tier = 2;
+  SkillKind kind = 3;
+  // At most this many entries: 50 when 0, capped at 500.
+  int32 limit = 4;
+  // Update the marketplaces first (`claude plugin marketplace update`; network). The
+  // Settings page uses skill.refresh instead.
+  bool refresh = 5;
+}
+
+message SearchSkillsResponse {
+  repeated SkillEntry entries = 1;
+  // How many matched before the limit.
+  int32 total = 2;
+  // Why refresh failed; the search ran over the last good read.
+  string refresh_error = 3;
+  // The snapshot searched (SkillEvent.epoch).
+  uint64 epoch = 4;
+}
+
+enum InstalledSkillState {
+  INSTALLED_SKILL_STATE_UNSPECIFIED = 0;
+  // From a marketplace: a plugin, or a skill Code Foundry installed whose directory is
+  // there.
+  INSTALLED_SKILL_STATE_INSTALLED = 1;
+  // A skill directory in ~/.claude/skills Code Foundry did not install: only skill.remove.
+  INSTALLED_SKILL_STATE_LOCAL = 2;
+  // A skill Code Foundry installed whose directory is gone: skill.update reinstalls it,
+  // skill.uninstall forgets it.
+  INSTALLED_SKILL_STATE_MISSING = 3;
+}
+
+// SkillOffer is a newer version in the marketplace.
+message SkillOffer {
+  // A plugin's plugin.json version in the checkout (else the index's); a skill's
+  // YYYYMMDD.
+  string version = 1;
+  google.protobuf.Timestamp last_updated = 2;
+  string commit_sha = 3;
+}
+
+// InstalledSkill is a plugin or skill on this Mac.
+message InstalledSkill {
+  SkillKind kind = 1;
+  string name = 2;
+  // name@marketplace for a plugin, the name for a skill.
+  string id = 3;
+  // The marketplace it came from; empty for a local skill.
+  string registry = 4;
+  // Its directory in the marketplace (the entry it updates from); may be empty.
+  string path = 5;
+  SkillTier tier = 6;
+  string description = 7;
+  string by = 8;
+  // A plugin's installed version (Claude Code's: plugin.json's, or a commit prefix); a
+  // recorded skill's YYYYMMDD; empty for a local skill.
+  string version = 9;
+  // A plugin's last install or update; a recorded skill's commit time.
+  google.protobuf.Timestamp last_updated = 10;
+  // A plugin Claude Code has enabled; a skill in ~/.claude/skills.
+  bool enabled = 11;
+  InstalledSkillState state = 12;
+  // Where it is on disk: the skill's directory, a plugin's install path.
+  string dir = 13;
+  // A plugin's Claude Code scope (user, project, local).
+  string scope = 14;
+  // A plugin's skill names.
+  repeated string skills = 15;
+  // A recorded skill's setup script, relative to dir.
+  string setup_script = 16;
+  // The setup script never exited 0, or changed since it did: skill.setup runs it.
+  bool needs_setup = 17;
+  // The marketplace's newer version; unset when there is none.
+  SkillOffer update = 18;
+}
+
+message ListInstalledSkillsRequest {}
+
+message ListInstalledSkillsResponse {
+  // By name, then kind.
+  repeated InstalledSkill installed = 1;
+  // Why `claude plugin list` failed; the plugins are the last good list's.
+  string plugins_error = 2;
+  uint64 epoch = 3;
+}
+
+// SkillRegistry is one marketplace Claude Code has, as last read.
+message SkillRegistry {
+  string name = 1;
+  // owner/repo for a github source.
+  string repo = 2;
+  // github, git, directory, ...
+  string source = 3;
+  string url = 4;
+  string ref = 5;
+  // The checkout (Claude Code's installLocation).
+  string dir = 6;
+  // marketplace.json's owner.name.
+  string owner = 7;
+  int32 plugins = 8;
+  int32 skills = 9;
+  // A shallow clone: entries date from its last commit until a refresh fetches the
+  // history.
+  bool shallow = 10;
+  // When the checkout was last read; unset when it never was.
+  google.protobuf.Timestamp read_at = 11;
+  // When Claude Code last updated it for us (skill.refresh, the hourly tick); unset
+  // when not since the daemon started.
+  google.protobuf.Timestamp refreshed_at = 12;
+  // Why the last read or refresh failed; the entries are the last good read's.
+  string error = 13;
+  // What the read skipped and why dates are missing, a sentence each.
+  repeated string issues = 14;
+}
+
+message ListSkillRegistriesRequest {}
+
+message ListSkillRegistriesResponse {
+  // In `claude plugin marketplace list` order. Empty: Claude Code has no marketplace.
+  repeated SkillRegistry registries = 1;
+  // Why the marketplaces could not be listed (claude missing, say); the registries are
+  // the last good list's.
+  string error = 2;
+  // The marketplace the empty state names as the one to add (`claude plugin
+  // marketplace add`): ai-marketplace.
+  string expected_marketplace = 3;
+  uint64 epoch = 4;
+}
+
+message WatchSkillsRequest {}
+
+message SkillEvent {
+  // Grows by one per read in this daemon's lifetime: re-read Search, Installed and
+  // Registries when it moves.
+  uint64 epoch = 1;
+}

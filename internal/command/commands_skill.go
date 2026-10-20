@@ -425,12 +425,7 @@ func browseView(snap *skill.Snapshot, res marketplace.Result) SkillBrowseView {
 			DeclaredVersion: e.DeclaredVersion, LastUpdated: timePtr(e.LastUpdated), Registry: e.Registry, Path: e.Path,
 			Keywords: e.Keywords, Skills: e.Skills, SetupScript: e.SetupScript,
 		}
-		for _, in := range snap.Installed {
-			match := in.Kind == e.Kind && in.Registry == e.Registry &&
-				(e.Kind == marketplace.KindPlugin && in.Name == e.Name || e.Kind == marketplace.KindSkill && in.Path == e.Path)
-			if !match {
-				continue
-			}
+		if in, ok := snap.InstalledOf(e); ok {
 			v.Installed, v.InstalledVersion = "disabled", in.Version
 			if in.Enabled {
 				v.Installed = "enabled"
@@ -438,7 +433,6 @@ func browseView(snap *skill.Snapshot, res marketplace.Result) SkillBrowseView {
 			if in.Update != nil {
 				v.Update = in.Update.Version
 			}
-			break
 		}
 		out.Entries = append(out.Entries, v)
 	}
