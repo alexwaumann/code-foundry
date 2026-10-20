@@ -14,7 +14,7 @@ import (
 // worker thread whose progress (status, report, age) is derived when it is read.
 
 // registerEmberTasks registers ember.task.add, ember.task.update, ember.task.done,
-// ember.task.cancel, ember.task.list and ember.task.show.
+// ember.task.start, ember.task.cancel, ember.task.list and ember.task.show.
 func registerEmberTasks(r *Registry, d EmberDeps) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Positional: true, ID: EmberTaskID, Description: "Task id (t-…; a unique suffix of 4+ characters)"}
 	stateArg := ArgSpec{Name: "state", Type: Enum, Enum: ember.StateNames, Description: "todo, doing, blocked, done or cancelled"}
@@ -96,17 +96,25 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 			},
 		},
 		Command{
-			Name:         "ember.task.done",
-			Title:        "Ember: Task Done",
-			Description:  "Mark a task done, with its outcome (what came of it: a PR, a branch, a finding).",
+			Name:  "ember.task.done",
+			Title: "Ember: Task Done",
+			Description: "Mark a task done, with its outcome (what came of it: a PR, a branch, a finding). With branch, " +
+				"origin/<branch> must exist in its worker's worktree first.",
 			Category:     emberCategory,
 			NoKeybinding: true,
-			Args:         []ArgSpec{idArg, {Name: "outcome", Type: String, Positional: true, Description: "What came of it"}},
+			Args: []ArgSpec{idArg, {Name: "outcome", Type: String, Positional: true, Description: "What came of it"},
+				{Name: "branch", Type: String, Description: "The branch the worker pushed: refused unless origin/<branch> exists in its worktree"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				if a.Has("branch") {
+					if err := checkTaskBranch(ctx, d, a.String("id"), a.String("branch")); err != nil {
+						return Result{}, err
+					}
+				}
 				s := ember.StateDone
 				return update(ctx, a.String("id"), "done:", ember.TaskUpdate{State: &s, Outcome: ptr(a, "outcome")})
 			},
 		},
+		emberTaskStart(r, d),
 		Command{
 			Name:         "ember.task.cancel",
 			Title:        "Ember: Cancel Task",

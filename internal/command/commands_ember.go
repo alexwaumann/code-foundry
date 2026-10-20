@@ -32,11 +32,16 @@ type EmberBackend interface {
 
 var _ EmberBackend = (*ember.Store)(nil)
 
-// EmberDeps are the ember.* commands' dependencies: the store, and the settings for
-// ember.enable and ember.disable.
+// EmberDeps are the ember.* commands' dependencies: the store, the settings for
+// ember.enable and ember.disable, and the thread store for ember.task.done's branch
+// check (ember.task.start creates its worker through thread.new in the registry).
 type EmberDeps struct {
 	Ember    EmberBackend
 	Settings SettingsBackend
+	Thread   ThreadBackend
+	// RemoteBranch reports whether origin/<branch> exists in a worktree. Default: git
+	// rev-parse there.
+	RemoteBranch func(ctx context.Context, worktree, branch string) (bool, error)
 	// Now is the clock of the board's times. Default time.Now.
 	Now func() time.Time
 }
@@ -52,13 +57,17 @@ const emberEnabledKey = "ember.enabled"
 const emberEnableWait = 10 * time.Second
 
 // RegisterEmber registers ember.status, ember.board, ember.remember, ember.reseed,
-// ember.enable, ember.disable and the ember.task.* commands.
+// ember.enable, ember.disable and the ember.task.* commands. ember.task.start invokes
+// thread.new through r.
 func RegisterEmber(r *Registry, d EmberDeps) error {
 	if d.Ember == nil {
 		d.Ember = noEmber{}
 	}
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.RemoteBranch == nil {
+		d.RemoteBranch = gitRemoteBranch
 	}
 	r.SetIDLister(EmberTaskID, func(context.Context) ([]string, error) { return d.Ember.TaskIDs(), nil })
 	setEnabled := func(ctx context.Context, on bool) (Result, error) {
