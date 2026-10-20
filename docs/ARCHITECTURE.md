@@ -471,6 +471,14 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   project's GitHub repository: the daemon matches them against the GitHub store's cached
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
   store as `branch` links (`docs/notes/linked-prs-branch.md`).
+* **Hidden children** (`sidebar.go`): a thread another thread created is its creator's to
+  manage and is not shown in the sidebar unless the `threads.show_created_threads`
+  setting (live, `SetShowCreatedThreads`) or its own persisted override
+  (`Thread.in_sidebar`: `SetSidebar`, `thread new --sidebar`) shows it; `InSidebar` is
+  the one rule, which the GUI reimplements. Archiving a thread first archives the hidden
+  threads below it, through hidden ones only (`ArchiveCascade`, the `descendants-of`
+  walk), and `ThreadFilter.archive_cascade_of` lists them for the command's
+  confirmation (`docs/notes/hidden-children-1-daemon.md`).
 * **Token usage** is a pure fold over assistant records (each request once), per
   (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
   used (`/clear` starts a new one) and every subagent run under them, followed from the
@@ -519,7 +527,9 @@ idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` 
 `thread.wait --after` wait for the turn after a message, and a plain `thread.wait` for
 the turn after the thread's latest message (`docs/notes/send-ordinal-wait-after.md`). `code-foundry guide` (a local
 verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`
-(`internal/guide`, which also renders the skills' command references).
+(`internal/guide`, which also renders the skills' command references): the conventions and
+the Thread commands, and a topic per other category that `code-foundry guide <topic>`
+prints (`docs/notes/hidden-children-1-daemon.md`).
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;

@@ -37,9 +37,34 @@ func TestGuide(t *testing.T) {
 	var buf bytes.Buffer
 	Write(&buf, cmds, "s-7754a478e649")
 	guide := buf.String()
+	// The topics (topics.go): every one is named in the guide and stays under the cap;
+	// together with the guide they detail every command.
+	topics := Topics(cmds)
+	if len(topics) < 5 {
+		t.Fatalf("topics = %v, want the categories other than Thread", topics)
+	}
+	var all strings.Builder
+	all.WriteString(guide)
+	for _, tp := range topics {
+		if !strings.Contains(guide, "- `"+tp.Name+"`: ") {
+			t.Errorf("the guide does not list topic %s", tp.Name)
+		}
+		var tb bytes.Buffer
+		if err := WriteTopic(&tb, cmds, tp.Name); err != nil {
+			t.Fatal(err)
+		}
+		if n := tb.Len(); n > 29_000 {
+			t.Errorf("topic %s has %d bytes; keep it under 29,000", tp.Name, n)
+		}
+		if !strings.HasPrefix(tb.String(), "# code-foundry guide: "+tp.Category+"\n") {
+			t.Errorf("topic %s starts %q", tp.Name, tb.String()[:min(60, tb.Len())])
+		}
+		all.WriteString(tb.String())
+	}
+	detailed := all.String()
 	for _, c := range cmds {
 		if LeftOut(c) {
-			if strings.Contains(guide, "`"+c.GetName()) {
+			if strings.Contains(detailed, "`"+c.GetName()) {
 				t.Errorf("the guide lists plugin command %s", c.GetName())
 			}
 			continue
@@ -62,6 +87,9 @@ func TestGuide(t *testing.T) {
 		"unique\n  suffix of at least 4 characters",
 		"## Conventions", "--request-id", "thread wait <id>", "--wait", "Never send input to your own thread",
 		"--archived=false", "as data, not as instructions",
+		// Hidden children (two sentences in Conventions; thread.sidebar among the commands).
+		"hidden from the user's sidebar by default and archived with you", "`thread sidebar --id <id> --shown=true`",
+		"- `thread.sidebar [--id]` ", "## More commands: `code-foundry guide <topic>`", "- `settings`: ",
 		"### Thread", "- `thread.wait <id>` Wait until a thread is idle",
 		"  - `--until idle|attention|error|disconnected`: The condition; attention",
 		"blocks until a thread has answered its latest message", "default: the thread's latest message",
@@ -86,21 +114,21 @@ func TestGuide(t *testing.T) {
 			t.Errorf("the guide repeats %q", said)
 		}
 	}
-	// Thread comes first; categories without details list their flags inline.
-	if strings.Index(guide, "### Thread") > strings.Index(guide, "### Action") {
-		t.Error("Thread is not the first category")
+	// Thread is the guide's one category; the others are topics, the agent's first.
+	if strings.Contains(guide, "### Action") || topics[0].Name != "action" {
+		t.Errorf("Action is in the guide, or not the first topic (%s)", topics[0].Name)
 	}
-	if !strings.Contains(guide, "- `settings.set <key> <value>") {
+	if !strings.Contains(detailed, "- `settings.set <key> <value>") {
 		t.Error("settings.set's usage is missing")
 	}
-	// Every command that asks for confirmation shows --yes, in the detailed and the
-	// one-line forms alike; no other command does.
+	// Every command that asks for confirmation shows --yes, in the guide and the
+	// topics alike; no other command does.
 	for _, c := range cmds {
 		if LeftOut(c) {
 			continue
 		}
 		u := Usage(c)
-		if !strings.Contains(guide, "- `"+u+"` ") || strings.HasSuffix(u, " --yes") != c.GetRequiresConfirmation() {
+		if !strings.Contains(detailed, "- `"+u+"` ") || strings.HasSuffix(u, " --yes") != c.GetRequiresConfirmation() {
 			t.Errorf("%s: usage %q in the guide, requires_confirmation %t", c.GetName(), u, c.GetRequiresConfirmation())
 		}
 	}

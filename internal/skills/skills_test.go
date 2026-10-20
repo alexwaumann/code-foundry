@@ -91,7 +91,7 @@ func TestRender(t *testing.T) {
 	want := []string{
 		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
 		"code-foundry-orchestrate/reference/patterns.md", "code-foundry-orchestrate/reference/wakes.md",
-		"code-foundry-orchestrate/reference/leads.md",
+		"code-foundry-orchestrate/reference/leads.md", "code-foundry-orchestrate/reference/sidebar.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
 		"code-foundry-help/reference/settings.md", "code-foundry-help/reference/commands.md",
 	}
@@ -234,6 +234,10 @@ func TestRender(t *testing.T) {
 		{"reference/wakes.md", "\n## Plugin wake sources\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/patterns.md", "\n## 8. Checking a batch before the roll-up\n", "SKILL.md", "`reference/patterns.md` §8"},
 		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
+		{"reference/sidebar.md", "\n## Hidden by default\n", "SKILL.md", "`reference/sidebar.md`"},
+		{"reference/sidebar.md", "`code-foundry thread sidebar --id <child> --shown=true`", "SKILL.md", "`reference/sidebar.md`"},
+		{"reference/sidebar.md", "\n## Handing over\n", "SKILL.md", "`reference/sidebar.md`"},
+		{"reference/sidebar.md", "\n## Archiving takes hidden threads along\n", "SKILL.md", "`reference/sidebar.md`"},
 		{"reference/leads.md", "Before a lead ends a turn while its workers still run, it posts `code-foundry thread\n  report progress",
 			"SKILL.md", "`reference/leads.md`"},
 	} {

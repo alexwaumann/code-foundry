@@ -13,8 +13,10 @@ import (
 // removed, unpinned, listed apart) or unarchive it (back in the thread list, still
 // disconnected). Without --archived it toggles. Archiving asks for confirmation only
 // while Claude is working or waiting on the user's answer, since it ends that turn, or
-// while the thread's background agents or shells run, since they stop with it; idle,
-// finished, errored and stopped threads archive at once, and unarchiving never asks.
+// while the thread's background agents or shells run, since they stop with it, or
+// while a hidden thread below it that the daemon archives with it is working or
+// waiting (commands_thread_sidebar.go); idle, finished, errored and stopped threads
+// archive at once, and unarchiving never asks (nor cascades).
 // With ids it acts on several threads (commands_thread_bulk.go), with descendants-of on
 // a thread's subtree (commands_thread_descendants.go).
 // See docs/notes/archive-threads-1-daemon.md and docs/notes/thread-lifecycle.md.
@@ -110,11 +112,24 @@ func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	if !archiving {
 		return ""
 	}
-	why, ends := archiveInterrupts(s)
-	if why == "" {
+	return archiveOneConfirm(ctx, b, s)
+}
+
+// archiveOneConfirm is the confirmation for archiving s, or "" when it needs none:
+// what archiving cuts off in s (archiveInterrupts) and the hidden threads below it
+// still working that it archives too (hiddenWorking), in one question.
+func archiveOneConfirm(ctx context.Context, b ThreadBackend, s *v1.Thread) string {
+	var parts []string
+	if why, ends := archiveInterrupts(s); why != "" {
+		parts = append(parts, why+"; archiving "+ends+".")
+	}
+	if kids := hiddenWorking(ctx, b, []string{s.GetId()}); len(kids) > 0 {
+		parts = append(parts, hiddenWorkingText(len(kids), threadNameOrID(s)))
+	}
+	if len(parts) == 0 {
 		return ""
 	}
-	return "Archive thread " + threadNameOrID(s) + "? " + why + "; archiving " + ends + "."
+	return "Archive thread " + threadNameOrID(s) + "? " + strings.Join(parts, " ")
 }
 
 // archiveInterrupts says what archiving (or snoozing) s would cut off, and what doing

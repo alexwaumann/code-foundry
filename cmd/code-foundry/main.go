@@ -32,7 +32,7 @@ var subcommands = []subcommand{
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},
 	{"events", "Stream the daemon's events, one line each (--source, --since seq, --since-epoch, --json); for agents and scripts", runEvents},
-	{"guide", "Print a Markdown guide for an agent driving threads from the CLI (made from the command registry)", runGuide},
+	{"guide", "Print a Markdown guide for an agent driving threads from the CLI (made from the command registry); guide <topic> for one category of commands", runGuide},
 	{"gui", "Start the app (the GUI installed next to this CLI, or the dev build)", runGUI},
 	{"update", "Download the latest release for `app restart`, or install it when no daemon runs (also --update; --version, --force, --yes)", runUpdate},
 }
@@ -122,7 +122,7 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	case "--update":
 		return runUpdate(ctx, cl, rest)
 	}
-	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0])) {
+	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0]) || verbTakesWords[name]) {
 		return sc.run(ctx, cl, rest)
 	}
 	if !isWord(name) {
@@ -132,6 +132,11 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	}
 	return cl.runRegistry(ctx, args)
 }
+
+// verbTakesWords are the local verbs that take a positional word ("guide action", a
+// topic). Any other local verb followed by a word goes to the registry ("daemon status"
+// is daemon.status).
+var verbTakesWords = map[string]bool{"guide": true}
 
 func localVerb(name string) (subcommand, bool) {
 	for _, c := range subcommands {

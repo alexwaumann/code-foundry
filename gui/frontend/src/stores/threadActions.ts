@@ -38,6 +38,7 @@ export const THREAD_COMMANDS = {
   setMode: "thread.set-mode",
   respond: "thread.respond",
   setEffort: "thread.set-effort",
+  sidebar: "thread.sidebar",
 } as const;
 
 /** The context of a thread (its worktree and workspace too), whether or not it is selected. */
@@ -76,6 +77,15 @@ export function pinThread(id: string, pinned: boolean): Promise<boolean> {
  */
 export function archiveThread(id: string, archived: boolean): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.archive, { archived: String(archived) }, threadContext(id));
+}
+
+/**
+ * thread.sidebar: show (hand to the user) or hide (back to its creator) a thread another
+ * thread created, whatever threads.show_created_threads says. The daemon refuses a thread
+ * the user created (always shown).
+ */
+export function setThreadSidebar(id: string, shown: boolean): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.sidebar, { shown: String(shown) }, threadContext(id));
 }
 
 /**

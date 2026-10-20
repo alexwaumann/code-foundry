@@ -84,8 +84,8 @@ func threadLabel(s *v1.Thread) string {
 }
 
 // RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename,
-// thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive, and
-// thread.snooze. There is no close or reconnect: a message starts a stopped thread and
+// thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
+// thread.snooze and thread.sidebar, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "thread".
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
@@ -124,6 +124,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
+				sidebarCreateArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
 					"in the last 24 hours prints the thread made then and starts nothing"},
 			},
@@ -147,6 +148,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
+				}
+				if err := createSidebar(req, a); err != nil {
+					return Result{}, err
 				}
 				if a.Has("budget") {
 					usd, err := parseUSD("budget", a.String("budget"))
@@ -190,6 +194,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
+				}
+				if req.InSidebar != nil {
+					msg += "; " + map[bool]string{true: "shown in", false: "hidden from"}[req.GetInSidebar()] + " the sidebar"
 				}
 				return Result{Message: msg, JSON: s}, nil
 			},
@@ -280,5 +287,6 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadFlagsCmd(b, idArg),
 		threadFlagClearCmd(b, idArg),
 		threadRestartCmd(b, idArg),
+		threadSidebarCmd(b, idArg),
 	)
 }

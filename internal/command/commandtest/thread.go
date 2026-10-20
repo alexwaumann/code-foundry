@@ -17,7 +17,7 @@ import (
 // Thread is a fake command.ThreadBackend. Err, when set, is returned by every call.
 // Threads returned by Create/Fork/Rename echo the request; Get returns
 // Current (default: a CONNECTED thread with the requested id). List returns Current
-// and Others.
+// and Others (Cascade with archive_cascade_of).
 type Thread struct {
 	// The conversation RPCs (ListItems, Send, ...) are unimplemented.
 	codefoundryv1connect.UnimplementedThreadServiceHandler
@@ -39,6 +39,9 @@ type Thread struct {
 	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the
 	// call is recorded first).
 	FailIDs map[string]error
+	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
+	// when absent): the hidden threads archiving it takes along.
+	Cascade map[string][]*v1.Thread
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
@@ -61,7 +64,7 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 		Id: "s1", ProjectId: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), State: v1.ThreadState_THREAD_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
 		WorkspaceId: m.GetWorkspaceId(), CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(),
-		BudgetUsd: m.GetBudgetUsd(),
+		BudgetUsd: m.GetBudgetUsd(), InSidebar: m.InSidebar,
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
@@ -90,6 +93,9 @@ func (s *Thread) Fork(_ context.Context, r *connect.Request[v1.ForkThreadRequest
 func (s *Thread) List(_ context.Context, r *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
+	}
+	if id := r.Msg.GetFilter().GetArchiveCascadeOf(); id != "" {
+		return connect.NewResponse(&v1.ListThreadsResponse{Threads: s.Cascade[id]}), nil
 	}
 	var out []*v1.Thread
 	if s.Current != nil {

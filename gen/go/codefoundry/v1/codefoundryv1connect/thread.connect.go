@@ -57,6 +57,9 @@ const (
 	ThreadServicePinProcedure = "/codefoundry.v1.ThreadService/Pin"
 	// ThreadServiceArchiveProcedure is the fully-qualified name of the ThreadService's Archive RPC.
 	ThreadServiceArchiveProcedure = "/codefoundry.v1.ThreadService/Archive"
+	// ThreadServiceSetSidebarProcedure is the fully-qualified name of the ThreadService's SetSidebar
+	// RPC.
+	ThreadServiceSetSidebarProcedure = "/codefoundry.v1.ThreadService/SetSidebar"
 	// ThreadServiceSnoozeProcedure is the fully-qualified name of the ThreadService's Snooze RPC.
 	ThreadServiceSnoozeProcedure = "/codefoundry.v1.ThreadService/Snooze"
 	// ThreadServiceLabelProcedure is the fully-qualified name of the ThreadService's Label RPC.
@@ -158,7 +161,17 @@ type ThreadServiceClient interface {
 	// it and records archived_at (kept when it is already archived). Unarchiving only
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	// Archiving also archives, the same way and first, every thread below it that is not
+	// shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
+	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
+	// A thread of those that fails is skipped and named in the error, which then comes
+	// after the thread itself was archived. Unarchiving does not cascade.
 	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
+	// SetSidebar shows or hides a thread another thread created in the GUI's sidebar
+	// (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
+	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
+	// thread the user created (always shown). Persisted; any state.
+	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
 	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
@@ -363,6 +376,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Archive")),
 			connect.WithClientOptions(opts...),
 		),
+		setSidebar: connect.NewClient[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse](
+			httpClient,
+			baseURL+ThreadServiceSetSidebarProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
+			connect.WithClientOptions(opts...),
+		),
 		snooze: connect.NewClient[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceSnoozeProcedure,
@@ -518,6 +537,7 @@ type threadServiceClient struct {
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
+	setSidebar        *connect.Client[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
@@ -601,6 +621,11 @@ func (c *threadServiceClient) Pin(ctx context.Context, req *connect.Request[v1.P
 // Archive calls codefoundry.v1.ThreadService.Archive.
 func (c *threadServiceClient) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	return c.archive.CallUnary(ctx, req)
+}
+
+// SetSidebar calls codefoundry.v1.ThreadService.SetSidebar.
+func (c *threadServiceClient) SetSidebar(ctx context.Context, req *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
+	return c.setSidebar.CallUnary(ctx, req)
 }
 
 // Snooze calls codefoundry.v1.ThreadService.Snooze.
@@ -762,7 +787,17 @@ type ThreadServiceHandler interface {
 	// it and records archived_at (kept when it is already archived). Unarchiving only
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	// Archiving also archives, the same way and first, every thread below it that is not
+	// shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
+	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
+	// A thread of those that fails is skipped and named in the error, which then comes
+	// after the thread itself was archived. Unarchiving does not cascade.
 	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
+	// SetSidebar shows or hides a thread another thread created in the GUI's sidebar
+	// (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
+	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
+	// thread the user created (always shown). Persisted; any state.
+	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
 	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
@@ -963,6 +998,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Archive")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSetSidebarHandler := connect.NewUnaryHandler(
+		ThreadServiceSetSidebarProcedure,
+		svc.SetSidebar,
+		connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSnoozeHandler := connect.NewUnaryHandler(
 		ThreadServiceSnoozeProcedure,
 		svc.Snooze,
@@ -1127,6 +1168,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServicePinHandler.ServeHTTP(w, r)
 		case ThreadServiceArchiveProcedure:
 			threadServiceArchiveHandler.ServeHTTP(w, r)
+		case ThreadServiceSetSidebarProcedure:
+			threadServiceSetSidebarHandler.ServeHTTP(w, r)
 		case ThreadServiceSnoozeProcedure:
 			threadServiceSnoozeHandler.ServeHTTP(w, r)
 		case ThreadServiceLabelProcedure:
@@ -1228,6 +1271,10 @@ func (UnimplementedThreadServiceHandler) Pin(context.Context, *connect.Request[v
 
 func (UnimplementedThreadServiceHandler) Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Archive is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetSidebar is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {

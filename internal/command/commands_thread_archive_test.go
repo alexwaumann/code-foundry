@@ -23,6 +23,7 @@ func TestThreadArchive(t *testing.T) {
 	busy := live(v1.ThreadStatus_THREAD_STATUS_BUSY, "working")
 	archivedAt := timestamppb.New(time.UnixMilli(42))
 	get := &v1.GetThreadRequest{Id: "s5"}
+	cascade := &v1.ListThreadsRequest{Filter: &v1.ThreadFilter{ArchiveCascadeOf: "s5"}}
 	archive := &v1.ArchiveThreadRequest{Id: "s5", Archived: true}
 	unarchive := &v1.ArchiveThreadRequest{Id: "s5"}
 	const working = "Archive thread drv? Claude is still working; archiving ends the turn."
@@ -43,10 +44,10 @@ func TestThreadArchive(t *testing.T) {
 	}{
 		{name: "toggle archives an idle thread without asking", ctx: command.Context{ActiveThreadID: "s5"},
 			current: live(v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"),
-			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, get, archive}},
+			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, cascade, get, archive}},
 		{name: "a finished turn archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
 			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "finished"),
-			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
+			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, cascade, archive}},
 		{name: "a failed turn archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
 			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "error: rate_limit"),
 			wantMsg: "archived thread drv (s5)"},
@@ -57,7 +58,7 @@ func TestThreadArchive(t *testing.T) {
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_CLOSING, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
 			wantMsg: "archived thread drv (s5)"},
 		{name: "a working thread asks", ctx: command.Context{ActiveThreadID: "s5"}, current: busy,
-			wantAsk: working, wantReqs: []proto.Message{get, get}},
+			wantAsk: working, wantReqs: []proto.Message{get, cascade, get, cascade}},
 		{name: "a starting thread asks", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_STARTING}, wantAsk: working},
 		{name: "a pending permission asks", args: map[string]string{"id": "s5", "archived": "true"},
@@ -91,7 +92,7 @@ func TestThreadArchive(t *testing.T) {
 			wantMsg: "unarchived thread drv (s5)", wantReqs: []proto.Message{get, unarchive}},
 		{name: "re-archiving an archived thread", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ArchivedAt: archivedAt},
-			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
+			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, cascade, archive}},
 		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		// The CLI may name its threads with ids alone, so Run says what is missing.
 		{name: "the CLI without a thread names what is missing", wantErr: command.ErrInvalidArgs},

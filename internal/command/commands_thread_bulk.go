@@ -147,29 +147,38 @@ func archiveManyConfirm(ctx context.Context, b ThreadBackend, ids []string, a Ar
 	for _, s := range res.Msg.GetThreads() {
 		byID[s.GetId()] = s
 	}
+	if len(ids) == 1 {
+		if s, ok := byID[ids[0]]; ok {
+			return archiveOneConfirm(ctx, b, s)
+		}
+		return ""
+	}
 	var busy []string
 	for _, id := range ids {
 		s, ok := byID[id]
 		if !ok {
 			continue
 		}
-		why, ends := archiveInterrupts(s)
-		if why == "" {
-			continue
+		if why, _ := archiveInterrupts(s); why != "" {
+			busy = append(busy, threadNameOrID(s)+" ("+why+")")
 		}
-		if len(ids) == 1 {
-			return "Archive thread " + threadNameOrID(s) + "? " + why + "; archiving " + ends + "."
-		}
-		busy = append(busy, threadNameOrID(s)+" ("+why+")")
 	}
+	var msg string
 	switch len(busy) {
 	case 0:
-		return ""
 	case 1:
-		return fmt.Sprintf("Archive %d threads? 1 of them is busy: %s. Archiving ends its turn or stops its background work.", len(ids), busy[0])
+		msg = fmt.Sprintf("Archive %d threads? 1 of them is busy: %s. Archiving ends its turn or stops its background work.", len(ids), busy[0])
+	default:
+		msg = fmt.Sprintf("Archive %d threads? %d of them are busy: %s. Archiving ends their turns and stops their background work.",
+			len(ids), len(busy), listSome(busy))
 	}
-	return fmt.Sprintf("Archive %d threads? %d of them are busy: %s. Archiving ends their turns and stops their background work.",
-		len(ids), len(busy), listSome(busy))
+	if kids := hiddenWorking(ctx, b, ids); len(kids) > 0 {
+		if msg == "" {
+			msg = fmt.Sprintf("Archive %d threads?", len(ids))
+		}
+		msg += " " + hiddenWorkingText(len(kids), "")
+	}
+	return msg
 }
 
 // threadNameOrID is s's name, else its id.

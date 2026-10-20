@@ -179,48 +179,49 @@ var Groups = []Group{
 
 // Keys of the static fields that have consumers in the daemon or GUI.
 const (
-	KeyDefaultModel      = "threads.default_model"
-	KeyDefaultEffort     = "threads.default_effort"
-	KeyDefaultWorktree   = "threads.default_worktree"
-	KeyAutoName          = "threads.auto_name"
-	KeyNamingModel       = "threads.naming_model"
-	KeyCacheTTL          = "threads.cache_ttl_seconds"
-	KeyCloseGrace        = "threads.close_grace_seconds"
-	KeyScrollback        = "threads.scrollback_lines"
-	KeyGhPollInterval    = "github.poll_interval_seconds"
-	KeyDashboards        = "github.dashboards_enabled"
-	KeyFetchInterval     = "projects.fetch_interval_seconds"
-	KeyEditorCommand     = "gitops.editor_command"
-	KeyTheme             = "appearance.theme"
-	KeyThemeDark         = "appearance.theme_dark"
-	KeyThemeLight        = "appearance.theme_light"
-	KeyFontFamily        = "appearance.font_family"
-	KeyFontSize          = "appearance.font_size"
-	KeyZoom              = "appearance.zoom"
-	KeyDensity           = "appearance.density"
-	KeyThreadWidth       = "appearance.thread_width"
-	KeyBackdrop          = "appearance.backdrop"
-	KeyBackdropFile      = "appearance.backdrop_file"
-	KeyPanelKeepOpen     = "appearance.panel_keep_open"
-	KeyDockBadge         = "notifications.dock_badge"
-	KeyBounce            = "notifications.bounce"
-	KeySound             = "notifications.sound"
-	KeySoundVolume       = "notifications.sound_volume"
-	KeyAlertCooldown     = "notifications.cooldown_seconds"
-	KeyUpdateChannel     = "update.channel"
-	KeyClaudePath        = "advanced.claude_path"
-	KeyGhPath            = "advanced.gh_path"
-	KeyLogLevel          = "advanced.log_level"
-	KeyPluginRegistries  = "plugins.registries"
-	keybindingKeyPrefix  = GroupKeybindings + "."
-	defaultFontFamily    = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
-	defaultScrollback    = 10000
-	defaultCloseGrace    = 10
-	defaultCacheTTL      = 3600
-	defaultGhPollSeconds = 60
-	defaultFetchSeconds  = 120
-	defaultSoundVolume   = 50
-	defaultAlertCooldown = 60
+	KeyDefaultModel       = "threads.default_model"
+	KeyDefaultEffort      = "threads.default_effort"
+	KeyDefaultWorktree    = "threads.default_worktree"
+	KeyAutoName           = "threads.auto_name"
+	KeyNamingModel        = "threads.naming_model"
+	KeyCacheTTL           = "threads.cache_ttl_seconds"
+	KeyShowCreatedThreads = "threads.show_created_threads"
+	KeyCloseGrace         = "threads.close_grace_seconds"
+	KeyScrollback         = "threads.scrollback_lines"
+	KeyGhPollInterval     = "github.poll_interval_seconds"
+	KeyDashboards         = "github.dashboards_enabled"
+	KeyFetchInterval      = "projects.fetch_interval_seconds"
+	KeyEditorCommand      = "gitops.editor_command"
+	KeyTheme              = "appearance.theme"
+	KeyThemeDark          = "appearance.theme_dark"
+	KeyThemeLight         = "appearance.theme_light"
+	KeyFontFamily         = "appearance.font_family"
+	KeyFontSize           = "appearance.font_size"
+	KeyZoom               = "appearance.zoom"
+	KeyDensity            = "appearance.density"
+	KeyThreadWidth        = "appearance.thread_width"
+	KeyBackdrop           = "appearance.backdrop"
+	KeyBackdropFile       = "appearance.backdrop_file"
+	KeyPanelKeepOpen      = "appearance.panel_keep_open"
+	KeyDockBadge          = "notifications.dock_badge"
+	KeyBounce             = "notifications.bounce"
+	KeySound              = "notifications.sound"
+	KeySoundVolume        = "notifications.sound_volume"
+	KeyAlertCooldown      = "notifications.cooldown_seconds"
+	KeyUpdateChannel      = "update.channel"
+	KeyClaudePath         = "advanced.claude_path"
+	KeyGhPath             = "advanced.gh_path"
+	KeyLogLevel           = "advanced.log_level"
+	KeyPluginRegistries   = "plugins.registries"
+	keybindingKeyPrefix   = GroupKeybindings + "."
+	defaultFontFamily     = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
+	defaultScrollback     = 10000
+	defaultCloseGrace     = 10
+	defaultCacheTTL       = 3600
+	defaultGhPollSeconds  = 60
+	defaultFetchSeconds   = 120
+	defaultSoundVolume    = 50
+	defaultAlertCooldown  = 60
 )
 
 // appearance.backdrop values: the bundled forest art, nothing, or the image named by
@@ -266,6 +267,16 @@ var staticFields = []Field{
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
 		Default:     WorktreeCurrent,
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
+	},
+	{
+		// Read by the thread store (the archive cascade; docs/notes/hidden-children-1-daemon.md)
+		// and the GUI (the sidebar, the Dock badge).
+		Key: KeyShowCreatedThreads, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool,
+		Title: "Show threads created by other threads",
+		Description: "Off: threads an agent creates stay out of the sidebar and the Dock badge, and are archived with their creator. " +
+			"They stay in the creator's Threads tab.",
+		Default: "false",
+		bind:    func(s *Settings) any { return &s.Threads.ShowCreatedThreads },
 	},
 	{
 		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",

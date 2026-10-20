@@ -24,6 +24,9 @@ type Fake struct {
 	Now func() time.Time
 	// Err, when set, is returned by every mutating method.
 	Err error
+	// ShowCreated is the threads.show_created_threads setting List's ArchiveCascadeOf
+	// applies. Archive does not cascade in the fake.
+	ShowCreated bool
 
 	mu      sync.Mutex
 	next    int
@@ -204,6 +207,9 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 		call += " attachments=" + strings.Join(o.Attachments, ",")
 	}
 	if err := f.createMetadata(&s, o, &call); err != nil {
+		return thread.Thread{}, err
+	}
+	if err := createSidebar(&s, o, &call); err != nil {
 		return thread.Thread{}, err
 	}
 	if o.Notify {
@@ -481,6 +487,9 @@ func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, e
 	removed := make([]thread.RemovedThread, 0, len(f.removed))
 	for _, r := range f.removed {
 		removed = append(removed, r)
+	}
+	if o.ArchiveCascadeOf != "" {
+		o.ShowCreated = f.ShowCreated
 	}
 	f.mu.Unlock()
 	return thread.FilterLineage(f.Snapshot().Threads, removed, o), nil

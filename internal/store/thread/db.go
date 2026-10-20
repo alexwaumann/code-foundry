@@ -10,7 +10,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032 and 0036) and thread_pull_requests (0010, 0039); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032, 0036 and 0040) and thread_pull_requests (0010, 0039); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -29,6 +29,14 @@ func fromMillis(ms int64) time.Time {
 	return time.UnixMilli(ms)
 }
 
+// nullBool is a nullable INTEGER column's value: NULL for nil.
+func nullBool(b *bool) any {
+	if b == nil {
+		return nil
+	}
+	return *b
+}
+
 func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO threads (
 			id, claude_session_id, project_id, worktree_path, name, auto_named, model, effort,
@@ -37,9 +45,10 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note)
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
+			in_sidebar)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			project_id = excluded.project_id,
@@ -82,14 +91,16 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			owner = excluded.owner,
 			spawn_env = excluded.spawn_env,
 			spawn_add_dirs = excluded.spawn_add_dirs,
-			resume_note = excluded.resume_note`,
+			resume_note = excluded.resume_note,
+			in_sidebar = excluded.in_sidebar`,
 		s.ID, s.ClaudeSessionID, s.ProjectID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
 		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
 		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
-		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional, s.Owner, labelsJSON(s.SpawnEnv), labelsJSON(s.SpawnAddDirs), resumeNoteJSON(s.ResumeNote))
+		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional, s.Owner, labelsJSON(s.SpawnEnv), labelsJSON(s.SpawnAddDirs), resumeNoteJSON(s.ResumeNote),
+		nullBool(s.SidebarOverride))
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
@@ -103,7 +114,8 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
+			in_sidebar
 		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
@@ -115,13 +127,15 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		var created, active, statusAt, lastResult, archived, snoozed, reportAt int64
 		var state, perm, status, reportStatus int
 		var labels, spawnEnv, spawnAddDirs, resumeNote string
+		var inSidebar sql.NullBool
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.ProjectID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
 			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
 			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
-			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional, &s.Owner, &spawnEnv, &spawnAddDirs, &resumeNote); err != nil {
+			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional, &s.Owner, &spawnEnv, &spawnAddDirs, &resumeNote,
+			&inSidebar); err != nil {
 			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
@@ -138,6 +152,9 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		s.Labels = parseLabels(labels)
 		s.SpawnEnv, s.SpawnAddDirs = parseLabels(spawnEnv), parseLabels(spawnAddDirs)
 		s.ResumeNote = parseResumeNote(resumeNote)
+		if inSidebar.Valid {
+			s.SidebarOverride = sidebarOverride(inSidebar.Bool)
+		}
 		if s.Report.Status = ReportStatus(reportStatus); !s.Report.Status.valid() {
 			s.Report.Status = ReportNone
 		}
