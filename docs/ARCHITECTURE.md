@@ -254,7 +254,7 @@ Services (v1):
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
-  update, action, plugin, ui; the thread source carries threads' pending requests only, a
+  update, action, plugin, skill, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
@@ -326,6 +326,9 @@ Services (v1):
   `api.PluginFeed` on the same loop as Watch, a bounded drop-oldest queue per plugin) and
   raise flags on threads (`thread/setFlag`; `Thread.flags`, ThreadService.ClearFlags,
   `thread flags`); `docs/notes/plugins-3-events-flags-env.md`.
+* `SkillService` — Search, Installed, Registries, Watch (the epoch): the Skills
+  marketplace, read only; its actions are the `skill.*` commands (§10;
+  `docs/notes/skills-3-api.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -779,7 +782,8 @@ list --json`; no setting of ours, never a clone of ours); each checkout is read 
 HEAD (a skill's version is its last commit's YYYYMMDD). `Search` ranks name hits first
 and caps the page. Installed is Claude Code's plugin list plus the skill directories in
 `~/.claude/skills` and `<home>/skills/disabled`, joined with `skill_installs` (no row:
-a local skill); update offers are derived (plugin: semver; skill: a newer commit). The
+a local skill); update offers are derived (plugin: the checkout's `plugin.json` version
+semver-newer than the installed copy's, else the index's; skill: a newer commit). The
 `claude` calls sit behind `skill.Claude` (fake in `skilltest`), with
 `advanced.claude_path` read live. The daemon reads the checkouts at start (no network)
 and on the plugin registry's hourly tick runs `claude plugin marketplace update` per
@@ -789,7 +793,10 @@ the store's too: a plugin is `claude plugin install|enable|disable|update|uninst
 <name>@<marketplace> --json`, a skill is a directory it copies (staged beside, then
 renamed), moves to and from `<home>/skills/disabled` and records; a setup script runs
 only in a visible `kind=setup` bottom-panel terminal (`skill.setup`), whose exit 0 the
-daemon records. The `skill.*` commands drive it.
+daemon records. The `skill.*` commands drive it. `SkillService`
+(`docs/notes/skills-3-api.md`) only reads (`Search`, `Installed`, `Registries`; `Watch`
+and the EventService skill source carry the epoch); the GUI's `stores/skill.ts` re-reads
+on a new epoch while the page is open and runs the `skill.*` commands for every action.
 
 ## 11. Conventions
 

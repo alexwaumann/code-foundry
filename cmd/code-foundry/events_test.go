@@ -88,6 +88,9 @@ func TestEventLine(t *testing.T) {
 			"9 ui focus-thread s-2"},
 		{"pending", &v1.Event{Seq: 10, Event: &v1.Event_Thread{Thread: &v1.ThreadEvent{Event: &v1.ThreadEvent_Pending{Pending: &v1.ThreadPending{ThreadId: "s-3"}}}}},
 			"10 thread pending s-3"},
+		{"skill epoch", &v1.Event{Seq: 12, Event: &v1.Event_Skill{Skill: &v1.SkillEvent{Epoch: 3}}}, "12 skill epoch 3"},
+		{"plugin registry epoch", &v1.Event{Seq: 13, Event: &v1.Event_Plugin{Plugin: &v1.PluginEvent{Event: &v1.PluginEvent_RegistryEpoch{RegistryEpoch: 2}}}},
+			"13 plugin registry-epoch 2"},
 		{"empty", &v1.Event{}, "- (empty event)"},
 	}
 	for _, tt := range tests {

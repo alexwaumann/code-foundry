@@ -194,6 +194,9 @@ func eventLine(ev *v1.Event) string {
 	switch {
 	case what.Kind() == protoreflect.StringKind:
 		return line + " " + val.String()
+	case what.Kind() == protoreflect.Uint64Kind || what.Kind() == protoreflect.Int64Kind:
+		// An epoch (skill epoch 3, plugin registry-epoch 2).
+		return line + " " + val.String()
 	case what.Message() == nil || what.IsList() || what.IsMap():
 		return line
 	}
