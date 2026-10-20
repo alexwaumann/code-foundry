@@ -62,7 +62,7 @@ Decided while building (flagged for review):
 * **The Threads tab's action** sits beside the row's button (a button cannot nest in
   one), absolutely placed over the age on line 2, which hides while the row is hovered
   or the action has keyboard focus. Only siblings and children get it (This thread has
-  the header button; the creator is not the thread's to hand over). The "hidden" mark is
+  the header button; the creator row stays a plain link, as the brief lists siblings and children). The "hidden" mark is
   on any hidden row, This thread and the creator included.
 * **Turning the setting on** (or showing a waiting child) while the window is not
   attended alerts like any thread entering the attention set: the user's set grew.
@@ -106,7 +106,7 @@ Decided while building (flagged for review):
   turn, a permission prompt and an API error, which is NEEDS_ATTENTION too), so turning
   the setting on adds 3 to the bell.
 * The agent session's worktree hook refuses some compound shell commands and heredocs;
-  edits went through the edit tool or one-line scripts.
+  edits went through the edit tool or one-line scripts, and `git` outside the worktree is refused, so the live scratch project was a plain folder (a no-git project).
 
 ## Tests
 
@@ -129,6 +129,43 @@ Decided while building (flagged for review):
 
 ## Verification
 
-(filled in below)
+* `make check` green; `make gui-e2e` green (470 passed, 26 skipped live specs, 4 WebKit
+  workers, no flakes on the run).
+* Live (2026-10-20, `make gui-build`, the built GUI with `CODE_FOUNDRY_HOME=/tmp/cf-hidden2`
+  and this branch's `bin/code-foundry`, a plain scratch folder `~/cf-scratch-hidden2`
+  registered as a project, threads on `claude-haiku-5-5[1m]` at medium):
+  * The parent "Split the README work" (started from the CLI, so the GUI focused it) had
+    its Claude run `code-foundry thread new` twice. Neither child appeared in the sidebar,
+    the view stayed on the parent (both focus intents skipped), and the bell stayed empty
+    with both children finished. The parent's Threads tab listed them with "hidden".
+  * Hovering a child in the tab showed the eye with its "Show in sidebar" tooltip; a click
+    added "List README headings" to the sidebar (↳, "Finished 5 min ago") and the bell
+    went to 1; the tab's mark went away.
+  * Opening the hidden "Count README words" from the tab: the pane showed it with the
+    header's eye beside Archive, and the parent's row was the highlighted one. The header
+    button showed it (its own row then highlighted) and hid it again.
+  * The row menu's "Hide from sidebar" (after Archive) on "List README headings" took its
+    row out.
+  * Settings › General › Threads showed "Show threads created by other threads" (off).
+    A child created from the shell with `--created-by` while it was off did not appear and
+    did not take the view; switching it on listed that child at once (bell 1), the two with
+    an explicit hidden override stayed hidden; off again removed it.
+  * With one child shown again and another hidden child (supervised) waiting on a Write
+    permission, Archive in the parent's header asked: "Archive thread Split the README
+    work? 1 hidden child thread is still working; archiving ends its turn and archives it
+    too. To keep it, ask Split the README work to hand it over (code-foundry thread sidebar
+    --shown=true) or show it in the sidebar first." After OK the daemon logged three
+    cascaded archives and the root (`cascaded=3 cascade_failed=0`); the shown child stayed
+    in the sidebar, the Archived footer counted only the parent, the start page said "1
+    waiting on you". The archive took ~10 s: one hidden child had a background shell, so
+    its Claude only stopped at the close grace (a WARN, existing behaviour); a second click
+    on Archive in that window got a second confirmation for the thread being archived.
+  * Screenshots (dark and light) in the PR body. Theme put back to `system`; the side
+    panel was the archived parent's (reset by the archive); Archived stayed collapsed.
+    The GUI and the isolated daemon were stopped and `/tmp/cf-hidden2`, the scratch folder
+    and its `~/.claude/projects` entry deleted.
+* Not verified live: cmd+1..9 / cmd+shift+a and the arrow keys (no keyboard events could
+  be sent to the window here; mock e2e), the Dock badge itself (the bell, which counts the
+  same set, was checked).
 
 Daemon restart needed: no (frontend only; needs the #266 daemon).
