@@ -45,6 +45,12 @@ const ViewPanelExpand = "panel.expand"
 // hidden panel, and no tab is added until a surface is picked.
 const ViewPanelNewTab = "panel.new-tab"
 
+// ViewPanelSplit is the ShowView name that splits the selection's side panel into two tab
+// groups, or joins a split one back into one. Like ViewPanelToggle it is an action on
+// per-selection GUI state, not a page: splitting shows a hidden panel, and a panel
+// without tabs has nothing to split.
+const ViewPanelSplit = "panel.split"
+
 // ViewPanelWorkspace is the ShowView name that opens (or reveals) the workspace surface
 // in the side panel of the selected workspace thread: the workspace's members with their
 // git and pull request state. Like ViewPanelToggle it is an action on per-selection GUI
@@ -99,7 +105,8 @@ func hasWorktreeThreadContext(c Context) bool {
 // view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.bottom.toggle, which shows or hides the bottom panel, view.panel.expand, which switches it between split and full width,
-// view.panel.new-tab, which shows its surface list to open another tab, and
+// view.panel.new-tab, which shows its surface list to open another tab,
+// view.panel.split, which splits it into two tab groups or joins them, and
 // view.panel.workspace, which opens the workspace surface in it,
 // view.panel.linked-prs, which opens the thread's linked pull requests in it,
 // view.panel.usage, which opens the thread's usage in it,
@@ -193,6 +200,16 @@ func RegisterView(r *Registry, e Emitter) error {
 			// it, and while the panel has focus each surface's letter opens that surface.
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelNewTab), nil
+			},
+		},
+		Command{
+			Name:        "view.panel.split",
+			Title:       "Split Side Panel",
+			Description: "Split or unsplit the side panel of the selected thread or page into two tab groups.",
+			Category:    "View",
+			Keybindings: []string{`cmd+\`},
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelSplit), nil
 			},
 		},
 		Command{

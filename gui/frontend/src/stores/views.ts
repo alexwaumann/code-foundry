@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
-import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
+import { expandPanel, getPanel, isSplit, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { agentsPanelTarget, openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
@@ -118,6 +118,10 @@ export function showView(name: string): boolean {
     case "panel.new-tab":
       // view.panel.new-tab: the surface list in the current selection's panel (its "+").
       newPanelTabCommand();
+      return true;
+    case "panel.split":
+      // view.panel.split: splits or joins the current selection's panel's tab groups.
+      splitPanelCommand();
       return true;
     case "panel.workspace":
       // view.panel.workspace: the workspace surface in the current workspace thread's panel.
@@ -255,7 +259,8 @@ export function expandPanelCommand(): boolean {
  * its panel if hidden, with the surface list ("Open a surface") instead of the active
  * tab (stores/panel.ts startPicking). No tab is added until a surface is picked; Escape
  * goes back. A panel without tabs shows the list anyway, so it is only shown. A no-op
- * while the settings or usage page is up and with nothing selected.
+ * while the settings or usage page is up and with nothing selected. In a split panel it
+ * picks in the focused group; a group's own "+" focuses that group before it runs.
  *
  * Focus moves to the panel, like toggling it on, so Escape and the surface letters work
  * at once; with the palette open, its return target moves there instead.
@@ -266,6 +271,34 @@ export function newPanelTabCommand(): boolean {
   if (!startPanelPicking("current", { focus: !inPalette })) return false;
   if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return true;
+}
+
+/**
+ * view.panel.split for the current selection: splits its panel into two tab groups
+ * (stores/panel.ts split: the active tab moves into the new second group; with a single
+ * tab the new group starts on its surface list), or joins a split panel's groups back
+ * into one (unsplit). A hidden panel is shown, split: a hidden split panel just shows,
+ * since joining groups the user cannot see would be a surprise. A panel without tabs has
+ * nothing to split (it is only shown). A no-op while the settings or usage page is up and
+ * with nothing selected. Returns whether the panel is split afterwards.
+ *
+ * Focus: splitting moves it to the panel (the new group is the focused one), like
+ * view.panel.new-tab; with the palette open, its return target moves there instead.
+ * Joining keeps focus in the panel when it was there (the second group's strip is gone).
+ */
+export function splitPanelCommand(): boolean {
+  if (pageOpen()) return false;
+  const ui = useUiStore.getState();
+  const inPalette = ui.palette.open;
+  const e = getPanel();
+  if (e.open && isSplit(e)) {
+    unsplitPanel("current");
+    if (!inPalette && ui.focus === "panel") useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+    return false;
+  }
+  const split = splitPanel("current", { focus: !inPalette });
+  if (inPalette && getPanel().open) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return split;
 }
 
 /**
