@@ -762,6 +762,23 @@ built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
   SHA-256, permissions equal to the manifest's), validated by its CI. No registry is
   configured by default: `plugins.registries` is empty until the user adds one.
 
+**Skills marketplace** (not Code Foundry plugins: Claude Code plugins and standalone
+skills; `docs/notes/skills-1-registry.md`). `internal/store/skill` serves Settings →
+Skills. Its registries are the marketplaces Claude Code has (`claude plugin marketplace
+list --json`; no setting of ours, never a clone of ours); each checkout is read by
+`skill/marketplace`: the plugins `.claude-plugin/marketplace.json` lists (with
+`plugin.json` and their skills) and every `SKILL.md` directory under
+`enterprise|community/skills/**`, dated by one `git log --name-only` pass cached by
+HEAD (a skill's version is its last commit's YYYYMMDD). `Search` ranks name hits first
+and caps the page. Installed is Claude Code's plugin list plus the skill directories in
+`~/.claude/skills` and `<home>/skills/disabled`, joined with `skill_installs` (no row:
+a local skill); update offers are derived (plugin: semver; skill: a newer commit). The
+`claude` calls sit behind `skill.Claude` (fake in `skilltest`), with
+`advanced.claude_path` read live. The daemon reads the checkouts at start (no network)
+and on the plugin registry's hourly tick runs `claude plugin marketplace update` per
+marketplace (deepening Claude Code's shallow clone once) and re-reads; each read
+publishes `skill.Changed{Epoch}`.
+
 ## 11. Conventions
 
 * Features add files, not edits. Registries over switch statements. Messages owned by the

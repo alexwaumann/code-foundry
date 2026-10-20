@@ -256,6 +256,12 @@ func (s *Store) Load(ctx context.Context) error {
 	next.Epoch = s.epoch
 	s.snap.Store(next)
 	bus.Publish[Event](s.opts.Bus, Changed{Epoch: next.Epoch})
+	nPlugins, nSkills := 0, 0
+	for _, r := range next.Registries {
+		nPlugins, nSkills = nPlugins+r.Plugins, nSkills+r.Skills
+	}
+	s.log.Info("marketplaces read", "registries", len(next.Registries), "plugins", nPlugins, "skills", nSkills,
+		"installed", len(next.Installed), "epoch", next.Epoch, "errors", len(errs))
 	return errors.Join(errs...)
 }
 

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,7 +43,7 @@ func newHarness(t *testing.T) *harness {
 	h.claude.Set([]skilltest.Marketplace{{Name: "ai-marketplace", Source: "github", Repo: "acme/ai-marketplace", InstallLocation: h.checkout}}, nil)
 	s, err := skill.New(skill.Options{
 		DB: h.db, Claude: h.claude, SkillsDir: h.skillsDir, DisabledDir: h.disabled, Bus: h.bus,
-		Now: func() time.Time { return now },
+		Now: func() time.Time { return now }, Log: slog.New(slog.DiscardHandler),
 	})
 	if err != nil {
 		t.Fatal(err)
