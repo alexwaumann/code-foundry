@@ -155,7 +155,7 @@ func (s *Store) toggle(ctx context.Context, name string, kind marketplace.Kind, 
 	ch := Change{Op: op, Kind: marketplace.KindSkill, Name: sk.name, Registry: sk.rec.Registry}
 	switch {
 	case !have && !other:
-		return Change{}, fmt.Errorf("skill %s is not in %s or %s any more; install it again: %w", sk.name, s.opts.SkillsDir, s.opts.DisabledDir, ErrNotFound)
+		return Change{}, refuse(ErrNotFound, "skill %s is not in %s or %s any more; install it again", sk.name, s.opts.SkillsDir, s.opts.DisabledDir)
 	case other && !have:
 		ch.Unchanged = true
 	case other && have:
@@ -251,7 +251,7 @@ func (s *Store) updateOne(ctx context.Context, t target) (Change, error) {
 	rec := sk.rec
 	e, ok := catalogEntry(s.Snapshot().catalogs[rec.Registry], marketplace.KindSkill, func(e marketplace.Entry) bool { return e.Path == rec.Path })
 	if !ok {
-		return Change{}, fmt.Errorf("skill %s: %s has no skill at %s any more: %w", sk.name, rec.Registry, rec.Path, ErrNotFound)
+		return Change{}, refuse(ErrNotFound, "skill %s: %s has no skill at %s any more", sk.name, rec.Registry, rec.Path)
 	}
 	ch := Change{Op: OpUpdate, Kind: marketplace.KindSkill, Name: sk.name, Registry: rec.Registry, PreviousVersion: skillVersion(rec)}
 	target := sk.dir()
@@ -323,7 +323,7 @@ func (s *Store) Remove(ctx context.Context, name string) (Change, error) {
 	}
 	sk := t.skill
 	if sk.recorded {
-		return Change{}, fmt.Errorf("skill %s was installed from %s: uninstall it instead: %w", sk.name, sk.rec.Registry, ErrLocal)
+		return Change{}, refuse(ErrLocal, "skill %s was installed from %s: uninstall it instead", sk.name, sk.rec.Registry)
 	}
 	dir := sk.dir()
 	for _, d := range []string{sk.enabledDir, sk.disabledDir} {
@@ -389,11 +389,11 @@ func (s *Store) installSkill(ctx context.Context, e marketplace.Entry) (Change, 
 func (s *Store) copySkill(ctx context.Context, e marketplace.Entry, name, target string, rec *Record) error {
 	checkout := s.registryDir(e.Registry)
 	if checkout == "" {
-		return fmt.Errorf("skill %s: marketplace %s is not read: %w", name, e.Registry, ErrNotFound)
+		return refuse(ErrNotFound, "skill %s: marketplace %s is not read", name, e.Registry)
 	}
 	src := filepath.Join(checkout, filepath.FromSlash(e.Path))
 	if fi, err := os.Stat(filepath.Join(src, marketplace.SkillFile)); err != nil || !fi.Mode().IsRegular() {
-		return fmt.Errorf("skill %s: %s has no %s: %w", name, src, marketplace.SkillFile, ErrNotFound)
+		return refuse(ErrNotFound, "skill %s: %s has no %s", name, src, marketplace.SkillFile)
 	}
 	if err := installDir(src, target); err != nil {
 		return fmt.Errorf("skill %s: %w", name, err)
@@ -437,7 +437,7 @@ func (s *Store) entryRef(name string, kind marketplace.Kind) (marketplace.Entry,
 		if e, ok := catalogEntry(s.Snapshot().catalogs[m], marketplace.KindPlugin, func(e marketplace.Entry) bool { return e.Name == n }); ok {
 			return e, nil
 		}
-		return marketplace.Entry{}, fmt.Errorf("no plugin named %q in marketplace %q: %w", n, m, ErrNotFound)
+		return marketplace.Entry{}, refuse(ErrNotFound, "no plugin named %q in marketplace %q", n, m)
 	}
 	return s.Entry(name, kind)
 }
@@ -487,7 +487,7 @@ func (k skillState) managed(op Op) error {
 	if k.recorded {
 		return nil
 	}
-	return fmt.Errorf("skill %s is local (Code Foundry did not install it), so it cannot be %s; remove deletes it: %w", k.name, pastTense(op), ErrLocal)
+	return refuse(ErrLocal, "skill %s is local (Code Foundry did not install it), so it cannot be %s; remove deletes it", k.name, pastTense(op))
 }
 
 func pastTense(op Op) string {
@@ -525,13 +525,13 @@ func isSkillDir(dir string) bool {
 // with its marketplace.
 func (s *Store) resolve(ctx context.Context, name string, kind marketplace.Kind) (target, error) {
 	if name == "" {
-		return target{}, fmt.Errorf("no name given: %w", ErrNotFound)
+		return target{}, refuse(ErrNotFound, "no name given")
 	}
 	if _, _, ok := cutPluginRef(name); ok && kind != marketplace.KindSkill {
 		if p, ok := s.installedPlugin(name); ok {
 			return target{kind: marketplace.KindPlugin, plugin: p}, nil
 		}
-		return target{}, fmt.Errorf("plugin %s is not installed: %w", name, ErrNotFound)
+		return target{}, refuse(ErrNotFound, "plugin %s is not installed", name)
 	}
 	var plugins []Installed
 	if kind != marketplace.KindSkill {
@@ -556,14 +556,14 @@ func (s *Store) resolve(ctx context.Context, name string, kind marketplace.Kind)
 		for i, p := range plugins {
 			ids[i] = p.ID()
 		}
-		return target{}, fmt.Errorf("plugin %s is installed from more than one marketplace; name one: %s: %w", name, strings.Join(ids, " or "), ErrAmbiguous)
+		return target{}, refuse(ErrAmbiguous, "plugin %s is installed from more than one marketplace; name one: %s", name, strings.Join(ids, " or "))
 	case len(plugins) == 1:
 		return target{kind: marketplace.KindPlugin, plugin: plugins[0]}, nil
 	case sk.installed():
 		return target{kind: marketplace.KindSkill, skill: sk}, nil
 	}
 	what := cmp.Or(string(kind), "plugin or skill")
-	return target{}, fmt.Errorf("no installed %s named %q: %w", what, name, ErrNotFound)
+	return target{}, refuse(ErrNotFound, "no installed %s named %q", what, name)
 }
 
 // installedPlugin is the installed plugin with id name@marketplace, as last read.
@@ -631,7 +631,7 @@ func validSkillName(name string) error {
 	switch {
 	case name == "", name == ".", name == "..", strings.HasPrefix(name, "."), name == syncedDir,
 		strings.ContainsAny(name, "/\\\x00"), filepath.Base(name) != name:
-		return fmt.Errorf("%q cannot be a skill directory name: %w", name, ErrInvalidName)
+		return refuse(ErrInvalidName, "%q cannot be a skill directory name", name)
 	}
 	return nil
 }
@@ -649,15 +649,15 @@ func (s *Store) Setup(ctx context.Context, name string) (SetupPlan, error) {
 	}
 	sk := t.skill
 	if !sk.recorded || sk.rec.SetupScript == "" {
-		return SetupPlan{}, fmt.Errorf("skill %s has no setup script: %w", sk.name, ErrNoSetup)
+		return SetupPlan{}, refuse(ErrNoSetup, "skill %s has no setup script", sk.name)
 	}
 	dir := sk.dir()
 	if dir == "" {
-		return SetupPlan{}, fmt.Errorf("skill %s is not in %s or %s any more; install it again: %w", sk.name, s.opts.SkillsDir, s.opts.DisabledDir, ErrNotFound)
+		return SetupPlan{}, refuse(ErrNotFound, "skill %s is not in %s or %s any more; install it again", sk.name, s.opts.SkillsDir, s.opts.DisabledDir)
 	}
 	script := filepath.Join(dir, filepath.FromSlash(sk.rec.SetupScript))
 	if fi, err := os.Stat(script); err != nil || !fi.Mode().IsRegular() {
-		return SetupPlan{}, fmt.Errorf("skill %s: its setup script %s is missing: %w", sk.name, script, ErrNoSetup)
+		return SetupPlan{}, refuse(ErrNoSetup, "skill %s: its setup script %s is missing", sk.name, script)
 	}
 	s.setupSHA[sk.name] = fileSHA256(script)
 	return SetupPlan{Name: sk.name, Dir: dir, Script: sk.rec.SetupScript, Argv: []string{"/bin/sh", sk.rec.SetupScript}}, nil

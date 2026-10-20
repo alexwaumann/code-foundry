@@ -40,6 +40,23 @@ var (
 	ErrInvalidName = errors.New("invalid skill name")
 )
 
+// Refusal is an error that is one of the sentinels above (errors.Is) without saying so
+// in its message, which is meant for the user as it is.
+type Refusal struct {
+	Msg  string
+	Kind error
+}
+
+func (e *Refusal) Error() string { return e.Msg }
+
+// Unwrap is the sentinel.
+func (e *Refusal) Unwrap() error { return e.Kind }
+
+// refuse is a *Refusal of kind with a formatted message.
+func refuse(kind error, format string, a ...any) error {
+	return &Refusal{Msg: fmt.Sprintf(format, a...), Kind: kind}
+}
+
 // ExpectedMarketplace is the marketplace the Registries section names when Claude Code
 // has none (an example of what to `claude plugin marketplace add`).
 const ExpectedMarketplace = "ai-marketplace"
@@ -183,7 +200,7 @@ func (s *Store) Entry(name string, kind marketplace.Kind) (marketplace.Entry, er
 	switch len(found) {
 	case 0:
 		what := cmp.Or(string(kind), "plugin or skill")
-		return marketplace.Entry{}, fmt.Errorf("no %s named %q in the marketplace: %w", what, name, ErrNotFound)
+		return marketplace.Entry{}, refuse(ErrNotFound, "no %s named %q in the marketplace", what, name)
 	case 1:
 		return found[0], nil
 	}

@@ -476,7 +476,7 @@ func formatSkillBrowse(v SkillBrowseView) string {
 			}
 			kind := string(e.Kind)
 			if len(e.Skills) > 0 {
-				kind += fmt.Sprintf(" (%d skills)", len(e.Skills))
+				kind += " (" + countWord(len(e.Skills), "skill") + ")"
 			}
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", e.Name, kind, cmp.Or(string(e.Tier), "-"), cmp.Or(e.Version, "-"),
 				inst, cmp.Or(e.By, "-"), clipText(e.Description, 60))
@@ -525,6 +525,14 @@ func formatRegistries(v SkillBrowseView) string {
 		sb.WriteString("error: " + v.Error + "\n")
 	}
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// countWord is "1 skill", "2 skills".
+func countWord(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }
 
 func clipText(s string, n int) string {
