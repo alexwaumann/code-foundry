@@ -3,6 +3,7 @@ package ember
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -16,10 +17,14 @@ const notesHeading = "## Notes"
 // maxFact caps one remembered fact.
 const maxFact = 1000
 
+// datedFact matches a date the caller already put in front of a fact ("2026-10-20: ",
+// "- 2026-10-20 · "): Remember adds its own.
+var datedFact = regexp.MustCompile(`^(?:- )?\d{4}-\d{2}-\d{2}\s*[:·]\s*`)
+
 // Remember appends "- <date>: <fact>" under MEMORY.md's Notes (made when missing) and
-// returns the line.
+// returns the line. A date already in front of the fact is dropped.
 func (s *Store) Remember(fact string) (string, error) {
-	fact = strings.Join(strings.Fields(fact), " ")
+	fact = datedFact.ReplaceAllString(strings.Join(strings.Fields(fact), " "), "")
 	switch {
 	case fact == "":
 		return "", fmt.Errorf("%w: an empty fact", ErrInvalidArgument)

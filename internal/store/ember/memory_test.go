@@ -53,7 +53,13 @@ func TestRemember(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), "## Notes\n\n"+line+"\n") || !strings.HasPrefix(string(b), "# Memory") {
 		t.Errorf("MEMORY.md = %q, %v", b, err)
 	}
-	for _, bad := range []string{"", "   ", strings.Repeat("x", maxFact+1)} {
+	// A date in front of the fact is not doubled.
+	for _, in := range []string{"2026-10-19: Dana reviews notes-api", "2026-10-19 · Dana reviews notes-api", "- 2026-10-19:Dana reviews notes-api"} {
+		if line, err := e.s.Remember(in); err != nil || line != "- 2026-10-20: Dana reviews notes-api" {
+			t.Errorf("Remember(%q) = %q, %v", in, line, err)
+		}
+	}
+	for _, bad := range []string{"", "   ", "2026-10-20: ", strings.Repeat("x", maxFact+1)} {
 		if _, err := e.s.Remember(bad); !errors.Is(err, ErrInvalidArgument) {
 			t.Errorf("Remember(%d bytes) err = %v", len(bad), err)
 		}

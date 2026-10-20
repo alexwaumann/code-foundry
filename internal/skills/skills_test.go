@@ -286,10 +286,17 @@ func TestEmberSkill(t *testing.T) {
 	if n := bytes.Count(ember[p], []byte("\n")); n >= 160 {
 		t.Errorf("%s has %d lines; keep it under 160", p, n)
 	}
-	for _, w := range []string{"ember task add", "--notify", "--labels ember,<task id>", "Never pass `--model`", "cf-task://", "reference/leads.md",
-		"--budget", "ember remember", "ember board"} {
+	for _, w := range []string{"ember task add", "ember task start", "--notify", "--labels ember,<task id>", "Never pass `--model`", "cf-task://", "reference/leads.md",
+		"--budget", "ember remember", "ember board", "Skill tool", "never progress", "thread send --id <worker>", "thread respond --id <worker>",
+		"thread subscribe --at", "git -C <worktree> log origin/<branch>", "--branch <branch>"} {
 		if !bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s lacks %q", p, w)
+		}
+	}
+	// Gone with ember task start: the two-command dance and its $(...) footgun.
+	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread"} {
+		if bytes.Contains(ember[p], []byte(w)) {
+			t.Errorf("%s still has %q", p, w)
 		}
 	}
 	if dynamicCommand.Match(ember[p]) {

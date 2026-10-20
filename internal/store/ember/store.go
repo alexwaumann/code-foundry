@@ -75,6 +75,9 @@ type Options struct {
 	Consolidate Runner
 	// Claude is the claude executable for the default Consolidate. Default "claude".
 	Claude string
+	// OrchestrateSkill is the absolute path of the code-foundry-orchestrate skill's
+	// directory (every thread's skills), named in PROJECTS.md. "": not named.
+	OrchestrateSkill string
 	// InstallSkill writes the code-foundry-ember skill under dir (Claude loads it from
 	// dir/.claude/skills). nil: none.
 	InstallSkill func(dir string) error
@@ -117,7 +120,9 @@ var (
 func Rules() string { return rules }
 
 // Tools are Ember's own permission rules (thread.ResidentTools): its CLI pre-allowed so
-// it never asks the user for it, and no editing tool.
+// it never asks the user for it, and no editing tool. git fetch only writes remote refs
+// and FETCH_HEAD; allowing it keeps the safety classifier from being the gate when Ember
+// checks a branch against origin.
 var Tools = thread.ResidentTools{
 	Allow: []string{
 		"Bash(code-foundry ember:*)",
@@ -129,6 +134,7 @@ var Tools = thread.ResidentTools{
 		"Bash(git diff:*)",
 		"Bash(git show:*)",
 		"Bash(git status:*)",
+		"Bash(git fetch:*)",
 	},
 	Deny: []string{"Edit", "Write", "NotebookEdit"},
 }

@@ -18,7 +18,7 @@ func TestEmberDefaults(t *testing.T) {
 	if f := field(t, KeyEmberEnabled); f.Page != PageEmber || !strings.HasPrefix(f.Description, "Experimental: ") {
 		t.Errorf("enabled field = %+v", f)
 	}
-	if f := field(t, KeyEmberEpochTokens); f.Min != 20000 {
+	if f := field(t, KeyEmberEpochTokens); f.Min != 50000 || !strings.Contains(f.Description, "fresh session already starts") {
 		t.Errorf("epoch tokens min = %d", f.Min)
 	}
 }

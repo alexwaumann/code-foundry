@@ -158,6 +158,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPluginRegistry(r, d.PluginRegistry, d.Thread),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
-		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings}),
+		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
 	)
 }
