@@ -259,3 +259,40 @@ func TestRender(t *testing.T) {
 		}
 	}
 }
+
+// Ember's skill is only Ember's: Render leaves it out, EmberFiles has it whole.
+func TestEmberSkill(t *testing.T) {
+	files, err := skills.Render(skills.Sources{Version: "v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for p := range files {
+		if strings.HasPrefix(p, skills.Ember+"/") {
+			t.Errorf("Render wrote %s", p)
+		}
+	}
+	ember, err := skills.EmberFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := skills.Ember + "/SKILL.md"
+	if len(ember) != 1 || len(ember[p]) == 0 {
+		t.Fatalf("EmberFiles = %v", ember)
+	}
+	fm := frontmatter(t, p, ember[p])
+	if fm["name"] != skills.Ember || fm["user-invocable"] != "false" {
+		t.Errorf("frontmatter = %v", fm)
+	}
+	if n := bytes.Count(ember[p], []byte("\n")); n >= 160 {
+		t.Errorf("%s has %d lines; keep it under 160", p, n)
+	}
+	for _, w := range []string{"ember task add", "--notify", "--labels ember,<task id>", "Never pass `--model`", "cf-task://", "reference/leads.md",
+		"--budget", "ember remember", "ember board"} {
+		if !bytes.Contains(ember[p], []byte(w)) {
+			t.Errorf("%s lacks %q", p, w)
+		}
+	}
+	if dynamicCommand.Match(ember[p]) {
+		t.Errorf("%s runs a shell command when it loads", p)
+	}
+}
