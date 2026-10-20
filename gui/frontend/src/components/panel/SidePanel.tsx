@@ -24,6 +24,7 @@ import { surfaceOf, surfaces } from "@/surfaces/registry";
 import { closeTab, hidePanel, liftedTab } from "./actions";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { FOCUS_OTHER_GROUP_CHORD, isPanelChord, panelKeyAction } from "./keys";
+import { PanelDnd } from "./PanelDnd";
 import { groupMin, splitOrientation, type SplitOrientation } from "./splitLayout";
 import { SplitDivider } from "./SplitDivider";
 import { keepPanelFocus, surfaceContext } from "./surfaceList";
@@ -151,13 +152,16 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
           data-split={split || undefined}
           data-orientation={split ? orientation : undefined}
         >
-          <TabGroup panelKey={panelKey} group={0} split={split} focused={focused === 0} controls={!side} style={split ? groupStyle(orientation, ratio) : undefined} />
-          {split && (
-            <>
-              <SplitDivider panelKey={panelKey} orientation={orientation} ratio={ratio} />
-              <TabGroup panelKey={panelKey} group={1} split focused={focused === 1} controls={side} style={groupStyle(orientation, 1 - ratio)} />
-            </>
-          )}
+          {/* One drag context around both groups: a tab can move between them, or split the panel (PanelDnd). */}
+          <PanelDnd panelKey={panelKey} orientation={orientation} panel={asideRef}>
+            <TabGroup panelKey={panelKey} group={0} split={split} focused={focused === 0} controls={!side} style={split ? groupStyle(orientation, ratio) : undefined} />
+            {split && (
+              <>
+                <SplitDivider panelKey={panelKey} orientation={orientation} ratio={ratio} />
+                <TabGroup panelKey={panelKey} group={1} split focused={focused === 1} controls={side} style={groupStyle(orientation, 1 - ratio)} />
+              </>
+            )}
+          </PanelDnd>
         </div>
       </aside>
     </div>

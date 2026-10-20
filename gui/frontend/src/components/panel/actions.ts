@@ -1,5 +1,5 @@
 /** What the side panel's strips, bodies and keys share: closing a tab, hiding the panel, ids. */
-import { allTabs, closePanelTab, getPanel, isSplit, togglePanel, type GroupIndex } from "@/stores/panel";
+import { allTabs, closePanelTab, getPanel, isSplit, movePanelTabToGroup, togglePanel, type GroupIndex } from "@/stores/panel";
 import { useUiStore } from "@/stores/ui";
 
 /** Asks the panel's <aside> to take focus (SidePanel answers panelFocusSeq). */
@@ -22,6 +22,19 @@ export function closeTab(panelKey: string, id: string): void {
   const after = getPanel(panelKey);
   if (!after.open) useUiStore.getState().focusContent();
   else if (allTabs(after).length === 0 || (wasSplit && !isSplit(after))) refocusPanel();
+}
+
+/**
+ * Moves a tab to the other group (a drop on its strip or body), or to a new second group
+ * (a drop on an unsplit panel's band, which splits it). If that emptied a group, the
+ * split collapses (the store), and a panel that had focus takes it back, as closeTab does:
+ * the emptied group's strip is gone.
+ */
+export function moveTabToGroup(panelKey: string, id: string, group: GroupIndex, index?: number): void {
+  const hadFocus = useUiStore.getState().focus === "panel";
+  const wasSplit = isSplit(getPanel(panelKey));
+  movePanelTabToGroup(panelKey, id, group, index);
+  if (hadFocus && wasSplit && !isSplit(getPanel(panelKey))) refocusPanel();
 }
 
 /** Hides the panel (cmd+w with no tabs) and gives focus to the content pane. */
