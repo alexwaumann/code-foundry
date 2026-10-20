@@ -226,14 +226,26 @@ test("headerless panes (start page, composer) drag the window from the same 44px
   await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
 });
 
-test("the daemon status and update indicator sit at the bottom of the sidebar", async ({ page }) => {
+test("the daemon status sits at the bottom of the sidebar, its glyphs on the pane's bottom edge", async ({ page }) => {
   await openApp(page);
   const sidebar = await box(page, "sidebar");
   const status = await box(page, "daemon-status");
   expect(status.left).toBeGreaterThanOrEqual(sidebar.left);
   expect(status.right).toBeLessThanOrEqual(sidebar.right);
-  expect(sidebar.bottom - status.bottom).toBeLessThan(16);
+  // The row (24px) ends 7px above the window's bottom edge, so its 14px glyphs (centred in
+  // 24px boxes) end on the content pane's bottom edge, a shell gap (12px) up.
+  const pane = await box(page, "content-pane");
+  const settings = await box(page, "status-settings");
+  expect(settings.bottom - 5).toBe(pane.bottom);
   await expect(page.locator("footer")).toHaveCount(0);
+
+  // The row shows the dot and version only; the daemon's pid and uptime are its tooltip.
+  const daemon = page.getByTestId("daemon-status");
+  await expect(daemon).toHaveText("mock");
+  await daemon.hover();
+  const tip = page.locator('[role="tooltip"]:not([data-state="closed"])');
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText(/^daemon · pid \d+ · up /);
 });
 
 // Dark only: the per-scheme palette is src/terminal/theme.test.ts.
