@@ -158,20 +158,24 @@ type Subscription struct {
 }
 
 // SubscribeOptions configures Store.Subscribe: exactly one of TargetThreadID,
-// TargetRunID, TargetPullRequest ("owner/name#123" or a pull request URL) and
-// TargetPlugin ("<plugin>/<source>", with Args). Condition "" is CondSettled for a
-// thread, CondFinished for a run, CondChecksDone for a pull request, CondFired for a
-// plugin; a run and a plugin also take CondSettled (it means their own). Repeat is
-// ignored for a run.
+// TargetRunID, TargetPullRequest ("owner/name#123" or a pull request URL),
+// TargetPlugin ("<plugin>/<source>", with Args) and a timer (TargetAt or TargetEvery;
+// subscriptions_timer.go). Condition "" is CondSettled for a thread, CondFinished for a
+// run, CondChecksDone for a pull request, CondFired for a plugin and a timer; a run, a
+// plugin and a timer also take CondSettled (it means their own). Repeat is ignored for a
+// run and a timer (TargetAt fires once, TargetEvery repeats).
 type SubscribeOptions struct {
 	SubscriberID      string
 	TargetThreadID    string
 	TargetRunID       string
 	TargetPullRequest string
 	TargetPlugin      string
-	Args              map[string]string
-	Condition         Condition
-	Repeat            bool
+	// TargetAt (after now) or TargetEvery (at least MinTimerEvery): a timer.
+	TargetAt    time.Time
+	TargetEvery time.Duration
+	Args        map[string]string
+	Condition   Condition
+	Repeat      bool
 }
 
 // SubscribeResult is Store.Subscribe's answer.
@@ -186,7 +190,7 @@ type SubscribeResult struct {
 }
 
 // UnsubscribeOptions configures Store.Unsubscribe: an ID, or a SubscriberID and exactly
-// one target.
+// one target (TargetTimer: every timer of the subscriber).
 type UnsubscribeOptions struct {
 	ID                string
 	SubscriberID      string
@@ -194,6 +198,7 @@ type UnsubscribeOptions struct {
 	TargetRunID       string
 	TargetPullRequest string
 	TargetPlugin      string
+	TargetTimer       bool
 }
 
 // ActionRun is what a wake about an action run says (Options.ActionRun).
@@ -232,11 +237,13 @@ type subscriptions struct {
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and
-// the pending request it was then waiting on (requestKey).
+// the pending request it was then waiting on (requestKey). retryAt holds a timer whose
+// fire was dropped until then (subscriptions_timer.go); in memory only.
 type subRec struct {
-	s   Subscription
-	sat bool
-	req string
+	s       Subscription
+	sat     bool
+	req     string
+	retryAt time.Time
 }
 
 // requestKey names the pending request (permission prompt or question) a running
@@ -281,8 +288,9 @@ func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, re
 	var stale []string
 	for _, sub := range rows {
 		_, okSub := live(sub.SubscriberID)
-		if okSub && sub.TargetKind == TargetPlugin {
-			// The plugin re-arms when it starts (PluginSubscriptions).
+		if okSub && (sub.TargetKind == TargetPlugin || sub.TargetKind == TargetTimer) {
+			// The plugin re-arms when it starts (PluginSubscriptions); a timer that came due
+			// meanwhile fires at the first check (subscriptions_timer.go).
 			s.byID[sub.ID] = &subRec{s: sub}
 			continue
 		}
@@ -323,17 +331,24 @@ func newSubscriptionID() (string, error) {
 func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) {
 	thread, run, pr, plugin := strings.TrimSpace(o.TargetThreadID), strings.TrimSpace(o.TargetRunID), strings.TrimSpace(o.TargetPullRequest),
 		strings.TrimSpace(o.TargetPlugin)
+	timer := !o.TargetAt.IsZero() || o.TargetEvery != 0
 	n := 0
 	for _, t := range []string{thread, run, pr, plugin} {
 		if t != "" {
 			n++
 		}
 	}
+	if timer {
+		n++
+	}
 	switch {
 	case n != 1:
-		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run, a pull request or a plugin's wake source", ErrInvalidArgument)
+		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run, a pull request, a plugin's wake source or a timer", ErrInvalidArgument)
 	case plugin == "" && len(o.Args) > 0:
 		return "", "", "", fmt.Errorf("%w: args are for a plugin's wake source", ErrInvalidArgument)
+	case timer:
+		target, c, err := TimerTarget(o.TargetAt, o.TargetEvery, o.Condition)
+		return TargetTimer, target, c, err
 	case pr != "":
 		target, err := ParsePullRequestTarget(pr)
 		if err != nil {
@@ -401,13 +416,21 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 			return SubscribeResult{}, err
 		}
 	}
+	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
+	repeat := o.Repeat && kind != TargetActionRun
+	if kind == TargetTimer {
+		if !o.TargetAt.IsZero() && !o.TargetAt.After(m.opts.Now()) {
+			return SubscribeResult{}, fmt.Errorf("%w: timer time %s is not in the future", ErrInvalidArgument, o.TargetAt.Format(time.RFC3339))
+		}
+		repeat = o.TargetEvery > 0
+	}
 	id, err := newSubscriptionID()
 	if err != nil {
 		return SubscribeResult{}, err
 	}
 	res, err := m.subscribe(Subscription{
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
-		Repeat: o.Repeat && kind != TargetActionRun, CreatedAt: m.opts.Now().Round(0).Truncate(time.Millisecond),
+		Repeat: repeat, CreatedAt: now,
 	}, run, pr)
 	if err == nil {
 		m.rewait(subscriber) // it may wait on the target now (waiting.go)
@@ -709,6 +732,12 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 	}
 	kind, target, _, err := subscribeTarget(SubscribeOptions{TargetThreadID: o.TargetThreadID, TargetRunID: o.TargetRunID,
 		TargetPullRequest: o.TargetPullRequest, TargetPlugin: o.TargetPlugin})
+	switch {
+	case o.TargetTimer && err == nil:
+		return nil, fmt.Errorf("%w: give one target: timers or another", ErrInvalidArgument)
+	case o.TargetTimer:
+		kind, target, err = TargetTimer, "", nil // every timer
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: give a subscription id, or a subscriber and a target", ErrInvalidArgument)
 	}
@@ -721,13 +750,13 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 	var out []Subscription
 	var ids []string
 	for id, r := range s.byID {
-		if r.s.SubscriberID == subscriber && r.s.TargetKind == kind && r.s.TargetID == target {
+		if r.s.SubscriberID == subscriber && r.s.TargetKind == kind && (r.s.TargetID == target || (kind == TargetTimer && target == "")) {
 			out = append(out, r.s)
 			ids = append(ids, id)
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("%w: thread %s has no subscription to %s", ErrNotFound, subscriber, target)
+		return nil, fmt.Errorf("%w: thread %s has no subscription to %s", ErrNotFound, subscriber, cmp.Or(target, "a timer"))
 	}
 	sortSubscriptions(out)
 	s.removeLocked(ids)
@@ -782,6 +811,8 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 			}
 		case TargetPlugin:
 			s.describePlugin(sub)
+		case TargetTimer:
+			describeTimer(sub, m.opts.Now())
 		}
 	}
 	sortSubscriptions(out)

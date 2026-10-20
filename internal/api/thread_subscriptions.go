@@ -41,6 +41,7 @@ var subscriptionTargets = map[thread.TargetKind]v1.ThreadSubscriptionTarget{
 	thread.TargetActionRun:   v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN,
 	thread.TargetPullRequest: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST,
 	thread.TargetPlugin:      v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN,
+	thread.TargetTimer:       v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
 }
 
 // subscriptionToProto maps a subscription.
@@ -77,11 +78,18 @@ func userMessageToProto(it thread.Item) *v1.UserMessageItem {
 // Subscribe makes a wake subscription.
 func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
 	m := req.Msg
-	res, err := h.store.Subscribe(ctx, thread.SubscribeOptions{
+	o := thread.SubscribeOptions{
 		SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
 		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(), Args: m.GetArgs(),
 		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
-	})
+	}
+	if m.GetTargetAt() != nil {
+		o.TargetAt = m.GetTargetAt().AsTime()
+	}
+	if m.GetTargetEvery() != nil {
+		o.TargetEvery = m.GetTargetEvery().AsDuration()
+	}
+	res, err := h.store.Subscribe(ctx, o)
 	if err != nil {
 		return nil, threadError(err)
 	}
@@ -95,7 +103,7 @@ func (h *Thread) Unsubscribe(ctx context.Context, req *connect.Request[v1.Unsubs
 	m := req.Msg
 	gone, err := h.store.Unsubscribe(ctx, thread.UnsubscribeOptions{
 		ID: m.GetSubscriptionId(), SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
-		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(),
+		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(), TargetTimer: m.GetTargetTimer(),
 	})
 	if err != nil {
 		return nil, threadError(err)

@@ -165,6 +165,17 @@ service ThreadService {
   // as it is (restarted false): its next message starts Claude with the current
   // environment anyway. See docs/notes/plugins-env-restart.md.
   rpc Restart(RestartThreadRequest) returns (RestartThreadResponse) {}
+  // Reseed gives a thread a fresh Claude session with a seed: its next process starts
+  // a new conversation (no --resume) with the request's system prompt append and
+  // add-dirs, which replace the thread's (empty clears them) and every later spawn uses,
+  // and the first message of that session starts with prefix (UserMessageItem.seed_prefix).
+  // The thread's items are kept; Thread.epoch goes up by one, context_tokens goes to 0.
+  // A thread idle at its prompt with nothing running stops at once; a working one stops
+  // once its turn and background work end (Thread.reseed_pending meanwhile); a stopped
+  // one only records it. What "allow for session" granted dies with the old process, as
+  // at any stop; the MCP status is kept until the new process reports. Any thread may be
+  // reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
+  rpc Reseed(ReseedThreadRequest) returns (ReseedThreadResponse) {}
   // McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
   // (mcp_status) at the start of every turn, again every few seconds while a server is
   // still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -261,6 +272,10 @@ message UserMessageItem {
   // reads it at its next tool call or when its reply ends. Once read the flag clears and
   // the item moves there (ThreadItem.placed_after).
   bool queued = 8;
+  // The seed prefix Claude got before the text (and the resume note): the first message
+  // of a fresh session a ThreadService.Reseed asked for starts with it. Empty for most
+  // messages.
+  string seed_prefix = 9;
 }
 
 // MessageOrigin is who sent a user_message item.
@@ -792,6 +807,26 @@ message RestartThreadResponse {
   Thread thread = 1;
   // False when Claude was not running for the thread (nothing to restart).
   bool restarted = 2;
+}
+
+message ReseedThreadRequest {
+  string id = 1;
+  // Appended to Claude's system prompt on every spawn of the thread from now on (after
+  // the app's own line and a workspace's); at most 64 KiB, no NUL. Empty: none.
+  string system_prompt_append = 2;
+  // Absolute directories passed as --add-dir on every spawn from now on (missing ones
+  // are skipped at spawn). Empty: none.
+  repeated string add_dirs = 3;
+  // Prepended, with a blank line, to the first message of the fresh session; at most
+  // 256 KiB, no NUL. Empty: none.
+  string prefix = 4;
+}
+
+message ReseedThreadResponse {
+  // epoch is the new one; reseed_pending is set when the stop waits for the turn.
+  Thread thread = 1;
+  // Claude was running and stopped at once for the reseed.
+  bool stopped = 2;
 }
 
 message McpStatusRequest {

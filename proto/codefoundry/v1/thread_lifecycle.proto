@@ -311,6 +311,35 @@ message Thread {
   // archived with its creator (ThreadService.Archive). See
   // docs/notes/hidden-children-1-daemon.md.
   optional bool in_sidebar = 62;
+  // What kind of thread it is. RESIDENT: the daemon's own long-lived agent thread
+  // (resident_name names it; one per name), made by the daemon only. A resident thread has
+  // no project or worktree (it runs in its own directory), is never auto-named, and
+  // cannot be archived, snoozed, removed or forked (FAILED_PRECONDITION). It is left out
+  // of a filtered List unless filter.include_resident or filter.all asks for it, and
+  // clients keep it out of the user's lists (sidebar, attention counts, dock alerts);
+  // Watch and Get carry it. Set once. See docs/notes/ember-1-primitives.md.
+  ThreadKind kind = 63;
+  // With kind RESIDENT: its name ("ember"). Empty otherwise.
+  string resident_name = 64;
+  // The thread's session epoch: 1 until its first ThreadService.Reseed, then one more per
+  // reseed. Persisted.
+  int32 epoch = 65;
+  // A reseed (ThreadService.Reseed) waits for the running turn to end: Claude still runs
+  // the old session and stops once it is back at its prompt with nothing running; the
+  // next message starts the fresh one. Never set on a thread that is not running (its
+  // next start is fresh). Not persisted.
+  bool reseed_pending = 66;
+  // A reseed's prefix waits for the fresh session's first message (it is prepended to
+  // what Claude gets; UserMessageItem.seed_prefix shows it). Persisted.
+  bool seed_pending = 67;
+}
+
+// ThreadKind is what kind of thread a Thread is.
+enum ThreadKind {
+  // An ordinary thread (the user's, another thread's or a plugin's).
+  THREAD_KIND_UNSPECIFIED = 0;
+  // A resident thread: the daemon's own long-lived agent (Thread.kind).
+  THREAD_KIND_RESIDENT = 1;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -632,6 +661,8 @@ message ThreadFilter {
   // include_archived or all; the other fields still apply. Not with descendants_of
   // (INVALID_ARGUMENT).
   string archive_cascade_of = 13;
+  // Also list resident threads (Thread.kind RESIDENT); all lists them too.
+  bool include_resident = 14;
 }
 
 message ListThreadsResponse {

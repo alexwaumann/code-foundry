@@ -36,6 +36,16 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 		kind, target, cond = thread.TargetPlugin, plugin, thread.CondFired
 		call = fmt.Sprintf("Subscribe %s %s %s %s repeat=%t args=%s", o.SubscriberID, kind, target, cond, o.Repeat, formatArgs(o.Args))
 	}
+	timer := !o.TargetAt.IsZero() || o.TargetEvery != 0
+	if timer {
+		var err error
+		if target, cond, err = thread.TimerTarget(o.TargetAt, o.TargetEvery, o.Condition); err != nil {
+			return thread.SubscribeResult{}, err
+		}
+		kind = thread.TargetTimer
+		o.Repeat = o.TargetEvery > 0
+		call = fmt.Sprintf("Subscribe %s %s %s %s repeat=%t", o.SubscriberID, kind, target, cond, o.Repeat)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.record(call); err != nil {
@@ -46,6 +56,9 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 		if strings.TrimSpace(t) != "" {
 			targets++
 		}
+	}
+	if timer {
+		targets++
 	}
 	switch {
 	case targets != 1:
@@ -87,9 +100,13 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 	return thread.SubscribeResult{Subscription: sub, Fired: fired}, nil
 }
 
-// Unsubscribe records "Unsubscribe <id>" or "Unsubscribe <subscriber> <target>".
+// Unsubscribe records "Unsubscribe <id>" or "Unsubscribe <subscriber> <target>"
+// ("timer" for every timer).
 func (f *Fake) Unsubscribe(_ context.Context, o thread.UnsubscribeOptions) ([]thread.Subscription, error) {
 	target := o.TargetThreadID + o.TargetRunID + o.TargetPlugin
+	if o.TargetTimer {
+		target = "timer"
+	}
 	if o.TargetPullRequest != "" {
 		target, _ = thread.ParsePullRequestTarget(o.TargetPullRequest)
 	}
@@ -104,7 +121,8 @@ func (f *Fake) Unsubscribe(_ context.Context, o thread.UnsubscribeOptions) ([]th
 	}
 	var out []thread.Subscription
 	f.subs = slices.DeleteFunc(f.subs, func(s thread.Subscription) bool {
-		hit := (o.ID != "" && s.ID == o.ID) || (o.ID == "" && s.SubscriberID == o.SubscriberID && s.TargetID == target)
+		hit := (o.ID != "" && s.ID == o.ID) || (o.ID == "" && s.SubscriberID == o.SubscriberID &&
+			(s.TargetID == target || (o.TargetTimer && s.TargetKind == thread.TargetTimer)))
 		if hit {
 			out = append(out, s)
 		}
@@ -133,8 +151,11 @@ func (f *Fake) Subscriptions(_ context.Context, subscriber string) ([]thread.Sub
 			s.SubscriberName = t.Name
 		}
 		s.TargetStatus = "gone"
-		if s.TargetKind == thread.TargetPlugin {
+		switch s.TargetKind {
+		case thread.TargetPlugin:
 			s.TargetName, s.TargetStatus = s.TargetID, "running"
+		case thread.TargetTimer:
+			s.TargetName, s.TargetStatus = strings.Replace(s.TargetID, ":", " ", 1), "next"
 		}
 		if t, ok := f.byID[s.TargetID]; ok {
 			s.TargetName, s.TargetStatus = t.Name, t.Status.String()

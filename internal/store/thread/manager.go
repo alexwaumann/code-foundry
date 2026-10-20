@@ -149,6 +149,9 @@ type Options struct {
 	// SnoozeCheckInterval is how often snoozed threads are checked against the wall
 	// clock (wakeSnoozed). Default SnoozeCheckInterval (the package constant).
 	SnoozeCheckInterval time.Duration
+	// TimerCheckInterval is how often timer wake subscriptions are checked against the
+	// wall clock (fireTimers). Default TimerCheckInterval (the package constant).
+	TimerCheckInterval time.Duration
 	// IdleCheckInterval is how often connected threads are checked for an idle stop at
 	// their prompt cache expiry (stopIdle). Default IdleCheckInterval (the package
 	// constant).
@@ -224,6 +227,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	def(&o.CacheTTL, DefaultCacheTTL)
 	def(&o.SnoozeCheckInterval, SnoozeCheckInterval)
+	def(&o.TimerCheckInterval, TimerCheckInterval)
 	def(&o.IdleCheckInterval, IdleCheckInterval)
 	def(&o.IdleGrace, IdleGrace)
 	def(&o.McpPollInterval, mcpPendingInterval)
@@ -375,6 +379,15 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		defer m.wg.Done()
 		defer snoozeTicker.Stop()
 		m.wakeSnoozedLoop(snoozeTicker.C)
+	}()
+	// Timer wake subscriptions, from the first tick on, so a timer that came due while
+	// the daemon was stopped fires once the daemon is up (subscriptions_timer.go).
+	timerTicker := time.NewTicker(opts.TimerCheckInterval)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer timerTicker.Stop()
+		m.fireTimersLoop(timerTicker.C)
 	}()
 	// Idle threads stop at their cache expiry (lifecycle.go). Nothing runs at startup.
 	idleTicker := time.NewTicker(opts.IdleCheckInterval)
