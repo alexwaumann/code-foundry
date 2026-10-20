@@ -1,7 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
-import { closestCenter, DndContext, defaultDropAnimation, PointerSensor, useSensor, useSensors, type Announcements, type DragCancelEvent, type DragEndEvent, type DragStartEvent, type ScreenReaderInstructions, type UniqueIdentifier } from "@dnd-kit/core";
-import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X } from "lucide-react";
@@ -13,7 +11,8 @@ import { activatePanelTab, emptyGroup, focusPanelGroup, movePanelTab, usePanelGr
 import { surfaceOf } from "@/surfaces/registry";
 import { bodyDomId, closeTab, liftedTab, tabDomId } from "./actions";
 import { tabMoveIndex } from "./keys";
-import { revealElement, revealTab, tabNode } from "./reveal";
+import { usePanelDrop } from "./panelDrop";
+import { revealElement, revealTab } from "./reveal";
 
 /** The active tab (and the "+" while picking): full tint in the focused group, lighter in the other one. */
 const ACTIVE_FOCUSED = "bg-accent text-accent-foreground dark:bg-accent/50";
@@ -21,7 +20,9 @@ const ACTIVE_UNFOCUSED = "bg-accent/40 text-foreground dark:bg-accent/25";
 
 /**
  * One tab, sortable: a pointer drag (past 4px, so clicks, the × and middle click work as
- * before) slides it along the strip, and its neighbours make room. `focusable` is the
+ * before) lifts a copy of it (PanelDnd's ghost) and leaves its slot dimmed, which slides
+ * along the strip as the neighbours make room. `drop` marks where a tab dragged from the
+ * other group would land: before this tab, or after it (the last one). `focusable` is the
  * roving tabindex: the active tab, or the first one while picking (no tab is active
  * then), so Tab still reaches the strip. dnd-kit's `attributes` (role="button",
  * tabIndex 0) are not spread on the wrapper, which stays presentation: only its
@@ -29,9 +30,26 @@ const ACTIVE_UNFOCUSED = "bg-accent/40 text-foreground dark:bg-accent/25";
  * whether its group has focus (always on an unsplit panel): the active tab of the other
  * group is tinted lighter.
  */
-function TabButton({ panelKey, group, tab, active, focused, focusable }: { panelKey: string; group: GroupIndex; tab: Tab; active: boolean; focused: boolean; focusable: boolean }) {
+function TabButton({
+  panelKey,
+  group,
+  tab,
+  active,
+  focused,
+  focusable,
+  drop,
+}: {
+  panelKey: string;
+  group: GroupIndex;
+  tab: Tab;
+  active: boolean;
+  focused: boolean;
+  focusable: boolean;
+  drop?: "before" | "after" | "first" | undefined;
+}) {
   const Icon = surfaceOf(tab.kind)?.icon;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+  const data = useMemo(() => ({ kind: "tab", group }), [group]);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, data });
   return (
     <div
       ref={setNodeRef}
@@ -42,7 +60,9 @@ function TabButton({ panelKey, group, tab, active, focused, focusable }: { panel
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
         "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-body-sm [--wails-draggable:no-drag]",
-        isDragging ? "z-10 bg-accent text-accent-foreground shadow-md ring-1 ring-border" : active ? (focused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+        active ? (focused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+        // The lifted tab's slot: the ghost under the pointer is the tab now.
+        isDragging && "opacity-40",
       )}
       {...listeners}
       onMouseDown={(e) => {
@@ -76,7 +96,7 @@ function TabButton({ panelKey, group, tab, active, focused, focusable }: { panel
           aria-label={`Close ${tab.title}`}
           className={cn(
             "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
-            active || isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+            active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
           onClick={() => {
             closeTab(panelKey, tab.id);
@@ -85,6 +105,14 @@ function TabButton({ panelKey, group, tab, active, focused, focusable }: { panel
           <X className="size-3" aria-hidden />
         </button>
       </Tip>
+      {drop && (
+        // In the 4px gap beside the tab (at the strip's start, inside the first tab's edge, which the strip would clip).
+        <span
+          aria-hidden
+          data-testid="panel-drop-marker"
+          className={cn("pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-ring", drop === "first" ? "left-0" : drop === "before" ? "-left-[3px]" : "-right-[3px]")}
+        />
+      )}
     </div>
   );
 }
@@ -96,8 +124,8 @@ function TabButton({ panelKey, group, tab, active, focused, focusable }: { panel
  */
 function onTabListKeyDown(e: KeyboardEvent<HTMLElement>, panelKey: string): void {
   const strip = e.currentTarget;
-  // While a tab is lifted, the strip's keys wait for the drop (Escape cancels the drag: see liftedTab).
-  if (liftedTab(strip)) return;
+  // While a tab of the panel is lifted, the strips' keys wait for the drop (Escape cancels the drag: see liftedTab).
+  if (liftedTab(strip.closest(`[data-region="panel"]`) ?? strip)) return;
   const tabs = Array.from(strip.querySelectorAll<HTMLElement>('[role="tab"]'));
   const i = tabs.findIndex((t) => t === document.activeElement || t.parentElement?.contains(document.activeElement));
   if (i < 0) return;
@@ -152,34 +180,20 @@ function NewTabButton({ picking, focused }: { picking: boolean; focused: boolean
   );
 }
 
-/** dnd-kit's announcements, in tab titles and 1-based positions instead of ids. */
-function tabAnnouncements(tabs: readonly Tab[]): Announcements {
-  const title = (id: UniqueIdentifier) => tabs.find((t) => t.id === id)?.title ?? "tab";
-  const at = (id: UniqueIdentifier) => `position ${String(tabs.findIndex((t) => t.id === id) + 1)} of ${String(tabs.length)}`;
-  return {
-    onDragStart: ({ active }) => `Picked up tab ${title(active.id)}.`,
-    onDragOver: ({ active, over }) => (over ? `Tab ${title(active.id)} is over ${at(over.id)}.` : `Tab ${title(active.id)} is no longer over the tabs.`),
-    onDragEnd: ({ active, over }) => (over ? `Tab ${title(active.id)} was dropped at ${at(over.id)}.` : `Tab ${title(active.id)} was dropped.`),
-    onDragCancel: ({ active }) => `Moving tab ${title(active.id)} was cancelled.`,
-  };
+/** Where the marker for a tab from the other group goes on the tab at `i` of `count`, with that group's drop at `slot`. */
+function dropMark(slot: number | null, i: number, count: number): "before" | "after" | "first" | undefined {
+  if (slot === null) return undefined;
+  if (slot === i) return i === 0 ? "first" : "before";
+  return slot >= count && i === count - 1 ? "after" : undefined;
 }
 
 /**
- * Scrolling the strip while a tab is dragged near its edge: only sideways, and slower
- * than dnd-kit's default (10), which crossed a dozen tabs in half a second and made the
- * dragged tab lag the scroll visibly.
- */
-const autoScroll = { acceleration: 4, threshold: { x: 0.2, y: 0 } };
-
-/** What a tab's aria-describedby reads: the keyboard way to move it (dnd-kit's own keyboard sensor is not used). */
-const screenReaderInstructions: ScreenReaderInstructions = { draggable: "To move this tab, press Option with Left Arrow or Right Arrow." };
-
-/**
- * One group's tabs, sortable by dragging (dnd-kit, in place: the dragged tab follows the
- * pointer along the strip, its neighbours slide aside, and the strip scrolls when the
- * pointer nears its edge). The "+" is not sortable and stays after the last tab; dropping
- * a tab over it puts the tab last. Each group's strip has its own DndContext, so a tab
- * stays in its group (dragging between groups is a later change).
+ * One group's tabs, sortable by dragging (dnd-kit; the DndContext is the panel's,
+ * PanelDnd, around both groups). A tab dragged along its strip reorders it (its
+ * neighbours slide aside, and the strip scrolls when the pointer nears its edge); onto
+ * the other group's strip it moves there, at the slot the marker shows. The "+" is not
+ * sortable and stays after the last tab; dropping a tab of this strip over it puts the
+ * tab last.
  */
 export function TabStrip({ panelKey, group, focused, label }: { panelKey: string; group: GroupIndex; focused: boolean; label: string }) {
   const grp = usePanelGroup(panelKey, group);
@@ -189,9 +203,9 @@ export function TabStrip({ panelKey, group, focused, label }: { panelKey: string
   const stripRef = useRef<HTMLDivElement>(null);
   const newTabRef = useRef<HTMLSpanElement>(null);
   const ids = useMemo(() => tabs.map((t) => t.id), [tabs]);
-  const announcements = useMemo(() => tabAnnouncements(tabs), [tabs]);
-  // A drag starts after 4px of travel, so a click (and the ×, and middle click) is still a click.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // A tab from the other group over this strip: the slot it would take.
+  const { target } = usePanelDrop();
+  const slot = target?.kind === "strip" && target.group === group ? target.index : null;
   // A new or activated tab may sit past the strip's scrolled edge (e.g. a PR row opened
   // its tenth tab): bring it into view. Picking brings the highlighted "+" into view.
   useEffect(() => {
@@ -199,97 +213,43 @@ export function TabStrip({ panelKey, group, focused, label }: { panelKey: string
     if (activeTabId !== null) revealTab(stripRef.current, activeTabId);
     else if (newTabRef.current) revealElement(stripRef.current, newTabRef.current);
   }, [activeTabId, tabs.length]);
-  // The drop: dnd-kit's drop animation belongs to a DragOverlay, and in place the dragged
-  // tab would jump from under the pointer to its slot. So the drop records where it is
-  // on screen and, once it sits in its slot, slides it the rest of the way (FLIP) with
-  // dnd-kit's default drop animation timing. A tab picked up again while it settles drops
-  // the animation, which would otherwise override dnd-kit's transform (the lifted tab
-  // would not follow the pointer until it ended).
-  const settle = useRef<{ id: string; left: number } | null>(null);
-  const settling = useRef(new Map<string, Animation>());
-  const [settleSeq, setSettleSeq] = useState(0);
-  const drop = (id: string) => {
-    const el = stripRef.current && tabNode(stripRef.current, id);
-    if (!el) return;
-    settle.current = { id, left: el.getBoundingClientRect().left };
-    setSettleSeq((n) => n + 1);
-  };
-  useLayoutEffect(() => {
-    const s = settle.current;
-    settle.current = null;
-    const el = s && stripRef.current && tabNode(stripRef.current, s.id);
-    if (!s || !el || typeof el.animate !== "function") return;
-    const dx = s.left - el.getBoundingClientRect().left;
-    if (Math.abs(dx) < 1) return;
-    const anim = el.animate([{ transform: `translate3d(${String(dx)}px, 0, 0)`, zIndex: 10 }, { transform: "translate3d(0, 0, 0)", zIndex: 10 }], {
-      duration: defaultDropAnimation.duration,
-      easing: defaultDropAnimation.easing,
-    });
-    const running = settling.current;
-    running.set(s.id, anim);
-    anim.onfinish = () => {
-      if (running.get(s.id) === anim) running.delete(s.id);
-    };
-  }, [settleSeq]);
-  const onDragStart = ({ active }: DragStartEvent) => {
-    const id = String(active.id);
-    settling.current.get(id)?.cancel();
-    settling.current.delete(id);
-  };
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    // dnd-kit's sensor outlives the strip: a release after the panel unmounted (the
-    // selection switched mid-drag) still ends the drag here. Its panel is gone, so it
-    // moves nothing.
-    if (!stripRef.current) return;
-    const id = String(active.id);
-    drop(id);
-    if (!over || active.id === over.id) return;
-    // arrayMove semantics: the dragged tab takes the index of the tab it was dropped on.
-    const to = ids.indexOf(String(over.id));
-    if (to >= 0) movePanelTab(panelKey, id, to);
-  };
-  const onDragCancel = ({ active }: DragCancelEvent) => {
-    drop(String(active.id));
-  };
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
-      accessibility={{ announcements, screenReaderInstructions }}
-      autoScroll={autoScroll}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragCancel={onDragCancel}
+    <div
+      ref={stripRef}
+      role="tablist"
+      aria-label={label}
+      aria-orientation="horizontal"
+      className="relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
+      data-testid="panel-tabs"
+      onKeyDown={(e) => {
+        onTabListKeyDown(e, panelKey);
+      }}
     >
-      <div
-        ref={stripRef}
-        role="tablist"
-        aria-label={label}
-        aria-orientation="horizontal"
-        className="relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
-        data-testid="panel-tabs"
-        onKeyDown={(e) => {
-          onTabListKeyDown(e, panelKey);
+      <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+        {tabs.map((t, i) => (
+          <TabButton
+            key={t.id}
+            panelKey={panelKey}
+            group={group}
+            tab={t}
+            active={t.id === activeTabId}
+            focused={focused}
+            focusable={t.id === activeTabId || (picking && i === 0)}
+            drop={dropMark(slot, i, tabs.length)}
+          />
+        ))}
+      </SortableContext>
+      <span
+        ref={newTabRef}
+        className="flex shrink-0 [--wails-draggable:no-drag]"
+        // The command picks in the focused group: this one, before it runs (a click
+        // without a pointerdown, e.g. from assistive tech, too).
+        onClickCapture={() => {
+          focusPanelGroup(panelKey, group);
         }}
       >
-        <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-          {tabs.map((t, i) => (
-            <TabButton key={t.id} panelKey={panelKey} group={group} tab={t} active={t.id === activeTabId} focused={focused} focusable={t.id === activeTabId || (picking && i === 0)} />
-          ))}
-        </SortableContext>
-        <span
-          ref={newTabRef}
-          className="flex shrink-0 [--wails-draggable:no-drag]"
-          // The command picks in the focused group: this one, before it runs (a click
-          // without a pointerdown, e.g. from assistive tech, too).
-          onClickCapture={() => {
-            focusPanelGroup(panelKey, group);
-          }}
-        >
-          <NewTabButton picking={picking} focused={focused} />
-        </span>
-      </div>
-    </DndContext>
+        <NewTabButton picking={picking} focused={focused} />
+      </span>
+    </div>
   );
 }

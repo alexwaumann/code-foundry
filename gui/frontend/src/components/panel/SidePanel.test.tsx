@@ -530,10 +530,10 @@ describe("reordering tabs", () => {
     expect(isPicking(getPanel(KEY))).toBe(false);
   });
 
-  /** jsdom lays nothing out: the strip is 400px wide and its tabs sit 100px apart, 80px wide, so dnd-kit finds the tab under the pointer. */
+  /** jsdom lays nothing out: the header and strip are 400px wide and the tabs sit 100px apart, 80px wide, so dnd-kit finds the tab under the pointer. */
   const layOutTabs = () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-      if (this.getAttribute("role") === "tablist") return DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 28 });
+      if (this.getAttribute("role") === "tablist" || this.dataset.testid === "panel-header") return DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 28 });
       if (this.dataset.tabId === undefined || !this.parentElement) return new DOMRect();
       const i = Array.from(this.parentElement.children).indexOf(this);
       return DOMRect.fromRect({ x: i * 100, y: 0, width: 80, height: 28 });
@@ -597,7 +597,7 @@ describe("reordering tabs", () => {
     render(<SidePanel />);
     const t = tab("#2");
     const described = document.getElementById(t.getAttribute("aria-describedby") ?? "");
-    expect(described?.textContent).toBe("To move this tab, press Option with Left Arrow or Right Arrow.");
+    expect(described?.textContent).toBe("To move this tab, press Option with Left Arrow or Right Arrow. Drag it onto the other group to move it there, or onto the far edge of the panel to split it.");
     const wrapper = t.parentElement;
     expect(wrapper?.getAttribute("role")).toBe("presentation");
     expect(wrapper?.hasAttribute("tabindex")).toBe(false);
