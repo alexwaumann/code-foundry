@@ -74,6 +74,9 @@ type Deps struct {
 	PluginRegistry command.PluginRegistryBackend
 	// PullRequestChecks backs pr.checks (a nil Gh works like Terminal).
 	PullRequestChecks command.PullRequestChecksDeps
+	// Skills backs skill.* (skill.setup also uses Terminal, Project and Thread). Nil
+	// registers them failing with Unimplemented.
+	Skills command.SkillBackend
 }
 
 // Register registers every domain's commands into r.
@@ -151,5 +154,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPluginOwned(r, command.PluginOwnedDeps{Thread: d.Thread, Project: d.Project, Terminal: d.Terminal}),
 		command.RegisterPluginRegistry(r, d.PluginRegistry, d.Thread),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
+		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 	)
 }

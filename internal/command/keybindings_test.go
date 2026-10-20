@@ -18,6 +18,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads", "plugin.wakes",
 		"pr.checks", "project.list",
 		"settings.get", "settings.path", "settings.reset", "settings.set",
+		"skill.browse",
 		"terminal.list", "theme.list",
 		"thread.agent.open", "thread.agents", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read", "thread.report", "thread.reports", "thread.respond",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",

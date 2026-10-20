@@ -232,6 +232,7 @@ func Run(ctx context.Context, opts Options) error {
 		PluginSurface:     pluginAPI,
 		PluginRegistry:    pluginAPI,
 		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
+		Skills:            st.skills,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -246,6 +247,7 @@ func Run(ctx context.Context, opts Options) error {
 	applyPluginRegistries(st.settings, plugins)
 	defer startPluginUpdateChecks(ctx, log.With("component", "plugins"), events, st.update, plugins)()
 	defer startSkills(ctx, log.With("store", "skill"), events, st.update, st.skills)()
+	defer startSkillSetupExits(ctx, log.With("store", "skill"), st.terminal, st.skills)()
 	defer startPluginContexts(ctx, events, plugins)()
 	defer startPluginEnvWatch(ctx, events, st.thread)()
 	defer startPluginChecks(ctx, events, plugins)()
