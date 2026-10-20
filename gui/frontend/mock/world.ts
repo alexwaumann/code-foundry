@@ -31,6 +31,7 @@ import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
 import { MockSkills } from "./skills";
+import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
@@ -677,8 +678,24 @@ export class World {
       for (const s of this.threads.values()) if (s.lastResultAt) this.publishThread(s);
       // And a new plugins.registries re-reads Browse (internal/daemon/plugin_registry.go).
       this.plugins.registry.settingsChanged();
+      this.emberSettingsChanged();
     },
   );
+  /**
+   * Ember's status and task board (mock/ember.ts; EmberService). Enabled is ember.enabled;
+   * turning it on adds the resident thread and the board's worker threads.
+   */
+  readonly ember = new MockEmber({
+    enabled: () => this.settings.value("ember.enabled") === "true",
+    epochContextTokens: () => Number(this.settings.value("ember.epoch_context_tokens")),
+    residentId: () => (this.threads.has(EMBER_THREAD) ? EMBER_THREAD : ""),
+    thread: (id) => {
+      const s = this.threads.get(id);
+      return s && { name: s.name, state: s.state, status: s.status, statusReason: s.statusReason, createdAt: s.createdAt, lastActivityAt: s.lastActivityAt, archived: s.archivedAt !== null };
+    },
+  });
+  /** The ember.* settings the board shows, as last published (emberSettingsChanged). */
+  private emberSettings = "";
   /** The backdrops folder (mock/backdrops.ts); imports select through settings. */
   readonly backdrops = new MockBackdrops(this.settings);
   /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
@@ -818,6 +835,21 @@ export class World {
     this.threadListEvents.publish(this.threadListSnapshot());
     this.actions.reset();
     this.update.reset();
+    this.emberSettings = this.emberSettingsKey();
+    this.ember.reset();
+  }
+
+  private emberSettingsKey(): string {
+    return `${this.settings.value("ember.enabled")}|${this.settings.value("ember.epoch_context_tokens")}`;
+  }
+
+  /** ember.enabled on adds the resident thread and its workers; a change to what the board shows republishes it. */
+  private emberSettingsChanged(): void {
+    const key = this.emberSettingsKey();
+    if (key === this.emberSettings) return;
+    this.emberSettings = key;
+    if (this.settings.value("ember.enabled") === "true") this.addEmberWorkers();
+    this.ember.changed();
   }
 
   // ---- Workspaces ---------------------------------------------------------------
@@ -1034,8 +1066,24 @@ export class World {
         state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(4), createdAt: ago(600),
         lastActivityAt: ago(4), resident: "ember", epoch: 2, held: true });
       this.publishThread(s);
+      this.ember.changed();
     }
     return id;
+  }
+
+  /**
+   * Ember turned on (ember.enabled, POST /__mock/ember?enabled=true): the resident thread and
+   * the seeded tasks' worker threads (mock/ember.ts), created by it, so hidden from the
+   * sidebar while threads.show_created_threads is off. Held. Idempotent.
+   */
+  addEmberWorkers(): void {
+    const resident = this.addResident();
+    for (const w of emberWorkers()) {
+      if (this.threads.has(w.id)) continue;
+      const s = this.addThread({ id: w.id, projectId: "repo-cf", worktreePath: CF, name: w.name, model: w.model, effort: "high", state: w.state, status: w.status, statusReason: w.statusReason,
+        statusChangedAt: w.lastActivityAt, createdAt: w.createdAt, lastActivityAt: w.lastActivityAt, createdBy: resident, createdByName: "Ember", brief: w.brief, held: true });
+      this.publishThread(s);
+    }
   }
 
   /**
@@ -1333,6 +1381,7 @@ export class World {
 
   private publishThread(s: MockThread): void {
     this.threadListEvents.publish({ event: { case: "updated", value: this.threadMsg(s) } });
+    if (this.ember.watches(s.id)) this.ember.changed();
   }
 
   /**
@@ -2039,6 +2088,7 @@ export class World {
       t.attach.publish("end");
     }
     this.actions.restart();
+    this.ember.endAll();
     this.events.endAll();
     this.termEvents.endAll();
   }

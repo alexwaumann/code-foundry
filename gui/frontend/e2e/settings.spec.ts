@@ -76,7 +76,7 @@ function searchbox(page: Page) {
 test("cmd+, opens settings on General; the nav switches pages, one at a time", async ({ page }) => {
   const settings = await openSettings(page);
   const nav = settings.getByRole("navigation", { name: "Settings pages" });
-  await expect(nav.getByRole("button")).toHaveText(["General", "Appearance", "Notifications", "Source control", "Keybindings", "Advanced", "Plugins", "Skills"]);
+  await expect(nav.getByRole("button")).toHaveText(["General", "Appearance", "Notifications", "Source control", "Ember", "Keybindings", "Advanced", "Plugins", "Skills"]);
   await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
   await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
   // General's sections, each a card; only this page's fields render.

@@ -50,28 +50,34 @@ func (m *Manager) applyCreateDefaults(ctx context.Context, creatorID string, o *
 	return validateModelEffort(o.Model, o.Effort)
 }
 
-// SetResidentAllowedTools sets the permission rules ("Bash(code-foundry ember:*)") every
-// spawn of the resident named name passes as --allowedTools after the protocol's
-// (ProtocolAllowedTools); nil or empty removes them. In memory: its store sets them at
+// ResidentTools are a resident's own permission rules, on every spawn of it: Allow after
+// the protocol's --allowedTools (ProtocolAllowedTools), Deny as --disallowedTools.
+type ResidentTools struct {
+	Allow, Deny []string
+}
+
+// SetResidentTools sets the permission rules ("Bash(code-foundry ember:*)") of the
+// resident named name; the zero value removes them. In memory: its store sets them at
 // every daemon start, before the resident can start. A running process keeps the rules
 // it was started with.
-func (m *Manager) SetResidentAllowedTools(name string, rules []string) {
-	if len(rules) == 0 {
+func (m *Manager) SetResidentTools(name string, t ResidentTools) {
+	if len(t.Allow) == 0 && len(t.Deny) == 0 {
 		m.residentTools.Delete(name)
 		return
 	}
-	m.residentTools.Store(name, slices.Clone(rules))
+	m.residentTools.Store(name, ResidentTools{Allow: slices.Clone(t.Allow), Deny: slices.Clone(t.Deny)})
 }
 
-// residentAllowed is a fresh slice of the resident rules for s; nil for a thread that
-// is not a resident or has none.
-func (m *Manager) residentAllowed(s Thread) []string {
+// residentRules are fresh slices of the resident rules for s; empty for a thread that is
+// not a resident or has none.
+func (m *Manager) residentRules(s Thread) (allow, deny []string) {
 	if s.Kind != KindResident {
-		return nil
+		return nil, nil
 	}
 	v, ok := m.residentTools.Load(s.ResidentName)
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	return slices.Clone(v.([]string))
+	t := v.(ResidentTools)
+	return slices.Clone(t.Allow), slices.Clone(t.Deny)
 }

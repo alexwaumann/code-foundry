@@ -8,11 +8,11 @@ import (
 )
 
 // A resident's own rules follow the protocol's on every spawn of it, and of no other
-// thread.
+// thread; its deny rules are --disallowedTools.
 func TestResidentAllowedTools(t *testing.T) {
 	e := newEnv(t)
 	rules := []string{"Bash(code-foundry ember:*)", "Bash(code-foundry thread:*)"}
-	e.m.SetResidentAllowedTools("ember", rules)
+	e.m.SetResidentTools("ember", ResidentTools{Allow: rules, Deny: []string{"Edit", "Write"}})
 	r, _, err := e.m.EnsureResident(e.ctx(), "ember", ResidentOptions{Cwd: filepath.Join(e.home, "residents", "ember")})
 	if err != nil {
 		t.Fatal(err)
@@ -22,23 +22,29 @@ func TestResidentAllowedTools(t *testing.T) {
 	}
 	e.waitFor(r.ID, "the turn", turnOver)
 	want := append(slices.Clone(ProtocolAllowedTools), rules...)
-	if got := allowedOf(e.spec(r.ID).Argv); !slices.Equal(got, want) {
+	argv := e.spec(r.ID).Argv
+	if got := flagList(argv, "--allowedTools"); !slices.Equal(got, want) {
 		t.Errorf("resident --allowedTools = %q\nwant %q", got, want)
 	}
+	if got := flagList(argv, "--disallowedTools"); !slices.Equal(got, []string{"Edit", "Write"}) {
+		t.Errorf("resident --disallowedTools = %q", got)
+	}
 	plain := e.connected(CreateOptions{})
-	if got := allowedOf(e.spec(plain.ID).Argv); !slices.Equal(got, ProtocolAllowedTools) {
+	if got := flagList(e.spec(plain.ID).Argv, "--allowedTools"); !slices.Equal(got, ProtocolAllowedTools) {
 		t.Errorf("plain --allowedTools = %q", got)
 	}
-	e.m.SetResidentAllowedTools("ember", nil)
-	if got := e.m.residentAllowed(r); got != nil {
-		t.Errorf("after removal = %q", got)
+	if got := flagList(e.spec(plain.ID).Argv, "--disallowedTools"); got != nil {
+		t.Errorf("plain --disallowedTools = %q", got)
+	}
+	e.m.SetResidentTools("ember", ResidentTools{})
+	if allow, deny := e.m.residentRules(r); allow != nil || deny != nil {
+		t.Errorf("after removal = %q, %q", allow, deny)
 	}
 }
 
-// allowedOf is the --allowedTools list of argv: the values after the flag up to the
-// next flag.
-func allowedOf(argv []string) []string {
-	i := slices.Index(argv, "--allowedTools")
+// flagList is the values after a variadic flag in argv, up to the next flag.
+func flagList(argv []string, flag string) []string {
+	i := slices.Index(argv, flag)
 	if i < 0 {
 		return nil
 	}

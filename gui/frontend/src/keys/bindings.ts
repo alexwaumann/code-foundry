@@ -117,13 +117,14 @@ export function isStartable(c: CommandView): boolean {
  * Commands the palette does not list: thread.agent.open takes a run id the palette cannot
  * pick (the GUI opens runs from their Agent rows, the strip and the Agents tab; the CLI
  * passes the id); thread.reseed is an agent and daemon verb (a resident's epochs,
- * docs/notes/ember-1-primitives.md), never the user's.
+ * docs/notes/ember-1-primitives.md), never the user's. Every ember.* command is too
+ * (Ember's task board: docs/notes/ember-2-store.md).
  */
 const paletteHidden: ReadonlySet<string> = new Set(["thread.agent.open", "thread.reseed"]);
 
 /** Whether the palette lists this command: startable here, and not one it cannot prompt for (paletteHidden). */
 export function inPalette(c: CommandView): boolean {
-  return isStartable(c) && !paletteHidden.has(c.name);
+  return isStartable(c) && !paletteHidden.has(c.name) && !c.name.startsWith("ember.");
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */

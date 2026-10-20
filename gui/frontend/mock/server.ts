@@ -149,6 +149,18 @@
  *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
  *        listError=… (the marketplace list failed); pluginsError=…; epoch=1 (a read, like the hourly
  *        refresh). GET /__mock/skills: { epoch, calls, failures, installed } (mock/skills.ts)
+ *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
+ *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
+ *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
+ *        t-5e6f7a8b todo (its subtask), t-9c0d1e2f blocked (s-ember-wails reported blocked),
+ *        t-3a4b5c6d done today (s-ember-flaky), t-7e8f9a0b cancelled. Reset restores them.
+ *        Every change below reaches WatchBoard streams.
+ *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
+ *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
+ *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…]
+ *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
+ *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
+ *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -170,6 +182,8 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
+import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
+import { emberStateNames } from "./ember";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
@@ -542,6 +556,13 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
+  router.service(EmberService, {
+    getStatus: () => ({ status: world.ember.status() }),
+    listTasks: (req) => ({ tasks: world.ember.list(req.open) }),
+    watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
@@ -608,6 +629,48 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
         return;
     }
     json(res, 200, { id: run.id, terminalId: run.terminalId, state: ActionRunState[run.state ?? 0], mode: ActionRunMode[run.mode ?? 0], exitCode: run.exitCode, output: run.output });
+  } catch (err) {
+    json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/** Ember controls: POST /__mock/ember[/task|/task/add|/consolidating|/epoch]. */
+function emberControl(res: ServerResponse, action: string, q: URLSearchParams): void {
+  const e = world.ember;
+  const bool = (name: string): boolean => {
+    const v = q.get(name);
+    if (v !== "true" && v !== "false") throw new CommandError("invalid", `${name} must be true or false`);
+    return v === "true";
+  };
+  const state = (v: string | null): EmberTaskState => {
+    const s = emberStateNames[v ?? ""];
+    if (s === undefined) throw new CommandError("invalid", "state must be one of " + Object.keys(emberStateNames).join(", "));
+    return s;
+  };
+  try {
+    switch (action) {
+      case "":
+        world.settings.update({ "ember.enabled": String(bool("enabled")) });
+        break;
+      case "/task":
+        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"));
+        break;
+      case "/task/add": {
+        const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });
+        json(res, 200, { id });
+        return;
+      }
+      case "/consolidating":
+        e.setConsolidating(bool("on"));
+        break;
+      case "/epoch":
+        e.nextEpoch();
+        break;
+      default:
+        json(res, 404, { error: "unknown ember control" });
+        return;
+    }
+    json(res, 200, e.json());
   } catch (err) {
     json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
   }
@@ -835,6 +898,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
+    return;
+  }
+  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/consolidating|\/epoch)$/.exec(path);
+  if (req.method === "POST" && emberCtl) {
+    emberControl(res, emberCtl[1] ?? "", q);
     return;
   }
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
@@ -1150,6 +1218,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/threads":
       json(res, 200, [...world.threads.keys()].map(threadSummary));
+      break;
+    case "GET /__mock/ember":
+      json(res, 200, world.ember.json());
       break;
     case "GET /__mock/actions":
       json(res, 200, world.actions.json());

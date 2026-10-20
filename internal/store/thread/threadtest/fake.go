@@ -46,6 +46,9 @@ type Fake struct {
 	requests map[string]string
 	// removed are Remove's tombstones, by id.
 	removed map[string]thread.RemovedThread
+	// createDefaults and residentTools are the resident hooks (residenthooks.go).
+	createDefaults thread.CreateDefaultsFunc
+	residentTools  map[string]thread.ResidentTools
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -156,7 +159,8 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
-func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread, error) {
+func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Thread, error) {
+	f.applyCreateDefaults(ctx, &o)
 	call := fmt.Sprintf("Create %s %s %s %s", o.ProjectID, o.WorktreePath, o.Model, o.Effort)
 	s := thread.Thread{
 		ProjectID: o.ProjectID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
