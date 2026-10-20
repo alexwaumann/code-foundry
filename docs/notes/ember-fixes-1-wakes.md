@@ -79,4 +79,65 @@ Left out:
 
 ## Live evidence
 
-TBD
+The daemon ran from this branch in `CODE_FOUNDRY_HOME=/tmp/ember-fixb-home`, on Haiku 5.5
+(medium), against a scratch repo under `~/scratch-ember-fixb`. Both were deleted
+afterwards.
+
+**Run 1: a lead with 3 workers, no progress report.** "Top" ran
+`thread new --created-by Top --notify` for "Poems lead". The lead started three workers
+with `--notify` and was told not to post a progress report.
+
+- 08:11:41 the lead's first turn ended with no report. Its settle fired (fired_count 1),
+  and the log has `wake held: lead still has 3 workers`. Top showed "waiting (on 1
+  child)".
+- The workers' wakes went to the lead (1, then 2 batched). The second came mid-turn, so
+  the lead did not settle in between.
+- 08:11:59 the lead reported done and settled (fired_count 2). Top got its one wake:
+  `Thread "Poems lead" (…) needs attention: finished, said more after its report.
+  Report: done — All 3 poems done. …`, with `children: {working: 0, reported: 3, total:
+  3}`.
+- Top's thread has exactly 1 wake. Before the fix, the no-report first turn alone would
+  have woken it (#83 in the battle test).
+
+**Run 2: a lead that settles between workers, plus a sibling.** "Top 2" had two
+children: "Lead 2" (3 workers, staggered) and "Solo" (a plain thread). The lead's
+intermediate turns ended in prose with no new report.
+
+- The lead settled 5 times (fired_count 1 to 5). Settles 1, 2 and 3 were held:
+  `wake held: lead still has 3 workers`, then `2 workers`, then `1 workers`. Settle 4
+  (report done, team settled) woke Top 2.
+- Settle 5 also woke Top 2: `finished (report is from before its last message). All 2
+  of your child threads settled.` A worker re-settled after the lead was done (its
+  background `sleep` ended and woke the lead), and the lead's team was settled by then.
+  The rule allows this; it is not the D1 case.
+- D2: Solo's second wake (08:13:00) came while Lead 2 was settled but held with 2 workers
+  running. It read `1 of your 2 child threads settled; still working: "Lead 2" (…)`.
+  The old code counted the lead as settled ("All 2 …") unless it had a fresh progress
+  report.
+- Top 2 got 4 wakes: Solo twice (it settled twice), and Lead 2 twice (its done report,
+  and the late re-settle). The old rule would have sent 3 more, for the lead's
+  intermediate settles.
+
+**Consolidation usage.** `ember.model` was set to Haiku 5.5, Ember got one message, and
+`ember reseed` ran the consolidation.
+
+- `ember status` printed `consolidation cost: last $0.0006 (3.5K in, 104 out), $0.0006
+  over 1 call`. The log has `ember: consolidation usage cost_usd=0.00062069
+  input_tokens=3461 output_tokens=104`, and `state.json` has both records.
+- That call's answer was a Haiku refusal ("…the output I was given is an environment
+  block…"), so MEMORY.md was kept. Its usage was still recorded, as intended.
+- Run by hand on the same input, `--output-format json` gave a `# Memory` answer 3 out
+  of 3 times, and plain text 2 out of 2. The refusal is the model, not the format.
+- A second reseed succeeded: `last $0.0004 (3.5K in, 366 out), $0.0011 over 2 calls`.
+  The line was the same after a daemon restart.
+
+## Gotchas
+
+- `TestThreadWakeDetailDelivered` used a settled subscription on a lead with no report
+  and busy workers, which is now held. It uses an attention subscription instead.
+- The thread store's fake claude replays one turn per process. The subscribed-lead test
+  closes the lead after each wake turn, so the next wake starts a new process.
+- Observed, not changed: a failed consolidation still moves `LastConsolidatedAt`
+  (epoch.go), so the next one's input skips the conversation of the failed one. In run
+  2, the "two sentences" preference from before the refused call was not in the second
+  MEMORY.md.
