@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
@@ -37,7 +38,10 @@ func TestThreadNewDefaultedModel(t *testing.T) {
 			if len(reqs) != 1 {
 				t.Fatalf("requests = %v", reqs)
 			}
-			r := reqs[0]
+			r, ok := reqs[0].(*v1.CreateThreadRequest)
+			if !ok {
+				t.Fatalf("request = %T", reqs[0])
+			}
 			if r.GetModel() != tt.wantModel || r.GetEffort() != tt.wantEff || r.GetModelDefaulted() != tt.modelDef || r.GetEffortDefaulted() != tt.effortDef {
 				t.Errorf("request = %v", r)
 			}
