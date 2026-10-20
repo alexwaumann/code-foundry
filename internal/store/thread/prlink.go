@@ -2,7 +2,6 @@ package thread
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"slices"
 	"time"
@@ -21,13 +20,29 @@ import (
 // and tracks the latest pull request seen, so it can flip back to an earlier one. A
 // thread's links are therefore every distinct URL, deduplicated by URL, in first-seen
 // order, and never removed.
+//
+// A thread also has every link of the threads it created, transitively
+// (prlink_children.go): a link is copied up the CreatedBy chain as it arrives.
 
-// LinkedPullRequest is a pull request Claude linked to the thread.
+// LinkSource is where a thread's link came from. Stored, not yet on the API.
+type LinkSource string
+
+const (
+	LinkClaude LinkSource = "claude" // a pr-link record in the thread's own transcript
+	LinkChild  LinkSource = "child"  // copied from a thread this thread created
+	LinkBranch LinkSource = "branch" // reserved: the pull request of the worktree's branch
+)
+
+// LinkedPullRequest is a pull request linked to the thread.
 type LinkedPullRequest struct {
 	Slug     string // "owner/name"
 	Number   int
 	URL      string
 	LinkedAt time.Time // first pr-link record for URL; the time it was seen if absent
+	Source   LinkSource
+	// ViaThreadID is, for LinkChild, the thread's direct child the link came through
+	// (not the descendant that linked it first); "" otherwise.
+	ViaThreadID string
 }
 
 var quotedPRLink = []byte(`"pr-link"`)
@@ -53,7 +68,7 @@ func parsePRLink(line []byte) (LinkedPullRequest, bool) {
 	if rec.PRURL == "" || rec.PRNumber <= 0 || rec.PRRepository == "" {
 		return LinkedPullRequest{}, false
 	}
-	l := LinkedPullRequest{Slug: rec.PRRepository, Number: rec.PRNumber, URL: rec.PRURL}
+	l := LinkedPullRequest{Slug: rec.PRRepository, Number: rec.PRNumber, URL: rec.PRURL, Source: LinkClaude}
 	if ts, err := time.Parse(time.RFC3339Nano, rec.Timestamp); err == nil {
 		l.LinkedAt = ts
 	}
@@ -89,9 +104,10 @@ func scanPRLinks(path string, limit int64) ([]LinkedPullRequest, error) {
 }
 
 // linkPullRequests adds the links whose URL the thread does not have yet, persists
-// them, and publishes the thread. Links without a time get now (links is modified:
-// the caller gives it up). Returns how many were new; a repeat of a known URL changes
-// nothing and publishes nothing.
+// them, and publishes the thread, then copies the new ones up its CreatedBy chain
+// (propagateLinksLocked). Links without a time get now (links is modified: the caller
+// gives it up). Returns how many were new to the thread; a repeat of a known URL
+// changes nothing and publishes nothing.
 func (m *Manager) linkPullRequests(id string, links []LinkedPullRequest) int {
 	if len(links) == 0 {
 		return 0
@@ -108,14 +124,7 @@ func (m *Manager) linkPullRequests(id string, links []LinkedPullRequest) int {
 			links[i].LinkedAt = now
 		}
 	}
-	merged, added := mergeLinks(rec.s.LinkedPullRequests, links)
-	if len(added) == 0 {
-		return 0
-	}
-	if err := saveLinks(context.Background(), m.opts.DB, id, added); err != nil {
-		m.log.Error("persist linked pull requests", "thread", id, "err", err)
-	}
-	rec.s.LinkedPullRequests = merged
-	m.commitLocked(rec, false)
+	added := m.addLinksLocked(rec, links)
+	m.propagateLinksLocked(id, added)
 	return len(added)
 }

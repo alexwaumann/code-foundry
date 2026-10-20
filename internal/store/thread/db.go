@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -9,7 +10,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032 and 0036) and thread_pull_requests (0010); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027, 0028, 0032 and 0036) and thread_pull_requests (0010, 0039); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -181,9 +182,9 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, l := range links {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_pull_requests (thread_id, slug, number, url, linked_at)
-			VALUES (?, ?, ?, ?, ?) ON CONFLICT (thread_id, url) DO NOTHING`,
-			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_pull_requests (thread_id, slug, number, url, linked_at, source, via_thread_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (thread_id, url) DO NOTHING`,
+			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt), string(cmp.Or(l.Source, LinkClaude)), l.ViaThreadID); err != nil {
 			return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 		}
 	}
@@ -196,7 +197,7 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 // loadLinks returns every thread's linked pull requests in first-seen (insertion)
 // order.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
-	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at
+	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at, source, via_thread_id
 		FROM thread_pull_requests ORDER BY thread_id, rowid`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load links: %w", err)
@@ -207,10 +208,11 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 		var id string
 		var l LinkedPullRequest
 		var at int64
-		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at); err != nil {
+		var source string
+		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at, &source, &l.ViaThreadID); err != nil {
 			return nil, fmt.Errorf("thread: load links: %w", err)
 		}
-		l.LinkedAt = fromMillis(at)
+		l.LinkedAt, l.Source = fromMillis(at), LinkSource(source)
 		out[id] = append(out[id], l)
 	}
 	if err := rows.Err(); err != nil {
