@@ -1,0 +1,7 @@
+{
+  "name": "enterprise-data",
+  "version": "1.3.9",
+  "description": "Data tools.",
+  "author": {"name": "Data Platform", "email": "data@example.com"},
+  "metadata": {"team": "data"}
+}

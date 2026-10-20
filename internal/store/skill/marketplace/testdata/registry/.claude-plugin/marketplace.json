@@ -1,0 +1,45 @@
+{
+  "name": "ai-marketplace",
+  "owner": {"name": "AI Platform", "email": "ai@example.com"},
+  "metadata": {"description": "Test marketplace", "version": "1.0.0"},
+  "plugins": [
+    {
+      "name": "enterprise-data",
+      "source": "./enterprise/c1-claude-code-marketplace/enterprise-data",
+      "description": "Query the data warehouse and its catalog.",
+      "version": "1.4.0",
+      "category": "data",
+      "tags": ["sql", "warehouse"]
+    },
+    {
+      "name": "lint-kit",
+      "source": "./community/marketplace/lint-kit",
+      "description": "Linters for every language.",
+      "version": "0.2.1",
+      "author": {"name": "Index Author"},
+      "category": "quality",
+      "tags": ["lint", "Quality"]
+    },
+    {
+      "name": "remote-tool",
+      "source": {"source": "github", "repo": "example/remote-tool"},
+      "description": "Lives in another repository.",
+      "version": "2.0.0",
+      "author": "Remote Team"
+    },
+    {
+      "name": "",
+      "source": "./nowhere"
+    },
+    {
+      "name": "escaper",
+      "source": "../outside",
+      "description": "Points outside the checkout."
+    },
+    {
+      "name": "lint-kit",
+      "source": "./community/marketplace/lint-kit",
+      "description": "Duplicate."
+    }
+  ]
+}
