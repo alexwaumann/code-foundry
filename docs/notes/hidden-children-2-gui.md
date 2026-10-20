@@ -129,7 +129,7 @@ Decided while building (flagged for review):
 
 ## Verification
 
-* `make check` green; `make gui-e2e` green (470 passed, 26 skipped live specs, 4 WebKit
+* `make check` green; `make gui-e2e` green (478 passed after the rebase onto #267, 26 skipped live specs, 4 WebKit
   workers, no flakes on the run).
 * Live (2026-10-20, `make gui-build`, the built GUI with `CODE_FOUNDRY_HOME=/tmp/cf-hidden2`
   and this branch's `bin/code-foundry`, a plain scratch folder `~/cf-scratch-hidden2`
