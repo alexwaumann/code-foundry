@@ -158,7 +158,11 @@ type Status struct {
 	// its error ("" when it went well: MEMORY.md was replaced).
 	LastConsolidatedAt     time.Time
 	LastConsolidationError string
-	Counts                 Counts
+	// LastConsolidationUsage is the last consolidation call's usage and cost (zero
+	// before one); ConsolidationUsageTotal sums every call's (consolidate.go).
+	LastConsolidationUsage  ConsolidationUsage
+	ConsolidationUsageTotal ConsolidationUsage
+	Counts                  Counts
 }
 
 // Snapshot is the published state: Ember's status and every task in board order

@@ -26,6 +26,10 @@ type persisted struct {
 	// there next time); LastConsolidationError why it failed, "" when it went well.
 	LastConsolidatedAt     time.Time `json:"last_consolidated_at"`
 	LastConsolidationError string    `json:"last_consolidation_error,omitempty"`
+	// LastConsolidationUsage is the last consolidation call's usage (nil before one
+	// reported it); ConsolidationUsageTotal sums every call's.
+	LastConsolidationUsage  *ConsolidationUsage `json:"last_consolidation_usage,omitempty"`
+	ConsolidationUsageTotal ConsolidationUsage  `json:"consolidation_usage_total"`
 	// WorkerNext counts the workers given a model from ember.worker_models.
 	WorkerNext int `json:"worker_next"`
 }

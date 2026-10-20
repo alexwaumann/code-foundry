@@ -9,9 +9,10 @@ the lead follows.
   cleanup`: its parent owns it.
 - Before a lead ends a turn while its workers still run, it posts `code-foundry thread
   report progress "<n> workers started: <ids>"` (with the ids its `thread new` calls
-  printed); without it the parent is woken with "finished" and no report. That settle
-  does not wake the parent: the daemon holds it while workers run and wakes the parent
-  when the lead's work is done or a worker needs someone. A lead's wake counts its
-  `children` ("2 of its 3 child threads still working": not done). Its final report
+  printed), so its parent's `thread reports` shows where it stands. No settle of a lead
+  wakes its parent while a worker runs, report or not: the daemon wakes the parent once
+  the team settled, or at once for the lead's own question, error, budget stop or
+  done/failed/blocked report. A lead's wake counts its `children` ("2 of its 3 child
+  threads still working": not done). Its final report
   lists each worker's id, branch, status and every concern a worker raised; a parent
   runs `thread reports --descendants-of <lead>` (with costs) before presenting it.

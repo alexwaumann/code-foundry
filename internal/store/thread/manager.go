@@ -495,6 +495,7 @@ func (m *Manager) commitLocked(rec *record, persist bool) {
 	}
 	m.observeLocked(rec.s) // wake subscriptions (subscriptions.go)
 	m.rewaitLocked(subscribers)
+	m.releaseHeldLocked(rec.s.ID) // a lead's held wake (subscriptions_hold.go)
 }
 
 func (m *Manager) record(id string) (*record, error) {
@@ -1048,6 +1049,7 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
 	m.fireRemovedLocked(tomb)     // before forgetLocked deletes the subscriptions
 	m.forgetLocked(id, "removed") // wake subscriptions (subscriptions.go)
+	m.releaseHeldLocked(rec.s.CreatedBy)
 	if len(rec.s.Usage) > 0 {
 		bus.Publish[Event](m.opts.Bus, RetiredUsage{Buckets: m.retired})
 	}

@@ -234,6 +234,9 @@ type subscriptions struct {
 	noting  bool
 	// restarted: DeliverRestartWakes ran (subscriptions_restart.go).
 	restarted bool
+	// held are leads' settled wakes held while their children work, by lead, then
+	// subscription id (subscriptions_hold.go). In memory only.
+	held map[string]map[string]Subscription
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and
@@ -650,6 +653,7 @@ func (s *subscriptions) removeLocked(ids []string) {
 		}
 		delete(s.byID, id)
 	}
+	s.forgetHeldLocked("", ids)
 	if err := deleteSubscriptions(context.Background(), s.db, ids); err != nil {
 		s.log.Error("delete wake subscriptions", "subscriptions", ids, "err", err)
 	}
@@ -694,6 +698,7 @@ func (m *Manager) forgetLocked(id, why string) {
 	if q, ok := s.queues[id]; ok {
 		q.items = nil
 	}
+	s.forgetHeldLocked(id, nil)
 	if why == "removed" {
 		delete(s.sent, id)
 		delete(s.noted, id)

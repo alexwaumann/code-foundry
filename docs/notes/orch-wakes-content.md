@@ -48,8 +48,8 @@ the subscriber's drain goroutine.
   runes, as before) and the header says `…: finished, said more after its report.
   Report: done — …`. `report_stale` keeps its meaning (false here); the report is still
   quoted. No new JSON flag: `last_message` with `report_stale` false says it.
-* **Held lead wakes (A6)**: a wake is held when its subscription is settled and repeat
-  (`--notify`'s), the turn ended plainly (idle, or needs attention "finished"; not an
+* **Held lead wakes (A6)** (superseded by `ember-fixes-1-wakes.md`): a wake is held
+  when its subscription is settled and repeat (`--notify`'s), the turn ended plainly (idle, or needs attention "finished"; not an
   error, a prompt, the budget), the target's report is `progress` and current, and its
   children counted at the fire have any working (`heldLeadWake`). It is counted
   (`FiredCount`, `LastFiredAt`; `thread subscriptions` shows it), logged `wake held:

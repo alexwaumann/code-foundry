@@ -203,6 +203,9 @@ type EmberStatusView struct {
 	LastConsolidationError string          `json:"lastConsolidationError,omitempty"`
 	Counts                 EmberCountsView `json:"counts"`
 	OpenTasks              int             `json:"openTasks"`
+
+	// Consolidation is what memory consolidations cost (ember_consolidation_usage.go).
+	Consolidation *EmberConsolidationView `json:"consolidation,omitempty"`
 }
 
 // EmberCountsView is the tasks per state in the JSON.
@@ -221,6 +224,7 @@ func emberStatusView(s ember.Status, dir string, now time.Time) EmberStatusView 
 		Counts:    EmberCountsView{Todo: s.Counts.Todo, Doing: s.Counts.Doing, Blocked: s.Counts.Blocked, Done: s.Counts.Done, Cancelled: s.Counts.Cancelled},
 		OpenTasks: s.Counts.Todo + s.Counts.Doing + s.Counts.Blocked,
 	}
+	v.Consolidation = emberConsolidationView(s)
 	if !s.EpochStartedAt.IsZero() {
 		at := s.EpochStartedAt
 		v.EpochStartedAt, v.EpochAgeSeconds = &at, int64(now.Sub(at)/time.Second)
@@ -259,6 +263,7 @@ func formatEmberStatus(v EmberStatusView) string {
 	case v.LastConsolidatedAt != nil:
 		fmt.Fprintf(&b, "last consolidation %s\n", v.LastConsolidatedAt.Local().Format("Jan 2 15:04"))
 	}
+	b.WriteString(emberConsolidationLine(v.Consolidation))
 	return strings.TrimRight(b.String(), "\n")
 }
 
