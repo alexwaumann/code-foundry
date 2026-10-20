@@ -39,6 +39,7 @@ import {
   type ThreadPendingRequestSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
 import { END_REPORTS, scriptAgents, type AgentRunInit } from "./agents";
+import { scriptEmberChat } from "./emberChat";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
@@ -1094,6 +1095,28 @@ export class MockThreadLogs {
     }
     l.seq = l.items.length;
     if (l.pending.length > 0) this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
+  }
+
+  /**
+   * Ember's chat (mock/emberChat.ts): the resident thread's history, matching the seeded
+   * board. Leaves the thread's status alone (idle at its prompt, as World.addResident makes it).
+   */
+  seedEmber(id: string): void {
+    this.logs.delete(id);
+    this.agents.delete(id);
+    this.shells.delete(id);
+    const l = this.log(id);
+    const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const x = this.item(id, payload, over);
+      l.items.push(x);
+      return x;
+    };
+    const tool = (name: string, input: object, value: { output?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
+      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
+    };
+    scriptEmberChat({ it, tool });
+    l.seq = l.items.length;
   }
 
   /**

@@ -2,6 +2,7 @@ import { BackdropEditor } from "./BackdropEditor";
 import type { SettingEditor } from "./editor";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
 import { VolumeEditor } from "./VolumeEditor";
+import { WorkerModelsEditor } from "./WorkerModelsEditor";
 
 /**
  * Editors for single settings, by key, ahead of the per-type editor (SettingRow): a
@@ -12,10 +13,11 @@ export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "appearance.theme_dark": ThemeDarkEditor,
   "appearance.theme_light": ThemeLightEditor,
   "appearance.backdrop": BackdropEditor,
+  "ember.worker_models": WorkerModelsEditor,
 };
 
 /**
  * Key editors taller than one control (the backdrop's gallery): their row aligns to the
  * top, so the title sits beside the editor's first control and the reset arrow beside it.
  */
-export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop"]);
+export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop", "ember.worker_models"]);

@@ -21,7 +21,7 @@ export type Selection =
   | { kind: "view"; name: string };
 
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
-export const viewNames: readonly string[] = ["dashboard", "pullrequests", "projects"];
+export const viewNames: readonly string[] = ["dashboard", "pullrequests", "projects", "ember"];
 
 /**
  * The dashboard page (view.dashboard): what the window selects when it loads and when its
@@ -148,6 +148,8 @@ interface UiState {
   collapsedProjects: string[];
   /** Projects page: workspace ids whose member rows are hidden. */
   collapsedWorkspaces: string[];
+  /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
+  emberShowWork: boolean;
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
   select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
@@ -176,6 +178,7 @@ interface UiState {
   toggleWorkingCollapsed: () => void;
   toggleArchivedCollapsed: () => void;
   toggleSnoozedCollapsed: () => void;
+  setEmberShowWork: (on: boolean) => void;
   /** Collapses (true) or expands a project on the Projects page; false when it already was. */
   setProjectCollapsed: (projectId: string, collapsed: boolean) => boolean;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
@@ -282,6 +285,7 @@ export const useUiStore = create<UiState>()(
       snoozedCollapsed: true,
       collapsedProjects: [],
       collapsedWorkspaces: [],
+      emberShowWork: false,
 
       select: (sel, opts) => {
         set((s) => ({
@@ -357,6 +361,9 @@ export const useUiStore = create<UiState>()(
       toggleSnoozedCollapsed: () => {
         set((s) => ({ snoozedCollapsed: !s.snoozedCollapsed }));
       },
+      setEmberShowWork: (emberShowWork) => {
+        set({ emberShowWork });
+      },
       setProjectCollapsed: (projectId, collapsed) => {
         const prev = get().collapsedProjects;
         const next = withMember(prev, projectId, collapsed);
@@ -394,6 +401,7 @@ export const useUiStore = create<UiState>()(
           snoozedCollapsed: typeof p.snoozedCollapsed === "boolean" ? p.snoozedCollapsed : current.snoozedCollapsed,
           collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
           collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
+          emberShowWork: typeof p.emberShowWork === "boolean" ? p.emberShowWork : current.emberShowWork,
         };
         return typeof p.sidebarWidth === "number" ? { ...merged, sidebarWidth: clamp(Math.round(p.sidebarWidth), SIDEBAR_MIN, SIDEBAR_MAX) } : merged;
       },
@@ -408,6 +416,7 @@ export const useUiStore = create<UiState>()(
         snoozedCollapsed: s.snoozedCollapsed,
         collapsedProjects: s.collapsedProjects,
         collapsedWorkspaces: s.collapsedWorkspaces,
+        emberShowWork: s.emberShowWork,
       }),
     },
   ),

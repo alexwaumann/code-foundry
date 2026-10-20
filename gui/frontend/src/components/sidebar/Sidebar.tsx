@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { EmberRow } from "@/components/ember/EmberRow";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { Tip } from "@/components/ui/tooltip";
@@ -9,6 +10,8 @@ import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSe
 import { sidebarAnchor } from "@/lib/inSidebar";
 import { zoomFactor } from "@/lib/zoom";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
+import { useShownEmberThreadId } from "@/stores/ember";
+import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
@@ -211,6 +214,10 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const unavailable = useThreadsStore((s) => s.availability === "unavailable");
   const streamError = useEventsStore((s) => s.streamError);
   const rowHeight = useRowHeight();
+  // Ember's pinned row (above New thread, components/ember/EmberRow.tsx) is the first stop
+  // of the arrows: above the first thread, and where they start while its chat is selected.
+  const emberId = useShownEmberThreadId();
+  const emberSelected = useUiStore((s) => emberId !== "" && s.selection.kind === "thread" && s.selection.id === emberId);
   // The row the context menu is open for (right-clicked), or null.
   const [menuRow, setMenuRow] = useState<ThreadRow | null>(null);
 
@@ -269,26 +276,37 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const firstThread = () => stepThread(rows, -1, 1);
   const lastThread = () => stepThread(rows, rows.length, -1);
 
+  const onEmber = emberId !== "" && (cursorKey === EMBER_ROW_KEY || (cursorIndex < 0 && emberSelected));
+  const toEmber = () => {
+    useUiStore.getState().setCursor(EMBER_ROW_KEY);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target !== e.currentTarget) return;
-    const row = rows[cursorIndex];
+    const row = onEmber ? undefined : rows[cursorIndex];
     const ui = useUiStore.getState();
     switch (e.key) {
       case "ArrowDown":
-        moveCursor(cursorIndex < 0 ? firstThread() : stepThread(rows, cursorIndex, 1));
+        moveCursor(cursorIndex < 0 || onEmber ? firstThread() : stepThread(rows, cursorIndex, 1));
         break;
       case "ArrowUp":
-        moveCursor(cursorIndex < 0 ? lastThread() : stepThread(rows, cursorIndex, -1));
+        if (onEmber) break;
+        if (emberId !== "" && cursorIndex >= 0 && stepThread(rows, cursorIndex, -1) === cursorIndex) toEmber();
+        else moveCursor(cursorIndex < 0 ? lastThread() : stepThread(rows, cursorIndex, -1));
         break;
       case "Home":
-        moveCursor(firstThread());
+        if (emberId !== "") toEmber();
+        else moveCursor(firstThread());
         break;
       case "End":
         moveCursor(lastThread());
         break;
       case "Enter":
       case " ":
-        if (row) activate(row);
+        if (onEmber) {
+          ui.setCursor(EMBER_ROW_KEY);
+          openEmber(emberId);
+        } else if (row) activate(row);
         break;
       case "F2":
         if (row?.kind !== "thread") return;
@@ -343,7 +361,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
     );
   };
 
-  const activeRow = rows[cursorIndex];
+  const activeRow = onEmber ? undefined : rows[cursorIndex];
   const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
   return (
     <RowTooltipsEnabled value={menuRow === null}>
@@ -361,7 +379,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
             tabIndex={0}
             data-region="sidebar"
             data-testid="thread-list"
-            aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
+            aria-activedescendant={onEmber ? `row-${EMBER_ROW_KEY}` : activeRow ? `row-${activeRow.key}` : undefined}
             className="group flex min-h-0 flex-1 flex-col outline-none"
             onKeyDown={onKeyDown}
             onContextMenu={onContextMenu}
@@ -458,6 +476,7 @@ function SidebarShown({ width }: { width: number }) {
           keeps them as far from the window edge as from the pane. */}
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-shell" data-testid="sidebar-body">
         <SidebarToolbar />
+        <EmberRow />
         <SidebarNewThread />
         <nav className="flex shrink-0 flex-col" aria-label="Pages">
           <PullRequestsNav />

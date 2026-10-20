@@ -8,6 +8,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { SurfaceKind } from "@/stores/panel";
 import { agentsSurface } from "./agents";
 import { diffSurface } from "./diff";
+import { emberSurface } from "./ember";
 import { filesSurface } from "./files";
 import { linkedPrsSurface } from "./linkedprs";
 import { mcpSurface } from "./mcp";
@@ -21,7 +22,7 @@ import { worktreeSurface } from "./worktree";
 
 export type { Subscribable, SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
-export const surfaces: readonly SurfaceSpec[] = [filesSurface, diffSurface, pullRequestSurface, linkedPrsSurface, usageSurface, mcpSurface, agentsSurface, threadsSurface, workspaceSurface, worktreeSurface];
+export const surfaces: readonly SurfaceSpec[] = [emberSurface, filesSurface, diffSurface, pullRequestSurface, linkedPrsSurface, usageSurface, mcpSurface, agentsSurface, threadsSurface, workspaceSurface, worktreeSurface];
 
 const byKind = new Map<SurfaceKind, SurfaceSpec>(surfaces.map((s) => [s.kind, s]));
 const byHotkey = new Map<string, SurfaceSpec>(surfaces.flatMap((s) => (s.hotkey ? [[s.hotkey.toLowerCase(), s] as const] : [])));
