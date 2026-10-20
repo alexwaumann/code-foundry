@@ -17,8 +17,9 @@ function useDegradedStreams(): string {
 }
 
 /**
- * Daemon pid/version/uptime from HealthService.Ping, in the sidebar's status row. A
- * narrow sidebar clips the trailing details; the tooltip carries all of them then.
+ * The daemon in the sidebar's status row: a status dot and its version (from
+ * HealthService.Ping). The tooltip carries the rest: the status in words, the pid, the
+ * uptime and, when unreachable, the error.
  */
 export function DaemonStatus() {
   const status = useHealthStore((s) => s.status);
@@ -29,30 +30,16 @@ export function DaemonStatus() {
   const error = useHealthStore((s) => s.error);
   const degraded = useDegradedStreams();
   const label = status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting";
-  const details = [label, pid !== undefined && `pid ${String(pid)}`, version, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error]
+  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error]
     .filter(Boolean)
     .join(" · ");
 
-  // The details while the row clips them, and always for an error (the row shows no message).
   return (
-    <Tip label={details} whenTruncated={status !== "error"} align="start">
-      <div className="flex min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap" data-testid="daemon-status">
-        {status === "ok" && degraded && <span className="shrink-0 text-warning">syncing {degraded}…</span>}
-        <span className="flex shrink-0 items-center gap-1.5">
-          <span className={cn("size-2 rounded-full", dot[status])} aria-hidden />
-          <span data-testid="status">{label}</span>
-        </span>
-        {pid !== undefined && (
-          <span className="tabular-nums">
-            pid <span data-testid="pid">{pid}</span>
-          </span>
-        )}
+    <Tip label={details} align="start">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap" data-testid="daemon-status" aria-label={details}>
+        <span className={cn("size-2 shrink-0 rounded-full", dot[status])} data-testid="status" data-status={status} aria-hidden />
         {version && <span data-testid="version">{version}</span>}
-        {uptime !== undefined && (
-          <span className="tabular-nums">
-            up <span data-testid="uptime">{formatUptime(uptime)}</span>
-          </span>
-        )}
+        {status === "ok" && degraded && <span className="shrink-0 text-warning">syncing {degraded}…</span>}
       </div>
     </Tip>
   );

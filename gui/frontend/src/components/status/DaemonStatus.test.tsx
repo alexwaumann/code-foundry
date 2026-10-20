@@ -7,14 +7,14 @@ import { DaemonStatus } from "./DaemonStatus";
 afterEach(cleanup);
 
 describe("DaemonStatus", () => {
-  it("renders pid, version, and uptime from the health store", () => {
+  it("shows the dot and version; pid and uptime go to the tooltip label", () => {
     useHealthStore.setState({ status: "ok", health: { pid: 4242, version: "1.2.3", uptimeSeconds: 249 }, error: null });
     useEventsStore.setState({ stream: "open" });
     render(<DaemonStatus />);
-    expect(screen.getByTestId("pid").textContent).toBe("4242");
     expect(screen.getByTestId("version").textContent).toBe("1.2.3");
-    expect(screen.getByTestId("uptime").textContent).toBe("4m 9s");
-    expect(screen.getByTestId("status").textContent).toBe("daemon");
+    expect(screen.getByTestId("status").dataset.status).toBe("ok");
+    expect(screen.getByTestId("daemon-status").textContent).toBe("1.2.3");
+    expect(screen.getByTestId("daemon-status").getAttribute("aria-label")).toBe("daemon · pid 4242 · up 4m 9s");
     expect(screen.queryByText(/syncing/)).toBeNull();
   });
 
@@ -32,9 +32,11 @@ describe("DaemonStatus", () => {
     expect(screen.getByText("syncing events…")).toBeDefined();
   });
 
-  it("shows unreachable when the daemon is down", () => {
+  it("shows a red dot with the error in the label when the daemon is down", () => {
     useHealthStore.setState({ status: "error", health: null, error: "connect failed" });
     render(<DaemonStatus />);
-    expect(screen.getByTestId("status").textContent).toBe("daemon unreachable");
+    expect(screen.getByTestId("status").dataset.status).toBe("error");
+    expect(screen.queryByTestId("version")).toBeNull();
+    expect(screen.getByTestId("daemon-status").getAttribute("aria-label")).toBe("daemon unreachable · connect failed");
   });
 });

@@ -44,6 +44,12 @@ still show the whole box, 5px past the line. Lucide draws a 24-unit viewBox with
 of padding, so the ink itself is ~1px further in (measured: Dashboard ink from x=13,
 Settings ink to 219 of 220).
 
+The same rule vertically (2026-10-19): the status row (`h-6`) ends 7px above the window's
+bottom edge (`pb-1.75`, was 6px), so its glyph boxes end on the content pane's bottom edge
+(12px up, `m-shell`). The row's text (a status dot and the daemon version; the daemon's
+pid and uptime moved into the dot's tooltip) is centred in the row, its ink 2-3px above
+the line. Before, the glyphs and text straddled the pane's bottom edge.
+
 Also checked:
 
 - Footer section headers (Working/Snoozed/Archived): the chevron sat in the header button's
