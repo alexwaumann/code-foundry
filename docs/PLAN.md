@@ -17,6 +17,7 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **Natural thread names** done (2026-10-13): the namer asks for a 3–6 word sentence-case title, cleaned to one line; `cf/<slug>` branches slugify it; forks are "<parent> (fork)"; old slug names stay (`natural-thread-names.md`).
 * **Rename session to thread** done (2026-10-16): one `ThreadService`, `internal/store/thread`, `thread.*` commands and CLI verbs, `threads.*` settings (legacy keys rewritten on load), `CODE_FOUNDRY_THREAD` / `--context-thread`, migration 0022 renames the tables, frontend modules and test ids (`rename-session-to-thread.md`).
 * **Rename repo to project** done (2026-10-17): `ProjectService`, `internal/store/project` (and `newproject` for create/publish), `project.*` commands and CLI verbs with a new `project list`, `--project` / `--context-project`, `projects.*` settings (legacy keys rewritten on load), migration 0026 renames the tables and `repo_id` columns, frontend modules and saved state (`rename-repo-to-project.md`).
+* **Skills marketplace** in progress (2026-10-20, four PRs): PR 1 (the `internal/store/skill` store: marketplaces from `claude plugin marketplace list`, checkouts read into plugin and skill entries, search, installed state, migration 0038, hourly refresh) done (`skills-1-registry.md`); PR 2 lifecycle + commands, PR 3 API, PR 4 GUI pending.
 
 ### Multi-repo workspaces: the five steps are built
 

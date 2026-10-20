@@ -245,6 +245,7 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	applyPluginRegistries(st.settings, plugins)
 	defer startPluginUpdateChecks(ctx, log.With("component", "plugins"), events, st.update, plugins)()
+	defer startSkills(ctx, log.With("store", "skill"), events, st.update, st.skills)()
 	defer startPluginContexts(ctx, events, plugins)()
 	defer startPluginEnvWatch(ctx, events, st.thread)()
 	defer startPluginChecks(ctx, events, plugins)()
