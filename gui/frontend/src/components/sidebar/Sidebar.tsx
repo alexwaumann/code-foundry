@@ -6,13 +6,14 @@ import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
+import { sidebarAnchor } from "@/lib/inSidebar";
 import { zoomFactor } from "@/lib/zoom";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useRowHeight } from "@/stores/settings";
+import { useRowHeight, useShowCreatedThreads } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { HEADER_HEIGHT, ROW_GAP, rowSize } from "./rowSizes";
@@ -49,7 +50,7 @@ function splitFooter(rows: readonly Row[]): [HeaderRow | null, Row[]] {
  * rows that actually changed.
  */
 function useListRows(): ListRows {
-  const threadKeys = useThreadListKeys();
+  const threadKeys = useThreadListKeys(useShowCreatedThreads());
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
   const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
@@ -66,6 +67,19 @@ function useListRows(): ListRows {
     }
     return { rows, main: rows.slice(0, sec.main.length), headers, footers };
   }, [stable, threadKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed]);
+}
+
+/**
+ * The row the selection highlights: the selected thread's, or for a thread hidden from the
+ * sidebar (opened from the Threads tab, the palette, a link) its nearest shown ancestor's
+ * (lib/inSidebar.ts sidebarAnchor); null when none (the dashboard, a page, a hidden thread
+ * with no shown ancestor). Arrow keys start from it. Derived, a primitive selector.
+ */
+function useSelectedRowKey(): string | null {
+  const showCreated = useShowCreatedThreads();
+  const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : null));
+  const anchor = useThreadsStore((s) => (id === null ? null : sidebarAnchor(s.byId, id, showCreated)));
+  return anchor === null ? null : threadKey(anchor);
 }
 
 /** The panel a row is shown in. */
@@ -190,7 +204,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const scrollWorking = useRef<ScrollTo>(null);
   const scrollSnoozed = useRef<ScrollTo>(null);
   const scrollArchived = useRef<ScrollTo>(null);
-  const selectedKey = useUiStore((s) => (s.selection.kind === "thread" ? threadKey(s.selection.id) : null));
+  const selectedKey = useSelectedRowKey();
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useThreadsStore((s) => s.loaded);
@@ -202,12 +216,24 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
 
   const sizeOf = useCallback((row: Row | undefined) => rowSize(row, rowHeight), [rowHeight]);
 
+  // The keyboard cursor's row, else (no cursor, or its row is gone: collapsed, hidden) the
+  // highlighted one: arrows move from there.
   const cursorIndex = useMemo(() => {
-    const key = cursorKey ?? selectedKey;
-    return key ? rows.findIndex((r) => r.key === key && isThreadRow(r)) : -1;
+    const at = (key: string | null) => (key ? rows.findIndex((r) => r.key === key && isThreadRow(r)) : -1);
+    const i = at(cursorKey);
+    return i >= 0 ? i : at(selectedKey);
   }, [rows, cursorKey, selectedKey]);
   // The ring is drawn only for a keyboard cursor that is on a shown row.
-  const shownCursor = cursorKey !== null && cursorIndex >= 0 ? cursorKey : null;
+  const shownCursor = cursorKey !== null && rows[cursorIndex]?.key === cursorKey ? cursorKey : null;
+
+  // A selection made elsewhere (the palette, the Threads tab, a link, an intent) moves the
+  // highlight: an old keyboard cursor elsewhere is dropped, so arrows start from the
+  // highlighted row (a hidden thread's shown ancestor included). A row's own click or
+  // Enter sets the cursor to that row first, so it stays.
+  useEffect(() => {
+    const ui = useUiStore.getState();
+    if (ui.cursorKey !== null && ui.cursorKey !== selectedKey) ui.setCursor(null);
+  }, [selectedKey]);
 
   useEffect(() => {
     if (focusSeq > 0) listRef.current?.focus();

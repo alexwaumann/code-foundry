@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { Archive, ArchiveRestore, ArrowRightLeft, FolderGit2, GitFork, Pencil, Pin, PinOff, SquareTerminal, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRightLeft, EyeOff, FolderGit2, GitFork, Pencil, Pin, PinOff, SquareTerminal, Trash2 } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -15,7 +15,7 @@ import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { useProjectsStore } from "@/stores/projects";
-import { archiveThread, forkThread, pinThread, removeThread, runThreadIn } from "@/stores/threadActions";
+import { archiveThread, forkThread, pinThread, removeThread, runThreadIn, setThreadSidebar } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -78,6 +78,8 @@ export function RowMenu({ id }: { id: string }) {
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
+  // Another thread created it: a row in the sidebar is shown, so it can be handed back.
+  const created = useThreadsStore((s) => (s.byId[id]?.createdBy ?? "") !== "");
   return (
     <ContextMenuContent
       data-testid="row-menu"
@@ -114,6 +116,17 @@ export function RowMenu({ id }: { id: string }) {
         {archived ? <ArchiveRestore /> : <Archive />}
         {archived ? "Unarchive" : "Archive"}
       </ContextMenuItem>
+      {created && (
+        <ContextMenuItem
+          data-testid="menu-sidebar-hide"
+          onSelect={() => {
+            void setThreadSidebar(id, false);
+          }}
+        >
+          <EyeOff />
+          Hide from sidebar
+        </ContextMenuItem>
+      )}
       {workspaceId && <RunInMenu threadId={id} workspaceId={workspaceId} />}
       <ContextMenuSeparator />
       <ContextMenuItem

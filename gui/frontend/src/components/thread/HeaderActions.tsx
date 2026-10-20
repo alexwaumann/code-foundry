@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Archive, ArchiveRestore, GitPullRequest, Layers } from "lucide-react";
+import { Archive, ArchiveRestore, Eye, EyeOff, GitPullRequest, Layers } from "lucide-react";
 import { ThreadActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
@@ -10,6 +10,7 @@ import { SnoozeButton } from "@/components/snooze/SnoozeMenu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
+import { useSidebarShown } from "@/stores/lineage";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -89,6 +90,18 @@ function ArchiveButton({ threadId }: { threadId: string }) {
 }
 
 /**
+ * thread.sidebar for a thread another thread created: "Hide from sidebar" (EyeOff) while
+ * the rule shows it (lib/inSidebar.ts), "Show in sidebar" (Eye) while it is hidden. Run
+ * without args, its presenter toggles (keys/bindings.ts). None on the user's own threads,
+ * which are always shown.
+ */
+function SidebarButton({ threadId }: { threadId: string }) {
+  const shown = useSidebarShown(threadId);
+  if (shown === null) return null;
+  return <CommandButton command="thread.sidebar" icon={shown ? EyeOff : Eye} tooltip={shown ? "Hide from sidebar" : "Show in sidebar"} data-testid="pane-sidebar" />;
+}
+
+/**
  * The thread header's right side: the workspace, the linked pull requests, then the
  * thread's and window's commands, run against the current selection (this thread) exactly
  * as the palette runs them. Each command button hides when the daemon does not list it as
@@ -100,6 +113,7 @@ export function HeaderActions({ threadId }: { threadId: string }) {
       <WorkspaceChip threadId={threadId} />
       <LinkedPrs threadId={threadId} />
       <SnoozeButton threadId={threadId} />
+      <SidebarButton threadId={threadId} />
       <ArchiveButton threadId={threadId} />
       <ThreadActionsMenu threadId={threadId} />
       <BottomToggle />

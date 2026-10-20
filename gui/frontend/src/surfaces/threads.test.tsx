@@ -4,12 +4,16 @@ import type { ThreadView } from "@/api/threads";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
+const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
+const { useSettingsStore } = await import("@/stores/settings");
+const { tooltipText } = await import("@/test/tooltip");
 const { showView, threadsPanelCommand, useViewsStore } = await import("@/stores/views");
 const { threadsTab } = await import("@/surfaces/threadsTarget");
 
@@ -252,5 +256,63 @@ describe("Threads surface", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, p: { ...s.byId.p, name: "Login redirect" } as ThreadView } }));
     });
     expect(screen.getByTestId("threads-subline").textContent).toBe("Created by Login redirect · 3 siblings · 1 child");
+  });
+});
+
+describe("Threads surface: hidden child threads (docs/notes/hidden-children-2-gui.md)", () => {
+  const setShowCreated = (on: boolean) => {
+    act(() => {
+      useSettingsStore.setState({ snapshot: { values: { "threads.show_created_threads": String(on) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+    });
+  };
+  const action = (id: string) => within(rowOf(id).parentElement as HTMLElement, "lineage-sidebar") as HTMLElement | null;
+  afterEach(() => {
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it("a muted hidden before the status of every hidden thread; none on shown ones or the user's", () => {
+    setThreads(sketch().map((x) => (x.id === "s1" ? { ...x, inSidebar: true } : x.id === "p" || x.id === "u" ? x : { ...x, inSidebar: null })));
+    open();
+    const hidden = rows().filter((r) => within(r, "lineage-hidden") !== null).map((r) => r.getAttribute("data-thread"));
+    expect(hidden).toEqual(["me", "s2", "s3", "c1"]);
+    expect(within(rowOf("s2"), "lineage-hidden")?.textContent).toBe("hidden");
+    expect(within(rowOf("s2"), "lineage-hidden")?.nextElementSibling?.getAttribute("data-testid")).toBe("lineage-status");
+    // The setting on: all shown, no mark.
+    setShowCreated(true);
+    expect(screen.queryAllByTestId("lineage-hidden")).toHaveLength(0);
+  });
+
+  it("siblings and children get Show in sidebar / Hide from sidebar beside the row (not in it); this thread and the creator do not", () => {
+    setThreads(sketch().map((x) => (x.id === "s1" ? { ...x, inSidebar: true } : x)));
+    open();
+    expect(action("s1")?.getAttribute("aria-label")).toBe("Hide from sidebar");
+    expect(action("s1")?.dataset.shown).toBe("true");
+    expect(tooltipText(action("s1") as HTMLElement)).toBe("Hide from sidebar");
+    expect(action("s2")?.getAttribute("aria-label")).toBe("Show in sidebar");
+    expect(action("c1")?.getAttribute("aria-label")).toBe("Show in sidebar");
+    expect(rowOf("s2").querySelector('[data-testid="lineage-sidebar"]')).toBeNull();
+    expect(within(rowOf("me").parentElement as HTMLElement, "lineage-sidebar")).toBeNull();
+    expect(within(rowOf("p").parentElement as HTMLElement, "lineage-sidebar")).toBeNull();
+  });
+
+  it.each<[string, string, string]>([
+    ["shows a hidden sibling", "s2", "true"],
+    ["hides a shown sibling", "s1", "false"],
+  ])("the action %s through thread.sidebar, without opening it", (_name, id, shown) => {
+    setThreads(sketch().map((x) => (x.id === "s1" ? { ...x, inSidebar: true } : x)));
+    open();
+    fireEvent.click(action(id) as HTMLElement);
+    expect(runCommand).toHaveBeenCalledWith("thread.sidebar", { shown }, expect.objectContaining({ activeThreadId: id }));
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "me" });
+  });
+
+  it("follows an override change live", () => {
+    open();
+    expect(action("s2")?.getAttribute("aria-label")).toBe("Show in sidebar");
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, s2: { ...s.byId.s2, inSidebar: true } as ThreadView } }));
+    });
+    expect(action("s2")?.getAttribute("aria-label")).toBe("Hide from sidebar");
+    expect(within(rowOf("s2"), "lineage-hidden")).toBeNull();
   });
 });

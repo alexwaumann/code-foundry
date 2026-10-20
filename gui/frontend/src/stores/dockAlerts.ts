@@ -13,7 +13,7 @@ import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { isPageAttended } from "@/api/stream";
 import { attentionIds, useThreadsStore } from "./threads";
-import { useSettingsStore } from "./settings";
+import { KEYS, showCreatedThreadsOf, useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */
 export const NOTIFY_KEYS = {
@@ -75,7 +75,10 @@ export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new 
 export interface DockAlertsInput {
   /** useThreadsStore's epoch: a change means the set was replaced (startup, reconnect). */
   epoch: number;
-  /** attentionIds of the current threads: the bell and window title count. */
+  /**
+   * attentionIds of the current threads: the bell and window title count. Threads hidden
+   * from the sidebar (lib/inSidebar.ts) are not in it: they neither badge nor alert.
+   */
   attention: readonly string[];
   /**
    * The user is looking at the app: its window is visible and key (isPageAttended). Not
@@ -151,7 +154,8 @@ const hostDeps: DockAlertsDeps = {
 function sameAlertSettings(a: SettingsSnapshotView | null, b: SettingsSnapshotView | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return Object.values(NOTIFY_KEYS).every((k) => a.values[k] === b.values[k]);
+  // threads.show_created_threads moves threads in or out of the attention set.
+  return [...Object.values(NOTIFY_KEYS), KEYS.showCreatedThreads].every((k) => a.values[k] === b.values[k]);
 }
 
 /** Starts the badge and alerts; returns the stop function. */
@@ -161,7 +165,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
     const threads = useThreadsStore.getState();
     const next = stepDockAlerts(state, {
       epoch: threads.epoch,
-      attention: attentionIds(threads),
+      attention: attentionIds(threads, showCreatedThreadsOf(useSettingsStore.getState().snapshot)),
       attended: deps.attended(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),

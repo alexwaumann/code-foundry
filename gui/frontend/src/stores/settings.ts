@@ -28,6 +28,7 @@ export const KEYS = {
   backdropFile: "appearance.backdrop_file",
   panelKeepOpen: "appearance.panel_keep_open",
   scrollback: "threads.scrollback_lines",
+  showCreatedThreads: "threads.show_created_threads",
 } as const;
 
 const KEYBINDING_PREFIX = "keybindings.";
@@ -108,6 +109,25 @@ export function useSettingValue(key: string): string | undefined {
  */
 export function panelKeepOpen(): boolean {
   return useSettingsStore.getState().snapshot?.values[KEYS.panelKeepOpen] === "true";
+}
+
+/**
+ * threads.show_created_threads from a snapshot: threads another thread created are listed
+ * in the sidebar (lib/inSidebar.ts). Off until a snapshot says "true", the daemon's
+ * default, so a hidden thread never flashes into the list at startup.
+ */
+export function showCreatedThreadsOf(snap: SettingsSnapshotView | null): boolean {
+  return snap?.values[KEYS.showCreatedThreads] === "true";
+}
+
+/** threads.show_created_threads, read imperatively (cmd+1..9, cmd+shift+a, intents). */
+export function getShowCreatedThreads(): boolean {
+  return showCreatedThreadsOf(useSettingsStore.getState().snapshot);
+}
+
+/** threads.show_created_threads (a primitive selector: re-renders only when it flips). */
+export function useShowCreatedThreads(): boolean {
+  return useSettingsStore((s) => showCreatedThreadsOf(s.snapshot));
 }
 
 /** CSS font-family for the terminal: the setting plus fallbacks, else the bundled font's stack. */

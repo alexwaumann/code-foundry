@@ -15,6 +15,7 @@ const { usePanelStore } = await import("./panel");
 const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
+const { useSettingsStore } = await import("./settings");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
@@ -134,5 +135,62 @@ describe("a playAlertSound intent (notifications.test)", () => {
     applyIntent({ kind: "playAlertSound", volume: 15 });
     expect(playAlertSound).toHaveBeenCalledExactlyOnceWith(15);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+  });
+});
+
+describe("the focusThread intent (hidden child threads, docs/notes/hidden-children-2-gui.md)", () => {
+  const now = Date.now();
+  const made = (id: string, over: Partial<ThreadView>): ThreadView => ({ ...thread(id), createdBy: "", inSidebar: null, createdAtMs: now, ...over });
+  const setShowCreated = (on: boolean) => {
+    useSettingsStore.setState({ snapshot: { values: { "threads.show_created_threads": String(on) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+  };
+  const selected = () => useUiStore.getState().selection;
+  afterEach(() => {
+    vi.useRealTimers();
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it.each<[string, Partial<ThreadView>, boolean, boolean]>([
+    ["the user's new thread", {}, false, true],
+    ["a new hidden child (setting off)", { createdBy: "s1" }, false, false],
+    ["a new child, the setting on", { createdBy: "s1" }, true, true],
+    ["a new child created with --sidebar", { createdBy: "s1", inSidebar: true }, false, true],
+    ["a new child created with --sidebar=false, setting on", { createdBy: "s1", inSidebar: false }, true, false],
+    ["an older hidden child (thread.focus)", { createdBy: "s1", createdAtMs: now - 60_000 }, false, true],
+  ])("%s: switches the view %s", (_name, over, showCreated, switches) => {
+    setShowCreated(showCreated);
+    useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", over) }, order: ["s1", "n"] });
+    applyIntent({ kind: "focusThread", threadId: "n" });
+    expect(selected()).toEqual(switches ? { kind: "thread", id: "n" } : { kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().promptFocusSeq).toBe(switches ? 1 : 0);
+  });
+
+  it.each<[string, Partial<ThreadView>, boolean]>([
+    ["a shown thread", {}, true],
+    ["a hidden child", { createdBy: "s1" }, false],
+  ])("one not in the list yet is decided when it arrives: %s", (_name, over, switches) => {
+    applyIntent({ kind: "focusThread", threadId: "late" });
+    expect(selected()).toEqual({ kind: "view", name: "dashboard" });
+    useThreadsStore.setState({ byId: { s1: thread("s1"), late: made("late", over) }, order: ["s1", "late"] });
+    expect(selected()).toEqual(switches ? { kind: "thread", id: "late" } : { kind: "view", name: "dashboard" });
+  });
+
+  it("a pending one is dropped by a selection, another intent, or PENDING_FOCUS_MS", () => {
+    vi.useFakeTimers();
+    applyIntent({ kind: "focusThread", threadId: "late" });
+    useUiStore.getState().select({ kind: "view", name: "projects" });
+    useThreadsStore.setState({ byId: { s1: thread("s1"), late: made("late", {}) }, order: ["s1", "late"] });
+    expect(selected()).toEqual({ kind: "view", name: "projects" });
+
+    applyIntent({ kind: "focusThread", threadId: "later" });
+    applyIntent({ kind: "showView", name: "projects" });
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, later: made("later", {}) }, order: [...s.order, "later"] }));
+    expect(selected()).not.toEqual({ kind: "thread", id: "later" });
+
+    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    applyIntent({ kind: "focusThread", threadId: "latest" });
+    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, latest: made("latest", {}) }, order: [...s.order, "latest"] }));
+    expect(selected()).toEqual({ kind: "view", name: "dashboard" });
   });
 });

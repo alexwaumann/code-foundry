@@ -178,7 +178,7 @@ describe("thread reducers", () => {
       thread("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
     ]);
     // e waits (a finished turn) but is archived, f is snoozed: not counted. g woke: counted.
-    expect(attentionIds(d)).toEqual(["a", "b", "g"]);
+    expect(attentionIds(d, false)).toEqual(["a", "b", "g"]);
   });
 
   it("start page counts and thread list: waiting first, then running (starting included); a stopped busy never", () => {
@@ -191,8 +191,8 @@ describe("thread reducers", () => {
       thread("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
       thread("stopped", { status: "idle", state: "disconnected", createdAtMs: 7 }),
     ]);
-    expect(runningCount(d)).toBe(2);
-    expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
+    expect(runningCount(d, false)).toBe(2);
+    expect(activeThreadIds(d, false)).toEqual(["wait1", "wait2", "busy1", "start"]);
   });
 
   it("a thread is never both waiting and running: attention wins (an MCP start keeps a saved finished turn)", () => {
@@ -201,12 +201,12 @@ describe("thread reducers", () => {
       thread("busy", { status: "busy", createdAtMs: 2 }),
       thread("asking", { status: "attention", statusReason: "question: Which?", state: "starting", createdAtMs: 3 }),
     ]);
-    expect(attentionIds(d)).toEqual(["mcp", "asking"]);
-    expect(runningCount(d)).toBe(1);
-    const ids = activeThreadIds(d);
+    expect(attentionIds(d, false)).toEqual(["mcp", "asking"]);
+    expect(runningCount(d, false)).toBe(1);
+    const ids = activeThreadIds(d, false);
     expect(ids).toEqual(["mcp", "asking", "busy"]);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(activeThreadIds(emptyThreads)).toEqual([]);
+    expect(activeThreadIds(emptyThreads, false)).toEqual([]);
   });
 });
 

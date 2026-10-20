@@ -15,13 +15,16 @@ import { isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/threads";
 import { errorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
+import { inSidebar } from "@/lib/inSidebar";
 import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
 import { sentComposerText } from "@/lib/userMessage";
 import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
 import { clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, updateDraft } from "./compose";
 import { getUiContext } from "./context";
+import { getShowCreatedThreads } from "./settings";
 import { setAnswering } from "./thread";
+import { useThreadsStore } from "./threads";
 
 export const THREAD_COMMANDS = {
   create: "thread.new",
@@ -86,6 +89,18 @@ export function archiveThread(id: string, archived: boolean): Promise<boolean> {
  */
 export function setThreadSidebar(id: string, shown: boolean): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.sidebar, { shown: String(shown) }, threadContext(id));
+}
+
+/**
+ * thread.sidebar's presenter (the header button, the palette): hides the thread when the
+ * rule shows it (lib/inSidebar.ts), else shows it. False for a thread the list does not
+ * know (the command then prompts for `shown` as usual).
+ */
+export function toggleThreadSidebar(id: string): boolean {
+  const t = useThreadsStore.getState().byId[id];
+  if (!t) return false;
+  void setThreadSidebar(id, !inSidebar(t, getShowCreatedThreads()));
+  return true;
 }
 
 /**

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { decodeProjectKeys, useProjectStructureKeys } from "@/stores/context";
 import { useProjectsStore } from "@/stores/projects";
 import { openHelp } from "@/stores/views";
+import { useShowCreatedThreads } from "@/stores/settings";
 import { activeThreadIds, attentionIds, isAttention, runningCount, useThreadsStore } from "@/stores/threads";
 
 /** Rows in the start page's thread list before "+N more". */
@@ -70,7 +71,8 @@ function StartThreadRow({ id }: { id: string }) {
 
 /** Threads waiting on the user, then running ones; hidden when there are none. */
 function ActiveThreads() {
-  const ids = useThreadsStore(useShallow((s) => activeThreadIds(s)));
+  const showCreated = useShowCreatedThreads();
+  const ids = useThreadsStore(useShallow((s) => activeThreadIds(s, showCreated)));
   if (ids.length === 0) return null;
   const more = ids.length - MAX_THREADS;
   return (
@@ -114,8 +116,9 @@ function Counts({ running, waiting }: { running: number; waiting: number }) {
 
 /** Projects exist: a greeting, the fleet's counts, actions, and the threads that matter now. */
 function Fleet() {
-  const running = useThreadsStore((s) => runningCount(s));
-  const waiting = useThreadsStore((s) => attentionIds(s).length);
+  const showCreated = useShowCreatedThreads();
+  const running = useThreadsStore((s) => runningCount(s, showCreated));
+  const waiting = useThreadsStore((s) => attentionIds(s, showCreated).length);
   return (
     <>
       <Header title={greeting(new Date().getHours())}>

@@ -1,5 +1,6 @@
 import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
+import { sidebarAnchor } from "@/lib/inSidebar";
 import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
@@ -9,8 +10,9 @@ import { openPublishDialog } from "@/stores/publish";
 import { allSurfaces } from "@/stores/plugins";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
+import { toggleThreadSidebar } from "@/stores/threadActions";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
-import { zoomUi } from "@/stores/settings";
+import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
@@ -28,18 +30,22 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
+/** Selects the Nth thread in sidebar order (rows of a collapsed section and hidden threads do not count). */
 function jumpTo(n: number): void {
-  const id = threadOrder(getListThreads(), getListOptions())[n - 1];
+  const id = threadOrder(getListThreads(getShowCreatedThreads()), getListOptions())[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
 /** Selects the next thread that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const waiting = new Set(attentionIds(useThreadsStore.getState()));
+  const showCreated = getShowCreatedThreads();
+  const waiting = new Set(attentionIds(useThreadsStore.getState(), showCreated));
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
-  const next = nextAfter(threadOrder(getListThreads(), getListOptions()), sel.kind === "thread" ? sel.id : null, (id) => waiting.has(id));
+  // A hidden thread selected (from its creator's Threads tab) starts from its creator's row.
+  const order = threadOrder(getListThreads(showCreated), getListOptions());
+  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id, showCreated) : null;
+  const next = nextAfter(order, from, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "thread", id: next }, { focusPrompt: true });
   return true;
@@ -120,7 +126,7 @@ export function inPalette(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "project.clone", "project.create", "project.github.publish", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -200,6 +206,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
+  // Show or hide in the sidebar: toggles the active thread (the header's button, the
+  // palette), so `shown` is never prompted for. The daemon refuses a thread the user created.
+  "thread.sidebar": () => toggleThreadSidebar(getUiContext().activeThreadId),
   // The Add Project dialog; its tabs call ProjectService.Register (project.add's CLI form with
   // a folder), stream ProjectService.Clone (project.clone's CLI form), or invoke project.create.
   // project.add's optional path is never prompted for. project.clone opens it on the GitHub tab.

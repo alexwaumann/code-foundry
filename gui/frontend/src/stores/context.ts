@@ -7,6 +7,7 @@ import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./
 import { useProjectsStore, type ProjectsData } from "./projects";
 import { getViewing, SUBAGENT_VIEW } from "./subagentView";
 import { useThreadsStore, type ThreadsData } from "./threads";
+import { inSidebar } from "@/lib/inSidebar";
 import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
 import { useTerminalsStore } from "./terminals";
@@ -138,39 +139,45 @@ export function decodeProjectKeys(keys: readonly string[]): TreeProject[] {
 
 /**
  * One string per thread for the sidebar list: id + pin + group + archive time + snooze
- * end (name, model, a different dialog and the status line's text don't rebuild the list;
- * a question turning into a finished turn, an idle thread starting work, archiving,
- * snoozing and their undoing does, since it moves). In the store's order.
+ * end + hidden (name, model, a different dialog and the status line's text don't rebuild
+ * the list; a question turning into a finished turn, an idle thread starting work,
+ * archiving, snoozing, showing or hiding it and their undoing does, since it moves). In
+ * the store's order. `showCreated` is threads.show_created_threads
+ * (useShowCreatedThreads): flipping it rebuilds the list.
  */
-export function useThreadListKeys(): string[] {
-  return useThreadsStore(useShallow((s) => s.order.map((id) => encodeThreadListKey(id, s.byId[id]))));
+export function useThreadListKeys(showCreated: boolean): string[] {
+  return useThreadsStore(useShallow((s) => s.order.map((id) => encodeThreadListKey(id, s.byId[id], showCreated))));
 }
 
 /** One thread's list key (useThreadListKeys); decodeThreadListKeys reads it back. */
-export function encodeThreadListKey(id: string, x: ThreadView | undefined): string {
+export function encodeThreadListKey(id: string, x: ThreadView | undefined, showCreated: boolean): string {
   const ms = (v: number | null | undefined) => (v != null ? String(v) : "");
-  return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", ms(x?.archivedAtMs), ms(x?.snoozedUntilMs)].join(SEP);
+  const hidden = x !== undefined && !inSidebar(x, showCreated);
+  return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), hidden ? "1" : ""].join(SEP);
 }
 
 export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = "", snoozed = ""] = k.split(SEP);
+    const [id = "", pinned = "", group = "", archived = "", snoozed = "", hidden = ""] = k.split(SEP);
     return {
       id,
       pinned: pinned === "1",
       group: isThreadGroup(group) ? group : "idle",
       archivedAtMs: archived === "" ? null : Number(archived),
       snoozedUntilMs: snoozed === "" ? null : Number(snoozed),
+      ...(hidden === "1" ? { hidden: true } : {}),
     };
   });
 }
 
-/** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a). */
-export function getListThreads(): ListThread[] {
+/** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a); `showCreated` as for useThreadListKeys. */
+export function getListThreads(showCreated: boolean): ListThread[] {
   const s = useThreadsStore.getState();
   return s.order.flatMap((id) => {
     const x = s.byId[id];
-    return x ? [{ id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs, snoozedUntilMs: x.snoozedUntilMs }] : [];
+    if (!x) return [];
+    const t: ListThread = { id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs, snoozedUntilMs: x.snoozedUntilMs };
+    return [inSidebar(x, showCreated) ? t : { ...t, hidden: true }];
   });
 }
 
