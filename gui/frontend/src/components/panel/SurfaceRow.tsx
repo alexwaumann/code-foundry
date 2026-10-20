@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { Kbd } from "@/components/ui/kbd";
-import { openSurface } from "@/stores/panel";
+import { openSurface, type GroupIndex } from "@/stores/panel";
 import { useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
 import { keepPanelFocus, surfaceContext } from "./surfaceList";
 
 /**
  * One entry of the empty panel's surface list. Its availability is a hook, so it follows
- * the stores the surface reads. `trailing` replaces the hotkey (a plugin's mark).
+ * the stores the surface reads. It opens in `group` (default: the focused one). `trailing`
+ * replaces the hotkey (a plugin's mark).
  */
-export function SurfaceRow({ spec, ctx, trailing }: { spec: SurfaceSpec; ctx: SurfaceContext; trailing?: ReactNode }) {
+export function SurfaceRow({ spec, ctx, group, trailing }: { spec: SurfaceSpec; ctx: SurfaceContext; group?: GroupIndex; trailing?: ReactNode }) {
   const availability = useAvailability(spec, ctx);
   if (availability === "hidden") return null;
   const enabled = availability === "enabled";
@@ -25,7 +26,7 @@ export function SurfaceRow({ spec, ctx, trailing }: { spec: SurfaceSpec; ctx: Su
           const tab = spec.openDefault(now);
           if (!tab || spec.available(now) !== "enabled") return;
           keepPanelFocus(e.currentTarget);
-          openSurface(ctx.panelKey, tab);
+          openSurface(ctx.panelKey, tab, { group });
         }}
       >
         <spec.icon className="size-4 text-muted-foreground" aria-hidden />

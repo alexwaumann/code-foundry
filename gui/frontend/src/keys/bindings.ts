@@ -17,7 +17,7 @@ import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -263,6 +263,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Same for the surface list ("+"): this window's panel for its selection.
   "view.panel.new-tab": () => {
     newPanelTabCommand();
+    return true;
+  },
+  // Same for splitting or joining the panel's tab groups: this window's panel for its selection.
+  "view.panel.split": () => {
+    splitPanelCommand();
     return true;
   },
   // Same for the workspace surface: this window's workspace thread's panel.

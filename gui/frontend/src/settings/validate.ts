@@ -11,10 +11,10 @@ export type Validated = { ok: true; value: string } | { ok: false; error: string
 
 /**
  * Chords the Wails app menu takes (gui/app.go appMenu; ReservedChords in chord.go), plus
- * the side panel's own chords: cmd+w (close the active tab) and cmd+shift+c (copy a pull
- * request's link).
+ * the side panel's own chords: cmd+w (close the active tab), cmd+shift+c (copy a pull
+ * request's link) and cmd+alt+\ (focus the other tab group of a split panel).
  */
-const menuChords = new Set(["cmd+w", "cmd+shift+c", "cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f"]);
+const menuChords = new Set(["cmd+w", "cmd+shift+c", "cmd+alt+\\", "cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f"]);
 
 const keyPattern =
   /^([a-z0-9]|enter|escape|tab|space|backspace|delete|arrowup|arrowdown|arrowleft|arrowright|home|end|pageup|pagedown|f([1-9]|1[0-2])|[,./=\-[\];'`\\])$/;

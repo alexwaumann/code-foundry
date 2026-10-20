@@ -3298,6 +3298,11 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.new-tab" } } }))}`,
       },
       {
+        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: ["cmd+\\"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.split" } } }))}`,
+      },
+      {
         cmd: {
           name: "view.panel.workspace",
           title: "Show Workspace in Side Panel",

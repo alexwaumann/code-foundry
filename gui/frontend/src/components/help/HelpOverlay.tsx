@@ -35,6 +35,7 @@ const extraChords: LocalChord[] = [
   { chord: "alt+arrowleft", title: "Side panel, focused tab: move it left or right" },
   { chord: "alt+arrowright", title: "Side panel, focused tab: move it left or right" },
   { chord: "cmd+shift+c", title: "Side panel, pull request: copy its link" },
+  { chord: "cmd+alt+\\", title: "Side panel, split: focus the other tab group" },
   { chord: "cmd+w", title: "Bottom panel: close the active terminal (hides an empty panel)" },
 ];
 

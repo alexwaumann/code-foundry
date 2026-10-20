@@ -25,6 +25,9 @@ import (
 //     (COPY_LINK_CHORD in gui/frontend/src/components/pr/keys.ts). The panel handles it
 //     before the registry while it has focus, so a command bound to it would never fire
 //     there.
+//   - cmd+alt+\: the side panel's "focus the other tab group" of a split panel
+//     (FOCUS_OTHER_GROUP_CHORD in gui/frontend/src/components/panel/keys.ts), taken by the
+//     panel before the registry like cmd+shift+c.
 //
 // See docs/notes/phase1e-gui.md and docs/notes/phase2-integration.md.
 var ReservedChords = []string{
@@ -34,8 +37,8 @@ var ReservedChords = []string{
 	"cmd+=", "cmd+-", "cmd+0",
 	// editingChords
 	"cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z",
-	// side panel: close tab; the Pull request surface's copy link
-	"cmd+w", "cmd+shift+c",
+	// side panel: close tab; the Pull request surface's copy link; focus the other tab group
+	"cmd+w", "cmd+shift+c", `cmd+alt+\`,
 	// app menu
 	"cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 }
