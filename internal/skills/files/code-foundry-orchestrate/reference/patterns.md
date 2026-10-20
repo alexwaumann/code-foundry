@@ -196,6 +196,19 @@ deletes a branch whose worktree is already gone. Never `git worktree remove` or 
 branch deletion. A removed child leaves a tombstone: `thread reports --all` lists it as
 removed.
 
+## 8. Checking a batch before the roll-up
+
+Before you present a batch, list each branch's files against the default branch (or
+use `git merge-tree --write-tree`):
+
+```
+git diff --name-only origin/<default>...<branch>
+```
+
+For each pair that touches the same file, read both diffs of it and say whether they fit
+together (same flag parsing, same types), not only whether git merges them. Tell the
+user what overlaps or conflicts.
+
 Notes:
 
 - Never `thread send` without `--id`: it would go to your own thread.
