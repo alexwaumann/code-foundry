@@ -210,7 +210,8 @@ func TestThreadWakeDetailJSON(t *testing.T) {
 }
 
 // End to end in the store: the wake reads the target's items when it is sent and counts
-// its children when it fires.
+// its children when it fires. An attention subscription: a settled one about a lead
+// whose workers run is held (subscriptions_hold.go).
 func TestThreadWakeDetailDelivered(t *testing.T) {
 	e := newEnv(t)
 	top, lead := e.stopped("top"), e.stopped("lead")
@@ -229,7 +230,8 @@ func TestThreadWakeDetailDelivered(t *testing.T) {
 	}
 	e.putItems(lead.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "lead it"}, Item{ID: "a1", Kind: KindAssistantText, Text: "Started w1-w3; waiting."})
 	e.setStep(lead.ID, busy)
-	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: lead.ID, Repeat: true}); err != nil {
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: lead.ID, Condition: CondAttention,
+		Repeat: true}); err != nil {
 		t.Fatal(err)
 	}
 	e.setStep(lead.ID, finished)

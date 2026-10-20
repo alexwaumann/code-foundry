@@ -236,14 +236,22 @@ func TestSiblingsOf(t *testing.T) {
 				Pending: []wakeSiblingPending{{"s-3", "ns-3", "permission: Edit README.md"}}}},
 		{"a stopped child's old prompt is not pending", []Thread{kid("s-1", finished), kid("s-2", offAsking)}, []Thread{kid("s-1", finished)},
 			&wakeSiblings{Settled: 2, Total: 2, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}},
-		// A lead with a progress report whose own workers run is still working (its
-		// settled wake was held); with a done report, or its workers settled, it is not.
+		// A lead whose own workers run is still working, whatever its report (its
+		// settled wake was held, or went for a report of its own); with its workers
+		// settled, it is not. A worker's own lead waiting on workers counts too.
 		{"a lead waiting on its workers is working",
 			[]Thread{kid("s-1", busy), withReport(kid("s-2", finished), ReportProgress), worker("w-1", "s-2", busy),
 				withReport(kid("s-3", finished), ReportDone), worker("w-2", "s-3", busy),
-				withReport(kid("s-4", finished), ReportProgress), worker("w-3", "s-4", finished)},
+				withReport(kid("s-4", finished), ReportProgress), worker("w-3", "s-4", finished),
+				kid("s-5", finished), worker("w-4", "s-5", finished), worker("w-5", "w-4", busy)},
 			[]Thread{kid("s-1", finished)},
-			&wakeSiblings{Settled: 3, Total: 4, Working: []wakeSibling{{"s-2", "ns-2"}}, Pending: []wakeSiblingPending{}}},
+			&wakeSiblings{Settled: 2, Total: 5, Working: []wakeSibling{{"s-2", "ns-2"}, {"s-3", "ns-3"}, {"s-5", "ns-5"}},
+				Pending: []wakeSiblingPending{}}},
+		// D2: the lead that fired, its workers running, is working too, and listed.
+		{"a target lead with workers running is working",
+			[]Thread{kid("s-1", busy), kid("s-2", finished), worker("w-1", "s-1", busy), worker("w-2", "s-1", finished)},
+			[]Thread{kid("s-1", finished)},
+			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-1", "ns-1"}}, Pending: []wakeSiblingPending{}}},
 		{"two targets in a batch are not listed", []Thread{kid("s-1", busy), kid("s-2", busy), kid("s-3", busy)},
 			[]Thread{kid("s-1", finished), kid("s-2", askBash)},
 			&wakeSiblings{Settled: 2, Total: 3, Working: []wakeSibling{{"s-3", "ns-3"}}, Pending: []wakeSiblingPending{}}},
@@ -306,95 +314,6 @@ func TestSiblingsSentence(t *testing.T) {
 	if !strings.Contains(msg.WakeJSON, `"siblings": {`) || !strings.Contains(msg.WakeJSON, `"pending": []`) {
 		t.Errorf("JSON:\n%s", msg.WakeJSON)
 	}
-}
-
-// A lead only waiting on its workers: a repeat settled wake, a plain turn end, a fresh
-// progress report, children working. Anything else wakes the parent.
-func TestHeldLeadWake(t *testing.T) {
-	progress := Report{Status: ReportProgress, Summary: "2 workers started"}
-	lead := func(s step, rep Report) Thread {
-		return Thread{ID: "s-l", State: s.st, Status: s.status, StatusReason: s.reason, Report: rep}
-	}
-	working := wakeChildren{Working: 2, Total: 2}
-	repeat := Subscription{Condition: CondSettled, Repeat: true}
-	tests := []struct {
-		name string
-		sub  Subscription
-		t    Thread
-		d    wakeDetail
-		want bool
-	}{
-		{"progress, workers working: held", repeat, lead(finished, progress), wakeDetail{children: working}, true},
-		{"idle at its prompt: held", repeat, lead(atPrompt, progress), wakeDetail{children: working}, true},
-		{"a stopped lead at its prompt: held", repeat, lead(offIdle, progress), wakeDetail{children: working}, true},
-		{"its workers all settled", repeat, lead(finished, progress), wakeDetail{children: wakeChildren{Total: 2, Reported: 2}}, false},
-		{"a done report", repeat, lead(finished, Report{Status: ReportDone}), wakeDetail{children: working}, false},
-		{"a blocked report", repeat, lead(finished, Report{Status: ReportBlocked}), wakeDetail{children: working}, false},
-		{"no report", repeat, lead(finished, Report{}), wakeDetail{children: working, noReport: true}, false},
-		{"a stale progress report", repeat, lead(finished, progress), wakeDetail{children: working, staleReport: true}, false},
-		{"a permission prompt", repeat, lead(askBash, progress), wakeDetail{children: working}, false},
-		{"an error", repeat, lead(crashed, progress), wakeDetail{children: working}, false},
-		{"its budget", repeat, lead(budget, progress), wakeDetail{children: working}, false},
-		{"a one-shot", Subscription{Condition: CondSettled}, lead(finished, progress), wakeDetail{children: working}, false},
-		{"an idle subscription", Subscription{Condition: CondIdle, Repeat: true}, lead(finished, progress), wakeDetail{children: working}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := heldLeadWake(threadWakePart{sub: tt.sub, t: tt.t, d: tt.d}); got != tt.want {
-				t.Errorf("held = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// In the store: a lead's progress wake is counted and not sent (and takes no slot of
-// the wake limit); its next settle with no worker left wakes the parent.
-func TestHeldLeadWakeDelivered(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.WakeLimit = 1 })
-	top, lead, worker := e.stopped("top"), e.stopped("lead"), e.stopped("worker")
-	if _, ok := e.m.update(worker.ID, false, func(rec *record) { rec.s.CreatedBy = lead.ID }); !ok {
-		t.Fatal("no worker")
-	}
-	e.setStep(worker.ID, busy)
-	e.setStep(lead.ID, busy)
-	res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: top.ID, TargetThreadID: lead.ID, Repeat: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.m.Report(e.ctx(), lead.ID, Report{Status: ReportProgress, Summary: "worker started"}); err != nil {
-		t.Fatal(err)
-	}
-	e.setStep(lead.ID, finished)
-	waitFired := func(n int) {
-		t.Helper()
-		deadline := time.Now().Add(5 * time.Second)
-		for {
-			if got, _ := e.subscription(res.Subscription.ID); got.FiredCount == n {
-				return
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("fired count never reached %d", n)
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-	}
-	waitFired(1)
-	time.Sleep(100 * time.Millisecond)
-	if n := len(wakes(e.items(top.ID).Items)); n != 0 {
-		t.Fatalf("a held wake was sent: %d wakes", n)
-	}
-	// The worker finishes; the lead's next turn reports done.
-	e.setStep(worker.ID, finished)
-	e.setStep(lead.ID, busy)
-	if _, err := e.m.Report(e.ctx(), lead.ID, Report{Status: ReportDone, Summary: "all merged"}); err != nil {
-		t.Fatal(err)
-	}
-	e.setStep(lead.ID, finished)
-	items := e.waitItems(top.ID, "the lead's wake", func(items []Item) bool { return len(wakes(items)) == 1 })
-	if w := wakes(items)[0]; !strings.Contains(w.WakeTitle, "Report: done — all merged.") {
-		t.Errorf("wake = %s", w.WakeTitle)
-	}
-	waitFired(2)
 }
 
 // A batch whose wakes are all held sends nothing and gives its slot back.

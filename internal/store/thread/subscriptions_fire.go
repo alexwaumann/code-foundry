@@ -105,6 +105,7 @@ func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Mess
 // children counted now, and the detail its items hold (wakeDetailOf) read when the wake
 // is sent (the items are not read under m.mu). Callers hold m.mu and m.subs.mu.
 func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
+	m.subs.unholdLocked(t.ID, r.s.ID) // this fire replaces a held one (subscriptions_hold.go)
 	kids := m.childrenLocked(t.ID)
 	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
 		return delivery{thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, s, t, at, kids) }}
@@ -123,17 +124,15 @@ func (m *Manager) threadPart(ctx context.Context, sub Subscription, t Thread, at
 	return threadWakePart{sub: sub, t: t, at: at, d: d}
 }
 
-// childrenLocked counts the threads thread id created that are not archived. Callers
-// hold m.mu.
+// childrenLocked counts the threads thread id created that are not archived; a child
+// works as threadWorking has it (a lead with working children works). Callers hold
+// m.mu.
 func (m *Manager) childrenLocked(id string) wakeChildren {
 	var c wakeChildren
-	for _, rec := range m.recs {
-		k := rec.s
-		if k.CreatedBy != id || !k.ArchivedAt.IsZero() {
-			continue
-		}
+	kids := m.kidsLocked()
+	for _, k := range kids[id] {
 		c.Total++
-		if !Meets(CondSettled, k) {
+		if threadWorking(k, kids, map[string]bool{id: true}) {
 			c.Working++
 		}
 		if k.Report.Status != ReportNone {
@@ -242,6 +241,10 @@ func (m *Manager) drain(subscriber string) {
 	for {
 		d, ok := m.subs.next(subscriber, m.opts.WakeBatch > 0)
 		if !ok {
+			// Quiet now, unless the wake started a turn: a wake held about it may go.
+			m.mu.Lock()
+			m.releaseHeldLocked(subscriber)
+			m.mu.Unlock()
 			return
 		}
 		if d.limit {
@@ -380,7 +383,8 @@ type wakeQuestion struct {
 }
 
 // wakeChildren counts a thread's children (created_by it, not archived): Working are
-// not settled, Reported have a report.
+// not settled, or wait on working children of their own (threadWorking); Reported have
+// a report.
 type wakeChildren struct {
 	Working  int `json:"working"`
 	Reported int `json:"reported"`

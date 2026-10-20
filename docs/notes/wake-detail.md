@@ -46,7 +46,8 @@ Follow-up to `agents-4-wake.md` from the Haiku 5.5 orchestration experiment of
   is the tool's JSON up to 4 KiB, else its head as a string with a "`thread read
   --full` has it all" marker.
 * **`children`** (`working`, `reported`, `total`): threads whose `created_by` is the
-  target, not archived; working = not settled, reported = has a report. Omitted when
+  target, not archived; working = not settled, shown waiting, or with working children
+  of its own (ember-fixes-1-wakes.md), reported = has a report. Omitted when
   there are none; the header adds `; 2 of its 3 child threads still working` (or `; its
   child thread is still working`) when any work.
 * **Header**: settled and idle wakes take the verb from the status (`needs attention`

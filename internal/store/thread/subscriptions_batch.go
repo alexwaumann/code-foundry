@@ -31,9 +31,9 @@ import (
 // "siblings": how many of the subscriber's live children have settled, and the others
 // still working or waiting on an answer, counted when the wake is sent.
 //
-// A lead that ends a turn with a fresh progress report while its own children work is
-// only waiting on them: its settled wake is held (counted in FiredCount, logged "wake
-// held: lead still has N workers", not sent) and its parent wakes on its next settle.
+// A lead that ends a turn while its own children work is only waiting on them: its
+// settled wake is held (counted in FiredCount, logged "wake held: lead still has N
+// workers", not sent) until its team settled (subscriptions_hold.go).
 
 // WakeBatchWindow is how long a thread wake waits for others to the same subscriber
 // (Options.WakeBatch's default).
@@ -148,7 +148,7 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 }
 
 // deliverThreadWakes builds batch's wakes, holds those of leads still waiting on their
-// workers (heldLeadWake), counts the subscriber's children for those about them, and
+// workers (heldLeadWake, holdLocked), counts the subscriber's children for those about them, and
 // sends the rest as one message. A batch that sends nothing gives its wake limit slot
 // back.
 func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
@@ -181,10 +181,14 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		}
 		p := d.thread(ctx)
 		if heldLeadWake(p) {
-			n := p.d.children.Working
-			m.log.Info("wake held: lead still has "+strconv.Itoa(n)+" workers", "thread", subscriber, "subscription", d.sub,
-				"target", p.t.ID, "workers", n)
-			continue
+			m.mu.Lock()
+			n, held := m.holdLocked(p)
+			m.mu.Unlock()
+			if held {
+				m.log.Info("wake held: lead still has "+strconv.Itoa(n)+" workers", "thread", subscriber, "subscription", d.sub,
+					"target", p.t.ID, "workers", n)
+				continue
+			}
 		}
 		parts, subs = append(parts, p), append(subs, d.sub)
 	}
@@ -240,20 +244,9 @@ func (s *subscriptions) refundLocked(subscriber string, slots []time.Time) {
 	}
 }
 
-// heldLeadWake reports whether p is a lead only waiting on its workers: a repeat
-// settled subscription, a turn that ended plainly (idle, or finished) with a progress
-// report filed in it, and children still working. Its parent is woken on its next
-// settle instead.
-func heldLeadWake(p threadWakePart) bool {
-	t := p.t
-	ended := t.Status == StatusIdle || (t.Status == StatusNeedsAttention && t.StatusReason == "finished")
-	return p.sub.Condition == CondSettled && p.sub.Repeat && ended && t.Report.Status == ReportProgress &&
-		!p.d.staleReport && p.d.children.Working > 0
-}
-
 // siblingsOf counts subscriber's live children for parts' wakes about them, nil when
-// none is about one: the targets as they fired, the others as snap has them. A lead
-// with a progress report and workers still running counts as working.
+// none is about one: the targets as they fired, the others as snap has them. A child
+// whose own children still work (teamWorking), a target included, counts as working.
 func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wakeSiblings {
 	fired := map[string]Thread{}
 	for _, p := range parts {
@@ -264,17 +257,11 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wake
 	if len(fired) == 0 {
 		return nil
 	}
-	kids := make([]Thread, 0, len(snap.Threads))
-	busyKids := map[string]int{} // working children per thread: a lead's workers
-	for _, k := range snap.Threads {
-		if !k.ArchivedAt.IsZero() || k.Removing {
-			continue
-		}
-		if k.CreatedBy == subscriber {
+	all := childIndex(snap.Threads)
+	kids := make([]Thread, 0, len(all[subscriber]))
+	for _, k := range all[subscriber] {
+		if !k.Removing {
 			kids = append(kids, k)
-		}
-		if k.CreatedBy != "" && !Meets(CondSettled, k) {
-			busyKids[k.CreatedBy]++
 		}
 	}
 	slices.SortFunc(kids, func(a, b Thread) int { return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID)) })
@@ -285,17 +272,16 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wake
 			k = f
 		}
 		s.Total++
-		// A lead that settled with a progress report while its workers run is waiting
-		// on them (its wake was held): still working.
-		waiting := !isTarget && k.Report.Status == ReportProgress && busyKids[k.ID] > 0
-		settled := Meets(CondSettled, k) && !waiting
+		// A lead whose workers run is waiting on them (its settled wake is held, or
+		// went for a prompt or a report of its own): still working.
+		settled := Meets(CondSettled, k) && teamWorking(k.ID, all) == 0
 		if settled {
 			s.Settled++
 		}
 		switch {
-		case isTarget:
 		case !settled:
 			s.Working = append(s.Working, wakeSibling{ID: k.ID, Name: k.Name})
+		case isTarget:
 		case requestKey(k) != "":
 			s.Pending = append(s.Pending, wakeSiblingPending{ID: k.ID, Name: k.Name, Reason: k.StatusReason})
 		}
