@@ -1,12 +1,32 @@
 import { memo, useMemo } from "react";
-import { Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { CodeDiff, CodeScroll } from "@/components/code/CodeDiff";
 import { Tip } from "@/components/ui/tooltip";
-import { copyText } from "@/lib/clipboard";
 import { diffText, splitPath, toolDiffFiles, type ToolDiff } from "@/lib/toolSummary";
+import { useCopied } from "@/lib/useCopied";
 
 /** Above this many rendered lines the diff scrolls in a bounded box that lays out only what is visible. */
 const VIRTUALIZE_LINES = 400;
+
+/** The diff header's Copy diff: a check and "Copied" for a moment after (its own state, so the diff below does not re-render). */
+function CopyDiff({ text }: { text: () => string }) {
+  const { copied, copy } = useCopied();
+  const label = copied ? "Copied" : "Copy diff";
+  return (
+    <Tip label={label}>
+      <button
+        type="button"
+        className="flex size-[22px] items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        aria-label={label}
+        data-copied={copied || undefined}
+        data-testid="thread-diff-copy"
+        onClick={() => void copy(text())}
+      >
+        {copied ? <Check className="size-3" aria-hidden /> : <Copy className="size-3" aria-hidden />}
+      </button>
+    </Tip>
+  );
+}
 
 /**
  * An Edit / Write / NotebookEdit row's diff (and the docked permission prompt's): the file
@@ -36,16 +56,7 @@ export const ToolDiffView = memo(function ToolDiffView({ diff, cwd }: { diff: To
           </span>
         </Tip>
         <span className="flex-1" />
-        <Tip label="Copy diff">
-          <button
-            type="button"
-            className="flex size-[22px] items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label="Copy diff"
-            onClick={() => void copyText(diffText(diff, files))}
-          >
-            <Copy className="size-3" />
-          </button>
-        </Tip>
+        <CopyDiff text={() => diffText(diff, files)} />
       </div>
       {lines > VIRTUALIZE_LINES ? <CodeScroll className="diff-scroll">{body}</CodeScroll> : body}
     </div>

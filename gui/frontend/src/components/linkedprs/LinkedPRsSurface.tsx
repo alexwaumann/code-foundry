@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Copy, ExternalLink, GitBranch, GitPullRequestArrow } from "lucide-react";
+import { toast } from "sonner";
+import { Check, Copy, ExternalLink, GitBranch, GitPullRequestArrow } from "lucide-react";
 import { ChecksBadge } from "@/components/prs/PrBits";
 import { RowAction } from "@/components/projects/WorktreeState";
 import { RowList } from "@/components/prs/RowList";
@@ -11,9 +12,10 @@ import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
+import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
-import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
+import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { linkedCount, newestFirst, spansRepos, urlHost } from "@/surfaces/linkedprsTarget";
@@ -96,14 +98,15 @@ function LinkedAge({ ms }: { ms: number | null }) {
  * One linked pull request. Title, state, checks and branch come from the pull request's
  * cached detail (pullRequestDetailResource, the PR surface's own resource: watching it
  * keeps it re-read while shown, and the tab opened from here starts warm). Until it
- * loads, the number and the URL's host stand in, with a skeleton for the title.
+ * loads, the number and the URL's host stand in, with a skeleton for the title. Copy link
+ * shows a check (no toast), and the row's actions stay shown while it does.
  */
 function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
   const key = pullRequestKey(link.slug, link.number);
   useEffect(() => pullRequestDetailResource.watch(key), [key]);
   const pr = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest ?? null);
   const failed = pullRequestDetailResource.store((s) => (s.entries[key]?.data ? null : (s.entries[key]?.error ?? null)));
-  const ref = { slug: link.slug, number: link.number };
+  const { copied, copy } = useCopied();
   return (
     <NavRow
       navKey={link.url}
@@ -151,12 +154,20 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
         )}
         <span className="ml-auto flex shrink-0 items-center gap-1 pl-1">
           <LinkedAge ms={link.linkedAt} />
-          <span className="-my-1 hidden items-center group-hover/link:flex group-aria-selected/link:flex">
+          <span className={cn("-my-1 hidden items-center group-hover/link:flex group-aria-selected/link:flex", copied && "flex")}>
             <RowAction label="Open on GitHub" testId="linkedpr-open-github" onClick={() => void openUrl(link.url)}>
               <ExternalLink />
             </RowAction>
-            <RowAction label="Copy link" testId="linkedpr-copy" onClick={() => void copyPullRequestLink(ref, link.url)}>
-              <Copy />
+            <RowAction
+              label={copied ? "Copied" : "Copy link"}
+              testId="linkedpr-copy"
+              onClick={() => {
+                void copy(link.url).then((ok) => {
+                  if (!ok) toast.error("Copy failed");
+                });
+              }}
+            >
+              {copied ? <Check /> : <Copy />}
             </RowAction>
           </span>
         </span>

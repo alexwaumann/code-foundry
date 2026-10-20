@@ -1,31 +1,18 @@
-import { useEffect, useState } from "react";
 import { Check, Copy, Play } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
-import { copyText } from "@/lib/clipboard";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
+import { useCopied } from "@/lib/useCopied";
 import { runInThreadTerminal } from "@/stores/bottomActions";
 import { useCommandsStore } from "@/stores/commands";
 import { useCodeRun } from "./codeContext";
 import "./codeActions.css";
-
-/** How long a copy button shows its check. */
-const COPIED_MS = 1500;
 
 /**
  * An icon button that copies `text` and shows a check with "Copied" for a moment. The
  * thread's code blocks and Bash commands (codeActions.css: shown on hover or focus).
  */
 export function CopyButton({ text, label = "Copy code" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => {
-      setCopied(false);
-    }, COPIED_MS);
-    return () => {
-      clearTimeout(t);
-    };
-  }, [copied]);
+  const { copied, copy } = useCopied();
   return (
     <Tip label={copied ? null : label}>
       <button
@@ -35,9 +22,7 @@ export function CopyButton({ text, label = "Copy code" }: { text: string; label?
         data-copied={copied || undefined}
         data-testid="code-copy"
         onClick={() => {
-          void copyText(text).then(() => {
-            setCopied(true);
-          });
+          void copy(text);
         }}
       >
         {copied ? <Check aria-hidden /> : <Copy aria-hidden />}

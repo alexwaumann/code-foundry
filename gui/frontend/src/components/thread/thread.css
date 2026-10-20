@@ -800,7 +800,8 @@ html[data-thread-width="full"] .cf-thread {
   padding-bottom: 16px;
 }
 /* A finished turn's answer copies from a button in the gutter at its top right, shown
-   while the answer is hovered (or the button has the keyboard). Outside the text, so it
+   while the answer is hovered (or the button has the keyboard, or shows its check after a
+   copy: useCopied). Outside the text, so it
    never covers a code block's own actions. */
 .cf-thread .a-md.final {
   position: relative;
@@ -820,7 +821,8 @@ html[data-thread-width="full"] .cf-thread {
   transition: opacity 0.12s;
 }
 .cf-thread .a-md.final:hover > .copy-answer,
-.cf-thread .copy-answer:focus-visible {
+.cf-thread .copy-answer:focus-visible,
+.cf-thread .copy-answer[data-copied] {
   opacity: 1;
 }
 .cf-thread .copy-answer:hover {
