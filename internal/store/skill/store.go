@@ -24,11 +24,38 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/skill/marketplace"
 )
 
-// Errors Entry returns, for errors.Is.
+// Errors Entry and the lifecycle operations return, for errors.Is.
 var (
 	ErrNotFound  = errors.New("not found")
 	ErrAmbiguous = errors.New("ambiguous")
+	// ErrCollision is a skill directory Code Foundry did not install from that entry in
+	// the way of an install, enable or disable (a *CollisionError).
+	ErrCollision = errors.New("name taken")
+	// ErrLocal is an operation other than Remove on a local skill (one Code Foundry did
+	// not install), or Remove on one it did.
+	ErrLocal = errors.New("local skill")
+	// ErrNoSetup is Setup for a skill without a setup script.
+	ErrNoSetup = errors.New("no setup script")
+	// ErrInvalidName is a skill name that cannot be a directory in ~/.claude/skills.
+	ErrInvalidName = errors.New("invalid skill name")
 )
+
+// Refusal is an error that is one of the sentinels above (errors.Is) without saying so
+// in its message, which is meant for the user as it is.
+type Refusal struct {
+	Msg  string
+	Kind error
+}
+
+func (e *Refusal) Error() string { return e.Msg }
+
+// Unwrap is the sentinel.
+func (e *Refusal) Unwrap() error { return e.Kind }
+
+// refuse is a *Refusal of kind with a formatted message.
+func refuse(kind error, format string, a ...any) error {
+	return &Refusal{Msg: fmt.Sprintf(format, a...), Kind: kind}
+}
 
 // ExpectedMarketplace is the marketplace the Registries section names when Claude Code
 // has none (an example of what to `claude plugin marketplace add`).
@@ -104,8 +131,11 @@ type Store struct {
 	opts Options
 	log  *slog.Logger
 
-	// refreshMu serializes Refresh (network); mu serializes Load and guards epoch.
+	// refreshMu serializes Refresh (network); mu serializes Load and guards epoch;
+	// opMu serializes the lifecycle operations (lifecycle.go) and guards setupSHA.
 	refreshMu  sync.Mutex
+	opMu       sync.Mutex
+	setupSHA   map[string]string // the script's sha256 when Setup handed it out, by skill
 	mu         sync.Mutex
 	epoch      uint64
 	refreshed  map[string]time.Time // RefreshedAt by registry
@@ -130,7 +160,7 @@ func New(opts Options) (*Store, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	s := &Store{opts: opts, log: opts.Log, refreshed: map[string]time.Time{}, refreshErr: map[string]string{}}
+	s := &Store{opts: opts, log: opts.Log, refreshed: map[string]time.Time{}, refreshErr: map[string]string{}, setupSHA: map[string]string{}}
 	s.snap.Store(&Snapshot{catalogs: map[string]*marketplace.Catalog{}})
 	return s, nil
 }
@@ -170,7 +200,7 @@ func (s *Store) Entry(name string, kind marketplace.Kind) (marketplace.Entry, er
 	switch len(found) {
 	case 0:
 		what := cmp.Or(string(kind), "plugin or skill")
-		return marketplace.Entry{}, fmt.Errorf("no %s named %q in the marketplace: %w", what, name, ErrNotFound)
+		return marketplace.Entry{}, refuse(ErrNotFound, "no %s named %q in the marketplace", what, name)
 	case 1:
 		return found[0], nil
 	}

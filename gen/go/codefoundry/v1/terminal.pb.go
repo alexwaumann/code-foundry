@@ -91,8 +91,9 @@ type Terminal struct {
 	// creators follow this contract (internal/termlabel):
 	//
 	//	kind      "shell" on a shell started by the terminal.new command; "action" on
-	//	          an action run in a terminal (ActionService.Run, action.run). A
-	//	          terminal without a kind is not a panel terminal. The daemon removes a
+	//	          an action run in a terminal (ActionService.Run, action.run); "setup"
+	//	          on a skill's setup script (skill.setup), which stays EXITED like an
+	//	          action run. A terminal without a kind is not a panel terminal. The daemon removes a
 	//	          "shell" terminal as soon as it exits; an "action" terminal stays EXITED until
 	//	          it is closed (terminal.close), so its output can be read. Both are
 	//	          killed and removed when their thread is removed, their project is
@@ -106,6 +107,9 @@ type Terminal struct {
 	//	action    on kind "action": the action's id (ActionService).
 	//	action.name  on kind "action": the action's name when the run started.
 	//	action.run   on kind "action": the run's id (ActionRun.id).
+	//	skill     on kind "setup": the skill's name.
+	//	title     on kind "setup": the tab's title, "Setup <skill>" (and on a plugin's
+	//	          terminal, kind "plugin", the title the plugin gave).
 	//
 	// An action terminal carries the same thread / project / worktree owner labels as a
 	// shell, so a bottom panel shows both the same way.

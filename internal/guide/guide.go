@@ -109,9 +109,11 @@ var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 // environment changed) (`code-foundry commands` and `help <command>` show them).
 var leftOut = []string{"pr.checks", "thread.restart"}
 
-// LeftOut reports whether the guide leaves c out: the plugin namespace and leftOut.
+// LeftOut reports whether the guide leaves c out: the plugin namespace, the Skills
+// marketplace (skill.*: the user's settings, not an agent's work; docs/notes/
+// skills-2-lifecycle.md) and leftOut.
 func LeftOut(c *v1.Command) bool {
-	return InPluginNamespace(c) || slices.Contains(leftOut, c.GetName())
+	return InPluginNamespace(c) || strings.HasPrefix(c.GetName(), "skill.") || slices.Contains(leftOut, c.GetName())
 }
 
 // writeGuideCommands lists cmds by category (guideCategoryOrder first), each with its

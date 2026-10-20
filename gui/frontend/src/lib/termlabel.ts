@@ -27,6 +27,13 @@ export const KIND_ACTION = "action";
 export const KIND_PLUGIN = "plugin";
 export const PLUGIN_LABEL = "plugin";
 export const TITLE_LABEL = "title";
+/**
+ * A skill's setup script (skill.setup; docs/notes/skills-2-lifecycle.md): kind=setup, the
+ * owner labels of a shell, skill=<name> and title="Setup <name>" (its tab's title). Like
+ * an action run it stays in the panel after it exits.
+ */
+export const KIND_SETUP = "setup";
+export const SKILL_LABEL = "skill";
 
 /** Whether the labels mark a plugin's own terminal. */
 export function isPluginLabels(labels: Readonly<Record<string, string>>): boolean {
@@ -43,7 +50,12 @@ export function isActionLabels(labels: Readonly<Record<string, string>>): boolea
   return labels[KIND_LABEL] === KIND_ACTION;
 }
 
-/** Whether the bottom panel shows the terminal: a shell or an action run (termlabel.IsPanel). */
+/** Whether the labels mark a skill's setup script (skill.setup). */
+export function isSetupLabels(labels: Readonly<Record<string, string>>): boolean {
+  return labels[KIND_LABEL] === KIND_SETUP;
+}
+
+/** Whether the bottom panel shows the terminal: a shell, an action run or a skill's setup (termlabel.IsPanel). */
 export function isPanelLabels(labels: Readonly<Record<string, string>>): boolean {
-  return isShellLabels(labels) || isActionLabels(labels);
+  return isShellLabels(labels) || isActionLabels(labels) || isSetupLabels(labels);
 }

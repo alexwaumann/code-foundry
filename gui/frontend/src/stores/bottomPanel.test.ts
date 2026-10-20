@@ -67,6 +67,8 @@ describe("ownerKeyOf", () => {
     ["another kind", { kind: "job", thread: "s1" }, null],
     ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "thread:s1"],
     ["a worktree's action run", { kind: "action", project: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
+    ["a thread's skill setup", { kind: "setup", thread: "s1", project: "r", worktree: "/src/app", skill: "pr-review", title: "Setup pr-review" }, "thread:s1"],
+    ["a worktree's skill setup", { kind: "setup", project: "r", worktree: "/src/app", skill: "pr-review" }, "view:projects"],
   ];
   it.each(cases)("%s", (_name, labels, want) => {
     expect(ownerKeyOf({ labels })).toBe(want);
@@ -116,6 +118,8 @@ describe("bottomTabTitle", () => {
     ["the Projects page without a worktree label: the cwd's", { cwd: "/src/other", labels: { kind: "shell" } }, "view:projects", "other"],
     ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", thread: "s1", "action.name": "Test" } }, "thread:s1", "Test"],
     ["an action run on the Projects page: the action's name", { labels: { kind: "action", worktree: "/src/app", "action.name": "Build" } }, "view:projects", "Build"],
+    ["a skill setup: Setup <name>, not its OSC title", { title: "sh", labels: { kind: "setup", thread: "s1", skill: "pr-review", title: "Setup pr-review" } }, "thread:s1", "Setup pr-review"],
+    ["a skill setup on the Projects page", { labels: { kind: "setup", worktree: "/src/app", skill: "x", title: "Setup x" } }, "view:projects", "Setup x"],
   ];
   it.each(cases)("%s", (_name, extra, key, want) => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);

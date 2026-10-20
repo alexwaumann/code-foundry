@@ -80,6 +80,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
 		"plugin.threads", "plugin.terminals", "plugin.wakes",
 		"plugin.browse", "plugin.install", "plugin.update", "plugin.uninstall",
+		"skill.browse", "skill.install", "skill.enable", "skill.disable", "skill.update", "skill.uninstall", "skill.remove", "skill.setup", "skill.refresh",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {
