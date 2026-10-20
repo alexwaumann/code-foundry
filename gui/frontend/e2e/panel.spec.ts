@@ -798,14 +798,19 @@ test("the drop settle leaves no transform or animation behind, and a tab picked 
         .map((w) => w.dataset.tabId),
     );
 
-  // A drop, then the same tab picked up again at once: the settle is cancelled, so the lifted tab is where dnd-kit puts it.
+  // A drop, then the same tab picked up again at once: the lifted tab (the ghost, since
+  // split 3) is under the pointer, and its slot has no animation but its CSS slide.
   await startTabDrag(page, tabs.first(), await centerX(plus));
   await page.mouse.up();
   await expect(tabs).toHaveText(["Diff", "#12", "Files"]);
   const files = panel(page).locator('[data-tab-id="files"]');
-  await startTabDrag(page, tabs.last(), await centerX(tabs.first()));
+  const to = await centerX(tabs.first());
+  await startTabDrag(page, tabs.last(), to);
   await expect(panel(page).locator("[data-dragging]")).toHaveAttribute("data-tab-id", "files");
-  expect(await files.evaluate((el) => el.getAnimations().length)).toBe(0);
+  expect(await files.evaluate((el) => el.getAnimations().filter((a) => !("transitionProperty" in a)).length)).toBe(0);
+  // The first ghost: the drop's ghost may still be flying to its slot (dnd-kit renders the new one first).
+  const ghost = await page.getByTestId("panel-tab-ghost").first().boundingBox();
+  expect(ghost && ghost.x <= to && to <= ghost.x + ghost.width).toBe(true);
   await page.mouse.up();
   await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
   await expect.poll(residue).toEqual([]);
