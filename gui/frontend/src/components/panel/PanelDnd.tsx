@@ -121,8 +121,15 @@ export function PanelDnd({ panelKey, orientation, panel, children }: { panelKey:
       onDragCancel={end}
     >
       <PanelDropContext.Provider value={state}>{children}</PanelDropContext.Provider>
-      {/* In document.body, so no panel box clips it; the ghost is kept inside the panel by the modifier. */}
-      {createPortal(<DragOverlay>{drag ? <TabGhost tab={drag.tab} /> : null}</DragOverlay>, document.body)}
+      {/* In document.body, so no panel box clips it; the ghost is kept inside the panel by the
+          modifier. It never takes the pointer: after a drop it flies back over the tab for 250ms,
+          and a press on the tab then would land on the ghost and start nothing. */}
+      {createPortal(
+        <DragOverlay className="pointer-events-none">
+          {drag ? <TabGhost tab={drag.tab} /> : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }

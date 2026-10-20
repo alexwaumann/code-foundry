@@ -100,6 +100,8 @@ test("dropping a tab on the band splits the panel with it in the second group: t
   expect(Math.abs(r.top - (b.top + b.height * 0.55))).toBeLessThan(1);
   // The lifted tab is the ghost under the pointer; its slot stays, dimmed.
   await expect(ghost(page)).toHaveText("Diff");
+  // It never takes the pointer (after a drop it flies over the tabs).
+  expect(await ghost(page).evaluate((el) => getComputedStyle(el.parentElement ?? el).pointerEvents)).toBe("none");
   const slot = panel(page).locator("[data-dragging]");
   await expect(slot).toHaveAttribute("data-tab-id", "diff");
   expect(await slot.evaluate((el) => getComputedStyle(el).opacity)).toBe("0.4");
@@ -151,7 +153,8 @@ test("a single-tab panel shows no band; a drop on the body outside the band, or 
   await expect(split(page)).not.toHaveAttribute("data-split");
   await expect(tabsOf(page, 0)).toHaveText(["Files", "Diff"]);
 
-  // Escape over the band cancels.
+  // Escape over the band cancels. The tab is picked up again at once, while the last
+  // drop's ghost still flies back over it: the ghost never takes the pointer.
   await startDrag(page, tabIn(page, 0, "Files"), ...(await at(bodyOf(page, 0), 0.5, 0.8)));
   await expect(band(page)).toHaveAttribute("data-over", "true");
   await page.keyboard.press("Escape");
