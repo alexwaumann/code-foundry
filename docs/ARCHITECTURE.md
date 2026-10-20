@@ -460,7 +460,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   know about actions; `docs/notes/actions-1-daemon.md`).
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `thread_pull_requests`, backfilled from
-  the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
+  the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`). A
+  thread also has every link of the threads it created (`CreatedBy`, transitively, not
+  forks): each new link is copied up the chain with its source and the direct child it
+  came through (`docs/notes/linked-prs-children.md`).
 * **Token usage** is a pure fold over assistant records (each request once), per
   (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
   used (`/clear` starts a new one) and every subagent run under them, followed from the
