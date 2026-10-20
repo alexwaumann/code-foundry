@@ -21,7 +21,7 @@ import {
   ReviewerKind,
 } from "@/gen/codefoundry/v1/gh_pb";
 import { ProjectEventSchema, ProjectSchema } from "@/gen/codefoundry/v1/project_pb";
-import { AgentRunStatus, ThreadListEventSchema, ThreadSchema, ThreadState, ThreadStatus } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
+import { AgentRunStatus, ThreadKind, ThreadListEventSchema, ThreadSchema, ThreadState, ThreadStatus } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
 import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
@@ -374,6 +374,10 @@ describe("events mapping", () => {
       toThreadView(create(ThreadSchema, { id: "s3", status: ThreadStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
     ).toMatchObject({ status: "error", statusReason: "interrupted", statusChangedAtMs: 7000 });
     expect(toThreadView(create(ThreadSchema, { id: "s2", projectId: "web", workspaceId: "w-1" }))).toMatchObject({ projectId: "web", workspaceId: "w-1" });
+    // A resident thread carries its name and epoch; any other thread has neither.
+    expect(toThreadView(create(ThreadSchema, { id: "s6", kind: ThreadKind.RESIDENT, residentName: "ember", epoch: 3 }))).toMatchObject({ resident: "ember", epoch: 3 });
+    expect(toThreadView(create(ThreadSchema, { id: "s7", epoch: 2 }))).not.toHaveProperty("resident");
+    expect(toThreadView(create(ThreadSchema, { id: "s7", epoch: 2 }))).not.toHaveProperty("epoch");
   });
 
   it("maps linked pull requests in order", () => {

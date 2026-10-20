@@ -4,6 +4,7 @@ import {
   AgentRunStatus,
   PermissionMode,
   ThreadFlagLevel,
+  ThreadKind,
   ThreadReportStatus,
   ThreadState,
   ThreadStatus,
@@ -199,6 +200,14 @@ export interface ThreadView {
    */
   pluginEnvStale?: true;
   pluginEnvChange?: string;
+  /**
+   * A resident thread's name ("ember"): the daemon's own long-lived agent thread
+   * (Thread.kind RESIDENT; docs/notes/ember-1-primitives.md). Kept out of the user's lists
+   * like an owned thread (isOwned), whose Watch stream still carries it. Absent for
+   * every other thread. `epoch` (its session count) comes with it.
+   */
+  resident?: string;
+  epoch?: number;
 }
 
 /** A plugin's flag on a thread. */
@@ -396,6 +405,7 @@ export function toThreadView(s: Thread): ThreadView {
     flags: s.flags.flatMap(toThreadFlagView),
     ...(s.owner ? { owner: s.owner } : {}),
     ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),
+    ...(s.kind === ThreadKind.RESIDENT ? { resident: s.residentName, epoch: s.epoch } : {}),
   };
 }
 

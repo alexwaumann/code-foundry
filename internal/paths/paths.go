@@ -143,6 +143,10 @@ func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 // TMPDIR (internal/store/thread childcontext.go). Removed with the thread.
 func (p Paths) Tmp() string { return filepath.Join(p.home, "tmp") }
 
+// Residents holds each resident thread's own directory, its cwd: <Residents>/<name>
+// (internal/store/thread resident.go).
+func (p Paths) Residents() string { return filepath.Join(p.home, "residents") }
+
 // Plugins is where plugin packages live: <Plugins>/<name>/plugin.json, a directory or,
 // for `plugin dev`, a symlink to the author's folder (internal/store/plugin).
 func (p Paths) Plugins() string { return filepath.Join(p.home, "plugins") }

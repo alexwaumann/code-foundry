@@ -2,14 +2,16 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
 // Wake subscriptions (ThreadService.Subscribe, Unsubscribe, ListSubscriptions): a
 // subscriber thread is sent a message when a target thread meets a condition, a target
 // action run finishes, a target pull request changes, or a plugin fires a wake source,
 // so an agent that started other threads or opened a pull request is woken instead of
-// polling. See docs/notes/agents-4-wake.md, docs/notes/gh-events-3-pr-wake.md and
-// docs/notes/plugins-wake-sources.md.
+// polling, or when a timer it set goes off. See docs/notes/agents-4-wake.md,
+// docs/notes/gh-events-3-pr-wake.md, docs/notes/plugins-wake-sources.md and
+// docs/notes/ember-1-primitives.md.
 
 // ThreadSubscriptionTarget is what a subscription watches.
 enum ThreadSubscriptionTarget {
@@ -27,6 +29,12 @@ enum ThreadSubscriptionTarget {
   // events). The plugin fires it; disabling or uninstalling the plugin, or an update
   // that drops the source, sends a last "source gone" wake and removes it.
   THREAD_SUBSCRIPTION_TARGET_PLUGIN = 4;
+  // A timer (target_id is "at:<RFC 3339 UTC>" or "every:<duration>", e.g. "every:30m"):
+  // fires once at a time, or repeatedly at an interval until unsubscribed. Never fires
+  // at subscribe time. Persisted: a time that passed while the daemon was stopped fires
+  // once when it starts (within the timer check, about 10 s), and an interval resumes its
+  // schedule (one catch-up wake for the slots it missed).
+  THREAD_SUBSCRIPTION_TARGET_TIMER = 5;
 }
 
 // ThreadSubscriptionCondition is when a subscription fires: on a transition of the
@@ -73,7 +81,7 @@ enum ThreadSubscriptionCondition {
   // Any change the poll reports; the wake lists them.
   THREAD_SUBSCRIPTION_CONDITION_CHANGED = 16;
   // A plugin target's only condition: the plugin fired the source with a match that
-  // covers the subscription's args.
+  // covers the subscription's args. Also a timer's only condition: its time came.
   THREAD_SUBSCRIPTION_CONDITION_FIRED = 20;
 }
 
@@ -93,14 +101,15 @@ message ThreadSubscription {
   // Unset until it fired.
   google.protobuf.Timestamp last_fired_at = 9;
   // The subscriber's and the target's names at read time (a run: its action's name; a
-  // pull request: "owner/name#123 Title"); empty when unnamed or gone.
+  // pull request: "owner/name#123 Title"; a timer: "every 30m" or "at 09:00", local
+  // time, with the date when not today); empty when unnamed or gone.
   string subscriber_name = 10;
   string target_name = 11;
   // The target's state at read time, as words: a thread's status and reason
   // ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
   // "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
-  // before the GitHub poll saw it), a plugin's state ("running", "disabled"); "gone"
-  // when the target no longer exists.
+  // before the GitHub poll saw it), a plugin's state ("running", "disabled"), a timer's
+  // next fire ("next 09:30", "due"); "gone" when the target no longer exists.
   string target_status = 12;
   // A plugin target's args: given, defaulted or taken from the subscriber's context.
   map<string, string> args = 20;
@@ -109,19 +118,24 @@ message ThreadSubscription {
 message SubscribeThreadRequest {
   // The subscriber thread.
   string subscriber_thread_id = 1;
-  // Exactly one target: a thread id, an action run id, a pull request, or a plugin's
-  // wake source ("<plugin>/<source>").
+  // Exactly one target: a thread id, an action run id, a pull request, a plugin's
+  // wake source ("<plugin>/<source>"), or a timer (target_at or target_every).
   string target_thread_id = 2;
   string target_run_id = 3;
   // "owner/name#123" or a github.com pull request URL.
   string target_pull_request = 6;
   string target_plugin = 10;
+  // A one-shot timer: fires once at this time (after now; INVALID_ARGUMENT otherwise).
+  google.protobuf.Timestamp target_at = 12;
+  // A repeating timer: fires every interval (at least one minute) from now until
+  // unsubscribed; repeat is implied.
+  google.protobuf.Duration target_every = 13;
   // UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
-  // request, FIRED for a plugin. A run takes only FINISHED (or SETTLED); a thread SETTLED
-  // to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin only FIRED (or
-  // SETTLED) (INVALID_ARGUMENT otherwise).
+  // request, FIRED for a plugin or a timer. A run takes only FINISHED (or SETTLED); a
+  // thread SETTLED to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin and a
+  // timer only FIRED (or SETTLED) (INVALID_ARGUMENT otherwise).
   ThreadSubscriptionCondition condition = 4;
-  // Ignored for a run (fires once).
+  // Ignored for a run and a timer (target_at fires once, target_every repeats).
   bool repeat = 5;
   // A plugin target's args, by the source's arg names. An arg with a context defaults
   // to the subscriber's (its id, pull request or project); a required one without a
@@ -149,6 +163,8 @@ message UnsubscribeThreadRequest {
   string target_pull_request = 5;
   // "<plugin>/<source>": every subscription of the subscriber to it, whatever its args.
   string target_plugin = 10;
+  // Every timer subscription of the subscriber.
+  bool target_timer = 11;
 }
 
 message UnsubscribeThreadResponse {

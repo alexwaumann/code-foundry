@@ -44,11 +44,16 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skills (code-fou
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
 // (workspacePrompt) for a workspace thread.
-func systemPrompt(workspaceLine string) string {
-	if workspaceLine == "" {
-		return ThreadPrompt
+func systemPrompt(workspaceLine, threadAppend string) string {
+	p := ThreadPrompt
+	if workspaceLine != "" {
+		p += " " + workspaceLine
 	}
-	return ThreadPrompt + " " + workspaceLine
+	if threadAppend != "" {
+		// The thread's own (Thread.SystemPromptAppend: a reseed's or a resident's).
+		p += "\n\n" + threadAppend
+	}
+	return p
 }
 
 // wsLaunch is what a workspace thread's spawn adds to claude's.

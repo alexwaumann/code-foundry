@@ -24,6 +24,8 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
+ *   POST /__mock/resident                         (the resident thread s-resident-ember, "Ember": kind
+ *        RESIDENT, epoch 2, stopped; hidden from the sidebar and counts; World.addResident)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, one shown by its override (s-l-logs), and a child of
  *        its own; the others hidden while threads.show_created_threads is off; World.addLineage)
@@ -1056,6 +1058,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/lineage":
       json(res, 200, world.addLineage());
+      break;
+    case "POST /__mock/resident":
+      json(res, 200, { id: world.addResident() });
       break;
     case "POST /__mock/empty":
       world.empty();

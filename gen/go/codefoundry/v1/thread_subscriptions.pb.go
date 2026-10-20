@@ -9,6 +9,7 @@ package codefoundryv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -40,6 +41,12 @@ const (
 	// events). The plugin fires it; disabling or uninstalling the plugin, or an update
 	// that drops the source, sends a last "source gone" wake and removes it.
 	ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN ThreadSubscriptionTarget = 4
+	// A timer (target_id is "at:<RFC 3339 UTC>" or "every:<duration>", e.g. "every:30m"):
+	// fires once at a time, or repeatedly at an interval until unsubscribed. Never fires
+	// at subscribe time. Persisted: a time that passed while the daemon was stopped fires
+	// once when it starts (within the timer check, about 10 s), and an interval resumes its
+	// schedule (one catch-up wake for the slots it missed).
+	ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER ThreadSubscriptionTarget = 5
 )
 
 // Enum value maps for ThreadSubscriptionTarget.
@@ -50,6 +57,7 @@ var (
 		2: "THREAD_SUBSCRIPTION_TARGET_ACTION_RUN",
 		3: "THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST",
 		4: "THREAD_SUBSCRIPTION_TARGET_PLUGIN",
+		5: "THREAD_SUBSCRIPTION_TARGET_TIMER",
 	}
 	ThreadSubscriptionTarget_value = map[string]int32{
 		"THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED":  0,
@@ -57,6 +65,7 @@ var (
 		"THREAD_SUBSCRIPTION_TARGET_ACTION_RUN":   2,
 		"THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST": 3,
 		"THREAD_SUBSCRIPTION_TARGET_PLUGIN":       4,
+		"THREAD_SUBSCRIPTION_TARGET_TIMER":        5,
 	}
 )
 
@@ -133,7 +142,7 @@ const (
 	// Any change the poll reports; the wake lists them.
 	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHANGED ThreadSubscriptionCondition = 16
 	// A plugin target's only condition: the plugin fired the source with a match that
-	// covers the subscription's args.
+	// covers the subscription's args. Also a timer's only condition: its time came.
 	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED ThreadSubscriptionCondition = 20
 )
 
@@ -225,14 +234,15 @@ type ThreadSubscription struct {
 	// Unset until it fired.
 	LastFiredAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_fired_at,json=lastFiredAt,proto3" json:"last_fired_at,omitempty"`
 	// The subscriber's and the target's names at read time (a run: its action's name; a
-	// pull request: "owner/name#123 Title"); empty when unnamed or gone.
+	// pull request: "owner/name#123 Title"; a timer: "every 30m" or "at 09:00", local
+	// time, with the date when not today); empty when unnamed or gone.
 	SubscriberName string `protobuf:"bytes,10,opt,name=subscriber_name,json=subscriberName,proto3" json:"subscriber_name,omitempty"`
 	TargetName     string `protobuf:"bytes,11,opt,name=target_name,json=targetName,proto3" json:"target_name,omitempty"`
 	// The target's state at read time, as words: a thread's status and reason
 	// ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
 	// "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
-	// before the GitHub poll saw it), a plugin's state ("running", "disabled"); "gone"
-	// when the target no longer exists.
+	// before the GitHub poll saw it), a plugin's state ("running", "disabled"), a timer's
+	// next fire ("next 09:30", "due"); "gone" when the target no longer exists.
 	TargetStatus string `protobuf:"bytes,12,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"`
 	// A plugin target's args: given, defaulted or taken from the subscriber's context.
 	Args          map[string]string `protobuf:"bytes,20,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -365,19 +375,24 @@ type SubscribeThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The subscriber thread.
 	SubscriberThreadId string `protobuf:"bytes,1,opt,name=subscriber_thread_id,json=subscriberThreadId,proto3" json:"subscriber_thread_id,omitempty"`
-	// Exactly one target: a thread id, an action run id, a pull request, or a plugin's
-	// wake source ("<plugin>/<source>").
+	// Exactly one target: a thread id, an action run id, a pull request, a plugin's
+	// wake source ("<plugin>/<source>"), or a timer (target_at or target_every).
 	TargetThreadId string `protobuf:"bytes,2,opt,name=target_thread_id,json=targetThreadId,proto3" json:"target_thread_id,omitempty"`
 	TargetRunId    string `protobuf:"bytes,3,opt,name=target_run_id,json=targetRunId,proto3" json:"target_run_id,omitempty"`
 	// "owner/name#123" or a github.com pull request URL.
 	TargetPullRequest string `protobuf:"bytes,6,opt,name=target_pull_request,json=targetPullRequest,proto3" json:"target_pull_request,omitempty"`
 	TargetPlugin      string `protobuf:"bytes,10,opt,name=target_plugin,json=targetPlugin,proto3" json:"target_plugin,omitempty"`
+	// A one-shot timer: fires once at this time (after now; INVALID_ARGUMENT otherwise).
+	TargetAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=target_at,json=targetAt,proto3" json:"target_at,omitempty"`
+	// A repeating timer: fires every interval (at least one minute) from now until
+	// unsubscribed; repeat is implied.
+	TargetEvery *durationpb.Duration `protobuf:"bytes,13,opt,name=target_every,json=targetEvery,proto3" json:"target_every,omitempty"`
 	// UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
-	// request, FIRED for a plugin. A run takes only FINISHED (or SETTLED); a thread SETTLED
-	// to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin only FIRED (or
-	// SETTLED) (INVALID_ARGUMENT otherwise).
+	// request, FIRED for a plugin or a timer. A run takes only FINISHED (or SETTLED); a
+	// thread SETTLED to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin and a
+	// timer only FIRED (or SETTLED) (INVALID_ARGUMENT otherwise).
 	Condition ThreadSubscriptionCondition `protobuf:"varint,4,opt,name=condition,proto3,enum=codefoundry.v1.ThreadSubscriptionCondition" json:"condition,omitempty"`
-	// Ignored for a run (fires once).
+	// Ignored for a run and a timer (target_at fires once, target_every repeats).
 	Repeat bool `protobuf:"varint,5,opt,name=repeat,proto3" json:"repeat,omitempty"`
 	// A plugin target's args, by the source's arg names. An arg with a context defaults
 	// to the subscriber's (its id, pull request or project); a required one without a
@@ -450,6 +465,20 @@ func (x *SubscribeThreadRequest) GetTargetPlugin() string {
 		return x.TargetPlugin
 	}
 	return ""
+}
+
+func (x *SubscribeThreadRequest) GetTargetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TargetAt
+	}
+	return nil
+}
+
+func (x *SubscribeThreadRequest) GetTargetEvery() *durationpb.Duration {
+	if x != nil {
+		return x.TargetEvery
+	}
+	return nil
 }
 
 func (x *SubscribeThreadRequest) GetCondition() ThreadSubscriptionCondition {
@@ -547,7 +576,9 @@ type UnsubscribeThreadRequest struct {
 	TargetRunId        string `protobuf:"bytes,4,opt,name=target_run_id,json=targetRunId,proto3" json:"target_run_id,omitempty"`
 	TargetPullRequest  string `protobuf:"bytes,5,opt,name=target_pull_request,json=targetPullRequest,proto3" json:"target_pull_request,omitempty"`
 	// "<plugin>/<source>": every subscription of the subscriber to it, whatever its args.
-	TargetPlugin  string `protobuf:"bytes,10,opt,name=target_plugin,json=targetPlugin,proto3" json:"target_plugin,omitempty"`
+	TargetPlugin string `protobuf:"bytes,10,opt,name=target_plugin,json=targetPlugin,proto3" json:"target_plugin,omitempty"`
+	// Every timer subscription of the subscriber.
+	TargetTimer   bool `protobuf:"varint,11,opt,name=target_timer,json=targetTimer,proto3" json:"target_timer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -622,6 +653,13 @@ func (x *UnsubscribeThreadRequest) GetTargetPlugin() string {
 		return x.TargetPlugin
 	}
 	return ""
+}
+
+func (x *UnsubscribeThreadRequest) GetTargetTimer() bool {
+	if x != nil {
+		return x.TargetTimer
+	}
+	return false
 }
 
 type UnsubscribeThreadResponse struct {
@@ -762,7 +800,7 @@ var File_codefoundry_v1_thread_subscriptions_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\n" +
-	")codefoundry/v1/thread_subscriptions.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x05\n" +
+	")codefoundry/v1/thread_subscriptions.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x05\n" +
 	"\x12ThreadSubscription\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
 	"\x14subscriber_thread_id\x18\x02 \x01(\tR\x12subscriberThreadId\x12@\n" +
@@ -783,14 +821,16 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\x04args\x18\x14 \x03(\v2,.codefoundry.v1.ThreadSubscription.ArgsEntryR\x04args\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcf\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc6\x04\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
 	"\rtarget_run_id\x18\x03 \x01(\tR\vtargetRunId\x12.\n" +
 	"\x13target_pull_request\x18\x06 \x01(\tR\x11targetPullRequest\x12#\n" +
 	"\rtarget_plugin\x18\n" +
-	" \x01(\tR\ftargetPlugin\x12I\n" +
+	" \x01(\tR\ftargetPlugin\x127\n" +
+	"\ttarget_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\btargetAt\x12<\n" +
+	"\ftarget_every\x18\r \x01(\v2\x19.google.protobuf.DurationR\vtargetEvery\x12I\n" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\x12D\n" +
 	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x1a7\n" +
@@ -800,7 +840,7 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\x17SubscribeThreadResponse\x12F\n" +
 	"\fsubscription\x18\x01 \x01(\v2\".codefoundry.v1.ThreadSubscriptionR\fsubscription\x12\x14\n" +
 	"\x05fired\x18\x02 \x01(\bR\x05fired\x12\x18\n" +
-	"\aexisted\x18\x03 \x01(\bR\aexisted\"\x98\x02\n" +
+	"\aexisted\x18\x03 \x01(\bR\aexisted\"\xbb\x02\n" +
 	"\x18UnsubscribeThreadRequest\x12'\n" +
 	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\x120\n" +
 	"\x14subscriber_thread_id\x18\x02 \x01(\tR\x12subscriberThreadId\x12(\n" +
@@ -808,19 +848,21 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\rtarget_run_id\x18\x04 \x01(\tR\vtargetRunId\x12.\n" +
 	"\x13target_pull_request\x18\x05 \x01(\tR\x11targetPullRequest\x12#\n" +
 	"\rtarget_plugin\x18\n" +
-	" \x01(\tR\ftargetPlugin\"Y\n" +
+	" \x01(\tR\ftargetPlugin\x12!\n" +
+	"\ftarget_timer\x18\v \x01(\bR\vtargetTimer\"Y\n" +
 	"\x19UnsubscribeThreadResponse\x12<\n" +
 	"\aremoved\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\aremoved\"R\n" +
 	"\x1eListThreadSubscriptionsRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\"k\n" +
 	"\x1fListThreadSubscriptionsResponse\x12H\n" +
-	"\rsubscriptions\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\rsubscriptions*\xec\x01\n" +
+	"\rsubscriptions\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\rsubscriptions*\x92\x02\n" +
 	"\x18ThreadSubscriptionTarget\x12*\n" +
 	"&THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED\x10\x00\x12%\n" +
 	"!THREAD_SUBSCRIPTION_TARGET_THREAD\x10\x01\x12)\n" +
 	"%THREAD_SUBSCRIPTION_TARGET_ACTION_RUN\x10\x02\x12+\n" +
 	"'THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST\x10\x03\x12%\n" +
-	"!THREAD_SUBSCRIPTION_TARGET_PLUGIN\x10\x04*\xc2\x06\n" +
+	"!THREAD_SUBSCRIPTION_TARGET_PLUGIN\x10\x04\x12$\n" +
+	" THREAD_SUBSCRIPTION_TARGET_TIMER\x10\x05*\xc2\x06\n" +
 	"\x1bThreadSubscriptionCondition\x12-\n" +
 	")THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED\x10\x00\x12)\n" +
 	"%THREAD_SUBSCRIPTION_CONDITION_SETTLED\x10\x01\x12&\n" +
@@ -870,6 +912,7 @@ var file_codefoundry_v1_thread_subscriptions_proto_goTypes = []any{
 	nil,                                     // 9: codefoundry.v1.ThreadSubscription.ArgsEntry
 	nil,                                     // 10: codefoundry.v1.SubscribeThreadRequest.ArgsEntry
 	(*timestamppb.Timestamp)(nil),           // 11: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),             // 12: google.protobuf.Duration
 }
 var file_codefoundry_v1_thread_subscriptions_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.ThreadSubscription.target:type_name -> codefoundry.v1.ThreadSubscriptionTarget
@@ -877,16 +920,18 @@ var file_codefoundry_v1_thread_subscriptions_proto_depIdxs = []int32{
 	11, // 2: codefoundry.v1.ThreadSubscription.created_at:type_name -> google.protobuf.Timestamp
 	11, // 3: codefoundry.v1.ThreadSubscription.last_fired_at:type_name -> google.protobuf.Timestamp
 	9,  // 4: codefoundry.v1.ThreadSubscription.args:type_name -> codefoundry.v1.ThreadSubscription.ArgsEntry
-	1,  // 5: codefoundry.v1.SubscribeThreadRequest.condition:type_name -> codefoundry.v1.ThreadSubscriptionCondition
-	10, // 6: codefoundry.v1.SubscribeThreadRequest.args:type_name -> codefoundry.v1.SubscribeThreadRequest.ArgsEntry
-	2,  // 7: codefoundry.v1.SubscribeThreadResponse.subscription:type_name -> codefoundry.v1.ThreadSubscription
-	2,  // 8: codefoundry.v1.UnsubscribeThreadResponse.removed:type_name -> codefoundry.v1.ThreadSubscription
-	2,  // 9: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	11, // 5: codefoundry.v1.SubscribeThreadRequest.target_at:type_name -> google.protobuf.Timestamp
+	12, // 6: codefoundry.v1.SubscribeThreadRequest.target_every:type_name -> google.protobuf.Duration
+	1,  // 7: codefoundry.v1.SubscribeThreadRequest.condition:type_name -> codefoundry.v1.ThreadSubscriptionCondition
+	10, // 8: codefoundry.v1.SubscribeThreadRequest.args:type_name -> codefoundry.v1.SubscribeThreadRequest.ArgsEntry
+	2,  // 9: codefoundry.v1.SubscribeThreadResponse.subscription:type_name -> codefoundry.v1.ThreadSubscription
+	2,  // 10: codefoundry.v1.UnsubscribeThreadResponse.removed:type_name -> codefoundry.v1.ThreadSubscription
+	2,  // 11: codefoundry.v1.ListThreadSubscriptionsResponse.subscriptions:type_name -> codefoundry.v1.ThreadSubscription
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_subscriptions_proto_init() }

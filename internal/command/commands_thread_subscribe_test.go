@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -42,6 +43,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			TargetId: "acme/web#7", TargetName: "acme/web#7 Retry", Condition: review, Repeat: true, TargetStatus: "open · checks pending (2/4)"},
 		{Id: "sub-5", SubscriberThreadId: "s-other", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN,
 			TargetId: "hello/tick", TargetName: "Hello: Tick", Condition: fired, Args: map[string]string{"every": "2s", "a": "b"}, TargetStatus: "running"},
+		{Id: "sub-6", SubscriberThreadId: "s-timed", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
+			TargetId: "every:30m", TargetName: "every 30m", Condition: fired, Repeat: true, FiredCount: 1, TargetStatus: "next 10:30 CDT"},
+		{Id: "sub-7", SubscriberThreadId: "s-timed", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
+			TargetId: "at:2026-10-20T19:00:00.000Z", TargetName: "at 14:00 CDT", Condition: fired, TargetStatus: "next 14:00 CDT"},
 	}
 	tests := []struct {
 		name           string
@@ -106,6 +111,22 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "args without a plugin", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "arg": "every=1s"}, wantErr: command.ErrInvalidArgs},
 		{name: "a plugin until idle", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "until": "idle"}, wantErr: command.ErrInvalidArgs},
 		{name: "a plugin and a thread", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer every 30m", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "30m"},
+			wantMsg:  "subscribed sub-1: s-me wakes every 30m (repeat)",
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(30 * time.Minute), Condition: unset}}},
+		{name: "a timer at a time", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2099-10-20T14:00:00-05:00"},
+			wantMsg: "subscribed sub-1: s-me wakes at 2099-10-20T19:00:00Z (once)",
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me",
+				TargetAt: timestamppb.New(time.Date(2099, 10, 20, 19, 0, 0, 0, time.UTC)), Condition: unset}}},
+		{name: "a timer in two hours", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2h"}},
+		{name: "a timer until settled", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "1h", "until": "settled"},
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(time.Hour), Condition: unset}}},
+		{name: "a timer under a minute", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "30s"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer at nonsense", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "tomorrow"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer at a past duration", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "-5m"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer at and every", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "5m", "every": "5m"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer and a thread", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "5m", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
+		{name: "a timer until idle", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "5m", "until": "idle"}, wantErr: command.ErrInvalidArgs},
 
 		{name: "unsubscribe by id", cmd: "thread.unsubscribe", args: map[string]string{"subscription": "sub-2"},
 			wantMsg:  "removed sub-2: s-me wakes when run r-1 finishes (once)",
@@ -121,6 +142,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "unsubscribe from a plugin's wake source", cmd: "thread.unsubscribe", args: map[string]string{"id": "s-other", "plugin": "hello/tick"},
 			wantMsg:  "removed sub-5: s-other wakes when plugin hello/tick fires (a=b every=2s) (once)",
 			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-other", TargetPlugin: "hello/tick"}}},
+		{name: "unsubscribe the timers", cmd: "thread.unsubscribe", args: map[string]string{"id": "s-timed", "timers": "true"},
+			wantMsg:  "removed sub-6: s-timed wakes every 30m (repeat)\nremoved sub-7: s-timed wakes at 2026-10-20T19:00:00Z (once)",
+			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-timed", TargetTimer: true}}},
+		{name: "unsubscribe timers and a thread", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"timers": "true", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe nothing", cmd: "thread.unsubscribe", ctx: inThread, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe an id and a pull request", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"subscription": "sub-4", "pr": "acme/web#7"}, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe both", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"subscription": "sub-1", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
@@ -139,6 +164,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantMsg: "ID     SUBSCRIBER  TARGET                                        UNTIL      REPEAT  FIRED  LAST FIRED  TARGET STATUS\n" +
 				"sub-3  s-other     thread s-me                                   attention  no      0      -           busy (working)\n" +
 				"sub-5  s-other     plugin hello/tick a=b every=2s (Hello: Tick)  fired      no      0      -           running"},
+		{name: "list timers", cmd: "thread.subscriptions", args: map[string]string{"id": "s-timed"},
+			wantMsg: "ID     SUBSCRIBER  TARGET              UNTIL  REPEAT  FIRED  LAST FIRED  TARGET STATUS\n" +
+				"sub-6  s-timed     timer every 30m     fired  yes     1      -           next 10:30 CDT\n" +
+				"sub-7  s-timed     timer at 14:00 CDT  fired  no      0      -           next 14:00 CDT"},
 		{name: "list none", cmd: "thread.subscriptions", args: map[string]string{"id": "s-none"}, wantMsg: "thread s-none has no wake subscriptions"},
 		{name: "list needs a thread", cmd: "thread.subscriptions", wantErr: command.ErrInvalidArgs},
 

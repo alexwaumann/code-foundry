@@ -204,6 +204,18 @@ Services (v1):
   activity and report; `docs/notes/agents-1-daemon.md`).
   See `docs/notes/rendered-threads-1-daemon.md`
   and `docs/notes/rendered-threads-3-interaction.md`.
+* `ThreadService` — the primitives of the resident agent (`docs/notes/ember-1-primitives.md`).
+  Reseed gives a thread a fresh Claude session with a seed: its next process starts a
+  new conversation (no `--resume`) with a system prompt append and add-dirs that every
+  later spawn passes, and the first message of that session starts with a prefix
+  (`UserMessageItem.seed_prefix`); the items stay, `Thread.epoch` goes up, an idle
+  process stops at once and a working one when its turn ends (`reseed_pending`).
+  Resident threads (`Thread.kind` RESIDENT, `resident_name`) are the daemon's own agent
+  threads, made only by the store's `EnsureResident`: no project, never auto-named,
+  never archived, snoozed, removed or forked, left out of a filtered List unless
+  `include_resident`, kept out of the user's lists by the GUI. Wake subscriptions also
+  take a timer target (`target_at` once, `target_every` repeating; wall clock, persisted,
+  one catch-up wake after a stop; `thread subscribe --at/--every`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
   the exit, remove; shells only).

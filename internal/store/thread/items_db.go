@@ -18,6 +18,7 @@ type itemData struct {
 	WakeTitle     string      `json:"wake_title,omitempty"`
 	WakeJSON      string      `json:"wake_json,omitempty"`
 	ResumeNote    string      `json:"resume_note,omitempty"`
+	SeedPrefix    string      `json:"seed_prefix,omitempty"`
 	NoteCreatedBy string      `json:"note_created_by,omitempty"`
 	Queued        bool        `json:"queued,omitempty"`
 	PlacedAfter   int64       `json:"placed_after,omitempty"`
@@ -53,7 +54,7 @@ func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item) e
 // saveItem inserts or rewrites one item. Streaming items are never saved.
 func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
-		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, ResumeNote: it.ResumeNote,
+		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix,
 		NoteCreatedBy: it.NoteCreatedBy, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
@@ -95,7 +96,7 @@ func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error)
 		it.Kind, it.CreatedAt, it.UpdatedAt = ItemKind(kind), fromMillis(created), fromMillis(updated)
 		it.ComposerText = d.Composer
 		it.Origin, it.WakeTitle, it.WakeJSON = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON
-		it.NoteCreatedBy, it.ResumeNote = d.NoteCreatedBy, d.ResumeNote
+		it.NoteCreatedBy, it.ResumeNote, it.SeedPrefix = d.NoteCreatedBy, d.ResumeNote, d.SeedPrefix
 		it.Queued, it.PlacedAfter = d.Queued, d.PlacedAfter
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 		out = append(out, it)

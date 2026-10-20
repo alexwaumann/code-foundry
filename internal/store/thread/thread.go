@@ -282,6 +282,24 @@ type Thread struct {
 	// restart and the process's end. Not persisted.
 	PluginEnvStale  bool
 	PluginEnvChange string
+	// Kind is KindResident for a resident thread (resident.go), whose ResidentName names
+	// it ("ember"). Persisted; set once.
+	Kind         ThreadKind
+	ResidentName string
+	// Epoch counts the thread's Claude sessions: 1, plus one per Reseed (reseed.go).
+	// Persisted.
+	Epoch int
+	// SystemPromptAppend is appended to Claude's system prompt on every spawn (after the
+	// app's line and a workspace's); set by Reseed and EnsureResident. Persisted.
+	SystemPromptAppend string
+	// FreshStart: the next spawn starts a new conversation instead of resuming (Reseed);
+	// cleared by that spawn. SeedPrefix is prepended to the first message of a fresh
+	// conversation and cleared once it went out. Both persisted.
+	FreshStart bool
+	SeedPrefix string
+	// ReseedPending: a Reseed waits for the running turn and background work to end
+	// before Claude stops (reseed.go). Never set on a stopped thread. Not persisted.
+	ReseedPending bool
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
@@ -576,4 +594,16 @@ type Store interface {
 	Unsubscribe(ctx context.Context, o UnsubscribeOptions) ([]Subscription, error)
 	// Subscriptions lists a subscriber's subscriptions, or every thread's ("").
 	Subscriptions(ctx context.Context, subscriber string) ([]Subscription, error)
+
+	// Resident threads and reseeds (resident.go, reseed.go; docs/notes/ember-1-primitives.md).
+
+	// EnsureResident returns the resident thread named name, making it (stopped) when
+	// there is none; created says whether it did.
+	EnsureResident(ctx context.Context, name string, o ResidentOptions) (t Thread, created bool, err error)
+	// Reseed gives a thread a fresh Claude session with a seed (reseed.go): its next
+	// process starts a new conversation with o's system prompt append and add-dirs (they
+	// replace the thread's) and o.Prefix before its first message. Epoch goes up by one.
+	// A running Claude stops at once when idle (stopped), else once its turn ends
+	// (ReseedPending); a stopped thread only records it.
+	Reseed(ctx context.Context, id string, o ReseedOptions) (t Thread, stopped bool, err error)
 }

@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
-import { PermissionMode, ThreadFlagLevel, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, ThreadFlagLevel, ThreadKind, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -146,6 +146,13 @@ interface MockThread {
   flags: MockFlag[];
   /** "plugin:<name>" for a plugin's own thread (hidden from the user's lists); "" for the user's. */
   owner: string;
+  /**
+   * A resident thread's name (Thread.kind RESIDENT, resident_name; POST /__mock/resident):
+   * the daemon's own agent thread, hidden from the user's lists; "" for any other.
+   */
+  resident: string;
+  /** Thread.epoch: its session count, 1 until a reseed. */
+  epoch: number;
   /**
    * Thread.plugin_env_change while plugin_env_stale (POST /__mock/thread/envstale): a plugin's
    * session environment changed since the running process started; "" when current.
@@ -1014,6 +1021,24 @@ export class World {
   }
 
   /**
+   * Scenario: the resident thread "ember" (docs/notes/ember-1-primitives.md): the daemon's
+   * own agent, stopped, in its own directory, in its second epoch, with no project. Kept
+   * out of the sidebar and the counts like a plugin's thread. POST /__mock/resident.
+   * Idempotent; returns its id.
+   */
+  addResident(): string {
+    const id = "s-resident-ember";
+    if (!this.threads.has(id)) {
+      const ago = (min: number) => new Date(Date.now() - min * 60_000);
+      const s = this.addThread({ id, projectId: "", worktreePath: `${HOME}/.code-foundry/residents/ember`, name: "Ember", model: "claude-opus-4-8[1m]", effort: "high",
+        state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(4), createdAt: ago(600),
+        lastActivityAt: ago(4), resident: "ember", epoch: 2, held: true });
+      this.publishThread(s);
+    }
+    return id;
+  }
+
+  /**
    * Scenario: thread lineage (docs/notes/agents-3-lineage-gui.md). "Fix login redirect"
    * (working) created "Add retry to login redirect" (finished; its log starts with the
    * daemon's "Created by" note) and six siblings of it, one archived, so the Threads tab
@@ -1236,6 +1261,8 @@ export class World {
       held: false,
       flags: [],
       owner: "",
+      resident: "",
+      epoch: 1,
       pluginEnvChange: "",
       ...o,
       state,
@@ -1276,6 +1303,8 @@ export class World {
       pinned: s.pinned,
       flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.owner ? { owner: s.owner } : {}),
+      ...(s.resident ? { kind: ThreadKind.RESIDENT, residentName: s.resident } : {}),
+      epoch: s.epoch,
       ...(s.pluginEnvChange ? { pluginEnvStale: true, pluginEnvChange: s.pluginEnvChange } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),

@@ -38,6 +38,9 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Threa
 		}
 		return rec.s, nil
 	}
+	if err := m.refuseResident(id, "snoozed"); err != nil {
+		return Thread{}, err
+	}
 	// Wall clock only (see wakeSnoozed); persisted at millisecond precision.
 	until = until.Round(0).Truncate(time.Millisecond)
 	if !until.After(m.opts.Now()) {

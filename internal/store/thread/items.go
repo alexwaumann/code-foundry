@@ -130,6 +130,9 @@ type Item struct {
 	// ResumeNote: user_message's resume note, the line Claude got before the text after
 	// something other than the user stopped its previous turn (resumenote.go).
 	ResumeNote string
+	// SeedPrefix: user_message's seed prefix, what Claude got before the text (and the
+	// resume note) as the first message of a fresh session a reseed asked for (reseed.go).
+	SeedPrefix string
 	// Queued: a user_message Claude has but has not read yet. A message sent while a turn
 	// runs waits in Claude Code's queue until its next tool call (or the end of the reply);
 	// the item is in the log from its arrival so the send shows at once (queued.go).

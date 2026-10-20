@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
@@ -20,8 +22,9 @@ import (
 // (default: the one this runs in) a wake message when another thread settles (or is
 // idle, needs attention, has an error, is disconnected), an action run finishes, a pull
 // request's checks finish, it gets a review or comment, is pushed, merged or closed, or a
-// plugin fires one of its wake sources (--plugin <plugin>/<source> with --arg k=v), so
-// an agent that started other threads or opened a pull request is woken instead of
+// plugin fires one of its wake sources (--plugin <plugin>/<source> with --arg k=v), or
+// at a time or every interval (--at, --every; docs/notes/ember-1-primitives.md), so an
+// agent that started other threads or opened a pull request is woken instead of
 // polling.
 // thread.unsubscribe and thread.subscriptions manage them. thread.new --notify
 // subscribes the creator to the new thread (commands_thread_lifecycle.go).
@@ -89,9 +92,12 @@ func conditionName(c v1.ThreadSubscriptionCondition) string {
 	return "settled"
 }
 
-// subscriptionTarget is "thread s-1", "run r-1", "pr acme/web#7" or "plugin hello/tick".
+// subscriptionTarget is "thread s-1", "run r-1", "pr acme/web#7", "plugin hello/tick" or
+// "timer every 30m".
 func subscriptionTarget(s *v1.ThreadSubscription) string {
 	switch s.GetTarget() {
+	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER:
+		return "timer " + cmp.Or(s.GetTargetName(), strings.Replace(s.GetTargetId(), ":", " ", 1))
 	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN:
 		return "run " + s.GetTargetId()
 	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST:
@@ -168,23 +174,81 @@ func subscriptionLine(s *v1.ThreadSubscription) string {
 	if v, ok := pullRequestVerbs[s.GetCondition()]; ok {
 		verb = v
 	}
+	if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER {
+		return s.GetId() + ": " + s.GetSubscriberThreadId() + " wakes " + timerWhen(s) + " (" + how + ")"
+	}
 	return s.GetId() + ": " + s.GetSubscriberThreadId() + " wakes when " + subscriptionTarget(s) + " " + verb + " (" + how + ")"
 }
 
-// subscribeTargetArgs reads exactly one of thread, run, pr and plugin.
-func subscribeTargetArgs(a Args) (thread, run, pr, plugin string, err error) {
+// timerWhen is a timer subscription's schedule: "every 30m" or "at 2026-10-20T14:00:00Z"
+// (UTC like every other command).
+func timerWhen(s *v1.ThreadSubscription) string {
+	kind, v, _ := strings.Cut(s.GetTargetId(), ":")
+	if kind == "at" {
+		if t, err := time.Parse(time.RFC3339Nano, v); err == nil {
+			v = t.UTC().Format(time.RFC3339)
+		}
+	}
+	return kind + " " + v
+}
+
+// parseTimerAt reads thread.subscribe's --at: an RFC 3339 time, or a duration from now
+// ("30m", "2h").
+func parseTimerAt(raw string, now time.Time) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return time.Time{}, InvalidArg("at", "%q is neither an RFC 3339 time (2026-10-20T09:00:00-05:00) nor a duration from now (30m, 2h)", raw)
+	}
+	return now.Add(d), nil
+}
+
+// parseTimerEvery reads thread.subscribe's --every: a duration of at least a minute.
+func parseTimerEvery(raw string) (time.Duration, error) {
+	d, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil || d < time.Minute {
+		return 0, InvalidArg("every", "%q is not a duration of at least 1m (30m, 2h)", raw)
+	}
+	return d, nil
+}
+
+// subscribeTargetArgs reads exactly one of thread, run, pr and plugin, or none of them
+// with timers (the count of the timer args given: at, every; unsubscribe's timers).
+func subscribeTargetArgs(a Args, timers int) (thread, run, pr, plugin string, err error) {
 	thread, run, pr = strings.TrimSpace(a.String("thread")), strings.TrimSpace(a.String("run")), strings.TrimSpace(a.String("pr"))
 	plugin = strings.TrimSpace(a.String("plugin"))
-	n := 0
+	n := timers
 	for _, t := range []string{thread, run, pr, plugin} {
 		if t != "" {
 			n++
 		}
 	}
 	if n != 1 {
-		return "", "", "", "", InvalidArg("thread", "give exactly one target: thread (a thread id), run (an action run id), pr (owner/name#123 or a pull request URL) or plugin (<plugin>/<source>; code-foundry plugin wakes lists them)")
+		return "", "", "", "", InvalidArg("thread", "give exactly one target: thread (a thread id), run (an action run id), pr (owner/name#123 or a pull request URL), plugin (<plugin>/<source>; code-foundry plugin wakes lists them), or a timer (at or every)")
 	}
 	return thread, run, pr, plugin, nil
+}
+
+// countSet counts the String args of names that are not empty.
+func countSet(a Args, names ...string) int {
+	n := 0
+	for _, name := range names {
+		if strings.TrimSpace(a.String(name)) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// boolCount is 1 for true.
+func boolCount(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func threadSubscribe(b ThreadBackend) Command {
@@ -192,7 +256,7 @@ func threadSubscribe(b ThreadBackend) Command {
 		Name:  "thread.subscribe",
 		Title: "Subscribe Thread to Wakes",
 		Description: "Wake a thread with a message when another thread settles, " +
-			"an action run finishes, a pull request's checks finish, or a plugin wake fires (plugin wakes). " +
+			"an action run finishes, a pull request's checks finish, a plugin wake fires (plugin wakes), or at a time or every interval (at, every). " +
 			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
 		Category:     "Thread",
 		NoKeybinding: true,
@@ -204,15 +268,33 @@ func threadSubscribe(b ThreadBackend) Command {
 			{Name: "plugin", Type: String, Description: "Target wake source, <plugin>/<source> (code-foundry plugin wakes lists them)"},
 			{Name: "arg", Type: String, Repeatable: true, Description: "A wake source's arg as name=value; " +
 				"args with a context default to this thread's (its id, pull request, project)"},
+			{Name: "at", Type: String, Description: "A timer: wake once at this time, RFC 3339 (2026-10-20T09:00:00-05:00) or a duration from now (30m, 2h)"},
+			{Name: "every", Type: String, Description: "A timer: wake every interval (at least 1m: 30m, 2h) until unsubscribed; repeat is implied"},
 			{Name: "until", Type: Enum, Enum: SubscriptionConditions,
 				Description: "Default: settled for a thread, finished for a run, checks_done for a pull request"},
 			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition, not once"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			thread, run, pr, plugin, err := subscribeTargetArgs(a)
+			thread, run, pr, plugin, err := subscribeTargetArgs(a, countSet(a, "at", "every"))
 			if err != nil {
 				return Result{}, err
+			}
+			var at *timestamppb.Timestamp
+			var every *durationpb.Duration
+			if raw := a.String("at"); raw != "" {
+				t, err := parseTimerAt(raw, time.Now())
+				if err != nil {
+					return Result{}, err
+				}
+				at = timestamppb.New(t)
+			}
+			if raw := a.String("every"); raw != "" {
+				d, err := parseTimerEvery(raw)
+				if err != nil {
+					return Result{}, err
+				}
+				every = durationpb.New(d)
 			}
 			args, err := parseWakeArgs(a.String("arg"))
 			if err != nil {
@@ -229,16 +311,18 @@ func threadSubscribe(b ThreadBackend) Command {
 				return Result{}, InvalidArg("until", "%s is not a pull request's condition; a pull request takes %s", until, strings.Join(pullRequestConditions, ", "))
 			case plugin != "" && until != "" && until != "settled":
 				return Result{}, InvalidArg("until", "a plugin's wake source fires when the plugin fires it; leave until out (not %s)", until)
+			case (at != nil || every != nil) && until != "" && until != "settled":
+				return Result{}, InvalidArg("until", "a timer fires at its time; leave until out (not %s)", until)
 			case plugin == "" && len(args) > 0:
 				return Result{}, InvalidArg("arg", "args are for a plugin's wake source (--plugin)")
 			}
 			cond := subscriptionConditions[until]
-			if plugin != "" {
+			if plugin != "" || at != nil || every != nil {
 				cond = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED
 			}
 			res, err := b.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{
 				SubscriberThreadId: a.String("id"), TargetThreadId: thread, TargetRunId: run, TargetPullRequest: pr,
-				TargetPlugin: plugin, Args: args, Condition: cond, Repeat: a.Bool("repeat"),
+				TargetPlugin: plugin, TargetAt: at, TargetEvery: every, Args: args, Condition: cond, Repeat: a.Bool("repeat"),
 			}))
 			if err != nil {
 				return Result{}, err
@@ -274,19 +358,21 @@ func threadUnsubscribe(b ThreadBackend) Command {
 			{Name: "run", Type: String, ID: RunID, Description: "Remove the subscriptions to this action run" + IDHelp},
 			{Name: "pr", Type: String, Description: "Remove the subscriptions to this pull request"},
 			{Name: "plugin", Type: String, Description: "Remove the subscriptions to this wake source, <plugin>/<source> (whatever their args)"},
+			{Name: "timers", Type: Bool, Description: "Remove every timer (at, every) of the thread"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			req := &v1.UnsubscribeThreadRequest{SubscriptionId: strings.TrimSpace(a.String("subscription"))}
 			if req.SubscriptionId == "" {
-				thread, run, pr, plugin, err := subscribeTargetArgs(a)
+				thread, run, pr, plugin, err := subscribeTargetArgs(a, boolCount(a.Bool("timers")))
 				if err != nil {
-					return Result{}, InvalidArg("subscription", "give a subscription id, or a target (thread, run, pr or plugin)")
+					return Result{}, InvalidArg("subscription", "give a subscription id, or a target (thread, run, pr, plugin or timers)")
 				}
 				if a.String("id") == "" {
 					return Result{}, InvalidArg("id", "give the subscribed thread's id with a target")
 				}
 				req.SubscriberThreadId, req.TargetThreadId, req.TargetRunId, req.TargetPullRequest, req.TargetPlugin = a.String("id"), thread, run, pr, plugin
-			} else if a.String("thread") != "" || a.String("run") != "" || a.String("pr") != "" || a.String("plugin") != "" {
+				req.TargetTimer = a.Bool("timers")
+			} else if a.String("thread") != "" || a.String("run") != "" || a.String("pr") != "" || a.String("plugin") != "" || a.Bool("timers") {
 				return Result{}, InvalidArg("subscription", "give a subscription id or a target, not both")
 			}
 			res, err := b.Unsubscribe(ctx, connect.NewRequest(req))
@@ -360,8 +446,11 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 			id += " " + args
 		}
 		target := strings.SplitN(subscriptionTarget(s), " ", 2)[0] + " " + named(id, s.GetTargetName())
-		if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST {
+		switch s.GetTarget() {
+		case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST:
 			target = "pr " + cmp.Or(s.GetTargetName(), s.GetTargetId()) // the name starts with the id
+		case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER:
+			target = subscriptionTarget(s) // "timer every 30m"
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), named(s.GetSubscriberThreadId(), s.GetSubscriberName()),
 			target,

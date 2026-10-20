@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -141,5 +143,34 @@ func TestThreadSubscriptionsPullRequest(t *testing.T) {
 	gone, err := c.Unsubscribe(ctx, connect.NewRequest(&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme/web#7"}))
 	if err != nil || len(gone.Msg.GetRemoved()) != 1 || gone.Msg.GetRemoved()[0].GetTargetId() != "acme/web#7" {
 		t.Errorf("Unsubscribe = %v, %v", gone, err)
+	}
+}
+
+func TestThreadSubscriptionsTimer(t *testing.T) {
+	fake, c := newThreadServer(t)
+	ctx := context.Background()
+	fake.Put(thread.Thread{ID: "s-p", Name: "Parent", State: thread.StateDisconnected, Status: thread.StatusIdle})
+	res, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetEvery: durationpb.New(30 * time.Minute)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetSubscription(); s.GetTarget() != v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER || s.GetTargetId() != "every:30m" ||
+		s.GetCondition() != v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED || !s.GetRepeat() {
+		t.Errorf("Subscribe every = %v", res.Msg)
+	}
+	at := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
+	res, err = c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetAt: timestamppb.New(at)}))
+	if err != nil || res.Msg.GetSubscription().GetTargetId() != "at:2099-01-02T03:04:05.000Z" || res.Msg.GetSubscription().GetRepeat() {
+		t.Errorf("Subscribe at = %v, %v", res.Msg, err)
+	}
+	if _, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetEvery: durationpb.New(time.Second)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("every second = %v", err)
+	}
+	gone, err := c.Unsubscribe(ctx, connect.NewRequest(&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-p", TargetTimer: true}))
+	if err != nil || len(gone.Msg.GetRemoved()) != 2 {
+		t.Errorf("Unsubscribe timers = %v, %v", gone, err)
+	}
+	if !slices.Contains(fake.Calls(), "Unsubscribe s-p timer") {
+		t.Errorf("calls = %q", fake.Calls())
 	}
 }

@@ -38,6 +38,11 @@ type runner struct {
 	pendingCd     *cdRequest
 	atPromptSince time.Time
 
+	// reseedPending: a reseed waits to stop the process (reseed.go). seed is the prefix
+	// of this fresh session's first message, until it went out (sendMessage).
+	reseedPending bool
+	seed          string
+
 	closing bool
 	// disconnectAs is the disconnect reason a close the daemon began itself records
 	// instead of ReasonClosed (ReasonIdle); empty for a Close.
@@ -380,6 +385,11 @@ func (r *runner) finish(fn func(*Thread)) {
 		s.BackgroundShellsRunning = 0
 		s.WakePending = false
 		s.PendingRequestID = "" // its requests ended with it
+		if s.ReseedPending {
+			// The reseed's stop (or any end meanwhile): the next start is fresh (reseed.go).
+			s.ReseedPending = false
+			s.resetContext()
+		}
 		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity

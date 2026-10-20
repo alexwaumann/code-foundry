@@ -310,6 +310,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.Flags = flagsToProto(s.Flags)               // thread_flags.go
 	p.Owner = s.Owner
 	p.PluginEnvStale, p.PluginEnvChange = s.PluginEnvStale, s.PluginEnvChange // thread_restart.go
+	residentToProto(s, p)                                                     // thread_reseed.go
 	return p
 }
 
@@ -376,7 +377,7 @@ func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
 		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
 		Project: f.GetProject(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
 		Owner: f.GetOwner(), Limit: int(f.GetLimit()), DescendantsOf: f.GetDescendantsOf(),
-		ArchiveCascadeOf: f.GetArchiveCascadeOf(),
+		ArchiveCascadeOf: f.GetArchiveCascadeOf(), IncludeResident: f.GetIncludeResident(),
 	}
 }
 

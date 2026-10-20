@@ -24,6 +24,18 @@ describe("owned threads", () => {
     expect(isOwned(mine)).toBe(false);
   });
 
+  // docs/notes/ember-1-primitives.md: a resident thread is kept out of every user list too.
+  it("keeps a resident thread out of order, attention and running counts", () => {
+    const ember = thread("s-ember", { createdAtMs: 4, resident: "ember", epoch: 2, status: "attention" });
+    const working = thread("s-ember-busy", { createdAtMs: 5, resident: "scout", status: "busy" });
+    const d = replaceThreads(emptyThreads, [mine, ember, working]);
+    expect(d.order).toEqual(["s-mine"]);
+    expect(d.owned).toEqual(["s-ember", "s-ember-busy"]);
+    expect(attentionIds(d, true)).toEqual([]);
+    expect(runningCount(d, true)).toBe(0);
+    expect(isOwned(ember)).toBe(true);
+  });
+
   it("follows updates and removals; the owned list is always set (the store merges results)", () => {
     let d = replaceThreads(emptyThreads, [mine]);
     expect(d.owned).toEqual([]);

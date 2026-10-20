@@ -288,5 +288,6 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadFlagClearCmd(b, idArg),
 		threadRestartCmd(b, idArg),
 		threadSidebarCmd(b, idArg),
+		threadReseedCmd(b, idArg),
 	)
 }

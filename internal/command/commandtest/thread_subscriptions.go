@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -12,7 +14,8 @@ import (
 
 // Subscribe echoes the request as subscription "sub-1" (condition unspecified becomes
 // settled for a thread, finished for a run, checks_done for a pull request, which is
-// kept as given, fired for a plugin, whose args it keeps), with Fired and Existed as set.
+// kept as given, fired for a plugin, whose args it keeps, and a timer, "at:<UTC>" or
+// "every:<interval>"), with Fired and Existed as set.
 func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -34,6 +37,14 @@ func (s *Thread) Subscribe(_ context.Context, r *connect.Request[v1.SubscribeThr
 		sub.Target, sub.TargetId, sub.Args = v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN, m.GetTargetPlugin(), m.GetArgs()
 		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED
 	}
+	if at := m.GetTargetAt(); at != nil {
+		sub.Target, sub.TargetId, sub.Repeat = v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER, "at:"+at.AsTime().UTC().Format(time.RFC3339), false
+		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED
+	}
+	if every := m.GetTargetEvery(); every != nil {
+		sub.Target, sub.TargetId, sub.Repeat = v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER, "every:"+strings.Replace(strings.Replace(every.AsDuration().String(), "m0s", "m", 1), "h0m", "h", 1), true
+		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED
+	}
 	if sub.Condition == v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED {
 		sub.Condition = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED
 	}
@@ -53,7 +64,8 @@ func (s *Thread) Unsubscribe(_ context.Context, r *connect.Request[v1.Unsubscrib
 	out := &v1.UnsubscribeThreadResponse{}
 	s.Subscriptions = slices.DeleteFunc(s.Subscriptions, func(sub *v1.ThreadSubscription) bool {
 		hit := sub.GetId() == m.GetSubscriptionId() || (m.GetSubscriptionId() == "" && sub.GetSubscriberThreadId() == m.GetSubscriberThreadId() &&
-			sub.GetTargetId() == m.GetTargetThreadId()+m.GetTargetRunId()+m.GetTargetPullRequest()+m.GetTargetPlugin())
+			(sub.GetTargetId() == m.GetTargetThreadId()+m.GetTargetRunId()+m.GetTargetPullRequest()+m.GetTargetPlugin() ||
+				(m.GetTargetTimer() && sub.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER)))
 		if hit {
 			out.Removed = append(out.Removed, sub)
 		}

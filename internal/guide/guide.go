@@ -63,6 +63,8 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("  `code-foundry thread send --id <id> \"...\" --wait` sends and returns once Claude has answered. Or end your")
 	p("  turn: a `[code-foundry wake]` message arrives when a thread you subscribed to (`--notify`, `thread subscribe`)")
 	p("  settles (wakes at once: one message; a lead's `progress` while workers run: none).")
+	p("- A timer wakes you on a schedule: `thread subscribe --every 30m` (at least 1m) or `--at 2h` (or an RFC 3339")
+	p("  time) sends a `Timer sub-… fired` wake; `thread unsubscribe --timers` ends them. Check on slow work this way.")
 	p("- `code-foundry thread read <id>` prints a thread's last items; `--since <nextSince>` (from `--json`) reads on.")
 	p("  `thread get <id>` has its status, brief, labels and report.")
 	p("- `thread list` leaves archived threads out (`--archived` or `--all` includes them; the other filters still apply)")

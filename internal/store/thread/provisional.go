@@ -18,15 +18,15 @@ import (
 // never uses it: the slug still waits on the namer (waitSlug).
 
 // namedForGood reports whether s has a name the namer must not replace: the user's,
-// the namer's, or a fork's.
+// the namer's, a fork's, or any resident thread's (resident.go: never auto-named).
 func (s *Thread) namedForGood() bool {
-	return s.Name != "" && !s.NameProvisional
+	return s.Kind == KindResident || (s.Name != "" && !s.NameProvisional)
 }
 
 // nameProvisionally gives an unnamed s the provisional name of its first prompt
 // (provisionalName); nothing when the prompt leaves none. Reports whether it did.
 func (s *Thread) nameProvisionally(composer, text string) bool {
-	if s.Name != "" {
+	if s.Name != "" || s.Kind == KindResident {
 		return false
 	}
 	if n := provisionalName(composer, text); n != "" {

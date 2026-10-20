@@ -107,6 +107,8 @@ const (
 	ThreadServiceSetEffortProcedure = "/codefoundry.v1.ThreadService/SetEffort"
 	// ThreadServiceRestartProcedure is the fully-qualified name of the ThreadService's Restart RPC.
 	ThreadServiceRestartProcedure = "/codefoundry.v1.ThreadService/Restart"
+	// ThreadServiceReseedProcedure is the fully-qualified name of the ThreadService's Reseed RPC.
+	ThreadServiceReseedProcedure = "/codefoundry.v1.ThreadService/Reseed"
 	// ThreadServiceMcpStatusProcedure is the fully-qualified name of the ThreadService's McpStatus RPC.
 	ThreadServiceMcpStatusProcedure = "/codefoundry.v1.ThreadService/McpStatus"
 	// ThreadServiceMcpReconnectProcedure is the fully-qualified name of the ThreadService's
@@ -268,6 +270,17 @@ type ThreadServiceClient interface {
 	// as it is (restarted false): its next message starts Claude with the current
 	// environment anyway. See docs/notes/plugins-env-restart.md.
 	Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error)
+	// Reseed gives a thread a fresh Claude session with a seed: its next process starts
+	// a new conversation (no --resume) with the request's system prompt append and
+	// add-dirs, which replace the thread's (empty clears them) and every later spawn uses,
+	// and the first message of that session starts with prefix (UserMessageItem.seed_prefix).
+	// The thread's items are kept; Thread.epoch goes up by one, context_tokens goes to 0.
+	// A thread idle at its prompt with nothing running stops at once; a working one stops
+	// once its turn and background work end (Thread.reseed_pending meanwhile); a stopped
+	// one only records it. What "allow for session" granted dies with the old process, as
+	// at any stop; the MCP status is kept until the new process reports. Any thread may be
+	// reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
+	Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -502,6 +515,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Restart")),
 			connect.WithClientOptions(opts...),
 		),
+		reseed: connect.NewClient[v1.ReseedThreadRequest, v1.ReseedThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceReseedProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Reseed")),
+			connect.WithClientOptions(opts...),
+		),
 		mcpStatus: connect.NewClient[v1.McpStatusRequest, v1.McpStatusResponse](
 			httpClient,
 			baseURL+ThreadServiceMcpStatusProcedure,
@@ -558,6 +577,7 @@ type threadServiceClient struct {
 	setPermissionMode *connect.Client[v1.SetThreadPermissionModeRequest, v1.SetThreadPermissionModeResponse]
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
 	restart           *connect.Client[v1.RestartThreadRequest, v1.RestartThreadResponse]
+	reseed            *connect.Client[v1.ReseedThreadRequest, v1.ReseedThreadResponse]
 	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
@@ -728,6 +748,11 @@ func (c *threadServiceClient) Restart(ctx context.Context, req *connect.Request[
 	return c.restart.CallUnary(ctx, req)
 }
 
+// Reseed calls codefoundry.v1.ThreadService.Reseed.
+func (c *threadServiceClient) Reseed(ctx context.Context, req *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error) {
+	return c.reseed.CallUnary(ctx, req)
+}
+
 // McpStatus calls codefoundry.v1.ThreadService.McpStatus.
 func (c *threadServiceClient) McpStatus(ctx context.Context, req *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {
 	return c.mcpStatus.CallUnary(ctx, req)
@@ -894,6 +919,17 @@ type ThreadServiceHandler interface {
 	// as it is (restarted false): its next message starts Claude with the current
 	// environment anyway. See docs/notes/plugins-env-restart.md.
 	Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error)
+	// Reseed gives a thread a fresh Claude session with a seed: its next process starts
+	// a new conversation (no --resume) with the request's system prompt append and
+	// add-dirs, which replace the thread's (empty clears them) and every later spawn uses,
+	// and the first message of that session starts with prefix (UserMessageItem.seed_prefix).
+	// The thread's items are kept; Thread.epoch goes up by one, context_tokens goes to 0.
+	// A thread idle at its prompt with nothing running stops at once; a working one stops
+	// once its turn and background work end (Thread.reseed_pending meanwhile); a stopped
+	// one only records it. What "allow for session" granted dies with the old process, as
+	// at any stop; the MCP status is kept until the new process reports. Any thread may be
+	// reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
+	Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -1124,6 +1160,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Restart")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceReseedHandler := connect.NewUnaryHandler(
+		ThreadServiceReseedProcedure,
+		svc.Reseed,
+		connect.WithSchema(threadServiceMethods.ByName("Reseed")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceMcpStatusHandler := connect.NewUnaryHandler(
 		ThreadServiceMcpStatusProcedure,
 		svc.McpStatus,
@@ -1210,6 +1252,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSetEffortHandler.ServeHTTP(w, r)
 		case ThreadServiceRestartProcedure:
 			threadServiceRestartHandler.ServeHTTP(w, r)
+		case ThreadServiceReseedProcedure:
+			threadServiceReseedHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpStatusProcedure:
 			threadServiceMcpStatusHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpReconnectProcedure:
@@ -1355,6 +1399,10 @@ func (UnimplementedThreadServiceHandler) SetEffort(context.Context, *connect.Req
 
 func (UnimplementedThreadServiceHandler) Restart(context.Context, *connect.Request[v1.RestartThreadRequest]) (*connect.Response[v1.RestartThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Restart is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Reseed is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {

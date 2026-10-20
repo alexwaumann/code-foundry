@@ -98,6 +98,9 @@ func (r *runner) setEffort(effort string) Thread {
 // end (wake.go), no send on its way. A user's restart (restart.go) only waits for the
 // prompt: it interrupts a running turn first and cuts background work off.
 func (r *runner) maybeRestart() {
+	if r.maybeReseed() { // a pending reseed stops the process instead (reseed.go)
+		return
+	}
 	st := r.st
 	if st.restart != restartNone || r.closing || r.finished || !st.initialized || st.first != nil {
 		return

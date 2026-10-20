@@ -4,15 +4,15 @@
 
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/thread_subscriptions.proto.
  */
 export const file_codefoundry_v1_thread_subscriptions: GenFile = /*@__PURE__*/
-  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEigQQKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAkSOgoEYXJncxgUIAMoCzIsLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbi5BcmdzRW50cnkaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi2AIKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEhsKE3RhcmdldF9wdWxsX3JlcXVlc3QYBiABKAkSFQoNdGFyZ2V0X3BsdWdpbhgKIAEoCRI+Cgljb25kaXRpb24YBCABKA4yKy5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25Db25kaXRpb24SDgoGcmVwZWF0GAUgASgIEj4KBGFyZ3MYCyADKAsyMC5jb2RlZm91bmRyeS52MS5TdWJzY3JpYmVUaHJlYWRSZXF1ZXN0LkFyZ3NFbnRyeRorCglBcmdzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJzChdTdWJzY3JpYmVUaHJlYWRSZXNwb25zZRI4CgxzdWJzY3JpcHRpb24YASABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24SDQoFZmlyZWQYAiABKAgSDwoHZXhpc3RlZBgDIAEoCCK2AQoYVW5zdWJzY3JpYmVUaHJlYWRSZXF1ZXN0EhcKD3N1YnNjcmlwdGlvbl9pZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRIYChB0YXJnZXRfdGhyZWFkX2lkGAMgASgJEhUKDXRhcmdldF9ydW5faWQYBCABKAkSGwoTdGFyZ2V0X3B1bGxfcmVxdWVzdBgFIAEoCRIVCg10YXJnZXRfcGx1Z2luGAogASgJIlAKGVVuc3Vic2NyaWJlVGhyZWFkUmVzcG9uc2USMwoHcmVtb3ZlZBgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbiI+Ch5MaXN0VGhyZWFkU3Vic2NyaXB0aW9uc1JlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkiXAofTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXNwb25zZRI5Cg1zdWJzY3JpcHRpb25zGAEgAygLMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uKuwBChhUaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSKgomVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVU5TUEVDSUZJRUQQABIlCiFUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9USFJFQUQQARIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9BQ1RJT05fUlVOEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfUFVMTF9SRVFVRVNUEAMSJQohVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfUExVR0lOEAQqwgYKG1RocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9VTlNQRUNJRklFRBAAEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1NFVFRMRUQQARImCiJUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9JRExFEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQVRURU5USU9OEAMSJwojVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRVJST1IQBBIuCipUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9ESVNDT05ORUNURUQQBRIqCiZUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9GSU5JU0hFRBAGEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19ET05FEAcSLworVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hFQ0tTX0ZBSUxFRBAIEi8KK1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19QQVNTRUQQCRIoCiRUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9SRVZJRVcQChIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DT01NRU5UEAsSMgouVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fUkVWSUVXX1JFUVVFU1RFRBAMEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0hFQURfUFVTSEVEEA0SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fTUVSR0VEEA4SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0xPU0VEEA8SKQolVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hBTkdFRBAQEicKI1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0ZJUkVEEBRC0AEKEmNvbS5jb2RlZm91bmRyeS52MUIYVGhyZWFkU3Vic2NyaXB0aW9uc1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEigQQKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAkSOgoEYXJncxgUIAMoCzIsLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbi5BcmdzRW50cnkaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiuAMKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEhsKE3RhcmdldF9wdWxsX3JlcXVlc3QYBiABKAkSFQoNdGFyZ2V0X3BsdWdpbhgKIAEoCRItCgl0YXJnZXRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KDHRhcmdldF9ldmVyeRgNIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhI+Cgljb25kaXRpb24YBCABKA4yKy5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25Db25kaXRpb24SDgoGcmVwZWF0GAUgASgIEj4KBGFyZ3MYCyADKAsyMC5jb2RlZm91bmRyeS52MS5TdWJzY3JpYmVUaHJlYWRSZXF1ZXN0LkFyZ3NFbnRyeRorCglBcmdzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJzChdTdWJzY3JpYmVUaHJlYWRSZXNwb25zZRI4CgxzdWJzY3JpcHRpb24YASABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24SDQoFZmlyZWQYAiABKAgSDwoHZXhpc3RlZBgDIAEoCCLMAQoYVW5zdWJzY3JpYmVUaHJlYWRSZXF1ZXN0EhcKD3N1YnNjcmlwdGlvbl9pZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRIYChB0YXJnZXRfdGhyZWFkX2lkGAMgASgJEhUKDXRhcmdldF9ydW5faWQYBCABKAkSGwoTdGFyZ2V0X3B1bGxfcmVxdWVzdBgFIAEoCRIVCg10YXJnZXRfcGx1Z2luGAogASgJEhQKDHRhcmdldF90aW1lchgLIAEoCCJQChlVbnN1YnNjcmliZVRocmVhZFJlc3BvbnNlEjMKB3JlbW92ZWQYASADKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24iPgoeTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXF1ZXN0EhwKFHN1YnNjcmliZXJfdGhyZWFkX2lkGAEgASgJIlwKH0xpc3RUaHJlYWRTdWJzY3JpcHRpb25zUmVzcG9uc2USOQoNc3Vic2NyaXB0aW9ucxgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbiqSAgoYVGhyZWFkU3Vic2NyaXB0aW9uVGFyZ2V0EioKJlRIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1VOU1BFQ0lGSUVEEAASJQohVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVEhSRUFEEAESKQolVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfQUNUSU9OX1JVThACEisKJ1RIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1BVTExfUkVRVUVTVBADEiUKIVRIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1BMVUdJThAEEiQKIFRIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1RJTUVSEAUqwgYKG1RocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9VTlNQRUNJRklFRBAAEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1NFVFRMRUQQARImCiJUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9JRExFEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQVRURU5USU9OEAMSJwojVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRVJST1IQBBIuCipUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9ESVNDT05ORUNURUQQBRIqCiZUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9GSU5JU0hFRBAGEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19ET05FEAcSLworVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hFQ0tTX0ZBSUxFRBAIEi8KK1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19QQVNTRUQQCRIoCiRUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9SRVZJRVcQChIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DT01NRU5UEAsSMgouVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fUkVWSUVXX1JFUVVFU1RFRBAMEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0hFQURfUFVTSEVEEA0SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fTUVSR0VEEA4SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0xPU0VEEA8SKQolVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hBTkdFRBAQEicKI1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0ZJUkVEEBRC0AEKEmNvbS5jb2RlZm91bmRyeS52MUIYVGhyZWFkU3Vic2NyaXB0aW9uc1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_duration, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.ThreadSubscription
@@ -75,7 +75,8 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
 
   /**
    * The subscriber's and the target's names at read time (a run: its action's name; a
-   * pull request: "owner/name#123 Title"); empty when unnamed or gone.
+   * pull request: "owner/name#123 Title"; a timer: "every 30m" or "at 09:00", local
+   * time, with the date when not today); empty when unnamed or gone.
    *
    * @generated from field: string subscriber_name = 10;
    */
@@ -90,8 +91,8 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
    * The target's state at read time, as words: a thread's status and reason
    * ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
    * "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
-   * before the GitHub poll saw it), a plugin's state ("running", "disabled"); "gone"
-   * when the target no longer exists.
+   * before the GitHub poll saw it), a plugin's state ("running", "disabled"), a timer's
+   * next fire ("next 09:30", "due"); "gone" when the target no longer exists.
    *
    * @generated from field: string target_status = 12;
    */
@@ -124,8 +125,8 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   subscriberThreadId: string;
 
   /**
-   * Exactly one target: a thread id, an action run id, a pull request, or a plugin's
-   * wake source ("<plugin>/<source>").
+   * Exactly one target: a thread id, an action run id, a pull request, a plugin's
+   * wake source ("<plugin>/<source>"), or a timer (target_at or target_every).
    *
    * @generated from field: string target_thread_id = 2;
    */
@@ -149,17 +150,32 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   targetPlugin: string;
 
   /**
+   * A one-shot timer: fires once at this time (after now; INVALID_ARGUMENT otherwise).
+   *
+   * @generated from field: google.protobuf.Timestamp target_at = 12;
+   */
+  targetAt?: Timestamp | undefined;
+
+  /**
+   * A repeating timer: fires every interval (at least one minute) from now until
+   * unsubscribed; repeat is implied.
+   *
+   * @generated from field: google.protobuf.Duration target_every = 13;
+   */
+  targetEvery?: Duration | undefined;
+
+  /**
    * UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
-   * request, FIRED for a plugin. A run takes only FINISHED (or SETTLED); a thread SETTLED
-   * to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin only FIRED (or
-   * SETTLED) (INVALID_ARGUMENT otherwise).
+   * request, FIRED for a plugin or a timer. A run takes only FINISHED (or SETTLED); a
+   * thread SETTLED to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin and a
+   * timer only FIRED (or SETTLED) (INVALID_ARGUMENT otherwise).
    *
    * @generated from field: codefoundry.v1.ThreadSubscriptionCondition condition = 4;
    */
   condition: ThreadSubscriptionCondition;
 
   /**
-   * Ignored for a run (fires once).
+   * Ignored for a run and a timer (target_at fires once, target_every repeats).
    *
    * @generated from field: bool repeat = 5;
    */
@@ -254,6 +270,13 @@ export type UnsubscribeThreadRequest = Message<"codefoundry.v1.UnsubscribeThread
    * @generated from field: string target_plugin = 10;
    */
   targetPlugin: string;
+
+  /**
+   * Every timer subscription of the subscriber.
+   *
+   * @generated from field: bool target_timer = 11;
+   */
+  targetTimer: boolean;
 };
 
 /**
@@ -361,6 +384,17 @@ export enum ThreadSubscriptionTarget {
    * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_PLUGIN = 4;
    */
   PLUGIN = 4,
+
+  /**
+   * A timer (target_id is "at:<RFC 3339 UTC>" or "every:<duration>", e.g. "every:30m"):
+   * fires once at a time, or repeatedly at an interval until unsubscribed. Never fires
+   * at subscribe time. Persisted: a time that passed while the daemon was stopped fires
+   * once when it starts (within the timer check, about 10 s), and an interval resumes its
+   * schedule (one catch-up wake for the slots it missed).
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_TIMER = 5;
+   */
+  TIMER = 5,
 }
 
 /**
@@ -503,7 +537,7 @@ export enum ThreadSubscriptionCondition {
 
   /**
    * A plugin target's only condition: the plugin fired the source with a match that
-   * covers the subscription's args.
+   * covers the subscription's args. Also a timer's only condition: its time came.
    *
    * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_FIRED = 20;
    */

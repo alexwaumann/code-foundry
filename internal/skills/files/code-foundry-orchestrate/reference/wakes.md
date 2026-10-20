@@ -60,3 +60,9 @@ Subscriptions survive a restart: do not subscribe again.
 
 When a plugin names a wake source (`code-foundry thread subscribe --plugin
 <plugin>/<source> --arg ...`), run it and end your turn; `code-foundry plugin wakes`.
+
+## Timers
+
+`code-foundry thread subscribe --every 30m` (or `--at 2h`, `--at <RFC 3339 time>`) wakes
+you with `Timer sub-… fired at …` and JSON `kind: "timer"`, `due_at`, `every` or `at`.
+Use it to look at slow work again later; `thread unsubscribe --timers` ends yours.

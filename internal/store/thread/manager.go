@@ -149,6 +149,9 @@ type Options struct {
 	// SnoozeCheckInterval is how often snoozed threads are checked against the wall
 	// clock (wakeSnoozed). Default SnoozeCheckInterval (the package constant).
 	SnoozeCheckInterval time.Duration
+	// TimerCheckInterval is how often timer wake subscriptions are checked against the
+	// wall clock (fireTimers). Default TimerCheckInterval (the package constant).
+	TimerCheckInterval time.Duration
 	// IdleCheckInterval is how often connected threads are checked for an idle stop at
 	// their prompt cache expiry (stopIdle). Default IdleCheckInterval (the package
 	// constant).
@@ -224,6 +227,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	def(&o.CacheTTL, DefaultCacheTTL)
 	def(&o.SnoozeCheckInterval, SnoozeCheckInterval)
+	def(&o.TimerCheckInterval, TimerCheckInterval)
 	def(&o.IdleCheckInterval, IdleCheckInterval)
 	def(&o.IdleGrace, IdleGrace)
 	def(&o.McpPollInterval, mcpPendingInterval)
@@ -375,6 +379,15 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		defer m.wg.Done()
 		defer snoozeTicker.Stop()
 		m.wakeSnoozedLoop(snoozeTicker.C)
+	}()
+	// Timer wake subscriptions, from the first tick on, so a timer that came due while
+	// the daemon was stopped fires once the daemon is up (subscriptions_timer.go).
+	timerTicker := time.NewTicker(opts.TimerCheckInterval)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer timerTicker.Stop()
+		m.fireTimersLoop(timerTicker.C)
 	}()
 	// Idle threads stop at their cache expiry (lifecycle.go). Nothing runs at startup.
 	idleTicker := time.NewTicker(opts.IdleCheckInterval)
@@ -546,7 +559,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	s := Thread{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
-		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs),
+		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs), Epoch: 1,
 	}
 	if o.InSidebar != nil {
 		s.SidebarOverride = sidebarOverride(*o.InSidebar)
@@ -700,6 +713,9 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	if closed {
 		return Thread{}, ErrClosed
 	}
+	if err := m.refuseResident(id, "forked"); err != nil {
+		return Thread{}, err
+	}
 	if parent.ClaudeSessionID == "" {
 		return Thread{}, fmt.Errorf("%w: thread %s has no saved conversation to fork yet", ErrFailedPrecondition, id)
 	}
@@ -730,7 +746,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		BaseRef: parent.BaseRef, CreatedWorktree: parent.CreatedWorktree, Branch: parent.Branch,
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
-		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
+		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Epoch: 1,
 	}
 	m.mu.Lock()
 	// The fork's transcript starts with the copied history, so its first user
@@ -796,6 +812,10 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 
 	r := newRunner(m, id, s.WorktreePath, l)
+	if l.resume == "" {
+		// A fresh session: a reseed's prefix goes with its first message (reseed.go).
+		r.seed = s.SeedPrefix
+	}
 	if s.ParentID != "" {
 		// A fork's transcript starts with a copy of its parent's records, billed to
 		// the parent; they keep their original times (usage.go).
@@ -849,7 +869,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // x is the extras it applied, for the staleness fingerprint (envstale.go).
 func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
-		allowedTools: allowedTools(g.allow), disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
+		allowedTools: allowedTools(g.allow), disallowedTools: g.deny, appendSystemPrompt: systemPrompt("", s.SystemPromptAppend)}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
@@ -869,7 +889,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		}
 		var ok bool
 		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.appendSystemPrompt = systemPrompt(wl.prompt)
+			sa.appendSystemPrompt = systemPrompt(wl.prompt, s.SystemPromptAppend)
 			env = append(slices.Clip(env), wl.env...)
 			members = wl.projects
 			if len(wl.missing) > 0 {
@@ -968,6 +988,9 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 // subscribers get a CondRemoved wake (subscriptions_removed.go). When it fails the
 // thread stays, no longer Removing.
 func (m *Manager) Remove(ctx context.Context, id string) (err error) {
+	if err := m.refuseResident(id, "removed"); err != nil {
+		return err
+	}
 	if err := m.setRemoving(id, true); err != nil {
 		return err
 	}
