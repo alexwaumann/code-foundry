@@ -77,12 +77,18 @@ export function sourceWords(r: Pick<InstalledSkillView, "state" | "registry">): 
   return r.registry ? `from ${r.registry}` : "";
 }
 
-/** An installed row's state pill: Missing (red), Needs setup (amber), Enabled (emerald), Disabled; a local skill has none (it says Local). */
+/**
+ * An installed row's state pill: Missing (red), Disabled, Needs setup (amber; an enabled
+ * skill whose script has not run), Enabled (emerald). A disabled skill says Disabled even
+ * when it needs setup (its Run setup button says the rest). A local skill has none (it
+ * says Local).
+ */
 export function installedPill(r: Pick<InstalledSkillView, "state" | "enabled" | "needsSetup" | "kind">): SkillPill | null {
   if (r.state === "local") return null;
   if (r.state === "missing") return { label: "Missing", tone: "error" };
+  if (!r.enabled) return { label: "Disabled", tone: "muted" };
   if (r.kind === "skill" && r.needsSetup) return { label: "Needs setup", tone: "attention" };
-  return r.enabled ? { label: "Enabled", tone: "ok" } : { label: "Disabled", tone: "muted" };
+  return { label: "Enabled", tone: "ok" };
 }
 
 /** Browse's words for an installed entry with nothing to update ("Installed", "Installed, disabled"). */

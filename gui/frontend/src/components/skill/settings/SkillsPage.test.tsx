@@ -161,14 +161,14 @@ describe("Installed rows", () => {
     fireEvent.click(within(installedRow("pr-review")).getByTestId("skill-disable"));
     fireEvent.click(within(installedRow("pr-review")).getByTestId("skill-uninstall"));
     fireEvent.click(within(installedRow("my-notes")).getByTestId("skill-remove"));
-    expect(onConfirm.mock.calls.map(([a, r]: [string, InstalledSkillView]) => `${a} ${r.name}`)).toEqual(["disable pr-review", "uninstall pr-review", "remove my-notes"]);
+    expect(onConfirm.mock.calls.map((c) => `${String(c[0])} ${(c[1] as InstalledSkillView).name}`)).toEqual(["disable pr-review", "uninstall pr-review", "remove my-notes"]);
     expect(m.disable).not.toHaveBeenCalled();
   });
 
   it("disable Run setup without a thread or project", () => {
     m.owner.value = false;
     render(<InstalledSection onConfirm={vi.fn()} />);
-    expect((within(installedRow("jira-sync")).getByTestId("skill-setup") as HTMLButtonElement).disabled).toBe(true);
+    expect(within(installedRow("jira-sync")).getByTestId<HTMLButtonElement>("skill-setup").disabled).toBe(true);
   });
 
   it("show a busy row's spinner, disable its buttons, and keep a failure until dismissed", () => {
@@ -176,8 +176,8 @@ describe("Installed rows", () => {
     useSkillMarketplaceStore.setState({ busy: { [key]: "disable" }, failures: { [key]: { action: "disable", message: "permission denied" } } });
     render(<InstalledSection onConfirm={vi.fn()} />);
     const row = within(installedRow("pr-review"));
-    expect((row.getByTestId("skill-disable") as HTMLButtonElement).disabled).toBe(true);
-    expect((row.getByTestId("skill-uninstall") as HTMLButtonElement).disabled).toBe(true);
+    expect(row.getByTestId<HTMLButtonElement>("skill-disable").disabled).toBe(true);
+    expect(row.getByTestId<HTMLButtonElement>("skill-uninstall").disabled).toBe(true);
     expect(row.getByTestId("skill-failure").textContent).toContain("permission denied");
     fireEvent.click(row.getByTestId("skill-failure-dismiss"));
     expect(useSkillMarketplaceStore.getState().failures[key]).toBeUndefined();

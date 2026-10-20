@@ -56,6 +56,7 @@ describe("skill settings model", () => {
     ["enabled", { state: "installed" as const, enabled: true, needsSetup: false, kind: "skill" as const }, "Enabled"],
     ["disabled", { state: "installed" as const, enabled: false, needsSetup: false, kind: "skill" as const }, "Disabled"],
     ["needs setup", { state: "installed" as const, enabled: true, needsSetup: true, kind: "skill" as const }, "Needs setup"],
+    ["disabled wins over needs setup", { state: "installed" as const, enabled: false, needsSetup: true, kind: "skill" as const }, "Disabled"],
     ["a plugin never needs setup", { state: "installed" as const, enabled: true, needsSetup: true, kind: "plugin" as const }, "Enabled"],
     ["missing", { state: "missing" as const, enabled: true, needsSetup: true, kind: "skill" as const }, "Missing"],
     ["local has none", { state: "local" as const, enabled: true, needsSetup: false, kind: "skill" as const }, null],
