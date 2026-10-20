@@ -3,19 +3,19 @@ package thread
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
 // Archive archives or unarchives a thread (docs/notes/archive-threads-1-daemon.md).
 //
-// Archiving closes the thread like Close (a no-op when it is disconnected), kills and
-// removes its shells like Remove, then, under m.mu, unpins and unsnoozes it and stamps
-// ArchivedAt unless it already has one (a second archive keeps the first time). A turn
-// the close cut off leaves the thread idle ReasonArchived instead of error
-// ReasonInterrupted. A Reconnect that
-// wins the race between the close and that last step makes Archive fail rather than
-// archive a live thread. Unarchiving only clears ArchivedAt: the thread stays
-// disconnected until the user reconnects it.
+// Archiving first archives the hidden threads below it (ArchiveCascade with the
+// threads.show_created_threads setting; docs/notes/hidden-children-1-daemon.md), each
+// through archiveOne in tree order, past one that fails (logged, and named in the
+// *CascadeError returned with the thread), then the thread itself, then any hidden
+// thread created below it meanwhile (its creator was still running). Unarchiving only
+// clears ArchivedAt, of this thread alone: the thread stays disconnected until the
+// user reconnects it.
 func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
 	if !archived {
 		m.mu.Lock()
@@ -29,24 +29,112 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		}
 		return rec.s, nil
 	}
-	wasInterrupted, err := m.interrupted(id)
+	if _, err := m.Get(ctx, id); err != nil {
+		return Thread{}, err
+	}
+	tried := map[string]bool{}
+	var failed []CascadeFailure
+	cascaded := 0
+	cascade := func() {
+		for _, t := range m.cascadeTargets(id, tried) {
+			tried[t.ID] = true
+			_, changed, err := m.archiveOne(ctx, t.ID)
+			if err != nil {
+				m.log.Warn("archive a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
+				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
+				continue
+			}
+			if changed {
+				cascaded++
+				m.log.Info("archived thread with the thread above it", "thread", t.ID, "root", id, "depth", t.Depth)
+			}
+		}
+	}
+	cascade()
+	s, changed, err := m.archiveOne(ctx, id)
 	if err != nil {
 		return Thread{}, err
 	}
+	cascade() // created below it while the others were archived
+	if changed || cascaded > 0 {
+		m.log.Info("archived thread", "thread", id, "cascaded", cascaded, "cascade_failed", len(failed))
+	}
+	if cur, err := m.Get(ctx, id); err == nil {
+		s = cur // the cascade may have moved its waiting overlay
+	}
+	if len(failed) > 0 {
+		return s, &CascadeError{ID: id, Failed: failed}
+	}
+	return s, nil
+}
+
+// cascadeTargets are the threads archiving id takes with it now (ArchiveCascade): not
+// archived, not being removed, not in skip.
+func (m *Manager) cascadeTargets(id string, skip map[string]bool) []Thread {
+	var out []Thread
+	for _, t := range ArchiveCascade(m.Snapshot().Threads, id, m.showCreatedThreads()) {
+		if t.ArchivedAt.IsZero() && !t.Removing && !skip[t.ID] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// CascadeFailure is one hidden thread an archive could not take with it.
+type CascadeFailure struct {
+	ID  string
+	Err error
+}
+
+// CascadeError is Archive's error when the thread was archived but some of the hidden
+// threads below it were not. It is an ErrFailedPrecondition.
+type CascadeError struct {
+	ID     string // the thread archived
+	Failed []CascadeFailure
+}
+
+func (e *CascadeError) Error() string {
+	parts := make([]string, len(e.Failed))
+	for i, f := range e.Failed {
+		parts[i] = f.ID + ": " + f.Err.Error()
+	}
+	what := "1 hidden thread below it was"
+	if len(e.Failed) != 1 {
+		what = fmt.Sprintf("%d hidden threads below it were", len(e.Failed))
+	}
+	return fmt.Sprintf("archived thread %s, but %s not archived: %s", e.ID, what, strings.Join(parts, "; "))
+}
+
+// Unwrap makes a CascadeError an ErrFailedPrecondition.
+func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
+
+// archiveOne archives one thread, and reports whether anything changed.
+//
+// It closes the thread like Close (a no-op when it is disconnected), kills and removes
+// its shells like Remove, then, under m.mu, unpins and unsnoozes it and stamps
+// ArchivedAt unless it already has one (a second archive keeps the first time). A turn
+// the close cut off leaves the thread idle ReasonArchived instead of error
+// ReasonInterrupted. A Reconnect that wins the race between the close and that last
+// step makes it fail rather than archive a live thread.
+func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, error) {
+	wasInterrupted, err := m.interrupted(id)
+	if err != nil {
+		return Thread{}, false, err
+	}
 	if err := m.Close(ctx, id); err != nil {
-		return Thread{}, err
+		return Thread{}, false, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {
-		return Thread{}, err
+		return Thread{}, false, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Thread{}, err
+		return Thread{}, false, err
 	}
 	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Thread{}, fmt.Errorf("%w: thread %s was started while being archived", ErrFailedPrecondition, id)
+		return Thread{}, false, fmt.Errorf("%w: thread %s was started while being archived", ErrFailedPrecondition, id)
 	}
 	// The close cut off a turn (or a pending request): the archive stopped it, not a
 	// failure, so it reads idle "archived" rather than error "interrupted".
@@ -56,7 +144,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	}
 	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
 	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed && !stopped {
-		return rec.s, nil
+		return rec.s, false, nil
 	}
 	if rec.s.ArchivedAt.IsZero() {
 		rec.s.ArchivedAt = m.opts.Now()
@@ -67,8 +155,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		m.log.Warn("clear the flags of an archived thread", "thread", id, "err", err)
 	}
 	m.commitLocked(rec, true)
-	m.log.Info("archived thread", "thread", id)
-	return rec.s, nil
+	return rec.s, true, nil
 }
 
 // interrupted reports whether thread id's status is already error "interrupted" (a

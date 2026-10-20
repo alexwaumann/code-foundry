@@ -57,7 +57,17 @@ service ThreadService {
   // it and records archived_at (kept when it is already archived). Unarchiving only
   // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
   // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+  // Archiving also archives, the same way and first, every thread below it that is not
+  // shown in the sidebar (Thread.in_sidebar), through hidden threads only: a shown
+  // thread and everything below it stays (ThreadFilter.archive_cascade_of lists them).
+  // A thread of those that fails is skipped and named in the error, which then comes
+  // after the thread itself was archived. Unarchiving does not cascade.
   rpc Archive(ArchiveThreadRequest) returns (ArchiveThreadResponse) {}
+  // SetSidebar shows or hides a thread another thread created in the GUI's sidebar
+  // (Thread.in_sidebar), overriding the threads.show_created_threads setting for it:
+  // shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
+  // thread the user created (always shown). Persisted; any state.
+  rpc SetSidebar(SetThreadSidebarRequest) returns (SetThreadSidebarResponse) {}
   // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
   // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
   // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze

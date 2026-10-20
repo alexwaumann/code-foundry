@@ -257,6 +257,9 @@ type Manager struct {
 	retired []UsageBucket
 	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.
 	cacheTTL time.Duration
+	// showCreated is the threads.show_created_threads setting (SetShowCreatedThreads;
+	// sidebar.go); guarded by mu.
+	showCreated bool
 
 	// threads are the threads' item logs loaded so far (items.go).
 	tmu     sync.Mutex
@@ -529,6 +532,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
+	if err := checkSidebarOverride(creatorID, o.InSidebar); err != nil {
+		return Thread{}, err
+	}
 	id, err := newThreadID()
 	if err != nil {
 		return Thread{}, err
@@ -541,6 +547,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
 		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs),
+	}
+	if o.InSidebar != nil {
+		s.SidebarOverride = sidebarOverride(*o.InSidebar)
 	}
 	namingTried := name != ""
 	var late <-chan namingResult

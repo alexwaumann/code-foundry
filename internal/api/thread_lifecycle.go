@@ -23,7 +23,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: thread.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), NoProject: m.GetNoProject(),
 		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(),
-		Notify: m.GetNotify(),
+		Notify: m.GetNotify(), InSidebar: optionalBool(m.InSidebar),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef()}
@@ -60,7 +60,7 @@ func (h *Thread) List(ctx context.Context, req *connect.Request[v1.ListThreadsRe
 		for i, t := range threads {
 			res.Threads[i] = threadToProto(t)
 		}
-		if f.GetDescendantsOf() != "" {
+		if f.GetDescendantsOf() != "" || f.GetArchiveCascadeOf() != "" {
 			res.Totals = subtreeTotals(threads, res.Threads)
 		}
 		if snap := h.store.Snapshot(); f.GetAll() && snap != nil {
@@ -305,8 +305,9 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	if r := s.Retry; r != nil {
 		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
 	}
-	metadataToProto(s, p)           // thread_metadata.go
-	p.Flags = flagsToProto(s.Flags) // thread_flags.go
+	metadataToProto(s, p)                         // thread_metadata.go
+	p.InSidebar = optionalBool(s.SidebarOverride) // thread_sidebar.go
+	p.Flags = flagsToProto(s.Flags)               // thread_flags.go
 	p.Owner = s.Owner
 	p.PluginEnvStale, p.PluginEnvChange = s.PluginEnvStale, s.PluginEnvChange // thread_restart.go
 	return p
@@ -375,11 +376,12 @@ func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
 		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
 		Project: f.GetProject(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
 		Owner: f.GetOwner(), Limit: int(f.GetLimit()), DescendantsOf: f.GetDescendantsOf(),
+		ArchiveCascadeOf: f.GetArchiveCascadeOf(),
 	}
 }
 
-// subtreeTotals sets each listed thread's depth (a List with descendants_of) and sums
-// them: threads and protos are the same list.
+// subtreeTotals sets each listed thread's depth (a List with descendants_of or
+// archive_cascade_of) and sums them: threads and protos are the same list.
 func subtreeTotals(threads []thread.Thread, protos []*v1.Thread) *v1.ThreadTotals {
 	tot := &v1.ThreadTotals{Threads: int32(len(protos))}
 	for i, p := range protos {

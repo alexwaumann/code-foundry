@@ -240,6 +240,12 @@ type Thread struct {
 	// at creation, kept verbatim. Persisted (metadata.go).
 	CreatedBy     string
 	CreatedByName string
+	// SidebarOverride shows (true) or hides (false) a thread with a CreatedBy in the
+	// sidebar whatever the threads.show_created_threads setting says; nil follows it,
+	// and is always nil on the user's own threads (sidebar.go, InSidebar). Set by
+	// CreateOptions.InSidebar and Store.SetSidebar. Persisted (in_sidebar). Copy on
+	// write: replaced, never written through.
+	SidebarOverride *bool
 	// Depth is how far below ListOptions.DescendantsOf the thread is (0: that thread),
 	// set on List's answer with that option only; never in a snapshot.
 	Depth int
@@ -394,6 +400,9 @@ type CreateOptions struct {
 	// Owner makes the thread someone else's than the user's ("plugin:<name>"; owner.go):
 	// hidden from the user's lists. Exclusive with CreatedBy.
 	Owner string
+	// InSidebar is Thread.SidebarOverride at creation (nil: follow the setting). Only
+	// with CreatedBy (ErrInvalidArgument otherwise).
+	InSidebar *bool
 	// Cwd, with NoProject, is where claude runs instead of Options.Home: an existing
 	// directory inside it (owner.go).
 	Cwd string
@@ -448,7 +457,15 @@ type Store interface {
 	// Archive archives a thread (archived true): it closes it like Close, kills and
 	// removes its shells, unpins and unsnoozes it and sets ArchivedAt (kept when already set). With
 	// archived false it only clears ArchivedAt; the thread stays disconnected.
+	//
+	// Archiving also archives, first and the same way, the threads below it that are
+	// not shown in the sidebar, through hidden threads only (ArchiveCascade); one that
+	// fails is skipped, and the thread is still archived but the error (a
+	// *CascadeError) names the failures. Unarchiving does not cascade.
 	Archive(ctx context.Context, id string, archived bool) (Thread, error)
+	// SetSidebar shows or hides a thread another thread created in the sidebar
+	// (Thread.SidebarOverride); ErrInvalidArgument for the user's own thread. Any state.
+	SetSidebar(ctx context.Context, id string, shown bool) (Thread, error)
 	// Label edits a thread's labels: clear removes every label, then remove's go, then
 	// add's are added (each validated; a label in both is ErrInvalidArgument). Any state.
 	Label(ctx context.Context, id string, add, remove []string, clear bool) (Thread, error)

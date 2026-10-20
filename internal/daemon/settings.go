@@ -23,6 +23,9 @@ import (
 //   - auto-naming and the naming model -> a Namer that reads both per thread;
 //   - threads.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
+//   - threads.show_created_threads -> thread.Manager.SetShowCreatedThreads on every
+//     change (applyShowCreatedThreads): which hidden threads archiving their creator
+//     takes with it (the GUI reads the setting itself for the sidebar);
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
@@ -96,6 +99,16 @@ type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 // threads.cache_ttl_seconds, now and on every settings change.
 func applyCacheTTL(st *settings.Store, threads cacheTTLSetter) {
 	st.OnChange(func(snap *settings.Snapshot) { threads.SetCacheTTL(snap.Settings.CacheTTL()) })
+}
+
+// showCreatedSetter is the thread store's live threads.show_created_threads
+// (*thread.Manager).
+type showCreatedSetter interface{ SetShowCreatedThreads(bool) }
+
+// applyShowCreatedThreads keeps the thread store's threads.show_created_threads equal
+// to the setting, now and on every settings change.
+func applyShowCreatedThreads(st *settings.Store, threads showCreatedSetter) {
+	st.OnChange(func(snap *settings.Snapshot) { threads.SetShowCreatedThreads(snap.Settings.Threads.ShowCreatedThreads) })
 }
 
 // updateChannelSetter is the updater's live channel (*update.Store).

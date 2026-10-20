@@ -63,6 +63,8 @@ type ThreadBackend interface {
 	FlagsBackend
 	// RestartBackend backs thread.restart (commands_thread_restart.go).
 	RestartBackend
+	// SidebarBackend backs thread.sidebar (commands_thread_sidebar.go).
+	SidebarBackend
 }
 
 var (

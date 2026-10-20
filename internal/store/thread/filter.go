@@ -51,27 +51,43 @@ type ListOptions struct {
 	// with Thread.Depth set. Removed threads are never listed (FilterRemoved) but keep
 	// the line between a root and the threads below them.
 	DescendantsOf string
+	// ArchiveCascadeOf: only the threads that archiving this thread takes with it
+	// (ArchiveCascade with ShowCreated: the hidden threads below it, through hidden
+	// ones only), in tree order with Thread.Depth set; not the thread itself. Not with
+	// DescendantsOf (Store.List: ErrInvalidArgument).
+	ArchiveCascadeOf string
+	// ShowCreated is the threads.show_created_threads setting ArchiveCascadeOf applies;
+	// Store.List sets it from the store's.
+	ShowCreated bool
 }
 
 // FilterThreads returns the threads o selects, the most recently active first (last
 // activity, else creation; then the newest created, then by id), at most o.Limit of
-// them. o.Project and o.Workspace are compared as ids. With o.DescendantsOf,
-// FilterLineage without removed threads.
+// them. o.Project and o.Workspace are compared as ids. With o.DescendantsOf or
+// o.ArchiveCascadeOf, FilterLineage without removed threads.
 func FilterThreads(threads []Thread, o ListOptions) []Thread {
 	return FilterLineage(threads, nil, o)
 }
 
 // FilterLineage is FilterThreads, with removed's creators in the lineage
 // o.DescendantsOf walks: the threads of that subtree that o selects, the most
-// recently active o.Limit of them, in tree order (Subtree), each with its Depth.
+// recently active o.Limit of them, in tree order (Subtree), each with its Depth. With
+// o.ArchiveCascadeOf, the same for the threads of ArchiveCascade (live ones only).
 func FilterLineage(threads []Thread, removed []RemovedThread, o ListOptions) []Thread {
 	var pos map[string]int // a subtree thread's place in tree order
 	var depth map[string]int
-	if o.DescendantsOf != "" {
+	switch {
+	case o.DescendantsOf != "":
 		sub := Subtree(lineageNodes(threads, removed), o.DescendantsOf)
 		pos, depth = make(map[string]int, len(sub)), make(map[string]int, len(sub))
 		for i, e := range sub {
 			pos[e.ID], depth[e.ID] = i, e.Depth
+		}
+	case o.ArchiveCascadeOf != "":
+		sub := ArchiveCascade(threads, o.ArchiveCascadeOf, o.ShowCreated)
+		pos, depth = make(map[string]int, len(sub)), make(map[string]int, len(sub))
+		for i, t := range sub {
+			pos[t.ID], depth[t.ID] = i, t.Depth
 		}
 	}
 	var out []Thread
@@ -141,6 +157,12 @@ func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
 	o, err := m.resolveListRefs(o)
 	if err != nil {
 		return nil, err
+	}
+	if o.ArchiveCascadeOf != "" {
+		if o.DescendantsOf != "" {
+			return nil, fmt.Errorf("%w: descendants_of and archive_cascade_of are exclusive", ErrInvalidArgument)
+		}
+		o.ShowCreated = m.showCreatedThreads()
 	}
 	var removed []RemovedThread
 	if o.DescendantsOf != "" {

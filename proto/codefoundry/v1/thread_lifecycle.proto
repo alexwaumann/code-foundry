@@ -296,6 +296,21 @@ message Thread {
   // How far below ThreadFilter.descendants_of the thread is (0: that thread, 1: a
   // thread it created); set by a List with that filter only.
   optional int32 depth = 61;
+  // Whether a thread another thread created (created_by set) is shown in the GUI's
+  // sidebar: the per-thread override of the threads.show_created_threads setting
+  // (ThreadService.SetSidebar, thread.sidebar, thread.new --sidebar). Unset follows the
+  // setting; always unset on a thread the user created. Persisted.
+  //
+  // Effective visibility, the one rule (the daemon's thread.Thread.InSidebar; the GUI
+  // reimplements it from created_by, in_sidebar and the setting):
+  //   created_by empty  -> shown (the user's own thread);
+  //   in_sidebar set    -> in_sidebar;
+  //   otherwise         -> threads.show_created_threads (default false: hidden).
+  // A shown thread is the user's to manage; a hidden one its creator's: it stays out of
+  // the sidebar and the Dock badge, is listed in its creator's Threads tab, and is
+  // archived with its creator (ThreadService.Archive). See
+  // docs/notes/hidden-children-1-daemon.md.
+  optional bool in_sidebar = 62;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -488,6 +503,10 @@ message CreateThreadRequest {
   // key is waited for. Persisted (a removed thread forgets its key). See
   // docs/notes/agents-5-cli.md.
   string request_id = 20;
+  // Thread.in_sidebar at creation: show (true) or hide (false) the new thread in the
+  // sidebar whatever the threads.show_created_threads setting says. Only with
+  // created_by (INVALID_ARGUMENT otherwise). Unset follows the setting.
+  optional bool in_sidebar = 21;
 }
 
 message NewWorktree {
@@ -605,6 +624,14 @@ message ThreadFilter {
   // ListThreadsResponse.totals. Removed threads are not listed (include_removed adds
   // none), but a removed thread's children are still below its creator.
   string descendants_of = 12;
+  // Only the threads that archiving this thread (by id) archives with it
+  // (ThreadService.Archive): the threads below it that are not shown in the sidebar
+  // (Thread.in_sidebar's rule), reached through hidden threads only (a shown thread and
+  // everything below it is left out), at most 8 levels down, in tree order with
+  // Thread.depth set. The thread itself is not listed. Archived ones are left out unless
+  // include_archived or all; the other fields still apply. Not with descendants_of
+  // (INVALID_ARGUMENT).
+  string archive_cascade_of = 13;
 }
 
 message ListThreadsResponse {
@@ -781,6 +808,16 @@ message ArchiveThreadRequest {
 }
 
 message ArchiveThreadResponse {
+  Thread thread = 1;
+}
+
+message SetThreadSidebarRequest {
+  string id = 1;
+  // Show (true) or hide (false) the thread in the sidebar (Thread.in_sidebar).
+  bool shown = 2;
+}
+
+message SetThreadSidebarResponse {
   Thread thread = 1;
 }
 
