@@ -32,6 +32,7 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
+import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
@@ -182,7 +183,7 @@ export function App() {
   // Settings and usage hide the panel, so the content pane shows the page even then.
   const pageOpen = useViewsStore(selectPageOpen);
   const panelExpanded = usePanelExpanded() && !pageOpen;
-  useWindowTitle(useAttentionCount());
+  useWindowTitle(useAttentionCount(useShowCreatedThreads()));
 
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating

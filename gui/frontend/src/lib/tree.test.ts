@@ -178,6 +178,49 @@ describe("buildSections: the Snoozed footer", () => {
   });
 });
 
+describe("buildSections: hidden threads (a thread's children, docs/notes/hidden-children-2-gui.md)", () => {
+  // One shown and one hidden thread in every section.
+  const threads = [
+    thread("pin", { pinned: true }),
+    thread("pin-h", { pinned: true, hidden: true }),
+    thread("ask", { group: "prompt" }),
+    thread("ask-h", { group: "prompt", hidden: true }),
+    thread("done", { group: "done" }),
+    thread("done-h", { group: "done", hidden: true }),
+    thread("idle"),
+    thread("idle-h", { hidden: true }),
+    thread("work", { group: "working" }),
+    thread("work-h", { group: "working", hidden: true }),
+    thread("zz", { snoozedUntilMs: 10 }),
+    thread("zz-h", { snoozedUntilMs: 20, hidden: true }),
+    thread("arch", { archivedAtMs: 10 }),
+    thread("arch-h", { archivedAtMs: 20, hidden: true }),
+  ];
+
+  it("are in no panel and count in no footer header", () => {
+    const sec = buildSections(threads);
+    expect(shape(sec.main)).toEqual(s("pin", "ask", "done", "idle"));
+    expect(shape(sec.working)).toEqual(["# Working 1", ...s("work")]);
+    expect(shape(sec.snoozed)).toEqual(["# Snoozed 1", ...s("zz")]);
+    expect(shape(sec.archived)).toEqual(["# Archived 1", ...s("arch")]);
+  });
+
+  it("a footer holding only hidden threads is not rendered", () => {
+    const sec = buildSections([thread("a"), thread("w", { group: "working", hidden: true }), thread("x", { archivedAtMs: 1, hidden: true })]);
+    expect(sec.working).toEqual([]);
+    expect(sec.archived).toEqual([]);
+  });
+
+  it("are skipped by the keyboard order (cmd+1..9, cmd+shift+a)", () => {
+    expect(threadOrder(threads)).toEqual(["pin", "ask", "done", "idle", "work", "zz", "arch"]);
+  });
+
+  it("join the list in their place once shown (hidden: false or absent)", () => {
+    const shown = threads.map((t) => (t.id === "done-h" ? { ...t, hidden: false } : t));
+    expect(shape(buildSections(shown).main)).toEqual(s("pin", "ask", "done-h", "done", "idle"));
+  });
+});
+
 describe("rowCache", () => {
   const byKey = (rows: readonly Row[], key: string) => rows.find((r) => r.key === key);
 

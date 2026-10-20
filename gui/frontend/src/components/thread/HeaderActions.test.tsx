@@ -23,6 +23,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
 const { useActionsStore } = await import("@/stores/actions");
+const { useSettingsStore } = await import("@/stores/settings");
 
 const cmd = (name: string, title = name): CommandView => ({ name, title, description: "", category: "", args: [], keybindings: [], available: true });
 const link = (number: number): LinkedPullRequestView => ({ slug: "o/web", number, url: `https://github.com/o/web/pull/${String(number)}`, linkedAt: null });
@@ -191,5 +192,32 @@ describe("HeaderActions", () => {
     expect(b.className).toContain(tone);
     fireEvent.click(b);
     expect(openPullRequestInPanel).toHaveBeenCalledWith({ slug: "o/web", number: 78 });
+  });
+
+  // Hidden child threads (docs/notes/hidden-children-2-gui.md): thread.sidebar beside Archive.
+  it.each<[string, Partial<ThreadView>, boolean, string, string]>([
+    ["hidden by the setting", { createdBy: "s-0", inSidebar: null }, false, "Show in sidebar", "lucide-eye"],
+    ["shown by the setting", { createdBy: "s-0", inSidebar: null }, true, "Hide from sidebar", "lucide-eye-off"],
+    ["shown by its override", { createdBy: "s-0", inSidebar: true }, false, "Hide from sidebar", "lucide-eye-off"],
+    ["hidden by its override", { createdBy: "s-0", inSidebar: false }, true, "Show in sidebar", "lucide-eye"],
+  ])("a thread another thread created, %s: %s, next to Archive, runs thread.sidebar", (_name, o, showCreated, title, icon) => {
+    useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("thread.sidebar", "Show or Hide Thread in Sidebar")] });
+    useSettingsStore.setState({ snapshot: { values: { "threads.show_created_threads": String(showCreated) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
+    setThread(o);
+    render(<HeaderActions threadId="s-1" />);
+    expect(order()).toEqual(["pane-snooze", "pane-sidebar", "thread.archive", "bottom-toggle", "panel-toggle"]);
+    const b = screen.getByRole("button", { name: title });
+    expect(tooltipText(b)).toBe(title);
+    expect(b.querySelector("svg")?.getAttribute("class")).toContain(icon);
+    fireEvent.click(b);
+    expect(startCommandNamed).toHaveBeenCalledWith("thread.sidebar");
+    useSettingsStore.setState({ snapshot: null });
+  });
+
+  it("the user's own thread has no sidebar button, even with thread.sidebar listed", () => {
+    useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("thread.sidebar")] });
+    setThread({ createdBy: "", inSidebar: null });
+    render(<HeaderActions threadId="s-1" />);
+    expect(screen.queryByTestId("pane-sidebar")).toBeNull();
   });
 });

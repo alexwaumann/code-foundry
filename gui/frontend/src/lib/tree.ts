@@ -32,6 +32,11 @@ export interface ListThread {
   archivedAtMs: number | null;
   /** When the snooze ends (epoch ms), null when not snoozed: it then sorts under Snoozed, whatever its pin and group. */
   snoozedUntilMs: number | null;
+  /**
+   * Hidden from the sidebar (lib/inSidebar.ts: a thread another thread created, by the
+   * setting or its override): in no panel, no count, no keyboard order. Absent: shown.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -144,10 +149,10 @@ export interface Sections {
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere
  * else; a thread is never both, but archived wins) under an Archived header, most recently
  * archived first. A footer has its header only when it has threads; collapsed, the header
- * alone.
+ * alone. A hidden thread (ListThread.hidden) is in none of them and counts in no header.
  */
 export function buildSections(threads: readonly ListThread[], opts: ListOptions = {}): Sections {
-  const newest = [...threads].reverse();
+  const newest = threads.filter((s) => s.hidden !== true).reverse();
   const live = newest.filter((s) => s.archivedAtMs === null && s.snoozedUntilMs === null);
   const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
   const rowsOf = (section: Section, list: readonly ListThread[]): Row[] => list.map((s) => ({ key: threadKey(s.id), kind: "thread", section, threadId: s.id }));

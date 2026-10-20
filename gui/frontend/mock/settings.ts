@@ -161,6 +161,16 @@ const staticFields: FieldInit[] = [
     enumLabels: ["A fresh copy of the project", "The project folder itself"],
     defaultValue: "current",
   },
+  {
+    key: "threads.show_created_threads",
+    group: "threads",
+    page: "general",
+    section: "threads",
+    type: S.BOOL,
+    title: "Show threads created by other threads",
+    description: "Off: threads an agent creates stay out of the sidebar and the Dock badge, and are archived with their creator. They stay in the creator's Threads tab.",
+    defaultValue: "false",
+  },
   { key: "threads.auto_name", group: "threads", page: "general", section: "threads", type: S.BOOL, title: "Name threads automatically", description: "Name a new thread from its first message with a short claude -p call to the naming model.", defaultValue: "true" },
   {
     key: "threads.naming_model",

@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { CornerDownRight, LoaderCircle, Network } from "lucide-react";
+import { CornerDownRight, Eye, EyeOff, LoaderCircle, Network } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { capIds, lineageStatusTones, lineageStatusWords, lineageTail, relatedCount, type LineageStatus } from "@/lib/lineage";
@@ -9,8 +10,9 @@ import type { StatusTone } from "@/lib/statusLine";
 import { shortAge } from "@/lib/thread";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
-import { useChildIds, useCreator, useLineageCounts, useLineageStatus, useSiblingIds } from "@/stores/lineage";
+import { useChildIds, useCreator, useLineageCounts, useLineageStatus, useSiblingIds, useSidebarShown } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
+import { setThreadSidebar } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
@@ -86,12 +88,12 @@ function Place({ id }: { id: string }) {
 }
 
 /** Time since the thread was created ("41m", "3h"), on the shared 30 s clock. */
-function Age({ id }: { id: string }) {
+function Age({ id, className }: { id: string; className?: string }) {
   const at = useThreadsStore((s) => s.byId[id]?.createdAtMs ?? null);
   const now = useNow(30_000);
   if (at === null) return null;
   return (
-    <span className="ml-auto shrink-0 pl-2 text-caption-sm tabular-nums" data-testid="lineage-age">
+    <span className={cn("ml-auto shrink-0 pl-2 text-caption-sm tabular-nums", className)} data-testid="lineage-age">
       {shortAge(at, now)}
     </span>
   );
@@ -102,11 +104,14 @@ function Age({ id }: { id: string }) {
  * age; its brief as a muted quote (two lines at most). A row opens its thread like a
  * sidebar click; the current thread's row is highlighted and not clickable.
  */
-function LineageRow({ id, me }: { id: string; me?: boolean }) {
+function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: boolean }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   const brief = useThreadsStore((s) => s.byId[id]?.brief ?? "");
   const status = useLineageStatus(id);
+  const shown = useSidebarShown(id);
   const archived = status === "archived";
+  // A sibling's or child's Show / Hide in sidebar action covers the age while hovered.
+  const toggle = actions === true && shown !== null;
   const body = (
     <>
       <div className={cn("flex min-w-0 items-center gap-2 text-body-sm", archived && "opacity-60")}>
@@ -117,13 +122,18 @@ function LineageRow({ id, me }: { id: string; me?: boolean }) {
           </span>
           {me && <span className="ml-1.5 text-caption-sm">this thread</span>}
         </span>
+        {shown === false && (
+          <span className="shrink-0 text-caption-sm" data-testid="lineage-hidden">
+            hidden
+          </span>
+        )}
         <span className={cn("shrink-0 text-caption-sm tabular-nums", TONE[lineageStatusTones[status]])} data-testid="lineage-status">
           {lineageStatusWords[status]}
         </span>
       </div>
       <div className={cn("flex min-w-0 items-center pl-5 text-caption", archived && "opacity-60")} data-testid="lineage-meta">
         <Place id={id} />
-        <Age id={id} />
+        <Age id={id} className={toggle ? "group-hover/row:invisible group-has-[:focus-visible]/row:invisible" : undefined} />
       </div>
       {brief && (
         <Tip label={brief} whenTruncated>
@@ -144,7 +154,7 @@ function LineageRow({ id, me }: { id: string; me?: boolean }) {
       </li>
     );
   return (
-    <li className="flex min-w-0">
+    <li className="group/row relative flex min-w-0">
       <button
         type="button"
         className={cn(common, "cursor-default outline-none hover:bg-accent/50 focus-visible:bg-accent/50")}
@@ -155,7 +165,37 @@ function LineageRow({ id, me }: { id: string; me?: boolean }) {
       >
         {body}
       </button>
+      {toggle && <SidebarToggle id={id} shown={shown} />}
     </li>
+  );
+}
+
+/**
+ * Show in sidebar (Eye) for a hidden thread, Hide from sidebar (EyeOff) for a shown one:
+ * thread.sidebar with the opposite of now. On hover (or keyboard focus) only, over the
+ * row's age on line 2, beside the row's own button (not inside it); the icon alone says
+ * nothing, so the tooltip names it.
+ */
+function SidebarToggle({ id, shown }: { id: string; shown: boolean }) {
+  const label = shown ? "Hide from sidebar" : "Show in sidebar";
+  const Icon = shown ? EyeOff : Eye;
+  return (
+    <Tip label={label}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label={label}
+        className="absolute top-[27px] right-3 text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground focus-visible:opacity-100 @max-[340px]:right-2"
+        data-testid="lineage-sidebar"
+        data-shown={shown}
+        onClick={() => {
+          void setThreadSidebar(id, !shown);
+        }}
+      >
+        <Icon className="size-3.5" aria-hidden />
+      </Button>
+    </Tip>
   );
 }
 
@@ -204,7 +244,7 @@ function Siblings({ threadId }: { threadId: string }) {
   return (
     <Section id="siblings" label="Siblings" count={ids.length}>
       {shown.map((id) => (
-        <LineageRow key={id} id={id} />
+        <LineageRow key={id} id={id} actions />
       ))}
       {more > 0 && (
         <li className="flex min-w-0">
@@ -230,7 +270,7 @@ function Children({ threadId }: { threadId: string }) {
   return (
     <Section id="children" label="Children" count={ids.length}>
       {ids.map((id) => (
-        <LineageRow key={id} id={id} />
+        <LineageRow key={id} id={id} actions />
       ))}
     </Section>
   );

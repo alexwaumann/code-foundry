@@ -7,6 +7,7 @@ import { jumpToAttention } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
+import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { isDashboard, useUiStore } from "@/stores/ui";
 
@@ -16,7 +17,7 @@ import { isDashboard, useUiStore } from "@/stores/ui";
  * its tooltip, so it is aria-disabled rather than disabled (disabled buttons get no hover).
  */
 function NotificationsButton() {
-  const count = useAttentionCount();
+  const count = useAttentionCount(useShowCreatedThreads());
   const label = count === 0 ? "No threads need attention" : `${String(count)} ${count === 1 ? "thread needs" : "threads need"} attention`;
   const Icon = count > 0 ? BellRing : Bell;
   return (

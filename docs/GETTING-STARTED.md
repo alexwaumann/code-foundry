@@ -47,6 +47,11 @@ The sidebar lists your threads. A thread whose second line is amber is waiting o
 a question, a permission, a plan to approve. Click it, answer, and it carries on. The
 bell at the top of the sidebar and the badge on the Dock icon count what is waiting.
 
+When a thread's agent starts threads of its own, they belong to that thread: they stay
+out of the sidebar and the Dock badge, and its **Threads** tab in the side panel lists
+them. Hover one there and click **Show in sidebar** to take it over, or turn on
+Settings › Threads › **Show threads created by other threads** to list them all.
+
 Closing the window stops nothing. Open the app again and every thread is where you
 left it.
 

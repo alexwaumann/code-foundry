@@ -82,34 +82,42 @@ describe("a Projects-page shell in the command context", () => {
 });
 
 describe("the sidebar list's keys", () => {
-  const thread = (o: Partial<ThreadView>) => ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, ...o }) as ThreadView;
-  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null };
+  const thread = (o: Partial<ThreadView>) =>
+    ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, ...o }) as ThreadView;
+  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null; hidden?: true };
 
-  it.each<[string, Partial<ThreadView>, Want]>([
-    ["idle", {}, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }],
-    ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null, snoozedUntilMs: null }],
-    ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null }],
-    ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000 }],
+  it.each<[string, Partial<ThreadView>, boolean, Want]>([
+    ["idle", {}, false, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }],
+    ["pinned and busy", { pinned: true, status: "busy" }, false, { pinned: true, group: "working", archivedAtMs: null, snoozedUntilMs: null }],
+    ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, false, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null }],
+    ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, false, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000 }],
     [
       "woken (snooze ended)",
       { state: "disconnected", status: "attention", statusReason: "snooze ended" },
+      false,
       { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null },
     ],
-  ])("round-trips %s", (_name, o, want) => {
-    expect(decodeThreadListKeys([encodeThreadListKey("s1", thread(o))])).toEqual([{ id: "s1", ...want }]);
+    ["created by a thread, setting off: hidden", { createdBy: "p" }, false, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, hidden: true }],
+    ["created by a thread, setting on: shown", { createdBy: "p" }, true, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }],
+    ["created by a thread, shown by its override", { createdBy: "p", inSidebar: true }, false, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }],
+    ["created by a thread, hidden by its override", { createdBy: "p", inSidebar: false }, true, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, hidden: true }],
+  ])("round-trips %s", (_name, o, showCreated, want) => {
+    expect(decodeThreadListKeys([encodeThreadListKey("s1", thread(o), showCreated)])).toEqual([{ id: "s1", ...want }]);
   });
 
-  it("an unknown thread decodes as an idle, unarchived, unsnoozed thread", () => {
-    expect(decodeThreadListKeys([encodeThreadListKey("s9", undefined)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }]);
+  it("an unknown thread decodes as an idle, unarchived, unsnoozed, shown thread", () => {
+    expect(decodeThreadListKeys([encodeThreadListKey("s9", undefined, false)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }]);
   });
 
-  it("getListThreads and getListOptions read the stores (archive and snooze times, the collapsed states)", () => {
-    useThreadsStore.setState({ byId: { s1: thread({ archivedAtMs: 5 }), s2: thread({ id: "s2", snoozedUntilMs: 7 }) }, order: ["s1", "s2"] });
+  it("getListThreads and getListOptions read the stores (archive and snooze times, hidden threads, the collapsed states)", () => {
+    useThreadsStore.setState({ byId: { s1: thread({ archivedAtMs: 5 }), s2: thread({ id: "s2", snoozedUntilMs: 7 }), s3: thread({ id: "s3", createdBy: "s1" }) }, order: ["s1", "s2", "s3"] });
     useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
-    expect(getListThreads()).toEqual([
+    expect(getListThreads(false)).toEqual([
       { id: "s1", pinned: false, group: "idle", archivedAtMs: 5, snoozedUntilMs: null },
       { id: "s2", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 7 },
+      { id: "s3", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, hidden: true },
     ]);
+    expect(getListThreads(true)[2]).toEqual({ id: "s3", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null });
     expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
   });
 });

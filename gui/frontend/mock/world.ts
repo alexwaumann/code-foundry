@@ -85,6 +85,12 @@ interface MockThread {
    */
   createdBy: string;
   createdByName: string;
+  /**
+   * Thread.in_sidebar: a created thread shown (true) or hidden (false) in the sidebar
+   * whatever threads.show_created_threads says; null follows the setting (thread.sidebar,
+   * thread.new --sidebar; docs/notes/hidden-children-1-daemon.md).
+   */
+  inSidebar: boolean | null;
   /** What the thread was started for, in its creator's words; "" when none. */
   brief: string;
   labels: string[];
@@ -256,6 +262,17 @@ function archiveInterrupts(s: { state: ThreadState; status: ThreadStatus; status
   if (why) return { why, ends: "ends the turn" };
   if (s.state !== ThreadState.CONNECTED || agents + shells === 0) return { why: "", ends: "" };
   return { why: backgroundRunning(agents, shells), ends: agents + shells === 1 ? "stops it" : "stops them" };
+}
+
+/**
+ * The daemon's hiddenWorkingText: thread.archive's clause for n hidden threads still
+ * working below the thread named root.
+ */
+function hiddenWorkingText(n: number, root: string): string {
+  if (n === 1) {
+    return `1 hidden child thread is still working; archiving ends its turn and archives it too. To keep it, ask ${root} to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first.`;
+  }
+  return `${String(n)} hidden child threads are still working; archiving ends their turns and archives them too. To keep one, ask ${root} to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first.`;
 }
 
 /** "end" closes attached streams (after the process exits). */
@@ -1001,8 +1018,11 @@ export class World {
    * (working) created "Add retry to login redirect" (finished; its log starts with the
    * daemon's "Created by" note) and six siblings of it, one archived, so the Threads tab
    * caps them at five; "Add retry…" created "Write retry backoff tests". All held (the
-   * clock leaves them alone). POST /__mock/lineage. Idempotent. Returns the ids, creator
-   * first, then the child, its siblings and its child in spawn order.
+   * clock leaves them alone). Every created thread follows threads.show_created_threads
+   * (hidden from the sidebar by default) except "Tidy redirect logging", shown by its
+   * override (docs/notes/hidden-children-2-gui.md). POST /__mock/lineage. Idempotent.
+   * Returns the ids, creator first, then the child, its siblings and its child in spawn
+   * order.
    */
   addLineage(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1020,7 +1040,8 @@ export class World {
       { id: "s-l-cookie", name: "Audit session cookie flags", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, projectId: "repo-gp", worktreePath: GP },
       { id: "s-l-allow", name: "Bump redirect allowlist", createdBy: P, createdByName: PN, brief: "Add staging.acme.dev to the redirect allowlist and its test", status: A, statusReason: "error: overloaded", state: D, min: 14 },
       { id: "s-l-spike", name: "Old redirect spike", createdBy: P, createdByName: PN, status: A, statusReason: "finished", state: D, min: 13, archivedAt: ago(5) },
-      { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12 },
+      // Handed to the user (thread.sidebar --shown=true): shown in the sidebar whatever the setting, and kept when P is archived.
+      { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12, inSidebar: true },
       { id: "s-l-metrics", name: "Check redirect metrics", createdBy: P, createdByName: PN, state: D, min: 11 },
       // Its creator was renamed since (the recorded name differs): the GUI shows the current one.
       { id: "s-l-grand", name: "Write retry backoff tests", createdBy: C, createdByName: `${CN} (old)`, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
@@ -1188,6 +1209,7 @@ export class World {
       parentId: "",
       createdBy: "",
       createdByName: "",
+      inSidebar: null,
       brief: "",
       labels: [],
       permissionMode: PermissionMode.AUTO,
@@ -1257,6 +1279,7 @@ export class World {
       ...(s.pluginEnvChange ? { pluginEnvStale: true, pluginEnvChange: s.pluginEnvChange } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
+      ...(s.inSidebar !== null ? { inSidebar: s.inSidebar } : {}),
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -1523,10 +1546,55 @@ export class World {
     const s = this.thread(id);
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     if (!archived) {
+      // Like the daemon: unarchiving does not cascade.
       s.archivedAt = null;
       this.publishThread(s);
       return `unarchived thread ${label}`;
     }
+    // Like the daemon: the hidden threads below it go first, in tree order, then the thread.
+    for (const c of this.archiveCascade(s.id)) if (c.archivedAt === null) this.archiveOne(c);
+    this.archiveOne(s);
+    return `archived thread ${label}`;
+  }
+
+  /** The sidebar rule (lib/inSidebar.ts, the daemon's Thread.InSidebar) with the mock's threads.show_created_threads. */
+  inSidebar(s: MockThread): boolean {
+    if (!s.createdBy) return true;
+    if (s.inSidebar !== null) return s.inSidebar;
+    return this.settings.values()["threads.show_created_threads"] === "true";
+  }
+
+  /**
+   * The threads archiving `root` takes with it (the daemon's ArchiveCascade): its
+   * descendants in tree order (spawn order, 8 levels, cycle safe) whose every ancestor
+   * below the root is hidden, archived ones included (archiving skips them; they keep
+   * their hidden children reachable). A shown thread and everything under it stay.
+   */
+  archiveCascade(root: string): MockThread[] {
+    const out: MockThread[] = [];
+    const seen = new Set([root]);
+    const walk = (id: string, depth: number) => {
+      if (depth > 8) return;
+      const kids = [...this.threads.values()].filter((t) => t.createdBy === id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
+      for (const c of kids) {
+        if (seen.has(c.id)) continue;
+        seen.add(c.id);
+        if (this.inSidebar(c)) continue;
+        out.push(c);
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(root, 1);
+    return out;
+  }
+
+  /** The unarchived threads archiving `root` takes with it that are mid-turn (thread.archive's confirmation; the daemon's hiddenWorking). */
+  private hiddenWorking(root: string): MockThread[] {
+    return this.archiveCascade(root).filter((t) => t.archivedAt === null && midTurn(t) !== "");
+  }
+
+  /** Archives one thread (no cascade): closes Claude, removes its shells, unpins, unsnoozes, stamps it. */
+  private archiveOne(s: MockThread): void {
     if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_THREAD] === s.id);
     s.pinned = false;
@@ -1534,7 +1602,20 @@ export class World {
     s.snoozedUntil = null;
     s.flags = [];
     this.publishThread(s);
-    return `archived thread ${label}`;
+  }
+
+  /**
+   * thread.sidebar (POST /__mock/thread/sidebar does what the CLI does): shows (true) or
+   * hides (false) a thread another thread created, whatever the setting says; refused for
+   * the user's own thread, like the daemon.
+   */
+  setThreadSidebar(id: string, shown: boolean): string {
+    const s = this.thread(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (!s.createdBy) throw new CommandError("invalid", `thread ${s.id}: invalid argument: only a thread another thread created can be shown or hidden in the sidebar; one the user created is always shown`);
+    s.inSidebar = shown;
+    this.publishThread(s);
+    return `thread ${label} ${shown ? "shown in" : "hidden from"} the sidebar`;
   }
 
   /**
@@ -1959,6 +2040,7 @@ export class World {
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
     }
+    const lineage = this.createdByArgs(args);
     const slug = promptSlug(prompt);
     const gen = this.generation;
     const settle = async (ms: number) => {
@@ -1994,11 +2076,30 @@ export class World {
       baseRef,
       createdWorktree: created,
       firstMessage: first,
+      ...lineage,
     });
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, project.id, path);
+    // Like the daemon: every new thread is focused; the GUI skips a hidden one (stores/intents.ts).
     this.focusThread(s.id);
-    return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+    const where = lineage.inSidebar === null || lineage.inSidebar === undefined ? "" : `; ${lineage.inSidebar ? "shown in" : "hidden from"} the sidebar`;
+    return { message: `created thread ${s.id} in ${path}${where}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /**
+   * thread.new's created-by and sidebar, like the daemon: a creator that exists (its name
+   * recorded), and sidebar only with one (InvalidArgument otherwise). Empty without them.
+   */
+  private createdByArgs(args: Record<string, string>): Partial<Pick<MockThread, "createdBy" | "createdByName" | "inSidebar">> {
+    const by = (args["created-by"] ?? "").trim();
+    const sidebar = args.sidebar ?? "";
+    if (!by) {
+      if (sidebar) throw new CommandError("invalid", "only applies to a thread another thread creates (created-by, which defaults to $CODE_FOUNDRY_THREAD inside a thread); a thread you create is always shown");
+      return {};
+    }
+    const creator = this.threads.get(by);
+    if (!creator) throw new CommandError("invalid", `created-by: no thread ${by}`);
+    return { createdBy: creator.id, createdByName: creator.name || creator.id, inSidebar: sidebar ? sidebar === "true" : null };
   }
 
   /**
@@ -2508,6 +2609,14 @@ export class World {
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
+            { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)" },
+            {
+              name: "sidebar",
+              type: ArgType.BOOL,
+              required: false,
+              description:
+                "With created-by: show the new thread in the sidebar (or with false, hide it) whatever settings threads.show_created_threads says; a thread another thread creates is hidden by default and archived with its creator",
+            },
           ],
         },
         // Like the daemon: also in the composer, whose no-project target has no project.
@@ -2699,15 +2808,19 @@ export class World {
             "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too.",
           keybindings: [],
           args: [{ name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" }],
-          // Like the daemon: only archiving a thread that is mid-turn or running background work asks.
+          // Like the daemon: only archiving a thread that is mid-turn or running background
+          // work asks, or one that takes a working hidden child along (archiveOneConfirm).
           confirmIf: (ctx, args) => {
             const s = activeThread(ctx);
-            return s !== undefined && archiving(s, args) && this.interrupts(s).why !== "";
+            return s !== undefined && archiving(s, args) && (this.interrupts(s).why !== "" || this.hiddenWorking(s.id).length > 0);
           },
           confirm: (ctx) => {
             const s = activeThread(ctx);
+            const name = s?.name || (s?.id ?? "");
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
-            return `Archive thread ${s?.name || (s?.id ?? "")}? ${why}; archiving ${ends}.`;
+            const kids = s ? this.hiddenWorking(s.id).length : 0;
+            const parts = [why ? `${why}; archiving ${ends}.` : "", kids > 0 ? hiddenWorkingText(kids, name) : ""].filter(Boolean);
+            return `Archive thread ${name}? ${parts.join(" ")}`;
           },
         },
         when: (ctx) => activeThread(ctx) !== undefined,
@@ -2715,6 +2828,24 @@ export class World {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           return this.archiveThread(s.id, archiving(s, args));
+        },
+      },
+      {
+        cmd: {
+          name: "thread.sidebar",
+          title: "Show or Hide Thread in Sidebar",
+          category: "Thread",
+          description:
+            "Show a thread another thread created in the sidebar, handing it to the user, or hide it again, handing it back to its creator (whatever settings threads.show_created_threads says). A hidden thread is archived with its creator; a shown one is not.",
+          keybindings: [],
+          args: [{ name: "shown", type: ArgType.BOOL, required: true, description: "Show (true) or hide (false) the thread in the sidebar" }],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeThread(ctx);
+          if (!s) throw new CommandError("unavailable", "no active thread");
+          if (args.shown !== "true" && args.shown !== "false") throw new CommandError("invalid", "shown is required: true or false");
+          return this.setThreadSidebar(s.id, args.shown === "true");
         },
       },
       {

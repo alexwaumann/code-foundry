@@ -25,12 +25,16 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
- *        six siblings, one archived, and a child of its own; World.addLineage)
+ *        six siblings, one archived, one shown by its override (s-l-logs), and a child of
+ *        its own; the others hidden while threads.show_created_threads is off; World.addLineage)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
  *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
- *                                                 closes, removes its shells, unpins, stamps; false unarchives)
+ *                                                 closes, removes its shells, unpins, stamps; false unarchives;
+ *                                                 hidden children go along: World.archiveCascade)
+ *   POST /__mock/thread/sidebar?id=s-l-child[&shown=false]   (thread.sidebar as the CLI does it: the
+ *                                                 override on a thread another thread created)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
@@ -744,6 +748,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         return;
       case "archive":
         world.archiveThread(id, q.get("archived") !== "false");
+        break;
+      case "sidebar":
+        world.setThreadSidebar(id, q.get("shown") !== "false");
         break;
       case "snooze":
         world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));

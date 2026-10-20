@@ -198,7 +198,21 @@ describe("attentionIds (the badge count)", () => {
       thread("waiting", { status: "idle", statusReason: "waiting on 2 child threads" }),
       thread("waiting-wake", { state: "disconnected", status: "idle", statusReason: "waiting" }),
     ]);
-    expect(attentionIds(data).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt", "woken"]);
+    expect(attentionIds(data, false).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt", "woken"]);
+  });
+
+  // Threads another thread created (lib/inSidebar.ts): only the ones the sidebar shows count.
+  const kid = (id: string, over: Partial<ThreadView>) => thread(id, { createdAtMs: 2, createdBy: "lead", inSidebar: null, status: "attention", statusReason: "finished", ...over });
+  it.each<[string, Partial<ThreadView>, boolean, boolean]>([
+    ["hidden by the setting (off)", {}, false, false],
+    ["shown by the setting (on)", {}, true, true],
+    ["shown by its override, setting off", { inSidebar: true }, false, true],
+    ["hidden by its override, setting on", { inSidebar: false }, true, false],
+    ["hidden and asking for a permission", { statusReason: "permission: Bash" }, false, false],
+    ["shown, but archived", { inSidebar: true, archivedAtMs: 5 }, false, false],
+  ])("a child thread %s: counts %s", (_name, over, showCreated, counts) => {
+    const data = replaceThreads(emptyThreads, [thread("lead", { status: "attention", statusReason: "finished" }), kid("kid", over)]);
+    expect(attentionIds(data, showCreated)).toEqual(counts ? ["lead", "kid"] : ["lead"]);
   });
 });
 
@@ -322,5 +336,22 @@ describe("startDockAlerts", () => {
     useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "sound 15"]);
+  });
+
+  it("a hidden child never badges or bounces; showing it (setting or override) does", () => {
+    settings({ "notifications.cooldown_seconds": "0" });
+    const kid = (over: Partial<ThreadView>) => thread("kid", { createdBy: "lead", inSidebar: null, status: "busy", ...over });
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("lead", { status: "busy" }), kid({})]), epoch: s.epoch + 1 }));
+    // The hidden child finishes and asks: nothing.
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: kid({ status: "attention", statusReason: "permission: Bash" }) }));
+    expect(calls).toEqual(["badge 0"]);
+    // Handed to the user (thread.sidebar --shown=true): it counts, and it is new to the set.
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: kid({ status: "attention", statusReason: "permission: Bash", inSidebar: true }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "bounce"]);
+    // Hidden again, then the setting shows every created thread.
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: kid({ status: "attention", statusReason: "permission: Bash", inSidebar: null }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "bounce", "badge 0"]);
+    settings({ "notifications.cooldown_seconds": "0", "threads.show_created_threads": "true" });
+    expect(calls).toEqual(["badge 0", "badge 1", "bounce", "badge 0", "badge 1", "bounce"]);
   });
 });

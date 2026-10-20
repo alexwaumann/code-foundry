@@ -1,13 +1,16 @@
 import { toast } from "sonner";
 import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
+import { threadFocus } from "@/lib/inSidebar";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
+import { getShowCreatedThreads } from "./settings";
 import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
+import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
@@ -21,18 +24,56 @@ import { showWorktreeOnProjectsPage } from "./worktreePanel";
 let pendingTerminal: string | null = null;
 let expiry: ReturnType<typeof setTimeout> | undefined;
 
-/** Forgets every pending focusTerminal (this module's and revealShell's). Exported for tests too. */
+/**
+ * A focusThread intent whose thread the list did not have yet (the intent and the list
+ * event arrive separately): decided once the thread arrives (threadFocus), within
+ * PENDING_FOCUS_MS. Dropped like pendingTerminal.
+ */
+let pendingThread: { id: string; stop: () => void } | null = null;
+
+/** Forgets every pending focusTerminal (this module's and revealShell's) and focusThread. Exported for tests too. */
 export function clearPendingFocus(): void {
   pendingTerminal = null;
   clearTimeout(expiry);
   expiry = undefined;
   clearRevealOnArrival();
+  pendingThread?.stop();
+  pendingThread = null;
 }
 
 // A selection change (the user's, or a resolved reveal's) ends the wait.
 useUiStore.subscribe((s, prev) => {
-  if (s.selection !== prev.selection && pendingTerminal !== null) clearPendingFocus();
+  if (s.selection !== prev.selection && (pendingTerminal !== null || pendingThread !== null)) clearPendingFocus();
 });
+
+/**
+ * Shows a thread the daemon asked to focus (thread.new, thread.fork, pr.*, thread.focus),
+ * unless it is a thread just created that is hidden from the sidebar (lib/inSidebar.ts
+ * threadFocus): an agent creating its children must not take the user's view. One not in
+ * the list yet is decided when it arrives.
+ */
+function focusThread(id: string): void {
+  clearPendingFocus();
+  const decide = (): boolean => {
+    const d = threadFocus(useThreadsStore.getState().byId[id], getShowCreatedThreads(), Date.now());
+    if (d === "select") useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
+    return d !== "wait";
+  };
+  if (decide()) return;
+  const stopWatch = useThreadsStore.subscribe((s) => {
+    if (!(id in s.byId)) return;
+    clearPendingFocus();
+    decide();
+  });
+  const timer = setTimeout(clearPendingFocus, PENDING_FOCUS_MS);
+  pendingThread = {
+    id,
+    stop: () => {
+      stopWatch();
+      clearTimeout(timer);
+    },
+  };
+}
 
 /**
  * Shows a terminal: a shell in its owner's bottom panel (revealShell: a thread's, or the
@@ -70,8 +111,7 @@ export function applyIntent(intent: UiIntentView): void {
       focusTerminal(intent.terminalId);
       break;
     case "focusThread":
-      clearPendingFocus();
-      ui.select({ kind: "thread", id: intent.threadId }, { focusPrompt: true });
+      focusThread(intent.threadId);
       break;
     case "focusProject":
       // The Projects page with the worktree (default: the project's main one) in its panel.
