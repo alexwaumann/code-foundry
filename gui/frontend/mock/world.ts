@@ -693,6 +693,12 @@ export class World {
       const s = this.threads.get(id);
       return s && { name: s.name, state: s.state, status: s.status, statusReason: s.statusReason, createdAt: s.createdAt, lastActivityAt: s.lastActivityAt, archived: s.archivedAt !== null };
     },
+    children: (id) =>
+      [...this.threads.values()]
+        .filter((t) => t.createdBy === id)
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
+        .map((t) => t.id),
+    createdBy: (id) => this.threads.get(id)?.createdBy ?? "",
   });
   /** The ember.* settings the board shows, as last published (emberSettingsChanged). */
   private emberSettings = "";
@@ -1082,7 +1088,8 @@ export class World {
     for (const w of emberWorkers()) {
       if (this.threads.has(w.id)) continue;
       const s = this.addThread({ id: w.id, projectId: "repo-cf", worktreePath: CF, name: w.name, model: w.model, effort: "high", state: w.state, status: w.status, statusReason: w.statusReason,
-        statusChangedAt: w.lastActivityAt, createdAt: w.createdAt, lastActivityAt: w.lastActivityAt, createdBy: resident, createdByName: "Ember", brief: w.brief, held: true });
+        statusChangedAt: w.lastActivityAt, createdAt: w.createdAt, lastActivityAt: w.lastActivityAt, createdBy: w.createdBy ?? resident,
+        createdByName: w.createdBy ? (emberWorkers().find((x) => x.id === w.createdBy)?.name ?? "") : "Ember", brief: w.brief, held: true });
       this.publishThread(s);
     }
   }

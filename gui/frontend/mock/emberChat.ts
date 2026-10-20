@@ -4,7 +4,10 @@
  * the 0.20 release notes and a wails bump; Ember planned (a run of work: the board, two
  * reads, two threads created, the board updated), replied with both task links, was woken
  * by the blocked wails worker, read it and said so, then took a follow-up as a subtask.
- * Three runs of work for the fold rows, three task links, one wake.
+ * Last, a progress wake from the notes API lead that Ember only thought about (no work
+ * row: docs/notes/ember-fixes-1-gui.md G6) and a reply with paths: an absolute one under
+ * the code-foundry checkout (a chip), a relative one and a git range (plain code; G1).
+ * Three runs of work for the fold rows, four task links, two wakes.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { MessageOrigin, ToolCallStatus, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
@@ -19,6 +22,8 @@ export interface EmberChatScript {
 }
 
 const CF = "/Users/alex/projects/code-foundry";
+/** The mock's code-foundry checkout (mock/world.ts), where the File tab finds README.md. */
+const HOME_CF = "/Users/dev/src/code-foundry";
 
 /** The wake the blocked wails worker sent (thread.new --notify). */
 function wailsWake(at: Date): { title: string; json: string } {
@@ -119,4 +124,20 @@ export function scriptEmberChat(s: EmberChatScript, now = Date.now()): void {
     { at: ago(30, 14) },
   );
   end(ago(30, 15), 15_000);
+
+  // 4. The notes API lead reports progress: Ember only thinks, then says where things are.
+  const leadAt = ago(3);
+  const leadTitle = 'Thread "Lead: notes API input validation" (s-ember-lead) reported progress: Schema done; handlers in two threads.';
+  s.it({ case: "userMessage", value: { text: `[code-foundry wake] ${leadTitle}`, attachments: [], origin: MessageOrigin.WAKE, wakeTitle: leadTitle, wakeJson: "{}" } }, { at: leadAt });
+  s.it({ case: "thinking", value: { text: "Progress only; nothing to do but tell the user where it stands." } }, { at: ago(3, 2), until: ago(3, 6) });
+  s.it(
+    {
+      case: "assistantText",
+      value: {
+        text: `The notes API team is under way: the schema is in, and two threads are on the handlers. The schema thread documented it in \`${HOME_CF}/README.md\` (each worktree's \`README.md\`); I'll compare \`main..cf/notes-validation\` once they report.\n\n[Validate notes API input](cf-task://t-4c5d6e7f)`,
+      },
+    },
+    { at: ago(3, 8) },
+  );
+  end(ago(3, 9), 9_000);
 }
