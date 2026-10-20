@@ -304,6 +304,9 @@ func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, e
 func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	f.mu.Lock()
 	parent, err := f.get(id)
+	if err == nil {
+		err = f.refuseResident(id, "forked")
+	}
 	f.mu.Unlock()
 	if err != nil {
 		return thread.Thread{}, err
@@ -353,6 +356,9 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 			s.ArchivedAt = time.Time{}
 			return nil
 		}
+		if err := f.refuseResident(id, "archived"); err != nil {
+			return err
+		}
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
 		}
@@ -381,6 +387,9 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 		}
 		if !until.After(f.Now()) {
 			return fmt.Errorf("%w: snooze time is not in the future", thread.ErrInvalidArgument)
+		}
+		if err := f.refuseResident(id, "snoozed"); err != nil {
+			return err
 		}
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
@@ -443,6 +452,9 @@ func (f *Fake) Remove(_ context.Context, id string) error {
 		return err
 	}
 	s, err := f.get(id)
+	if err == nil {
+		err = f.refuseResident(id, "removed")
+	}
 	if err != nil {
 		f.mu.Unlock()
 		return err

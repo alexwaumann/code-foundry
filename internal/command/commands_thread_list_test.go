@@ -64,6 +64,12 @@ func TestThreadList(t *testing.T) {
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  [in sidebar]  ↳ Fix the login",
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  [hidden]  ↳ Fix the login",
 			}},
+		// Residents are asked for with --resident, and marked.
+		{name: "residents", args: map[string]string{"resident": "true"}, threads: []*v1.Thread{
+			{Id: "s-0000000000e1", Name: "Ember", Kind: v1.ThreadKind_THREAD_KIND_RESIDENT, ResidentName: "ember", WorktreePath: "/home/residents/ember",
+				Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt", LastActivityAt: ago(time.Minute)}},
+			wantFilter: &v1.ThreadFilter{IncludeResident: true, Limit: 50},
+			wantLines:  []string{"s-0000000000e1  idle  Ember  no project  1m  [resident ember]"}},
 		{name: "a caller not in the list", caller: "s-999999999999", threads: []*v1.Thread{busy},
 			wantFilter: &v1.ThreadFilter{Limit: 50}, wantLines: []string{"s-7754a478e649  busy  Fix the login  app@cf/fix  5m"}},
 		// The creator is resolved by its id: its current name, not the recorded one.

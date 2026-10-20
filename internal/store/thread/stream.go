@@ -136,6 +136,7 @@ type threadCmd struct {
 	send      *outgoing
 	effort    *string // SetEffort
 	restart   bool    // Restart (restart.go)
+	reseed    *seed   // Reseed (reseed.go)
 	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
 	requestID string
 	decision  Decision
@@ -546,7 +547,13 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if !st.initialized || r.closing {
 		return Item{}, fmt.Errorf("%w: thread %s is not ready for a message", ErrFailedPrecondition, r.id)
 	}
-	blocks := []claudestream.ContentBlock{claudestream.TextBlock(o.prompt)}
+	// The first message of a fresh session a reseed asked for starts with its prefix
+	// (reseed.go); o keeps the prompt as it was, should this send fail.
+	prompt, seed := o.prompt, r.seed
+	if seed != "" {
+		prompt = seed + "\n\n" + prompt
+	}
+	blocks := []claudestream.ContentBlock{claudestream.TextBlock(prompt)}
 	for _, a := range o.attachments {
 		if !a.inline() {
 			continue // the prompt names its path; Claude reads it with Read
@@ -574,15 +581,23 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	var it Item
 	if o.itemID == "" {
 		u := userItem(id, o)
-		u.Queued = queued
+		u.Queued, u.SeedPrefix = queued, seed
 		it = st.proj.w.add(u)
-	} else if queued {
-		it, _ = st.proj.w.change(id, func(x *Item) { x.Queued = true })
+	} else if queued || seed != "" {
+		it, _ = st.proj.w.change(id, func(x *Item) {
+			x.Queued = x.Queued || queued
+			x.SeedPrefix = seed
+		})
 	} else {
 		it, _ = st.log.get(id)
 	}
 	if o.note != "" {
 		r.m.clearResumeNote(r.id, o.resume)
+	}
+	if seed != "" {
+		r.seed = ""
+		r.m.clearSeedPrefix(r.id, seed)
+		r.log().info("sent the seed prefix with the fresh session's first message", "prefix_bytes", len(seed))
 	}
 	st.sd.sent(o.origin != OriginWake)
 	r.activity = r.m.opts.Now()
@@ -678,6 +693,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.thread = r.setEffort(*cmd.effort)
 	case cmd.restart:
 		rep.thread, rep.restarted = r.requestRestart()
+	case cmd.reseed != nil:
+		rep.thread, rep.restarted = r.onReseed(*cmd.reseed)
 	case cmd.wakeLimit:
 		rep.item = r.onWakeLimit()
 	default:

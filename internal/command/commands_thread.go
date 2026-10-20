@@ -65,6 +65,8 @@ type ThreadBackend interface {
 	RestartBackend
 	// SidebarBackend backs thread.sidebar (commands_thread_sidebar.go).
 	SidebarBackend
+	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
+	ReseedBackend
 }
 
 var (

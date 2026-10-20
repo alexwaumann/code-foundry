@@ -217,6 +217,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		if l.resume == "" {
 			r.s.ClaudeSessionID = ""
 			r.namingTried = r.s.namedForGood()
+			r.s.FreshStart = false // a reseed's fresh start is this one (reseed.go)
 		}
 		r.first = o.first
 	})
@@ -302,6 +303,11 @@ func userItem(id string, o *outgoing) Item {
 func (m *Manager) resumeLaunch(prev Thread) (l launch, lastErr, note string, err error) {
 	if _, err := os.Stat(prev.WorktreePath); err != nil {
 		return launch{}, "", "", fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, prev.WorktreePath, err)
+	}
+	if prev.FreshStart {
+		// A reseed asked for a new conversation (reseed.go).
+		l.newID, err = newUUID()
+		return l, "", "", err
 	}
 	if prev.ClaudeSessionID != "" {
 		if _, ok := m.opts.Paths.transcriptPath(prev.WorktreePath, prev.ClaudeSessionID); ok {
@@ -494,9 +500,15 @@ func idleHoldOf(in idleInputs) string {
 
 // idleHold is idleHoldOf for this runner at now (run goroutine only).
 func (r *runner) idleHold(now time.Time) string {
+	return idleHoldOf(r.idleInputs(now))
+}
+
+// idleInputs are what an idle stop (and a reseed's: reseed.go) depends on for this
+// runner at now (run goroutine only).
+func (r *runner) idleInputs(now time.Time) idleInputs {
 	st := r.st
 	s, _ := r.m.Snapshot().Thread(r.id)
-	return idleHoldOf(idleInputs{
+	return idleInputs{
 		now:             now,
 		closing:         r.closing || r.finished,
 		starting:        !st.initialized || st.restart != restartNone,
@@ -511,5 +523,5 @@ func (r *runner) idleHold(now time.Time) string {
 		lastActive:      r.lastActive(),
 		cacheTTL:        r.m.cacheTTLNow(),
 		idleGrace:       r.m.opts.IdleGrace,
-	})
+	}
 }

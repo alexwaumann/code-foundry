@@ -59,6 +59,9 @@ type ListOptions struct {
 	// ShowCreated is the threads.show_created_threads setting ArchiveCascadeOf applies;
 	// Store.List sets it from the store's.
 	ShowCreated bool
+	// IncludeResident keeps resident threads (resident.go); without it (and without All)
+	// they are left out.
+	IncludeResident bool
 }
 
 // FilterThreads returns the threads o selects, the most recently active first (last
@@ -119,7 +122,7 @@ func (o ListOptions) matches(t Thread) bool {
 	switch {
 	case !o.All && !o.IncludeArchived && !t.ArchivedAt.IsZero():
 		return false
-	case !o.ownerMatches(t.Owner):
+	case !o.ownerMatches(t.Owner), !o.residentMatches(t.Kind):
 		return false
 	case o.Status != StatusUnknown && t.Status != o.Status:
 		return false

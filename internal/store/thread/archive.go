@@ -32,6 +32,9 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	if _, err := m.Get(ctx, id); err != nil {
 		return Thread{}, err
 	}
+	if err := m.refuseResident(id, "archived"); err != nil {
+		return Thread{}, err
+	}
 	tried := map[string]bool{}
 	var failed []CascadeFailure
 	cascaded := 0

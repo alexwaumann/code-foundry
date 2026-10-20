@@ -63,6 +63,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
 			{Name: "plugin", Type: String, Description: "Only the threads this plugin owns, or * for every plugin's (left out otherwise, except with all)"},
+			{Name: "resident", Type: Bool, Description: "Include the resident threads, the app's own agents (left out otherwise, except with all)"},
 			descendantsArg("only it and the threads below it, as a tree with each one's cost and a total line"),
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},
@@ -75,7 +76,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")), Owner: pluginOwner(a.String("plugin")),
-				DescendantsOf: a.String("descendants-of"),
+				DescendantsOf: a.String("descendants-of"), IncludeResident: a.Bool("resident"),
 			}
 			by, err := resolveCreatedBy(ctx, d.Thread, a.String("created-by"))
 			if err != nil {
@@ -211,6 +212,9 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		}
 		if s.GetSnoozedUntil() != nil {
 			marks = append(marks, "snoozed")
+		}
+		if m := residentMark(s); m != "" { // commands_thread_reseed.go
+			marks = append(marks, m)
 		}
 		if s.InSidebar != nil { // an override; unset follows the setting (commands_thread_sidebar.go)
 			marks = append(marks, map[bool]string{true: "in sidebar", false: "hidden"}[s.GetInSidebar()])
