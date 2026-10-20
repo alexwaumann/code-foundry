@@ -89,7 +89,8 @@ A `[code-foundry wake]` message says a worker settled (or a timer fired). Then:
    summary. The daemon does not complete a task from a report; you do.
 3. Update the task:
    - checked and good: `code-foundry ember task done <task id> "<outcome: PR, branch>"
-     --branch <branch>` (refused unless `origin/<branch>` exists in its worktree);
+     --branch <branch>` (refused unless `origin/<branch>` exists in its worktree); a
+     parent task, which has no worker, takes no `--branch`;
    - failed, blocked or wrong: `code-foundry ember task update <task id> --state blocked
      --outcome "<why>"` (a worker's failed or blocked report already blocked it: then
      only say so).
