@@ -90,7 +90,8 @@ func TestRender(t *testing.T) {
 	}
 	want := []string{
 		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
-		"code-foundry-orchestrate/reference/patterns.md",
+		"code-foundry-orchestrate/reference/patterns.md", "code-foundry-orchestrate/reference/wakes.md",
+		"code-foundry-orchestrate/reference/leads.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
 		"code-foundry-help/reference/settings.md", "code-foundry-help/reference/commands.md",
 	}
@@ -116,7 +117,9 @@ func TestRender(t *testing.T) {
 	}{
 		// Model only: not in the slash menu. Names the user's words for parallel work, and
 		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2, v3).
-		{skills.Orchestrate, "false", 600, 160},
+		// Wake and lead rules live in reference files (orch-skill-split); new material
+		// goes behind a pointer too, so the cap stays below the old 160.
+		{skills.Orchestrate, "false", 600, 130},
 		{skills.Help, "", 400, 120},   // both: no invocation keys
 		{skills.Plugin, "", 600, 120}, // both; names the words that should trigger it
 	} {
@@ -215,19 +218,28 @@ func TestRender(t *testing.T) {
 		t.Error("reference/getting-started.md is not docs/GETTING-STARTED.md")
 	}
 
-	// The orchestrate skill keeps its line cap by pointing at worked sections of
-	// patterns.md (orch-skill-v3); each section exists and SKILL.md names it.
-	orch, patterns := string(files[skills.Orchestrate+"/SKILL.md"]), string(files[skills.Orchestrate+"/reference/patterns.md"])
-	for _, tt := range []struct{ heading, pointer string }{
-		{"## 5. A supervised child\n", "`reference/patterns.md` §5"},
-		{"## 6. Budget stops\n", "`reference/patterns.md` §6"},
-		{"## 7. Discarding a child's work\n", "`reference/patterns.md` §7"},
+	// The orchestrate skill keeps its line cap by pointing at reference files: worked
+	// sections of patterns.md (orch-skill-v3), and the wake and lead rules
+	// (orch-skill-split). Each file has its sections and the file that sends the reader
+	// there (SKILL.md, or wakes.md for the supervised and budget sections) names each.
+	for _, tt := range []struct{ file, want, from, pointer string }{
+		{"reference/patterns.md", "\n## 5. A supervised child\n", "reference/wakes.md", "`reference/patterns.md` §5"},
+		{"reference/patterns.md", "\n## 6. Budget stops\n", "reference/wakes.md", "`reference/patterns.md` §6"},
+		{"reference/patterns.md", "\n## 7. Discarding a child's work\n", "SKILL.md", "`reference/patterns.md` §7"},
+		{"reference/wakes.md", "\n## Pending prompts and questions\n", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "`report_stale: true`", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "\n## A batch of wakes\n", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "\n## After the app restarts\n", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "WITHOUT `--wait`", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
+		{"reference/leads.md", "Before a lead ends a turn while its workers still run, it posts `code-foundry thread\n  report progress",
+			"SKILL.md", "`reference/leads.md`"},
 	} {
-		if !strings.Contains(patterns, "\n"+tt.heading) {
-			t.Errorf("patterns.md lacks %q", tt.heading)
+		if got := string(files[skills.Orchestrate+"/"+tt.file]); !strings.Contains(got, tt.want) {
+			t.Errorf("%s lacks %q", tt.file, tt.want)
 		}
-		if !strings.Contains(orch, tt.pointer) {
-			t.Errorf("the orchestrate SKILL.md does not point at %s", tt.pointer)
+		if !strings.Contains(string(files[skills.Orchestrate+"/"+tt.from]), tt.pointer) {
+			t.Errorf("the orchestrate %s does not point at %s", tt.from, tt.pointer)
 		}
 	}
 

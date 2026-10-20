@@ -59,41 +59,14 @@ sees every thread in the app's sidebar. You create and drive other threads with 
      end your turn; one wake per push's CI run, with `head_sha` (`reference/patterns.md`).
 
    Pick ONE. With `--notify`, end your turn: do not also run `thread wait`, or every
-   child wakes you twice. From a wake turn, follow up with `thread send --id <child>`
-   WITHOUT `--wait` and end the turn (`send --wait` there holds back your other
-   children's wakes); the subscription fires again on its next settle. `thread send`
-   prints the message's ordinal; a plain `thread wait` after it waits for the answer to
-   that message (`--after <ordinal>`). A wait that times out exits 1: wait again.
+   child wakes you twice. `thread send` prints the message's ordinal; a plain `thread
+   wait` after it waits for the answer to that message (`--after <ordinal>`). A wait
+   that times out exits 1: wait again.
 
-   `needs attention (finished)` is a turn that ended normally. A wake with
-   `report_stale: true` (no report, or one older than its last message) has
-   `last_message`: the child may be asking you something in prose; read it, answer with
-   `thread send --id <child>`.
-   Each permission prompt or question wakes you on its own; its `pending` has the
-   `request_id`, the tool `input` (judge that, not the child's description) and a
-   question's `options` (what `thread respond --answer` takes). Answer every pending
-   request you can before relaying a child's question to the user as plain text at the
-   end of your turn (the child still asks with its own question tool; a blocking
-   question tool in YOUR turn holds back your other children). Supervised children:
-   `reference/patterns.md` §5. A budget stop is not finished work: tell the user and
-   never raise a budget they set unasked; raising alone does not resume the child, so
-   resume it as `reference/patterns.md` §6 shows.
-
-   On a wake for a batch, look at the whole batch (`thread reports --created-by
-   $CODE_FOUNDRY_THREAD --all`; wakes can arrive seconds apart), and talk to the user
-   only when something needs them (a question, a failure, a conflict) or the batch is
-   complete; otherwise end the turn silently or with one short line. Do a check now or
-   not at all: never promise one for later. Do not message a finished child only to
-   inform it: every message starts a turn and a wake. A `thread send` to a working child
-   is read at its next tool call, not held: work it already pushed stays pushed; `thread
-   interrupt --id <id>` first if it must stop now. When a follow-up changes the task,
-   `thread rename --id <id> --name "<new name>"` so the user's sidebar matches.
-
-   **After the app restarts** (a wake says so, or the user does): `thread reports
-   --created-by $CODE_FOUNDRY_THREAD --all` and `thread list --created-by
-   $CODE_FOUNDRY_THREAD`. A child in `error (interrupted)` (reason "daemon stopped")
-   lost its current turn only: check its worktree, then `thread send --id <child> "the
-   app restarted; continue"`. Subscriptions survive a restart: do not subscribe again.
+   A wake carries the child's state, its report, and when it needs you, a `pending`
+   permission prompt or question, or a stale report's `last_message`. Before you act on
+   a wake, read `reference/wakes.md`: pending prompts, stale reports, batches, restarts,
+   and following up from a wake turn (never `send --wait` there).
 3. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`-`: no report yet; `--json` for the data). `thread read <id>` prints
    its last 20 items (`--since <nextSince>` reads on); answer with `thread respond --id`.
@@ -109,18 +82,10 @@ sees every thread in the app's sidebar. You create and drive other threads with 
 
 ## Leads (children that orchestrate)
 
-- To make a child a lead, tell it in its prompt "You are a lead: use the
-  code-foundry-orchestrate skill" rather than copying these rules into the prompt. A
-  lead only coordinates: give it no new worktree. It never runs `project worktree
-  cleanup`: its parent owns it.
-- Before a lead ends a turn while its workers still run, it posts `code-foundry thread
-  report progress "<n> workers started: <ids>"` (with the ids its `thread new` calls
-  printed); without it the parent is woken with "finished" and no report. That settle
-  does not wake the parent: the daemon holds it while workers run and wakes the parent
-  when the lead's work is done or a worker needs someone. A lead's wake counts its
-  `children` ("2 of its 3 child threads still working": not done). Its final report
-  lists each worker's id, branch, status and every concern a worker raised; a parent
-  runs `thread reports --descendants-of <lead>` (with costs) before presenting it.
+Tell the child in its prompt "You are a lead: use the code-foundry-orchestrate skill";
+give it no new worktree. Before it ends a turn while its workers run, it posts a
+`thread report progress` naming them. `reference/leads.md`: every lead rule, its wakes
+and its final report. Read it before you start a lead, or when you are one.
 
 ## Cleanup
 
@@ -157,4 +122,6 @@ is project-wide. To discard a child's work: `reference/patterns.md` §7.
 - `reference/patterns.md`: worked examples: one child and a wait; fanning out; a branch
   built on a sibling's; a review loop; a PR's CI and review; §5 a supervised child; §6
   budget stops; §7 discarding a child's work.
+- `reference/wakes.md`: reading a wake and the turn it starts. `reference/leads.md`:
+  children that orchestrate.
 - `code-foundry help <command>`: one command's flags. `code-foundry guide`: the CLI guide.
