@@ -38,6 +38,8 @@ code-foundry-orchestrate skill; this skill is how you use it.
    code-foundry ember task update <task id> --thread <thread id> --state doing
    ```
 
+   Two separate commands: `thread new` prints `created thread <name> (<id>)`; put that id
+   in the update. Never chain them or capture the id with `$(...)`.
    Never pass `--model` or `--effort`: the daemon gives Ember's workers their model
    (the user's Ember settings). Pass `--budget <usd>` when the user named a budget or the
    piece could run long (a worker is stopped at it). Start the pieces that do not depend
