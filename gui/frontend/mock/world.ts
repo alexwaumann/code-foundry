@@ -30,6 +30,7 @@ import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
+import { MockSkills } from "./skills";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
@@ -190,9 +191,10 @@ const LABEL_PROJECT = "project";
 const LABEL_WORKTREE = "worktree";
 const KIND_SHELL = "shell";
 const KIND_ACTION = "action";
+const KIND_SETUP = "setup";
 
-/** termlabel.IsPanel: a shell or an action run (the bottom panel's terminals; what close and thread removal take). */
-const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION;
+/** termlabel.IsPanel: a shell, an action run or a skill's setup (the bottom panel's terminals; what close and thread removal take). */
+const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION || labels[LABEL_KIND] === KIND_SETUP;
 
 /** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when threadId is set. */
 function shellLabels(threadId: string, projectId: string, worktree: string): Record<string, string> {
@@ -684,6 +686,11 @@ export class World {
     },
     registries: () => this.settings.value("plugins.registries"),
   });
+  /** The Skills marketplace (mock/skills.ts); the EventService skill source. */
+  readonly skills = new MockSkills({
+    publish: (v) => this.events.publish({ source: EventSource.SKILL, event: { event: { case: "skill", value: v } } }),
+    startSetup: (ctx, name, dir, script) => this.startSkillSetup(ctx, name, dir, script),
+  });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => this.restartCost(),
@@ -753,6 +760,7 @@ export class World {
     for (const r of initialProjects()) this.projects.set(r.id, r);
     this.gh.reset();
     this.plugins.reset();
+    this.skills.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
@@ -1836,6 +1844,8 @@ export class World {
     this.publishTerm(t);
     // An action run's terminal: its run finishes with this code (the terminal stays, EXITED).
     this.actions.terminalExited(id, code);
+    // A skill's setup script: exit 0 is setup done (the daemon's skill_setup_exits.go).
+    if (t.labels[LABEL_KIND] === KIND_SETUP) this.skills.setupExited(t.labels.skill ?? "", code);
     // Like the daemon's shell reaper: a shell terminal.new started is removed once it exits.
     if (t.labels[LABEL_KIND] === KIND_SHELL && !keep) this.remove(id);
   }
@@ -1860,6 +1870,34 @@ export class World {
    * the active thread, else the active registered worktree, else the deepest registered worktree
    * containing cwd. Refuses a cwd outside every project.
    */
+  /**
+   * skill.setup's terminal, like the daemon's: owned by the context's thread, else its
+   * worktree, else its project's main worktree (null with none); kind=setup with the
+   * skill and its tab's title. The script prints a few lines and exits 0 about a second
+   * later, which marks the skill set up (kill → MockSkills.setupExited).
+   */
+  private startSkillSetup(ctx: UiContext | undefined, name: string, dir: string, script: string): { id: string; cwd: string; labels: Record<string, string> } | null {
+    let labels: Record<string, string>;
+    if (ctx?.activeThreadId || ctx?.activeWorktreePath) labels = this.shellOwner(ctx, "").labels;
+    else {
+      const p = ctx?.activeProjectId ? this.projects.get(ctx.activeProjectId) : undefined;
+      if (!p) return null;
+      labels = shellLabels("", p.id, p.path);
+    }
+    const t = this.create(["/bin/sh", script], dir, { ...labels, [LABEL_KIND]: KIND_SETUP, skill: name, title: `Setup ${name}` }, "action");
+    const gen = this.generation;
+    const live = () => gen === this.generation && this.terms.get(t.id) === t;
+    [`$ /bin/sh ${script}\r\n`, `Setting up ${name}...\r\n`, "Done.\r\n"].forEach((line, i) => {
+      setTimeout(() => {
+        if (live()) this.output(t, line);
+      }, 300 * (i + 1));
+    });
+    setTimeout(() => {
+      if (live()) this.kill(t.id, 0);
+    }, 1200);
+    return { id: t.id, cwd: t.cwd, labels: t.labels };
+  }
+
   private shellOwner(ctx: UiContext | undefined, cwd: string): { labels: Record<string, string>; cwd: string } {
     const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
@@ -2414,6 +2452,7 @@ export class World {
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...this.actions.commands(),
       ...this.plugins.commands(),
+      ...this.skills.commands(),
       {
         cmd: {
           name: "terminal.new",
