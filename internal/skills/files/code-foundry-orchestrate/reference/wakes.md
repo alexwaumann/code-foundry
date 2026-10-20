@@ -55,3 +55,8 @@ $CODE_FOUNDRY_THREAD --all` and `thread list --created-by $CODE_FOUNDRY_THREAD`.
 child in `error (interrupted)` (reason "daemon stopped") lost its current turn only:
 check its worktree, then `thread send --id <child> "the app restarted; continue"`.
 Subscriptions survive a restart: do not subscribe again.
+
+## Plugin wake sources
+
+When a plugin names a wake source (`code-foundry thread subscribe --plugin
+<plugin>/<source> --arg ...`), run it and end your turn; `code-foundry plugin wakes`.

@@ -231,6 +231,8 @@ func TestRender(t *testing.T) {
 		{"reference/wakes.md", "\n## A batch of wakes\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/wakes.md", "\n## After the app restarts\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/wakes.md", "WITHOUT `--wait`", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "\n## Plugin wake sources\n", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/patterns.md", "\n## 8. Checking a batch before the roll-up\n", "SKILL.md", "`reference/patterns.md` §8"},
 		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
 		{"reference/leads.md", "Before a lead ends a turn while its workers still run, it posts `code-foundry thread\n  report progress",
 			"SKILL.md", "`reference/leads.md`"},
