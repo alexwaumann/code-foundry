@@ -33,7 +33,7 @@ func TestRenderBoard(t *testing.T) {
 		want  []string
 		not   []string
 	}{
-		{"empty", nil, []string{"# Task board", "As of 2026-10-20 14:05", "No tasks yet."}, []string{"## In progress"}},
+		{"empty", nil, []string{"# Task board", "As of 2026-10-20 14:05 UTC.", "\nTime zone: UTC, local times.", "No tasks yet."}, []string{"## In progress"}},
 		{"every section", tasks, []string{
 			"## In progress\n\n- t-00000001 Write docs · worker s-111111111111 busy, report progress: Drafting the line, 12m\n  - t-00000002 README part\n",
 			"## Up next\n\n- t-00000003 Changelog part\n",
@@ -75,6 +75,40 @@ func TestThreadState(t *testing.T) {
 	for _, tt := range tests {
 		if got := ThreadState(&tt.tt); got != tt.want {
 			t.Errorf("ThreadState(%+v) = %q, want %q", tt.tt, got, tt.want)
+		}
+	}
+}
+
+// The board names the zone its times are in: the IANA name and the abbreviation.
+func TestZoneLine(t *testing.T) {
+	cdt := time.FixedZone("CDT", -5*3600)
+	if got := zoneLine(now, cdt); !strings.HasPrefix(got, "Time zone: CDT, local times.") {
+		t.Errorf("fixed zone = %q", got)
+	}
+	chicago, err := time.LoadLocation("America/Chicago")
+	if err != nil {
+		t.Skip("no tzdata:", err)
+	}
+	if got := zoneLine(now, chicago); !strings.HasPrefix(got, "Time zone: America/Chicago (CDT), local times.") {
+		t.Errorf("named zone = %q", got)
+	}
+	if got := RenderBoard(nil, now, chicago); !strings.Contains(got, "As of 2026-10-20 09:05 CDT.") {
+		t.Errorf("board in Chicago:\n%s", got)
+	}
+	t.Setenv("TZ", "Europe/Berlin")
+	if got := ZoneName(time.Local); got != "Europe/Berlin" {
+		t.Errorf("ZoneName(Local) with TZ = %q", got)
+	}
+}
+
+func TestRenderSkills(t *testing.T) {
+	if got := RenderSkills(""); got != "" {
+		t.Errorf("no dir = %q", got)
+	}
+	got := RenderSkills("/h/claude/.claude/skills/code-foundry-orchestrate")
+	for _, w := range []string{"## Skills", "`/h/claude/.claude/skills/code-foundry-orchestrate`", "`/h/claude/.claude/skills/code-foundry-orchestrate/reference/leads.md`", "never search the disk"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("skills lack %q:\n%s", w, got)
 		}
 	}
 }

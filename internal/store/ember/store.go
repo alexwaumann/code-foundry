@@ -75,6 +75,9 @@ type Options struct {
 	Consolidate Runner
 	// Claude is the claude executable for the default Consolidate. Default "claude".
 	Claude string
+	// OrchestrateSkill is the absolute path of the code-foundry-orchestrate skill's
+	// directory (every thread's skills), named in PROJECTS.md. "": not named.
+	OrchestrateSkill string
 	// InstallSkill writes the code-foundry-ember skill under dir (Claude loads it from
 	// dir/.claude/skills). nil: none.
 	InstallSkill func(dir string) error

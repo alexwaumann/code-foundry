@@ -2,6 +2,7 @@ package ember
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -129,7 +130,8 @@ func RenderRecent(msgs []Message, budget int, loc *time.Location) string {
 func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString("# Task board\n\n")
-	fmt.Fprintf(&b, "As of %s. `code-foundry ember board` prints it live; `ember task show <id>` one task.\n", now.In(loc).Format("2006-01-02 15:04"))
+	fmt.Fprintf(&b, "As of %s. `code-foundry ember board` prints it live; `ember task show <id>` one task.\n", now.In(loc).Format("2006-01-02 15:04 MST"))
+	b.WriteString(zoneLine(now, loc))
 	y, m, d := now.In(loc).Date()
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
 	type section struct {
@@ -276,6 +278,17 @@ func RenderProjects(ps []ProjectSeed) string {
 		b.WriteString("  Latest threads: " + strings.Join(parts, "; ") + "\n")
 	}
 	return b.String()
+}
+
+// RenderSkills is PROJECTS.md's closing section: where the code-foundry-orchestrate
+// skill is (dir, absolute), so Ember reads its references by path; "" without dir.
+func RenderSkills(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	return "\n## Skills\n\nThe code-foundry-orchestrate skill (the thread protocol) is in `" + dir + "`: " +
+		"SKILL.md, and `reference/leads.md` for leads (`" + filepath.Join(dir, "reference", "leads.md") + "`). " +
+		"Read them by these paths; never search the disk for them.\n"
 }
 
 // Age is a duration in one unit: "now", "5m", "3h", "2d".

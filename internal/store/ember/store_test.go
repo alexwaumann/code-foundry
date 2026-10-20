@@ -59,7 +59,7 @@ func newEnv(t *testing.T, mods ...func(*env)) *env {
 	e.opts = Options{
 		DB: database, Bus: b, Log: slog.New(slog.DiscardHandler), Threads: e.threads, Config: e.config, Dir: e.dir,
 		Projects: projectsFake{&project.Snapshot{Projects: []project.Project{{ID: "p-1", Name: "app", Path: "/u/app", DefaultBranch: "main", Git: true}}}},
-		Now:      e.clock, Location: utc, CheckInterval: time.Hour,
+		Now:      e.clock, Location: utc, CheckInterval: time.Hour, OrchestrateSkill: "/h/claude/.claude/skills/code-foundry-orchestrate",
 		Consolidate: func(_ context.Context, model, prompt string) (string, error) {
 			e.mu.Lock()
 			defer e.mu.Unlock()
@@ -192,7 +192,8 @@ func TestEnable(t *testing.T) {
 			t.Errorf("%s: %v", f, err)
 		}
 	}
-	if b, _ := os.ReadFile(filepath.Join(e.dir, "seed", "PROJECTS.md")); !strings.Contains(string(b), "**app** (`p-1`)") {
+	if b, _ := os.ReadFile(filepath.Join(e.dir, "seed", "PROJECTS.md")); !strings.Contains(string(b), "**app** (`p-1`)") ||
+		!strings.Contains(string(b), "/h/claude/.claude/skills/code-foundry-orchestrate/reference/leads.md") {
 		t.Errorf("PROJECTS.md = %q", b)
 	}
 	if len(e.skillDirs) != 1 || e.skillDirs[0] != filepath.Join(e.dir, "skills") {

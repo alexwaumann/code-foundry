@@ -50,6 +50,8 @@ func openEmber(ctx context.Context, log *slog.Logger, p paths.Paths, db *sql.DB,
 		Config:       func() ember.Config { return emberConfig(st.Settings()) },
 		Claude:       claude,
 		InstallSkill: installEmberSkill,
+		// installSkills writes every thread's skills there (p.Claude(), the first add-dir).
+		OrchestrateSkill: filepath.Join(p.Claude(), skills.SkillsDir, skills.Orchestrate),
 	})
 	if err != nil {
 		return nil, err
