@@ -109,8 +109,19 @@ its own copy). The GUI runs it locally (`commandPresenters` in keys/bindings.ts)
 Splitting focuses the panel (or the palette's return target moves there), like
 `view.panel.new-tab`.
 
-CLI, against a scratch daemon (`CODE_FOUNDRY_HOME=/tmp/...`): `code-foundry view
-panel.split` delivers a ShowView to every window, and `code-foundry help` lists it.
+CLI: `code-foundry view panel split` (or `view.panel.split`) delivers the ShowView to every
+window; `code-foundry help view` lists it as "Split Side Panel".
+
+## Live check
+
+Built app (`make gui-build`) with an isolated `CODE_FOUNDRY_HOME`, a scratch git project
+under `~` with three changed files, and a thread in it (never sent a message). With the
+worktree tab and README.md's diff open, `code-foundry view panel split` split the panel
+(stacked at 420px), dragging the resize handle to the 776px maximum flipped it side by
+side on release, `view panel expand` kept it side by side, cmd+\ joined and split it
+again, and cmd+alt+\ moved the full tint to the other group, all in the WKWebView. The
+PR body's shots come from that run. Theme switches went through `appearance.theme` in
+the isolated settings file and were put back to `system`.
 
 ## Decisions and deviations from the brief
 
