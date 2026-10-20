@@ -26,6 +26,9 @@ type ClaudeError struct {
 	Args []string
 	// Msg is the first line claude printed on stderr (else stdout).
 	Msg string
+	// Stdout is what claude printed on stdout: a `--json` command's result line, which
+	// it prints on failure too.
+	Stdout []byte
 }
 
 func (e *ClaudeError) Error() string {
@@ -68,7 +71,7 @@ func (c ExecClaude) Run(ctx context.Context, args ...string) ([]byte, error) {
 			if msg == "" {
 				msg = firstLine(stdout.String())
 			}
-			return nil, &ClaudeError{Args: args, Msg: msg}
+			return nil, &ClaudeError{Args: args, Msg: msg, Stdout: stdout.Bytes()}
 		}
 		return nil, fmt.Errorf("run claude: %w", err)
 	}
