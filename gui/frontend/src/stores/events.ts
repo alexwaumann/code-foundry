@@ -16,6 +16,7 @@ import { onPluginEvent } from "./plugins";
 import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
+import { onSkillEpoch } from "./skill";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyThreadSourceEvent, pruneThreadLogs } from "./thread";
 import { applyUpdateEvent } from "./update";
@@ -82,6 +83,8 @@ const handlers: Handlers = {
   },
   // Plugins and their surfaces' availability (stores/plugins.ts re-lists commands).
   plugin: onPluginEvent,
+  // The Skills marketplace read again: an open Settings → Skills re-reads (stores/skill.ts).
+  skill: (ev) => { onSkillEpoch(ev.epoch); },
 };
 
 export function dispatchEvent(ev: EventView): void {
