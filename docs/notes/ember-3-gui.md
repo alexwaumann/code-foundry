@@ -204,6 +204,25 @@ as a subtask. Three work rows, three task links, one wake.
   a live add, a worker opening its thread; the Board not offered on another thread; the
   nav flame and the chips (toggle on, off, the last one stays).
 
+## Verification
+
+* `make check` green; `make gui-e2e`: 485 passed, 26 skipped live specs, one failure in
+  `workspaces.spec.ts` ("pick a project, add Also in", a cmd+n then cmd+1 picker timing
+  check with Ember off) that passed 12 of 12 on a rerun: a flake, not this PR.
+* Live (2026-10-20): `make build`, the daemon with `CODE_FOUNDRY_HOME=/tmp/ember-pr3-home`
+  (`daemon --dev`), Ember and its workers on `claude-haiku-5-5[1m]` at medium, a scratch
+  git repo `~/ember-pr3-scratch` registered as a project, `ember enable`, then `thread send
+  --id <ember> "In the ember-pr3-scratch project, add a file hello.txt … commit it on a
+  branch. Do not push and open no PR." --wait`. The GUI (Vite, pointed at that daemon with
+  `?daemon=…&token=…`, WebKit): the pinned row (Working), the chat with "Worked for 9s ·
+  created 1 thread, updated the board, ran 1 command, used 2 skills", Ember's reply with
+  its task link ("· done" once the worker finished, live from WatchBoard), a second run
+  "Worked for 4s · 1 wake, updated the board, checked git", the live "Working" row under
+  the streaming reply, the busy placeholder, and the Board opened from the link with the
+  task under Done today, its outcome and its worker row (Finished). Then the daemon was
+  stopped (SIGTERM) and the scratch home, repo and their `~/.claude/projects` entries
+  deleted.
+
 ## Gotchas
 
 * The Ember row is outside the sidebar's listbox (it sits above New thread), so the list's
