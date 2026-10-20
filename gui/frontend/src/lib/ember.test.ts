@@ -325,6 +325,14 @@ describe("a lead's team", () => {
     ]);
   });
 
+  it("says Needs input on a lead's card while one of its team asks", () => {
+    const [card] = boardSections([lead], NOW).inProgress;
+    expect(card && cardMeta(card)).toEqual({ text: "Needs input", tone: "amber" });
+    const calm = task("t-l", { state: "doing", threadId: "s-lead", thread: { ...leadThread, descendantsWaiting: 0 } });
+    const [c2] = boardSections([calm], NOW).inProgress;
+    expect(c2 && cardMeta(c2)).toEqual({ text: "Working", tone: "sky" });
+  });
+
   it("leaves a done task's team out", () => {
     const done = task("t-l", { state: "done", threadId: "s-lead", thread: leadThread });
     const [card] = boardSections([done], NOW).doneToday;

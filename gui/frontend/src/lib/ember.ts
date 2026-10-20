@@ -80,6 +80,9 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
   }
 }
 
+/** The words of a worker waiting on the user. */
+const NEEDS_INPUT: Words = { text: "Needs input", tone: "amber" };
+
 /** A task's state in a card's or a worker row's words. */
 const stateWords: Readonly<Record<EmberTaskStateView, string>> = {
   todo: "queued",
@@ -162,14 +165,17 @@ export function cardProgress(c: BoardCard): { done: number; total: number } | nu
   return { done: counted.filter((s) => s.state === "done").length, total: counted.length };
 }
 
-/** A card's right side: "x of y" for a parent, else its worker's status words, else its state. */
+/** A card's right side: "x of y" for a parent, else its worker's status words (Needs input while one of a lead's team asks), else its state. */
 export function cardMeta(c: BoardCard): Words {
   const p = cardProgress(c);
   if (p) return { text: `${String(p.done)} of ${String(p.total)}`, tone: "muted" };
   const t = c.task;
   if (t.state === "done" || t.state === "cancelled" || t.state === "todo") return { text: stateWords[t.state], tone: "muted" };
   if (t.state === "blocked") return { text: stateWords.blocked, tone: "amber" };
-  if (t.thread) return workerWords(t.thread);
+  if (t.thread) {
+    const words = workerWords(t.thread);
+    return t.thread.descendantsWaiting > 0 && words.tone !== "red" ? NEEDS_INPUT : words;
+  }
   return { text: stateWords[t.state], tone: "muted" };
 }
 
@@ -322,8 +328,6 @@ export function headerSummary(tasks: readonly EmberTaskView[]): string {
 export function firstDoingTitle(tasks: readonly EmberTaskView[]): string {
   return (tasks.find((t) => t.state === "doing" && t.parentId === "") ?? tasks.find((t) => t.state === "doing"))?.title ?? "";
 }
-
-const NEEDS_INPUT: Words = { text: "Needs input", tone: "amber" };
 
 /**
  * The pinned row's status: Ember's own prompt or error; else Needs input while a worker

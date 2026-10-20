@@ -202,6 +202,7 @@ test("a worker waiting on the user: Needs input on the row, Ember in the bell un
   await expect(bell).toHaveAttribute("data-count", "2");
   await page.getByTestId("ember-board-toggle").click();
   await expect(board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-team-put"]').getByTestId("ember-worker-meta")).toHaveText("Needs input");
+  await expect(board(page).locator('[data-testid="ember-task"][data-task="t-4c5d6e7f"]').getByTestId("ember-task-meta")).toHaveText("Needs input");
   // A task's own worker asking counts too, once with the team's.
   await mockPost(`thread/status?id=s-ember-notes&status=attention&reason=${encodeURIComponent("permission: Bash git push")}`);
   await expect(bell).toHaveAttribute("data-count", "2");
