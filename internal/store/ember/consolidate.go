@@ -2,7 +2,9 @@ package ember
 
 import (
 	"bytes"
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/claudestream"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -21,8 +24,13 @@ import (
 // that never runs inside Ember's context: the current file, the task changes and the
 // visible conversation since the last consolidation go in on stdin, the new file comes
 // out. An answer that fails validation (ValidMemory) keeps the old file.
+//
+// The call keeps no session, so no transcript feeds the usage page: it answers with
+// --output-format json, and the result's usage and cost are recorded on the status
+// (ConsolidationUsage: the last call, and the total since state.json began).
 
-// Runner runs one consolidation call with model and returns its output.
+// Runner runs one consolidation call with model and returns its output: claude's JSON
+// result (consolidationResult), or the answer as plain text.
 type Runner func(ctx context.Context, model, prompt string) (string, error)
 
 // maxConsolidationInput caps a consolidation's input; the oldest messages go first.
@@ -33,10 +41,10 @@ const keepConsolidations = 5
 
 // consolidationArgs is the call's command for model m: like the naming call
 // (thread.ClaudeNamer) at low effort, no session persistence, no customizations and no
-// tools, the prompt on stdin; the minimal variant drops the flags managed settings may
-// refuse.
+// tools, the prompt on stdin, a JSON result (its usage); the minimal variant drops the
+// flags managed settings may refuse.
 func consolidationArgs(m string, minimal bool) []string {
-	args := []string{"-p", "--model", m, "--effort", "low", "--no-session-persistence"}
+	args := []string{"-p", "--model", m, "--effort", "low", "--no-session-persistence", "--output-format", "json"}
 	if !minimal {
 		args = append(args, "--safe-mode", "--tools", "")
 	}
@@ -73,6 +81,59 @@ func runClaude(ctx context.Context, claude, cwd string, args []string, prompt st
 		return "", fmt.Errorf("claude -p: %w: %s", err, truncate(detail, 4096, "…"))
 	}
 	return string(out), nil
+}
+
+// ConsolidationUsage is what consolidation calls cost: the last one (Calls 1), or the
+// sum over every call since state.json began. InputTokens counts every prompt token
+// (uncached, cache reads and cache writes).
+type ConsolidationUsage struct {
+	At           time.Time `json:"at"`
+	Calls        int       `json:"calls"`
+	InputTokens  int64     `json:"input_tokens"`
+	OutputTokens int64     `json:"output_tokens"`
+	CostUSD      float64   `json:"cost_usd"`
+}
+
+// add sums u into a total, stamped with u's time.
+func (t ConsolidationUsage) add(u ConsolidationUsage) ConsolidationUsage {
+	return ConsolidationUsage{At: u.At, Calls: t.Calls + u.Calls, InputTokens: t.InputTokens + u.InputTokens,
+		OutputTokens: t.OutputTokens + u.OutputTokens, CostUSD: t.CostUSD + u.CostUSD}
+}
+
+// consolidationResult reads a Runner's output: claude's JSON result gives the answer,
+// its usage and cost (ok); anything else is the answer itself. A result claude marked an
+// error is one.
+func consolidationResult(out string) (answer string, u ConsolidationUsage, ok bool, err error) {
+	var r claudestream.Result
+	trimmed := strings.TrimSpace(out)
+	if !strings.HasPrefix(trimmed, "{") || json.Unmarshal([]byte(trimmed), &r) != nil || r.Type != "result" {
+		return out, ConsolidationUsage{}, false, nil
+	}
+	u = ConsolidationUsage{Calls: 1, CostUSD: r.TotalCostUSD}
+	for _, m := range r.ModelUsage {
+		u.InputTokens += m.InputTokens + m.CacheReadInputTokens + m.CacheCreationInputTokens
+		u.OutputTokens += m.OutputTokens
+	}
+	if len(r.ModelUsage) == 0 && r.Usage != nil {
+		u.InputTokens = r.Usage.InputTokens + r.Usage.CacheReadInputTokens + r.Usage.CacheCreationInputTokens
+		u.OutputTokens = r.Usage.OutputTokens
+	}
+	if r.IsError {
+		return "", u, true, fmt.Errorf("claude -p: %s: %s", cmp.Or(r.Subtype, "error"), truncate(cmp.Or(r.Result, strings.Join(r.Errors, "; ")), 4096, "…"))
+	}
+	return r.Result, u, true, nil
+}
+
+// recordConsolidationUsage keeps u as the last consolidation's usage and adds it to
+// the total (state.json).
+func (s *Store) recordConsolidationUsage(u ConsolidationUsage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u.At = s.opts.Now()
+	s.st.LastConsolidationUsage = &u
+	s.st.ConsolidationUsageTotal = s.st.ConsolidationUsageTotal.add(u)
+	s.saveStateLocked()
+	s.publishLocked(s.opts.Threads.Snapshot())
 }
 
 // ConsolidationInput is a consolidation's prompt: the instructions, then the current
@@ -171,6 +232,14 @@ func (s *Store) consolidate(ctx context.Context, id string) error {
 	start := time.Now()
 	out, err := s.opts.Consolidate(cctx, model, input)
 	cancel()
+	if err == nil {
+		var u ConsolidationUsage
+		var ok bool
+		if out, u, ok, err = consolidationResult(out); ok {
+			s.recordConsolidationUsage(u)
+			s.log.Info("ember: consolidation usage", "cost_usd", u.CostUSD, "input_tokens", u.InputTokens, "output_tokens", u.OutputTokens)
+		}
+	}
 	if err != nil {
 		s.keepConsolidation(stamp+"-output.md", "ERROR: "+err.Error()+"\n")
 		s.log.Warn("ember: consolidation failed; MEMORY.md kept", "err", err, "took", time.Since(start).Round(time.Millisecond))

@@ -561,6 +561,10 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 	st.Enabled, st.Consolidating = s.enabled, s.consolidating
 	st.EpochContextTokens = int64(s.cfg.EpochContextTokens)
 	st.LastConsolidatedAt, st.LastConsolidationError = s.st.LastConsolidatedAt, s.st.LastConsolidationError
+	if u := s.st.LastConsolidationUsage; u != nil {
+		st.LastConsolidationUsage = *u
+	}
+	st.ConsolidationUsageTotal = s.st.ConsolidationUsageTotal
 	if t, ok := residentOf(threads); ok {
 		st.ThreadID, st.Epoch, st.ContextTokens = t.ID, t.Epoch, t.ContextTokens
 		st.EpochStartedAt = s.st.EpochStartedAt
