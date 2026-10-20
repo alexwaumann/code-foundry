@@ -155,6 +155,11 @@ func (p Paths) PluginData() string { return filepath.Join(p.home, "plugin-data")
 // log notifications, 1 MiB, one rotation).
 func (p Paths) PluginLogs() string { return filepath.Join(p.Logs(), "plugins") }
 
+// DisabledSkills holds the marketplace skills the user disabled, moved out of
+// ~/.claude/skills so Claude Code no longer loads them: <DisabledSkills>/<name>
+// (internal/store/skill).
+func (p Paths) DisabledSkills() string { return filepath.Join(p.home, "skills", "disabled") }
+
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)
 // load (gui/windowbg.go). Not under App(): an update replaces that directory.

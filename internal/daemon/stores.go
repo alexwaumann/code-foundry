@@ -24,6 +24,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/skill"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -63,6 +64,9 @@ type stores struct {
 	thread *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
+	// skills reads the Skills marketplaces Claude Code has and what is installed
+	// (skill_registry.go); it holds no resources.
+	skills *skill.Store
 	// workspace holds branch sets across projects; it creates and removes worktrees
 	// through project and asks thread which threads are live. Opened before thread,
 	// which reads workspace members at launch.
@@ -252,6 +256,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
+	if s.skills, err = newSkillStore(p, s.db, s.bus, s.settings, log.With("store", "skill")); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 

@@ -3,10 +3,7 @@ package daemon
 import (
 	"context"
 	"log/slog"
-	"os"
 	"path/filepath"
-	"sync"
-	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -50,10 +47,6 @@ type pluginUpdateChecker interface {
 	CheckUpdates(ctx context.Context, refresh bool) ([]plugin.PluginUpdate, error)
 }
 
-// pluginUpdateTick is how often the fallback loop compares the wall clock with the
-// interval (see update.Store's loop for why not a plain timer).
-const pluginUpdateTick = time.Minute
-
 // startPluginUpdateChecks rides the app's update check: whenever the updater has checked
 // (an update.Event with a new LastCheckedAt), the registries are read (each from its cache
 // while younger than an hour) and the plugins' update offers refreshed, which publishes
@@ -61,9 +54,7 @@ const pluginUpdateTick = time.Minute
 // (a dev build) checks on the same cadence by itself. Nothing is ever installed. stop
 // waits for a check in flight.
 func startPluginUpdateChecks(ctx context.Context, log *slog.Logger, b *bus.Bus, u update.Service, plugins pluginUpdateChecker) (stop func()) {
-	ctx, cancel := context.WithCancel(ctx)
-	var wg sync.WaitGroup
-	check := func() {
+	return onUpdateChecks(ctx, b, u, func(ctx context.Context) {
 		ups, err := plugins.CheckUpdates(ctx, false)
 		switch {
 		case ctx.Err() != nil:
@@ -72,55 +63,5 @@ func startPluginUpdateChecks(ctx context.Context, log *slog.Logger, b *bus.Bus, 
 		default:
 			log.Info("plugin update check", "updates", len(ups))
 		}
-	}
-	if u.Snapshot().Enabled {
-		sub := bus.Subscribe[update.Event](b, 16)
-		wg.Go(func() {
-			defer sub.Close()
-			var last time.Time
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case ev, ok := <-sub.C():
-					if !ok {
-						return
-					}
-					if at := ev.Status.LastCheckedAt; !at.IsZero() && !at.Equal(last) {
-						last = at
-						check()
-					}
-				}
-			}
-		})
-	} else {
-		delay := update.DefaultInitialDelay
-		if d, err := time.ParseDuration(os.Getenv(update.EnvInitialDelay)); err == nil && d >= 0 {
-			delay = d
-		}
-		wg.Go(func() {
-			initial := time.NewTimer(delay)
-			defer initial.Stop()
-			tick := time.NewTicker(pluginUpdateTick)
-			defer tick.Stop()
-			var last time.Time
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-initial.C:
-				case <-tick.C:
-					if last.IsZero() || time.Now().Round(0).Sub(last) < update.DefaultInterval {
-						continue
-					}
-				}
-				check()
-				last = time.Now().Round(0)
-			}
-		})
-	}
-	return func() {
-		cancel()
-		wg.Wait()
-	}
+	})
 }
