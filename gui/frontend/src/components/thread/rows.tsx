@@ -2,6 +2,7 @@ import { memo, useContext, useEffect, useMemo, useState, type ReactNode } from "
 import { useShallow } from "zustand/react/shallow";
 import {
   Bot,
+  Check,
   ChevronRight,
   CircleAlert,
   CircleCheck,
@@ -31,12 +32,12 @@ import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, fmtElapsed, parseAgentNote } from "@/lib/agents";
-import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
 import { parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
+import { useCopied } from "@/lib/useCopied";
 import { wakeLines, type WakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type StripStep, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { agentReport, formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
@@ -355,21 +356,24 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
 /** Claude's text: markdown, with a caret while it streams; the turn's final answer gets more air. */
 /**
  * Copies a finished turn's answer (its final text items, `answer`'s ids, joined by blank
- * lines): a 24px button at the answer's top right, shown while the answer is hovered.
+ * lines): a 24px button at the answer's top right, shown while the answer is hovered,
+ * and while it shows its check after a copy (thread.css: [data-copied]).
  */
 function CopyAnswer({ answer }: { answer: string }) {
   const { threadId } = useThreadCtx();
-  const copy = () => {
+  const { copied, copy } = useCopied();
+  const onClick = () => {
     const ids = new Set(answer.split("\n"));
     const text = getThreadItems(threadId)
       .flatMap((x: ThreadItemView) => (ids.has(x.id) && x.kind === "text" ? [x.text] : []))
       .join("\n\n");
-    void copyText(text);
+    void copy(text);
   };
+  const label = copied ? "Copied" : "Copy answer";
   return (
-    <Tip label="Copy answer">
-      <button type="button" className="tb copy-answer" aria-label="Copy answer" data-testid="thread-copy-answer" onClick={copy}>
-        <Copy aria-hidden />
+    <Tip label={label}>
+      <button type="button" className="tb copy-answer" aria-label={label} data-copied={copied || undefined} data-testid="thread-copy-answer" onClick={onClick}>
+        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
       </button>
     </Tip>
   );

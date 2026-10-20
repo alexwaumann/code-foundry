@@ -68,6 +68,28 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
 }
 
+/**
+ * WebKit lets no test read the clipboard back: records what the app writes to it instead
+ * (lib/clipboard.ts takes the writeText path when it exists).
+ */
+async function stubClipboard(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __cfClipboard: string[] };
+    w.__cfClipboard = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          w.__cfClipboard.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+}
+
+const lastCopied = (page: Page) => page.evaluate(() => (window as unknown as { __cfClipboard: string[] }).__cfClipboard.at(-1) ?? "");
+
 const pane = (page: Page) => page.getByTestId("thread-pane");
 /** Finished turns' headers (the running turn's live header is "thread-working" inside it). */
 const headers = (page: Page) => page.locator('[data-testid="thread-turn-header"]:not([data-live])');
@@ -131,6 +153,14 @@ for (const scheme of schemes) {
       await expect(code.locator('[data-line][data-line-type="change-addition"]')).toHaveCount(6);
       await expect(code.locator('[data-line][data-line-type="change-deletion"]')).toHaveCount(1);
       await expect(code).toContainText("HeadRefOid");
+      // Copy diff shows a check and "Copied" for a moment (useCopied).
+      await stubClipboard(page);
+      const copyDiff = diff.getByTestId("thread-diff-copy");
+      await expect(copyDiff).toHaveAttribute("aria-label", "Copy diff");
+      await copyDiff.click();
+      await expect(copyDiff).toHaveAttribute("aria-label", "Copied");
+      expect(await lastCopied(page)).toContain("HeadRefOid");
+      await expect(copyDiff).toHaveAttribute("aria-label", "Copy diff", { timeout: 3000 });
 
       // The subagent: one line; open, only its report (its own rows stay out of the thread).
       const agent = await reveal(page, pane(page).locator('[data-tool="Agent"]'));
@@ -193,6 +223,16 @@ for (const scheme of schemes) {
       await expect(copy).toHaveCSS("opacity", "0");
       await answer.hover();
       await expect(copy).toHaveCSS("opacity", "1");
+      // A copy flips it to a check and "Copied", shown even once the pointer leaves.
+      await stubClipboard(page);
+      await copy.click();
+      const copied = answer.getByTestId("thread-copy-answer");
+      await expect(copied).toHaveAttribute("aria-label", "Copied");
+      expect(await lastCopied(page)).toContain("I have not pushed.");
+      await page.mouse.move(0, 0);
+      await expect(copied).toHaveCSS("opacity", "1");
+      await expect(copied).toHaveAttribute("aria-label", "Copy answer", { timeout: 3000 });
+      await expect(copied).toHaveCSS("opacity", "0");
     });
 
     test("the latest turn folds when it ends and keeps its header and answer in view; only the user's scroll unpins the list", async ({ page }) => {
