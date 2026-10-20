@@ -6,6 +6,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { allSurfaces, usePluginsStore } from "@/stores/plugins";
 import { pluginSurfaceSpec, showAvailability } from "@/surfaces/plugin";
 import type { SurfaceContext } from "@/surfaces/registry";
+import type { GroupIndex } from "@/stores/panel";
 import type { Selection } from "@/stores/ui";
 
 function subscribe(onChange: () => void): () => void {
@@ -31,8 +32,9 @@ function useAvailableSurfaces(sel: Selection): string {
  * The plugin surfaces this panel can open, after the built-in ones behind a divider
  * (docs/sketches/plugins, "list"): a puzzle mark where a hotkey would be, its tooltip
  * naming the plugin. Only available ones are listed; with none, nothing (no divider).
+ * They open in `group` (the group whose list this is).
  */
-export function PluginSurfaceRows({ ctx }: { ctx: SurfaceContext }) {
+export function PluginSurfaceRows({ ctx, group }: { ctx: SurfaceContext; group?: GroupIndex }) {
   const kinds = useAvailableSurfaces(ctx.selection);
   const rows = kinds ? kinds.split("\u0001").map((r) => r.split("\u0000") as [string, string]) : [];
   if (rows.length === 0) return null;
@@ -46,6 +48,7 @@ export function PluginSurfaceRows({ ctx }: { ctx: SurfaceContext }) {
             key={kind}
             spec={spec}
             ctx={ctx}
+            group={group}
             trailing={
               <Tip label={`From the ${plugin} plugin`}>
                 <span className="inline-flex shrink-0 text-muted-foreground" data-testid="plugin-mark">

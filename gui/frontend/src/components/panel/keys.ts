@@ -1,17 +1,30 @@
 import { surfaceByHotkey, type SurfaceContext } from "@/surfaces/registry";
-import { groupAt, focusedGroup, isPicking, type PanelEntry, type Tab } from "@/stores/panel";
+import { groupAt, focusedGroup, isPicking, isSplit, type GroupIndex, type PanelEntry, type Tab } from "@/stores/panel";
 
 /**
- * Whether a chord is the panel's own: cmd+w, a bare letter some surface uses as its
- * hotkey (whether or not that surface is enabled now), and Escape while `picking` (the
- * surface list shows instead of a surface). SurfaceSpec.onKey never sees these. Escape
- * is the panel's only while picking: surfaces use it (closing a popup, cancelling an ask).
+ * Moves focus to the other tab group of a split panel, whichever way the groups sit
+ * (cmd+alt+\, next to view.panel.split's cmd+\). Reserved like cmd+w (internal/command
+ * chord.go ReservedChords), since the panel takes it before the registry.
+ */
+export const FOCUS_OTHER_GROUP_CHORD = "cmd+alt+\\";
+
+/**
+ * Whether a chord is the panel's own: cmd+w, cmd+alt+\ (the other group), a bare letter
+ * some surface uses as its hotkey (whether or not that surface is enabled now), and
+ * Escape while `picking` (the surface list shows instead of a surface). SurfaceSpec.onKey
+ * never sees these. Escape is the panel's only while picking: surfaces use it (closing a
+ * popup, cancelling an ask).
  */
 export function isPanelChord(chord: string, picking = false): boolean {
-  return chord === "cmd+w" || (picking && chord === "escape") || (/^[a-z]$/.test(chord) && surfaceByHotkey(chord) !== undefined);
+  return chord === "cmd+w" || chord === FOCUS_OTHER_GROUP_CHORD || (picking && chord === "escape") || (/^[a-z]$/.test(chord) && surfaceByHotkey(chord) !== undefined);
 }
 
-export type PanelKeyAction = { kind: "close"; tabId: string } | { kind: "hide" } | { kind: "stopPicking" } | { kind: "open"; tab: Tab };
+export type PanelKeyAction =
+  | { kind: "close"; tabId: string }
+  | { kind: "hide" }
+  | { kind: "stopPicking" }
+  | { kind: "open"; tab: Tab; group: GroupIndex }
+  | { kind: "focusGroup"; group: GroupIndex };
 
 /**
  * What a key does while focus is inside the side panel. It acts on the focused group
@@ -19,8 +32,9 @@ export type PanelKeyAction = { kind: "close"; tabId: string } | { kind: "hide" }
  * cmd+w is always handled while the panel has focus); while it is picking (the "+" was
  * clicked) cmd+w and Escape go back to the tab that was active instead (or, for a split
  * panel's empty group, collapse the split); a surface's bare hotkey letter opens its
- * default tab (in that group) when the surface is enabled. Anything else (and disabled or
- * hidden surfaces) is null. The caller skips letters typed into text fields.
+ * default tab in that group when the surface is enabled. On a split panel,
+ * FOCUS_OTHER_GROUP_CHORD focuses the other group. Anything else (and disabled or hidden
+ * surfaces) is null. The caller skips letters typed into text fields.
  */
 export function panelKeyAction(chord: string, entry: PanelEntry, ctx: SurfaceContext): PanelKeyAction | null {
   const g = focusedGroup(entry);
@@ -29,11 +43,12 @@ export function panelKeyAction(chord: string, entry: PanelEntry, ctx: SurfaceCon
     const active = groupAt(entry, g).activeTabId;
     return active === null ? { kind: "hide" } : { kind: "close", tabId: active };
   }
+  if (chord === FOCUS_OTHER_GROUP_CHORD) return isSplit(entry) ? { kind: "focusGroup", group: g === 0 ? 1 : 0 } : null;
   if (!/^[a-z]$/.test(chord)) return null;
   const spec = surfaceByHotkey(chord);
   if (!spec || spec.available(ctx) !== "enabled") return null;
   const tab = spec.openDefault(ctx);
-  return tab ? { kind: "open", tab } : null;
+  return tab ? { kind: "open", tab, group: g } : null;
 }
 
 /**

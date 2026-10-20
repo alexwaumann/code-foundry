@@ -3,12 +3,18 @@ import { emptyEntry, makeTab, type PanelEntry } from "@/stores/panel";
 import { filesSurface } from "@/surfaces/files";
 import { surfaceByHotkey, surfaceOf, surfaces } from "@/surfaces/registry";
 import type { SurfaceContext } from "@/surfaces/types";
-import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
+import { FOCUS_OTHER_GROUP_CHORD, isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 
 const ctx: SurfaceContext = { selection: { kind: "thread", id: "s-1" }, panelKey: "thread:s-1" };
 const files = makeTab("files", "Files");
 const withTab: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: files.id }] };
 const picking: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: null, pickFrom: files.id }] };
+const diff = makeTab("diff", "Diff", { path: "a.go" });
+// Split: files left (or top), diff right (or bottom); focus on either.
+const split0: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [diff], activeTabId: diff.id }] };
+const split1: PanelEntry = { ...split0, focused: 1 };
+// Split from a single tab: the second group is empty and picking, and focused.
+const splitEmpty: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [], activeTabId: null }], focused: 1 };
 
 describe("isPanelChord", () => {
   it.each([
@@ -23,6 +29,9 @@ describe("isPanelChord", () => {
     ["escape", true, true],
     ["cmd+w", true, true],
     ["q", true, false],
+    // The other group's chord is the panel's, split or not.
+    ["cmd+alt+\\", false, true],
+    ["cmd+\\", false, false],
   ])("%s (picking %s) -> %s", (chord, picking, want) => {
     expect(isPanelChord(chord, picking)).toBe(want);
   });
@@ -41,6 +50,16 @@ describe("panelKeyAction", () => {
     ["escape with an active tab does nothing", "escape", withTab, null],
     ["escape with no tabs does nothing", "escape", { ...emptyEntry, open: true }, null],
     ["a disabled hotkey while picking does nothing", "f", picking, null],
+    // Split: the keys act on the focused group.
+    ["split, cmd+w closes the first group's tab when it has focus", "cmd+w", split0, { kind: "close", tabId: files.id }],
+    ["split, cmd+w closes the second group's tab when it has focus", "cmd+w", split1, { kind: "close", tabId: diff.id }],
+    ["split, cmd+w on the empty picking group stops picking (collapses the split)", "cmd+w", splitEmpty, { kind: "stopPicking" }],
+    ["split, escape on the empty picking group stops picking", "escape", splitEmpty, { kind: "stopPicking" }],
+    ["split, escape in a group with a tab does nothing", "escape", split1, null],
+    ["split, the chord focuses the second group from the first", FOCUS_OTHER_GROUP_CHORD, split0, { kind: "focusGroup", group: 1 }],
+    ["split, the chord focuses the first group from the second", FOCUS_OTHER_GROUP_CHORD, split1, { kind: "focusGroup", group: 0 }],
+    ["split, the chord works while a group picks", FOCUS_OTHER_GROUP_CHORD, splitEmpty, { kind: "focusGroup", group: 0 }],
+    ["unsplit, the chord does nothing", FOCUS_OTHER_GROUP_CHORD, withTab, null],
   ];
   it.each(cases)("%s", (_name, chord, entry, want) => {
     expect(panelKeyAction(chord, entry, ctx)).toEqual(want);
@@ -50,9 +69,12 @@ describe("panelKeyAction", () => {
     const spy = vi.spyOn(filesSurface, "available").mockReturnValue("enabled");
     const def = vi.spyOn(filesSurface, "openDefault").mockReturnValue(files);
     try {
-      expect(panelKeyAction("f", { ...emptyEntry, open: true }, ctx)).toEqual({ kind: "open", tab: files });
+      expect(panelKeyAction("f", { ...emptyEntry, open: true }, ctx)).toEqual({ kind: "open", tab: files, group: 0 });
       // While picking too: the letter picks from the list.
-      expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files });
+      expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files, group: 0 });
+      // Split: in the focused group.
+      expect(panelKeyAction("f", split0, ctx)).toEqual({ kind: "open", tab: files, group: 0 });
+      expect(panelKeyAction("f", splitEmpty, ctx)).toEqual({ kind: "open", tab: files, group: 1 });
     } finally {
       spy.mockRestore();
       def.mockRestore();

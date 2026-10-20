@@ -55,6 +55,14 @@ export const SIDEBAR_DEFAULT = 280;
 export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;
 export const PANEL_DEFAULT = 420;
+/**
+ * A split side panel shows its two tab groups side by side from this rendered width
+ * (two PANEL_MIN groups, the 1px divider, and 24px of room), stacked below it, and side
+ * by side whenever it is expanded (components/panel/splitLayout.ts).
+ */
+export const PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_MIN + 1 + 24;
+/** A stacked split panel's tab group is never shorter than this (its header and some body). */
+export const PANEL_GROUP_MIN_HEIGHT = 160;
 /** The content pane never gets narrower than this to make room for the side panel. */
 export const CONTENT_MIN = 360;
 /**

@@ -12,12 +12,17 @@ const STEP = 16;
  * Focusable: Left/Right resize (Left widens), Home/End go to the minimum/maximum.
  *
  * `width` is the rendered width, which is below the stored one when the room shrank
- * (window, sidebar); drags and keys start from it, so they act at once.
+ * (window, sidebar); drags and keys start from it, so they act at once. `onDragChange`
+ * hears a pointer drag start and end (a split panel keeps its orientation until the end).
  */
-export function PanelResizeHandle({ panelKey, width, max }: { panelKey: string; width: number; max: number }) {
+export function PanelResizeHandle({ panelKey, width, max, onDragChange }: { panelKey: string; width: number; max: number; onDragChange?: (dragging: boolean) => void }) {
   const drag = useRef<{ x: number; w: number } | null>(null);
   const set = (w: number) => {
     setPanelWidth(panelKey, w);
+  };
+  const end = () => {
+    if (drag.current) onDragChange?.(false);
+    drag.current = null;
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -44,20 +49,19 @@ export function PanelResizeHandle({ panelKey, width, max }: { panelKey: string; 
         e.currentTarget.setPointerCapture(e.pointerId);
         const rendered = e.currentTarget.parentElement?.getBoundingClientRect().width ?? width;
         drag.current = { x: e.clientX, w: rendered };
+        onDragChange?.(true);
       }}
       onPointerMove={(e) => {
         const d = drag.current;
         if (d) set(d.w - (e.clientX - d.x));
       }}
       onPointerUp={(e) => {
-        drag.current = null;
+        end();
         if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       }}
       // Capture can end without a pointerup (the element unmounts, the system takes the
       // pointer); stop dragging so a later hover does not resize.
-      onLostPointerCapture={() => {
-        drag.current = null;
-      }}
+      onLostPointerCapture={end}
       onKeyDown={onKeyDown}
       onDoubleClick={() => {
         resetPanelWidth(panelKey);
