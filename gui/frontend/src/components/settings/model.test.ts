@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/api/settings";
-import { bucketKeybindings, fieldRows, highlightParts, isBound, matchField, pageSections, queryWords, searchSettings } from "./model";
+import { bucketKeybindings, fieldRows, highlightParts, isBound, matchField, pageSections, queryWords, searchGuiPages, searchSettings } from "./model";
 
 const base: Omit<SettingFieldView, "key" | "title" | "type" | "page" | "section"> = {
   description: "",
@@ -167,5 +167,35 @@ describe("keybindings", () => {
     ]);
     expect(b.empty).toEqual([]);
     expect([b.bound, b.total]).toEqual([3, 6]);
+  });
+});
+
+describe("searchGuiPages", () => {
+  const skills: SettingPageView = {
+    id: "skills",
+    title: "Skills",
+    description: "",
+    sections: [
+      { id: "installed", title: "Installed", description: "On this Mac." },
+      { id: "browse", title: "Browse", description: "Search the marketplace." },
+      { id: "registries", title: "Registries", description: "The marketplaces Claude Code has." },
+    ],
+  };
+  // Also a schema page: its fields are what the search finds.
+  const plugins: SettingPageView = { id: "plugins", title: "Plugins", description: "", sections: [{ id: "browse", title: "Browse", description: "" }] };
+
+  it.each([
+    ["the page's title finds every section", ["skills"], ["installed", "browse", "registries"]],
+    ["a section's title", ["browse"], ["browse"]],
+    ["a description, every word", ["skills", "marketplace"], ["browse", "registries"]],
+    ["nothing", ["fonts"], []],
+  ])("%s", (_name, words, want) => {
+    const r = searchGuiPages([skills, plugins], new Set(["plugins"]), words);
+    expect(r.hits.map((h) => h.section.id)).toEqual(want);
+    expect(r.counts).toEqual({ skills: want.length });
+  });
+
+  it("finds nothing without words", () => {
+    expect(searchGuiPages([skills], new Set(), [])).toEqual({ hits: [], counts: {} });
   });
 });

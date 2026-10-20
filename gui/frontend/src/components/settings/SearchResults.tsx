@@ -1,14 +1,30 @@
 import { ChevronRight } from "lucide-react";
-import type { SearchResult } from "./model";
+import { LinkRow } from "./LinkRow";
+import type { PageSectionHit, SearchResult } from "./model";
 import { SettingRow } from "./SettingRow";
 
 /**
  * The search with text: one flat card of every match across the pages, each under a
  * "Page › Section" breadcrumb, with the key shown and the words marked. Keybindings show
- * as full rows here (title, description, key), so the card has one kind of row.
+ * as full rows here (title, description, key), so the card has one kind of row. Sections of
+ * the GUI's own pages (Skills) follow as link rows that open the page at the section.
  */
-export function SearchResults({ query, words, result, back }: { query: string; words: readonly string[]; result: SearchResult; back: string }) {
-  const n = result.hits.length;
+export function SearchResults({
+  query,
+  words,
+  result,
+  sections = [],
+  onOpenSection,
+  back,
+}: {
+  query: string;
+  words: readonly string[];
+  result: SearchResult;
+  sections?: readonly PageSectionHit[];
+  onOpenSection?: (pageId: string, sectionId: string) => void;
+  back: string;
+}) {
+  const n = result.hits.length + sections.length;
   return (
     <div data-testid="settings-results">
       <div className="mb-3 flex items-baseline gap-2" data-testid="settings-result-count">
@@ -39,6 +55,18 @@ export function SearchResults({ query, words, result, back }: { query: string; w
                   )}
                 </div>
               }
+            />
+          ))}
+          {sections.map(({ page, section }, i) => (
+            <LinkRow
+              key={`${page.id}/${section.id}`}
+              label={`${page.title} › ${section.title}`}
+              description={section.description}
+              className={result.hits.length + i > 0 ? "border-t border-border" : undefined}
+              testId="settings-section-hit"
+              onClick={() => {
+                onOpenSection?.(page.id, section.id);
+              }}
             />
           ))}
         </div>
