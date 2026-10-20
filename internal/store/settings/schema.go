@@ -526,8 +526,8 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "tokens", Type: Int, Title: "Context limit",
-		Description: "Start a fresh session once Ember's context passes this many tokens.",
-		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 20000, Max: 1000000,
+		Description: "Start a fresh session once Ember's context passes this many tokens. A fresh session already starts near 25K (its instructions, skills and seed).",
+		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 50000, Max: 1000000,
 		bind: func(s *Settings) any { return &s.Ember.EpochContextTokens },
 	},
 	{
