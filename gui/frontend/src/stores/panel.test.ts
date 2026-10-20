@@ -10,6 +10,7 @@ import {
   keyOf,
   makeTab,
   migratePanelV1,
+  migratePanelV2,
   movePanelTab,
   moveTab,
   openSurface,
@@ -102,6 +103,32 @@ describe("migratePanelV1", () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": legacy(true, [old], old.id) } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual(entry(true, [renamed], renamed.id));
+    localStorage.clear();
+    usePanelStore.setState({ byKey: {} });
+  });
+});
+
+describe("migratePanelV2", () => {
+  const cases: [string, PanelEntryV2, PanelEntry][] = [
+    ["an open panel with an active tab", legacy(true, [files, diff], diff.id), entry(true, [files, diff], diff.id)],
+    ["a picking panel keeps pickFrom in its group", legacy(true, [files, diff], null, diff.id), picking([files, diff], diff.id)],
+    ["a panel without tabs is the empty one", legacy(false, [], null), emptyEntry],
+    ["a kept-open panel without tabs", legacy(true, [], null), { ...emptyEntry, open: true }],
+    ["width and expanded stay on the entry", { ...legacy(false, [pr], pr.id), width: 500, expanded: true }, { ...entry(false, [pr], pr.id), width: 500, expanded: true }],
+  ];
+  it.each(cases)("%s", (_name, before, want) => {
+    expect(migratePanelV2({ k: before })).toEqual({ k: want });
+  });
+
+  it("migrates every key", () => {
+    expect(migratePanelV2({ a: legacy(true, [files], files.id), b: legacy(false, [], null) })).toEqual({ a: entry(true, [files], files.id), b: emptyEntry });
+  });
+
+  it("rehydrates a version 2 store through it and saves it as version 3", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 2, state: { byKey: { "thread:s-1": { ...legacy(true, [files, diff], null, files.id), width: 500 } } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 3, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });
