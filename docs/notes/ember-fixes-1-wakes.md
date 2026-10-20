@@ -138,6 +138,6 @@ intermediate turns ended in prose with no new report.
 - The thread store's fake claude replays one turn per process. The subscribed-lead test
   closes the lead after each wake turn, so the next wake starts a new process.
 - Observed, not changed: a failed consolidation still moves `LastConsolidatedAt`
-  (epoch.go), so the next one's input skips the conversation of the failed one. In run
-  2, the "two sentences" preference from before the refused call was not in the second
+  (epoch.go), so the next one's input skips the conversation of the failed one. Above,
+  the "two sentences" preference from before the refused call was not in the second
   MEMORY.md.
