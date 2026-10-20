@@ -214,9 +214,127 @@ Done last, after rebasing onto main with the orchestrate skill split (#264) in i
   child, unarchive), `commands_thread_archive_test.go` (requests now include the cascade
   list), `commands_thread_list_test.go` (marks), the registered-commands list.
 
-## End to end
+## End to end (2026-10-20, isolated home, scratch project under ~)
 
-TODO
+`make build`; `CODE_FOUNDRY_HOME=/tmp/cf-hidden ./bin/code-foundry daemon --dev` (no
+`CODE_FOUNDRY_*` in its environment); `~/cf-scratch-hidden` with a README. Every
+`code-foundry` below is `./bin/code-foundry` with `CODE_FOUNDRY_HOME=/tmp/cf-hidden`.
+Threads `claude-haiku-5-5[1m]` at medium; the children were made from the shell with
+`--created-by` (what an agent's `thread new` sends). Output as printed.
+
+```
+$ code-foundry project add ~/cf-scratch-hidden
+registered cf-scratch-hidden (a3107eff7ef4)
+$ code-foundry settings get threads.show_created_threads
+false
+$ code-foundry thread new --project a3107eff7ef4 --model 'claude-haiku-5-5[1m]' --effort medium --name "hc parent" --prompt "Reply with the single word ready."
+created thread hc parent (s-75a0bcf8d7b8) in /Users/alex/cf-scratch-hidden
+$ code-foundry thread new ... --permission auto --name "hc hidden worker" --created-by s-75a0bcf8d7b8 --prompt @loop-prompt.txt
+created thread hc hidden worker (s-e3225285f01e) in /Users/alex/cf-scratch-hidden     # runs a 240 s foreground loop
+$ code-foundry thread new ... --name "hc handed over" --created-by s-75a0bcf8d7b8 --sidebar --prompt "Reply with the single word ready."
+created thread hc handed over (s-09ae83a5d9dc) in /Users/alex/cf-scratch-hidden; shown in the sidebar
+$ code-foundry thread new ... --name "hc under shown" --created-by s-09ae83a5d9dc --prompt ...
+created thread hc under shown (s-bb00d9eb3414) in /Users/alex/cf-scratch-hidden
+$ code-foundry thread new ... --name "hc toggled" --created-by s-75a0bcf8d7b8 --prompt ...
+created thread hc toggled (s-b58d06fa4c5a) in /Users/alex/cf-scratch-hidden
+$ code-foundry thread new --project a3107eff7ef4 --sidebar --prompt hi
+code-foundry thread.new: only applies to a thread another thread creates (created-by, which defaults to $CODE_FOUNDRY_THREAD inside a thread); a thread you create is always shown
+exit=2
+$ code-foundry thread sidebar --id s-b58d06fa4c5a --shown=true
+thread hc toggled (s-b58d06fa4c5a) shown in the sidebar
+$ code-foundry thread sidebar --id s-b58d06fa4c5a --shown=false
+thread hc toggled (s-b58d06fa4c5a) hidden from the sidebar
+$ code-foundry thread sidebar --id s-75a0bcf8d7b8 --shown=true
+code-foundry thread.sidebar: thread s-75a0bcf8d7b8: invalid argument: only a thread another thread created can be shown or hidden in the sidebar; one the user created is always shown
+exit=2
+$ code-foundry thread list
+s-b58d06fa4c5a  attention (finished)  hc toggled        cf-scratch-hidden  now  [hidden]  ↳ hc parent
+s-bb00d9eb3414  attention (finished)  hc under shown    cf-scratch-hidden  2s  ↳ hc handed over
+s-09ae83a5d9dc  attention (finished)  hc handed over    cf-scratch-hidden  6s  [in sidebar]  ↳ hc parent
+s-e3225285f01e  busy                  hc hidden worker  cf-scratch-hidden  8s  ↳ hc parent
+s-75a0bcf8d7b8  attention (finished)  hc parent         cf-scratch-hidden  10s
+$ code-foundry thread list --json | (id name createdBy inSidebar)
+s-b58d06fa4c5a hc toggled s-75a0bcf8d7b8 False
+s-bb00d9eb3414 hc under shown s-09ae83a5d9dc unset
+s-09ae83a5d9dc hc handed over s-75a0bcf8d7b8 True
+s-e3225285f01e hc hidden worker s-75a0bcf8d7b8 unset
+s-75a0bcf8d7b8 hc parent - unset
+
+$ code-foundry thread archive --id s-75a0bcf8d7b8 </dev/null
+code-foundry thread.archive: Archive thread hc parent? 1 hidden child thread is still working; archiving ends its turn and archives it too. To keep it, ask hc parent to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first.
+Re-run with --yes to confirm.
+exit=2
+# the parent sent the same loop prompt, now busy too:
+$ code-foundry thread archive --id s-75a0bcf8d7b8 </dev/null
+code-foundry thread.archive: Archive thread hc parent? Claude is still working; archiving ends the turn. 1 hidden child thread is still working; archiving ends its turn and archives it too. To keep it, ask hc parent to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first.
+Re-run with --yes to confirm.
+exit=2
+$ code-foundry thread archive --id s-75a0bcf8d7b8 --yes            # 0.7 s
+archived thread hc parent (s-75a0bcf8d7b8)
+$ code-foundry thread list --all
+s-75a0bcf8d7b8  idle                  hc parent         cf-scratch-hidden  now  [archived]
+s-e3225285f01e  idle                  hc hidden worker  cf-scratch-hidden  now  [archived]  ↳ hc parent
+s-b58d06fa4c5a  attention (finished)  hc toggled        cf-scratch-hidden  13s  [archived, hidden]  ↳ hc parent
+s-bb00d9eb3414  attention (finished)  hc under shown    cf-scratch-hidden  15s  ↳ hc handed over
+s-09ae83a5d9dc  attention (finished)  hc handed over    cf-scratch-hidden  19s  [in sidebar]  ↳ hc parent
+# daemon log:
+#   archived thread with the thread above it thread=s-e3225285f01e root=s-75a0bcf8d7b8 depth=1
+#   archived thread with the thread above it thread=s-b58d06fa4c5a root=s-75a0bcf8d7b8 depth=1
+#   archived thread thread=s-75a0bcf8d7b8 cascaded=2 cascade_failed=0
+$ code-foundry thread archive --id s-75a0bcf8d7b8 --archived=false
+unarchived thread hc parent (s-75a0bcf8d7b8)
+$ code-foundry thread list                                        # the worker stays archived
+s-75a0bcf8d7b8  idle                  hc parent       cf-scratch-hidden  3s
+s-bb00d9eb3414  attention (finished)  hc under shown  cf-scratch-hidden  18s  ↳ hc handed over
+s-09ae83a5d9dc  attention (finished)  hc handed over  cf-scratch-hidden  23s  [in sidebar]  ↳ hc parent
+$ code-foundry thread get s-e3225285f01e --json | (state status reason archivedAt)
+THREAD_STATE_DISCONNECTED THREAD_STATUS_IDLE archived 2026-10-20T07:34:03.364098Z
+
+# daemon stopped (SIGTERM) and started again on the same home:
+$ code-foundry thread list --all
+s-75a0bcf8d7b8  idle                  hc parent         cf-scratch-hidden  16s
+s-e3225285f01e  idle                  hc hidden worker  cf-scratch-hidden  16s  [archived]  ↳ hc parent
+s-b58d06fa4c5a  attention (finished)  hc toggled        cf-scratch-hidden  29s  [archived, hidden]  ↳ hc parent
+s-bb00d9eb3414  attention (finished)  hc under shown    cf-scratch-hidden  31s  ↳ hc handed over
+s-09ae83a5d9dc  attention (finished)  hc handed over    cf-scratch-hidden  35s  [in sidebar]  ↳ hc parent
+
+# the setting, live:
+$ code-foundry settings set threads.show_created_threads true
+$ code-foundry thread archive --id s-09ae83a5d9dc --yes            # log: cascaded=0
+archived thread hc handed over (s-09ae83a5d9dc)
+$ code-foundry thread list                                        # "hc under shown" is shown now: it stays
+s-75a0bcf8d7b8  idle                  hc parent       cf-scratch-hidden  22s
+s-bb00d9eb3414  attention (finished)  hc under shown  cf-scratch-hidden  37s  ↳ hc handed over
+$ code-foundry settings set threads.show_created_threads false
+$ code-foundry thread archive --id s-09ae83a5d9dc --archived=true --yes   # log: s-bb00d9eb3414 root=s-09ae83a5d9dc; cascaded=1
+archived thread hc handed over (s-09ae83a5d9dc)
+
+# --descendants-of with the cascade: each id once
+$ code-foundry thread archive --ids s-09ae83a5d9dc,s-bb00d9eb3414,s-e3225285f01e,s-b58d06fa4c5a --archived=false
+unarchived 4 threads: s-09ae83a5d9dc, s-bb00d9eb3414, s-e3225285f01e, s-b58d06fa4c5a
+$ code-foundry thread archive --descendants-of s-75a0bcf8d7b8 --include-root --yes
+archived 5 threads: s-75a0bcf8d7b8, s-e3225285f01e, s-09ae83a5d9dc, s-bb00d9eb3414, s-b58d06fa4c5a
+# log: the root cascaded 2 (worker, toggled), "hc handed over" cascaded 1 (under shown);
+# the command's own calls for those three were no-ops (nothing logged)
+
+$ code-foundry guide | wc -c
+21381
+$ code-foundry guide pull-request | head -1
+# code-foundry guide: Pull Request
+$ code-foundry guide bogus
+guide: no guide topic "bogus"; topics: action, workspace, project, terminal, app, daemon, git, pull-request, settings, view, worktree (thread commands are in the guide itself)
+exit=2
+```
+
+No ERROR lines in either daemon log. The daemon was stopped, and `~/cf-scratch-hidden`,
+`/tmp/cf-hidden` and `~/.claude/projects/-Users-alex-cf-scratch-hidden` deleted.
+
+The first `guide <topic>` run printed `unknown command "guide pull-request"`: the CLI
+hands a local verb followed by a word to the registry ("daemon status" is
+`daemon.status`). `guide` is now the one local verb that takes a word
+(`verbTakesWords` in `cmd/code-foundry/main.go`; CLI e2e cases added).
+
+Not verified live: the GUI (no GUI change; PR 2).
 
 Daemon restart needed: yes (migration 0040, new RPC, filter and commands, the archive
 cascade).
