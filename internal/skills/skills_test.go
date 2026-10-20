@@ -118,8 +118,11 @@ func TestRender(t *testing.T) {
 		// Model only: not in the slash menu. Names the user's words for parallel work, and
 		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2, v3).
 		// Wake and lead rules live in reference files (orch-skill-split); new material
-		// goes behind a pointer too, so the cap stays below the old 160.
-		{skills.Orchestrate, "false", 600, 130},
+		// goes behind a pointer too, so the cap stays below the old 160. Round 3 of the
+		// orchestration experiments (orch-round-3) put nine lines of rules back inline
+		// (shared checkout, conflict-free prompts, quiet wake turns, leads, re-reports):
+		// the references were read late or not at all, so those rules earn their place.
+		{skills.Orchestrate, "false", 600, 136},
 		{skills.Help, "", 400, 120},   // both: no invocation keys
 		{skills.Plugin, "", 600, 120}, // both; names the words that should trigger it
 	} {
@@ -233,6 +236,9 @@ func TestRender(t *testing.T) {
 		{"reference/wakes.md", "WITHOUT `--wait`", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/wakes.md", "\n## Plugin wake sources\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/patterns.md", "\n## 8. Checking a batch before the roll-up\n", "SKILL.md", "`reference/patterns.md` §8"},
+		{"reference/patterns.md", "\n## 0. The child's prompt\n", "SKILL.md", "`reference/patterns.md` §0"},
+		{"reference/wakes.md", "\n## Interrupted\n", "SKILL.md", "`reference/wakes.md`"},
+		{"reference/wakes.md", "\n## A child you handed over\n", "reference/sidebar.md", "`reference/wakes.md`"},
 		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
 		{"reference/sidebar.md", "\n## Hidden by default\n", "SKILL.md", "`reference/sidebar.md`"},
 		{"reference/sidebar.md", "`code-foundry thread sidebar --id <child> --shown=true`", "SKILL.md", "`reference/sidebar.md`"},

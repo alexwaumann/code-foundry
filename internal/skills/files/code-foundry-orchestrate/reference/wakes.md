@@ -11,7 +11,8 @@ fires again on its next settle.
 
 ## Finished, or a stale report
 
-`needs attention (finished)` is a turn that ended normally. A wake with
+`needs attention (finished)` is a turn that ended normally. "said more after its
+report" with a fresh report is the child's closing recap: nothing to read. A wake with
 `report_stale: true` (no report, or one older than its last message) has
 `last_message`: the child may be asking you something in prose; read it, answer with
 `thread send --id <child>`.
@@ -37,8 +38,10 @@ unasked; raising alone does not resume the child, so resume it as
 On a wake for a batch, look at the whole batch (`thread reports --created-by
 $CODE_FOUNDRY_THREAD --all`; wakes can arrive seconds apart), and talk to the user only
 when something needs them (a question, a failure, a conflict) or the batch is complete;
-otherwise end the turn silently or with one short line. Do a check now or not at all:
-never promise one for later.
+otherwise end the turn silently or with one short line ("done pushed; 2 still working").
+No analysis of a partial batch. Do a check now or not at all: never promise one for
+later. For a chain (B builds on A): one line when A is done and B started; the roll-up
+once B is done. Routine approvals of a supervised child: no text at all.
 
 ## Messaging a child
 
@@ -48,13 +51,29 @@ it already pushed stays pushed; `thread interrupt --id <id>` first if it must st
 When a follow-up changes the task, `thread rename --id <id> --name "<new name>"` so the
 user's sidebar matches.
 
+## Interrupted
+
+A settled wake for a child whose last turn end says `interrupted` means someone stopped
+it: the user, or you with `thread interrupt`. Its last tool call shows `[running]` or an
+error such as "was NOT written": that is the interrupt, not a rejection, and nothing is
+wrong with the child. Check its worktree (`git status`, `git diff`: an edit may sit there
+uncommitted), and for a user's interrupt ask the user before resuming; a `thread
+interrupt` of your own you resume with `thread send --id <child>` saying what you checked.
+
 ## After the app restarts
 
-When a wake says the app restarted, or the user does: `thread reports --created-by
-$CODE_FOUNDRY_THREAD --all` and `thread list --created-by $CODE_FOUNDRY_THREAD`. A
-child in `error (interrupted)` (reason "daemon stopped") lost its current turn only:
-check its worktree, then `thread send --id <child> "the app restarted; continue"`.
-Subscriptions survive a restart: do not subscribe again.
+When a wake says the app restarted, or the user does: the restart wake lists the
+interrupted children (`error (interrupted)`, reason "daemon stopped"); each lost its
+current turn only. For each, check its worktree (`git status`, `git diff`), then `thread
+send --id <child> "the app restarted; continue"` once. Subscriptions survive a restart:
+do not subscribe again. `thread reports --created-by $CODE_FOUNDRY_THREAD --all` shows
+what had been reported before the stop.
+
+## A child you handed over
+
+`thread sidebar --shown=true` does not end your `--notify` subscription on it: run
+`code-foundry thread unsubscribe --thread <child>` (`reference/sidebar.md`), or every
+steer the user sends it wakes you, and its wakes are not yours to act on.
 
 ## Plugin wake sources
 

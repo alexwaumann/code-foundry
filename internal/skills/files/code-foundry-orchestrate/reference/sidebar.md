@@ -31,9 +31,14 @@ prompts (`reference/wakes.md`), and tell the user what it did.
 
 Create hidden, drive it, and hand it to the user when they should take over: a child
 whose work the user will review, steer or merge themselves, or one blocked on a decision
-only the user can make. Say so when you do ("I handed <name> (<id>) to you; it is in
-your sidebar"). The reverse: when the user asks you to take a thread back, or a shown
-child turns out to be routine, hide it (`--shown=false`) and keep driving it.
+only the user can make. Then `code-foundry thread unsubscribe --thread <child>`: the
+user's steers are not yours to act on, and each would wake you. Say so when you do ("I
+handed <name> (<id>) to you; it is in your sidebar; I no longer follow it"). A thread
+you handed over is the user's: archive it only when they name it, and say when you left
+it out ("archive everything" means your hidden children). The reverse: when the user
+asks you to take a thread back, or a shown child turns out to be routine, hide it
+(`--shown=false`), subscribe again (`thread subscribe --thread <child> --repeat`) and
+keep driving it.
 
 ## Archiving takes hidden threads along
 

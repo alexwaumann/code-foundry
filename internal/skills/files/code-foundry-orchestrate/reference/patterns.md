@@ -4,6 +4,34 @@ Worked examples for the code-foundry-orchestrate skill. Ids and paths are exampl
 use the ones the commands print (`code-foundry project list` prints the project ids).
 Every command runs in your Bash tool.
 
+## 0. The child's prompt
+
+The prompt is all the child knows. Every child prompt says:
+
+- What done means, and which files it owns. New code and its tests go in files of its
+  own (`<feature>.go`, `<feature>_test.go`); where it must edit a shared file, give it a
+  distinct anchor ("the `case` after `list`" for one child, "before `default`" for the
+  other). Two children editing one spot of one file always conflict, and a switch has
+  only as many distinct spots as it has existing cases: with more children than spots,
+  one child (or you, after the merge) owns the shared file's edits and the others expose
+  a function for it to call, or the children stack (§2b). Say where to add code, not
+  that existing types must not change: a shared type change goes in the shared
+  design you write into both prompts. A README or changelog has one owner, or you after
+  the merge.
+- `git add <the files you changed>` (never `-A` or `.`: build output such as a compiled
+  binary would be committed), `git push origin HEAD` (not `-u`), never `git stash`
+  (sibling worktrees share one stash), build output inside the worktree, a PR only if
+  `origin` is on GitHub (else the pushed branch is done, not blocked).
+- Before reporting: `git diff origin/<default> --stat` and the diff of each file it
+  names must match what it claims (a scripted edit can match nothing and still "pass").
+- Its LAST step: `code-foundry thread report done "<summary>" --data '{"branch":
+  "<branch>", "files": [every file the branch changes]}'` (or `blocked`/`failed`), as its
+  own command after the push succeeded (never after `;`), the summary carrying every
+  caveat (not done, not verified, found but not fixed). A later report replaces the
+  earlier one, so it restates the whole branch. After any later message from you or the
+  user, it reports again.
+- The shell is zsh on macOS: BSD `sed -i ''`, quote variables.
+
 ## 1. One child, and wait for it
 
 One thread in a new worktree. Without `--notify`, since you wait in this turn.
@@ -67,7 +95,9 @@ without `--wait` and end the turn; its subscription wakes you again.
 When every child has reported, check which branches touch the same files
 (`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
 (one line per child with its PR and any overlap). Leave the threads open: the user may
-review or steer them. Archive them in one call once the user accepts the work:
+review or steer them. Archive them in one call once the user accepts the work (`--yes`
+only once every one of them has settled: archiving stops a working child and its unpushed
+work is lost; without `--yes` the command exits 2 and names who is still working):
 
 ```
 code-foundry thread archive --ids 5e4f,5e6f --yes
@@ -82,20 +112,33 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/cf/a
   --name "CLI --tag flag" --notify --request-id batch-1018-tag --prompt "..."
 ```
 
-Merge order is then first branch, second branch.
+Merge order is then first branch, second branch. Stack only when the work depends on
+the sibling's branch or the user agreed; for line-level overlap, assign anchors (§0)
+instead. When the first branch changes after the second was started (a review fix),
+fix the first, then send the second child `git fetch && git rebase origin/<first
+branch>` and `git push --force-with-lease origin HEAD` (a plain push is refused after a
+rebase), and check `git merge-base --is-ancestor origin/<first> origin/<second>`.
 
 ## 3. A review loop
 
-A child opened a PR; you review it and send it back until it is right.
+A child opened a PR; you review it and send it back until it is right. Check the diff
+against every criterion the user named, on every new code path (a CLI's argument
+handling too, not only the library). A child's own caveat that matches one of those
+criteria ("untested", "README not updated") is a finding to send back, not a caveat to
+relay: a caveat is what you could not get fixed.
 
 ```
-gh pr diff 87 --repo acme/web          # or read the child's worktree
+gh pr diff 87 --repo acme/web          # or git diff in the child's worktree (read-only)
 code-foundry thread send --id 5e6f "Review of PR #87: the loader in routes/admin.tsx still uses the old API; switch it and add a test. Push to the same branch." --wait --for 30m
 # thread s-1a2b3c4d5e6f Bump the router: needs attention (finished)
 code-foundry thread read 5e6f --last 10
 ```
 
-`send --wait` returns once the child has answered this message, not an earlier turn.
+`send --wait` is for a child you are not subscribed to; a `--notify` child gets `send`
+without `--wait`, then you end the turn and its wake brings the answer. `send --wait`
+returns once the child has answered this message, not an earlier turn. While you wait in
+a turn the user cannot reach you: for a follow-up longer than a minute or so, prefer the
+`--notify` shape.
 To follow up with several children at once, send to each without `--wait` and end your
 turn (their `--notify` subscriptions wake you), or run the `send --wait` calls in
 parallel (a plain `thread wait` after a `send` waits for the answer to that message).
@@ -151,12 +194,14 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --permission super
 
 On a wake whose `pending` is a permission, judge the tool `input` against the task and
 answer with `code-foundry thread respond --id <child> allow --request <request_id>` (or
-`deny --message "<why>"`). When a
-child asks a question while others wait for permission, first answer every pending
-request you can (`thread list --created-by $CODE_FOUNDRY_THREAD` shows who is waiting),
-then relay the question to the user as plain text at the end of your turn, and answer
-the child with `thread respond --id <child> --answer "<option label>"` once the user
-has. The child still asks with its own question tool (its `options` reach you in the
+`deny --message "<why>"`). Approvals are routine: approve and end the turn with no text
+to the user; tell them about a denial or something you found, once. Add to the prompt
+"when an edit is denied, apply the reason before you retry; never resend the same
+edit". When a child asks a question while others wait for permission, first answer
+every pending request you can (`thread list --created-by $CODE_FOUNDRY_THREAD` shows who
+is waiting), then relay the question to the user as plain text at the end of your turn
+(once: do not repeat it in later turns), and answer the child with `thread respond --id
+<child> --answer "<option label>"` once the user has. The child still asks with its own question tool (its `options` reach you in the
 wake); only you relay in plain text: a blocking question tool in your turn would hold
 back every other child until the user answers. Never tell a child not to use its
 question tool.
@@ -164,11 +209,15 @@ question tool.
 ## 6. Budget stops
 
 `--budget <usd>` stops a child at that cost; the wake and `thread get` say "budget
-reached". A budget stop is not finished work: tell the user what the child got done and
-what is left. A budget the user set is theirs: never raise it unasked, even when the
-child is close to done. Once they agree, raise it and resume the child in one go:
-raising alone does not start a turn, and the child saw the stop as a rejection of its
-last tool call.
+reached". The budget is the child's whole cost, not per message: before a follow-up to
+a budgeted child, compare `thread get` cost with the cap, and if the follow-up needs
+more than is left, ask the user; do not send. A budget stop is not finished work: tell
+the user what the child got done and what is left. A budget the user set is theirs:
+never raise it unasked, even when the child is close to done. Once they agree, raise it
+and resume the child in one go: raising alone does not start a turn, and the child saw
+the stop as a rejection of its last tool call. If the child had already reported done
+before the stop (its report is newer than its last tool call), there is nothing to
+resume: say the work was complete, and ask before starting new work.
 
 ```
 code-foundry thread budget --id 5e6f 10
@@ -198,16 +247,27 @@ removed.
 
 ## 8. Checking a batch before the roll-up
 
-Before you present a batch, list each branch's files against the default branch (or
-use `git merge-tree --write-tree`):
+Before you present a batch, `git fetch origin`, rerun `thread list --project <project
+id>` (other threads' open branches count too), then check every pair of branches:
 
 ```
-git diff --name-only origin/<default>...<branch>
+branches=(cf/add-done cf/add-remove cf/add-clear)
+for ((i = 1; i <= ${#branches}; i++)); do for ((j = i + 1; j <= ${#branches}; j++)); do
+  a=${branches[i]}; b=${branches[j]}
+  if git merge-tree --write-tree --name-only origin/$a origin/$b >/dev/null; then echo "$a + $b: clean"
+  else echo "$a + $b: CONFLICT"; git merge-tree --write-tree --name-only origin/$a origin/$b | tail -n +2; fi
+done; done
 ```
 
-For each pair that touches the same file, read both diffs of it and say whether they fit
-together (same flag parsing, same types), not only whether git merges them. Tell the
-user what overlaps or conflicts.
+Pairwise, not cumulative: merging branches one after another into one tree gives
+results that depend on the order and hides pairs. For each pair that touches the same
+file, read both diffs of it (`git diff origin/<default>...origin/<branch> -- <file>`) and
+say whether they fit together (same flag parsing, same types), not only whether git
+merges them. Then read each branch's diff against its report: a report can name a
+change the diff does not have. Redo the check whenever a branch changes after the last
+roll-up. No clones or temporary worktrees inside the project's repository; if you must
+clone, `git clone <origin url> "$(mktemp -d)"`. Tell the user what overlaps or
+conflicts, per pair.
 
 Notes:
 
