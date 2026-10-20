@@ -96,7 +96,8 @@ func (s *Thread) resetContext() {
 
 // onReseed is Reseed on the runner's goroutine: the row takes the seed, and Claude
 // stops at once when nothing holds it (maybeReseed), else once the turn ends (every
-// maybeRestart looks again). It reports whether the stop began.
+// maybeRestart looks again). It reports whether the stop began; ReseedPending stays set
+// until the process is gone (finish).
 func (r *runner) onReseed(sd seed) (Thread, bool) {
 	r.reseedPending = true
 	r.m.update(r.id, true, func(rec *record) {

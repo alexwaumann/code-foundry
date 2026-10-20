@@ -9,7 +9,7 @@ import (
 )
 
 // Reseed returns Current one epoch on (from 1); like the daemon, a CONNECTED thread
-// that is busy gets reseed_pending, an idle one is stopped (DISCONNECTED, stopped),
+// that is busy gets reseed_pending, an idle one is stopping (CLOSING, reseed_pending, stopped),
 // and a prefix sets seed_pending.
 func (s *Thread) Reseed(_ context.Context, r *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
@@ -23,7 +23,8 @@ func (s *Thread) Reseed(_ context.Context, r *connect.Request[v1.ReseedThreadReq
 		if cur.GetStatus() == v1.ThreadStatus_THREAD_STATUS_BUSY {
 			cur.ReseedPending = true
 		} else {
-			cur.State, stopped = v1.ThreadState_THREAD_STATE_DISCONNECTED, true
+			// Closing: reseed_pending until the process is gone, like the daemon.
+			cur.State, cur.ReseedPending, stopped = v1.ThreadState_THREAD_STATE_CLOSING, true, true
 		}
 	}
 	return connect.NewResponse(&v1.ReseedThreadResponse{Thread: cur, Stopped: stopped}), nil

@@ -58,10 +58,10 @@ func threadReseedCmd(b ThreadBackend, idArg ArgSpec) Command {
 			s := res.Msg.GetThread()
 			msg := "reseeded thread " + threadLabel(s) + " (epoch " + strconv.Itoa(int(s.GetEpoch())) + "); "
 			switch {
+			case res.Msg.GetStopped(): // reseed_pending stays set until the process is gone
+				msg += "stopped Claude; the next message starts the new session"
 			case s.GetReseedPending():
 				msg += "Claude stops when its turn ends; the next message starts the new session"
-			case res.Msg.GetStopped():
-				msg += "stopped Claude; the next message starts the new session"
 			default:
 				msg += "the next message starts the new session"
 			}

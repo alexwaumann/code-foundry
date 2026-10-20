@@ -755,8 +755,9 @@ type Thread struct {
 	Epoch int32 `protobuf:"varint,65,opt,name=epoch,proto3" json:"epoch,omitempty"`
 	// A reseed (ThreadService.Reseed) waits for the running turn to end: Claude still runs
 	// the old session and stops once it is back at its prompt with nothing running; the
-	// next message starts the fresh one. Never set on a thread that is not running (its
-	// next start is fresh). Not persisted.
+	// next message starts the fresh one. Set until the old process is gone, also while
+	// it closes for the reseed. Never set on a stopped thread (its next start is fresh).
+	// Not persisted.
 	ReseedPending bool `protobuf:"varint,66,opt,name=reseed_pending,json=reseedPending,proto3" json:"reseed_pending,omitempty"`
 	// A reseed's prefix waits for the fresh session's first message (it is prepended to
 	// what Claude gets; UserMessageItem.seed_prefix shows it). Persisted.

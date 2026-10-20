@@ -20,7 +20,7 @@ func TestThreadReseed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := res.Msg.GetThread(); !res.Msg.GetStopped() || s.GetEpoch() != 2 || !s.GetSeedPending() || s.GetReseedPending() || s.GetContextTokens() != 0 {
+	if s := res.Msg.GetThread(); !res.Msg.GetStopped() || s.GetEpoch() != 2 || !s.GetSeedPending() || s.GetContextTokens() != 0 {
 		t.Errorf("Reseed idle = %v", res.Msg)
 	}
 	res, err = c.Reseed(ctx, connect.NewRequest(&v1.ReseedThreadRequest{Id: "s-2"}))
