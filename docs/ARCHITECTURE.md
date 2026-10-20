@@ -527,7 +527,9 @@ idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` 
 `thread.wait --after` wait for the turn after a message, and a plain `thread.wait` for
 the turn after the thread's latest message (`docs/notes/send-ordinal-wait-after.md`). `code-foundry guide` (a local
 verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`
-(`internal/guide`, which also renders the skills' command references).
+(`internal/guide`, which also renders the skills' command references): the conventions and
+the Thread commands, and a topic per other category that `code-foundry guide <topic>`
+prints (`docs/notes/hidden-children-1-daemon.md`).
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;
