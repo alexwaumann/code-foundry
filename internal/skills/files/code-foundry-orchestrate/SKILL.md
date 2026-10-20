@@ -8,8 +8,8 @@ user-invocable: false
 
 You run inside Code Foundry, an app that runs Claude Code threads (conversations like
 this one) in git worktrees. `$CODE_FOUNDRY_THREAD` is your own thread's id. The user
-sees every thread in the app's sidebar. You create and drive other threads with the
-`code-foundry` CLI through your Bash tool.
+sees their threads in the app's sidebar; the ones you create stay out of it unless you
+hand them over. You create and drive other threads with the `code-foundry` CLI.
 
 ## Thread or subagent
 
@@ -75,7 +75,8 @@ sees every thread in the app's sidebar. You create and drive other threads with 
 5. **Archive** a child once the user has accepted or merged its work, not after its
    first report (the user may steer it; archiving deletes your wakes on it). It keeps the
    worktree and branch: `code-foundry thread archive --ids <id1>,<id2> --yes`. A lead and
-   its team: `thread archive --descendants-of <lead> --include-root --yes`.
+   its team: `thread archive --descendants-of <lead> --include-root --yes`. Archiving a
+   thread also archives the hidden threads below it; shown ones stay (`reference/sidebar.md`).
 6. **Clean up only after merge** (below).
 
 ## Leads (children that orchestrate)
@@ -120,4 +121,6 @@ is project-wide. To discard a child's work: `reference/patterns.md` §7.
   budget stops; §7 discarding a child's work; §8 checking a batch before the roll-up.
 - `reference/wakes.md`: reading a wake and the turn it starts; plugin wake sources.
   `reference/leads.md`: children that orchestrate.
+- `reference/sidebar.md`: which threads the user sees, handing one over, what archiving
+  takes along.
 - `code-foundry help <command>`: one command's flags. `code-foundry guide`: the CLI guide.

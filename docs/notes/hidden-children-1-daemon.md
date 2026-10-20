@@ -152,7 +152,35 @@ GUI's `attentionIds` must skip threads hidden by the rule.
 
 ## Skill and guide
 
-TODO
+Done last, after rebasing onto main with the orchestrate skill split (#264) in it.
+
+* **`reference/sidebar.md`** (new, static, embedded): hidden by default and what that
+  means (no sidebar, no Dock badge, the creator's Threads tab, you answer it), the
+  override (`thread sidebar --shown=true|false`, `thread new --sidebar`, the list
+  marks), the handover pattern and its reverse, and the archive cascade (hidden ones go
+  along, shown ones stay, unarchive does not cascade, the confirmation, `--ids` and
+  `--descendants-of` exact). SKILL.md (now 126 lines of the 130 cap): the intro no
+  longer says the user sees every thread, the Archive step has one sentence on the
+  cascade, "More" has the pointer. `skills_test.go`: the file in the rendered set and
+  four pointer entries.
+* **`reference/commands.md` is generated** from the registry (`internal/skills`
+  `commandsReference`), so `thread.sidebar` and `thread new --sidebar` are in it with no
+  edit.
+* **The guide is split into topics.** On main it was ~28,990 of its 29,000 bytes; the
+  registry alone (`thread.sidebar` and `thread.new --sidebar`, rendered from the
+  commands) took it to 29,550 before any hand-written sentence. As agreed, nothing was
+  trimmed: `code-foundry guide` now has the intro, Conventions (with the two new
+  sentences) and the Thread commands in detail, then "More commands: `code-foundry guide
+  <topic>`" with one line per other category naming each of its commands;
+  `code-foundry guide <topic>` (`action`, `workspace`, `project`, `terminal`, `app`,
+  `daemon`, `git`, `pull-request`, `settings`, `view`, `worktree`) prints that category
+  with whole descriptions and one line per flag (the old guide had only first sentences
+  for them, so the topics say more than before). An unknown topic exits 2 naming the
+  topics. `internal/guide/topics.go`; `cmd/code-foundry/guide.go` takes the optional
+  positional topic. `TestGuide` still checks every command is named in the guide, that
+  every command's usage (with `--yes` exactly when it confirms) appears in the guide or
+  its topic, the cap on the guide and on each topic, and that every topic is listed;
+  `topics_test.go` covers names, an unknown topic and the guide's new size.
 
 ## Gotchas
 
