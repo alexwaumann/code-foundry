@@ -62,12 +62,12 @@ type Projects interface {
 
 // Options configures New. DB, Threads, Config and Dir are required.
 type Options struct {
-	DB       *sql.DB
-	Bus      *bus.Bus     // shared with the thread and settings stores; default a private one
-	Log      *slog.Logger // default slog.Default()
-	Threads  Threads
+	DB      *sql.DB
+	Bus     *bus.Bus     // shared with the thread and settings stores; default a private one
+	Log     *slog.Logger // default slog.Default()
+	Threads Threads
 	// Config reads the settings, at New and after every ConfigChanged.
-	Config func() Config
+	Config   func() Config
 	Projects Projects // nil: PROJECTS.md lists none
 	// Dir is Ember's home (<home>/residents/ember).
 	Dir string

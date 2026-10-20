@@ -56,7 +56,7 @@ func newEmberFixture(t *testing.T) *emberFixture {
 		EpochContextTokens: 400000, EpochMaxHours: 24}
 	s, err := ember.New(context.Background(), ember.Options{
 		DB: dbtest.Open(t), Bus: b, Log: slog.New(slog.DiscardHandler), Threads: f.threads, Dir: filepath.Join(t.TempDir(), "ember"),
-		Config: func() ember.Config { mu.Lock(); defer mu.Unlock(); return cfg },
+		Config:      func() ember.Config { mu.Lock(); defer mu.Unlock(); return cfg },
 		Consolidate: func(context.Context, string, string) (string, error) { return "# Memory\n", nil },
 	})
 	if err != nil {
