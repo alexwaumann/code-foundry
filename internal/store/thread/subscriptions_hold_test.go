@@ -209,9 +209,9 @@ func TestLeadWakeHeld(t *testing.T) {
 				l.tick(time.Second)
 				l.setStep(w.ID, finished)
 			}
-			items := l.waitItems(l.top.ID, "the wakes", func(items []Item) bool { return len(wakes(items)) == tt.after })
+			l.waitItems(l.top.ID, "the wakes", func(items []Item) bool { return len(wakes(items)) == tt.after })
 			time.Sleep(50 * time.Millisecond) // nothing more comes
-			items = l.items(l.top.ID).Items
+			items := l.items(l.top.ID).Items
 			ws := wakes(items)
 			if len(ws) != tt.after {
 				t.Fatalf("wakes = %d, want %d:\n%s", len(ws), tt.after, describeItems(items))
