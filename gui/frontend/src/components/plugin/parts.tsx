@@ -2,16 +2,16 @@
  * The shared pieces of plugin views: inline content (text runs with tones, links and
  * ticking times), pills, status glyphs and buttons (PRIMITIVES.md §A, shared value types).
  */
-import { useEffect, useState } from "react";
 import { Check, Circle, Copy, ExternalLink, LoaderCircle } from "lucide-react";
 import type { Glyph as GlyphValue, Inline, Pill as PillValue, Span, ViewButton } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
+import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { usePending } from "@/stores/pluginSurfaces";
-import { copyElementText, openElementUrl } from "@/stores/pluginSurfaces";
+import { openElementUrl } from "@/stores/pluginSurfaces";
 import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
 import { formatFixedDuration, formatTime } from "./format";
@@ -187,30 +187,24 @@ export function ButtonBar({ buttons, align, className }: { buttons: readonly Vie
   );
 }
 
-/** A muted Copy icon button (always visible): copies `text` on the host and shows a check for a moment. */
+/**
+ * A muted Copy icon button (always visible): copies `text` on the host and shows a check
+ * for a moment, no toast (an icon button's feedback is its check; a plugin's other copy
+ * actions toast through copyElementText).
+ */
 export function CopyIconButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => {
-      setCopied(false);
-    }, 1500);
-    return () => {
-      clearTimeout(t);
-    };
-  }, [copied]);
+  const { copied, copy } = useCopied();
   return (
     <Tip label={copied ? "Copied" : label}>
       <Button
         variant="ghost"
         size="icon-xs"
         className="shrink-0 text-muted-foreground hover:text-foreground"
-        aria-label={label}
+        aria-label={copied ? "Copied" : label}
+        data-copied={copied || undefined}
         data-testid="plugin-copy"
         onClick={() => {
-          void copyElementText(text).then(() => {
-            setCopied(true);
-          });
+          void copy(text);
         }}
       >
         {copied ? <Check aria-hidden /> : <Copy aria-hidden />}

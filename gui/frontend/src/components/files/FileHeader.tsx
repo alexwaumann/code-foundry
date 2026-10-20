@@ -1,15 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Check, Copy, FolderSearch, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
 import { Segmented } from "@/components/usage/Segmented";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { copyText } from "@/lib/clipboard";
+import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { setWrap, useCodeViewStore } from "@/stores/codeView";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
-
-/** How long Copy path shows its check. */
-const COPIED_MS = 1500;
 
 /**
  * The File and Diff tabs' header ("header A", docs/notes/file-viewer-3-tabs.md): row one
@@ -63,25 +60,14 @@ export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { 
 
 /** Copy path: copies the absolute path; a check for a moment after. */
 export function CopyPathAction({ path }: { path: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => {
-      setCopied(false);
-    }, COPIED_MS);
-    return () => {
-      clearTimeout(t);
-    };
-  }, [copied]);
+  const { copied, copy } = useCopied();
   return (
     <HeaderAction
       icon={copied ? Check : Copy}
       label={copied ? "Copied" : "Copy path"}
       testId="file-copy-path"
       onClick={() => {
-        void copyText(path).then(() => {
-          setCopied(true);
-        });
+        void copy(path);
       }}
     />
   );
