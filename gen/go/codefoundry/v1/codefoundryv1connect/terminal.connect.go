@@ -75,7 +75,8 @@ type TerminalServiceClient interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
-	// Close kills a shell terminal (labels kind=shell) or an action run (kind=action) like
+	// Close kills a shell terminal (labels kind=shell), an action run (kind=action) or a
+	// skill's setup (kind=setup) like
 	// Kill, waits for it to exit, and removes it. It returns once the terminal is gone
 	// (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
 	// shell or action run just removes it. Any other
@@ -244,7 +245,8 @@ type TerminalServiceHandler interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
-	// Close kills a shell terminal (labels kind=shell) or an action run (kind=action) like
+	// Close kills a shell terminal (labels kind=shell), an action run (kind=action) or a
+	// skill's setup (kind=setup) like
 	// Kill, waits for it to exit, and removes it. It returns once the terminal is gone
 	// (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
 	// shell or action run just removes it. Any other

@@ -14,6 +14,10 @@
 //   - An action run in a terminal (internal/store/action) has Kind = KindAction, the
 //     same owner labels as a shell (Thread, Project, Worktree), plus Action (the action's
 //     id), ActionName (its name when it started) and ActionRun (the run's id).
+//   - A skill's setup script (skill.setup; docs/notes/skills-2-lifecycle.md) has Kind =
+//     KindSetup, the same owner labels as a shell, plus Skill (the skill's name) and
+//     Title ("Setup <name>", the tab's title). Like an action run it stays when it exits,
+//     so the output can be read; the daemon records a setup that exited 0.
 //
 // A plugin's terminal (terminal/create; docs/notes/plugins-6-thread-terminal.md) has Kind
 // = KindPlugin, Plugin = the plugin's name and Title = the title it gave. It belongs to
@@ -46,6 +50,8 @@ const (
 	// title it gave the terminal (a tab title).
 	Plugin = "plugin"
 	Title  = "title"
+	// Skill is the name of the skill a KindSetup terminal runs the setup script of.
+	Skill = "skill"
 )
 
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
@@ -61,6 +67,10 @@ const KindAction = "action"
 // KindPlugin is Kind's value on a plugin's terminal.
 const KindPlugin = "plugin"
 
+// KindSetup is Kind's value on a skill's setup script in a terminal (skill.setup). Like
+// an action run it stays when it exits and goes with its thread, worktree or project.
+const KindSetup = "setup"
+
 // IsPlugin reports whether labels mark a plugin's terminal.
 func IsPlugin(labels map[string]string) bool { return labels[Kind] == KindPlugin }
 
@@ -75,10 +85,15 @@ func IsShell(labels map[string]string) bool { return labels[Kind] == KindShell }
 // IsAction reports whether labels mark an action run in a terminal.
 func IsAction(labels map[string]string) bool { return labels[Kind] == KindAction }
 
-// IsPanel reports whether labels mark a terminal the bottom panel shows (a shell or an
-// action run): one with an owner, closed with terminal.close, and cleaned up when its
-// owner goes away.
-func IsPanel(labels map[string]string) bool { return IsShell(labels) || IsAction(labels) }
+// IsSetup reports whether labels mark a skill's setup script in a terminal.
+func IsSetup(labels map[string]string) bool { return labels[Kind] == KindSetup }
+
+// IsPanel reports whether labels mark a terminal the bottom panel shows (a shell, an
+// action run or a skill's setup): one with an owner, closed with terminal.close, and
+// cleaned up when its owner goes away.
+func IsPanel(labels map[string]string) bool {
+	return IsShell(labels) || IsAction(labels) || IsSetup(labels)
+}
 
 // Shell returns the labels of a shell owned by worktree path of project projectID, and by
 // thread threadID when it is not empty.
@@ -98,5 +113,15 @@ func ActionTerminal(threadID, projectID, worktree, actionID, name, runID string)
 	l[Action] = actionID
 	l[ActionName] = name
 	l[ActionRun] = runID
+	return l
+}
+
+// SetupTerminal returns the labels of skill name's setup script in a terminal owned like
+// a shell (see Shell), titled "Setup <name>".
+func SetupTerminal(threadID, projectID, worktree, name string) map[string]string {
+	l := Shell(threadID, projectID, worktree)
+	l[Kind] = KindSetup
+	l[Skill] = name
+	l[Title] = "Setup " + name
 	return l
 }
