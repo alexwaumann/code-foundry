@@ -108,6 +108,17 @@ func TestWatchPullRequests(t *testing.T) {
 	if !ok || p.HeadRef != "feature-x" || p.Author != "someone" || p.Checks.Pending != 1 {
 		t.Fatalf("CachedPullRequest(#9) = %+v, %v", p, ok)
 	}
+	// CachedPullRequests: every list (dashboards and the branch list), one copy each.
+	all := map[int]int{}
+	for _, p := range s.CachedPullRequests() {
+		all[p.Number]++
+		if p.Number == 9 && p.HeadRef != "feature-x" {
+			t.Errorf("CachedPullRequests #9 = %+v", p)
+		}
+	}
+	if all[1] != 1 || all[9] != 1 {
+		t.Errorf("CachedPullRequests numbers (count) = %v; want 1 and 9 once each", all)
+	}
 	if evs := changedEvents(sub); len(evs) != 0 {
 		t.Errorf("the branch's first poll announced %s", kinds(evs))
 	}
