@@ -8,9 +8,11 @@ export interface ThreadsData {
   byId: Readonly<Record<string, ThreadView>>;
   /**
    * The user's threads in display order: creation time, then id. Owned threads (a
-   * plugin's; ThreadView.owner) are left out, so nothing that lists the user's threads
-   * (the sidebar, attention counts and the dock, the Threads panel, lineage, pickers)
-   * shows them: their plugin's thread node does (docs/notes/plugins-6-thread-terminal.md).
+   * plugin's, ThreadView.owner, or a resident one, ThreadView.resident) are left out, so
+   * nothing that lists the user's threads (the sidebar, attention counts and the dock, the
+   * Threads panel, lineage, pickers) shows them: their plugin's thread node does
+   * (docs/notes/plugins-6-thread-terminal.md); a resident's own row is the GUI's to add
+   * (docs/notes/ember-1-primitives.md).
    */
   order: readonly string[];
   /** The owned threads, in the same order; absent when there are none. */
@@ -108,9 +110,9 @@ function sameLinks(a: ThreadView["linkedPullRequests"], b: ThreadView["linkedPul
   return a === b || (a.length === b.length && a.every((l, i) => l.url === b[i]?.url));
 }
 
-/** Whether a thread is someone else's than the user's (a plugin's). */
-export function isOwned(s: Pick<ThreadView, "owner"> | undefined): boolean {
-  return (s?.owner ?? "") !== "";
+/** Whether a thread is someone else's than the user's: a plugin's, or a resident one. */
+export function isOwned(s: Pick<ThreadView, "owner" | "resident"> | undefined): boolean {
+  return (s?.owner ?? "") !== "" || s?.resident !== undefined;
 }
 
 function sortedOrder(byId: Readonly<Record<string, ThreadView>>, owned = false): string[] {

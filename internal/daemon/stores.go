@@ -240,6 +240,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	applyCacheTTL(s.settings, s.thread)
 	applyShowCreatedThreads(s.settings, s.thread)
+	ensureDevResidents(ctx, log.With("store", "thread"), s.thread, p) // residents_dev.go
 	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
