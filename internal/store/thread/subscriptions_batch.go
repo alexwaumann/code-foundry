@@ -148,9 +148,9 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 }
 
 // deliverThreadWakes builds batch's wakes, holds those of leads still waiting on their
-// workers (heldLeadWake, holdLocked), counts the subscriber's children for those about them, and
-// sends the rest as one message. A batch that sends nothing gives its wake limit slot
-// back.
+// workers (heldLeadWake, holdLocked), counts the subscriber's children for those about
+// them, and sends the rest as one message. A batch that sends nothing gives its wake
+// limit slot back.
 func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 	ctx := m.ctx
 	parts := make([]threadWakePart, 0, len(batch))
