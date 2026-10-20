@@ -139,6 +139,10 @@
  *   POST /__mock/action/run?thread=s-1&action=Test[&mode=terminal|background]   (or worktree=…
  *                                                 instead of thread: a run as the CLI or an agent
  *                                                 would start it, not through the GUI)
+ *   POST /__mock/skills?fail=skill.install&error=…   (that skill.* command fails with the message until
+ *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
+ *        listError=… (the marketplace list failed); pluginsError=…; epoch=1 (a read, like the hourly
+ *        refresh). GET /__mock/skills: { epoch, calls, failures, installed } (mock/skills.ts)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -158,6 +162,7 @@ import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
+import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
@@ -518,16 +523,29 @@ function routes(router: ConnectRouter): void {
     act: async (req) => ({ version: await world.plugins.act(req) }),
   });
 
+  // The Skills marketplace (mock/skills.ts): reads only; the actions are skill.* commands.
+  router.service(SkillService, {
+    search: (req) => world.skills.search(req),
+    installed: () => world.skills.list(),
+    registries: () => world.skills.registries(),
+    watch: async function* (_req, ctx) {
+      yield world.skills.event();
+      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
+        if (source === EventSource.SKILL && event.event?.case === "skill") yield event.event.value;
+      }
+    },
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
+    // thread, gh, gitops, settings, update, action, plugin, skill), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -542,6 +560,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
         { source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } },
         { source: EventSource.PLUGIN, event: { event: { case: "plugin", value: world.plugins.snapshot() } } },
+        { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1122,6 +1141,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/actions":
       json(res, 200, world.actions.json());
+      break;
+    case "GET /__mock/skills":
+      json(res, 200, world.skills.state());
+      break;
+    case "POST /__mock/skills":
+      json(res, 200, world.skills.control(q));
       break;
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);

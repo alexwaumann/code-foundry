@@ -6,6 +6,7 @@ import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
+import { toSkillEventView, type SkillEventView } from "./skill";
 import { toThreadListEventView, type ThreadListEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
@@ -32,7 +33,8 @@ export type EventView =
   | { source: "settings"; event: SettingsSnapshotView }
   | { source: "update"; event: UpdateEventView }
   | { source: "action"; event: ActionEventView }
-  | { source: "plugin"; event: PluginEventView };
+  | { source: "plugin"; event: PluginEventView }
+  | { source: "skill"; event: SkillEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -85,6 +87,8 @@ export function toEventView(ev: Event): EventView | null {
       const v = toPluginEventView(e.value);
       return v && { source: "plugin", event: v };
     }
+    case "skill":
+      return { source: "skill", event: toSkillEventView(e.value) };
     default:
       return null;
   }

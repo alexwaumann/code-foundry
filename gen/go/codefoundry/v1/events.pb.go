@@ -100,6 +100,9 @@ const (
 	EventSource_EVENT_SOURCE_ACTION EventSource = 13
 	// Plugins: a PluginEvent snapshot (after action), then updated / removed_name.
 	EventSource_EVENT_SOURCE_PLUGIN EventSource = 14
+	// The Skills marketplace: a SkillEvent with the current epoch (after plugin), then
+	// each new epoch (SkillService.Watch).
+	EventSource_EVENT_SOURCE_SKILL EventSource = 15
 )
 
 // Enum value maps for EventSource.
@@ -118,6 +121,7 @@ var (
 		12: "EVENT_SOURCE_THREAD",
 		13: "EVENT_SOURCE_ACTION",
 		14: "EVENT_SOURCE_PLUGIN",
+		15: "EVENT_SOURCE_SKILL",
 	}
 	EventSource_value = map[string]int32{
 		"EVENT_SOURCE_UNSPECIFIED": 0,
@@ -133,6 +137,7 @@ var (
 		"EVENT_SOURCE_THREAD":      12,
 		"EVENT_SOURCE_ACTION":      13,
 		"EVENT_SOURCE_PLUGIN":      14,
+		"EVENT_SOURCE_SKILL":       15,
 	}
 )
 
@@ -393,6 +398,7 @@ type Event struct {
 	//	*Event_Heartbeat
 	//	*Event_Action
 	//	*Event_Plugin
+	//	*Event_Skill
 	Event isEvent_Event `protobuf_oneof:"event"`
 	// Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
 	// daemon lifetime, shared by every client and source (the same event has the same
@@ -563,6 +569,15 @@ func (x *Event) GetPlugin() *PluginEvent {
 	return nil
 }
 
+func (x *Event) GetSkill() *SkillEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Event_Skill); ok {
+			return x.Skill
+		}
+	}
+	return nil
+}
+
 func (x *Event) GetSeq() uint64 {
 	if x != nil {
 		return x.Seq
@@ -640,6 +655,11 @@ type Event_Plugin struct {
 	Plugin *PluginEvent `protobuf:"bytes,15,opt,name=plugin,proto3,oneof"`
 }
 
+type Event_Skill struct {
+	// The Skills marketplace: its epoch, on connect and per read.
+	Skill *SkillEvent `protobuf:"bytes,16,opt,name=skill,proto3,oneof"`
+}
+
 func (*Event_Project) isEvent_Event() {}
 
 func (*Event_Terminal) isEvent_Event() {}
@@ -666,11 +686,13 @@ func (*Event_Action) isEvent_Event() {}
 
 func (*Event_Plugin) isEvent_Event() {}
 
+func (*Event_Skill) isEvent_Event() {}
+
 var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x97\x02\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1bcodefoundry/v1/plugin.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1acodefoundry/v1/skill.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x97\x02\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
 	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
@@ -685,7 +707,7 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
 	"\avisible\x18\x02 \x01(\bR\avisible\x12\x18\n" +
 	"\afocused\x18\x03 \x01(\bR\afocused\"\x18\n" +
-	"\x16SetClientStateResponse\"\x9b\x06\n" +
+	"\x16SetClientStateResponse\"\xcf\x06\n" +
 	"\x05Event\x128\n" +
 	"\aproject\x18\x01 \x01(\v2\x1c.codefoundry.v1.ProjectEventH\x00R\aproject\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
@@ -701,7 +723,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x06thread\x18\f \x01(\v2\x1b.codefoundry.v1.ThreadEventH\x00R\x06thread\x12?\n" +
 	"\theartbeat\x18\r \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeat\x125\n" +
 	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06action\x125\n" +
-	"\x06plugin\x18\x0f \x01(\v2\x1b.codefoundry.v1.PluginEventH\x00R\x06plugin\x12\x10\n" +
+	"\x06plugin\x18\x0f \x01(\v2\x1b.codefoundry.v1.PluginEventH\x00R\x06plugin\x122\n" +
+	"\x05skill\x18\x10 \x01(\v2\x1a.codefoundry.v1.SkillEventH\x00R\x05skill\x12\x10\n" +
 	"\x03seq\x18\x14 \x01(\x04R\x03seq\x12\x14\n" +
 	"\x05epoch\x18\x15 \x01(\tR\x05epochB\a\n" +
 	"\x05event*S\n" +
@@ -709,7 +732,7 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"ClientKind\x12\x1b\n" +
 	"\x17CLIENT_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCLIENT_KIND_GUI\x10\x01\x12\x13\n" +
-	"\x0fCLIENT_KIND_CLI\x10\x02*\xdc\x02\n" +
+	"\x0fCLIENT_KIND_CLI\x10\x02*\xf4\x02\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14EVENT_SOURCE_PROJECT\x10\x01\x12\x19\n" +
@@ -724,7 +747,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x16EVENT_SOURCE_WORKSPACE\x10\v\x12\x17\n" +
 	"\x13EVENT_SOURCE_THREAD\x10\f\x12\x17\n" +
 	"\x13EVENT_SOURCE_ACTION\x10\r\x12\x17\n" +
-	"\x13EVENT_SOURCE_PLUGIN\x10\x0e2\xb9\x01\n" +
+	"\x13EVENT_SOURCE_PLUGIN\x10\x0e\x12\x16\n" +
+	"\x12EVENT_SOURCE_SKILL\x10\x0f2\xb9\x01\n" +
 	"\fEventService\x12F\n" +
 	"\x05Watch\x12\".codefoundry.v1.WatchEventsRequest\x1a\x15.codefoundry.v1.Event\"\x000\x01\x12a\n" +
 	"\x0eSetClientState\x12%.codefoundry.v1.SetClientStateRequest\x1a&.codefoundry.v1.SetClientStateResponse\"\x00B\xc3\x01\n" +
@@ -764,6 +788,7 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 	(*StreamHeartbeat)(nil),        // 16: codefoundry.v1.StreamHeartbeat
 	(*ActionEvent)(nil),            // 17: codefoundry.v1.ActionEvent
 	(*PluginEvent)(nil),            // 18: codefoundry.v1.PluginEvent
+	(*SkillEvent)(nil),             // 19: codefoundry.v1.SkillEvent
 }
 var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
@@ -781,15 +806,16 @@ var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	16, // 12: codefoundry.v1.Event.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
 	17, // 13: codefoundry.v1.Event.action:type_name -> codefoundry.v1.ActionEvent
 	18, // 14: codefoundry.v1.Event.plugin:type_name -> codefoundry.v1.PluginEvent
-	2,  // 15: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
-	3,  // 16: codefoundry.v1.EventService.SetClientState:input_type -> codefoundry.v1.SetClientStateRequest
-	5,  // 17: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
-	4,  // 18: codefoundry.v1.EventService.SetClientState:output_type -> codefoundry.v1.SetClientStateResponse
-	17, // [17:19] is the sub-list for method output_type
-	15, // [15:17] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	19, // 15: codefoundry.v1.Event.skill:type_name -> codefoundry.v1.SkillEvent
+	2,  // 16: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
+	3,  // 17: codefoundry.v1.EventService.SetClientState:input_type -> codefoundry.v1.SetClientStateRequest
+	5,  // 18: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
+	4,  // 19: codefoundry.v1.EventService.SetClientState:output_type -> codefoundry.v1.SetClientStateResponse
+	18, // [18:20] is the sub-list for method output_type
+	16, // [16:18] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_events_proto_init() }
@@ -804,6 +830,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_plugin_proto_init()
 	file_codefoundry_v1_project_proto_init()
 	file_codefoundry_v1_settings_proto_init()
+	file_codefoundry_v1_skill_proto_init()
 	file_codefoundry_v1_terminal_proto_init()
 	file_codefoundry_v1_thread_proto_init()
 	file_codefoundry_v1_thread_lifecycle_proto_init()
@@ -824,6 +851,7 @@ func file_codefoundry_v1_events_proto_init() {
 		(*Event_Heartbeat)(nil),
 		(*Event_Action)(nil),
 		(*Event_Plugin)(nil),
+		(*Event_Skill)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

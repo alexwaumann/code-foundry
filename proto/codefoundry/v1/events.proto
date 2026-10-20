@@ -9,6 +9,7 @@ import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/plugin.proto";
 import "codefoundry/v1/project.proto";
 import "codefoundry/v1/settings.proto";
+import "codefoundry/v1/skill.proto";
 import "codefoundry/v1/terminal.proto";
 import "codefoundry/v1/thread.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
@@ -22,7 +23,7 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, plugin, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, plugin, skill, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -108,6 +109,9 @@ enum EventSource {
   EVENT_SOURCE_ACTION = 13;
   // Plugins: a PluginEvent snapshot (after action), then updated / removed_name.
   EVENT_SOURCE_PLUGIN = 14;
+  // The Skills marketplace: a SkillEvent with the current epoch (after plugin), then
+  // each new epoch (SkillService.Watch).
+  EVENT_SOURCE_SKILL = 15;
 }
 
 message Event {
@@ -132,6 +136,8 @@ message Event {
     ActionEvent action = 14;
     // Plugins: a snapshot, then updated / removed_name.
     PluginEvent plugin = 15;
+    // The Skills marketplace: its epoch, on connect and per read.
+    SkillEvent skill = 16;
   }
   // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
   // daemon lifetime, shared by every client and source (the same event has the same

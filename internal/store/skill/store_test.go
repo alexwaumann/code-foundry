@@ -226,7 +226,7 @@ func TestInstalled(t *testing.T) {
 	}
 	want := map[string]row{
 		"plugin enterprise-data": {ID: "enterprise-data@ai-marketplace", Registry: "ai-marketplace", Version: "1.3.0",
-			Description: "Query the data warehouse and its catalog.", Dir: "/p/ed", Enabled: true, Update: "1.4.0",
+			Description: "Query the data warehouse and its catalog.", Dir: "/p/ed", Enabled: true, Update: "1.3.9",
 			Skills: []string{"catalog", "query-warehouse"}},
 		"plugin lint-kit": {ID: "lint-kit@ai-marketplace", Registry: "ai-marketplace", Version: "0.2.1",
 			Description: "Linters for every language.", Dir: "/p/lk", Skills: []string{"lint"}},
@@ -274,6 +274,67 @@ func TestInstalled(t *testing.T) {
 	i := slices.IndexFunc(h.store.Installed(), func(in skill.Installed) bool { return in.Name == "pr-review" })
 	if in := h.store.Installed()[i]; !in.Local || in.Update != nil || in.Registry != "" {
 		t.Errorf("after forgetting: %+v", in)
+	}
+}
+
+// TestPluginUpdateOffer: a plugin's offer compares the checkout's plugin.json version
+// with the installed copy's (Claude Code installs and reports plugin.json's), so an
+// index version that differs from plugin.json (the fixture's enterprise-data: 1.4.0 in
+// marketplace.json, 1.3.9 in plugin.json) never offers an update `claude plugin update`
+// cannot bring. A checkout without plugin.json (lint-kit) falls back to the index.
+func TestPluginUpdateOffer(t *testing.T) {
+	manifest := func(t *testing.T, version string) string {
+		t.Helper()
+		dir := t.TempDir()
+		if version != "-" {
+			if err := os.MkdirAll(filepath.Join(dir, ".claude-plugin"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, ".claude-plugin", "plugin.json"), []byte(`{"name":"x","version":"`+version+`"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dir
+	}
+	tests := []struct {
+		name      string
+		id        string
+		listed    string // the version `claude plugin list` reports
+		installed string // the installed copy's plugin.json version; "-" for none
+		want      string // the offer; "" for none
+	}{
+		{name: "plugin.json versions agree, index newer: no offer", id: "enterprise-data@ai-marketplace", listed: "1.3.9", installed: "1.3.9"},
+		{name: "installed plugin.json older", id: "enterprise-data@ai-marketplace", listed: "1.3.0", installed: "1.3.0", want: "1.3.9"},
+		{name: "installed plugin.json wins over the list", id: "enterprise-data@ai-marketplace", listed: "1.0.0", installed: "1.3.9"},
+		{name: "no installed plugin.json: the listed version", id: "enterprise-data@ai-marketplace", listed: "1.3.0", installed: "-", want: "1.3.9"},
+		{name: "installed newer than the checkout", id: "enterprise-data@ai-marketplace", listed: "2.0.0", installed: "2.0.0"},
+		{name: "a commit prefix never compares", id: "enterprise-data@ai-marketplace", listed: "dbd4588f9e10", installed: "-"},
+		{name: "checkout without plugin.json: index newer", id: "lint-kit@ai-marketplace", listed: "0.2.0", installed: "-", want: "0.2.1"},
+		{name: "checkout without plugin.json: index the same", id: "lint-kit@ai-marketplace", listed: "0.2.1", installed: "0.1.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.claude.Set(h.claude.Marketplaces, []skilltest.Plugin{{ID: tt.id, Version: tt.listed, Scope: "user", Enabled: true, InstallPath: manifest(t, tt.installed)}})
+			h.load(t)
+			in := h.store.Installed()
+			if len(in) != 1 {
+				t.Fatalf("installed = %+v", in)
+			}
+			got := ""
+			if in[0].Update != nil {
+				got = in[0].Update.Version
+			}
+			if got != tt.want {
+				t.Errorf("offer = %q, want %q", got, tt.want)
+			}
+			if wantBy := map[string]string{"enterprise-data": "Data Platform", "lint-kit": "Index Author"}[in[0].Name]; in[0].By != wantBy {
+				t.Errorf("by = %q, want %q", in[0].By, wantBy)
+			}
+			if ups := h.store.Updates(""); (len(ups) == 1) != (tt.want != "") {
+				t.Errorf("updates = %+v", ups)
+			}
+		})
 	}
 }
 

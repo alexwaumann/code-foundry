@@ -62,7 +62,7 @@ func TestReadEntries(t *testing.T) {
 	}{
 		{marketplace.KindPlugin, "enterprise-data", marketplace.Entry{
 			Kind: marketplace.KindPlugin, Tier: marketplace.TierEnterprise, Name: "enterprise-data",
-			Description: "Query the data warehouse and its catalog.", By: "Data Platform", Version: "1.4.0",
+			Description: "Query the data warehouse and its catalog.", By: "Data Platform", Version: "1.4.0", ManifestVersion: "1.3.9",
 			LastUpdated: marketplacetest.Catalog, Registry: "ai-marketplace",
 			Path:     "enterprise/c1-claude-code-marketplace/enterprise-data",
 			Keywords: []string{"sql", "warehouse", "data"}, Skills: []string{"catalog", "query-warehouse"},

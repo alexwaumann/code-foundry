@@ -183,7 +183,7 @@ func Run(ctx context.Context, opts Options) error {
 	// and tell the plugins as they come and go (plugin_wakes.go).
 	st.thread.SetPluginWakes(threadPluginWakes{plugins: plugins})
 	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
-	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients})
+	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
 	if err := all.Register(commands, all.Deps{
@@ -268,6 +268,7 @@ func Run(ctx context.Context, opts Options) error {
 		workspaceAPI.Route(),
 		actionAPI.Route(),
 		pluginAPI.Route(),
+		api.NewSkill(st.skills, events).Route(),
 		api.NewFilesystem(st.home, st.project).Route(),
 		eventsAPI.Route(),
 	}
