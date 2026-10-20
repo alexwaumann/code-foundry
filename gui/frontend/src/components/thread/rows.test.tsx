@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
@@ -204,9 +204,22 @@ describe("the latest turn", () => {
     // One copy action, on the answer's first row.
     expect(finals[0]?.querySelectorAll('[aria-label="Copy answer"]')).toHaveLength(1);
     expect(finals[1]?.querySelector('[aria-label="Copy answer"]')).toBeNull();
-    fireEvent.click(finals[0]?.querySelector('[aria-label="Copy answer"]') as HTMLButtonElement);
+    const btn = finals[0]?.querySelector('[aria-label="Copy answer"]') as HTMLButtonElement;
+    fireEvent.click(btn);
     await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith("done\n\nand more");
+    // A check and "Copied" for a moment, held visible by data-copied (thread.css).
+    await waitFor(() => {
+      expect(btn.getAttribute("aria-label")).toBe("Copied");
+    });
+    expect(btn.hasAttribute("data-copied")).toBe(true);
+    await waitFor(
+      () => {
+        expect(btn.getAttribute("aria-label")).toBe("Copy answer");
+      },
+      { timeout: 3000 },
+    );
+    expect(btn.hasAttribute("data-copied")).toBe(false);
   });
 });
 

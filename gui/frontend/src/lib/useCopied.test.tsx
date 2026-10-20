@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COPIED_MS, useCopied } from "./useCopied";
 
-const writeText = vi.fn((_text: string) => Promise.resolve());
+const writeText = vi.fn<(text: string) => Promise<void>>();
 
 beforeEach(() => {
   writeText.mockReset();

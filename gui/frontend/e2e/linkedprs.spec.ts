@@ -231,6 +231,13 @@ test("hover actions: open on GitHub and copy the link", async ({ page }) => {
   await first.hover();
   await first.getByTestId("linkedpr-copy").click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied)).toEqual([`https://github.com/${CF}/pull/142`]);
+  // A check and "Copied", no toast; the actions stay while it shows, pointer gone or not.
+  const copy = first.getByTestId("linkedpr-copy");
+  await expect(copy).toHaveAttribute("aria-label", "Copied");
+  await expect(page.getByText("Link copied")).toHaveCount(0);
+  await page.mouse.move(0, 0);
+  await expect(copy).toBeVisible();
+  await expect(copy).toHaveAttribute("aria-label", "Copy link", { timeout: 3000 });
   await first.hover();
   await first.getByTestId("linkedpr-open-github").click();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([`https://github.com/${CF}/pull/142`]);
