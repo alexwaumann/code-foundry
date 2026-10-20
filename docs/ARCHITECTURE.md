@@ -777,7 +777,12 @@ a local skill); update offers are derived (plugin: semver; skill: a newer commit
 `advanced.claude_path` read live. The daemon reads the checkouts at start (no network)
 and on the plugin registry's hourly tick runs `claude plugin marketplace update` per
 marketplace (deepening Claude Code's shallow clone once) and re-reads; each read
-publishes `skill.Changed{Epoch}`.
+publishes `skill.Changed{Epoch}`. The lifecycle (`docs/notes/skills-2-lifecycle.md`) is
+the store's too: a plugin is `claude plugin install|enable|disable|update|uninstall
+<name>@<marketplace> --json`, a skill is a directory it copies (staged beside, then
+renamed), moves to and from `<home>/skills/disabled` and records; a setup script runs
+only in a visible `kind=setup` bottom-panel terminal (`skill.setup`), whose exit 0 the
+daemon records. The `skill.*` commands drive it.
 
 ## 11. Conventions
 
