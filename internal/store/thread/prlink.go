@@ -22,7 +22,9 @@ import (
 // order, and never removed.
 //
 // A thread also has every link of the threads it created, transitively
-// (prlink_children.go): a link is copied up the CreatedBy chain as it arrives.
+// (prlink_children.go): a link is copied up the CreatedBy chain as it arrives. And the
+// daemon links the pull requests whose head is a branch the thread works on
+// (prlink_branch.go).
 
 // LinkSource is where a thread's link came from. Stored, not yet on the API.
 type LinkSource string
@@ -30,7 +32,7 @@ type LinkSource string
 const (
 	LinkClaude LinkSource = "claude" // a pr-link record in the thread's own transcript
 	LinkChild  LinkSource = "child"  // copied from a thread this thread created
-	LinkBranch LinkSource = "branch" // reserved: the pull request of the worktree's branch
+	LinkBranch LinkSource = "branch" // a pull request whose head is a branch the thread works on
 )
 
 // LinkedPullRequest is a pull request linked to the thread.

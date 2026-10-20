@@ -2,6 +2,7 @@ package ghtest
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"strings"
 
@@ -62,4 +63,36 @@ func (s *Store) CachedPullRequest(slug string, number int) (gh.PullRequest, bool
 		return det.PullRequest, true
 	}
 	return gh.PullRequest{}, false
+}
+
+// CachedPullRequests returns the dashboard lists and the branches set with
+// SetBranchPullRequests (each branch pull request's Repo defaulting to its slug), one
+// copy per pull request, the first list holding it winning.
+func (s *Store) CachedPullRequests() []gh.PullRequest {
+	var out []gh.PullRequest
+	seen := map[gh.PullRequestRef]bool{}
+	add := func(p gh.PullRequest) {
+		r := gh.PullRequestRef{Slug: strings.ToLower(p.Repo), Number: p.Number}
+		if !seen[r] {
+			seen[r] = true
+			out = append(out, p)
+		}
+	}
+	d := s.Snapshot().Dashboard
+	for _, list := range [][]gh.PullRequest{d.Authored, d.ReviewRequested, d.Reviewed, d.RecentlyMerged} {
+		for _, p := range list {
+			add(p)
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	keys := slices.Sorted(maps.Keys(s.branch))
+	for _, k := range keys {
+		b := s.branch[k]
+		for _, p := range b.PullRequests {
+			p.Repo = cmp.Or(p.Repo, b.Slug)
+			add(p)
+		}
+	}
+	return out
 }

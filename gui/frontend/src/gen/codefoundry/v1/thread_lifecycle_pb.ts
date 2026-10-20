@@ -222,7 +222,11 @@ export type Thread = Message<"codefoundry.v1.Thread"> & {
    * re-emits the record at nearly every turn and it can flip back to an earlier pull
    * request, so this is every distinct URL (deduplicated by URL) in first-seen order;
    * entries are never removed. A reconnected thread is backfilled from its transcript's
-   * history. Persisted. See docs/notes/linked-prs.md.
+   * history. Also included: the links of the threads it created (created_by,
+   * transitively), and the pull requests whose head is a branch the thread works on (its
+   * worktree's or each workspace member's) in the project's repository, as the GitHub
+   * store's cached lists know them. Persisted. See docs/notes/linked-prs.md,
+   * linked-prs-children.md and linked-prs-branch.md.
    *
    * @generated from field: repeated codefoundry.v1.LinkedPullRequest linked_pull_requests = 25;
    */
@@ -855,7 +859,7 @@ export const UsageBucketSchema: GenMessage<UsageBucket> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_thread_lifecycle, 4);
 
 /**
- * A pull request Claude linked to a thread (Thread.linked_pull_requests).
+ * A pull request linked to a thread (Thread.linked_pull_requests).
  *
  * @generated from message codefoundry.v1.LinkedPullRequest
  */
@@ -878,7 +882,8 @@ export type LinkedPullRequest = Message<"codefoundry.v1.LinkedPullRequest"> & {
   url: string;
 
   /**
-   * The first pr-link record for url (when it was seen, if the record had no time).
+   * The first pr-link record for url (when it was seen, if the record had no time); a
+   * child thread's link keeps its time; a branch link has the pull request's creation.
    *
    * @generated from field: google.protobuf.Timestamp linked_at = 4;
    */
