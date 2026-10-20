@@ -342,6 +342,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		s.Flags = flags[s.ID]
 		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}
+	// Links that predate copying them up the CreatedBy chain (prlink_children.go).
+	m.foldChildLinks(ctx)
 	// Wake subscriptions, armed with the threads as loaded (subscriptions.go).
 	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs, opts.WatchPullRequests); err != nil {
 		return nil, err

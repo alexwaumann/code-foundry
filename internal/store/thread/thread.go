@@ -184,7 +184,8 @@ type Thread struct {
 	// Reconnect, Pin(true), Send and Archive(true) clear it. Persisted.
 	SnoozedUntil time.Time
 	// LinkedPullRequests are the pull requests Claude linked to the conversation
-	// (pr-link transcript records; prlink.go), one per URL, in first-seen order. Never
+	// (pr-link transcript records; prlink.go) and those of the threads it created,
+	// transitively (prlink_children.go), one per URL, in first-seen order. Never
 	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
 	// array is never written, so snapshots may share it.
 	LinkedPullRequests []LinkedPullRequest
