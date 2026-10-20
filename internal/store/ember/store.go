@@ -18,7 +18,6 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
-	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -37,10 +36,23 @@ type Threads interface {
 	SetResidentTools(name string, t thread.ResidentTools)
 }
 
-// Settings is the settings store as the Ember store reads it; its changes arrive as
-// settings.Changed on the bus.
-type Settings interface {
-	Snapshot() *settings.Snapshot
+// Config is what the Ember store reads from the ember.* settings (and one threads.*
+// one). The daemon maps the settings onto it (the store does not import the settings
+// store) and calls ConfigChanged after every change.
+type Config struct {
+	// Enabled is ember.enabled.
+	Enabled bool
+	// Model and Effort are the resident's (ember.model, ember.effort).
+	Model, Effort string
+	// WorkerModels and WorkerEffort are its workers' (ember.worker_models,
+	// ember.worker_effort).
+	WorkerModels []string
+	WorkerEffort string
+	// EpochContextTokens and EpochMaxHours are the epoch limits.
+	EpochContextTokens, EpochMaxHours int
+	// ShowCreatedThreads is threads.show_created_threads: which threads PROJECTS.md
+	// lists.
+	ShowCreatedThreads bool
 }
 
 // Projects is the project store as PROJECTS.md reads it.
@@ -48,13 +60,14 @@ type Projects interface {
 	Snapshot() *project.Snapshot
 }
 
-// Options configures New. DB, Threads, Settings and Dir are required.
+// Options configures New. DB, Threads, Config and Dir are required.
 type Options struct {
 	DB       *sql.DB
 	Bus      *bus.Bus     // shared with the thread and settings stores; default a private one
 	Log      *slog.Logger // default slog.Default()
 	Threads  Threads
-	Settings Settings
+	// Config reads the settings, at New and after every ConfigChanged.
+	Config func() Config
 	Projects Projects // nil: PROJECTS.md lists none
 	// Dir is Ember's home (<home>/residents/ember).
 	Dir string
@@ -133,11 +146,14 @@ type Store struct {
 	tasks []Task // without Thread, in board order
 	st    persisted
 	// cfg and enabled are the settings last applied (applySettings).
-	cfg     settings.Ember
+	cfg     Config
 	enabled bool
 	applied bool
 	// consolidating: an epoch boundary runs (boundary).
 	consolidating bool
+
+	// configChanged wakes the loop to apply the settings (ConfigChanged).
+	configChanged chan struct{}
 
 	// epochMu serializes epoch boundaries; memMu MEMORY.md's read-modify-writes.
 	epochMu sync.Mutex
@@ -150,8 +166,8 @@ type Store struct {
 // into the thread store, applies the settings (making the resident when Ember is on)
 // and starts following thread and settings changes. Close stops it.
 func New(ctx context.Context, opts Options) (*Store, error) {
-	if opts.DB == nil || opts.Threads == nil || opts.Settings == nil || opts.Dir == "" {
-		return nil, errors.New("ember: Options.DB, Threads, Settings and Dir are required")
+	if opts.DB == nil || opts.Threads == nil || opts.Config == nil || opts.Dir == "" {
+		return nil, errors.New("ember: Options.DB, Threads, Config and Dir are required")
 	}
 	if !filepath.IsAbs(opts.Dir) {
 		return nil, fmt.Errorf("ember: Options.Dir %q is not absolute", opts.Dir)
@@ -186,15 +202,15 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	}
 	sortTasks(tasks)
 	sctx, cancel := context.WithCancel(context.Background())
-	s := &Store{opts: opts, log: opts.Log, ctx: sctx, cancel: cancel, tasks: tasks, st: loadState(opts.Log, opts.Dir)}
+	s := &Store{opts: opts, log: opts.Log, ctx: sctx, cancel: cancel, tasks: tasks, st: loadState(opts.Log, opts.Dir),
+		configChanged: make(chan struct{}, 1)}
 	opts.Threads.SetResidentTools(Name, Tools)
 	opts.Threads.SetCreateDefaults(s.workerDefaults)
 	threadSub := bus.Subscribe[thread.Event](opts.Bus, 256)
-	settingsSub := bus.Subscribe[settings.Changed](opts.Bus, 16)
 	s.applySettings(ctx)
 	s.onThreads()
 	s.wg.Add(1)
-	go s.run(threadSub, settingsSub)
+	go s.run(threadSub)
 	return s, nil
 }
 
@@ -211,6 +227,15 @@ func (s *Store) Snapshot() *Snapshot {
 		return p
 	}
 	return &Snapshot{}
+}
+
+// ConfigChanged tells the store the settings changed: it applies them shortly, on its
+// own goroutine. Never blocks.
+func (s *Store) ConfigChanged() {
+	select {
+	case s.configChanged <- struct{}{}:
+	default:
+	}
 }
 
 // Dir is Ember's home.
@@ -237,10 +262,9 @@ func (s *Store) Await(ctx context.Context, done func(*Snapshot) bool) (*Snapshot
 }
 
 // run follows thread and settings changes and checks the epoch rules on a tick.
-func (s *Store) run(threadSub *bus.Subscription[thread.Event], settingsSub *bus.Subscription[settings.Changed]) {
+func (s *Store) run(threadSub *bus.Subscription[thread.Event]) {
 	defer s.wg.Done()
 	defer threadSub.Close()
-	defer settingsSub.Close()
 	tick := time.NewTicker(s.opts.CheckInterval)
 	defer tick.Stop()
 	for {
@@ -250,8 +274,7 @@ func (s *Store) run(threadSub *bus.Subscription[thread.Event], settingsSub *bus.
 		case <-threadSub.C():
 			drain(threadSub.C())
 			s.onThreads()
-		case <-settingsSub.C():
-			drain(settingsSub.C())
+		case <-s.configChanged:
 			s.applySettings(s.ctx)
 			s.onThreads()
 		case <-tick.C:
@@ -274,7 +297,7 @@ func drain[T any](c <-chan T) {
 // applySettings applies the ember.* settings: enabling makes (or configures) the
 // resident, disabling stops it; a model or effort change goes to the resident at once.
 func (s *Store) applySettings(ctx context.Context) {
-	cfg := s.opts.Settings.Snapshot().Settings.Ember
+	cfg := s.opts.Config()
 	s.mu.Lock()
 	was, first, prev := s.enabled, !s.applied, s.cfg
 	s.mu.Unlock()
@@ -300,7 +323,7 @@ func (s *Store) applySettings(ctx context.Context) {
 
 // enable prepares Ember's home and makes its resident thread, seeded for its first
 // epoch, or configures the one there is.
-func (s *Store) enable(ctx context.Context, cfg settings.Ember) error {
+func (s *Store) enable(ctx context.Context, cfg Config) error {
 	if err := s.prepareHome(); err != nil {
 		return err
 	}
@@ -343,7 +366,7 @@ func (s *Store) enable(ctx context.Context, cfg settings.Ember) error {
 }
 
 // configure brings the resident's model, effort and permission mode in line with cfg.
-func (s *Store) configure(ctx context.Context, cfg settings.Ember) {
+func (s *Store) configure(ctx context.Context, cfg Config) {
 	t, ok := residentOf(s.opts.Threads.Snapshot())
 	if !ok {
 		return
@@ -464,7 +487,7 @@ func (s *Store) onThreads() {
 // pending request, no reseed or seed waiting), and then when its context passed
 // cfg.EpochContextTokens or the epoch (started at started) is older than
 // cfg.EpochMaxHours.
-func epochDue(t thread.Thread, cfg settings.Ember, started, now time.Time) string {
+func epochDue(t thread.Thread, cfg Config, started, now time.Time) string {
 	switch {
 	case t.ReseedPending, t.SeedPrefix != "", t.FreshStart, t.PendingRequestID != "", t.WakePending,
 		t.State == thread.StateStarting, t.Status == thread.StatusBusy:
@@ -557,8 +580,8 @@ func (s *Store) workerDefaults(_ context.Context, createdBy string, needModel, n
 	if !ok || !descends(snap, createdBy, res.ID) {
 		return "", ""
 	}
-	cfg := s.opts.Settings.Snapshot().Settings.Ember
-	if models := settings.SplitList(cfg.WorkerModels); needModel && len(models) > 0 {
+	cfg := s.opts.Config()
+	if models := cfg.WorkerModels; needModel && len(models) > 0 {
 		s.mu.Lock()
 		model = models[s.st.WorkerNext%len(models)]
 		s.st.WorkerNext++

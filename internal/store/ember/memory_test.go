@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestAddNote(t *testing.T) {
@@ -59,5 +58,4 @@ func TestRemember(t *testing.T) {
 			t.Errorf("Remember(%d bytes) err = %v", len(bad), err)
 		}
 	}
-	_ = time.Now
 }

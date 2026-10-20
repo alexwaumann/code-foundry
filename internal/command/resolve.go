@@ -31,6 +31,8 @@ const (
 	SubscriptionID
 	// TerminalID: "t-" + 12 hex digits.
 	TerminalID
+	// EmberTaskID: a task on Ember's board, "t-" + 8 hex digits.
+	EmberTaskID
 )
 
 // MinIDSuffix is the shortest suffix an id arg resolves.
@@ -42,6 +44,7 @@ var idKinds = map[IDKind]struct{ prefix, noun string }{
 	RunID:          {"r-", "action run"},
 	SubscriptionID: {"sub-", "subscription"},
 	TerminalID:     {"t-", "terminal"},
+	EmberTaskID:    {"t-", "task"},
 }
 
 // IDLister returns every id of a kind the daemon knows now.

@@ -150,7 +150,7 @@ func (s *Store) projectSeeds() []ProjectSeed {
 		return nil
 	}
 	threads := s.opts.Threads.Snapshot()
-	showCreated := s.opts.Settings.Snapshot().Settings.Threads.ShowCreatedThreads
+	showCreated := s.opts.Config().ShowCreatedThreads
 	out := make([]ProjectSeed, 0, len(ps.Projects))
 	for _, p := range ps.Projects {
 		seed := ProjectSeed{ID: p.ID, Name: p.Name, Path: p.Path, DefaultBranch: p.DefaultBranch, Git: p.Git}
@@ -162,7 +162,9 @@ func (s *Store) projectSeeds() []ProjectSeed {
 				}
 			}
 		}
-		slices.SortFunc(list, func(a, b thread.Thread) int { return cmp.Or(b.LastActivityAt.Compare(a.LastActivityAt), strings.Compare(a.ID, b.ID)) })
+		slices.SortFunc(list, func(a, b thread.Thread) int {
+			return cmp.Or(b.LastActivityAt.Compare(a.LastActivityAt), strings.Compare(a.ID, b.ID))
+		})
 		for _, t := range list[:min(len(list), recentThreads)] {
 			tt := taskThread(threads, t.ID)
 			seed.Threads = append(seed.Threads, ThreadLine{ID: t.ID, Name: t.Name, State: ThreadState(tt)})

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -15,24 +16,22 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
-	"github.com/alexwaumann/code-foundry/internal/store/settings"
-	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-// env is a Store on a real database, the thread store's fake and a real settings
-// store, in a test directory, with a fake consolidation and a fixed clock.
+// env is a Store on a real database and the thread store's fake, in a test directory,
+// with settings it sets, a fake consolidation and a fixed clock.
 type env struct {
-	t        *testing.T
-	s        *Store
-	threads  *threadtest.Fake
-	settings *settingstest.Fake
-	bus      *bus.Bus
-	dir      string
-	opts     Options
+	t       *testing.T
+	s       *Store
+	threads *threadtest.Fake
+	bus     *bus.Bus
+	dir     string
+	opts    Options
 
 	mu        sync.Mutex
+	cfg       Config
 	now       time.Time
 	prompts   []string
 	answer    string
@@ -54,16 +53,11 @@ func newEnv(t *testing.T, mods ...func(*env)) *env {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	b := bus.New()
-	set, err := settingstest.New(ctx, root, b, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = set.Close() })
-	e := &env{t: t, threads: threadtest.New(b), settings: set, bus: b, dir: filepath.Join(root, "residents", "ember"),
-		now: now, answer: "# Memory\n\n- consolidated\n"}
+	e := &env{t: t, threads: threadtest.New(b), bus: b, dir: filepath.Join(root, "residents", "ember"),
+		now: now, answer: "# Memory\n\n- consolidated\n", cfg: defaultConfig}
 	e.threads.Now = e.clock
 	e.opts = Options{
-		DB: database, Bus: b, Log: slog.New(slog.DiscardHandler), Threads: e.threads, Settings: set, Dir: e.dir,
+		DB: database, Bus: b, Log: slog.New(slog.DiscardHandler), Threads: e.threads, Config: e.config, Dir: e.dir,
 		Projects: projectsFake{&project.Snapshot{Projects: []project.Project{{ID: "p-1", Name: "app", Path: "/u/app", DefaultBranch: "main", Git: true}}}},
 		Now:      e.clock, Location: utc, CheckInterval: time.Hour,
 		Consolidate: func(_ context.Context, model, prompt string) (string, error) {
@@ -102,23 +96,36 @@ func (e *env) advance(d time.Duration) {
 	e.mu.Unlock()
 }
 
-// set applies settings and waits until the store applied them.
-func (e *env) set(kv ...string) {
+// defaultConfig is the settings' defaults.
+var defaultConfig = Config{
+	Model: "claude-opus-4-8[1m]", Effort: "high", WorkerModels: []string{"claude-opus-4-7[1m]", "claude-opus-4-8[1m]"},
+	WorkerEffort: "high", EpochContextTokens: 400000, EpochMaxHours: 24,
+}
+
+func (e *env) config() Config {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	c := e.cfg
+	c.WorkerModels = slices.Clone(c.WorkerModels)
+	return c
+}
+
+// set changes the settings and waits until the store applied them.
+func (e *env) set(change func(*Config)) {
 	e.t.Helper()
-	partial := map[string]string{}
-	for i := 0; i+1 < len(kv); i += 2 {
-		partial[kv[i]] = kv[i+1]
-	}
-	if _, err := e.settings.Update(context.Background(), partial); err != nil {
-		e.t.Fatal(err)
-	}
-	want := e.settings.Snapshot().Settings.Ember
+	e.mu.Lock()
+	change(&e.cfg)
+	want := e.cfg
+	e.mu.Unlock()
+	e.s.ConfigChanged()
 	e.await("settings applied", func(*Snapshot) bool {
 		e.s.mu.Lock()
 		defer e.s.mu.Unlock()
-		return e.s.cfg == want
+		return e.s.applied && reflect.DeepEqual(e.s.cfg, want)
 	})
 }
+
+func on(c *Config) { c.Enabled = true }
 
 // await waits for cond on the store's snapshot.
 func (e *env) await(what string, cond func(*Snapshot) bool) *Snapshot {
@@ -167,7 +174,7 @@ func TestEnable(t *testing.T) {
 	if tools := e.threads.ResidentTools(Name); !slices.Contains(tools.Allow, "Bash(code-foundry ember:*)") || !slices.Contains(tools.Deny, "Edit") {
 		t.Errorf("tools = %+v", tools)
 	}
-	e.set(settings.KeyEmberEnabled, "true")
+	e.set(on)
 	st := e.await("the resident", func(s *Snapshot) bool { return s.Status.ThreadID != "" }).Status
 	r := e.resident()
 	if !st.Enabled || st.Epoch != 1 || st.EpochContextTokens != 400000 || r.Name != DisplayName || r.WorktreePath != e.dir ||
@@ -193,14 +200,14 @@ func TestEnable(t *testing.T) {
 	}
 
 	// The model and effort apply to it at once.
-	e.set(settings.KeyEmberModel, "claude-haiku-5-5[1m]", settings.KeyEmberEffort, "medium")
+	e.set(func(c *Config) { c.Model, c.Effort = "claude-haiku-5-5[1m]", "medium" })
 	if r := e.resident(); r.Model != "claude-haiku-5-5[1m]" || r.Effort != "medium" {
 		t.Errorf("after the change: %s %s", r.Model, r.Effort)
 	}
 
 	// Off: its timers go; a running process stops; the thread stays.
 	e.threads.Put(func() thread.Thread { r := e.resident(); r.State = thread.StateConnected; return r }())
-	e.set(settings.KeyEmberEnabled, "false")
+	e.set(func(c *Config) { c.Enabled = false })
 	e.await("off", func(s *Snapshot) bool { return !s.Status.Enabled && s.Status.ThreadID == r.ID })
 	deadline := time.Now().Add(5 * time.Second)
 	for len(e.calls("Close")) == 0 && time.Now().Before(deadline) {
@@ -214,7 +221,7 @@ func TestEnable(t *testing.T) {
 	}
 
 	// On again: the same thread, not a second one.
-	e.set(settings.KeyEmberEnabled, "true")
+	e.set(on)
 	if got := e.calls("EnsureResident"); len(got) != 1 {
 		t.Errorf("EnsureResident calls = %q", got)
 	}
@@ -227,7 +234,7 @@ func TestEnableSeedsAnUnseededResident(t *testing.T) {
 	if _, _, err := e.threads.EnsureResident(context.Background(), Name, thread.ResidentOptions{Cwd: "/x"}); err != nil {
 		t.Fatal(err)
 	}
-	e.set(settings.KeyEmberEnabled, "true")
+	e.set(on)
 	if got := e.calls("Reseed"); len(got) != 1 {
 		t.Fatalf("Reseed calls = %q", got)
 	}
@@ -238,7 +245,7 @@ func TestEnableSeedsAnUnseededResident(t *testing.T) {
 
 func TestEpochDue(t *testing.T) {
 	started := now.Add(-2 * time.Hour)
-	cfg := settings.Ember{EpochContextTokens: 400000, EpochMaxHours: 24}
+	cfg := Config{EpochContextTokens: 400000, EpochMaxHours: 24}
 	quiet := thread.Thread{ID: "s-e", State: thread.StateConnected, Status: thread.StatusIdle, LastResultAt: now.Add(-time.Minute), ContextTokens: 500000}
 	tests := []struct {
 		name string
@@ -278,7 +285,7 @@ func TestEpochDue(t *testing.T) {
 func TestAutomaticEpoch(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.set(settings.KeyEmberEnabled, "true", settings.KeyEmberEpochTokens, "20000")
+	e.set(func(c *Config) { c.Enabled, c.EpochContextTokens = true, 20000 })
 	r := e.resident()
 	e.advance(time.Minute)
 	e.threads.PutItems(r.ID,
@@ -334,7 +341,7 @@ func TestConsolidationKeepsMemory(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			e := newEnv(t)
-			e.set(settings.KeyEmberEnabled, "true")
+			e.set(on)
 			r := e.resident()
 			e.advance(time.Minute)
 			e.threads.PutItems(r.ID, thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi", CreatedAt: e.clock()})
@@ -359,7 +366,7 @@ func TestReseedRefusals(t *testing.T) {
 	if _, err := e.s.Reseed(context.Background()); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("off: err = %v", err)
 	}
-	e.set(settings.KeyEmberEnabled, "true")
+	e.set(on)
 	// Nothing to consolidate: no claude call, but a new epoch.
 	st, err := e.s.Reseed(context.Background())
 	if err != nil || st.Epoch != 2 || len(e.prompts) != 0 {
@@ -394,8 +401,9 @@ func TestVisibleMessages(t *testing.T) {
 func TestWorkerDefaults(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.set(settings.KeyEmberEnabled, "true", settings.KeyEmberWorkerModels, "claude-opus-4-7[1m],claude-sonnet-5[1m]",
-		settings.KeyEmberWorkerEffort, "xhigh")
+	e.set(func(c *Config) {
+		c.Enabled, c.WorkerModels, c.WorkerEffort = true, []string{"claude-opus-4-7[1m]", "claude-sonnet-5[1m]"}, "xhigh"
+	})
 	r := e.resident()
 	ctx := context.Background()
 	create := func(o thread.CreateOptions) thread.Thread {
