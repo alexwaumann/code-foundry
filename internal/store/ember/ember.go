@@ -130,6 +130,8 @@ type TaskThread struct {
 	Archived       bool
 	// Removed: the thread is gone; the task keeps its id.
 	Removed bool
+	// Team is the threads below it (team.go), for an open task only; zero otherwise.
+	Team Team
 }
 
 // Counts are the tasks per state.

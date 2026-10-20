@@ -532,9 +532,16 @@ func (s *Store) publish() {
 // and publishes it when it differs from the last one.
 func (s *Store) publishLocked(threads *thread.Snapshot) {
 	out := &Snapshot{Tasks: make([]Task, len(s.tasks))}
+	var teams *teamIndex
 	for i, t := range s.tasks {
 		if t.ThreadID != "" {
 			t.Thread = taskThread(threads, t.ThreadID)
+			if t.State.Open() && !t.Thread.Removed {
+				if teams == nil {
+					teams = newTeamIndex(threads)
+				}
+				t.Thread.Team = teams.team(t.ThreadID)
+			}
 		}
 		out.Tasks[i] = t
 		switch t.State {
