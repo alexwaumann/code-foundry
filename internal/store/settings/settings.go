@@ -37,7 +37,21 @@ type Settings struct {
 	Keybindings map[string]string
 	Update      Update
 	Plugins     Plugins
+	Ember       Ember
 	Advanced    Advanced
+}
+
+// Ember configures the resident agent (internal/store/ember).
+type Ember struct {
+	Enabled bool
+	Model   string // a model registry value; default model.EmberDefault
+	Effort  string // low, medium, high
+	// WorkerModels is the comma-separated model ids its worker threads alternate
+	// between (SplitList reads it).
+	WorkerModels       string
+	WorkerEffort       string
+	EpochContextTokens int
+	EpochMaxHours      int
 }
 
 // Threads are defaults for new Claude Code sessions.
