@@ -45,6 +45,14 @@ const Default = "claude-sonnet-5[1m]"
 // name is a few words.
 const NamingDefault = "claude-sonnet-4-6[1m]"
 
+// EmberDefault is the model of the resident agent Ember when the settings
+// (ember.model) do not pick one.
+const EmberDefault = "claude-opus-4-8[1m]"
+
+// EmberWorkersDefault is the comma-separated models Ember's worker threads alternate
+// between when the settings (ember.worker_models) do not pick them.
+const EmberWorkersDefault = "claude-opus-4-7[1m],claude-opus-4-8[1m]"
+
 // All returns the registry in display order.
 func All() []Model { return slices.Clone(registry) }
 

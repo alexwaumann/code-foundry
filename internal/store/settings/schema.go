@@ -116,6 +116,7 @@ const (
 	GroupKeybindings = "keybindings"
 	GroupUpdate      = "update"
 	GroupPlugins     = "plugins"
+	GroupEmber       = "ember"
 	GroupAdvanced    = "advanced"
 )
 
@@ -126,6 +127,7 @@ const (
 	PageNotifications = "notifications"
 	PageSource        = "source"
 	PageKeybindings   = "keybindings"
+	PageEmber         = "ember"
 	PageAdvanced      = "advanced"
 	// PagePlugins is drawn by the GUI (Settings → Plugins: installed plugins and Browse)
 	// around its one section of fields.
@@ -153,6 +155,11 @@ var Pages = []Page{
 		{ID: "github", Title: "GitHub", Description: "Your pull requests and default-branch checks, polled with gh's login."},
 		{ID: "projects", Title: "Projects", Description: "Fetching, and how worktrees open."},
 	}},
+	{ID: PageEmber, Title: "Ember", Description: "Ember is a resident agent that plans work, runs worker threads and reports back in its own chat.", Sections: []Section{
+		{ID: "experiment", Title: "Experiment"},
+		{ID: "models", Title: "Models"},
+		{ID: "epochs", Title: "Epochs", Description: "Advanced. Ember's Claude session is replaced by a fresh one, seeded with its memory, task board and recent messages, when either limit is reached after a turn."},
+	}},
 	{ID: PageKeybindings, Title: "Keybindings",
 		Description: `Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound.`},
 	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
@@ -174,55 +181,97 @@ var Groups = []Group{
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
 	{GroupPlugins, "Plugins", "Where plugins are installed from."},
+	{GroupEmber, "Ember", "The resident agent: whether it runs, its models, and when it starts a fresh session."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
 }
 
 // Keys of the static fields that have consumers in the daemon or GUI.
 const (
-	KeyDefaultModel       = "threads.default_model"
-	KeyDefaultEffort      = "threads.default_effort"
-	KeyDefaultWorktree    = "threads.default_worktree"
-	KeyAutoName           = "threads.auto_name"
-	KeyNamingModel        = "threads.naming_model"
-	KeyCacheTTL           = "threads.cache_ttl_seconds"
-	KeyShowCreatedThreads = "threads.show_created_threads"
-	KeyCloseGrace         = "threads.close_grace_seconds"
-	KeyScrollback         = "threads.scrollback_lines"
-	KeyGhPollInterval     = "github.poll_interval_seconds"
-	KeyDashboards         = "github.dashboards_enabled"
-	KeyFetchInterval      = "projects.fetch_interval_seconds"
-	KeyEditorCommand      = "gitops.editor_command"
-	KeyTheme              = "appearance.theme"
-	KeyThemeDark          = "appearance.theme_dark"
-	KeyThemeLight         = "appearance.theme_light"
-	KeyFontFamily         = "appearance.font_family"
-	KeyFontSize           = "appearance.font_size"
-	KeyZoom               = "appearance.zoom"
-	KeyDensity            = "appearance.density"
-	KeyThreadWidth        = "appearance.thread_width"
-	KeyBackdrop           = "appearance.backdrop"
-	KeyBackdropFile       = "appearance.backdrop_file"
-	KeyPanelKeepOpen      = "appearance.panel_keep_open"
-	KeyDockBadge          = "notifications.dock_badge"
-	KeyBounce             = "notifications.bounce"
-	KeySound              = "notifications.sound"
-	KeySoundVolume        = "notifications.sound_volume"
-	KeyAlertCooldown      = "notifications.cooldown_seconds"
-	KeyUpdateChannel      = "update.channel"
-	KeyClaudePath         = "advanced.claude_path"
-	KeyGhPath             = "advanced.gh_path"
-	KeyLogLevel           = "advanced.log_level"
-	KeyPluginRegistries   = "plugins.registries"
-	keybindingKeyPrefix   = GroupKeybindings + "."
-	defaultFontFamily     = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
-	defaultScrollback     = 10000
-	defaultCloseGrace     = 10
-	defaultCacheTTL       = 3600
-	defaultGhPollSeconds  = 60
-	defaultFetchSeconds   = 120
-	defaultSoundVolume    = 50
-	defaultAlertCooldown  = 60
+	KeyDefaultModel         = "threads.default_model"
+	KeyDefaultEffort        = "threads.default_effort"
+	KeyDefaultWorktree      = "threads.default_worktree"
+	KeyAutoName             = "threads.auto_name"
+	KeyNamingModel          = "threads.naming_model"
+	KeyCacheTTL             = "threads.cache_ttl_seconds"
+	KeyShowCreatedThreads   = "threads.show_created_threads"
+	KeyCloseGrace           = "threads.close_grace_seconds"
+	KeyScrollback           = "threads.scrollback_lines"
+	KeyGhPollInterval       = "github.poll_interval_seconds"
+	KeyDashboards           = "github.dashboards_enabled"
+	KeyFetchInterval        = "projects.fetch_interval_seconds"
+	KeyEditorCommand        = "gitops.editor_command"
+	KeyTheme                = "appearance.theme"
+	KeyThemeDark            = "appearance.theme_dark"
+	KeyThemeLight           = "appearance.theme_light"
+	KeyFontFamily           = "appearance.font_family"
+	KeyFontSize             = "appearance.font_size"
+	KeyZoom                 = "appearance.zoom"
+	KeyDensity              = "appearance.density"
+	KeyThreadWidth          = "appearance.thread_width"
+	KeyBackdrop             = "appearance.backdrop"
+	KeyBackdropFile         = "appearance.backdrop_file"
+	KeyPanelKeepOpen        = "appearance.panel_keep_open"
+	KeyDockBadge            = "notifications.dock_badge"
+	KeyBounce               = "notifications.bounce"
+	KeySound                = "notifications.sound"
+	KeySoundVolume          = "notifications.sound_volume"
+	KeyAlertCooldown        = "notifications.cooldown_seconds"
+	KeyUpdateChannel        = "update.channel"
+	KeyClaudePath           = "advanced.claude_path"
+	KeyGhPath               = "advanced.gh_path"
+	KeyLogLevel             = "advanced.log_level"
+	KeyPluginRegistries     = "plugins.registries"
+	KeyEmberEnabled         = "ember.enabled"
+	KeyEmberModel           = "ember.model"
+	KeyEmberEffort          = "ember.effort"
+	KeyEmberWorkerModels    = "ember.worker_models"
+	KeyEmberWorkerEffort    = "ember.worker_effort"
+	KeyEmberEpochTokens     = "ember.epoch_context_tokens"
+	KeyEmberEpochHours      = "ember.epoch_max_hours"
+	keybindingKeyPrefix     = GroupKeybindings + "."
+	defaultFontFamily       = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
+	defaultScrollback       = 10000
+	defaultCloseGrace       = 10
+	defaultCacheTTL         = 3600
+	defaultGhPollSeconds    = 60
+	defaultFetchSeconds     = 120
+	defaultSoundVolume      = 50
+	defaultAlertCooldown    = 60
+	defaultEmberEpochTokens = 400000
+	defaultEmberEpochHours  = 24
 )
+
+// emberEfforts are ember.effort's levels.
+var emberEfforts = []string{"low", "medium", "high"}
+
+// checkModelList validates a comma-separated list of model registry values (at least
+// one, each listed once).
+func checkModelList(v string) error {
+	ids := SplitList(v)
+	if len(ids) == 0 {
+		return errors.New("want at least one model id")
+	}
+	for i, id := range ids {
+		if !model.Known(id) {
+			return fmt.Errorf("unknown model %q; want ids from %s", id, enumList(model.Values()))
+		}
+		if slices.Contains(ids[:i], id) {
+			return fmt.Errorf("model %q is listed twice", id)
+		}
+	}
+	return nil
+}
+
+// SplitList splits a comma-separated setting, trimming each entry and dropping blanks.
+func SplitList(v string) []string {
+	var out []string
+	for p := range strings.SplitSeq(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
 
 // appearance.backdrop values: the bundled forest art, nothing, or the image named by
 // appearance.backdrop_file.
@@ -440,6 +489,52 @@ var staticFields = []Field{
 		Description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor ($VISUAL/$EDITOR if graphical, then common editors).",
 		Placeholder: "auto-detect",
 		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
+	},
+	// Ember (docs/notes/ember-2-store.md): read by the Ember store (internal/store/ember),
+	// live.
+	{
+		Key: KeyEmberEnabled, Group: GroupEmber, Page: PageEmber, Section: "experiment", Type: Bool, Title: "Enable Ember",
+		Description: "Experimental: a resident agent pinned above your threads. Tell it what you want done; it plans the work, creates worker threads, follows them and reports back in its own chat. " +
+			"It keeps its memory and task board under ~/.code-foundry/residents/ember, and nothing else changes while it is off.",
+		Default: "false",
+		bind:    func(s *Settings) any { return &s.Ember.Enabled },
+	},
+	{
+		Key: KeyEmberModel, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", Type: Enum, Title: "Model",
+		Description: "The model Ember itself runs on. A change applies to its running session at once.",
+		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.EmberDefault,
+		bind: func(s *Settings) any { return &s.Ember.Model },
+	},
+	{
+		Key: KeyEmberEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", Type: Enum, Title: "Effort",
+		Description: "Ember's effort level.",
+		Enum:        emberEfforts, EnumLabels: effortLabels(emberEfforts), Default: "high",
+		bind: func(s *Settings) any { return &s.Ember.Effort },
+	},
+	{
+		Key: KeyEmberWorkerModels, Group: GroupEmber, Page: PageEmber, Section: "models", Type: String, Title: "Worker threads",
+		Description: "The models Ember's worker threads run on. With more than one, new workers alternate between them.",
+		Default:     model.EmberWorkersDefault, Placeholder: model.EmberWorkersDefault,
+		check: checkModelList,
+		bind:  func(s *Settings) any { return &s.Ember.WorkerModels },
+	},
+	{
+		Key: KeyEmberWorkerEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Type: Enum, Title: "Worker effort",
+		Description: "The effort level of Ember's worker threads.",
+		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "high",
+		bind: func(s *Settings) any { return &s.Ember.WorkerEffort },
+	},
+	{
+		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "tokens", Type: Int, Title: "Context limit",
+		Description: "Start a fresh session once Ember's context passes this many tokens.",
+		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 20000, Max: 1000000,
+		bind: func(s *Settings) any { return &s.Ember.EpochContextTokens },
+	},
+	{
+		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "h", Type: Int, Title: "Session age limit",
+		Description: "Start a fresh session once the current one is this many hours old (and has had a turn).",
+		Default:     strconv.Itoa(defaultEmberEpochHours), Min: 1, Max: 720,
+		bind: func(s *Settings) any { return &s.Ember.EpochMaxHours },
 	},
 	// Advanced.
 	{

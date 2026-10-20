@@ -233,6 +233,7 @@ func Run(ctx context.Context, opts Options) error {
 		PluginRegistry:    pluginAPI,
 		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
 		Skills:            st.skills,
+		Ember:             st.ember,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -269,6 +270,7 @@ func Run(ctx context.Context, opts Options) error {
 		actionAPI.Route(),
 		pluginAPI.Route(),
 		api.NewSkill(st.skills, events).Route(),
+		api.NewEmber(st.ember, events).Route(),
 		api.NewFilesystem(st.home, st.project).Route(),
 		eventsAPI.Route(),
 	}

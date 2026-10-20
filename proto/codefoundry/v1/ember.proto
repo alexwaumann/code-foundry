@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/thread_lifecycle.proto";
+import "google/protobuf/timestamp.proto";
+
+// EmberService reads Ember, the resident agent (docs/notes/ember-2-store.md): its state
+// and its task board. It only reads: Ember and the CLI change the board with the
+// ember.* commands (CommandService.Invoke), and the settings (ember.*) turn it on and
+// choose its models. Ember's chat is its resident thread (Thread.kind RESIDENT,
+// resident_name "ember"), read through ThreadService like any thread.
+service EmberService {
+  // GetStatus is Ember's state now.
+  rpc GetStatus(GetEmberStatusRequest) returns (GetEmberStatusResponse) {}
+  // ListTasks lists the board's tasks, each with its worker thread's progress.
+  rpc ListTasks(ListEmberTasksRequest) returns (ListEmberTasksResponse) {}
+  // WatchBoard sends the whole board (status and every task) at once, then again on
+  // every change: a task, Ember's state, or a task's worker thread (its status or
+  // report).
+  rpc WatchBoard(WatchEmberBoardRequest) returns (stream EmberBoard) {}
+}
+
+// A task's state on the board.
+enum EmberTaskState {
+  EMBER_TASK_STATE_UNSPECIFIED = 0;
+  EMBER_TASK_STATE_TODO = 1;
+  EMBER_TASK_STATE_DOING = 2;
+  // Waiting on something: set by Ember, or by the daemon when the task's worker reports
+  // failed or blocked while the task is doing (outcome is the report's summary).
+  EMBER_TASK_STATE_BLOCKED = 3;
+  EMBER_TASK_STATE_DONE = 4;
+  EMBER_TASK_STATE_CANCELLED = 5;
+}
+
+// EmberStatus is Ember's state.
+message EmberStatus {
+  // ember.enabled.
+  bool enabled = 1;
+  // The resident thread; "" until Ember was first enabled.
+  string thread_id = 2;
+  // The resident thread's epoch (its Claude session count, Thread.epoch).
+  int32 epoch = 3;
+  // When the current epoch began (unset until known).
+  google.protobuf.Timestamp epoch_started_at = 4;
+  // The current session's context size (Thread.context_tokens).
+  int64 context_tokens = 5;
+  // ember.epoch_context_tokens: past it, the next idle moment starts a fresh epoch.
+  int64 epoch_context_tokens = 6;
+  // A consolidation (MEMORY.md rewritten by a one-shot claude -p) runs now; a fresh
+  // epoch follows it.
+  bool consolidating = 7;
+  // When the last consolidation finished, and its error when it failed (MEMORY.md was
+  // then kept as it was).
+  google.protobuf.Timestamp last_consolidated_at = 8;
+  string last_consolidation_error = 9;
+  EmberTaskCounts counts = 10;
+}
+
+// Tasks per state.
+message EmberTaskCounts {
+  int32 todo = 1;
+  int32 doing = 2;
+  int32 blocked = 3;
+  int32 done = 4;
+  int32 cancelled = 5;
+}
+
+// EmberTask is one unit of work on Ember's board.
+message EmberTask {
+  // "t-" and 8 hex digits.
+  string id = 1;
+  string title = 2;
+  string detail = 3;
+  EmberTaskState state = 4;
+  // The task it is part of (one level only); "" for a top-level task.
+  string parent_id = 5;
+  // The worker thread that owns it; "" for none.
+  string thread_id = 6;
+  // What came of it (done), or why it stopped (blocked, cancelled).
+  string outcome = 7;
+  // Board order (ascending).
+  int32 position = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  // When it became done; unset otherwise.
+  google.protobuf.Timestamp done_at = 11;
+  // The worker thread's progress, derived when read; unset without thread_id.
+  EmberTaskThread thread = 12;
+}
+
+// EmberTaskThread is a task's worker thread as the board shows it.
+message EmberTaskThread {
+  string id = 1;
+  // Its name now; "" once removed.
+  string name = 2;
+  ThreadState state = 3;
+  ThreadStatus status = 4;
+  string status_reason = 5;
+  // Its latest report (Thread.report); UNSPECIFIED when it has none.
+  ThreadReportStatus report_status = 6;
+  string report_summary = 7;
+  google.protobuf.Timestamp report_at = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp last_activity_at = 10;
+  // Archived (it keeps its task); removed: the thread is gone (the task stays).
+  bool archived = 11;
+  bool removed = 12;
+}
+
+// EmberBoard is the status and every task, in board order.
+message EmberBoard {
+  EmberStatus status = 1;
+  repeated EmberTask tasks = 2;
+}
+
+message GetEmberStatusRequest {}
+
+message GetEmberStatusResponse {
+  EmberStatus status = 1;
+}
+
+message ListEmberTasksRequest {
+  // Only open tasks (todo, doing, blocked); default every task.
+  bool open = 1;
+}
+
+message ListEmberTasksResponse {
+  repeated EmberTask tasks = 1;
+}
+
+message WatchEmberBoardRequest {}

@@ -31,6 +31,9 @@ import (
 //     Config func (stores.go), read before every poll.
 //   - update.channel -> update.Store.SetChannel on every change (applyUpdateChannel),
 //     which re-checks at once when the channel changed.
+//   - ember.* (and threads.show_created_threads) -> the Ember store's Config, read
+//     after every change (ConfigChanged; ember.go): on/off, its model and effort, its
+//     workers' and its epoch limits.
 
 // applySettings tells the settings store which commands exist (enabling keybinding
 // fields and validation) and keeps the registry and log level in sync with it. The

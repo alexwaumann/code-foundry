@@ -19,6 +19,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
+	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
@@ -62,6 +63,8 @@ type stores struct {
 	// thread layers Claude sessions on terminal and db; shut down before terminal so
 	// live threads are recorded as disconnected while their processes still run.
 	thread *thread.Manager
+	// ember is the resident agent's store (ember.go); closed before thread.
+	ember *ember.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// skills reads the Skills marketplaces Claude Code has and what is installed
@@ -240,7 +243,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	applyCacheTTL(s.settings, s.thread)
 	applyShowCreatedThreads(s.settings, s.thread)
-	ensureDevResidents(ctx, log.With("store", "thread"), s.thread, p) // residents_dev.go
+	// After thread and project: Ember's resident thread is made (when it is on) and its
+	// hooks set before anything can start it (ember.go).
+	if s.ember, err = openEmber(ctx, log.With("store", "ember"), p, s.db, s.bus, s.settings, s.thread, s.project, claude); err != nil {
+		return nil, err
+	}
 	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
@@ -336,6 +343,9 @@ func (s *stores) close() error {
 	}
 	if s.stopBranchLinks != nil {
 		s.stopBranchLinks()
+	}
+	if s.ember != nil {
+		s.ember.Close()
 	}
 	if s.action != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

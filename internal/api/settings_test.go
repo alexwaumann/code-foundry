@@ -86,7 +86,7 @@ func TestSettingsService(t *testing.T) {
 			t.Errorf("keybindings sections = %v", p.GetSections())
 		}
 	}
-	if want := []string{"general", "appearance", "notifications", "source", "keybindings", "advanced", "plugins"}; !slices.Equal(pageIDs, want) {
+	if want := []string{"general", "appearance", "notifications", "source", "ember", "keybindings", "advanced", "plugins"}; !slices.Equal(pageIDs, want) {
 		t.Errorf("pages = %v, want %v", pageIDs, want)
 	}
 	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "github-light" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "GitHub Light" {

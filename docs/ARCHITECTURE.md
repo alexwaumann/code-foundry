@@ -105,6 +105,9 @@ internal/
     plugin/                plugins: discovery, consent, one actor per enabled plugin (stdio
                            JSON-RPC), plugin.<name>.* commands, Keychain secrets, surfaces,
                            predicates, events, flags, session environment (§10)
+    ember/                 Ember, the resident agent: its home (SOUL.md, MEMORY.md, seed/),
+                           epochs (consolidation by a one-shot claude -p, then a reseed), the
+                           task board, its workers' models (docs/notes/ember-2-store.md)
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
                            migrated by a newer build (db.ErrNewerSchema)
@@ -112,7 +115,7 @@ internal/
   paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
-                           (orchestrate, help, plugin)
+                           (orchestrate, help, plugin), and Ember's own (ember)
   fsx/                     the home-directory boundary and directory completion
 pluginsdk/                 the plugin SDK, its own module (stdlib only, Go 1.24): manifest, protocol,
                            Serve, Host, ui (view model), plugintest (§10)
@@ -216,6 +219,14 @@ Services (v1):
   `include_resident`, kept out of the user's lists by the GUI. Wake subscriptions also
   take a timer target (`target_at` once, `target_every` repeating; wall clock, persisted,
   one catch-up wake after a stop; `thread subscribe --at/--every`).
+* `EmberService` — GetStatus, ListTasks, WatchBoard (server stream: the whole board, then
+  again on every change of a task, of Ember's state or of a task's worker thread): Ember,
+  the resident agent, and its task board, each task with its worker's derived status and
+  report (`docs/notes/ember-2-store.md`). Read only: Ember and the CLI change the board
+  with the `ember.*` commands; `ember.*` settings turn it on and pick its models. Its
+  chat is its resident thread. A thread Ember or a thread below it creates without a
+  model runs on `ember.worker_models` (round robin) at `ember.worker_effort`
+  (`CreateThreadRequest.model_defaulted`: the CLI's settings default counts as none).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
   the exit, remove; shells only).

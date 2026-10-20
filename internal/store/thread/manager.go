@@ -277,6 +277,12 @@ type Manager struct {
 	removed tombstones
 	// spawnExtras is what every spawn adds (spawnextras.go); nil: nothing.
 	spawnExtras atomic.Pointer[SpawnExtrasFunc]
+	// createDefaults picks the model and effort of threads some threads create
+	// (residenthooks.go); nil: none.
+	createDefaults atomic.Pointer[CreateDefaultsFunc]
+	// residentTools are each resident's own --allowedTools rules (residenthooks.go):
+	// resident name -> ResidentTools.
+	residentTools sync.Map
 }
 
 type record struct {
@@ -536,6 +542,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	// The creator's name now: the note and created_by_name keep it (metadata.go).
 	creatorID, creatorName, err := m.creator(o.CreatedBy)
 	if err != nil {
+		return Thread{}, err
+	}
+	if err := m.applyCreateDefaults(ctx, creatorID, &o); err != nil {
 		return Thread{}, err
 	}
 	if err := m.checkNotify(o.Notify, creatorID); err != nil {
@@ -868,8 +877,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
 // x is the extras it applied, for the staleness fingerprint (envstale.go).
 func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
+	// A resident's own rules (residenthooks.go) come before the conversation's grants.
+	residentAllow, residentDeny := m.residentRules(s)
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
-		allowedTools: allowedTools(g.allow), disallowedTools: g.deny, appendSystemPrompt: systemPrompt("", s.SystemPromptAppend)}
+		allowedTools: allowedTools(append(residentAllow, g.allow...)), disallowedTools: append(residentDeny, g.deny...),
+		appendSystemPrompt: systemPrompt("", s.SystemPromptAppend)}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)

@@ -382,6 +382,11 @@ type CreateOptions struct {
 	Model string
 	// Effort is a claude --effort level: low, medium, high, xhigh, max.
 	Effort string
+	// ModelDefaulted and EffortDefaulted: Model and Effort were filled from the user's
+	// settings, not chosen (the CLI's thread.new without --model or --effort), so a
+	// creator's defaults (Manager.SetCreateDefaults) may replace them, as they replace
+	// an empty one.
+	ModelDefaulted, EffortDefaulted bool
 	// Name, if set, is the display name and disables auto-naming.
 	Name string
 	// InitialPrompt is sent as the thread's first user message once Claude answers the

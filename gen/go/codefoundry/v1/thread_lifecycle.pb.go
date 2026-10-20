@@ -1889,9 +1889,15 @@ type CreateThreadRequest struct {
 	// Thread.in_sidebar at creation: show (true) or hide (false) the new thread in the
 	// sidebar whatever the threads.show_created_threads setting says. Only with
 	// created_by (INVALID_ARGUMENT otherwise). Unset follows the setting.
-	InSidebar     *bool `protobuf:"varint,21,opt,name=in_sidebar,json=inSidebar,proto3,oneof" json:"in_sidebar,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	InSidebar *bool `protobuf:"varint,21,opt,name=in_sidebar,json=inSidebar,proto3,oneof" json:"in_sidebar,omitempty"`
+	// model (effort) was filled from the user's settings, not chosen: the CLI's thread.new
+	// without --model (--effort) sets it. A thread Ember (or a thread below it) creates then
+	// runs on Ember's worker model (effort) instead, as with an empty one
+	// (docs/notes/ember-2-store.md). An explicit model always wins.
+	ModelDefaulted  bool `protobuf:"varint,22,opt,name=model_defaulted,json=modelDefaulted,proto3" json:"model_defaulted,omitempty"`
+	EffortDefaulted bool `protobuf:"varint,23,opt,name=effort_defaulted,json=effortDefaulted,proto3" json:"effort_defaulted,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateThreadRequest) Reset() {
@@ -2060,6 +2066,20 @@ func (x *CreateThreadRequest) GetRequestId() string {
 func (x *CreateThreadRequest) GetInSidebar() bool {
 	if x != nil && x.InSidebar != nil {
 		return *x.InSidebar
+	}
+	return false
+}
+
+func (x *CreateThreadRequest) GetModelDefaulted() bool {
+	if x != nil {
+		return x.ModelDefaulted
+	}
+	return false
+}
+
+func (x *CreateThreadRequest) GetEffortDefaulted() bool {
+	if x != nil {
+		return x.EffortDefaulted
 	}
 	return false
 }
@@ -5008,7 +5028,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xff\x05\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xd3\x06\n" +
 	"\x13CreateThreadRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
@@ -5036,7 +5056,9 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x14 \x01(\tR\trequestId\x12\"\n" +
 	"\n" +
-	"in_sidebar\x18\x15 \x01(\bH\x00R\tinSidebar\x88\x01\x01B\r\n" +
+	"in_sidebar\x18\x15 \x01(\bH\x00R\tinSidebar\x88\x01\x01\x12'\n" +
+	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +
+	"\x10effort_defaulted\x18\x17 \x01(\bR\x0feffortDefaultedB\r\n" +
 	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"Y\n" +

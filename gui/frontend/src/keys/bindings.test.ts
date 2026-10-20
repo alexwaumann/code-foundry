@@ -5,7 +5,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { chordFires, commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
+import { chordFires, commandBindings, handleKeyDown, inPalette, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 // The re-list a chord on a stale list waits for: a test sets what it lists.
@@ -423,5 +423,22 @@ describe("a bare-key command chord", () => {
     expect(chordFires("cmd+t", sidebar)).toBe(true);
     expect(chordFires("escape", sidebar)).toBe(false);
     expect(chordFires("shift+escape", pane)).toBe(true);
+  });
+});
+
+describe("inPalette", () => {
+  it.each([
+    ["thread.new", true],
+    ["thread.agent.open", false],
+    ["thread.reseed", false],
+    ["ember.task.add", false],
+    ["ember.status", false],
+    ["embers.x", true],
+  ])("%s -> %s", (name, want) => {
+    expect(inPalette(cmd({ name }))).toBe(want);
+  });
+
+  it("leaves out a command that is not startable here", () => {
+    expect(inPalette(cmd({ name: "git.push", available: false }))).toBe(false);
   });
 });

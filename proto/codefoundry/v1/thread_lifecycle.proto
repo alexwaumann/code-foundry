@@ -537,6 +537,12 @@ message CreateThreadRequest {
   // sidebar whatever the threads.show_created_threads setting says. Only with
   // created_by (INVALID_ARGUMENT otherwise). Unset follows the setting.
   optional bool in_sidebar = 21;
+  // model (effort) was filled from the user's settings, not chosen: the CLI's thread.new
+  // without --model (--effort) sets it. A thread Ember (or a thread below it) creates then
+  // runs on Ember's worker model (effort) instead, as with an empty one
+  // (docs/notes/ember-2-store.md). An explicit model always wins.
+  bool model_defaulted = 22;
+  bool effort_defaulted = 23;
 }
 
 message NewWorktree {

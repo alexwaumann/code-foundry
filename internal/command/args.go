@@ -150,6 +150,18 @@ func InvalidArg(arg, format string, a ...any) error {
 // parsed and defaulted; accessors return the zero value for absent or mistyped names.
 type Args struct {
 	vals map[string]any
+	// given are the names the caller passed a value for (not a context or Default);
+	// nil from NewArgs, where every value counts as given.
+	given map[string]bool
+}
+
+// Given reports whether the caller passed name explicitly, rather than its value coming
+// from the context or its Default (a settings default among them).
+func (a Args) Given(name string) bool {
+	if a.given == nil {
+		return a.Has(name)
+	}
+	return a.given[name]
 }
 
 // Has reports whether name has a value (explicit, context default, or Default).
@@ -203,6 +215,7 @@ func parseArgs(specs []ArgSpec, raw map[string]string, uctx Context) (Args, Cont
 		}
 	}
 	vals := make(map[string]any, len(specs))
+	given := map[string]bool{}
 	eff := uctx
 	for _, s := range specs {
 		if v := raw[s.Name]; v != "" {
@@ -211,6 +224,7 @@ func parseArgs(specs []ArgSpec, raw map[string]string, uctx Context) (Args, Cont
 				return Args{}, uctx, &ArgError{Arg: s.Name, Msg: fmt.Sprintf("argument %q: %v", s.Name, err)}
 			}
 			vals[s.Name] = parsed
+			given[s.Name] = true
 			if s.Context != NoContext {
 				eff = eff.With(s.Context, parsed.(string))
 			}
@@ -226,7 +240,7 @@ func parseArgs(specs []ArgSpec, raw map[string]string, uctx Context) (Args, Cont
 			vals[s.Name], _ = s.parse(s.Default) // validated at Register
 		}
 	}
-	return Args{vals: vals}, eff, nil
+	return Args{vals: vals, given: given}, eff, nil
 }
 
 // checkRequired returns an *ArgError for the first required spec without a value.

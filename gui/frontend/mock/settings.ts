@@ -35,6 +35,7 @@ export const groups: GroupInit[] = [
   { id: "keybindings", title: "Keybindings", description: 'Override a command\'s chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.' },
   { id: "update", title: "Updates", description: "Which releases the app checks for and offers to install." },
   { id: "plugins", title: "Plugins", description: "Where plugins are installed from." },
+  { id: "ember", title: "Ember", description: "The resident agent: whether it runs, its models, and when it starts a fresh session." },
   { id: "advanced", title: "Advanced", description: "Executables and logging." },
 ];
 
@@ -89,6 +90,16 @@ export const staticPages: PageInit[] = [
       { id: "projects", title: "Projects", description: "Fetching, and how worktrees open." },
     ],
   },
+  {
+    id: "ember",
+    title: "Ember",
+    description: "Ember is a resident agent that plans work, runs worker threads and reports back in its own chat.",
+    sections: [
+      { id: "experiment", title: "Experiment" },
+      { id: "models", title: "Models" },
+      { id: "epochs", title: "Epochs", description: "Advanced. Ember's Claude session is replaced by a fresh one, seeded with its memory, task board and recent messages, when either limit is reached after a turn." },
+    ],
+  },
   { id: "keybindings", title: "Keybindings", description: "Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound." },
   {
     id: "advanced",
@@ -121,6 +132,24 @@ function categorySection(category: string): string {
 }
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+const EFFORT_LABELS = ["Low", "Medium", "High", "Extra high", "Max"];
+/** ember.effort's levels (emberEfforts). */
+const EMBER_EFFORTS = EFFORTS.slice(0, 3);
+/** model.EmberWorkersDefault. */
+const EMBER_WORKERS_DEFAULT = "claude-opus-4-7[1m],claude-opus-4-8[1m]";
+
+/** checkModelList: a comma-separated list of model registry values, at least one, each once. */
+export function checkModelList(v: string): void {
+  const ids = v.split(",").map((p) => p.trim()).filter(Boolean);
+  if (ids.length === 0) throw new Error("want at least one model id");
+  ids.forEach((id, i) => {
+    if (!MODEL_VALUES.includes(id)) throw new Error(`unknown model ${JSON.stringify(id)}; want ids from ${MODEL_VALUES.map((m) => JSON.stringify(m)).join(", ")}`);
+    if (ids.slice(0, i).includes(id)) throw new Error(`model ${JSON.stringify(id)} is listed twice`);
+  });
+}
+
+/** Field.check beyond the type's parse, by key. */
+const checks: Record<string, (v: string) => void> = { "ember.worker_models": checkModelList };
 
 const staticFields: FieldInit[] = [
   {
@@ -146,7 +175,7 @@ const staticFields: FieldInit[] = [
     title: "Effort",
     description: "Effort level new threads use unless you pick otherwise.",
     enumValues: EFFORTS,
-    enumLabels: ["Low", "Medium", "High", "Extra high", "Max"],
+    enumLabels: EFFORT_LABELS,
     defaultValue: "medium",
   },
   {
@@ -210,6 +239,24 @@ const staticFields: FieldInit[] = [
   { key: "github.poll_interval_seconds", group: "github", page: "source", section: "github", unit: "s", type: S.INT, title: "Poll interval", description: "How often one request checks your pull requests, watched branches and tracked default branches for changes while the app's window is visible. Details are fetched only for what changed. With the window hidden it checks every 5 minutes, with the app closed every 15 (or at this interval, if longer).", defaultValue: "60", min: 15n, max: 3600n },
   { key: "projects.fetch_interval_seconds", group: "projects", page: "source", section: "projects", unit: "s", type: S.INT, title: "Fetch interval", description: "How often each project runs git fetch --prune. 0 turns background fetching off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
+  // Ember (docs/notes/ember-2-store.md).
+  {
+    key: "ember.enabled",
+    group: "ember",
+    page: "ember",
+    section: "experiment",
+    type: S.BOOL,
+    title: "Enable Ember",
+    description:
+      "Experimental: a resident agent pinned above your threads. Tell it what you want done; it plans the work, creates worker threads, follows them and reports back in its own chat. It keeps its memory and task board under ~/.code-foundry/residents/ember, and nothing else changes while it is off.",
+    defaultValue: "false",
+  },
+  { key: "ember.model", group: "ember", page: "ember", section: "models", row: "ember-model", type: S.ENUM, title: "Model", description: "The model Ember itself runs on. A change applies to its running session at once.", enumValues: MODEL_VALUES, enumLabels: MODELS.map((m) => m.label), defaultValue: "claude-opus-4-8[1m]" },
+  { key: "ember.effort", group: "ember", page: "ember", section: "models", row: "ember-model", type: S.ENUM, title: "Effort", description: "Ember's effort level.", enumValues: EMBER_EFFORTS, enumLabels: EFFORT_LABELS.slice(0, 3), defaultValue: "high" },
+  { key: "ember.worker_models", group: "ember", page: "ember", section: "models", type: S.STRING, title: "Worker threads", description: "The models Ember's worker threads run on. With more than one, new workers alternate between them.", defaultValue: EMBER_WORKERS_DEFAULT, placeholder: EMBER_WORKERS_DEFAULT },
+  { key: "ember.worker_effort", group: "ember", page: "ember", section: "models", type: S.ENUM, title: "Worker effort", description: "The effort level of Ember's worker threads.", enumValues: EFFORTS, enumLabels: EFFORT_LABELS, defaultValue: "high" },
+  { key: "ember.epoch_context_tokens", group: "ember", page: "ember", section: "epochs", unit: "tokens", type: S.INT, title: "Context limit", description: "Start a fresh session once Ember's context passes this many tokens.", defaultValue: "400000", min: 20000n, max: 1000000n },
+  { key: "ember.epoch_max_hours", group: "ember", page: "ember", section: "epochs", unit: "h", type: S.INT, title: "Session age limit", description: "Start a fresh session once the current one is this many hours old (and has had a turn).", defaultValue: "24", min: 1n, max: 720n },
   { key: "advanced.claude_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "claude executable", description: "Absolute path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "gh executable", description: "Absolute path to gh. Empty finds it on PATH or in Homebrew's locations.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
   { key: "plugins.registries", group: "plugins", page: "plugins", section: "registries", type: S.STRING, title: "Plugin registries", description: 'Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas. Empty (the default) configures none: Browse lists nothing and install takes only a release or a folder.', defaultValue: "", placeholder: "https://github.com/<owner>/<repo>" },
@@ -370,6 +417,7 @@ export class MockSettings {
       }
       try {
         next[k] = this.parse(f, v);
+        checks[k]?.(next[k]);
       } catch (err) {
         issues.push({ key: k, message: (err as Error).message });
       }

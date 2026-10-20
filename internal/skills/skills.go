@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/alexwaumann/code-foundry/docs"
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -26,6 +27,9 @@ import (
 const (
 	Orchestrate = "code-foundry-orchestrate"
 	Help        = "code-foundry-help"
+	// Ember is the resident agent's own skill: only Ember's skills directory gets it
+	// (EmberFiles), never every thread's (Render leaves it out).
+	Ember = "code-foundry-ember"
 )
 
 //go:embed files
@@ -98,6 +102,9 @@ func Render(src Sources) (Files, error) {
 			return fmt.Errorf("read embedded %s: %w", p, err)
 		}
 		rel := p[len(staticRoot)+1:]
+		if strings.HasPrefix(rel, Ember+"/") {
+			return nil // Ember's own (EmberFiles)
+		}
 		if out[rel], err = fill(rel, b, values); err != nil {
 			return err
 		}
@@ -113,6 +120,27 @@ func Render(src Sources) (Files, error) {
 		var buf bytes.Buffer
 		r.render(&buf, src)
 		out[r.path] = buf.Bytes()
+	}
+	return out, nil
+}
+
+// EmberFiles returns the files of Ember's own skill (static, no placeholders), for its
+// skills directory (internal/store/ember; Install writes them).
+func EmberFiles() (Files, error) {
+	out := Files{}
+	err := fs.WalkDir(static, staticRoot+"/"+Ember, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := static.ReadFile(p)
+		if err != nil {
+			return fmt.Errorf("read embedded %s: %w", p, err)
+		}
+		out[p[len(staticRoot)+1:]] = b
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("skills: %w", err)
 	}
 	return out, nil
 }

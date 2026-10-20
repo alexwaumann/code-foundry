@@ -77,6 +77,9 @@ type Deps struct {
 	// Skills backs skill.* (skill.setup also uses Terminal, Project and Thread). Nil
 	// registers them failing with Unimplemented.
 	Skills command.SkillBackend
+	// Ember backs ember.* (ember.enable and ember.disable also use Settings). Nil
+	// registers them failing with Unimplemented.
+	Ember command.EmberBackend
 }
 
 // Register registers every domain's commands into r.
@@ -155,5 +158,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPluginRegistry(r, d.PluginRegistry, d.Thread),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
+		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings}),
 	)
 }
