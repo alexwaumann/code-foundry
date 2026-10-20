@@ -66,6 +66,10 @@ type Entry struct {
 	// Version is a plugin's index version (else its plugin.json's); a skill's is
 	// YYYYMMDD (UTC) of the last commit touching its directory, "" without git.
 	Version string
+	// ManifestVersion is a plugin's .claude-plugin/plugin.json version in the checkout:
+	// what Claude Code installs and reports (`claude plugin list`), so the one an update
+	// offer compares. "" when the plugin has no plugin.json here (or it has no version).
+	ManifestVersion string
 	// DeclaredVersion is a skill's frontmatter metadata.version, for display only.
 	DeclaredVersion string
 	// LastUpdated and CommitSHA are the last commit touching Path; zero without git.
@@ -122,6 +126,24 @@ const IndexFile = ".claude-plugin/marketplace.json"
 
 // pluginManifest is a plugin's manifest, relative to its directory.
 const pluginManifest = ".claude-plugin/plugin.json"
+
+// ManifestVersion is the version in dir's .claude-plugin/plugin.json: a plugin
+// directory in a checkout, or an installed plugin's install path. "" when there is no
+// such file, it is not valid JSON, or it has no version.
+func ManifestVersion(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(pluginManifest)))
+	if err != nil {
+		return ""
+	}
+	var pf pluginFile
+	if json.Unmarshal(data, &pf) != nil {
+		return ""
+	}
+	return strings.TrimSpace(pf.Version)
+}
 
 // SkillFile marks a skill directory.
 const SkillFile = "SKILL.md"
@@ -280,6 +302,7 @@ func (r *reader) plugin(p indexPlugin) Entry {
 	}
 	e.By = cmp.Or(authorName(pf.Author), e.By)
 	e.Version = cmp.Or(e.Version, pf.Version)
+	e.ManifestVersion = strings.TrimSpace(pf.Version)
 	e.Description = cmp.Or(e.Description, clip(pf.Description))
 	e.Keywords = keywords(append(e.Keywords, pf.Keywords...))
 	// The skills: the index entry's list, else plugin.json's, else <source>/skills/**.

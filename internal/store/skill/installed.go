@@ -29,6 +29,9 @@ type Installed struct {
 	Tier marketplace.Tier
 	// Description is the installed SKILL.md's (a skill), the index entry's (a plugin).
 	Description string
+	// By is who it is by: the marketplace entry's (plugin.json author, the skill's
+	// frontmatter owner), else the installed SKILL.md's.
+	By string
 	// Version is a plugin's installed version (Claude Code's; a commit prefix when the
 	// index gives none) and a recorded skill's YYYYMMDD; "" for a local skill.
 	Version string
@@ -76,7 +79,7 @@ type Offer struct {
 const syncedDir = "synced"
 
 // installedPlugins joins `claude plugin list` with the catalogs: description, skills,
-// tier and an update offer (the index version semver-newer than the installed one).
+// tier and an update offer (pluginOffer).
 func installedPlugins(plugins []pluginInfo, cats map[string]*marketplace.Catalog) []Installed {
 	var out []Installed
 	for _, p := range plugins {
@@ -86,14 +89,31 @@ func installedPlugins(plugins []pluginInfo, cats map[string]*marketplace.Catalog
 			Dir: p.InstallPath, Scope: p.Scope, LastUpdated: parseTime(cmp.Or(p.LastUpdated, p.InstalledAt)),
 		}
 		if e, ok := catalogEntry(cats[reg], marketplace.KindPlugin, func(e marketplace.Entry) bool { return e.Name == name }); ok {
-			in.Path, in.Tier, in.Description, in.Skills = e.Path, e.Tier, e.Description, e.Skills
-			if update.Newer(e.Version, p.Version) {
-				in.Update = &Offer{Version: e.Version, LastUpdated: e.LastUpdated, CommitSHA: e.CommitSHA}
-			}
+			in.Path, in.Tier, in.Description, in.Skills, in.By = e.Path, e.Tier, e.Description, e.Skills, e.By
+			in.Update = pluginOffer(e, p)
 		}
 		out = append(out, in)
 	}
 	return out
+}
+
+// pluginOffer is the update a plugin's marketplace entry offers over what is installed,
+// nil for none. Claude Code installs and reports the version in the plugin's
+// .claude-plugin/plugin.json, not the index's, and an index may say otherwise (1.4.0 in
+// marketplace.json, 1.3.9 in plugin.json), which would offer an update `claude plugin
+// update` never brings. So when the checkout has a plugin.json with a version the offer
+// compares like with like: that version against the installed copy's plugin.json (else
+// what `plugin list` reported). Only a checkout without one falls back to the index.
+func pluginOffer(e marketplace.Entry, p pluginInfo) *Offer {
+	avail, have := e.Version, p.Version
+	if e.ManifestVersion != "" {
+		avail = e.ManifestVersion
+		have = cmp.Or(marketplace.ManifestVersion(p.InstallPath), p.Version)
+	}
+	if !update.Newer(avail, have) {
+		return nil
+	}
+	return &Offer{Version: avail, LastUpdated: e.LastUpdated, CommitSHA: e.CommitSHA}
 }
 
 // installedSkills lists the skill directories in skillsDir (enabled) and disabledDir,
@@ -111,7 +131,8 @@ func installedSkills(skillsDir, disabledDir string, recs map[string]Record, cats
 				continue
 			}
 			in := &Installed{Kind: marketplace.KindSkill, Name: name, Enabled: enabled, Dir: filepath.Join(dir, name)}
-			in.Description = readDescription(in.Dir)
+			fm := readFrontmatter(in.Dir)
+			in.Description, in.By = strings.Join(strings.Fields(fm.Description), " "), fm.By()
 			byName[name] = in
 			order = append(order, name)
 		}
@@ -144,6 +165,7 @@ func installedSkills(skillsDir, disabledDir string, recs map[string]Record, cats
 			if in.Description == "" {
 				in.Description = e.Description
 			}
+			in.By = cmp.Or(e.By, in.By)
 			if e.LastUpdated.After(r.CommitAt) {
 				in.Update = &Offer{Version: e.Version, LastUpdated: e.LastUpdated, CommitSHA: e.CommitSHA}
 			}
@@ -173,17 +195,19 @@ func skillDirs(dir string) []string {
 	return out
 }
 
-func readDescription(dir string) string {
+// readFrontmatter is the frontmatter of dir's SKILL.md; the zero value when it cannot
+// be read.
+func readFrontmatter(dir string) marketplace.Frontmatter {
 	f, err := os.Open(filepath.Join(dir, marketplace.SkillFile))
 	if err != nil {
-		return ""
+		return marketplace.Frontmatter{}
 	}
 	defer func() { _ = f.Close() }()
 	head, err := io.ReadAll(io.LimitReader(f, 64<<10))
 	if err != nil {
-		return ""
+		return marketplace.Frontmatter{}
 	}
-	return strings.Join(strings.Fields(marketplace.ParseFrontmatter(string(head)).Description), " ")
+	return marketplace.ParseFrontmatter(string(head))
 }
 
 // fileSHA256 is the hex SHA-256 of the file at p; "" when it cannot be read.
