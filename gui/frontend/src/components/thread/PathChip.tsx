@@ -9,17 +9,19 @@ import { openFileInPanel } from "@/stores/filePanel";
 import { useThreadsStore } from "@/stores/threads";
 import { PathPlaceContext, useThreadCtx } from "./context";
 
-/** The place chips under this component resolve against. */
-function usePathPlace(): PathPlace {
+/** The place a chip's path resolves against under this component; null: it is no chip (PathPlaceContext refused it). */
+function usePathPlace(path: string): PathPlace | null {
   const place = useContext(PathPlaceContext);
   const { threadId, cwd } = useThreadCtx();
   const project = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
+  if (typeof place === "function") return place(path);
   return place ?? { project, base: cwd };
 }
 
-/** Click (cmd-click too), Enter and Space open the file; the event stops here (a tool row's own toggle is under it). */
+/** Click (cmd-click too), Enter and Space open the file; the event stops here (a tool row's own toggle is under it). Null when the path is no chip here. */
 function useOpen(path: string, line: number | undefined) {
-  const place = usePathPlace();
+  const place = usePathPlace(path);
+  if (!place) return null;
   const open = () => {
     openFileInPanel("current", chipTarget({ path, ...(line !== undefined && { line }) }, place));
   };
@@ -47,6 +49,7 @@ function useOpen(path: string, line: number | undefined) {
  */
 export function PathChip({ match }: { match: PathMatch }) {
   const handlers = useOpen(match.path, match.line);
+  if (!handlers) return <code data-testid="path-plain">{match.text}</code>;
   const suffix = match.text.slice(match.path.length);
   const dir = dirPart(match.path);
   const name = fileName(match.path) + (match.path.endsWith("/") ? "/" : "");
@@ -83,6 +86,7 @@ export function PathChip({ match }: { match: PathMatch }) {
  */
 export function ToolPathChip({ path, line, children }: { path: string; line?: number; children: ReactNode }) {
   const handlers = useOpen(path, line);
+  if (!handlers) return <>{children}</>;
   return (
     <span
       role="button"

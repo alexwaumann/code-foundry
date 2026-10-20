@@ -10,7 +10,7 @@ import { watchEmberBoard } from "@/api/ember";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream } from "@/api/stream";
 import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
-import { boardSections, firstDoingTitle, flameState, headerSummary, linkMeta, workingThreads, type FlameState } from "@/lib/ember";
+import { boardSections, firstDoingTitle, flameState, headerSummary, linkMeta, waitingThreads, workingThreads, type FlameState } from "@/lib/ember";
 import { useSettingsStore } from "./settings";
 import { useThreadStore } from "./thread";
 import { isAttention, useThreadsStore, type ThreadsData } from "./threads";
@@ -129,9 +129,14 @@ export function useFirstDoingTitle(): string {
   return useEmberStore((s) => firstDoingTitle(s.board?.tasks ?? NO_TASKS));
 }
 
-/** Worker threads working now. */
+/** Worker threads working now (leads' teams included). */
 export function useWorkingThreads(): number {
   return useEmberStore((s) => workingThreads(s.board?.tasks ?? NO_TASKS));
+}
+
+/** Worker threads (leads' teams included) waiting on the user's answer: the row's Needs input, the bell's Ember. */
+export function useWaitingThreads(): number {
+  return useEmberStore((s) => waitingThreads(s.board?.tasks ?? NO_TASKS));
 }
 
 /** A task link's words after its title, joined ("in progress · 3 pieces · 2 working"); "" for a task not on the board. */
@@ -173,29 +178,34 @@ export function clearWorkRowChoices(threadId: string): void {
 /** The flame's state for Ember's thread (lib/ember flameState): a primitive, so a view re-renders only when it changes. */
 export function useFlameState(threadId: string): FlameState {
   const doing = useDoingCount();
+  const waiting = useWaitingThreads();
   const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
   const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");
-  return flameState(threadId ? { state, status } : undefined, doing);
+  return flameState(threadId ? { state, status } : undefined, doing, waiting);
 }
 
 // ---------- attention ----------
 
 /**
- * Ember's thread when it needs the user (a prompt, or a reply not seen yet) and Ember is
- * on; "" otherwise. The bell counts it and cmd+shift+a reaches it first (its row is the
- * sidebar's first); the Dock badge and the start page leave it out, as every resident.
+ * Ember's thread when it needs the user (a prompt, a reply not seen yet, or a worker of
+ * its board waiting on an answer: `workersWaiting`) and Ember is on; "" otherwise. The
+ * bell counts it once and cmd+shift+a reaches it first (its row is the sidebar's first);
+ * the Dock badge and the start page leave it out, as every resident. A worker's prompt
+ * stays until it is answered: opening Ember's chat does not clear it.
  */
-export function emberAttentionId(threads: ThreadsData, enabled: boolean): string {
+export function emberAttentionId(threads: ThreadsData, enabled: boolean, workersWaiting = 0): string {
   const id = enabled ? emberThreadOf(threads) : "";
   const t = id ? threads.byId[id] : undefined;
-  return t && isAttention(t) ? id : "";
+  return t && (isAttention(t) || workersWaiting > 0) ? id : "";
 }
 
 export function getEmberAttentionId(): string {
-  return emberAttentionId(useThreadsStore.getState(), useSettingsStore.getState().snapshot?.values[EMBER_ENABLED] === "true");
+  const waiting = waitingThreads(useEmberStore.getState().board?.tasks ?? NO_TASKS);
+  return emberAttentionId(useThreadsStore.getState(), useSettingsStore.getState().snapshot?.values[EMBER_ENABLED] === "true", waiting);
 }
 
 export function useEmberAttention(): boolean {
   const enabled = useEmberEnabled();
-  return useThreadsStore((s) => emberAttentionId(s, enabled) !== "");
+  const waiting = useWaitingThreads();
+  return useThreadsStore((s) => emberAttentionId(s, enabled, waiting) !== "");
 }

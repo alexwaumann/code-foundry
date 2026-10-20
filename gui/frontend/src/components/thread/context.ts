@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { PathPlace } from "@/lib/pathChips";
+import type { PathPlaceSource } from "@/lib/pathChips";
 
 /** The thread a timeline row belongs to, and its worktree (paths inside it are shown relative). */
 export interface ThreadCtx {
@@ -23,6 +23,8 @@ export const KeepRowContext = createContext<(rowKey: string) => void>(() => unde
 /**
  * Where path chips (PathChip) resolve relative paths, when not the enclosing thread's: the
  * File tab's rendered markdown provides its tab's project and base (the thread checkout the
- * tab was opened from). Null: the thread's (ThreadContext's cwd and its project).
+ * tab was opened from); Ember's chat a function that resolves only absolute paths under a
+ * project (a refused path stays plain code). Null: the thread's (ThreadContext's cwd and
+ * its project).
  */
-export const PathPlaceContext = createContext<PathPlace | null>(null);
+export const PathPlaceContext = createContext<PathPlaceSource | null>(null);

@@ -25,4 +25,13 @@ describe("Ember's thread", () => {
     const d = replaceThreads(emptyThreads, [mine, scout, thread("s-ember", { resident: "ember", epoch: 2, status })]);
     expect(emberAttentionId(d, enabled)).toBe(want);
   });
+
+  it.each([
+    ["idle", "idle", true, "s-ember"],
+    ["busy", "busy", true, "s-ember"],
+    ["off", "idle", false, ""],
+  ] as const)("counts once for the bell while a worker waits on the user, Ember %s", (_n, status, enabled, want) => {
+    const d = replaceThreads(emptyThreads, [mine, thread("s-ember", { resident: "ember", epoch: 2, status })]);
+    expect(emberAttentionId(d, enabled, 2)).toBe(want);
+  });
 });

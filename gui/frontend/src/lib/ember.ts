@@ -4,11 +4,12 @@
  * task links in Ember's text, and the chat's rows, where every run of work between two
  * visible messages folds into one "Worked for" row.
  */
-import type { EmberTaskStateView, EmberTaskThreadView, EmberTaskView } from "@/api/ember";
+import type { EmberTaskDescendantView, EmberTaskStateView, EmberTaskThreadView, EmberTaskView } from "@/api/ember";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
+import { isWaiting } from "./waiting";
 import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 // ---------- the flame ----------
@@ -17,21 +18,33 @@ import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type Timeline
 export type FlameState = "idle" | "thinking" | "working" | "attention";
 
 /**
- * The flame's state for Ember's thread and the number of doing tasks: needs attention (a
- * prompt, or a reply the user has not seen: the daemon's finished-turn attention, cleared
- * when the chat is open) wins, then busy (thinking), then a doing task (working).
+ * The flame's state for Ember's thread, the number of doing tasks and of workers waiting
+ * on the user: needs attention (a prompt, a reply the user has not seen: the daemon's
+ * finished-turn attention, cleared when the chat is open; or a worker's prompt, cleared
+ * only by answering it) wins, then busy (thinking), then a doing task (working).
  */
-export function flameState(t: { state: ThreadStateView; status: ThreadStatusView } | undefined, doing: number): FlameState {
-  if (t?.status === "attention") return "attention";
+export function flameState(t: { state: ThreadStateView; status: ThreadStatusView } | undefined, doing: number, waiting = 0): FlameState {
+  if (t?.status === "attention" || waiting > 0) return "attention";
   if (t && threadBadge(t) === "busy") return "thinking";
   return doing > 0 ? "working" : "idle";
 }
 
 // ---------- worker threads ----------
 
-/** A task's worker is working: on a turn, not archived or removed. */
-export function workerBusy(th: EmberTaskThreadView | null): boolean {
-  return th !== null && !th.archived && !th.removed && th.status !== "attention" && threadBadge(th) === "busy";
+/** A worker thread as the board's words read it: a task's thread or one of its team. */
+type WorkerLike = Pick<EmberTaskThreadView, "state" | "status" | "statusReason" | "reportStatus" | "reportSummary"> & { archived?: boolean; removed?: boolean };
+
+/** A task's worker is working: on a turn, or waiting on its own child threads (a lead whose workers run); not archived or removed. */
+export function workerBusy(th: WorkerLike | null): boolean {
+  if (th === null || th.archived === true || th.removed === true || th.status === "attention") return false;
+  return threadBadge(th) === "busy" || isWaiting(th);
+}
+
+/** A worker waits on the user: a pending permission request or question (the sidebar's "Needs input"). */
+export function workerAsks(th: WorkerLike | null): boolean {
+  if (th === null || th.archived === true || th.removed === true) return false;
+  const kind = statusLine({ ...th, statusChangedAtMs: null }).kind;
+  return kind === "input" || kind === "question";
 }
 
 export interface Words {
@@ -39,12 +52,16 @@ export interface Words {
   tone: StatusTone;
 }
 
-/** A worker thread's status in the sidebar's words and colours (lib/lineage's set), or archived / removed. */
-export function workerWords(th: EmberTaskThreadView): Words {
-  if (th.removed) return { text: "Removed", tone: "muted" };
-  if (th.archived) return { text: "Archived", tone: "muted" };
+/**
+ * A worker thread's status in the sidebar's words and colours (lib/lineage's set), or
+ * archived / removed. A lead waiting on its child threads is Working: its team is.
+ */
+export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusReason" | "archived" | "removed">): Words {
+  if (th.removed === true) return { text: "Removed", tone: "muted" };
+  if (th.archived === true) return { text: "Archived", tone: "muted" };
   switch (statusLine({ ...th, statusChangedAtMs: null }).kind) {
     case "working":
+    case "waiting":
       return { text: "Working", tone: "sky" };
     case "input":
     case "question":
@@ -59,7 +76,6 @@ export function workerWords(th: EmberTaskThreadView): Words {
     case "flagError":
       return { text: "Error", tone: "red" };
     case "place":
-    case "waiting":
       return { text: "Idle", tone: "muted" };
   }
 }
@@ -169,6 +185,15 @@ export interface WorkerRow {
   /** When the worker last did something (else the subtask's last change), for the age. */
   atMs: number | null;
   subtask: boolean;
+  /** 0 for a task's own worker or a subtask; 1+ for a thread of a lead's team, by how far below the lead it is. */
+  depth: number;
+}
+
+/** A worker row's dot: sky while it works, amber while it waits on the user, else the task's. */
+function workerDot(th: WorkerLike, state: EmberTaskStateView): TaskDot {
+  if (workerBusy(th)) return "doing";
+  if (workerAsks(th)) return "blocked";
+  return taskDot(state);
 }
 
 /**
@@ -176,7 +201,7 @@ export interface WorkerRow {
  * error says more than a report; while the task is doing, its latest report's summary
  * (muted) says more than "Working" or "Idle"; else the worker's status words.
  */
-function workerMeta(th: EmberTaskThreadView, doing: boolean): Words {
+function workerMeta(th: WorkerLike, doing: boolean): Words {
   const words = workerWords(th);
   if (words.tone === "amber" || words.tone === "red") return words;
   if (th.reportStatus === "blocked") return { text: "Blocked", tone: "amber" };
@@ -185,19 +210,50 @@ function workerMeta(th: EmberTaskThreadView, doing: boolean): Words {
   return words;
 }
 
+/**
+ * A lead's team under its row, while its task is doing or blocked: the daemon's first ten
+ * threads below it (tree order, indented by depth), then "+N more" for the rest. Threads
+ * a subtask row already shows are left out.
+ */
+function teamRows(th: EmberTaskThreadView, t: EmberTaskView, shown: ReadonlySet<string>): WorkerRow[] {
+  if (t.state !== "doing" && t.state !== "blocked") return [];
+  const rows = th.descendants
+    .filter((d) => !shown.has(d.id))
+    .map(
+      (d: EmberTaskDescendantView): WorkerRow => ({
+        key: `d:${t.id}:${d.id}`,
+        threadId: d.id,
+        title: d.name || d.id,
+        dot: workerDot(d, t.state),
+        meta: workerMeta(d, t.state === "doing"),
+        atMs: d.lastActivityAtMs,
+        subtask: false,
+        depth: Math.max(1, d.depth),
+      }),
+    );
+  const more = th.descendantsTotal - th.descendants.length;
+  if (more > 0)
+    rows.push({ key: `d:${t.id}:more`, threadId: "", title: `+${String(more)} more ${more === 1 ? "thread" : "threads"}`, dot: "open", meta: { text: "", tone: "muted" }, atMs: null, subtask: false, depth: 1 });
+  return rows;
+}
+
 export function workerRows(c: BoardCard): WorkerRow[] {
   const rows: WorkerRow[] = [];
+  // Subtasks' workers have rows of their own: a lead's team does not repeat them.
+  const shown = new Set(c.subtasks.flatMap((s) => (s.thread ? [s.thread.id] : [])));
   const own = c.task.thread;
   if (own) {
     rows.push({
       key: `w:${c.task.id}`,
       threadId: own.removed ? "" : own.id,
       title: own.name || own.id,
-      dot: workerBusy(own) ? "doing" : taskDot(c.task.state),
+      dot: workerDot(own, c.task.state),
       meta: workerMeta(own, c.task.state === "doing"),
       atMs: own.lastActivityAtMs,
       subtask: false,
+      depth: 0,
     });
+    rows.push(...teamRows(own, c.task, shown));
   }
   for (const s of c.subtasks) {
     const th = s.thread;
@@ -205,18 +261,51 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       key: `s:${s.id}`,
       threadId: th && !th.removed ? th.id : "",
       title: s.title,
-      dot: taskDot(s.state),
+      dot: th && (s.state === "doing" || s.state === "blocked") ? workerDot(th, s.state) : taskDot(s.state),
       meta: s.state === "blocked" && s.outcome ? { text: s.outcome, tone: "amber" } : th && (s.state === "doing" || s.state === "blocked") ? workerMeta(th, s.state === "doing") : { text: stateWords[s.state], tone: "muted" },
       atMs: th?.lastActivityAtMs ?? s.updatedAtMs,
       subtask: true,
+      depth: 0,
     });
+    if (th) rows.push(...teamRows(th, s, shown));
   }
   return rows;
 }
 
-/** Distinct worker threads that are working, over the given tasks. */
+/**
+ * Distinct threads matching `is` over the tasks' worker threads and their teams (a
+ * subtask's worker may sit in its parent lead's team too). The daemon lists ten of a
+ * team; its counts (`extra` of a thread) cover the rest.
+ */
+function countThreads(tasks: readonly EmberTaskView[], is: (th: WorkerLike) => boolean, extra: (th: EmberTaskThreadView) => number, only: (t: EmberTaskView) => boolean): number {
+  const ids = new Set<string>();
+  const seen = new Set<string>();
+  let unlisted = 0;
+  for (const t of tasks) {
+    const th = t.thread;
+    if (!th || !only(t)) continue;
+    if (is(th)) ids.add(th.id);
+    if (seen.has(th.id)) continue;
+    seen.add(th.id);
+    const listed = th.descendants.filter(is);
+    for (const d of listed) ids.add(d.id);
+    unlisted += Math.max(0, extra(th) - listed.length);
+  }
+  return ids.size + unlisted;
+}
+
+/** Distinct threads that are working, over the given tasks: their workers (a lead waiting on its team included) and the leads' teams. */
 export function workingThreads(tasks: readonly EmberTaskView[]): number {
-  return new Set(tasks.filter((t) => workerBusy(t.thread)).map((t) => t.threadId)).size;
+  return countThreads(tasks, workerBusy, (th) => th.descendantsWorking, () => true);
+}
+
+/**
+ * Threads waiting on the user's answer (a permission request or question) among the
+ * workers of doing and blocked tasks and their teams: the pinned row's "Needs input" and
+ * Ember's place in the bell. Only answering clears it, not opening Ember's chat.
+ */
+export function waitingThreads(tasks: readonly EmberTaskView[]): number {
+  return countThreads(tasks, workerAsks, (th) => th.descendantsWaiting, (t) => t.state === "doing" || t.state === "blocked");
 }
 
 /** The chat header's summary: "2 threads working · 1 queued"; "" when nothing is going on. */
@@ -234,12 +323,18 @@ export function firstDoingTitle(tasks: readonly EmberTaskView[]): string {
   return (tasks.find((t) => t.state === "doing" && t.parentId === "") ?? tasks.find((t) => t.state === "doing"))?.title ?? "";
 }
 
-/** The pinned row's status: what Ember's own thread is doing, else Working while a task is doing, else Idle. */
-export function emberStatusWords(t: { state: ThreadStateView; status: ThreadStatusView; statusReason: string; statusChangedAtMs: number | null } | undefined, doing: number): Words {
-  if (t && (t.status === "attention" || t.status === "error" || threadBadge(t) === "busy")) {
-    const w = workerWords({ ...t, id: "", name: "", reportStatus: null, reportSummary: "", reportAtMs: null, createdAtMs: null, lastActivityAtMs: null, archived: false, removed: false });
-    if (w.text !== "Idle") return w;
-  }
+const NEEDS_INPUT: Words = { text: "Needs input", tone: "amber" };
+
+/**
+ * The pinned row's status: Ember's own prompt or error; else Needs input while a worker
+ * waits on the user (`waiting`); else what Ember's own thread is doing (Finished, Working);
+ * else Working while a task is doing, else Idle.
+ */
+export function emberStatusWords(t: { state: ThreadStateView; status: ThreadStatusView; statusReason: string; statusChangedAtMs: number | null } | undefined, doing: number, waiting = 0): Words {
+  const own = t && (t.status === "attention" || t.status === "error" || threadBadge(t) === "busy") ? workerWords(t) : null;
+  if (own && (own.tone === "amber" || own.tone === "red")) return own;
+  if (waiting > 0) return NEEDS_INPUT;
+  if (own && own.text !== "Idle") return own;
   return doing > 0 ? { text: "Working", tone: "sky" } : { text: "Idle", tone: "muted" };
 }
 
@@ -364,13 +459,18 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
     }
   };
 
+  /** Only a wake, thinking and turn ends, the wake included. */
+  const quiet = (r: readonly TimelineItem[]): boolean =>
+    r.some((it) => it.kind === "user") && r.every((it) => it.kind === "thinking" || it.kind === "turnEnd" || (it.kind === "user" && opts.wake(it.id)));
+
   const rows: EmberRow[] = [];
   let run: TimelineItem[] = [];
   /** Pushes the run (its work row, then its rows while expanded); false when it had no work. */
   const flush = (live: boolean): boolean => {
     const first = run[0];
-    // Only turn ends (a reply's own): nothing worked.
-    if (!first || run.every((it) => it.kind === "turnEnd")) {
+    // Only turn ends (a reply's own): nothing worked. A wake with only thinking after it
+    // (a progress wake Ember just acknowledged) did nothing worth a row either.
+    if (!first || run.every((it) => it.kind === "turnEnd") || (!live && quiet(run))) {
       run = [];
       return false;
     }
@@ -487,6 +587,25 @@ export function workMs(items: readonly ThreadItemView[], now: number | null): nu
   if (now !== null && from !== null) to = Math.max(to ?? now, now);
   close();
   return total;
+}
+
+/**
+ * A finished run's "Worked for" time: workMs when it ran a tool; a run with none (Ember
+ * only thought) has no span of its own, so its turn's duration (`turnMs`: that of the
+ * first turn end at or after the run's first item; turnEndAfter finds it).
+ */
+export function runMs(run: readonly ThreadItemView[], turnMs: number | null): number {
+  if (run.some((it) => it.kind === "tool") || turnMs === null || turnMs <= 0) return workMs(run, null);
+  return turnMs;
+}
+
+/** The duration of the first turn end at or after item `from` in the log's order; null for none. */
+export function turnEndAfter(log: { byId: Readonly<Record<string, ThreadItemView>>; order: readonly string[] }, from: string): number | null {
+  for (let i = log.order.indexOf(from); i >= 0 && i < log.order.length; i++) {
+    const it = log.byId[log.order[i] ?? ""];
+    if (it?.kind === "turnEnd") return it.durationMs;
+  }
+  return null;
 }
 
 /** "40s", "2m", "1h 05m"; "" under a second. */
