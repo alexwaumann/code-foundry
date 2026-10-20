@@ -80,7 +80,7 @@ const entry = () => screen.queryByTestId("panel-empty")?.querySelector('[data-su
 beforeEach(() => {
   useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "view:projects": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
@@ -108,19 +108,19 @@ describe("Agents surface", () => {
     render(<SidePanel />);
     expect(entry()).toBeNull();
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
-    expect(getPanel("thread:s-r").activeTabId).toBeNull();
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBeNull();
     act(() => {
       setListRuns("s-r", 1);
     });
     expect(entry()?.getAttribute("data-availability")).toBe("enabled");
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
-    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("agents");
   });
 
   it("view.panel.agents opens the tab for a thread with runs; without runs it toasts and opens nothing", () => {
     usePanelStore.setState({ byKey: {} });
     expect(agentsPanelCommand()).toBe(true);
-    expect(getPanel("thread:s-r")).toMatchObject({ open: true, activeTabId: "agents" });
+    expect(getPanel("thread:s-r")).toMatchObject({ open: true, groups: [{ activeTabId: "agents" }] });
     expect(toast).not.toHaveBeenCalled();
     setAgents("s-r", []);
     usePanelStore.setState({ byKey: {} });
@@ -135,14 +135,14 @@ describe("Agents surface", () => {
     });
     setAgents("s-r", []);
     render(<SidePanel />);
-    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("agents");
     expect(screen.getByTestId("agents-empty")).toBeTruthy();
   });
 
   it("A opens it: the header counts, rows in spawn order with the nested run under its parent", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
-    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("agents");
     expect(screen.getByTestId("agents-count").textContent).toBe("3 running · 5 this thread");
     expect(screen.getByTestId("agents-subline").textContent).toBe("2 in the background keep running after the turn ends");
     expect(rows().map((r) => [r.getAttribute("data-agent"), r.getAttribute("data-level"), r.getAttribute("data-status")])).toEqual([
@@ -237,7 +237,7 @@ describe("Agents surface", () => {
 
   it("a disconnected thread still lists its runs; no thread selected says so", () => {
     setAgents("s-off", [run("z", { status: "failed", error: "the daemon stopped before the agent finished", endedAtMs: NOW })]);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-off": { open: true, tabs: [], activeTabId: null } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-off": { open: true, groups: [{ tabs: [], activeTabId: null }] } } }));
     act(() => {
       useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
       showView("panel.agents");

@@ -148,7 +148,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(
     await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`),
-  ).toEqual({ open: false, tabs: [], activeTabId: null });
+  ).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
   // Opened again from the Archived section: its composer, and neither panel comes back.
   await page.getByTestId("archived-header").click();
   await row(page, "s:s-1").click();

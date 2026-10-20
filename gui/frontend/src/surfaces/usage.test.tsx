@@ -56,7 +56,7 @@ const pressU = () => fireEvent.keyDown(screen.getByTestId("side-panel"), { key: 
 beforeEach(() => {
   useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
-  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null }, "thread:s-x": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-0": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-x": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
@@ -86,7 +86,7 @@ describe("Usage surface", () => {
   it("U opens the tab: hero cost, summary, models by cost with share, token kinds", () => {
     render(<SidePanel />);
     pressU();
-    expect(getPanel("thread:s-1").activeTabId).toBe("usage");
+    expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("usage");
     expect(screen.getByTestId("usage-cost").textContent).toBe("$141.20");
     expect(screen.getByTestId("usage-summary").textContent).toBe("362M tokens · 412 requests");
     expect(screen.getAllByTestId("usage-model").map((m) => m.getAttribute("data-model"))).toEqual(["claude-opus-5-5", "claude-fable-5-1"]);
@@ -147,10 +147,10 @@ describe("usagePanelCommand (view.panel.usage)", () => {
   it("opens the tab and shows a hidden panel for a thread, with or without usage", () => {
     usePanelStore.setState({ byKey: {} });
     expect(usagePanelCommand()).toBe(true);
-    expect(getPanel("thread:s-1")).toMatchObject({ open: true, activeTabId: "usage" });
+    expect(getPanel("thread:s-1")).toMatchObject({ open: true, groups: [{ activeTabId: "usage" }] });
     select("s-0");
     expect(showView("panel.usage")).toBe(true);
-    expect(getPanel("thread:s-0")).toMatchObject({ open: true, activeTabId: "usage" });
+    expect(getPanel("thread:s-0")).toMatchObject({ open: true, groups: [{ activeTabId: "usage" }] });
     expect(toast).not.toHaveBeenCalled();
   });
 

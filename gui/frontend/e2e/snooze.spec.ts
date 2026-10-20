@@ -181,7 +181,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("reconnect")).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
-  expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, tabs: [], activeTabId: null });
+  expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
   // The header button unsnoozes now.
   await expect(header.getByRole("button", { name: "Unsnooze Thread" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toHaveCount(0);

@@ -10,6 +10,7 @@ import {
   keyOf,
   makeTab,
   migratePanelV1,
+  migratePanelV2,
   movePanelTab,
   moveTab,
   openSurface,
@@ -27,6 +28,8 @@ import {
   togglePanel,
   usePanelStore,
   type PanelEntry,
+  type PanelEntryV2,
+  type Tab,
 } from "./panel";
 import { KEYS, useSettingsStore } from "./settings";
 import { PANEL_MIN, panelMax, useUiStore, type Selection } from "./ui";
@@ -35,13 +38,19 @@ const files = makeTab("files", "Files");
 const diff = makeTab("diff", "Diff");
 const pr = makeTab("pullrequest", "#12", { number: "12" });
 
-function entry(open: boolean, tabs: PanelEntry["tabs"], activeTabId: string | null): PanelEntry {
-  return { open, tabs, activeTabId };
+/** An unsplit panel. */
+function entry(open: boolean, tabs: readonly Tab[], activeTabId: string | null): PanelEntry {
+  return { open, groups: [{ tabs, activeTabId }] };
 }
 
-/** A panel picking (activeTabId null) that came from `pickFrom`. */
-function picking(tabs: PanelEntry["tabs"], pickFrom: string): PanelEntry {
-  return { open: true, tabs, activeTabId: null, pickFrom };
+/** An unsplit panel picking (activeTabId null) that came from `pickFrom`. */
+function picking(tabs: readonly Tab[], pickFrom: string): PanelEntry {
+  return { open: true, groups: [{ tabs, activeTabId: null, pickFrom }] };
+}
+
+/** A stored entry of versions 1 and 2 (one flat tab list). */
+function legacy(open: boolean, tabs: readonly Tab[], activeTabId: string | null, pickFrom?: string): PanelEntryV2 {
+  return { open, tabs, activeTabId, ...(pickFrom === undefined ? {} : { pickFrom }) };
 }
 
 describe("keyOf", () => {
@@ -80,18 +89,18 @@ describe("migratePanelV1", () => {
 
   it("renames a tab's repo param to project and moves the ids that pointed at it", () => {
     const got = migratePanelV1({
-      "thread:s-1": entry(true, [files, old], old.id),
-      "view:projects": picking([old, diff], old.id),
-      "thread:s-2": entry(false, [files, pr], pr.id),
+      "thread:s-1": legacy(true, [files, old], old.id),
+      "view:projects": legacy(true, [old, diff], null, old.id),
+      "thread:s-2": legacy(false, [files, pr], pr.id),
     });
     expect(renamed.id).toBe("worktree?path=%2Fsrc%2Fweb&project=web");
-    expect(got["thread:s-1"]).toEqual(entry(true, [files, renamed], renamed.id));
-    expect(got["view:projects"]).toEqual(picking([renamed, diff], renamed.id));
-    expect(got["thread:s-2"]).toEqual(entry(false, [files, pr], pr.id));
+    expect(got["thread:s-1"]).toEqual(legacy(true, [files, renamed], renamed.id));
+    expect(got["view:projects"]).toEqual(legacy(true, [renamed, diff], null, renamed.id));
+    expect(got["thread:s-2"]).toEqual(legacy(false, [files, pr], pr.id));
   });
 
   it("rehydrates a version 1 store through it", async () => {
-    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": entry(true, [old], old.id) } } }));
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": legacy(true, [old], old.id) } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual(entry(true, [renamed], renamed.id));
     localStorage.clear();
@@ -99,8 +108,34 @@ describe("migratePanelV1", () => {
   });
 });
 
+describe("migratePanelV2", () => {
+  const cases: [string, PanelEntryV2, PanelEntry][] = [
+    ["an open panel with an active tab", legacy(true, [files, diff], diff.id), entry(true, [files, diff], diff.id)],
+    ["a picking panel keeps pickFrom in its group", legacy(true, [files, diff], null, diff.id), picking([files, diff], diff.id)],
+    ["a panel without tabs is the empty one", legacy(false, [], null), emptyEntry],
+    ["a kept-open panel without tabs", legacy(true, [], null), { ...emptyEntry, open: true }],
+    ["width and expanded stay on the entry", { ...legacy(false, [pr], pr.id), width: 500, expanded: true }, { ...entry(false, [pr], pr.id), width: 500, expanded: true }],
+  ];
+  it.each(cases)("%s", (_name, before, want) => {
+    expect(migratePanelV2({ k: before })).toEqual({ k: want });
+  });
+
+  it("migrates every key", () => {
+    expect(migratePanelV2({ a: legacy(true, [files], files.id), b: legacy(false, [], null) })).toEqual({ a: entry(true, [files], files.id), b: emptyEntry });
+  });
+
+  it("rehydrates a version 2 store through it and saves it as version 3", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 2, state: { byKey: { "thread:s-1": { ...legacy(true, [files, diff], null, files.id), width: 500 } } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 3, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    localStorage.clear();
+    usePanelStore.setState({ byKey: {} });
+  });
+});
+
 describe("openTab", () => {
-  const cases: [string, PanelEntry, PanelEntry["tabs"][number], PanelEntry][] = [
+  const cases: [string, PanelEntry, Tab, PanelEntry][] = [
     ["first tab opens the panel", emptyEntry, files, entry(true, [files], files.id)],
     ["appends and activates", entry(true, [files], files.id), diff, entry(true, [files, diff], diff.id)],
     ["existing tab is activated, not duplicated", entry(true, [files, diff], diff.id), makeTab("files", "Files"), entry(true, [files, diff], files.id)],
@@ -311,7 +346,7 @@ describe("width", () => {
     expect(closed).toEqual({ ...entry(false, [], null), width: 500 });
     expect(openTab(closed, diff).width).toBe(500);
     expect(toggle(sized).width).toBe(500);
-    expect(activateTab({ ...sized, tabs: [files, diff] }, diff.id).width).toBe(500);
+    expect(activateTab({ ...sized, groups: [{ tabs: [files, diff], activeTabId: files.id }] }, diff.id).width).toBe(500);
   });
 });
 
@@ -339,7 +374,7 @@ describe("expanded", () => {
     const closed = closeTab(expanded, files.id);
     expect(closed).toEqual({ ...entry(false, [], null), expanded: true });
     expect(openTab(closed, diff).expanded).toBe(true);
-    expect(activateTab({ ...expanded, tabs: [files, diff] }, diff.id).expanded).toBe(true);
+    expect(activateTab({ ...expanded, groups: [{ tabs: [files, diff], activeTabId: files.id }] }, diff.id).expanded).toBe(true);
     expect(setWidth(expanded, 500)).toEqual({ ...expanded, width: 500 });
     expect(setWidth({ ...expanded, width: 500 }, undefined)).toEqual(expanded);
   });
@@ -402,9 +437,9 @@ describe("panel store", () => {
     openSurface("thread:b", diff);
     movePanelTab("current", pr.id, 0);
     expect(getPanel()).toEqual(entry(true, [pr, files, diff], pr.id));
-    expect(getPanel("thread:b").tabs).toEqual([files, diff]);
+    expect(getPanel("thread:b").groups[0]?.tabs).toEqual([files, diff]);
     movePanelTab("thread:b", files.id, 1);
-    expect(getPanel("thread:b").tabs).toEqual([diff, files]);
+    expect(getPanel("thread:b").groups[0]?.tabs).toEqual([diff, files]);
     // No change, no new state (and no write).
     const before = usePanelStore.getState();
     movePanelTab("current", pr.id, 0);
@@ -414,8 +449,8 @@ describe("panel store", () => {
     usePanelStore.setState({ byKey: {} });
     localStorage.setItem("code-foundry.panel", saved);
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("thread:a").tabs).toEqual([pr, files, diff]);
-    expect(getPanel("thread:b").tabs).toEqual([diff, files]);
+    expect(getPanel("thread:a").groups[0]?.tabs).toEqual([pr, files, diff]);
+    expect(getPanel("thread:b").groups[0]?.tabs).toEqual([diff, files]);
   });
 
   it("movePanelTab does nothing with nothing selected", () => {
@@ -492,7 +527,7 @@ describe("panel store", () => {
     expect(getPanel()).toEqual(entry(true, [files, diff], diff.id));
     // Persisted like the rest (a reload keeps the picker).
     startPanelPicking("current", { focus: false });
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ state: { byKey: { "thread:a": { activeTabId: null, pickFrom: diff.id } } } });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ state: { byKey: { "thread:a": { groups: [{ activeTabId: null, pickFrom: diff.id }] } } } });
   });
 
   it("startPanelPicking without tabs only shows the panel; with nothing selected it does nothing", () => {

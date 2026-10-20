@@ -14,7 +14,7 @@ import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
-import { openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
+import { allTabs, openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
 import { createResource, type Resource } from "./resource";
 
 export type PrInnerTab = "summary" | "timeline" | "code";
@@ -58,7 +58,7 @@ function pruneClosedTabs(panels: PanelState): void {
   const keys = Object.keys(byTab);
   if (keys.length === 0) return;
   const live = new Set<string>();
-  for (const [panelKey, e] of Object.entries(panels.byKey)) for (const t of e.tabs) live.add(prTabKey(panelKey, t.id));
+  for (const [panelKey, e] of Object.entries(panels.byKey)) for (const t of allTabs(e)) live.add(prTabKey(panelKey, t.id));
   if (keys.every((k) => live.has(k))) return;
   usePrPanelStore.setState({ byTab: Object.fromEntries(Object.entries(byTab).filter(([k]) => live.has(k))) });
 }

@@ -51,7 +51,7 @@ describe("togglePanelCommand", () => {
       ["hiding keeps another return target", true, "sidebar", "sidebar"],
     ];
     it.each(cases)("%s", (_name, wasOpen, returnTo, want) => {
-      if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null } } });
+      if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
       useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo } });
       expect(togglePanelCommand()).toBe(!wasOpen);
       const ui = useUiStore.getState();
@@ -97,7 +97,7 @@ describe("expandPanelCommand", () => {
   });
 
   it("a hidden expanded panel comes back expanded, not flipped", () => {
-    usePanelStore.setState({ byKey: { "thread:a": { open: false, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: false, groups: [{ tabs: [], activeTabId: null }], expanded: true } } });
     expect(expandPanelCommand()).toBe(true);
     expect(getPanel()).toMatchObject({ open: true, expanded: true });
   });
@@ -108,14 +108,14 @@ describe("expandPanelCommand", () => {
     ["from the panel leaves focus there", "panel", true, [0, 0, 0, 0]],
   ];
   it.each(focusCases)("expanding %s", (_name, focus, wasOpen, want) => {
-    if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null } } });
+    if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
     useUiStore.setState({ focus });
     expect(expandPanelCommand()).toBe(true);
     expect(seqs()).toEqual(want);
   });
 
   it("restoring the split leaves focus where it is", () => {
-    usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } });
     useUiStore.setState({ focus: "panel" });
     expect(expandPanelCommand()).toBe(false);
     expect(seqs()).toEqual([0, 0, 0, 0]);
@@ -158,15 +158,15 @@ describe("newPanelTabCommand", () => {
   });
 
   it("starts picking in a hidden panel with tabs, shows it, and focuses it", () => {
-    usePanelStore.setState({ byKey: { "thread:a": { open: false, tabs: [files, diff], activeTabId: diff.id } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: false, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
     expect(newPanelTabCommand()).toBe(true);
-    expect(getPanel()).toEqual({ open: true, tabs: [files, diff], activeTabId: null, pickFrom: diff.id });
+    expect(getPanel()).toEqual({ open: true, groups: [{ tabs: [files, diff], activeTabId: null, pickFrom: diff.id }] });
     expect(useUiStore.getState().panelFocusSeq).toBe(1);
   });
 
   it("without tabs only shows the panel (its list shows anyway)", () => {
     expect(newPanelTabCommand()).toBe(true);
-    expect(getPanel()).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(getPanel()).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
   });
 
   it("is a no-op while the settings page is up or with nothing selected", () => {
@@ -187,9 +187,9 @@ describe("newPanelTabCommand", () => {
   });
 
   it("is what ShowView \"panel.new-tab\" runs", () => {
-    usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [files], activeTabId: files.id } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [files], activeTabId: files.id }] } } });
     expect(showView("panel.new-tab")).toBe(true);
-    expect(getPanel()).toMatchObject({ activeTabId: null, pickFrom: files.id });
+    expect(getPanel()).toMatchObject({ groups: [{ activeTabId: null, pickFrom: files.id }] });
   });
 });
 
@@ -307,7 +307,7 @@ describe("toggleBottomCommand", () => {
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
     ["the settings page", () => { useViewsStore.setState({ settingsOpen: true }); }],
     ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
-    ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null, expanded: true } } })],
+    ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } })],
   ];
   it.each(noops)("is a no-op with %s", (_name, arrange) => {
     arrange();

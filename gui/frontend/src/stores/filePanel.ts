@@ -5,7 +5,7 @@
  * through openFileInPanel too.
  */
 import { diffTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
-import { openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { allTabs, openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";
 
 /**
  * Opens (or activates) a file's tab in a panel ("current": the window's selection) and
@@ -25,9 +25,13 @@ export function diffOfChange(project: string, worktree: string, change: { path: 
   return { project, worktree, path: change.path, oldPath: change.oldPath, scope: change.uncommitted ? "working" : "branch" };
 }
 
-/** A panel's last tab of a kind (strip order), which the surface's letter brings back; null without one. */
+/**
+ * A panel's last tab of a kind (strip order, the first group's strip then the second's),
+ * which the surface's letter brings back; null without one.
+ */
 export function lastTabOf(kind: string, panelKey: string): Tab | null {
-  const tabs = usePanelStore.getState().byKey[panelKey]?.tabs ?? [];
+  const e = usePanelStore.getState().byKey[panelKey];
+  const tabs = e ? allTabs(e) : [];
   for (let i = tabs.length - 1; i >= 0; i--) {
     const t = tabs[i];
     if (t?.kind === kind) return t;
