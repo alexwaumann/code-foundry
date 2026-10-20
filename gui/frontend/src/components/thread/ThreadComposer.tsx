@@ -146,6 +146,7 @@ export function ThreadComposer({
   pending,
   busy,
   placeholder,
+  busyPlaceholder,
   focusRequests = true,
 }: {
   threadId: string;
@@ -153,6 +154,8 @@ export function ThreadComposer({
   busy: boolean;
   /** The empty prompt's text (default "Send a follow-up…"). */
   placeholder?: string | undefined;
+  /** The empty prompt's text while Claude works (default: the placeholder and "Claude picks it up mid-turn"). */
+  busyPlaceholder?: string | undefined;
   /** Whether focus requests for the content pane land here: the content pane's composer only, not a plugin's thread node's. */
   focusRequests?: boolean;
 }) {
@@ -356,7 +359,7 @@ export function ThreadComposer({
               draftKey={draftKey}
               value={text}
               disabled={sending}
-              placeholder={busy ? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn` : (placeholder ?? "Send a follow-up…")}
+              placeholder={busy ? (busyPlaceholder ?? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn`) : (placeholder ?? "Send a follow-up…")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}

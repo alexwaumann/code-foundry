@@ -325,7 +325,7 @@ export type ThreadListEventView =
   | { kind: "removed"; id: string }
   | { kind: "retiredUsage"; buckets: UsageBucketView[] };
 
-const stateMap: Record<ThreadState, ThreadStateView> = {
+export const stateMap: Record<ThreadState, ThreadStateView> = {
   [ThreadState.UNSPECIFIED]: "unknown",
   [ThreadState.STARTING]: "starting",
   [ThreadState.CONNECTED]: "connected",
@@ -333,7 +333,7 @@ const stateMap: Record<ThreadState, ThreadStateView> = {
   [ThreadState.DISCONNECTED]: "disconnected",
 };
 
-const statusMap: Record<ThreadStatus, ThreadStatusView> = {
+export const statusMap: Record<ThreadStatus, ThreadStatusView> = {
   [ThreadStatus.UNSPECIFIED]: "unknown",
   [ThreadStatus.BUSY]: "busy",
   [ThreadStatus.IDLE]: "idle",
@@ -431,7 +431,7 @@ export function toThreadFlagView(f: ThreadFlag): ThreadFlagView[] {
   ];
 }
 
-const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView | null> = {
+export const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView | null> = {
   [ThreadReportStatus.UNSPECIFIED]: null,
   [ThreadReportStatus.DONE]: "done",
   [ThreadReportStatus.BLOCKED]: "blocked",

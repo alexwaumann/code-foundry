@@ -51,6 +51,7 @@ const CSS_ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 3px oklch(0 0 0 /", why: "a shadow is black in every theme" },
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 2px oklch(0 0 0 /", why: "a shadow is black in every theme" },
   { file: "/src/components/thread/thread.css", match: "85%, black);", why: "light status tones darken the theme's token a step so small text clears 4.5:1" },
+  { file: "/src/components/ember/ember.css", match: "--cf-flame-", why: "Ember's flame is a mascot drawn in its own fixed colours, the same in every theme (docs/notes/ember-3-gui.md)" },
   { file: "/src/components/backdrop/backdrop.css", match: "radial-gradient(55% 45% at 50% 50%, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%)", why: "a mask: only its alpha is used" },
 ];
 

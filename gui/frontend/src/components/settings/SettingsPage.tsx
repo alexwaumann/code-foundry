@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Bell, FileText, GitBranch, Keyboard, Palette, Search, Settings2, SlidersHorizontal, TriangleAlert, Wrench, X, type LucideIcon } from "lucide-react";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
+import { FlameNavIcon } from "@/components/ember/Flame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tip } from "@/components/ui/tooltip";
@@ -18,14 +19,15 @@ import { PageHead } from "./PageHead";
 import { SearchResults } from "./SearchResults";
 import { SettingsSection } from "./SectionCard";
 
-/** The nav's icon per page id; a page without one gets a generic gear. */
-const pageIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
+/** The nav's icon per page id; a page without one gets a generic gear. Ember's is its flame. */
+const pageIcons: Readonly<Partial<Record<string, LucideIcon | ComponentType<{ className?: string }>>>> = {
   general: SlidersHorizontal,
   appearance: Palette,
   notifications: Bell,
   source: GitBranch,
   keybindings: Keyboard,
   advanced: Wrench,
+  ember: FlameNavIcon,
   ...Object.fromEntries(guiPages.map((g) => [g.page.id, g.icon])),
 };
 

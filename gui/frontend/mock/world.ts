@@ -1065,6 +1065,7 @@ export class World {
       const s = this.addThread({ id, projectId: "", worktreePath: `${HOME}/.code-foundry/residents/ember`, name: "Ember", model: "claude-opus-4-8[1m]", effort: "high",
         state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(4), createdAt: ago(600),
         lastActivityAt: ago(4), resident: "ember", epoch: 2, held: true });
+      this.logs.seedEmber(id);
       this.publishThread(s);
       this.ember.changed();
     }

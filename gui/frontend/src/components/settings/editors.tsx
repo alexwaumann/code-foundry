@@ -108,7 +108,8 @@ export function TextEditor({ field, value, pending, invalid, commit, setError }:
   );
   if (!number) return input;
   return (
-    <div className="relative w-34">
+    // A long unit ("tokens") takes a wider box, or six digits run under it.
+    <div className={field.unit.length > 2 ? "relative w-40" : "relative w-34"}>
       {input}
       {field.unit && (
         <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-caption" aria-hidden data-testid="setting-unit">

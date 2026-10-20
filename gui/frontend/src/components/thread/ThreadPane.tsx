@@ -1,9 +1,11 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
+import { EmberBody } from "@/components/ember/EmberPane";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
+import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
@@ -65,7 +67,9 @@ function WatchedThread({ threadId }: { threadId: string }) {
     };
   }, [threadId]);
   const runId = useShownRun(threadId);
-  return runId ? <SubagentPane key={runId} threadId={threadId} runId={runId} /> : <ThreadBody threadId={threadId} />;
+  // Ember's thread is its chat (components/ember/EmberPane.tsx): the same stream and timeline, its own header and rows.
+  const ember = useIsEmberThread(threadId);
+  return runId ? <SubagentPane key={runId} threadId={threadId} runId={runId} /> : ember ? <EmberBody threadId={threadId} /> : <ThreadBody threadId={threadId} />;
 }
 
 function ThreadBody({ threadId }: { threadId: string }) {

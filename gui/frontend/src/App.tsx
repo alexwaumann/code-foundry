@@ -40,6 +40,8 @@ import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
+import { EmberView } from "@/components/ember/EmberView";
+import { EMBER_VIEW } from "@/surfaces/emberTarget";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
@@ -95,6 +97,7 @@ function Content() {
   if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
+  if (sel.kind === "view" && sel.name === EMBER_VIEW) return <EmberView />;
   if (sel.kind === "compose")
     return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId} projectId={sel.projectId} workspaceId={sel.workspaceId} noProject={sel.noProject} />;
   if (sel.kind === "thread") return <ThreadPane threadId={sel.id} />;

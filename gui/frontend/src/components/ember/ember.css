@@ -1,0 +1,185 @@
+/* Ember's flame (Flame.tsx; docs/notes/ember-3-gui.md): an outer and an inner tongue, two
+   eyes and a mouth, animated by state. idle: a slow wobble, dimmed; thinking: taller, the
+   pupils up; working: a flicker; attention: a grin and an amber ring. The eyes blink every
+   few seconds in every state. Static under prefers-reduced-motion. */
+/* The flame's own colours: a mascot, the same in every theme. */
+.cf-flame {
+  --cf-flame-outer: #ff7a2f;
+  --cf-flame-inner: #ffc94d;
+  --cf-flame-eye: #fff8e6;
+  --cf-flame-ink: #2b1a0e;
+  --cf-flame-glow: #ff963c;
+  --cf-flame-glow-hot: #ffaa46;
+  --cf-flame-glow-deep: #ff641e;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.cf-flame[data-size="row"] {
+  width: 22px;
+  height: 25px;
+}
+.cf-flame[data-size="header"] {
+  width: 16px;
+  height: 18px;
+}
+.cf-flame[data-size="nav"] {
+  width: 13px;
+  height: 15px;
+}
+.cf-flame[data-size="hero"] {
+  width: 44px;
+  height: 50px;
+}
+.cf-flame svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.cf-flame .outer {
+  fill: var(--cf-flame-outer);
+  transform-origin: 50% 100%;
+  animation: cf-flame-wobble 1.9s ease-in-out infinite;
+}
+.cf-flame .inner {
+  fill: var(--cf-flame-inner);
+  transform-origin: 50% 100%;
+  animation: cf-flame-wobble 1.4s ease-in-out infinite reverse;
+}
+.cf-flame .eye {
+  fill: var(--cf-flame-eye);
+}
+.cf-flame .pupil {
+  fill: var(--cf-flame-ink);
+}
+.cf-flame .mouth {
+  stroke: var(--cf-flame-ink);
+}
+.cf-flame .glow {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--cf-flame-glow) 75%, transparent)) drop-shadow(0 0 7px color-mix(in srgb, var(--cf-flame-glow-deep) 35%, transparent));
+}
+.cf-flame .eyes {
+  transform-origin: 50% 62%;
+  animation: cf-flame-blink 5.2s steps(1, end) infinite;
+}
+.cf-flame .pupils {
+  transition: transform 0.3s;
+}
+.cf-flame[data-state="idle"] .outer,
+.cf-flame[data-state="idle"] .inner {
+  animation-duration: 3.2s;
+}
+.cf-flame[data-state="idle"] .glow {
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--cf-flame-glow) 45%, transparent));
+  opacity: 0.9;
+}
+.cf-flame[data-state="thinking"] .outer {
+  animation: cf-flame-think 0.9s ease-in-out infinite;
+}
+.cf-flame[data-state="thinking"] .inner {
+  animation-duration: 0.7s;
+}
+.cf-flame[data-state="thinking"] .glow {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--cf-flame-glow-hot) 95%, transparent)) drop-shadow(0 0 10px color-mix(in srgb, var(--cf-flame-glow-deep) 50%, transparent));
+}
+.cf-flame[data-state="thinking"] .pupils {
+  transform: translateY(-1.2px);
+}
+.cf-flame[data-state="working"] .outer {
+  animation: cf-flame-flicker 1.1s steps(1, end) infinite;
+}
+.cf-flame[data-state="working"] .inner {
+  animation: cf-flame-flicker 0.8s steps(1, end) infinite reverse;
+}
+.cf-flame[data-state="attention"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid var(--warning);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: cf-flame-ring 1.4s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes cf-flame-wobble {
+  0%,
+  100% {
+    transform: scaleY(1) skewX(0);
+  }
+  30% {
+    transform: scaleY(1.06) skewX(-3deg);
+  }
+  60% {
+    transform: scaleY(0.97) skewX(3deg);
+  }
+}
+@keyframes cf-flame-think {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.14) scaleX(0.94);
+  }
+}
+@keyframes cf-flame-flicker {
+  0% {
+    transform: scaleY(1) skewX(0);
+  }
+  20% {
+    transform: scaleY(1.1) skewX(-5deg);
+  }
+  35% {
+    transform: scaleY(0.94) skewX(4deg);
+  }
+  55% {
+    transform: scaleY(1.07) skewX(-2deg);
+  }
+  70% {
+    transform: scaleY(0.98) skewX(5deg);
+  }
+  85% {
+    transform: scaleY(1.12) skewX(-4deg);
+  }
+}
+@keyframes cf-flame-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  94%,
+  98% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes cf-flame-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.7);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-flame .outer,
+  .cf-flame .inner,
+  .cf-flame .eyes,
+  .cf-flame .pupils {
+    animation: none !important;
+    transition: none;
+  }
+  /* The ring stays, still, so "has something for you" still shows. */
+  .cf-flame[data-state="attention"]::after {
+    animation: none;
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.8;
+  }
+}

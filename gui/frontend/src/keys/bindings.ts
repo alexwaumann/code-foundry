@@ -6,6 +6,7 @@ import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } fr
 import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
+import { getEmberAttentionId } from "@/stores/ember";
 import { openPublishDialog } from "@/stores/publish";
 import { allSurfaces } from "@/stores/plugins";
 import { presentSnooze } from "@/stores/snoozeDialog";
@@ -45,7 +46,10 @@ export function jumpToAttention(): boolean {
   // A hidden thread selected (from its creator's Threads tab) starts from its creator's row.
   const order = threadOrder(getListThreads(showCreated), getListOptions());
   const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id, showCreated) : null;
-  const next = nextAfter(order, from, (id) => waiting.has(id));
+  // Ember's row is the sidebar's first; it counts while it waits on the user (stores/ember.ts).
+  const ember = getEmberAttentionId();
+  if (ember) waiting.add(ember);
+  const next = nextAfter(ember ? [ember, ...order] : order, from, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "thread", id: next }, { focusPrompt: true });
   return true;

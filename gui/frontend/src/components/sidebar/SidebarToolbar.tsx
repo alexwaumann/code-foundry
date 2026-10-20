@@ -7,17 +7,19 @@ import { jumpToAttention } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
+import { useEmberAttention } from "@/stores/ember";
 import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { isDashboard, useUiStore } from "@/stores/ui";
 
 /**
- * Notifications: the threads waiting on the user. Always shown; with a count, a click
- * jumps to the next one (as cmd+shift+a does). With none it does nothing, but still shows
- * its tooltip, so it is aria-disabled rather than disabled (disabled buttons get no hover).
+ * Notifications: the threads waiting on the user, Ember's included (stores/ember.ts).
+ * Always shown; with a count, a click jumps to the next one (as cmd+shift+a does). With
+ * none it does nothing, but still shows its tooltip, so it is aria-disabled rather than
+ * disabled (disabled buttons get no hover).
  */
 function NotificationsButton() {
-  const count = useAttentionCount(useShowCreatedThreads());
+  const count = useAttentionCount(useShowCreatedThreads()) + (useEmberAttention() ? 1 : 0);
   const label = count === 0 ? "No threads need attention" : `${String(count)} ${count === 1 ? "thread needs" : "threads need"} attention`;
   const Icon = count > 0 ? BellRing : Bell;
   return (
