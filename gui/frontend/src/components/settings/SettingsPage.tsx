@@ -13,7 +13,7 @@ import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings, setSettingsPage, useViewsStore } from "@/stores/views";
 import { guiPages } from "./guiPages";
 import { KeybindingsPage } from "./KeybindingsPage";
-import { pageSections, queryWords, searchSettings, type SearchResult } from "./model";
+import { pageSections, queryWords, searchGuiPages, searchSettings, type SearchResult } from "./model";
 import { PageHead } from "./PageHead";
 import { SearchResults } from "./SearchResults";
 import { SettingsSection } from "./SectionCard";
@@ -145,15 +145,59 @@ export function SettingsPage() {
   // A GUI page may also be a schema page (Plugins: its settings section): the schema's wins, drawn by the GUI's component.
   const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page).filter((g) => !schema.pages.some((p) => p.id === g.id))] : []), [schema]);
   const page = pages.find((p) => p.id === pageId) ?? pages[0];
+  // The GUI's own pages have no fields: their sections are found by name (Skills › Browse).
+  const guiHits = useMemo(
+    () =>
+      schema && searching
+        ? searchGuiPages(
+            guiPages.map((g) => g.page),
+            new Set(schema.pages.map((p) => p.id)),
+            words,
+          )
+        : null,
+    [schema, searching, words],
+  );
+  const counts = useMemo(() => (result ? { ...result.counts, ...guiHits?.counts } : null), [result, guiHits]);
+  // A section hit opens its page there (after the page change scrolls to the top).
+  const [toSection, setToSection] = useState<string | null>(null);
 
   // A new page (or the search's results) starts at the top.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [page?.id, searching]);
 
+  useEffect(() => {
+    const box = scrollRef.current;
+    const body = box?.firstElementChild;
+    if (!toSection || searching || !box || !body) return;
+    const go = () => {
+      box.querySelector(`[data-section="${CSS.escape(toSection)}"]`)?.scrollIntoView({ block: "start" });
+    };
+    const frame = requestAnimationFrame(go);
+    // A page that reads its content once shown (Skills) grows above the section: follow it
+    // until it settles or the user scrolls.
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(go);
+    ro?.observe(body);
+    const stop = () => {
+      setToSection(null);
+    };
+    const timer = setTimeout(stop, 1500);
+    box.addEventListener("wheel", stop, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      ro?.disconnect();
+      clearTimeout(timer);
+      box.removeEventListener("wheel", stop);
+    };
+  }, [toSection, searching, page?.id]);
+
   const pick = (id: string) => {
     setQuery("");
     setSettingsPage(id);
+  };
+  const openSection = (pageId: string, sectionId: string) => {
+    pick(pageId);
+    setToSection(sectionId);
   };
   const Page = page ? (customPages[page.id] ?? FieldsPage) : null;
 
@@ -195,13 +239,13 @@ export function SettingsPage() {
         </Button>
       </PaneHeader>
       <div className="flex min-h-0 flex-1">
-        <SettingsNav pages={pages} current={searching ? null : (page?.id ?? null)} counts={result?.counts ?? null} onPick={pick} />
+        <SettingsNav pages={pages} current={searching ? null : (page?.id ?? null)} counts={counts} onPick={pick} />
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
           <div className="mx-auto max-w-3xl" data-testid="settings-body" data-page={searching ? undefined : page?.id}>
             <Banners />
             {schemaError && <p className="text-body text-destructive">Cannot load the settings schema: {schemaError}</p>}
             {!schema && !schemaError && <p className="text-body text-muted-foreground">Loading…</p>}
-            {schema && result && <SearchResults query={query.trim()} words={words} result={result} back={page?.title ?? "the page"} />}
+            {schema && result && <SearchResults query={query.trim()} words={words} result={result} sections={guiHits?.hits} onOpenSection={openSection} back={page?.title ?? "the page"} />}
             {schema && !result && page && Page && <Page key={page.id} schema={schema} page={page} />}
           </div>
         </div>

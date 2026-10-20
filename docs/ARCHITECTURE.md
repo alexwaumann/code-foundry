@@ -660,6 +660,17 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   getting started guide, `docs/GETTING-STARTED.md` bundled at build time (and shipped to
   threads in the `code-foundry-help` skill); keep every label and chord it names in step
   with the app (`docs/notes/onboarding-2-guide.md`).
+* Skills page (`docs/notes/skills-4-gui.md`): Settings → Skills is a GUI page
+  (`components/settings/guiPages.ts`, `components/skill/settings`) over `stores/skill.ts`,
+  held open (`openSkillMarketplace`) while it shows. Installed rows (plugins and skills,
+  "from <marketplace>" or Local, Enabled / Disabled / Needs setup / Missing) carry the
+  actions `installedActions` gives; Browse is the daemon's search (150 ms debounce, tier
+  and kind chips, at most 200 hits in a `VirtualStack` on the page's scroll box);
+  Registries lists Claude Code's marketplaces or says how to add one. Disable, Uninstall
+  and Remove confirm in the page's dialog and answer the daemon's confirm for that call
+  (`stores/skillConfirm.ts`, as `plugin.uninstall` does). A GUI-only page lists its
+  sections in its `SettingPageView`, and the settings search finds them by name
+  (`searchGuiPages`): a hit opens the page at the section.
 
 ## 9. Project and GitHub stores
 

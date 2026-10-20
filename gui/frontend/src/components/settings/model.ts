@@ -114,6 +114,34 @@ export function searchSettings(schema: SettingsSchemaView, words: readonly strin
   return { hits, counts };
 }
 
+/** A section of a page the GUI draws on its own (guiPages), found by the search: it opens the page at the section. */
+export interface PageSectionHit {
+  page: SettingPageView;
+  section: SettingSectionView;
+}
+
+/**
+ * The search across the GUI's own pages (Skills: no fields, so searchSettings never finds
+ * it): every listed section whose page title, section title or description has every
+ * word. Pages the schema has too are left out (their fields are found). Counts are added
+ * to `counts` per page.
+ */
+export function searchGuiPages(pages: readonly SettingPageView[], schemaPageIds: ReadonlySet<string>, words: readonly string[]): { hits: PageSectionHit[]; counts: Record<string, number> } {
+  const hits: PageSectionHit[] = [];
+  const counts: Record<string, number> = {};
+  if (words.length === 0) return { hits, counts };
+  for (const page of pages) {
+    if (schemaPageIds.has(page.id)) continue;
+    const found = page.sections.filter((s) => {
+      const hay = `${page.title} ${s.title} ${s.description}`.toLowerCase();
+      return words.every((w) => hay.includes(w));
+    });
+    for (const section of found) hits.push({ page, section });
+    counts[page.id] = found.length;
+  }
+  return { hits, counts };
+}
+
 /** A keybinding value that binds a chord: not "" (no default) and not "none" (unbound on purpose). */
 export function isBound(value: string | undefined): boolean {
   return value !== undefined && value !== "" && value !== "none";
