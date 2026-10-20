@@ -171,7 +171,7 @@ func TestEnable(t *testing.T) {
 	if got := e.calls("EnsureResident"); len(got) != 0 {
 		t.Fatalf("calls = %q", got)
 	}
-	if tools := e.threads.ResidentTools(Name); !slices.Contains(tools.Allow, "Bash(code-foundry ember:*)") || !slices.Contains(tools.Deny, "Edit") {
+	if tools := e.threads.ResidentTools(Name); !slices.Contains(tools.Allow, "Bash(code-foundry ember:*)") || !slices.Contains(tools.Allow, "Bash(git fetch:*)") || !slices.Contains(tools.Deny, "Edit") {
 		t.Errorf("tools = %+v", tools)
 	}
 	e.set(on)
