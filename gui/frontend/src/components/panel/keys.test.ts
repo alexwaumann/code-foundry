@@ -90,6 +90,7 @@ describe("surface registry", () => {
 
   it("looks surfaces up by kind and hotkey", () => {
     expect(surfaces.map((s) => [s.kind, s.hotkey])).toEqual([
+      ["ember", "b"],
       ["files", "f"],
       ["diff", "d"],
       ["pullrequest", "p"],
@@ -108,10 +109,12 @@ describe("surface registry", () => {
     expect(surfaceByHotkey("U")?.kind).toBe("usage");
     expect(surfaceByHotkey("m")?.kind).toBe("mcp");
     expect(surfaceByHotkey("A")?.kind).toBe("agents");
+    expect(surfaceByHotkey("b")?.kind).toBe("ember");
     expect(surfaceByHotkey("h")?.kind).toBe("threads");
     expect(surfaceByHotkey("T")?.kind).toBe("worktree");
     // s-1 is unknown here: no pull request, no linked pull requests, not a known thread,
     // no workspace thread, no worktree to place it in.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden"]);
+    // The Board is Ember's chat's only.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden"]);
   });
 });

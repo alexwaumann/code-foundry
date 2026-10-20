@@ -37,20 +37,20 @@ export function Flame({ state, size, label, className }: { state: FlameState; si
         <g className="glow">
           <path
             className="outer"
-            fill="#ff7a2f"
+           
             d="M12 1.2c-1.1 3.8-6.4 6.8-6.4 13.2A6.4 6.4 0 0 0 18.4 14.4c0-3.1-1.6-5.2-3.1-7.6-.4 1.7-1 2.9-2.3 3.5.5-2.8.2-5.8-1-9.1z"
           />
-          <path className="inner" fill="#ffc94d" d="M12 10.2c-.9 2.1-3.4 3.4-3.4 6.4a3.4 3.4 0 0 0 6.8 0c0-1.9-1-3.1-1.7-4.6-.3.9-.7 1.5-1.4 1.7.2-1.2.1-2.4-.3-3.5z" />
+          <path className="inner" d="M12 10.2c-.9 2.1-3.4 3.4-3.4 6.4a3.4 3.4 0 0 0 6.8 0c0-1.9-1-3.1-1.7-4.6-.3.9-.7 1.5-1.4 1.7.2-1.2.1-2.4-.3-3.5z" />
         </g>
         <g className="eyes">
-          <ellipse cx="9.9" cy="15.6" rx="1.45" ry="1.9" fill="#fff8e6" />
-          <ellipse cx="14.1" cy="15.6" rx="1.45" ry="1.9" fill="#fff8e6" />
+          <ellipse className="eye" cx="9.9" cy="15.6" rx="1.45" ry="1.9" />
+          <ellipse className="eye" cx="14.1" cy="15.6" rx="1.45" ry="1.9" />
           <g className="pupils">
-            <circle cx="10.1" cy="16" r=".8" fill="#2b1a0e" />
-            <circle cx="14.3" cy="16" r=".8" fill="#2b1a0e" />
+            <circle className="pupil" cx="10.1" cy="16" r=".8" />
+            <circle className="pupil" cx="14.3" cy="16" r=".8" />
           </g>
         </g>
-        <path d={state === "attention" ? GRIN : SMILE} fill="none" stroke="#2b1a0e" strokeWidth=".9" strokeLinecap="round" />
+        <path className="mouth" d={state === "attention" ? GRIN : SMILE} fill="none" strokeWidth=".9" strokeLinecap="round" />
       </svg>
     </span>
   );

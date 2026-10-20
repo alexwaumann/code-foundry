@@ -157,7 +157,7 @@ const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
  * a turned chevron, the title, and where the task is on the board now ("in progress · 3
  * pieces · 2 working", live). A click opens the Board panel at that task.
  */
-export function TaskPointer({ id, title }: { id: string; title: string }) {
+export function TaskPointer({ id, name }: { id: string; name: string }) {
   const meta = useLinkMeta(id);
   return (
     <button
@@ -170,7 +170,7 @@ export function TaskPointer({ id, title }: { id: string; title: string }) {
       }}
     >
       <ChevronRight className="size-3.5 shrink-0 rotate-90 opacity-80" aria-hidden />
-      <span className="truncate font-medium text-foreground">{title}</span>
+      <span className="truncate font-medium text-foreground">{name}</span>
       {meta && (
         <span className="shrink-0 truncate" data-testid="ember-task-link-meta">
           · {meta}
@@ -199,7 +199,7 @@ const EmberText = memo(function EmberText({ id }: { id: string }) {
               {p.text}
             </ThreadMarkdown>
           ) : (
-            <TaskPointer key={i} id={p.id} title={p.title} />
+            <TaskPointer key={i} id={p.id} name={p.title} />
           ),
         )}
       </CodeRunContext.Provider>

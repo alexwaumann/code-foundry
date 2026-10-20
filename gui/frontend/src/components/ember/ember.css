@@ -2,7 +2,15 @@
    eyes and a mouth, animated by state. idle: a slow wobble, dimmed; thinking: taller, the
    pupils up; working: a flicker; attention: a grin and an amber ring. The eyes blink every
    few seconds in every state. Static under prefers-reduced-motion. */
+/* The flame's own colours: a mascot, the same in every theme. */
 .cf-flame {
+  --cf-flame-outer: #ff7a2f;
+  --cf-flame-inner: #ffc94d;
+  --cf-flame-eye: #fff8e6;
+  --cf-flame-ink: #2b1a0e;
+  --cf-flame-glow: #ff963c;
+  --cf-flame-glow-hot: #ffaa46;
+  --cf-flame-glow-deep: #ff641e;
   position: relative;
   display: inline-block;
   flex: none;
@@ -31,15 +39,26 @@
   overflow: visible;
 }
 .cf-flame .outer {
+  fill: var(--cf-flame-outer);
   transform-origin: 50% 100%;
   animation: cf-flame-wobble 1.9s ease-in-out infinite;
 }
 .cf-flame .inner {
+  fill: var(--cf-flame-inner);
   transform-origin: 50% 100%;
   animation: cf-flame-wobble 1.4s ease-in-out infinite reverse;
 }
+.cf-flame .eye {
+  fill: var(--cf-flame-eye);
+}
+.cf-flame .pupil {
+  fill: var(--cf-flame-ink);
+}
+.cf-flame .mouth {
+  stroke: var(--cf-flame-ink);
+}
 .cf-flame .glow {
-  filter: drop-shadow(0 0 3px rgb(255 150 60 / 0.75)) drop-shadow(0 0 7px rgb(255 100 30 / 0.35));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--cf-flame-glow) 75%, transparent)) drop-shadow(0 0 7px color-mix(in srgb, var(--cf-flame-glow-deep) 35%, transparent));
 }
 .cf-flame .eyes {
   transform-origin: 50% 62%;
@@ -53,7 +72,7 @@
   animation-duration: 3.2s;
 }
 .cf-flame[data-state="idle"] .glow {
-  filter: drop-shadow(0 0 2px rgb(255 150 60 / 0.45));
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--cf-flame-glow) 45%, transparent));
   opacity: 0.9;
 }
 .cf-flame[data-state="thinking"] .outer {
@@ -63,7 +82,7 @@
   animation-duration: 0.7s;
 }
 .cf-flame[data-state="thinking"] .glow {
-  filter: drop-shadow(0 0 4px rgb(255 170 70 / 0.95)) drop-shadow(0 0 10px rgb(255 110 30 / 0.5));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--cf-flame-glow-hot) 95%, transparent)) drop-shadow(0 0 10px color-mix(in srgb, var(--cf-flame-glow-deep) 50%, transparent));
 }
 .cf-flame[data-state="thinking"] .pupils {
   transform: translateY(-1.2px);
