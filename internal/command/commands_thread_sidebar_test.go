@@ -128,7 +128,7 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 		{name: "unarchiving never asks", args: map[string]string{"id": "s5", "archived": "false"}, current: idleRoot,
 			cascade: map[string][]*v1.Thread{"s5": {busyKid}}},
 		{name: "ids: a working child of one asks", args: map[string]string{"ids": "s5,s6"},
-			others: []*v1.Thread{{Id: "s5", Name: "lead", State: connected}, {Id: "s6", State: connected}},
+			others:  []*v1.Thread{{Id: "s5", Name: "lead", State: connected}, {Id: "s6", State: connected}},
 			cascade: map[string][]*v1.Thread{"s6": {busyKid}},
 			wantAsk: "Archive 2 threads? 1 hidden child thread is still working; archiving ends its turn and archives it too. " +
 				"To keep it, ask its creator to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first."},
