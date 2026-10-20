@@ -7,8 +7,8 @@ import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 
 const ctx: SurfaceContext = { selection: { kind: "thread", id: "s-1" }, panelKey: "thread:s-1" };
 const files = makeTab("files", "Files");
-const withTab: PanelEntry = { open: true, tabs: [files], activeTabId: files.id };
-const picking: PanelEntry = { open: true, tabs: [files], activeTabId: null, pickFrom: files.id };
+const withTab: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: files.id }] };
+const picking: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: null, pickFrom: files.id }] };
 
 describe("isPanelChord", () => {
   it.each([

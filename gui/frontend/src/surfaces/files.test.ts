@@ -57,11 +57,11 @@ describe("opening and the surfaces' availability", () => {
     openDiffInPanel(KEY, { project: "web", worktree: "/w", path: "b.ts", oldPath: "", scope: "working" });
     openFileInPanel(KEY, { project: "web", base: "/w", path: "/w/a.ts", line: 9 });
     const e = getPanel(KEY);
-    expect(e.tabs.map((t) => t.title)).toEqual(["a.ts", "b.ts"]);
-    expect(e.tabs[0]?.params.line).toBe("9");
-    expect(e.activeTabId).toBe(e.tabs[0]?.id);
+    expect(e.groups[0]?.tabs.map((t) => t.title)).toEqual(["a.ts", "b.ts"]);
+    expect(e.groups[0]?.tabs[0]?.params.line).toBe("9");
+    expect(e.groups[0]?.activeTabId).toBe(e.groups[0]?.tabs[0]?.id);
     openDiffInPanel(KEY, { project: "web", worktree: "/w", path: "b.ts", oldPath: "", scope: "branch" });
-    expect(getPanel(KEY).tabs.map((t) => t.params.scope ?? "")).toEqual(["", "branch"]);
+    expect(getPanel(KEY).groups[0]?.tabs.map((t) => t.params.scope ?? "")).toEqual(["", "branch"]);
   });
 
   it("File and Diff are dimmed until the panel has such a tab; then F and D bring back the last one", () => {
@@ -83,7 +83,8 @@ describe("opening and the surfaces' availability", () => {
 function openSurface2() {
   usePanelStore.setState((s) => {
     const e = s.byKey[KEY];
-    if (!e) return s;
-    return { byKey: { ...s.byKey, [KEY]: { ...e, tabs: [...e.tabs, makeTab("pullrequest", "#1", { number: "1" })] } } };
+    const g = e?.groups[0];
+    if (!e || !g) return s;
+    return { byKey: { ...s.byKey, [KEY]: { ...e, groups: [{ ...g, tabs: [...g.tabs, makeTab("pullrequest", "#1", { number: "1" })] }] } } };
   });
 }

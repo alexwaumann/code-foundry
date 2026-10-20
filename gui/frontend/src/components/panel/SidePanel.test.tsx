@@ -18,7 +18,7 @@ const KEY = "thread:a";
 const newTabCommand: CommandView = { name: "view.panel.new-tab", title: "New Side Panel Tab", description: "", category: "View", args: [], keybindings: [], available: true };
 
 beforeEach(() => {
-  usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ selection: { kind: "thread", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
   useCommandsStore.setState({ commands: [newTabCommand] });
@@ -85,7 +85,7 @@ describe("SidePanel", () => {
   });
 
   it("expanded, it fills the row without a resize handle, shows without room, and settings still hides it", () => {
-    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500, expanded: true } } });
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500, expanded: true } } });
     useUiStore.setState({ windowWidth: 1000, sidebarWidth: 520 });
     render(<SidePanel />);
     const wrapper = screen.getByTestId("side-panel-wrapper");
@@ -101,7 +101,7 @@ describe("SidePanel", () => {
     act(() => {
       useViewsStore.setState({ settingsOpen: false });
       useUiStore.setState({ windowWidth: 1400, sidebarWidth: 260 });
-      usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500 } } });
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500 } } });
     });
     expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("500px");
     expect(screen.getByRole("separator")).toBeTruthy();
@@ -119,7 +119,7 @@ describe("SidePanel", () => {
   });
 
   it("sizes only the current selection's panel; double-click resets it to the default", () => {
-    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null }, "thread:b": { open: true, tabs: [], activeTabId: null, width: 500 } } });
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:b": { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500 } } });
     render(<SidePanel />);
     const sep = () => screen.getByRole("separator");
     const wrapper = () => screen.getByTestId("side-panel-wrapper");
@@ -141,7 +141,7 @@ describe("SidePanel", () => {
   });
 
   it("renders a stored width above the room at the room, and keeps it for when the room comes back", () => {
-    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 800 } } });
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 800 } } });
     render(<SidePanel />);
     // 1400 - 260 - 36 - 360 = 744.
     expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("744px");
@@ -180,7 +180,7 @@ describe("SidePanel", () => {
       onKey.mockClear();
       fireEvent.keyDown(body, { key: "w", metaKey: true });
       expect(onKey).not.toHaveBeenCalled();
-      expect(usePanelStore.getState().byKey[KEY]?.tabs.map((t) => t.id)).toEqual([one.id]);
+      expect(usePanelStore.getState().byKey[KEY]?.groups[0]?.tabs.map((t) => t.id)).toEqual([one.id]);
     } finally {
       pullRequestSurface.onKey = prev;
     }
@@ -206,7 +206,7 @@ describe("the new-tab button and picking", () => {
 
   const plus = () => screen.getByTestId("panel-new-tab");
   const aside = () => screen.getByTestId("side-panel");
-  const tabIds = () => getPanel(KEY).tabs.map((t) => t.id);
+  const tabIds = () => getPanel(KEY).groups[0]?.tabs.map((t) => t.id);
   const selected = () => screen.queryAllByRole("tab").filter((t) => t.getAttribute("aria-selected") === "true");
   const enterPicking = () => {
     fireEvent.click(plus());
@@ -219,7 +219,7 @@ describe("the new-tab button and picking", () => {
     expect(plus().getAttribute("aria-label")).toBe("New tab");
     expect(plus().getAttribute("aria-pressed")).toBe("false");
     act(() => {
-      usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null } } });
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
     });
     expect(screen.queryByTestId("panel-new-tab")).toBeNull();
     expect(screen.getByTestId("panel-empty")).toBeTruthy();
@@ -230,7 +230,7 @@ describe("the new-tab button and picking", () => {
     expect(aside().hasAttribute("data-picking")).toBe(false);
     enterPicking();
     expect(tabIds()).toEqual([one.id, two.id]);
-    expect(getPanel(KEY)).toMatchObject({ activeTabId: null, pickFrom: two.id });
+    expect(getPanel(KEY)).toMatchObject({ groups: [{ activeTabId: null, pickFrom: two.id }] });
     expect(aside().getAttribute("data-picking")).toBe("true");
     expect(screen.getByTestId("panel-empty")).toBeTruthy();
     expect(screen.queryByTestId("panel-body")).toBeNull();
@@ -257,21 +257,21 @@ describe("the new-tab button and picking", () => {
     });
     render(<SidePanel />);
     enterPicking();
-    expect(getPanel(KEY).pickFrom).toBe(files.id);
+    expect(getPanel(KEY).groups[0]?.pickFrom).toBe(files.id);
     act(() => {
       fireEvent.click(screen.getByRole("tab", { name: "#1" }));
     });
     enterPicking();
     fireEvent.click(screen.getByTestId("panel-empty").querySelector('[data-surface="files"]') as HTMLButtonElement);
     expect(tabIds()).toEqual([one.id, two.id, files.id]);
-    expect(getPanel(KEY).activeTabId).toBe(files.id);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(files.id);
   });
 
   it("clicking a tab leaves picking", () => {
     render(<SidePanel />);
     enterPicking();
     fireEvent.click(screen.getByRole("tab", { name: "#1" }));
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [one, two], activeTabId: one.id });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [one, two], activeTabId: one.id }] });
     expect(screen.getByTestId("probe").textContent).toBe(one.id);
     expect(aside().hasAttribute("data-picking")).toBe(false);
   });
@@ -284,7 +284,7 @@ describe("the new-tab button and picking", () => {
     fireEvent.click(screen.getByRole("tab", { name: "#1" }));
     enterPicking();
     fireEvent.keyDown(screen.getByTestId("panel-empty"), ev);
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [one, two], activeTabId: one.id });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [one, two], activeTabId: one.id }] });
     expect(screen.getByTestId("probe").textContent).toBe(one.id);
   });
 
@@ -300,7 +300,7 @@ describe("the new-tab button and picking", () => {
     if (!row) throw new Error("no files row");
     row.focus();
     leave(row);
-    expect(getPanel(KEY).activeTabId).toBe(active);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(active);
     expect(screen.queryByTestId("panel-empty")).toBeNull();
     expect(document.activeElement).toBe(aside());
   });
@@ -313,7 +313,7 @@ describe("the new-tab button and picking", () => {
       render(<SidePanel />);
       fireEvent.keyDown(screen.getByTestId("probe"), { key: "Escape" });
       expect(onKey).toHaveBeenCalledWith("escape", expect.objectContaining({ id: two.id }));
-      expect(getPanel(KEY).activeTabId).toBe(two.id);
+      expect(getPanel(KEY).groups[0]?.activeTabId).toBe(two.id);
     } finally {
       pullRequestSurface.onKey = prev;
     }
@@ -327,10 +327,10 @@ describe("the new-tab button and picking", () => {
     render(<SidePanel />);
     enterPicking();
     fireEvent.click(screen.getByRole("button", { name: "Close #2" }));
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [one, files], activeTabId: null, pickFrom: files.id });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [one, files], activeTabId: null, pickFrom: files.id }] });
     expect(aside().getAttribute("data-picking")).toBe("true");
     fireEvent.keyDown(aside(), { key: "Escape" });
-    expect(getPanel(KEY).activeTabId).toBe(files.id);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(files.id);
   });
 
   it("closing every tab while picking hides the panel", () => {
@@ -338,7 +338,7 @@ describe("the new-tab button and picking", () => {
     enterPicking();
     fireEvent.click(screen.getByRole("button", { name: "Close #1" }));
     fireEvent.click(screen.getByRole("button", { name: "Close #2" }));
-    expect(getPanel(KEY)).toEqual({ open: false, tabs: [], activeTabId: null });
+    expect(getPanel(KEY)).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
     expect(screen.queryByTestId("side-panel")).toBeNull();
   });
 });
@@ -378,7 +378,7 @@ describe("appearance.panel_keep_open", () => {
     keepOpen(true);
     render(<SidePanel />);
     fireEvent.click(screen.getByRole("button", { name: "Close #1" }));
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
     expect(screen.getByTestId("panel-empty")).toBeTruthy();
     expect(screen.queryByTestId("panel-new-tab")).toBeNull();
     expect(document.activeElement).toBe(aside());
@@ -391,9 +391,9 @@ describe("appearance.panel_keep_open", () => {
     });
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true });
-    expect(getPanel(KEY).tabs.map((t) => t.id)).toEqual([one.id]);
+    expect(getPanel(KEY).groups[0]?.tabs.map((t) => t.id)).toEqual([one.id]);
     fireEvent.keyDown(screen.getByTestId("probe"), { key: "w", metaKey: true });
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
     expect(screen.getByTestId("panel-empty")).toBeTruthy();
     fireEvent.keyDown(aside(), { key: "w", metaKey: true });
     expect(getPanel(KEY).open).toBe(false);
@@ -406,7 +406,7 @@ describe("appearance.panel_keep_open", () => {
     const wrapper = screen.getByRole("tab", { name: "#1" }).parentElement;
     if (!wrapper) throw new Error("no tab wrapper");
     fireEvent(wrapper, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
-    expect(getPanel(KEY)).toEqual({ open: true, tabs: [], activeTabId: null });
+    expect(getPanel(KEY)).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
   });
 });
 
@@ -426,7 +426,7 @@ describe("reordering tabs", () => {
 
   const tab = (name: string) => screen.getByRole("tab", { name });
   const titles = () => screen.getAllByRole("tab").map((t) => t.textContent);
-  const tabIds = () => getPanel(KEY).tabs.map((t) => t.id);
+  const tabIds = () => getPanel(KEY).groups[0]?.tabs.map((t) => t.id);
 
   it("alt+Right and alt+Left move the focused tab one slot, keep it focused, and keep the active tab", () => {
     render(<SidePanel />);
@@ -442,7 +442,7 @@ describe("reordering tabs", () => {
     expect(titles()).toEqual(["#2", "#1", "#3"]);
     expect(document.activeElement).toBe(tab("#1"));
     // Moving is not activating: #3 stays the active tab.
-    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(three.id);
     expect(tab("#3").getAttribute("aria-selected")).toBe("true");
   });
 
@@ -491,7 +491,7 @@ describe("reordering tabs", () => {
     fireEvent.pointerMove(t, { isPrimary: true, clientX: 12, clientY: 11 });
     fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 12, clientY: 11 });
     fireEvent.click(t);
-    expect(getPanel(KEY).activeTabId).toBe(one.id);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(one.id);
     expect(screen.getByTestId("probe").textContent).toBe(one.id);
   });
 
@@ -503,7 +503,7 @@ describe("reordering tabs", () => {
     expect(t.parentElement?.getAttribute("data-dragging")).toBe("true");
     fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
     fireEvent.click(t);
-    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(getPanel(KEY).groups[0]?.activeTabId).toBe(three.id);
     expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
   });
 

@@ -85,8 +85,8 @@ describe("startArchiveCleanup", () => {
     useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("a"), thread("b")]) });
     usePanelStore.setState({
       byKey: {
-        "thread:a": { open: true, tabs: [tab], activeTabId: tab.id, width: 500 },
-        "thread:b": { open: true, tabs: [tab], activeTabId: tab.id },
+        "thread:a": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }], width: 500 },
+        "thread:b": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] },
       },
     });
     useBottomStore.setState({ byKey: { "thread:a": { open: true, height: 300, activeTerminalId: "t1" }, "thread:b": { open: true } } });
@@ -106,7 +106,7 @@ describe("startArchiveCleanup", () => {
 
   it("unarchiving, and opening an archived thread's panels afterwards, change nothing", () => {
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: true, tabs: [tab], activeTabId: tab.id } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] } } }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // unrelated update
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a") })); // unarchived
     expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
@@ -118,7 +118,7 @@ describe("startArchiveCleanup", () => {
     expect(useBottomStore.getState().byKey["thread:b"]).toEqual({ open: false });
     expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
     expect(useBottomStore.getState().byKey["thread:a"]?.open).toBe(true);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:b": { open: true, tabs: [tab], activeTabId: tab.id } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:b": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] } } }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 43) })); // another time
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // woke
     expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);

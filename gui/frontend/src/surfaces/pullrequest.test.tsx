@@ -25,7 +25,7 @@ beforeEach(() => {
   getBranchPullRequests.mockImplementation((_slug: string, head: string) => Promise.resolve(prs(head === "fix/resize" ? [145] : [])));
   useProjectsStore.setState({ byId: { r1: project("feat/nopr") }, order: ["r1"] });
   useThreadsStore.setState({ byId: { s1: thread }, order: ["s1"] });
-  usePanelStore.setState({ byKey: { "thread:s1": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ selection: { kind: "thread", id: "s1" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
 });

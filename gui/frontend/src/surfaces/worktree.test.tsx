@@ -40,7 +40,7 @@ beforeEach(() => {
     order: ["s-main", "s-feat", "s-sub", "s-lost"],
   });
   useTerminalsStore.setState({ byId: {}, order: [] });
-  const open = { open: true, tabs: [], activeTabId: null };
+  const open = { open: true, groups: [{ tabs: [], activeTabId: null }] };
   usePanelStore.setState({ byKey: { "thread:s-main": open, "thread:s-feat": open, "thread:s-sub": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
@@ -89,8 +89,8 @@ describe("Worktree surface availability", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
     const p = getPanel("thread:s-feat");
-    expect(p.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&project=web`);
-    expect(p.tabs[0]?.title).toBe("web · cf/feat");
+    expect(p.groups[0]?.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&project=web`);
+    expect(p.groups[0]?.tabs[0]?.title).toBe("web · cf/feat");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB_FEAT);
     expect(screen.getByTestId("worktree-surface-title").textContent).toBe("web@cf/feat");
   });
@@ -112,7 +112,7 @@ describe("Worktree surface availability", () => {
     select("s-sub");
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    expect(getPanel("thread:s-sub").tabs[0]?.params).toEqual({ project: "web", path: WEB_FEAT });
+    expect(getPanel("thread:s-sub").groups[0]?.tabs[0]?.params).toEqual({ project: "web", path: WEB_FEAT });
   });
 });
 
@@ -121,8 +121,8 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-main");
     expect(worktreePanelCommand()).toBe(true);
-    expect(getPanel("thread:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&project=web` });
-    expect(getPanel("thread:s-main").tabs[0]?.title).toBe("web");
+    expect(getPanel("thread:s-main")).toMatchObject({ open: true, groups: [{ activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&project=web` }] });
+    expect(getPanel("thread:s-main").groups[0]?.tabs[0]?.title).toBe("web");
   });
 
   it("does nothing for a thread outside any worktree, on a page, or under the settings page", () => {
@@ -158,8 +158,8 @@ describe("showWorktreeInPanel (the Projects page's rows)", () => {
     expect(showWorktreeInPanel("web", WEB_MAIN)).toBe(true);
     const p = getPanel("view:projects");
     expect(p.open).toBe(true);
-    expect(p.tabs.map((t) => t.title)).toEqual(["web", "web · cf/feat"]);
-    expect(p.activeTabId).toBe(p.tabs[0]?.id);
+    expect(p.groups[0]?.tabs.map((t) => t.title)).toEqual(["web", "web · cf/feat"]);
+    expect(p.groups[0]?.activeTabId).toBe(p.groups[0]?.tabs[0]?.id);
     // The list keeps the keyboard: no focus request.
     expect(useUiStore.getState().panelFocusSeq).toBe(seq);
   });

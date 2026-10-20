@@ -1,5 +1,5 @@
 import { surfaceByHotkey, type SurfaceContext } from "@/surfaces/registry";
-import { isPicking, type PanelEntry, type Tab } from "@/stores/panel";
+import { groupAt, focusedGroup, isPicking, type PanelEntry, type Tab } from "@/stores/panel";
 
 /**
  * Whether a chord is the panel's own: cmd+w, a bare letter some surface uses as its
@@ -14,16 +14,21 @@ export function isPanelChord(chord: string, picking = false): boolean {
 export type PanelKeyAction = { kind: "close"; tabId: string } | { kind: "hide" } | { kind: "stopPicking" } | { kind: "open"; tab: Tab };
 
 /**
- * What a key does while focus is inside the side panel: cmd+w closes the active tab, or
- * hides the panel when it has none (so cmd+w is always handled while the panel has
- * focus); while picking (the "+" was clicked) cmd+w and Escape go back to the tab that
- * was active instead; a surface's bare hotkey letter opens its default tab when the
- * surface is enabled. Anything else (and disabled or hidden surfaces) is null. The
- * caller skips letters typed into text fields.
+ * What a key does while focus is inside the side panel. It acts on the focused group
+ * (focusedGroup): cmd+w closes its active tab, or hides the panel when it has none (so
+ * cmd+w is always handled while the panel has focus); while it is picking (the "+" was
+ * clicked) cmd+w and Escape go back to the tab that was active instead (or, for a split
+ * panel's empty group, collapse the split); a surface's bare hotkey letter opens its
+ * default tab (in that group) when the surface is enabled. Anything else (and disabled or
+ * hidden surfaces) is null. The caller skips letters typed into text fields.
  */
 export function panelKeyAction(chord: string, entry: PanelEntry, ctx: SurfaceContext): PanelKeyAction | null {
-  if (isPicking(entry) && (chord === "cmd+w" || chord === "escape")) return { kind: "stopPicking" };
-  if (chord === "cmd+w") return entry.activeTabId === null ? { kind: "hide" } : { kind: "close", tabId: entry.activeTabId };
+  const g = focusedGroup(entry);
+  if (isPicking(entry, g) && (chord === "cmd+w" || chord === "escape")) return { kind: "stopPicking" };
+  if (chord === "cmd+w") {
+    const active = groupAt(entry, g).activeTabId;
+    return active === null ? { kind: "hide" } : { kind: "close", tabId: active };
+  }
   if (!/^[a-z]$/.test(chord)) return null;
   const spec = surfaceByHotkey(chord);
   if (!spec || spec.available(ctx) !== "enabled") return null;

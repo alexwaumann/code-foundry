@@ -13,7 +13,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { pullRequestDetailResource } = await import("@/stores/gh");
-const { getPanel, usePanelStore } = await import("@/stores/panel");
+const { activatePanelTab, getPanel, usePanelStore } = await import("@/stores/panel");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
@@ -46,7 +46,7 @@ beforeEach(() => {
   useProjectsStore.setState({ byId: {}, order: [] });
   // First-seen order 5, 7, 6: the list shows 6, 7, 5.
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
-  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-0": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
@@ -80,7 +80,7 @@ describe("Linked PRs surface", () => {
   it("L opens the tab: header, rows newest first, skeletons until the details load", async () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "l" });
-    expect(getPanel("thread:s-1").activeTabId).toBe("linkedprs");
+    expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("linkedprs");
     expect(screen.getByTestId("linkedprs-thread").textContent).toBe("thread s-1");
     expect(screen.getByTestId("linkedprs-count").textContent).toBe("3 linked PRs");
     expect(numbers()).toEqual(["#6", "#7", "#5"]);
@@ -118,17 +118,17 @@ describe("Linked PRs surface", () => {
     fireEvent.keyDown(list, { key: "j" });
     fireEvent.keyDown(list, { key: "Enter" });
     let p = getPanel("thread:s-1");
-    expect(p.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7"]);
-    expect(p.activeTabId).toBe("pullrequest?number=7&slug=o%2Fweb");
+    expect(p.groups[0]?.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7"]);
+    expect(p.groups[0]?.activeTabId).toBe("pullrequest?number=7&slug=o%2Fweb");
 
     act(() => {
-      usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-1": { ...p, activeTabId: "linkedprs" } } }));
+      activatePanelTab("thread:s-1", "linkedprs");
     });
     const first = screen.getAllByTestId("linkedpr")[0]?.closest('[role="option"]');
     if (!first) throw new Error("no row");
     fireEvent.click(first);
     p = getPanel("thread:s-1");
-    expect(p.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7", "#6"]);
+    expect(p.groups[0]?.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7", "#6"]);
   });
 });
 
@@ -136,7 +136,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
   it("opens the tab and shows a hidden panel for a thread with links", () => {
     usePanelStore.setState({ byKey: {} });
     expect(linkedPrsPanelCommand()).toBe(true);
-    expect(getPanel("thread:s-1")).toMatchObject({ open: true, activeTabId: "linkedprs" });
+    expect(getPanel("thread:s-1")).toMatchObject({ open: true, groups: [{ activeTabId: "linkedprs" }] });
     expect(toast).not.toHaveBeenCalled();
   });
 

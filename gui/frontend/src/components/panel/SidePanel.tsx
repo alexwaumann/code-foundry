@@ -12,8 +12,10 @@ import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import {
   activatePanelTab,
+  activeTab,
+  allTabs,
   closePanelTab,
-  emptyEntry,
+  emptyGroup,
   getPanel,
   isPicking,
   movePanelTab,
@@ -57,7 +59,7 @@ function closeTab(panelKey: string, id: string): void {
   if (!hadFocus) return;
   const after = getPanel(panelKey);
   if (!after.open) useUiStore.getState().focusContent();
-  else if (after.tabs.length === 0) useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+  else if (allTabs(after).length === 0) useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
 }
 
 /** Hides the panel (cmd+w with no tabs) and gives focus to the content pane. */
@@ -239,9 +241,10 @@ const screenReaderInstructions: ScreenReaderInstructions = { draggable: "To move
  * over it puts the tab last.
  */
 function TabStrip({ panelKey }: { panelKey: string }) {
-  const tabs = usePanelStore((s) => s.byKey[panelKey]?.tabs ?? emptyEntry.tabs);
-  const activeTabId = usePanelStore((s) => s.byKey[panelKey]?.activeTabId ?? null);
-  const picking = usePanelPicking(panelKey);
+  // The first group only: a split panel's second group renders in a later change.
+  const tabs = usePanelStore((s) => s.byKey[panelKey]?.groups[0]?.tabs ?? emptyGroup.tabs);
+  const activeTabId = usePanelStore((s) => s.byKey[panelKey]?.groups[0]?.activeTabId ?? null);
+  const picking = usePanelPicking(panelKey, 0);
   const stripRef = useRef<HTMLDivElement>(null);
   const newTabRef = useRef<HTMLSpanElement>(null);
   const ids = useMemo(() => tabs.map((t) => t.id), [tabs]);
@@ -367,7 +370,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
 function Body({ panelKey }: { panelKey: string }) {
   const active = usePanelStore((s) => {
     const e = s.byKey[panelKey];
-    return e?.tabs.find((t) => t.id === e.activeTabId) ?? null;
+    return e ? activeTab(e, 0) : null;
   });
   if (!active) return <EmptyState panelKey={panelKey} />;
   const spec = surfaceOf(active.kind);
@@ -390,10 +393,9 @@ function Body({ panelKey }: { panelKey: string }) {
   );
 }
 
-/** The active tab's surface handles a chord (SurfaceSpec.onKey); true if it did. */
+/** The focused group's active tab's surface handles a chord (SurfaceSpec.onKey); true if it did. */
 function surfaceKey(panelKey: string, chord: string): boolean {
-  const e = getPanel(panelKey);
-  const tab = e.tabs.find((t) => t.id === e.activeTabId);
+  const tab = activeTab(getPanel(panelKey));
   return tab ? (surfaceOf(tab.kind)?.onKey?.(chord, tab) ?? false) : false;
 }
 
@@ -425,8 +427,8 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   // when the room does). Expanded, it takes the whole row instead and keeps the width
   // for when the split comes back.
   const width = Math.min(usePanelWidth(panelKey), max);
-  const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
-  const picking = usePanelPicking(panelKey);
+  const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.groups[0]?.tabs.length ?? 0) > 0);
+  const picking = usePanelPicking(panelKey, 0);
 
   // Surfaces keep what their availability reads loaded while this panel shows.
   useEffect(() => {

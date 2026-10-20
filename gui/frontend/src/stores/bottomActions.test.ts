@@ -100,7 +100,7 @@ describe("revealShell (focusTerminal)", () => {
   it("a thread's shell: selects the thread, opens its panel on the shell, focuses it", () => {
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
     useViewsStore.setState({ settingsOpen: true });
-    usePanelStore.setState({ byKey: { "thread:s1": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } });
     expect(revealShell("a")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
     expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "a" });
@@ -208,7 +208,7 @@ describe("focus for this window's own shells (by id)", () => {
   ];
   it.each(uncover)("a shell this window started %s", async (_name, id, uncovered, focused) => {
     useViewsStore.setState({ settingsOpen: true });
-    usePanelStore.setState({ byKey: { "thread:s1": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } });
     commands.runCommandForResult.mockResolvedValue({ message: "", resultJson: JSON.stringify({ id }) });
     await newThreadTerminal(id === "t-other" ? "s2" : "s1", "/src/api");
     if (id !== "a") {

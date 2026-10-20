@@ -76,7 +76,7 @@ function select(id: string): void {
   act(() => {
     useUiStore.setState({ selection: { kind: "thread", id } });
   });
-  usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [`thread:${id}`]: s.byKey[`thread:${id}`] ?? { open: true, tabs: [], activeTabId: null } } }));
+  usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [`thread:${id}`]: s.byKey[`thread:${id}`] ?? { open: true, groups: [{ tabs: [], activeTabId: null }] } } }));
 }
 
 function open(): void {
@@ -97,7 +97,7 @@ beforeEach(() => {
     order: ["web", "auth"],
   });
   setThreads(sketch());
-  usePanelStore.setState({ byKey: { "thread:me": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:me": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "view:projects": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "me" }, palette: { ...useUiStore.getState().palette, open: false } });
 });
@@ -110,7 +110,7 @@ describe("Threads surface", () => {
     expect(entry()?.getAttribute("data-availability")).toBe("enabled");
     expect(entry()?.textContent).toContain("Threads");
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "h" });
-    expect(getPanel("thread:me").activeTabId).toBe("threads");
+    expect(getPanel("thread:me").groups[0]?.activeTabId).toBe("threads");
     cleanup();
     act(() => {
       useUiStore.setState({ selection: { kind: "view", name: "projects" } });
@@ -126,13 +126,13 @@ describe("Threads surface", () => {
     render(<SidePanel />);
     expect(entry()).toBeNull();
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "h" });
-    expect(getPanel("thread:u").activeTabId).toBeNull();
+    expect(getPanel("thread:u").groups[0]?.activeTabId).toBeNull();
     act(() => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, u1: thread("u1", by("u")) }, order: [...s.order, "u1"] }));
     });
     expect(entry()?.getAttribute("data-availability")).toBe("enabled");
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "h" });
-    expect(getPanel("thread:u").activeTabId).toBe("threads");
+    expect(getPanel("thread:u").groups[0]?.activeTabId).toBe("threads");
   });
 
   it.each([
@@ -145,7 +145,7 @@ describe("Threads surface", () => {
     usePanelStore.setState({ byKey: {} });
     expect(threadsPanelCommand()).toBe(opens);
     expect(getPanel(`thread:${id}`).open).toBe(opens);
-    expect(getPanel(`thread:${id}`).activeTabId).toBe(opens ? "threads" : null);
+    expect(getPanel(`thread:${id}`).groups[0]?.activeTabId).toBe(opens ? "threads" : null);
     if (opens) expect(toast).not.toHaveBeenCalled();
     else expect(toast).toHaveBeenCalledWith("No related threads", expect.anything());
   });
@@ -207,7 +207,7 @@ describe("Threads surface", () => {
     act(() => {
       useUiStore.setState({ selection: { kind: "thread", id: "p" } });
     });
-    usePanelStore.setState({ byKey: { "thread:p": { open: true, tabs: [], activeTabId: null } } });
+    usePanelStore.setState({ byKey: { "thread:p": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
     open();
     expect(screen.getByTestId("threads-count").textContent).toBe("4 related");
     expect(screen.getByTestId("threads-subline").textContent).toBe("Created by you · 4 threads created from here, in 2 projects");
@@ -218,7 +218,7 @@ describe("Threads surface", () => {
 
   it("nothing related (a tab opened before, e.g. restored with the panel): Created by you, no threads created from here", () => {
     select("u");
-    usePanelStore.setState({ byKey: { "thread:u": { open: true, tabs: [threadsTab()], activeTabId: "threads" } } });
+    usePanelStore.setState({ byKey: { "thread:u": { open: true, groups: [{ tabs: [threadsTab()], activeTabId: "threads" }] } } });
     render(<SidePanel />);
     expect(screen.queryByTestId("threads-count")).toBeNull();
     expect(screen.queryByTestId("threads-subline")).toBeNull();

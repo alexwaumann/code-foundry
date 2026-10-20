@@ -210,14 +210,14 @@ describe("revertPullRequest", () => {
     invokeCommand.mockResolvedValueOnce({ message: "Revert requested", resultJson: "{}" });
     await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toBeNull();
     expect(toast.success).toHaveBeenCalledWith("Revert requested");
-    expect(usePanelStore.getState().byKey["thread:a"]?.tabs.map((t) => t.title)).toEqual(["#5"]);
+    expect(usePanelStore.getState().byKey["thread:a"]?.groups[0]?.tabs.map((t) => t.title)).toEqual(["#5"]);
   });
 
   it("opens the new pull request as a tab of the same panel", async () => {
     openSurface("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
     invokeCommand.mockResolvedValueOnce({ message: "Opened #9", resultJson: JSON.stringify({ number: 9, url: "https://github.com/acme/repo/pull/9" }) });
     await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toEqual({ slug: SLUG, number: 9 });
-    expect(usePanelStore.getState().byKey["thread:a"]?.tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
+    expect(usePanelStore.getState().byKey["thread:a"]?.groups[0]?.tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
   });
 });
 

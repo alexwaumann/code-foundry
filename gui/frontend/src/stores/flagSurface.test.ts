@@ -82,10 +82,10 @@ describe("openFlagSurface", () => {
   it("waits for the thread's list, then opens the available surface's tab in its panel", async () => {
     useCommandsStore.setState({ commands: [], contextKey: "previous selection", loading: true });
     const opened = openFlagSurface("s-1", "test-watcher");
-    expect(getPanel("thread:s-1").tabs).toHaveLength(0);
+    expect(getPanel("thread:s-1").groups[0]?.tabs).toHaveLength(0);
     listed(thread, [cmd("plugin.test-watcher.show.tests", true)]);
     await expect(opened).resolves.toBe("plugin.test-watcher.tests");
-    expect(getPanel("thread:s-1")).toMatchObject({ open: true, activeTabId: "plugin.test-watcher.tests" });
+    expect(getPanel("thread:s-1")).toMatchObject({ open: true, groups: [{ activeTabId: "plugin.test-watcher.tests" }] });
   });
 
   it("opens nothing when no surface is available for the thread", async () => {
