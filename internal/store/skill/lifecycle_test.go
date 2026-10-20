@@ -143,8 +143,10 @@ func TestInstallSkillRefusals(t *testing.T) {
 			install: "pr-review", wantErr: skill.ErrCollision, wantMsg: "already exists and Code Foundry did not install it",
 		},
 		{
-			name:    "a directory without SKILL.md",
-			prepare: func(t *testing.T, h *harness) { writeSkill(t, h.skillsDir, "pr-review", "-", map[string]string{"x": "y"}) },
+			name: "a directory without SKILL.md",
+			prepare: func(t *testing.T, h *harness) {
+				writeSkill(t, h.skillsDir, "pr-review", "-", map[string]string{"x": "y"})
+			},
 			install: "pr-review", wantErr: skill.ErrCollision, wantMsg: "/pr-review already exists",
 		},
 		{
@@ -579,8 +581,10 @@ func TestPluginFailures(t *testing.T) {
 			wantErr: skill.ErrNotFound, wantMsg: `install plugin lint-kit@ai-marketplace: Plugin "lint-kit" not found in marketplace "ai-marketplace"`,
 		},
 		{
-			name:    "claude fails without a result line",
-			prepare: func(h *harness) { h.claude.Fail("plugin install", &skill.ClaudeError{Args: []string{"plugin", "install"}, Msg: "boom"}) },
+			name: "claude fails without a result line",
+			prepare: func(h *harness) {
+				h.claude.Fail("plugin install", &skill.ClaudeError{Args: []string{"plugin", "install"}, Msg: "boom"})
+			},
 			run:     func(h *harness) error { _, err := h.store.Install(ctx, "enterprise-data", ""); return err },
 			wantMsg: "claude plugin install: boom",
 		},
