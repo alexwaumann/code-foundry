@@ -25,8 +25,9 @@
  * - has a character a path in prose does not ("*?[]{}()<>|&;=,$`'\"\\#", whitespace other
  *   than a spaced path's single spaces; a spaced path may have balanced parentheses):
  *   globs, shell, code;
- * - has no letter (`1/2`, `10/17/2026`), is only `/`, `~`, `~/`, `.`, `..`, or has a `...`
- *   segment (Go's `./...`).
+ * - has no letter (`1/2`, `10/17/2026`), is only `/`, `~`, `~/`, `.`, `..`, has a `...`
+ *   segment (Go's `./...`), or a `..` inside a segment (a git range: `main..cf/x`,
+ *   `origin/main...cf/x`).
  *
  * Then it must look like a path:
  *
@@ -157,8 +158,8 @@ export function matchPath(token: string, where: PathContext): PathMatch | null {
   if (path === "~" || path === "." || path === ".." || /^\/+$/.test(path)) return null;
   const dir = path.endsWith("/");
   const segments = path.split("/").filter((s) => s !== "");
-  // Go's `./...` and the like: patterns, not files.
-  if (segments.length === 0 || segments.some((s) => /^\.{3,}$/.test(s))) return null;
+  // Go's `./...` and the like: patterns, not files; `main..cf/x`: a git range.
+  if (segments.length === 0 || segments.some((s) => /^\.{3,}$/.test(s) || (s !== ".." && s.includes("..")))) return null;
   const name = segments[segments.length - 1] ?? "";
   const known = !dir && hasKnownExtension(name);
   const match = (): PathMatch => ({ text: token, path, ...(line !== undefined && { line }), ...(col !== undefined && { col }) });
@@ -318,6 +319,35 @@ export interface PathPlace {
   project: string;
   /** Absolute directory. */
   base: string;
+}
+
+/**
+ * Where a chip's path resolves, by path: a fixed place (a thread's checkout, a File tab's),
+ * or a function that may refuse a path (null: the token stays plain code). Ember's chat
+ * uses the latter (projectPlace): its own directory is no checkout, and the paths it
+ * writes belong to whichever project it talks about.
+ */
+export type PathPlaceSource = PathPlace | ((path: string) => PathPlace | null);
+
+/** A project's checkout (a worktree's path) a path may sit under. */
+export interface ProjectRoot {
+  project: string;
+  path: string;
+}
+
+/**
+ * The place for an absolute path under one of the roots (the deepest that holds it), with
+ * that root as its base; null for a relative or `~/` path, or one under no root.
+ */
+export function projectPlace(roots: readonly ProjectRoot[], path: string): PathPlace | null {
+  if (!path.startsWith("/")) return null;
+  let best: ProjectRoot | null = null;
+  for (const r of roots) {
+    const root = r.path.replace(/\/+$/, "");
+    if (root === "" || (path !== root && !path.startsWith(root + "/"))) continue;
+    if (!best || root.length > best.path.length) best = { project: r.project, path: root };
+  }
+  return best && { project: best.project, base: best.path };
 }
 
 /** The File tab a chip opens: absolute and `~/` paths as typed, relative ones against the place's base. */

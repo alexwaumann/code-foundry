@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chipTarget, matchPath, rehypePathChips, splitProse, type PathContext } from "./pathChips";
+import { chipTarget, projectPlace, matchPath, rehypePathChips, splitProse, type PathContext } from "./pathChips";
 
 describe("matchPath: chips", () => {
   it.each<[string, PathContext, string, number?, number?]>([
@@ -70,6 +70,9 @@ describe("matchPath: not chips", () => {
     ["e.g", "prose"],
     ["src/a.ts:0", "code"],
     ["README.md#usage", "code"],
+    ["main..cf/x", "code"],
+    ["origin/main...cf/combine-tally-flag-branches", "code"],
+    ["HEAD~3..HEAD/x.ts", "prose"],
   ])("%s (%s)", (token, where) => {
     expect(matchPath(token, where)).toBeNull();
   });
@@ -164,6 +167,25 @@ describe("splitProse", () => {
       " and ",
       { text: "docs/ARCHITECTURE.md", path: "docs/ARCHITECTURE.md" },
     ]);
+  });
+});
+
+describe("projectPlace", () => {
+  const roots = [
+    { project: "p1", path: "/Users/a/code/app" },
+    { project: "p1", path: "/Users/a/.code-foundry/worktrees/app/cf-x/" },
+    { project: "p2", path: "/Users/a/code/app-docs" },
+  ];
+  it.each<[string, { project: string; base: string } | null]>([
+    ["/Users/a/code/app/README.md", { project: "p1", base: "/Users/a/code/app" }],
+    ["/Users/a/code/app", { project: "p1", base: "/Users/a/code/app" }],
+    ["/Users/a/.code-foundry/worktrees/app/cf-x/src/a.ts", { project: "p1", base: "/Users/a/.code-foundry/worktrees/app/cf-x" }],
+    ["/Users/a/code/app-docs/x.md", { project: "p2", base: "/Users/a/code/app-docs" }],
+    ["/Users/a/code/other/x.md", null],
+    ["README.md", null],
+    ["~/code/app/README.md", null],
+  ])("%s", (path, want) => {
+    expect(projectPlace(roots, path)).toEqual(want);
   });
 });
 

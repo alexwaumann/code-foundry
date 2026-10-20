@@ -11,10 +11,15 @@ import {
   headerSummary,
   linkMeta,
   modelList,
+  runMs,
   shortDuration,
   splitTaskLinks,
   toggleModel,
+  turnEndAfter,
+  waitingThreads,
   workerRows,
+  workerWords,
+  workingThreads,
   workMs,
   workSummary,
   type EmberRow,
@@ -38,6 +43,10 @@ function thread(over: Partial<EmberTaskThreadView> = {}): EmberTaskThreadView {
     lastActivityAtMs: NOW - 2 * MIN,
     archived: false,
     removed: false,
+    descendantsWorking: 0,
+    descendantsWaiting: 0,
+    descendantsTotal: 0,
+    descendants: [],
     ...over,
   };
 }
@@ -58,6 +67,11 @@ describe("flameState", () => {
     ["a prompt while busy", { state: "connected", status: "attention" }, 0, "attention"],
   ] as const)("%s", (_n, t, doing, want) => {
     expect(flameState(t, doing)).toBe(want);
+  });
+
+  it("burns for the user while a worker waits on an answer, even while Ember thinks", () => {
+    expect(flameState({ state: "connected", status: "busy" }, 1, 1)).toBe("attention");
+    expect(flameState({ state: "disconnected", status: "idle" }, 1, 2)).toBe("attention");
   });
 });
 
@@ -81,7 +95,7 @@ describe("splitTaskLinks", () => {
   });
 });
 
-/** Timeline items from short specs: "u:id", "w:id" (a wake), "t:id" (text), "b:id" (Bash), "r:id" (Read), "e:id" (turn end), "p:id:tool" (pending permission on a tool). */
+/** Timeline items from short specs: "u:id", "w:id" (a wake), "t:id" (text), "b:id" (Bash), "r:id" (Read), "e:id" (turn end), "h:id" (thinking), "p:id:tool" (pending permission on a tool). */
 function items(...specs: string[]): { list: TimelineItem[]; wakes: Set<string> } {
   const wakes = new Set<string>();
   const list = specs.flatMap((s): TimelineItem[] => {
@@ -101,6 +115,8 @@ function items(...specs: string[]): { list: TimelineItem[]; wakes: Set<string> }
         return [{ ...base, kind: "tool", name: "Read", toolUseId: id, toolStatus: "done" }];
       case "e":
         return [{ ...base, kind: "turnEnd" }];
+      case "h":
+        return [{ ...base, kind: "thinking" }];
       case "p":
         return [{ ...base, kind: "permission", name: "Bash", toolUseId: ref, requestState: "pending" }];
       default:
@@ -142,6 +158,14 @@ describe("buildEmberRows", () => {
     expect(rows[1]?.key).toBe("w:live:u1");
   });
 
+  it("draws no row for a wake Ember only thought about; thinking alone still is a run", () => {
+    const { list, wakes } = items("u:u1", "h:h1", "t:t1", "e:e1", "w:w1", "h:h2", "t:t2", "e:e2", "w:w2", "b:b1", "t:t3");
+    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(h1)", "etext:t1", "etext:t2", "work(e2,w2,b1)", "etext:t3"]);
+    // While it is live, the row stands: Ember may still run a tool.
+    const live = items("u:u1", "t:t1", "e:e1", "w:w1", "h:h1");
+    expect(shape(buildEmberRows(live.list, opts(live.wakes, { working: true })))).toEqual(["user:u1", "etext:t1", "work(e1,w1,h1) live"]);
+  });
+
   it("keys a run by its first item, so it holds as the run grows", () => {
     const a = items("u:u1", "b:b1");
     const b = items("u:u1", "b:b1", "b:b2");
@@ -180,6 +204,19 @@ describe("workSummary and workMs", () => {
     expect(workMs(run, null)).toBe(15_000);
     // Live: the last segment runs to now.
     expect(workMs([bash("1", "x", 0, 2)], at(30))).toBe(30_000);
+  });
+
+  it("takes a run without tools from its turn's duration", () => {
+    const think = { id: "h", kind: "thinking", text: "", ordinal: 0, parentToolUseId: "", createdAtMs: at(0), updatedAtMs: at(0), streaming: false } as ThreadItemView;
+    const text = { id: "t", kind: "text", text: "Done.", ordinal: 0, parentToolUseId: "", createdAtMs: at(1), updatedAtMs: at(1), streaming: false } as ThreadItemView;
+    const e = { ...end("e", 1), durationMs: 42_000 } as ThreadItemView;
+    const log = { byId: { h: think, t: text, e }, order: ["h", "t", "e"] };
+    expect(turnEndAfter(log, "h")).toBe(42_000);
+    expect(turnEndAfter(log, "missing")).toBeNull();
+    expect(runMs([think], 42_000)).toBe(42_000);
+    // With a tool, its spans; with no turn end yet, the span it has.
+    expect(runMs([bash("1", "x", 0, 3)], 42_000)).toBe(3000);
+    expect(runMs([think], null)).toBe(0);
   });
 
   it.each([
@@ -237,6 +274,98 @@ describe("the board", () => {
     expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, 1)).toEqual({ text: "Working", tone: "sky" });
     expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, 0)).toEqual({ text: "Idle", tone: "muted" });
     expect(emberStatusWords({ state: "connected", status: "attention", statusReason: "permission: Bash", statusChangedAtMs: null }, 0)).toEqual({ text: "Needs input", tone: "amber" });
+  });
+});
+
+describe("a lead's team", () => {
+  const member = (id: string, over: Partial<EmberTaskThreadView["descendants"][number]> = {}) => ({
+    id,
+    name: `Worker ${id}`,
+    state: "connected" as const,
+    status: "busy" as const,
+    statusReason: "working",
+    reportStatus: null,
+    reportSummary: "",
+    lastActivityAtMs: NOW - MIN,
+    depth: 1,
+    ...over,
+  });
+  const leadThread = thread({
+    id: "s-lead",
+    name: "Lead",
+    status: "idle",
+    statusReason: "waiting on 3 child threads",
+    state: "connected",
+    descendantsWorking: 2,
+    descendantsWaiting: 1,
+    descendantsTotal: 13,
+    descendants: [
+      member("s-1"),
+      member("s-2", { status: "attention", statusReason: "question: which port?" }),
+      member("s-3", { depth: 2, reportSummary: "half done" }),
+      member("s-sub"),
+    ],
+  });
+  const lead = task("t-l", { title: "Lead the API work", state: "doing", threadId: "s-lead", thread: leadThread });
+  const sub = task("t-sub", { title: "Subtask", state: "doing", parentId: "t-l", threadId: "s-sub", thread: thread({ id: "s-sub" }) });
+
+  it("counts a lead waiting on its team as working", () => {
+    expect(workerWords(leadThread)).toEqual({ text: "Working", tone: "sky" });
+  });
+
+  it("draws the team under the lead, indented, a subtask's own worker once, the rest as +N more", () => {
+    const [card] = boardSections([lead, sub], NOW).inProgress;
+    expect((card ? workerRows(card) : []).map((r) => [r.key, r.title, r.dot, r.meta.text, r.depth, r.threadId])).toEqual([
+      ["w:t-l", "Lead", "doing", "Working", 0, "s-lead"],
+      ["d:t-l:s-1", "Worker s-1", "doing", "Working", 1, "s-1"],
+      ["d:t-l:s-2", "Worker s-2", "blocked", "Needs input", 1, "s-2"],
+      ["d:t-l:s-3", "Worker s-3", "doing", "half done", 2, "s-3"],
+      ["d:t-l:more", "+9 more threads", "open", "", 1, ""],
+      ["s:t-sub", "Subtask", "doing", "Working", 0, "s-sub"],
+    ]);
+  });
+
+  it("says Needs input on a lead's card while one of its team asks", () => {
+    const [card] = boardSections([lead], NOW).inProgress;
+    expect(card && cardMeta(card)).toEqual({ text: "Needs input", tone: "amber" });
+    const calm = task("t-l", { state: "doing", threadId: "s-lead", thread: { ...leadThread, descendantsWaiting: 0 } });
+    const [c2] = boardSections([calm], NOW).inProgress;
+    expect(c2 && cardMeta(c2)).toEqual({ text: "Working", tone: "sky" });
+  });
+
+  it("leaves a done task's team out", () => {
+    const done = task("t-l", { state: "done", threadId: "s-lead", thread: leadThread });
+    const [card] = boardSections([done], NOW).doneToday;
+    expect((card ? workerRows(card) : []).map((r) => r.key)).toEqual(["w:t-l"]);
+  });
+
+  it("counts the team in the threads working, once each, and the unlisted ones by the daemon's count", () => {
+    // The lead, s-1, s-3, s-sub listed (s-sub also a subtask's worker), and 2 - 3 listed = none unlisted.
+    expect(workingThreads([lead, sub])).toBe(4);
+    expect(headerSummary([lead, sub])).toBe("4 threads working");
+    const big = task("t-big", { state: "doing", threadId: "s-big", thread: thread({ id: "s-big", descendantsWorking: 12, descendantsTotal: 12, descendants: [member("s-a"), member("s-b")] }) });
+    expect(workingThreads([big])).toBe(13);
+  });
+
+  it("finds the workers waiting on the user, doing and blocked tasks only", () => {
+    expect(waitingThreads([lead, sub])).toBe(1);
+    const asks = thread({ id: "s-q", status: "attention", statusReason: "permission: Bash npm test" });
+    expect(waitingThreads([task("t-q", { state: "doing", threadId: "s-q", thread: asks })])).toBe(1);
+    expect(waitingThreads([task("t-q", { state: "blocked", threadId: "s-q", thread: asks })])).toBe(1);
+    expect(waitingThreads([task("t-q", { state: "done", threadId: "s-q", thread: asks })])).toBe(0);
+    // A finished worker is attention too, but asks nothing.
+    expect(waitingThreads([task("t-f", { state: "doing", threadId: "s-f", thread: thread({ id: "s-f", status: "attention", statusReason: "finished" }) })])).toBe(0);
+    // Unlisted waiters count from the daemon's number.
+    expect(waitingThreads([task("t-u", { state: "doing", threadId: "s-u", thread: thread({ id: "s-u", descendantsWaiting: 2, descendantsTotal: 14 }) })])).toBe(2);
+  });
+
+  it("says Needs input on the pinned row while a worker waits, under Ember's own prompt or error", () => {
+    const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
+    expect(emberStatusWords(idle, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "error", statusReason: "crashed" }, 1, 1).tone).toBe("red");
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, 1, 0)).toEqual({ text: "Finished", tone: "emerald" });
   });
 });
 

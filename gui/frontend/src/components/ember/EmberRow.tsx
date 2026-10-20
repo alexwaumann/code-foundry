@@ -5,7 +5,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { emberStatusWords } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
-import { holdEmberBoard, useDoingCount, useFirstDoingTitle, useFlameState, useShownEmberThreadId, useWorkingThreads } from "@/stores/ember";
+import { holdEmberBoard, useDoingCount, useFirstDoingTitle, useFlameState, useShownEmberThreadId, useWaitingThreads, useWorkingThreads } from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber, openEmberBoard, openEmberSettings } from "@/stores/emberPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -26,7 +26,7 @@ function useEmberSelected(threadId: string): boolean {
   return useUiStore((s) => (s.selection.kind === "thread" && s.selection.id === threadId) || (s.selection.kind === "view" && s.selection.name === EMBER_VIEW));
 }
 
-/** "<Status> · <first doing task> · N threads", the status in the thread rows' colours. */
+/** "<Status> · <first doing task> · N threads", the status in the thread rows' colours (Needs input while a worker waits on the user). */
 function EmberLine({ threadId }: { threadId: string }) {
   const doing = useDoingCount();
   const t = useThreadsStore(
@@ -35,7 +35,8 @@ function EmberLine({ threadId }: { threadId: string }) {
       return x ? { state: x.state, status: x.status, statusReason: x.statusReason, statusChangedAtMs: x.statusChangedAtMs } : undefined;
     }),
   );
-  const words = emberStatusWords(t, doing);
+  const waiting = useWaitingThreads();
+  const words = emberStatusWords(t, doing, waiting);
   const title = useFirstDoingTitle();
   const working = useWorkingThreads();
   return (

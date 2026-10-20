@@ -3,7 +3,7 @@
  * models. The board is read-only here: Ember changes it through the `ember.*` commands.
  */
 import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskThread } from "@/gen/codefoundry/v1/ember_pb";
+import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread } from "@/gen/codefoundry/v1/ember_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { reportStatusMap, stateMap, statusMap, type ThreadReportStatusView, type ThreadStateView, type ThreadStatusView } from "./threads";
 
@@ -25,6 +25,26 @@ export interface EmberTaskThreadView {
   archived: boolean;
   /** The thread was removed: only the task remembers it. */
   removed: boolean;
+  /** Its team (the threads below it, not archived; open tasks only): how many work, wait on the user, and are. */
+  descendantsWorking: number;
+  descendantsWaiting: number;
+  descendantsTotal: number;
+  /** The first ten of them, in tree order. */
+  descendants: readonly EmberTaskDescendantView[];
+}
+
+/** A thread below a task's worker thread (a lead's worker). */
+export interface EmberTaskDescendantView {
+  id: string;
+  name: string;
+  state: ThreadStateView;
+  status: ThreadStatusView;
+  statusReason: string;
+  reportStatus: ThreadReportStatusView | null;
+  reportSummary: string;
+  lastActivityAtMs: number | null;
+  /** 1: a thread the task's thread created. */
+  depth: number;
 }
 
 export interface EmberTaskView {
@@ -97,6 +117,24 @@ function toTaskThreadView(t: EmberTaskThread): EmberTaskThreadView {
     lastActivityAtMs: ms(t.lastActivityAt),
     archived: t.archived,
     removed: t.removed,
+    descendantsWorking: t.descendantsWorking,
+    descendantsWaiting: t.descendantsWaiting,
+    descendantsTotal: t.descendantsTotal,
+    descendants: t.descendants.map(toDescendantView),
+  };
+}
+
+function toDescendantView(d: EmberTaskDescendant): EmberTaskDescendantView {
+  return {
+    id: d.id,
+    name: d.name,
+    state: stateMap[d.state],
+    status: statusMap[d.status],
+    statusReason: d.statusReason,
+    reportStatus: reportStatusMap[d.reportStatus] ?? null,
+    reportSummary: d.reportSummary,
+    lastActivityAtMs: ms(d.lastActivityAt),
+    depth: d.depth,
   };
 }
 

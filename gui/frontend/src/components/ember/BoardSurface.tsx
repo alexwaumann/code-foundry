@@ -38,24 +38,34 @@ function openThread(id: string): void {
   useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
-/** A worker under a card: its dot, the subtask's title or the worker's name, its report or status, and its age. */
+/** A lead's team member's indent by its depth below the lead (lib/ember teamRows). */
+const INDENT = ["", "pl-4", "pl-7", "pl-10"] as const;
+
+/** A worker under a card: its dot, the subtask's title or the worker's name, its report or status, and its age; a lead's team indented beneath it. */
 function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
   const body = (
     <>
       <Dot dot={row.dot} />
-      <span className="min-w-0 flex-1 truncate text-foreground/90">{row.title}</span>
-      <Tip label={row.meta.text} whenTruncated>
-        <span className={cn("max-w-[55%] min-w-0 shrink truncate", TONE[row.meta.tone])} data-testid="ember-worker-meta">
-          {row.meta.text}
-        </span>
-      </Tip>
+      <span className={cn("min-w-0 flex-1 truncate", row.threadId === "" && row.depth > 0 ? "text-muted-foreground" : "text-foreground/90")}>{row.title}</span>
+      {row.meta.text && (
+        <Tip label={row.meta.text} whenTruncated>
+          <span className={cn("max-w-[55%] min-w-0 shrink truncate", TONE[row.meta.tone])} data-testid="ember-worker-meta">
+            {row.meta.text}
+          </span>
+        </Tip>
+      )}
       {row.atMs !== null && <span className="shrink-0 text-muted-foreground tabular-nums">{shortAge(row.atMs, now)}</span>}
     </>
   );
-  const cls = cn("flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1 text-left text-caption", row.subtask && row.threadId === "" && "cursor-default");
+  const cls = cn(
+    "flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1 text-left text-caption",
+    INDENT[Math.min(row.depth, INDENT.length - 1)],
+    row.threadId === "" && "cursor-default",
+  );
+  const team = row.depth > 0 || undefined;
   if (row.threadId === "")
     return (
-      <div className={cls} data-testid="ember-worker" data-subtask={row.subtask || undefined}>
+      <div className={cls} data-testid="ember-worker" data-subtask={row.subtask || undefined} data-team={team}>
         {body}
       </div>
     );
@@ -66,11 +76,36 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
       data-testid="ember-worker"
       data-thread={row.threadId}
       data-subtask={row.subtask || undefined}
+      data-team={team}
       onClick={() => {
         openThread(row.threadId);
       }}
     >
       {body}
+    </button>
+  );
+}
+
+/**
+ * A blocked task's outcome in amber, three lines at most (a worker's error can run to
+ * dozens); a click opens it in full and closes it again.
+ */
+function BlockedOutcome({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      className={cn(
+        "mt-1 w-full cursor-pointer rounded-sm text-left text-caption break-words whitespace-pre-line text-warning outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        !open && "line-clamp-3",
+      )}
+      aria-expanded={open}
+      data-testid="ember-task-outcome"
+      onClick={() => {
+        setOpen(!open);
+      }}
+    >
+      {text}
     </button>
   );
 }
@@ -103,11 +138,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
           <div className="h-full bg-info" style={{ width: `${String(Math.round((progress.done / progress.total) * 100))}%` }} />
         </div>
       )}
-      {t.state === "blocked" && t.outcome && (
-        <p className="mt-1 text-caption break-words text-warning" data-testid="ember-task-outcome">
-          {t.outcome}
-        </p>
-      )}
+      {t.state === "blocked" && t.outcome && <BlockedOutcome text={t.outcome} />}
       {(t.state === "done" || t.state === "cancelled") && t.outcome && (
         <Tip label={t.outcome} whenTruncated>
           <p className="mt-0.5 truncate text-caption text-muted-foreground" data-testid="ember-task-outcome">

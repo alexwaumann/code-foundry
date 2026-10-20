@@ -10,7 +10,14 @@
 import { randomBytes } from "node:crypto";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import { EmberTaskState, type EmberBoardSchema, type EmberStatusSchema, type EmberTaskSchema, type EmberTaskThreadSchema } from "../src/gen/codefoundry/v1/ember_pb";
+import {
+  EmberTaskState,
+  type EmberBoardSchema,
+  type EmberStatusSchema,
+  type EmberTaskDescendantSchema,
+  type EmberTaskSchema,
+  type EmberTaskThreadSchema,
+} from "../src/gen/codefoundry/v1/ember_pb";
 import { ThreadReportStatus, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
@@ -19,6 +26,7 @@ export type EmberBoardInit = MessageInitShape<typeof EmberBoardSchema>;
 type EmberStatusInit = MessageInitShape<typeof EmberStatusSchema>;
 type EmberTaskInit = MessageInitShape<typeof EmberTaskSchema>;
 type EmberTaskThreadInit = MessageInitShape<typeof EmberTaskThreadSchema>;
+type EmberTaskDescendantInit = MessageInitShape<typeof EmberTaskDescendantSchema>;
 
 export const EMBER_THREAD = "s-resident-ember";
 
@@ -45,6 +53,8 @@ export interface EmberThreadView {
 /** A seeded worker thread: what World.addEmberWorkers creates, and the board's fallback while it does not exist. */
 export interface EmberWorkerFixture extends EmberThreadView {
   id: string;
+  /** Its creator: Ember's thread when "", else a lead (a team member). */
+  createdBy?: string;
   model: string;
   brief: string;
   report: { status: ThreadReportStatus; summary: string; at: Date } | null;
@@ -92,6 +102,27 @@ export function emberWorkers(): EmberWorkerFixture[] {
       state: ThreadState.DISCONNECTED, status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", createdAt: new Date(today.getTime() - 50 * 60_000), lastActivityAt: today, archived: false,
       report: { status: ThreadReportStatus.DONE, summary: "Raised the spawn timeout to 5s under -race; PR #251 merged", at: today },
     },
+    // A lead and its team (docs/notes/ember-fixes-1-gui.md): the lead waits on three workers it created.
+    {
+      id: "s-ember-lead", name: "Lead: notes API input validation", model: "claude-opus-4-8[1m]", brief: "Validate the notes API's input; split the work across a few threads",
+      state: ThreadState.CONNECTED, status: ThreadStatus.IDLE, statusReason: "waiting on 2 child threads", createdAt: ago(20), lastActivityAt: ago(3), archived: false,
+      report: { status: ThreadReportStatus.PROGRESS, summary: "Schema done; handlers in two threads", at: ago(3) },
+    },
+    {
+      id: "s-ember-team-schema", createdBy: "s-ember-lead", name: "Notes API: request schema", model: "claude-opus-4-7[1m]", brief: "Define the request schema for POST and PUT /notes",
+      state: ThreadState.DISCONNECTED, status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", createdAt: ago(18), lastActivityAt: ago(6), archived: false,
+      report: { status: ThreadReportStatus.DONE, summary: "Schema in internal/api/notes_schema.go", at: ago(6) },
+    },
+    {
+      id: "s-ember-team-post", createdBy: "s-ember-lead", name: "Notes API: validate POST /notes", model: "claude-opus-4-8[1m]", brief: "Validate POST /notes against the schema",
+      state: ThreadState.CONNECTED, status: ThreadStatus.BUSY, statusReason: "working", createdAt: ago(17), lastActivityAt: ago(1), archived: false,
+      report: null,
+    },
+    {
+      id: "s-ember-team-put", createdBy: "s-ember-lead", name: "Notes API: validate PUT /notes/:id", model: "claude-opus-4-7[1m]", brief: "Validate PUT /notes/:id against the schema",
+      state: ThreadState.CONNECTED, status: ThreadStatus.BUSY, statusReason: "working", createdAt: ago(16), lastActivityAt: ago(2), archived: false,
+      report: { status: ThreadReportStatus.PROGRESS, summary: "Rejecting unknown fields", at: ago(2) },
+    },
   ];
 }
 
@@ -106,6 +137,7 @@ function seedTasks(): MockTask[] {
     t({ id: "t-9c0d1e2f", title: "Bump wails to v3.1", state: EmberTaskState.BLOCKED, threadId: "s-ember-wails", outcome: "wails v3.1 needs Go 1.27; the toolchain here is 1.26", position: 3, updatedAt: ago(40) }, 90),
     t({ id: "t-3a4b5c6d", title: "Fix the flaky TestSendSpawnFailure", state: EmberTaskState.DONE, threadId: "s-ember-flaky", outcome: "Raised the spawn timeout to 5s under -race; PR #251 merged", position: 4, updatedAt: today, doneAt: today }, 200),
     t({ id: "t-7e8f9a0b", title: "Rename the agents panel to Runs", state: EmberTaskState.CANCELLED, outcome: "Alex kept the name", position: 5, updatedAt: ago(120) }, 240),
+    t({ id: "t-4c5d6e7f", title: "Validate notes API input", state: EmberTaskState.DOING, threadId: "s-ember-lead", position: 6, updatedAt: ago(20) }, 20),
   ];
 }
 
@@ -118,6 +150,23 @@ export interface EmberDeps {
   residentId: () => string;
   /** A worker thread as the world has it; undefined when it has none. */
   thread: (id: string) => EmberThreadView | undefined;
+  /** The threads a thread created, oldest first (thread.new's created-by). */
+  children: (id: string) => string[];
+  /** The thread that created a thread; "" for none. */
+  createdBy: (id: string) => string;
+}
+
+/** How many of a team the board lists (the daemon's MaxTeamList). */
+const TEAM_LIST = 10;
+
+/** A team member is working: on a turn, starting, or waiting on its own child threads (internal/store/ember/team.go). */
+function teamWorking(t: EmberThreadView): boolean {
+  return t.status === ThreadStatus.BUSY || t.state === ThreadState.STARTING || (t.status === ThreadStatus.IDLE && /^waiting( on |$)/.test(t.statusReason));
+}
+
+/** A team member waits on the user: a pending permission request or question while its process runs. */
+function teamAsks(t: EmberThreadView): boolean {
+  return t.status === ThreadStatus.NEEDS_ATTENTION && t.state !== ThreadState.DISCONNECTED && t.state !== ThreadState.CLOSING && /^(permission|question):/.test(t.statusReason);
 }
 
 export class MockEmber {
@@ -156,9 +205,14 @@ export class MockEmber {
     this.hub.endAll();
   }
 
-  /** Whether a thread is a task's worker (its changes change the board). */
+  /** Whether a thread is a task's worker or below one (its changes change the board). */
   watches(threadId: string): boolean {
-    return this.tasks.some((t) => t.threadId === threadId);
+    let id = threadId;
+    for (let i = 0; id !== "" && i < 9; i++) {
+      if (this.tasks.some((t) => t.threadId === id)) return true;
+      id = this.deps.createdBy(id);
+    }
+    return false;
   }
 
   /** WatchBoard: the board now, then again on every change. */
@@ -212,11 +266,12 @@ export class MockEmber {
       createdAt: timestampFromDate(t.createdAt),
       updatedAt: timestampFromDate(t.updatedAt),
       ...(t.doneAt ? { doneAt: timestampFromDate(t.doneAt) } : {}),
-      ...(t.threadId ? { thread: this.threadMsg(t.threadId) } : {}),
+      ...(t.threadId ? { thread: this.threadMsg(t.threadId, [EmberTaskState.TODO, EmberTaskState.DOING, EmberTaskState.BLOCKED].includes(t.state)) } : {}),
     };
   }
 
-  private threadMsg(id: string): EmberTaskThreadInit {
+  /** A task's worker thread; with its team (the threads below it, not archived) for an open task, as the daemon derives it. */
+  private threadMsg(id: string, team = false): EmberTaskThreadInit {
     const fixture = this.workers.get(id);
     const live = this.deps.thread(id) ?? fixture;
     if (!live) return { id, name: "", removed: true };
@@ -231,7 +286,37 @@ export class MockEmber {
       createdAt: timestampFromDate(live.createdAt),
       lastActivityAt: timestampFromDate(live.lastActivityAt),
       archived: live.archived,
+      ...(team ? this.team(id) : {}),
     };
+  }
+
+  /** The team below thread root: depth first, siblings oldest first, archived ones left out. */
+  private team(root: string): Pick<EmberTaskThreadInit, "descendantsWorking" | "descendantsWaiting" | "descendantsTotal" | "descendants"> {
+    const out = { descendantsWorking: 0, descendantsWaiting: 0, descendantsTotal: 0, descendants: [] as EmberTaskDescendantInit[] };
+    const seen = new Set([root]);
+    const walk = (id: string, depth: number) => {
+      if (depth > 8) return;
+      for (const kid of this.deps.children(id)) {
+        if (seen.has(kid)) continue;
+        seen.add(kid);
+        const t = this.deps.thread(kid);
+        if (t && !t.archived) {
+          out.descendantsTotal++;
+          if (teamAsks(t)) out.descendantsWaiting++;
+          else if (teamWorking(t)) out.descendantsWorking++;
+          if (out.descendants.length < TEAM_LIST) {
+            const report = this.workers.get(kid)?.report;
+            out.descendants.push({
+              id: kid, name: t.name, state: t.state, status: t.status, statusReason: t.statusReason, lastActivityAt: timestampFromDate(t.lastActivityAt), depth,
+              ...(report ? { reportStatus: report.status, reportSummary: report.summary } : {}),
+            });
+          }
+        }
+        walk(kid, depth + 1);
+      }
+    };
+    walk(root, 1);
+    return out;
   }
 
   private task(id: string): MockTask {

@@ -106,6 +106,32 @@ message EmberTaskThread {
   // Archived (it keeps its task); removed: the thread is gone (the task stays).
   bool archived = 11;
   bool removed = 12;
+  // The threads below it (those it created, those they created, and so on; not archived),
+  // so a lead's team shows: how many are working (on a turn, starting, or themselves
+  // waiting on child threads), how many wait on the user (a pending permission request or
+  // question), and how many there are.
+  int32 descendants_working = 13;
+  int32 descendants_waiting = 14;
+  int32 descendants_total = 15;
+  // The first of them in tree order (each thread before the threads it created, siblings
+  // oldest first), at most 10.
+  repeated EmberTaskDescendant descendants = 16;
+}
+
+// EmberTaskDescendant is a thread below a task's worker thread, as the board shows it.
+message EmberTaskDescendant {
+  string id = 1;
+  string name = 2;
+  ThreadStatus status = 3;
+  string status_reason = 4;
+  // Its latest report; UNSPECIFIED when it has none.
+  ThreadReportStatus report_status = 5;
+  string report_summary = 6;
+  // ThreadState, for "starting" and "disconnected".
+  ThreadState state = 7;
+  google.protobuf.Timestamp last_activity_at = 8;
+  // How far below the task's thread it is (1: a thread it created).
+  int32 depth = 9;
 }
 
 // EmberBoard is the status and every task, in board order.

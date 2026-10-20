@@ -8,7 +8,7 @@ import { KeepRowContext, useThreadCtx } from "@/components/thread/context";
 import { TimelineRowView } from "@/components/thread/rows";
 import { TimelineList } from "@/components/thread/Timeline";
 import { useNow } from "@/lib/clock";
-import { buildEmberRows, shortDuration, splitTaskLinks, WORK_ROW_HEIGHT, workMs, workSummary, type EmberRow, type WorkRow } from "@/lib/ember";
+import { buildEmberRows, runMs, shortDuration, turnEndAfter, splitTaskLinks, WORK_ROW_HEIGHT, workMs, workSummary, type EmberRow, type WorkRow } from "@/lib/ember";
 import { decodeTimelineKey } from "@/lib/threadTimeline";
 import { useLinkMeta } from "@/stores/ember";
 import { openEmberBoard } from "@/stores/emberPanel";
@@ -78,13 +78,24 @@ export function EmberTimeline({ threadId, working, bottomInset }: { threadId: st
   return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderRow} estimateRow={estimate} />;
 }
 
+type ItemLog = { byId: Readonly<Record<string, ThreadItemView>>; order: readonly string[] } | undefined;
+
 /** The run's items, as the thread's Watch has them. */
-function runItems(log: { byId: Readonly<Record<string, ThreadItemView>> } | undefined, ids: readonly string[]): ThreadItemView[] {
+function runItems(log: ItemLog, ids: readonly string[]): ThreadItemView[] {
   if (!log) return [];
   return ids.flatMap((id) => {
     const it = log.byId[id];
     return it ? [it] : [];
   });
+}
+
+/** A finished run's time (lib/ember runMs): its tools' spans, else its turn's duration. */
+function finishedMs(log: ItemLog, ids: readonly string[]): number {
+  const run = runItems(log, ids);
+  const first = ids[0];
+  // Only a run without tools looks for its turn's end (a walk of the log).
+  const turn = log && first !== undefined && !run.some((it) => it.kind === "tool") ? turnEndAfter(log, first) : null;
+  return runMs(run, turn);
 }
 
 /** The live row's clock: ticks while live, frozen otherwise. */
@@ -110,7 +121,7 @@ const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
   const { threadId } = useThreadCtx();
   const keep = useContext(KeepRowContext);
   const summary = useThreadStore((s) => workSummary(runItems(s.logs[threadId], row.ids)));
-  const ms = useThreadStore((s) => (row.live ? 0 : workMs(runItems(s.logs[threadId], row.ids), null)));
+  const ms = useThreadStore((s) => (row.live ? 0 : finishedMs(s.logs[threadId], row.ids)));
   const took = shortDuration(ms);
   const lead = row.live ? null : took ? `Worked for ${took}` : "Worked";
   const body = (

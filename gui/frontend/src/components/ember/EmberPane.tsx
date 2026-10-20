@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Eye, Loader2 } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { AgentsStrip } from "@/components/thread/AgentsStrip";
 import { useElementHeight, useThreadActivity } from "@/components/thread/activity";
-import { ThreadContext } from "@/components/thread/context";
+import { PathPlaceContext, ThreadContext } from "@/components/thread/context";
 import { ThreadComposer } from "@/components/thread/ThreadComposer";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
+import { projectPlace, type ProjectRoot } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, useHeaderSummary, useWorkingThreads } from "@/stores/ember";
 import { toggleEmberBoard, useEmberBoardShown } from "@/stores/emberPanel";
 import { keyOf } from "@/stores/panel";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { EmberTimeline } from "./EmberTimeline";
@@ -85,6 +88,25 @@ function HeaderActions({ threadId }: { threadId: string }) {
   );
 }
 
+/** Every project's checkouts as "<project id> <path>" (a primitive list, so a git refresh does not re-render the chat). */
+function useProjectRoots(): readonly string[] {
+  return useProjectsStore(useShallow((s) => s.order.flatMap((id) => (s.byId[id]?.worktrees ?? []).map((w) => `${id} ${w.path}`))));
+}
+
+/**
+ * Path chips in Ember's chat: Ember's own directory is no checkout, and the paths it
+ * writes belong to whichever project it talks about, so only an absolute path under a
+ * project's checkout is a chip (opening in that project); any other stays plain code.
+ */
+function EmberPathPlace({ children }: { children: ReactNode }) {
+  const keys = useProjectRoots();
+  const resolve = useMemo(() => {
+    const roots: ProjectRoot[] = keys.map((k) => ({ project: k.slice(0, k.indexOf(" ")), path: k.slice(k.indexOf(" ") + 1) }));
+    return (path: string) => projectPlace(roots, path);
+  }, [keys]);
+  return <PathPlaceContext.Provider value={resolve}>{children}</PathPlaceContext.Provider>;
+}
+
 /**
  * Ember's chat in the content pane (docs/notes/ember-3-gui.md): its thread's Watch and
  * timeline machinery (ThreadPane's WatchedThread holds the stream), with its own header
@@ -129,7 +151,9 @@ export function EmberBody({ threadId }: { threadId: string }) {
               <p className="text-body text-muted-foreground">Tell Ember what you want done. It plans the work, starts worker threads and reports back here.</p>
             </div>
           )}
-          <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
+          <EmberPathPlace>
+            <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
+          </EmberPathPlace>
           <div className="dock" ref={dockRef}>
             <AgentsStrip threadId={threadId} />
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={PLACEHOLDER} busyPlaceholder={BUSY_PLACEHOLDER} />
