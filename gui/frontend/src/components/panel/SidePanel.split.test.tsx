@@ -29,9 +29,10 @@ beforeEach(() => {
   useUiStore.setState({ selection: { kind: "thread", id: "a" }, windowWidth: 1440, sidebarVisible: true, sidebarWidth: 280, focus: "panel" });
   useCommandsStore.setState({ commands: [command("view.panel.new-tab"), command("view.panel.expand"), command("view.panel.toggle")] });
   // jsdom has no pointer capture.
-  Element.prototype.setPointerCapture ??= () => undefined;
-  Element.prototype.releasePointerCapture ??= () => undefined;
-  Element.prototype.hasPointerCapture ??= () => false;
+  const proto = Element.prototype as unknown as Record<string, unknown>;
+  proto.setPointerCapture ??= () => undefined;
+  proto.releasePointerCapture ??= () => undefined;
+  proto.hasPointerCapture ??= () => false;
 });
 
 afterEach(() => {
