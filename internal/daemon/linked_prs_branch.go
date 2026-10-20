@@ -99,17 +99,30 @@ func threadBranches(th thread.Thread, projects *project.Snapshot, workspaces *wo
 	return out
 }
 
+// threadLinks is one thread's new branch links.
+type threadLinks struct {
+	id    string
+	links []thread.LinkedPullRequest
+}
+
 // branchLinksFor matches every thread in threads that is not archived against idx and
-// returns, per thread id, the pull requests on its branches it has not linked yet,
-// linked at their creation (now when unknown). Threads with nothing new are left out,
-// so a pass where nothing changed calls into the thread store not at all.
+// returns the pull requests on each thread's branches it has not linked yet, linked at
+// their creation (now when unknown). Threads with nothing new are left out, so a pass
+// where nothing changed calls into the thread store not at all. Threads come oldest
+// first: a creator predates what it created, so when a thread and the thread it
+// created are on the same branch, the creator's own link is in before the copy from
+// the created one, and each keeps source branch.
 func branchLinksFor(threads *thread.Snapshot, projects *project.Snapshot, workspaces *workspace.Snapshot,
-	idx map[headKey][]gh.PullRequest, now time.Time) map[string][]thread.LinkedPullRequest {
-	out := map[string][]thread.LinkedPullRequest{}
+	idx map[headKey][]gh.PullRequest, now time.Time) []threadLinks {
+	var out []threadLinks
 	if threads == nil || len(idx) == 0 {
 		return out
 	}
-	for _, th := range threads.Threads {
+	ths := slices.Clone(threads.Threads)
+	slices.SortStableFunc(ths, func(a, b thread.Thread) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
+	})
+	for _, th := range ths {
 		if !th.ArchivedAt.IsZero() {
 			continue
 		}
@@ -126,7 +139,7 @@ func branchLinksFor(threads *thread.Snapshot, projects *project.Snapshot, worksp
 			}
 		}
 		if len(links) > 0 {
-			out[th.ID] = links
+			out = append(out, threadLinks{th.ID, links})
 		}
 	}
 	return out
@@ -136,15 +149,9 @@ func branchLinksFor(threads *thread.Snapshot, projects *project.Snapshot, worksp
 // thread, push what is new. Returns how many links were added.
 func linkBranchPullRequests(threads branchLinker, projects *project.Snapshot, workspaces *workspace.Snapshot,
 	prs branchPRCache, now time.Time) int {
-	found := branchLinksFor(threads.Snapshot(), projects, workspaces, prsByHead(prs.CachedPullRequests()), now)
-	ids := make([]string, 0, len(found))
-	for id := range found {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
 	n := 0
-	for _, id := range ids {
-		n += threads.LinkBranchPullRequests(id, found[id])
+	for _, f := range branchLinksFor(threads.Snapshot(), projects, workspaces, prsByHead(prs.CachedPullRequests()), now) {
+		n += threads.LinkBranchPullRequests(f.id, f.links)
 	}
 	return n
 }

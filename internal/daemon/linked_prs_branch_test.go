@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -62,15 +61,15 @@ func branchWorkspaces() *workspace.Snapshot {
 }
 
 // branchFacts renders found links as "id: repo#n@minutes" ("now" for a link without a
-// creation time), threads sorted.
-func branchFacts(t *testing.T, found map[string][]thread.LinkedPullRequest, now time.Time) []string {
+// creation time), in the order found.
+func branchFacts(t *testing.T, found []threadLinks, now time.Time) []string {
 	t.Helper()
 	var out []string
-	for _, id := range slices.Sorted(maps.Keys(found)) {
+	for _, f := range found {
 		var parts []string
-		for _, l := range found[id] {
+		for _, l := range f.links {
 			if l.Source != thread.LinkBranch || l.ViaThreadID != "" || !strings.EqualFold(l.URL, fmt.Sprintf("https://github.com/%s/pull/%d", l.Slug, l.Number)) {
-				t.Errorf("%s: link %+v", id, l)
+				t.Errorf("%s: link %+v", f.id, l)
 			}
 			at := "now"
 			if !l.LinkedAt.Equal(now) {
@@ -78,7 +77,7 @@ func branchFacts(t *testing.T, found map[string][]thread.LinkedPullRequest, now 
 			}
 			parts = append(parts, fmt.Sprintf("%s#%d@%s", l.Slug, l.Number, at))
 		}
-		out = append(out, id+": "+strings.Join(parts, " "))
+		out = append(out, f.id+": "+strings.Join(parts, " "))
 	}
 	return out
 }
@@ -152,6 +151,13 @@ func TestBranchLinksFor(t *testing.T) {
 		{name: "no project: nothing",
 			threads: []thread.Thread{{ID: "t", WorktreePath: "/Users/me", Branch: "cf/x"}},
 			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x")}},
+		{name: "oldest thread first, whatever its id",
+			threads: []thread.Thread{
+				{ID: "a-new", ProjectID: "p-api", WorktreePath: "/wt/api-x", CreatedAt: branchT0.Add(time.Minute)},
+				{ID: "b-old", ProjectID: "p-api", WorktreePath: "/wt/api-x", CreatedAt: branchT0},
+				{ID: "a-old", ProjectID: "p-api", WorktreePath: "/wt/api-x", CreatedAt: branchT0}},
+			prs:  []gh.PullRequest{branchPR("o/api", 1, "cf/x")},
+			want: []string{"a-old: o/api#1@1", "b-old: o/api#1@1", "a-new: o/api#1@1"}},
 		{name: "archived thread skipped",
 			threads: []thread.Thread{
 				{ID: "t1", ProjectID: "p-api", WorktreePath: "/wt/api-x", ArchivedAt: branchT0},
