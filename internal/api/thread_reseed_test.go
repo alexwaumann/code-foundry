@@ -77,7 +77,10 @@ func TestThreadResident(t *testing.T) {
 			_, err := c.Archive(ctx, connect.NewRequest(&v1.ArchiveThreadRequest{Id: r.ID, Archived: true}))
 			return err
 		},
-		func() error { _, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveThreadRequest{Id: r.ID})); return err },
+		func() error {
+			_, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveThreadRequest{Id: r.ID}))
+			return err
+		},
 		func() error { _, err := c.Fork(ctx, connect.NewRequest(&v1.ForkThreadRequest{Id: r.ID})); return err },
 	} {
 		if err := call(); connect.CodeOf(err) != connect.CodeFailedPrecondition {
