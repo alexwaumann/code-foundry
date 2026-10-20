@@ -152,6 +152,7 @@ export function cardMeta(c: BoardCard): Words {
   if (p) return { text: `${String(p.done)} of ${String(p.total)}`, tone: "muted" };
   const t = c.task;
   if (t.state === "done" || t.state === "cancelled" || t.state === "todo") return { text: stateWords[t.state], tone: "muted" };
+  if (t.state === "blocked") return { text: stateWords.blocked, tone: "amber" };
   if (t.thread) return workerWords(t.thread);
   return { text: stateWords[t.state], tone: "muted" };
 }
@@ -170,10 +171,17 @@ export interface WorkerRow {
   subtask: boolean;
 }
 
-function workerMeta(th: EmberTaskThreadView): Words {
+/**
+ * A worker row's words: a blocked or failed report says so (amber, red); a prompt or an
+ * error says more than a report; while the task is doing, its latest report's summary
+ * (muted) says more than "Working" or "Idle"; else the worker's status words.
+ */
+function workerMeta(th: EmberTaskThreadView, doing: boolean): Words {
   const words = workerWords(th);
-  // A report says more than "Idle" or "Finished"; a prompt or an error says more than an old report.
-  if (th.reportSummary && (words.tone === "muted" || words.tone === "emerald" || words.tone === "sky")) return { text: th.reportSummary, tone: words.tone === "sky" ? "muted" : words.tone };
+  if (words.tone === "amber" || words.tone === "red") return words;
+  if (th.reportStatus === "blocked") return { text: "Blocked", tone: "amber" };
+  if (th.reportStatus === "failed") return { text: "Failed", tone: "red" };
+  if (doing && th.reportSummary) return { text: th.reportSummary, tone: "muted" };
   return words;
 }
 
@@ -186,7 +194,7 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       threadId: own.removed ? "" : own.id,
       title: own.name || own.id,
       dot: workerBusy(own) ? "doing" : taskDot(c.task.state),
-      meta: workerMeta(own),
+      meta: workerMeta(own, c.task.state === "doing"),
       atMs: own.lastActivityAtMs,
       subtask: false,
     });
@@ -198,7 +206,7 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       threadId: th && !th.removed ? th.id : "",
       title: s.title,
       dot: taskDot(s.state),
-      meta: s.state === "blocked" && s.outcome ? { text: s.outcome, tone: "amber" } : th && (s.state === "doing" || s.state === "blocked") ? workerMeta(th) : { text: stateWords[s.state], tone: "muted" },
+      meta: s.state === "blocked" && s.outcome ? { text: s.outcome, tone: "amber" } : th && (s.state === "doing" || s.state === "blocked") ? workerMeta(th, s.state === "doing") : { text: stateWords[s.state], tone: "muted" },
       atMs: th?.lastActivityAtMs ?? s.updatedAtMs,
       subtask: true,
     });
@@ -348,7 +356,7 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
       case "question":
         return it.requestState === "pending";
       case "permission":
-        return it.requestState === "pending" && permissions.get(it.toolUseId)?.id !== it.id;
+        return it.requestState === "pending";
       case "tool":
         return permissions.get(it.toolUseId)?.requestState === "pending";
       default:
@@ -374,6 +382,8 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
     return true;
   };
   for (const it of top) {
+    // A permission on a tool call shows on that call's row (workNodes): it is in no run.
+    if (it.kind === "permission" && permissions.get(it.toolUseId)?.id === it.id) continue;
     if (!visible(it)) {
       run.push(it);
       continue;
