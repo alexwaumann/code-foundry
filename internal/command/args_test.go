@@ -102,3 +102,37 @@ func TestSplitWords(t *testing.T) {
 		})
 	}
 }
+
+// Given tells a value the caller passed from a context's or a Default's.
+func TestArgsGiven(t *testing.T) {
+	specs := []ArgSpec{
+		{Name: "model", Type: String, Default: "m-default"},
+		{Name: "project", Type: String, Context: ContextProject},
+		{Name: "name", Type: String},
+	}
+	tests := []struct {
+		name  string
+		raw   map[string]string
+		given map[string]bool
+	}{
+		{"defaults only", map[string]string{}, map[string]bool{"model": false, "project": false, "name": false}},
+		{"explicit", map[string]string{"model": "m", "project": "p"}, map[string]bool{"model": true, "project": true, "name": false}},
+		{"blank counts as absent", map[string]string{"model": ""}, map[string]bool{"model": false}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a, _, err := parseArgs(specs, tt.raw, Context{ActiveProjectID: "ctx-project"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, want := range tt.given {
+				if got := a.Given(name); got != want {
+					t.Errorf("Given(%q) = %v, want %v (value %q)", name, got, want, a.String(name))
+				}
+			}
+		})
+	}
+	if a := NewArgs(map[string]any{"model": "m"}); !a.Given("model") || a.Given("name") {
+		t.Error("NewArgs: every value counts as given")
+	}
+}

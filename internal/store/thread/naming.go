@@ -379,3 +379,7 @@ func firstUserText(line []byte) (string, bool) {
 	}
 	return text, true
 }
+
+// IsFlagRefused is isFlagRefused for other one-shot claude -p callers (the Ember
+// store's consolidation): whether an error is Claude refusing a command-line flag.
+func IsFlagRefused(err error) bool { return isFlagRefused(err) }

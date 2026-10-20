@@ -145,6 +145,10 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
 					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
+					// A model or effort from the settings' default, not chosen: a resident's
+					// worker defaults may replace it (docs/notes/ember-2-store.md).
+					ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
+					EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
