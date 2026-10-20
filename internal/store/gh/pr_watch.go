@@ -181,6 +181,14 @@ func (s *Store) CachedPullRequest(slug string, number int) (PullRequest, bool) {
 	return p, ok
 }
 
+// CachedPullRequests returns every pull request the cached lists hold (the dashboards
+// and every branch list in the cache, watched now or not), one copy each, in no
+// particular order. Never asks GitHub and watches nothing: thread branch links read it
+// (docs/notes/linked-prs-branch.md). Placeholders (Partial) have no head branch.
+func (s *Store) CachedPullRequests() []PullRequest {
+	return slices.Collect(maps.Values(s.cachedByRef()))
+}
+
 // keepFingerprints keeps a watched branch's pull requests that the store follows: the
 // viewer's own from the repository itself (keepViewerFingerprints), and the watched
 // pull requests (numbers in keep) whoever wrote them.

@@ -87,6 +87,9 @@ type stores struct {
 	// stopProjectActivity stops the glue that tells project which worktrees have live
 	// threads and when a thread edited files (projectactivity.go).
 	stopProjectActivity func()
+	// stopBranchLinks stops the glue that links each thread to the pull requests on its
+	// branches, from the GitHub store's cached lists (linked_prs_branch.go).
+	stopBranchLinks func()
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
@@ -251,6 +254,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
+	s.stopBranchLinks = startBranchLinks(ctx, log.With("store", "thread"), s.thread, s.project.Snapshot, s.workspace.Snapshot, s.gh, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
@@ -327,6 +331,9 @@ func (s *stores) close() error {
 	}
 	if s.stopProjectActivity != nil {
 		s.stopProjectActivity()
+	}
+	if s.stopBranchLinks != nil {
+		s.stopBranchLinks()
 	}
 	if s.action != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

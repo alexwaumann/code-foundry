@@ -528,7 +528,11 @@ type Thread struct {
 	// re-emits the record at nearly every turn and it can flip back to an earlier pull
 	// request, so this is every distinct URL (deduplicated by URL) in first-seen order;
 	// entries are never removed. A reconnected thread is backfilled from its transcript's
-	// history. Persisted. See docs/notes/linked-prs.md.
+	// history. Also included: the links of the threads it created (created_by,
+	// transitively), and the pull requests whose head is a branch the thread works on (its
+	// worktree's or each workspace member's) in the project's repository, as the GitHub
+	// store's cached lists know them. Persisted. See docs/notes/linked-prs.md,
+	// linked-prs-children.md and linked-prs-branch.md.
 	LinkedPullRequests []*LinkedPullRequest `protobuf:"bytes,25,rep,name=linked_pull_requests,json=linkedPullRequests,proto3" json:"linked_pull_requests,omitempty"`
 	// When status or status_reason last changed. Persisted with them; unset if never
 	// known (a row from before status persistence).
@@ -1622,13 +1626,14 @@ func (x *UsageBucket) GetCacheSavingsUsd() float64 {
 	return 0
 }
 
-// A pull request Claude linked to a thread (Thread.linked_pull_requests).
+// A pull request linked to a thread (Thread.linked_pull_requests).
 type LinkedPullRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Slug   string                 `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"` // "owner/name"
 	Number int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
 	Url    string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
-	// The first pr-link record for url (when it was seen, if the record had no time).
+	// The first pr-link record for url (when it was seen, if the record had no time); a
+	// child thread's link keeps its time; a branch link has the pull request's creation.
 	LinkedAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=linked_at,json=linkedAt,proto3" json:"linked_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

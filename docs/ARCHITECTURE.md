@@ -463,7 +463,11 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`). A
   thread also has every link of the threads it created (`CreatedBy`, transitively, not
   forks): each new link is copied up the chain with its source and the direct child it
-  came through (`docs/notes/linked-prs-children.md`).
+  came through (`docs/notes/linked-prs-children.md`). And it has every pull request whose
+  head is a branch it works on (its worktree's, or each workspace member's) in the
+  project's GitHub repository: the daemon matches them against the GitHub store's cached
+  lists (dashboards and branch lists, no new polling) and pushes them to the thread
+  store as `branch` links (`docs/notes/linked-prs-branch.md`).
 * **Token usage** is a pure fold over assistant records (each request once), per
   (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
   used (`/clear` starts a new one) and every subagent run under them, followed from the
