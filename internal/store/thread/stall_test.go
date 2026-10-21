@@ -61,7 +61,7 @@ func TestSendToAStuckClaude(t *testing.T) {
 	pid := e.pid(s.ID)
 	start := time.Now()
 	_, err := e.m.Send(e.ctx(), s.ID, Message{Text: strings.Repeat("y", 1<<20)})
-	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "not reading its input") {
+	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "Claude stopped reading its input") {
 		t.Errorf("send: %v", err)
 	}
 	if took := time.Since(start); took > 3*time.Second {

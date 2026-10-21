@@ -577,6 +577,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if err := st.conn.Send(ctx, claudestream.UserMessage{UUID: id, Blocks: blocks}); err != nil {
 		if errors.Is(err, claudestream.ErrStalled) {
 			r.onStalled(err)
+			return Item{}, fmt.Errorf("%w: Claude stopped reading its input; the message was not delivered and the thread is closing", ErrFailedPrecondition)
 		}
 		return Item{}, fmt.Errorf("%w: send to claude: %v", ErrFailedPrecondition, err)
 	}
