@@ -179,10 +179,13 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				return hasTerminal(c) && (d.IsShell == nil || d.IsShell(c.ActiveTerminalID))
 			},
 			WhyUnavailable: func(c Context) string {
-				if hasTerminal(c) {
-					return "terminal " + c.ActiveTerminalID + " is not a shell; use terminal.kill"
+				if !hasTerminal(c) {
+					return ""
 				}
-				return ""
+				if ids, err := terminalIDs(d.Terminal)(context.Background()); err == nil && !slices.Contains(ids, c.ActiveTerminalID) {
+					return "no terminal " + c.ActiveTerminalID
+				}
+				return "terminal " + c.ActiveTerminalID + " is not a shell; use terminal.kill"
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
