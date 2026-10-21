@@ -10,10 +10,11 @@ import (
 // Archive archives or unarchives a thread (docs/notes/archive-threads-1-daemon.md).
 //
 // Archiving first archives the hidden threads below it (ArchiveCascade with the
-// threads.show_created_threads setting; docs/notes/hidden-children-1-daemon.md), each
-// through archiveOne in tree order, past one that fails (logged, and named in the
-// *CascadeError returned with the thread), then the thread itself, then any hidden
-// thread created below it meanwhile (its creator was still running). Unarchiving only
+// threads.show_created_threads setting; docs/notes/hidden-children-1-daemon.md): their
+// closes begin together, then each is archived in tree order, past one that fails
+// (logged, and named in the *CascadeError returned with the thread); then the thread
+// itself, then any hidden thread created below it meanwhile (its creator was still
+// running). Unarchiving only
 // clears ArchivedAt, of this thread alone: the thread stays disconnected until the
 // user reconnects it.
 func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
@@ -39,9 +40,20 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 	var failed []CascadeFailure
 	cascaded := 0
 	cascade := func() {
-		for _, t := range m.cascadeTargets(id, tried) {
+		targets := m.cascadeTargets(id, tried)
+		// Their closes begin together (each may wait CloseTimeout for its process),
+		// after what each was before any of them closed is read; the archives then
+		// commit in tree order.
+		was := make([]bool, len(targets))
+		for i, t := range targets {
 			tried[t.ID] = true
-			_, changed, err := m.archiveOne(ctx, t.ID)
+			was[i], _ = m.interrupted(t.ID) // gone meanwhile: archiveFrom says so
+		}
+		for _, t := range targets {
+			m.requestClose(t.ID)
+		}
+		for i, t := range targets {
+			_, changed, err := m.archiveFrom(ctx, t.ID, was[i])
 			if err != nil {
 				m.log.Warn("archive a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
 				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
@@ -124,6 +136,12 @@ func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, erro
 	if err != nil {
 		return Thread{}, false, err
 	}
+	return m.archiveFrom(ctx, id, wasInterrupted)
+}
+
+// archiveFrom is archiveOne with whether the thread was interrupted before its close
+// began (interrupted) read already.
+func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool) (Thread, bool, error) {
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, false, err
 	}
@@ -159,6 +177,16 @@ func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, erro
 	}
 	m.commitLocked(rec, true)
 	return rec.s, true, nil
+}
+
+// requestClose begins closing thread id's process, if it runs, without waiting
+// (Close waits).
+func (m *Manager) requestClose(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if rec, ok := m.recs[id]; ok && rec.run != nil {
+		rec.run.requestClose()
+	}
 }
 
 // interrupted reports whether thread id's status is already error "interrupted" (a

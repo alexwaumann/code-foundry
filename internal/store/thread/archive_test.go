@@ -2,6 +2,7 @@ package thread
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -218,5 +219,35 @@ func TestArchivedAtPersistsAcrossRestart(t *testing.T) {
 	if got.ArchivedAt.UnixMilli() != s.ArchivedAt.UnixMilli() || got.Pinned || got.State != StateDisconnected {
 		t.Errorf("after restart = ArchivedAt %v pinned %v state %s; want %v, unpinned, disconnected",
 			got.ArchivedAt, got.Pinned, got.State, s.ArchivedAt)
+	}
+}
+
+// The cascade closes the hidden threads together: four children that each take a second
+// to exit archive in about that second, not four, still committed in tree order.
+func TestArchiveCascadeClosesTogether(t *testing.T) {
+	e := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=1s"})
+	lead := e.connected(CreateOptions{Name: "lead"})
+	var kids []Thread
+	for i := range 4 {
+		kids = append(kids, e.connected(CreateOptions{Name: fmt.Sprintf("kid %d", i), CreatedBy: lead.ID}))
+	}
+	start := time.Now()
+	if _, err := e.m.Archive(e.ctx(), lead.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	// Sequential closes take 5s (four children, then the lead).
+	if took := time.Since(start); took > 3500*time.Millisecond {
+		t.Errorf("archive took %s", took)
+	}
+	prev := time.Time{}
+	for _, k := range append(kids, lead) {
+		s := e.snapshot(k.ID)
+		if s.ArchivedAt.IsZero() || s.State != StateDisconnected {
+			t.Fatalf("%s: archived %v, state %v", s.Name, s.ArchivedAt, s.State)
+		}
+		if s.ArchivedAt.Before(prev) {
+			t.Errorf("%s archived before the thread above it in tree order", s.Name)
+		}
+		prev = s.ArchivedAt
 	}
 }
