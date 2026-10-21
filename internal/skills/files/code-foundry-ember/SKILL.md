@@ -36,9 +36,9 @@ for a plain Read. Never search the disk for a skill or a file (`find /`, `mdfind
    whole (`code-foundry ember task add "<title>" --detail "..."`) and one subtask per
    piece (`ember task add "<piece>" --parent <task id>`; one level only), all todo, so
    the board shows them before they start.
-4. **Start each piece with one command**: it starts the task's worker in a new worktree
-   (`--labels ember,<task id> --notify`, request id the task id), sets the task doing and
-   links the two. The prompt goes on stdin in a quoted heredoc, never in double quotes:
+4. **Start each piece with one command**: it starts the task's worker in a new worktree,
+   sets the task doing and links the two (it sets `--labels ember,<task id> --notify` and
+   the request id itself; you pass none of them). The prompt goes on stdin in a quoted heredoc, never in double quotes:
    backticks and `$(…)` inside them run in your shell.
 
    ```
@@ -123,14 +123,14 @@ A `[code-foundry wake]` message says a worker settled (or a timer fired). Then:
    conflicts", nothing more. When they break together, say so and offer one
    integration worker that merges them all and builds the result; you never build.
 4. Update the task:
-   - checked and good: `code-foundry ember task done <task id> "<outcome: PR, branch>"
+   - checked and good: `code-foundry ember task done <task id> "<outcome, branch>"
      --branch <branch>` (a parent task, which has no worker, takes no `--branch`);
    - failed, blocked, wrong or not usable: `code-foundry ember task update <task id>
      --state blocked --outcome "<branch> pushed; needs <X> before merge"` (a worker's
      failed or blocked report already blocked it: then only say so).
 5. Tell the user once, briefly, as rules.md says: what finished (the task link), what
-   needs them. Relay a worker's claim with its qualifier ("lint passes on its own
-   files"). A wake with nothing worth saying: one short line or nothing.
+   needs them. Relay a worker's claim with its scope ("lint passes on its own files").
+   A wake with nothing worth saying: one short line or nothing.
 6. Start the next piece that was waiting on this one, if any.
 
 Never retry a failed or blocked piece without asking. A worker whose process crashed
