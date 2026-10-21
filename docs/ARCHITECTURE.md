@@ -476,8 +476,15 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   when the next message re-reads a cold context
   (`docs/notes/rendered-threads-cold-cache.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
-  ("Fix the login redirect"); a new worktree's branch is `cf/` + the title's slug
-  (`docs/notes/natural-thread-names.md`). Until it answers, a thread with a first prompt
+  ("Fix the login redirect") and, for a new worktree or workspace, its branch in the same
+  call, in the `projects.branch_naming` mode: `semantic` (default, `<type>/<slug>`, the
+  type validated against feat, fix, chore, docs, ci, refactor, test, perf, build),
+  `prefix` (`<prefix>/<slug>`) or `custom` (the model follows
+  `projects.branch_instructions`; git checks the result). `thread new --branch` with a
+  slash is the branch, without one the slug; an existing one is checked out. Taken
+  generated branches get `-2`..`-9`; anything unusable is `cf/<thread id>`
+  (`branchname.go`, `docs/notes/natural-thread-names.md`,
+  `docs/notes/branch-naming-modes.md`). Until it answers, a thread with a first prompt
   has a provisional name, the prompt's first line or sentence cut to 48 characters
   (`name_provisional`, `provisional.go`); the title replaces it, a rename clears it, the
   branch never uses it (`docs/notes/provisional-names.md`). Once a thread whose worktree Create made has

@@ -109,19 +109,20 @@ func TestSettingsNamer(t *testing.T) {
 	st := openSettings(t)
 	calls := 0
 	var models []string
-	namer := settingsNamer(st, func(ctx context.Context, _ string) (string, error) {
+	namer := settingsNamer(st, func(ctx context.Context, _ thread.NamingRequest) (thread.Naming, error) {
 		calls++
 		models = append(models, thread.NamingModel(ctx))
-		return "a-name", nil
+		return thread.Naming{Title: "a-name"}, nil
 	})
-	if name, err := namer(context.Background(), "hi"); err != nil || name != "a-name" {
-		t.Fatalf("namer = %q, %v", name, err)
+	hi := thread.NamingRequest{Message: "hi"}
+	if n, err := namer(context.Background(), hi); err != nil || n.Title != "a-name" {
+		t.Fatalf("namer = %+v, %v", n, err)
 	}
 	// The naming model is read per call: no restart, no new namer.
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyNamingModel: "claude-4.5-haiku[1m]"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := namer(context.Background(), "hi"); err != nil {
+	if _, err := namer(context.Background(), hi); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"claude-sonnet-4-6[1m]", "claude-4.5-haiku[1m]"}; !slices.Equal(models, want) {
@@ -130,7 +131,7 @@ func TestSettingsNamer(t *testing.T) {
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyAutoName: "false"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := namer(context.Background(), "hi"); !errors.Is(err, errAutoNameOff) || calls != 2 {
+	if _, err := namer(context.Background(), hi); !errors.Is(err, thread.ErrNamingOff) || calls != 2 {
 		t.Fatalf("namer with auto-naming off: err = %v, calls = %d", err, calls)
 	}
 }
@@ -223,5 +224,26 @@ func TestApplyUpdateChannel(t *testing.T) {
 				t.Errorf("SetChannel calls = %v, want %v", rec.got, tt.want)
 			}
 		})
+	}
+}
+
+// TestBranchNaming checks the projects.branch_* settings reach the thread store per
+// call: no restart.
+func TestBranchNaming(t *testing.T) {
+	st := openSettings(t)
+	get := branchNaming(st)
+	if got, want := get(), (thread.BranchNaming{Mode: thread.BranchModeSemantic, Prefix: "cf"}); got != want {
+		t.Errorf("defaults = %+v, want %+v", got, want)
+	}
+	if _, err := st.Update(context.Background(), map[string]string{
+		settings.KeyBranchNaming: "custom", settings.KeyBranchPrefix: settings.BranchPrefixNone, settings.KeyBranchInstructions: "ab/<slug>",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := get(), (thread.BranchNaming{Mode: thread.BranchModeCustom, Instructions: "ab/<slug>"}); got != want {
+		t.Errorf("after update = %+v, want %+v", got, want)
+	}
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyBranchNaming: "nope"}); err == nil {
+		t.Error("an unknown mode was accepted")
 	}
 }

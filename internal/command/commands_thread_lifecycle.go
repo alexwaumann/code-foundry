@@ -67,7 +67,7 @@ func canStartThread(c Context) bool {
 // noProjectAlone refuses thread.new's no-project with any arg that places the thread
 // in a project or workspace.
 func noProjectAlone(a Args) error {
-	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base"} {
+	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base", "branch"} {
 		if a.String(name) != "" || a.Bool(name) {
 			return InvalidArg(name, "no-project starts a thread without a project; it does not take %s", name)
 		}
@@ -106,18 +106,19 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name (with workspace or projects: the member the thread runs in)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
-				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; project picks the member the thread runs in (default: the first)"},
+				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a worktree on the same new branch in each; project picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: supervisedHelp + ", accept-edits (edits allowed) or auto"},
-				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt); without it the thread works in the given worktree, else the project's own checkout (the GUI's threads.default_worktree does not apply)"},
-				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
+				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (its branch named from the prompt by settings projects.branch_naming, e.g. feat/add-filter; cf/<thread id> when naming fails); without it the thread works in the given worktree, else the project's own checkout (the GUI's threads.default_worktree does not apply)"},
+				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree; ignored when branch exists"},
+				{Name: "branch", Type: String, Description: "The new worktree's branch: with a / it is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); an existing branch is checked out, not suffixed; needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
-				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree or base)"},
+				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree, base or branch)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
@@ -169,11 +170,13 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				case ws != "" && a.Bool("new-worktree"):
 					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with projects")
 				case len(projects) > 0:
-					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base")}
+					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base"), Branch: a.String("branch")}
 				case a.Bool("new-worktree"):
-					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base")}
+					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base"), Branch: a.String("branch")}
 				case a.String("base") != "":
 					return Result{}, InvalidArg("base", "only applies with new-worktree")
+				case a.String("branch") != "":
+					return Result{}, InvalidArg("branch", "only applies with new-worktree")
 				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {

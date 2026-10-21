@@ -47,7 +47,11 @@ type env struct {
 
 	mu    sync.Mutex
 	named []string
+	// namer answers each naming call: the title of a title-only call, else a raw
+	// model reply parseNaming reads (a bare title, or "Title: ...\nBranch: ...").
 	namer func(string) (string, error)
+	// namingReqs are every naming call's requests, in order.
+	namingReqs []NamingRequest
 }
 
 // newEnv is newFixtureEnv with the text-table capture: every message gets one turn
@@ -117,12 +121,20 @@ func (e *env) open(mutate ...func(*Options)) {
 		WakeBatch:    -1,
 		StartTimeout: 5 * time.Second,
 		CloseTimeout: 2 * time.Second,
-		Namer: func(_ context.Context, msg string) (string, error) {
+		Namer: func(_ context.Context, req NamingRequest) (Naming, error) {
 			e.mu.Lock()
-			e.named = append(e.named, msg)
+			e.named = append(e.named, req.Message)
+			e.namingReqs = append(e.namingReqs, req)
 			fn := e.namer
 			e.mu.Unlock()
-			return fn(msg)
+			out, err := fn(req.Message)
+			if err != nil {
+				return Naming{}, err
+			}
+			if req.Branch == nil {
+				return Naming{Title: out}, nil
+			}
+			return parseNaming(out, true), nil
 		},
 	}
 	e.mutate(&opts)

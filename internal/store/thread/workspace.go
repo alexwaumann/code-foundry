@@ -113,8 +113,11 @@ type NewWorkspace struct {
 	// BaseRef every member without its own base branches from. Empty: each
 	// repository's default.
 	BaseRef string
-	// Name of the workspace. Empty: the branch slug (cf/<slug> without "cf/").
+	// Name of the workspace. Empty: the branch's last component (feat/add-filter ->
+	// add-filter).
 	Name string
+	// Branch steers the one branch of every member, as NewWorktree.Branch.
+	Branch string
 }
 
 // createdWorkspace is what newWorkspace made.
@@ -193,9 +196,9 @@ func memberPaths(w workspace.Workspace) string {
 	return strings.Join(out, ", ")
 }
 
-// newWorkspace makes the workspace of a new workspace thread: after the single slug
-// wait (as for a new worktree), a worktree on cf/<slug> in every repository through
-// the workspace store, which creates all or none.
+// newWorkspace makes the workspace of a new workspace thread: after the single naming
+// wait (as for a new worktree), a worktree on the one branch in every repository
+// through the workspace store, which creates all or none.
 func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOptions) (createdWorkspace, error) {
 	var cw createdWorkspace
 	nw := o.NewWorkspace
@@ -209,6 +212,10 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	}
 	base := strings.TrimSpace(nw.BaseRef)
 	if err := validateRef(base); err != nil {
+		return cw, err
+	}
+	bc, err := m.newBranchChoice(nw.Branch)
+	if err != nil {
 		return cw, err
 	}
 	// Resolve every repository before waiting for a name, so a typo fails fast.
@@ -245,7 +252,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	}
 	wsName := strings.TrimSpace(nw.Name)
 
-	sl, err := m.waitSlug(ctx, id, name, o.InitialPrompt)
+	sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
 	if err != nil {
 		return cw, err
 	}
@@ -260,9 +267,13 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 			return err == nil
 		}
 	}
-	branch := m.pickBranch(ctx, paths, sl.slug, id, nameTaken)
+	branch, existing := m.pickBranch(ctx, paths, bc, sl.branch, id, nameTaken)
+	if existing {
+		// The workspace store checks it out in each member that has it.
+		m.log.Info("branch exists; checking it out where it exists", "thread", id, "branch", branch)
+	}
 	if wsName == "" {
-		wsName = strings.TrimPrefix(branch, branchPrefix)
+		wsName = slugPart(branch)
 	}
 	specs := make([]workspace.MemberSpec, len(ids))
 	cwdBase := base

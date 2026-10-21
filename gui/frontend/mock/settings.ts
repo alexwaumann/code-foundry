@@ -238,6 +238,21 @@ const staticFields: FieldInit[] = [
   { key: "github.dashboards_enabled", group: "github", page: "source", section: "github", type: S.BOOL, title: "Pull request dashboards", description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.", defaultValue: "true" },
   { key: "github.poll_interval_seconds", group: "github", page: "source", section: "github", unit: "s", type: S.INT, title: "Poll interval", description: "How often one request checks your pull requests, watched branches and tracked default branches for changes while the app's window is visible. Details are fetched only for what changed. With the window hidden it checks every 5 minutes, with the app closed every 15 (or at this interval, if longer).", defaultValue: "60", min: 15n, max: 3600n },
   { key: "projects.fetch_interval_seconds", group: "projects", page: "source", section: "projects", unit: "s", type: S.INT, title: "Fetch interval", description: "How often each project runs git fetch --prune. 0 turns background fetching off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
+  {
+    key: "projects.branch_naming",
+    group: "projects",
+    page: "source",
+    section: "projects",
+    type: S.ENUM,
+    title: "Branch names",
+    description:
+      "How a new worktree's branch is named. Semantic: the naming model picks a type (feat, fix, chore, docs, ci, refactor, test, perf, build) and a slug, as in feat/add-search-filter. Prefix: the branch prefix and a slug. Custom: the naming model follows your branch instructions. With automatic naming off there is no model call: prefix mode uses the thread's name, the others cf/<thread id>.",
+    enumValues: ["semantic", "prefix", "custom"],
+    enumLabels: ["Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"],
+    defaultValue: "semantic",
+  },
+  { key: "projects.branch_prefix", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch prefix", description: "Prefix mode: what goes before the slash. none gives a bare slug.", defaultValue: "cf", placeholder: "cf" },
+  { key: "projects.branch_instructions", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch instructions", description: "Custom mode: how the naming model writes the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". Spaces in its answer become dashes; a name git refuses falls back to cf/<thread id>.", defaultValue: "", placeholder: "ab/<slug of 2 to 4 words>" },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
   // Ember (docs/notes/ember-2-store.md).
   {

@@ -539,3 +539,33 @@ func TestPluginRegistriesField(t *testing.T) {
 		})
 	}
 }
+
+func TestBranchPrefix(t *testing.T) {
+	tests := []struct {
+		v, want string
+		wantErr bool
+	}{
+		{v: "cf", want: "cf"},
+		{v: "alex/wip/", want: "alex/wip"},
+		{v: "team_a.b", want: "team_a.b"},
+		{v: BranchPrefixNone, want: ""},
+		{v: "a b", wantErr: true},
+		{v: "-x", wantErr: true},
+		{v: "a..b", wantErr: true},
+		{v: "a//b", wantErr: true},
+		{v: "x.lock", wantErr: true},
+		{v: "/", wantErr: true},
+		{v: "ü", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.v, func(t *testing.T) {
+			err := checkBranchPrefix(tt.v)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("checkBranchPrefix(%q) = %v", tt.v, err)
+			}
+			if got := (Projects{BranchPrefix: tt.v}).BranchPrefixValue(); err == nil && got != tt.want {
+				t.Errorf("BranchPrefixValue = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

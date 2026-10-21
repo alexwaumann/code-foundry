@@ -77,6 +77,11 @@ func TestThreadLifecycleCommands(t *testing.T) {
 		{name: "new worktree with default base", cmd: "thread.new", args: map[string]string{"project": "r1", "new-worktree": "true"},
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, NewWorktree: &v1.NewWorktree{}}}},
 		{name: "base needs new worktree", cmd: "thread.new", args: map[string]string{"project": "r1", "base": "main"}, wantErr: command.ErrInvalidArgs},
+		{name: "new worktree with a branch", cmd: "thread.new", args: map[string]string{"project": "r1", "new-worktree": "true", "branch": "feat/x"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, NewWorktree: &v1.NewWorktree{Branch: "feat/x"}}}},
+		{name: "branch needs new worktree", cmd: "thread.new", args: map[string]string{"project": "r1", "branch": "x"}, wantErr: command.ErrInvalidArgs},
+		{name: "new workspace with a branch slug", cmd: "thread.new", args: map[string]string{"new-worktree": "true", "projects": "web,api", "branch": "add-filter"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{PermissionMode: auto, NewWorkspace: &v1.NewWorkspace{Projects: []string{"web", "api"}, Branch: "add-filter"}}}},
 		{name: "new unavailable in the GUI without a project or worktree", cmd: "thread.new", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		{name: "new from the CLI needs a target", cmd: "thread.new", wantErr: command.ErrInvalidArgs},
 		{name: "new in a workspace", cmd: "thread.new", args: map[string]string{"workspace": "login", "project": "api"},
@@ -104,6 +109,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 		{name: "no project refuses projects", cmd: "thread.new", args: map[string]string{"no-project": "true", "new-worktree": "true", "projects": "web,api"}, wantErr: command.ErrInvalidArgs},
 		{name: "no project refuses new worktree", cmd: "thread.new", args: map[string]string{"no-project": "true", "new-worktree": "true"}, wantErr: command.ErrInvalidArgs},
 		{name: "no project refuses base", cmd: "thread.new", args: map[string]string{"no-project": "true", "base": "main"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses branch", cmd: "thread.new", args: map[string]string{"no-project": "true", "branch": "x"}, wantErr: command.ErrInvalidArgs},
 		{name: "no project false still needs a target", cmd: "thread.new", args: map[string]string{"no-project": "false"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad effort", cmd: "thread.new", args: map[string]string{"worktree": "/wt", "effort": "huge"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad model", cmd: "thread.new", args: map[string]string{"worktree": "/wt", "model": "gpt"}, wantErr: command.ErrInvalidArgs},
@@ -194,7 +200,7 @@ func TestThreadNewKeybindingAndEnums(t *testing.T) {
 	for _, a := range c.Args {
 		names = append(names, a.Name)
 	}
-	for _, want := range []string{"project", "worktree", "model", "effort", "permission", "new-worktree", "base", "name", "prompt", "attachments", "no-project"} {
+	for _, want := range []string{"project", "worktree", "model", "effort", "permission", "new-worktree", "base", "branch", "name", "prompt", "attachments", "no-project"} {
 		if !slices.Contains(names, want) {
 			t.Errorf("thread.new has no %q arg (args %v)", want, names)
 		}

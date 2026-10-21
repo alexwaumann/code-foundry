@@ -105,7 +105,7 @@ func (f *Fake) Snapshot() *workspace.Snapshot {
 }
 
 // Create implements workspace.Store. Project refs are used as project ids verbatim; the
-// branch defaults to cf/<name>.
+// branch defaults to cf/<slug of name>, as the real store's without DefaultBranch.
 func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -130,7 +130,7 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 	f.next++
 	w := workspace.Workspace{ID: "w-" + strconv.Itoa(f.next), Name: o.Name, Branch: o.Branch, CreatedAt: f.Now()}
 	if w.Branch == "" {
-		w.Branch = "cf/" + o.Name
+		w.Branch = "cf/" + workspace.Slug(o.Name)
 	}
 	for _, m := range o.Members {
 		w.Members = append(w.Members, workspace.Member{ProjectID: m.Project, WorktreePath: f.path(m.Project, w.Branch)})

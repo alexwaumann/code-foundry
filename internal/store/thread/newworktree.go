@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -17,25 +16,19 @@ import (
 // New-worktree threads (CreateOptions.NewWorktree).
 //
 // Create makes the worktree synchronously so a failure reaches the caller before
-// anything is persisted (the GUI composer keeps its draft). The branch is
-// cf/<slug>: the slug is the thread's explicit name slugified, else the namer's
-// title for the first prompt slugified, else (no title, or one with nothing to
-// slugify) the thread id. Only the branch waits for the namer, bounded by
-// Options.SlugTimeout. The namer is called once per thread: a title that arrives in
-// time names the branch and the thread; one that arrives later only names the
-// thread then (the branch stays cf/<id>; the row keeps its provisional name, else its
-// placeholder, until then). The provisional name never names the branch.
-
-// branchPrefix namespaces branches the app creates.
-const branchPrefix = "cf/"
-
-// maxBranchSuffix bounds the -2, -3, ... suffixes tried when cf/<slug> is taken.
-const maxBranchSuffix = 9
+// anything is persisted (the GUI composer keeps its draft). The branch follows the
+// projects.branch_naming mode (branchname.go) from the namer's reply for the first
+// prompt (and the explicit name, and a --branch slug), else cf/<thread id>. Only the
+// branch waits for the namer, bounded by Options.SlugTimeout. The namer is called once
+// per thread: a reply that arrives in time names the branch and the thread; one that
+// arrives later only names the thread then (the branch stays cf/<id>; the row keeps
+// its provisional name, else its placeholder, until then). The provisional name never
+// names the branch.
 
 // namingResult is one namer call's outcome.
 type namingResult struct {
-	name string
-	err  error
+	Naming
+	err error
 }
 
 // createdWorktree is what newWorktree made.
@@ -59,6 +52,10 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	if err := validateRef(base); err != nil {
 		return nw, err
 	}
+	bc, err := m.newBranchChoice(o.NewWorktree.Branch)
+	if err != nil {
+		return nw, err
+	}
 	projectID := o.ProjectID
 	if projectID == "" {
 		if o.WorktreePath == "" {
@@ -78,12 +75,16 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 		return nw, fmt.Errorf("%w: %s is not a git repository; threads run in its current checkout", ErrFailedPrecondition, r.Name)
 	}
 
-	sl, err := m.waitSlug(ctx, id, name, o.InitialPrompt)
+	sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
 	if err != nil {
 		return nw, err
 	}
 	nw.name, nw.namerCalled, nw.late = sl.name, sl.namerCalled, sl.late
-	branch := m.pickBranch(ctx, []string{r.Path}, sl.slug, id, nil)
+	branch, existing := m.pickBranch(ctx, []string{r.Path}, bc, sl.branch, id, nil)
+	if existing && base != "" {
+		m.log.Info("branch exists; checking it out and ignoring the base", "thread", id, "branch", branch, "base", base)
+		base = ""
+	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
 		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true,
 	})
@@ -93,16 +94,17 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	nw.projectID, nw.path, nw.branch = r.ID, wt.Path, branch
 	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
 	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
-		"path", wt.Path, "base", nw.baseRef)
+		"existing", existing, "path", wt.Path, "base", nw.baseRef)
 	return nw, nil
 }
 
-// slugWait is the outcome of waitSlug.
+// slugWait is the outcome of waitNaming.
 type slugWait struct {
-	// slug for the branch: the explicit name slugified, else the namer's title
-	// slugified, else "" (the caller falls back to the thread id).
-	slug string
-	// name is the namer's title when it arrived within SlugTimeout.
+	// branch is composeBranch's for the reply (or offBranch's): "" falls back to
+	// cf/<id>.
+	branch string
+	// name is the namer's title when it arrived within SlugTimeout and the thread has
+	// no explicit name.
 	name string
 	// namerCalled: the namer was started for this thread (in time or not).
 	namerCalled bool
@@ -110,16 +112,23 @@ type slugWait struct {
 	late <-chan namingResult
 }
 
-// waitSlug picks the slug a new worktree's (or workspace's) branch is named after:
-// name slugified when set, else the namer's title for the first prompt slugified,
-// waiting at most Options.SlugTimeout.
-func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWait, error) {
-	sw := slugWait{slug: slugify(name)}
-	if name != "" || strings.TrimSpace(prompt) == "" {
-		return sw, nil
+// waitNaming runs the namer for a new worktree's (or workspace's) branch and, without
+// an explicit name, the thread's title, waiting at most Options.SlugTimeout. The namer
+// is not called when it has nothing to read (no prompt, name or slug) or nothing to
+// answer (the thread is named and the branch needs no model).
+func (m *Manager) waitNaming(ctx context.Context, id, name, prompt string, bc branchChoice) (slugWait, error) {
+	var sw slugWait
+	req := NamingRequest{Name: name, Branch: bc.branchRequest()}
+	needTitle := name == "" && strings.TrimSpace(prompt) != ""
+	if !needTitle {
+		if req.Branch == nil || (name == "" && bc.hint == "") {
+			sw.branch = composeBranch(bc.cfg, bc.hint, "", "")
+			return sw, nil
+		}
 	}
 	// The worktrees do not exist yet: the namer sees file references as relative paths.
-	ch, err := m.startSlug(id, stripFileRefs(prompt))
+	req.Message = stripFileRefs(prompt)
+	ch, err := m.startSlug(id, req)
 	if err != nil {
 		return sw, err
 	}
@@ -129,17 +138,27 @@ func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWa
 	select {
 	case res := <-ch:
 		timer.Stop()
-		if res.err != nil {
-			m.log.Warn("naming new worktree branch failed; using the thread id", "thread", id, "err", res.err)
-		} else {
-			sw.slug, sw.name = slugify(res.name), res.name
-			m.log.Info("thread auto-named", "thread", id, "name", res.name,
+		switch {
+		case errors.Is(res.err, ErrNamingOff):
+			sw.branch = offBranch(bc, name)
+		case res.err != nil:
+			m.log.Warn("naming new worktree branch failed; using the fallback", "thread", id, "err", res.err)
+			sw.branch = composeBranch(bc.cfg, bc.hint, "", "")
+		default:
+			sw.branch = composeBranch(bc.cfg, bc.hint, res.Branch, res.Title)
+			if name == "" {
+				sw.name = res.Title
+			}
+			m.log.Info("thread auto-named", "thread", id, "name", res.Title, "branch", res.Branch,
 				"took", time.Since(start).Round(time.Millisecond).String())
 		}
 	case <-timer.C:
-		m.log.Info("naming new worktree branch timed out; using the thread id", "thread", id,
+		m.log.Info("naming new worktree branch timed out; using the fallback", "thread", id,
 			"timeout", m.opts.SlugTimeout.String())
-		sw.late = ch
+		sw.branch = composeBranch(bc.cfg, bc.hint, "", "")
+		if name == "" {
+			sw.late = ch
+		}
 	case <-ctx.Done():
 		timer.Stop()
 		return sw, ctx.Err()
@@ -147,10 +166,10 @@ func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWa
 	return sw, nil
 }
 
-// startSlug runs the namer for a first prompt in the background, retrying once after
+// startSlug runs the namer for req in the background, retrying once after
 // NamingRetryDelay when the failure looks like a rate limit. The channel receives
 // exactly one result.
-func (m *Manager) startSlug(id, prompt string) (<-chan namingResult, error) {
+func (m *Manager) startSlug(id string, req NamingRequest) (<-chan namingResult, error) {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
@@ -163,18 +182,18 @@ func (m *Manager) startSlug(id, prompt string) (<-chan namingResult, error) {
 		defer m.wg.Done()
 		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
-		name, err := m.opts.Namer(ctx, prompt)
+		n, err := m.opts.Namer(ctx, req)
 		if isRateLimit(err) {
 			m.log.Info("naming rate limited; retrying once", "thread", id, "err", err)
 			t := time.NewTimer(m.opts.NamingRetryDelay)
 			select {
 			case <-t.C:
-				name, err = m.opts.Namer(ctx, prompt)
+				n, err = m.opts.Namer(ctx, req)
 			case <-ctx.Done():
 				t.Stop()
 			}
 		}
-		ch <- namingResult{name: name, err: err}
+		ch <- namingResult{Naming: n, err: err}
 	}()
 	return ch, nil
 }
@@ -201,43 +220,19 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 			m.log.Warn("auto-naming failed", "thread", id, "err", res.err)
 			return
 		}
+		if res.Title == "" {
+			return
+		}
 		applied := false
-		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(res.name) }); !ok {
+		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(res.Title) }); !ok {
 			return // removed meanwhile
 		}
 		if applied {
-			m.log.Info("thread auto-named after its worktree was created", "thread", id, "name", res.name)
+			m.log.Info("thread auto-named after its worktree was created", "thread", id, "name", res.Title)
 		} else {
-			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", res.name)
+			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", res.Title)
 		}
 	}()
-}
-
-// pickBranch returns cf/<slug>, or cf/<slug>-N when that branch exists locally or on
-// origin in any of projectPaths (or taken reports its name part, "<slug>" or
-// "<slug>-N", as used), or cf/<id> when the slug is empty or every suffix is taken.
-func (m *Manager) pickBranch(ctx context.Context, projectPaths []string, slug, id string, taken func(string) bool) string {
-	if slug == "" {
-		return branchPrefix + id
-	}
-	free := func(b string) bool {
-		for _, p := range projectPaths {
-			if m.opts.RefExists(ctx, p, "refs/heads/"+b) || m.opts.RefExists(ctx, p, "refs/remotes/origin/"+b) {
-				return false
-			}
-		}
-		return true
-	}
-	for i := 1; i <= maxBranchSuffix; i++ {
-		s := slug
-		if i > 1 {
-			s += "-" + strconv.Itoa(i)
-		}
-		if (taken == nil || !taken(s)) && free(branchPrefix+s) {
-			return branchPrefix + s
-		}
-	}
-	return branchPrefix + id
 }
 
 // gitRefExists is the default Options.RefExists.

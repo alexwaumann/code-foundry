@@ -547,7 +547,14 @@ message CreateThreadRequest {
 
 message NewWorktree {
   // Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
+  // Ignored when branch names an existing branch.
   string base_ref = 1;
+  // Steers the branch. With a "/" it is the branch, verbatim; without one it is the
+  // slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a
+  // hint to custom instructions). An existing branch (local or on origin) is checked
+  // out rather than suffixed. Empty: generated from the naming model's reply, else
+  // cf/<thread id>.
+  string branch = 2;
 }
 
 message NewWorkspace {
@@ -557,8 +564,11 @@ message NewWorkspace {
   // Ref every member without its own base branches from. Defaults to
   // origin/<default branch>, else <default branch>, per project.
   string base_ref = 2;
-  // Workspace name. Default: the slug (cf/<slug> without the prefix).
+  // Workspace name. Default: the branch's last component (feat/add-filter ->
+  // add-filter).
   string name = 3;
+  // Steers the one branch of every member, as NewWorktree.branch.
+  string branch = 4;
 }
 
 message StageAttachmentRequest {

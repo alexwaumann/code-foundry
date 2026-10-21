@@ -42,7 +42,7 @@ code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
   --brief "After login users land on / instead of the page they asked for" \
   --labels bug,auth --request-id fix-login-redirect \
   --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR if origin is on GitHub. Your LAST step: code-foundry thread report done \"<one-line summary>\" --data '{\"branch\": \"<branch>\", \"pr\": \"<url>\"}'"
-# created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/cf/fix-the-login-redirect
+# created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/fix-login-redirect
 
 code-foundry thread wait 7d10 --for 1h
 # thread s-3f9a1c2b7d10 Fix the login redirect: needs attention (finished)
@@ -108,7 +108,7 @@ code-foundry thread archive --ids 5e4f,5e6f --yes
 After the first child pushed, the second branches from it, not from main:
 
 ```
-code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/cf/add-filter \
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/feat/add-filter \
   --name "CLI --tag flag" --notify --request-id batch-1018-tag --prompt "..."
 ```
 
@@ -233,7 +233,7 @@ Only on the user's say-so. Ask first whether to delete the branch too, then:
 
 ```
 code-foundry thread remove --id 5e6f --yes
-code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/cf/bump-the-router --yes
+code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/build-bump-router --yes
 ```
 
 `thread remove` stops a working child itself: no `thread interrupt` first. The path
@@ -251,7 +251,7 @@ Before you present a batch, `git fetch origin`, rerun `thread list --project <pr
 id>` (other threads' open branches count too), then check every pair of branches:
 
 ```
-branches=(cf/add-done cf/add-remove cf/add-clear)
+branches=(feat/add-done feat/add-remove feat/add-clear)
 for ((i = 1; i <= ${#branches}; i++)); do for ((j = i + 1; j <= ${#branches}; j++)); do
   a=${branches[i]}; b=${branches[j]}
   if git merge-tree --write-tree --name-only origin/$a origin/$b >/dev/null; then echo "$a + $b: clean"
