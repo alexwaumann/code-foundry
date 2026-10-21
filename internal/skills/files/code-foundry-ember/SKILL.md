@@ -38,8 +38,8 @@ for a plain Read. Never search the disk for a skill or a file (`find /`, `mdfind
    the board shows them before they start.
 4. **Start each piece with one command**: it starts the task's worker in a new worktree,
    sets the task doing and links the two (it sets `--labels ember,<task id> --notify` and
-   the request id itself; you pass none of them). The prompt goes on stdin in a quoted heredoc, never in double quotes:
-   backticks and `$(…)` inside them run in your shell.
+   the request id itself; you pass none of them). The prompt goes on stdin in a quoted
+   heredoc, never in double quotes: backticks and `$(…)` inside them run in your shell.
 
    ```
    code-foundry ember task start --task <task id> --project <project id> \
