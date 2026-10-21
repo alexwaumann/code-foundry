@@ -144,6 +144,10 @@ func TestHandler(t *testing.T) {
 			if res.StatusCode != tc.status {
 				t.Fatalf("status %d, want %d", res.StatusCode, tc.status)
 			}
+			// The opaque-origin page fetches its own files and sees their errors.
+			if got := res.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+				t.Errorf("Access-Control-Allow-Origin = %q, want *", got)
+			}
 			if tc.status != 200 {
 				return
 			}
@@ -154,8 +158,6 @@ func TestHandler(t *testing.T) {
 				"Cache-Control":          "no-store",
 				"Referrer-Policy":        "no-referrer",
 				"X-Content-Type-Options": "nosniff",
-				// The opaque-origin page fetches its own files.
-				"Access-Control-Allow-Origin": "*",
 			} {
 				if got := res.Header.Get(k); got != want {
 					t.Errorf("%s = %q, want %q", k, got, want)

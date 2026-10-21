@@ -143,6 +143,8 @@ func escapeSegment(s string) string {
 // origin: the page is opaque-origin and reads its own files with fetch().
 func Handler(g *Grants, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Any origin, on errors too, so a page's fetch() sees a 404 rather than a CORS failure.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -228,7 +230,6 @@ func serve(w http.ResponseWriter, r *http.Request, p string) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
-	h.Set("Access-Control-Allow-Origin", "*")
 	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads")
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
