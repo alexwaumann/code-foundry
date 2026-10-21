@@ -190,7 +190,8 @@ func (WorktreeRemoved) isProjectEvent() {}
 
 // CreateWorktreeOptions configures Store.CreateWorktree. The path is always the app's:
 // <Options.WorktreeRoot>/<owner>/<repo>/<branch, "/" -> "-">, with _local/<repo name>
-// in place of owner/repo when origin is not on GitHub.
+// in place of owner/repo when origin is not on GitHub, and "-<id prefix>" after it when
+// a project registered earlier has the same directory (worktree_path.go).
 type CreateWorktreeOptions struct {
 	ProjectID string
 	// Branch to check out. If neither a local branch nor origin/<Branch> exists (or

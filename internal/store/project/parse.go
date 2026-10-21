@@ -312,13 +312,11 @@ func worktreeDirName(branch string) string {
 // names cannot start with "_", so it never collides with a real owner.
 const localOwner = "_local"
 
-// defaultWorktreePath is <root>/<owner>/<repo>/<branch, "/" -> "-">, where owner/repo
-// is the GitHub slug, or _local/<repo name> when there is none.
-func defaultWorktreePath(root, slug, name, branch string) string {
-	if slug == "" {
-		slug = localOwner + "/" + name
-	}
-	return filepath.Join(root, filepath.FromSlash(slug), worktreeDirName(branch))
+// defaultWorktreePath is <root>/<key>/<branch, "/" -> "-">, where key is the project's
+// directory (Git.worktreeDirKey: owner/repo for a GitHub slug, else _local/<repo
+// name>, suffixed when another project has it).
+func defaultWorktreePath(root, key, branch string) string {
+	return filepath.Join(root, filepath.FromSlash(key), worktreeDirName(branch))
 }
 
 // refsFormat is the for-each-ref format parseRefs reads. Ref names cannot contain

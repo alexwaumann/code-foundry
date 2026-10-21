@@ -620,10 +620,14 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
 		slug = parseGitHubSlug(string(trimNL(out)))
 	}
-	path := filepath.Clean(defaultWorktreePath(g.wtRoot, slug, m.Name, opts.Branch))
+	path := filepath.Clean(defaultWorktreePath(g.wtRoot, g.worktreeDirKey(m, slug), opts.Branch))
 
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()
+	g.dropStaleWorktrees(ctx, m, path, opts.Branch)
+	if err := requireFree(path); err != nil {
+		return Worktree{}, err
+	}
 	local := g.refExists(ctx, m.Path, "refs/heads/"+opts.Branch)
 	remote := g.refExists(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	var args []string
