@@ -103,10 +103,6 @@ func (bc branchChoice) branchRequest() *BranchRequest {
 	return &BranchRequest{Mode: bc.cfg.Mode, Instructions: bc.cfg.Instructions, Hint: bc.hint}
 }
 
-// userChosen reports whether the user steered the branch with --branch: an existing
-// one is then checked out rather than suffixed.
-func (bc branchChoice) userChosen() bool { return bc.verbatim != "" || bc.hint != "" }
-
 // composeBranch builds a branch for cfg from the namer's branch field (reply), its
 // title (a slug of last resort) and the user's slug (hint, which wins over the
 // model's). "" when there is nothing to build one from. A custom branch is not
