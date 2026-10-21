@@ -15,6 +15,7 @@ import { agentsPanelTarget, openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
+import { jumpToNeighbour } from "./threadNeighbours";
 import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
@@ -166,6 +167,14 @@ export function showView(name: string): boolean {
     case "forward":
       // view.forward: the selection after this one, after going back.
       historyCommand(1);
+      return true;
+    case "thread.previous":
+      // thread.previous: the thread above the current one in the sidebar, wrapping.
+      jumpToNeighbour(-1);
+      return true;
+    case "thread.next":
+      // thread.next: the thread below the current one in the sidebar, wrapping.
+      jumpToNeighbour(1);
       return true;
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a page would hide the panel.

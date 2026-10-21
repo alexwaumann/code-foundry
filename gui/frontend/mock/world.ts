@@ -3352,6 +3352,16 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "forward" } } }))}`,
       },
       {
+        cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: ["cmd+shift+["], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.previous" } } }))}`,
+      },
+      {
+        cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: ["cmd+shift+]"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.next" } } }))}`,
+      },
+      {
         cmd: {
           name: "view.panel.workspace",
           title: "Show Workspace in Side Panel",

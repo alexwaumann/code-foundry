@@ -213,6 +213,18 @@ export function threadOrder(threads: readonly ListThread[], opts: ListOptions = 
 }
 
 /**
+ * The id `by` rows from `current` in `order`, wrapping at both ends (thread.previous and
+ * thread.next, macOS tab switching). From an id not in the order (a page, a thread in a
+ * collapsed section): the first row going down, the last going up. Null when empty.
+ */
+export function neighbourIn(order: readonly string[], current: string | null, by: 1 | -1): string | null {
+  if (order.length === 0) return null;
+  const at = current === null ? -1 : order.indexOf(current);
+  if (at === -1) return (by === 1 ? order[0] : order[order.length - 1]) ?? null;
+  return order[(at + by + order.length) % order.length] ?? null;
+}
+
+/**
  * The next id in `order` after `current` that satisfies `pick`, wrapping around; the
  * first match when `current` is not in the list. Null when nothing matches.
  */
