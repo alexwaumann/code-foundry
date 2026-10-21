@@ -75,12 +75,30 @@ type GitHub struct {
 	DashboardsEnabled   bool
 }
 
-// Projects configures the project store.
+// Projects configures the project store, and how the thread store names the branches
+// of new worktrees and workspaces.
 type Projects struct {
 	FetchIntervalSeconds int // 0 = off
 	// AutoPull fast-forwards checkouts on the default branch after each scheduled
 	// fetch (project.AutoPull); read at every fetch.
 	AutoPull bool
+	// BranchNaming is BranchNamingPrefix, BranchNamingSemantic (default) or
+	// BranchNamingCustom.
+	BranchNaming string
+	// BranchPrefix is prefix mode's first component; BranchPrefixNone for none
+	// (BranchPrefixValue reads it).
+	BranchPrefix string
+	// BranchInstructions are custom mode's instructions to the naming model.
+	BranchInstructions string
+}
+
+// BranchPrefixValue is the prefix branches get in prefix mode: "" for
+// BranchPrefixNone, else BranchPrefix without slashes at its ends.
+func (p Projects) BranchPrefixValue() string {
+	if p.BranchPrefix == BranchPrefixNone {
+		return ""
+	}
+	return strings.Trim(p.BranchPrefix, "/")
 }
 
 // GitOps configures the gitops store.

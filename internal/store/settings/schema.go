@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -200,6 +201,9 @@ const (
 	KeyDashboards           = "github.dashboards_enabled"
 	KeyFetchInterval        = "projects.fetch_interval_seconds"
 	KeyAutoPull             = "projects.auto_pull"
+	KeyBranchNaming         = "projects.branch_naming"
+	KeyBranchPrefix         = "projects.branch_prefix"
+	KeyBranchInstructions   = "projects.branch_instructions"
 	KeyEditorCommand        = "gitops.editor_command"
 	KeyTheme                = "appearance.theme"
 	KeyThemeDark            = "appearance.theme_dark"
@@ -287,6 +291,35 @@ const (
 	WorktreeNew     = "new"
 	WorktreeCurrent = "current"
 )
+
+// projects.branch_naming values (thread.BranchMode*).
+const (
+	BranchNamingPrefix   = "prefix"
+	BranchNamingSemantic = "semantic"
+	BranchNamingCustom   = "custom"
+)
+
+// BranchPrefixNone is the projects.branch_prefix value for no prefix: an empty value
+// resets a setting to its default, so "no prefix" needs a word.
+const BranchPrefixNone = "none"
+
+// branchPrefixJunk matches what a branch prefix may not contain: anything but ASCII
+// letters, digits, '-', '_', '.' and '/'.
+var branchPrefixJunk = regexp.MustCompile(`[^A-Za-z0-9._/-]`)
+
+// checkBranchPrefix validates projects.branch_prefix: BranchPrefixNone, or one or more
+// components of letters, digits, '-', '_' and '.' (a slash between components).
+func checkBranchPrefix(v string) error {
+	p := strings.Trim(v, "/")
+	switch {
+	case v == BranchPrefixNone:
+		return nil
+	case p == "" || branchPrefixJunk.MatchString(p) || strings.HasPrefix(p, "-") || strings.HasPrefix(p, ".") ||
+		strings.Contains(p, "..") || strings.Contains(p, "//") || strings.HasSuffix(p, ".lock") || strings.HasSuffix(p, "."):
+		return fmt.Errorf("want letters, digits, -, _, . and / (or %s for no prefix), got %q", BranchPrefixNone, v)
+	}
+	return nil
+}
 
 // KeybindingKey is the settings key of a command's keybinding override.
 func KeybindingKey(command string) string { return keybindingKeyPrefix + command }
@@ -492,6 +525,31 @@ var staticFields = []Field{
 			"Untracked files don't block it; if git refuses the pull, it is tried again after the next fetch. Does nothing while background fetching is off.",
 		Default: "true",
 		bind:    func(s *Settings) any { return &s.Projects.AutoPull },
+	},
+	{
+		// Read by the thread store at every new worktree or workspace
+		// (internal/store/thread/branchname.go), live.
+		Key: KeyBranchNaming, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Enum, Title: "Branch names",
+		Description: "How a new worktree's branch is named. Semantic: the naming model picks a type (feat, fix, chore, docs, ci, refactor, test, perf, build) and a slug, as in feat/add-search-filter. " +
+			"Prefix: the branch prefix and a slug. Custom: the naming model follows your branch instructions. " +
+			"With automatic naming off there is no model call: prefix mode uses the thread's name, the others cf/<thread id>.",
+		Enum:       []string{BranchNamingSemantic, BranchNamingPrefix, BranchNamingCustom},
+		EnumLabels: []string{"Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"},
+		Default:    BranchNamingSemantic,
+		bind:       func(s *Settings) any { return &s.Projects.BranchNaming },
+	},
+	{
+		Key: KeyBranchPrefix, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch prefix",
+		Description: "Prefix mode: what goes before the slash. " + BranchPrefixNone + " gives a bare slug.",
+		Default:     "cf", Placeholder: "cf", check: checkBranchPrefix,
+		bind: func(s *Settings) any { return &s.Projects.BranchPrefix },
+	},
+	{
+		Key: KeyBranchInstructions, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch instructions",
+		Description: "Custom mode: how the naming model writes the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
+			"Spaces in its answer become dashes; a name git refuses falls back to cf/<thread id>.",
+		Placeholder: "ab/<slug of 2 to 4 words>",
+		bind:        func(s *Settings) any { return &s.Projects.BranchInstructions },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",

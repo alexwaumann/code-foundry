@@ -99,7 +99,8 @@ type MemberSpec struct {
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
 	Name string
-	// Branch for every member. Empty: cf/<Name as a slug>.
+	// Branch for every member. Empty: Options.DefaultBranch's for Name, else
+	// cf/<Name as a slug>.
 	Branch  string
 	Members []MemberSpec
 	// BaseRef is the default base for members without their own.

@@ -2,7 +2,7 @@ package daemon
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -81,19 +81,29 @@ func logLevel(s string) slog.Level {
 }
 
 // errAutoNameOff is what the namer returns when auto-naming is turned off; the thread
-// store logs it and leaves the thread unnamed.
-var errAutoNameOff = errors.New("auto-naming is turned off in settings (threads.auto_name)")
+// store leaves the thread unnamed and names a new worktree's branch without the model.
+var errAutoNameOff = fmt.Errorf("%w in settings (threads.auto_name)", thread.ErrNamingOff)
 
 // settingsNamer wraps next so threads.auto_name and threads.naming_model apply
 // without a restart: each call reads them and hands the model to next with
 // thread.WithNamingModel.
 func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
-	return func(ctx context.Context, msg string) (string, error) {
+	return func(ctx context.Context, req thread.NamingRequest) (thread.Naming, error) {
 		s := st.Settings().Threads
 		if !s.AutoName {
-			return "", errAutoNameOff
+			return thread.Naming{}, errAutoNameOff
 		}
-		return next(thread.WithNamingModel(ctx, s.NamingModel), msg)
+		return next(thread.WithNamingModel(ctx, s.NamingModel), req)
+	}
+}
+
+// branchNaming is the thread store's Options.BranchNaming: projects.branch_naming,
+// branch_prefix and branch_instructions, read at every new worktree or workspace so a
+// change applies without a restart.
+func branchNaming(st *settings.Store) func() thread.BranchNaming {
+	return func() thread.BranchNaming {
+		p := st.Settings().Projects
+		return thread.BranchNaming{Mode: p.BranchNaming, Prefix: p.BranchPrefixValue(), Instructions: p.BranchInstructions}
 	}
 }
 

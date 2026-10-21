@@ -2,8 +2,10 @@ package thread
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -17,10 +19,44 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
-// Namer turns a thread's first user message into a short natural title, such as
-// "Fix the login redirect". The title is the thread's name; a new worktree's branch
-// is cf/<slugify(title)>.
-type Namer func(ctx context.Context, firstMessage string) (string, error)
+// Namer names a thread from its first user message: a short natural title, such as
+// "Fix the login redirect", and, when the request asks (NamingRequest.Branch), a
+// branch for its new worktree in one call (branchname.go composes the branch).
+type Namer func(ctx context.Context, req NamingRequest) (Naming, error)
+
+// NamingRequest is one naming call's input.
+type NamingRequest struct {
+	// Message is the thread's first user message; "" when there is none (a workspace
+	// named by the user, `workspace new`).
+	Message string
+	// Name is the thread's (or workspace's) explicit name: context for the branch. The
+	// reply's title is not used then.
+	Name string
+	// Branch asks for a branch too; nil asks for the title only.
+	Branch *BranchRequest
+}
+
+// BranchRequest is what a naming call is asked about a branch.
+type BranchRequest struct {
+	// Mode is a BranchMode* value: what the branch field holds (a slug, <type>/<slug>,
+	// or the whole branch from Instructions).
+	Mode string
+	// Instructions are custom mode's, verbatim.
+	Instructions string
+	// Hint is the slug the user gave (--branch without a slash): semantic mode only
+	// picks the type, custom mode builds around it.
+	Hint string
+}
+
+// Naming is a naming call's answer. Either field may be empty, not both.
+type Naming struct {
+	Title  string
+	Branch string // the reply's branch field, one line; "" when not asked or missing
+}
+
+// ErrNamingOff is what a Namer returns when naming is turned off (the daemon's
+// threads.auto_name): no model was called.
+var ErrNamingOff = errors.New("auto-naming is turned off")
 
 // maxNamingInput bounds how much of the first message goes into the naming prompt.
 const maxNamingInput = 2000
@@ -114,6 +150,56 @@ const namingPrompt = "Write a short title of 3 to 6 words that names the coding 
 	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
 	"Reply with only the title.\n\nRequest:\n"
 
+// namingTitleRule is how the title is written when a branch is asked for too.
+const namingTitleRule = "Title: a short title of 3 to 6 words that names the coding task, in sentence case " +
+	"(capitalize only the first word and proper nouns), no trailing period, no quotes, no markdown. " +
+	"Example: Fix the login redirect.\n"
+
+// namingSlugRule is how a branch slug is written.
+const namingSlugRule = "2 to 5 lowercase English words joined by dashes (letters, digits and dashes only)"
+
+// buildNamingPrompt is the prompt of a naming call: namingPrompt for a title only, else
+// the title and branch rules, the reply format, the context, and the request.
+func buildNamingPrompt(req NamingRequest) string {
+	msg := req.Message
+	if len(msg) > maxNamingInput {
+		msg = msg[:maxNamingInput]
+	}
+	b := req.Branch
+	if b == nil {
+		return namingPrompt + msg
+	}
+	var p strings.Builder
+	p.WriteString("Name the coding task in the request below twice: a title and a git branch.\n" + namingTitleRule)
+	switch b.Mode {
+	case BranchModePrefix:
+		p.WriteString("Branch: a slug of " + namingSlugRule + ". Example: fix-login-redirect.\n")
+	case BranchModeCustom:
+		p.WriteString("Branch: a complete git branch name (no spaces) written by these instructions:\n" + strings.TrimSpace(b.Instructions) + "\n")
+		if b.Hint != "" {
+			p.WriteString("The user chose the slug " + b.Hint + " for this branch; build the branch around it.\n")
+		}
+	default:
+		types := strings.Join(BranchTypes, ", ")
+		if b.Hint != "" {
+			p.WriteString("Branch: <type>/" + b.Hint + ", where the slug " + b.Hint + " is fixed and you choose only the type, exactly one of: " +
+				types + ". Example: fix/" + b.Hint + ".\n")
+		} else {
+			p.WriteString("Branch: <type>/<slug>, where type is exactly one of: " + types + "; and slug is " + namingSlugRule +
+				". Example: fix/login-redirect.\n")
+		}
+	}
+	p.WriteString("Reply with exactly these two lines and nothing else:\nTitle: <title>\nBranch: <branch>\n")
+	if n := strings.TrimSpace(req.Name); n != "" {
+		p.WriteString("\nThe user named this task: " + n + "\n")
+	}
+	if strings.TrimSpace(msg) == "" {
+		msg = strings.TrimSpace(req.Name)
+	}
+	p.WriteString("\nRequest:\n" + msg)
+	return p.String()
+}
+
 // ClaudeNamer names threads with an independent, non-interactive claude call:
 //
 //	claude -p --model <model> --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>
@@ -134,11 +220,8 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 		log = slog.Default()
 	}
 	var minimal atomic.Bool
-	return func(ctx context.Context, msg string) (string, error) {
-		if len(msg) > maxNamingInput {
-			msg = msg[:maxNamingInput]
-		}
-		prompt := namingPrompt + msg
+	return func(ctx context.Context, req NamingRequest) (Naming, error) {
+		prompt := buildNamingPrompt(req)
 		thread := namingThread(ctx)
 		m := NamingModel(ctx)
 		args := namingArgs(m, minimal.Load())
@@ -153,13 +236,13 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 			}
 		}
 		if err != nil {
-			return "", err
+			return Naming{}, err
 		}
-		title := cleanTitle(out)
-		if title == "" {
-			return "", fmt.Errorf("claude -p: no usable name in %q", out)
+		n := parseNaming(out, req.Branch != nil)
+		if n.Title == "" && n.Branch == "" {
+			return Naming{}, fmt.Errorf("claude -p: no usable name in %q", out)
 		}
-		return title, nil
+		return n, nil
 	}
 }
 
@@ -331,6 +414,70 @@ func cleanTitle(s string) string {
 		return title
 	}
 	return ""
+}
+
+// namingLabel matches a labelled line of a naming reply ("Title: ...", "**Branch:**
+// ...", "- branch = ..."): markdown before and around the label is tolerated.
+var namingLabel = regexp.MustCompile("(?i)^[\\s*_#>`+-]*(title|name|branch)[\\s*_`]*[:=][\\s*_`]*(.*)$")
+
+// parseNaming reads a naming reply. With withBranch it looks for a JSON object with
+// title and branch, else for labelled lines (namingLabel); a field it cannot find is
+// "", and a reply with neither is read as a bare title (cleanTitle), as a title-only
+// call's. A branch with no title gives one made from its last component
+// (feat/add-filter -> "Add filter"). Without withBranch the reply is a bare title.
+func parseNaming(out string, withBranch bool) Naming {
+	if !withBranch {
+		return Naming{Title: cleanTitle(out)}
+	}
+	var n Naming
+	if i, j := strings.IndexByte(out, '{'), strings.LastIndexByte(out, '}'); i >= 0 && j > i {
+		var obj struct {
+			Title  string `json:"title"`
+			Name   string `json:"name"`
+			Branch string `json:"branch"`
+		}
+		if json.Unmarshal([]byte(out[i:j+1]), &obj) == nil {
+			n = Naming{Title: cleanTitle(cmp.Or(obj.Title, obj.Name)), Branch: cleanBranchField(obj.Branch)}
+		}
+	}
+	if n == (Naming{}) {
+		labelled := false
+		for line := range strings.Lines(out) {
+			mm := namingLabel.FindStringSubmatch(strings.TrimSpace(line))
+			if mm == nil {
+				continue
+			}
+			labelled = true
+			switch strings.ToLower(mm[1]) {
+			case "branch":
+				if n.Branch == "" {
+					n.Branch = cleanBranchField(mm[2])
+				}
+			default:
+				if n.Title == "" {
+					n.Title = cleanTitle(mm[2])
+				}
+			}
+		}
+		if !labelled {
+			n.Title = cleanTitle(out)
+		}
+	}
+	if n.Title == "" && n.Branch != "" {
+		n.Title = cleanTitle(slugPart(n.Branch))
+	}
+	return n
+}
+
+// cleanBranchField trims a reply's branch field to one line without quotes, backticks
+// or emphasis around it.
+func cleanBranchField(s string) string {
+	s, _, _ = strings.Cut(strings.TrimSpace(s), "\n")
+	for prev := ""; prev != s; {
+		prev = s
+		s = strings.Trim(strings.TrimSpace(s), titleQuotes+"'")
+	}
+	return s
 }
 
 // firstUserText extracts the text a user typed from a transcript line, if the line

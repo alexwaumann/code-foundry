@@ -38,7 +38,11 @@ type Options struct {
 	// Trust pre-trusts a new member worktree for Claude, as a thread's worktree is
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
-	Now   func() time.Time
+	// DefaultBranch names the branch of a workspace created without one from its name
+	// (the daemon: the thread store's WorkspaceBranch, which follows
+	// projects.branch_naming). Nil, or "": cf/<slug of the name>.
+	DefaultBranch func(ctx context.Context, name string) string
+	Now           func() time.Time
 }
 
 // Manager is the Store backed by SQLite and the project store.
@@ -116,7 +120,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	if err != nil {
 		return Workspace{}, err
 	}
-	branch, err := branchFor(name, o.Branch)
+	branch, err := branchFor(ctx, name, o.Branch, m.opts.DefaultBranch)
 	if err != nil {
 		return Workspace{}, err
 	}
@@ -322,6 +326,12 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 	existed := true
 	if refs, err := m.opts.Projects.ListRefs(ctx, r.ID); err == nil {
 		existed = slices.Contains(refs.Local, branch)
+		if base != "" && !existed && slices.Contains(refs.Remote, "origin/"+branch) {
+			// An existing branch is checked out (tracking origin's), not made again
+			// from the base; a local one already ignores it.
+			m.log.Info("branch exists on origin; checking it out and ignoring the base", "project", r.ID, "branch", branch, "base", base)
+			base = ""
+		}
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
 		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch,

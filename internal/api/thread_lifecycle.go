@@ -27,10 +27,10 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		ModelDefaulted: m.GetModelDefaulted(), EffortDefaulted: m.GetEffortDefaulted(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
-		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef()}
+		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef(), Branch: nw.GetBranch()}
 	}
 	if nw := m.GetNewWorkspace(); nw != nil {
-		o.NewWorkspace = &thread.NewWorkspace{Projects: nw.GetProjects(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
+		o.NewWorkspace = &thread.NewWorkspace{Projects: nw.GetProjects(), BaseRef: nw.GetBaseRef(), Name: nw.GetName(), Branch: nw.GetBranch()}
 	}
 	s, reused, err := h.store.CreateOnce(ctx, m.GetRequestId(), o)
 	if err != nil {

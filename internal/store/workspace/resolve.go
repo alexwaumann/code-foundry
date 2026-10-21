@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"cmp"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -17,7 +18,8 @@ import (
 
 // Pure lookups and validation shared by the Manager and the fake.
 
-// branchPrefix namespaces branches the app derives from a name (as new threads do).
+// branchPrefix namespaces the branch derived from a name when Options.DefaultBranch
+// gives none.
 const branchPrefix = "cf/"
 
 // ResolveWorkspace finds the workspace ref names in snap: by id, then by name, else
@@ -282,9 +284,9 @@ func cleanName(name string) (string, error) {
 
 var slugJunk = regexp.MustCompile(`[^a-z0-9]+`)
 
-// slug turns a name into a branch component: lowercase ASCII letters and digits
+// Slug turns a name into a branch component: lowercase ASCII letters and digits
 // joined by single dashes, at most 60 bytes.
-func slug(name string) string {
+func Slug(name string) string {
 	s := strings.Trim(slugJunk.ReplaceAllString(strings.ToLower(name), "-"), "-")
 	if len(s) > 60 {
 		s = strings.TrimRight(s[:60], "-")
@@ -292,15 +294,21 @@ func slug(name string) string {
 	return s
 }
 
-// branchFor is the branch a workspace gets: the given one, else cf/<slug of name>.
-func branchFor(name, branch string) (string, error) {
+// branchFor is the branch a workspace gets: the given one, else derive's for name
+// (Options.DefaultBranch: the branch naming settings), else cf/<slug of name>.
+func branchFor(ctx context.Context, name, branch string, derive func(context.Context, string) string) (string, error) {
 	branch = strings.TrimSpace(branch)
 	if branch == "" {
-		s := slug(name)
+		s := Slug(name)
 		if s == "" {
 			return "", fmt.Errorf("%w: cannot derive a branch from name %q; pass a branch", ErrInvalidArgument, name)
 		}
-		branch = branchPrefix + s
+		if derive != nil {
+			branch = derive(ctx, name)
+		}
+		if branch == "" {
+			branch = branchPrefix + s
+		}
 	}
 	return branch, validateRef("branch", branch)
 }

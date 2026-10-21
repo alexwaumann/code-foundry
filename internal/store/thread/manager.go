@@ -52,6 +52,9 @@ type Options struct {
 	// /tmp, which names with model.NamingDefault unless the ctx carries
 	// WithNamingModel (the daemon's settingsNamer sets it per call).
 	Namer Namer
+	// BranchNaming returns the branch naming settings, read at every new worktree or
+	// workspace (branchname.go). Default: DefaultBranchNaming.
+	BranchNaming func() BranchNaming
 	// AttachmentsDir is where StageAttachment writes images and PDFs. Empty disables
 	// attachments. New creates it and removes files older than
 	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
@@ -129,7 +132,7 @@ type Options struct {
 	WakeTimeout    time.Duration
 	StatusDebounce time.Duration // default 100ms
 	// SlugTimeout bounds how long Create waits for the namer before naming a new
-	// worktree's branch after the thread id. Default 6s.
+	// worktree's branch after the thread id. Default 10s.
 	SlugTimeout time.Duration
 	// NamingRetryDelay is the pause before the one retry of a rate-limited naming
 	// call. Default 2s.
@@ -195,6 +198,9 @@ func (o Options) withDefaults() (Options, error) {
 	if o.Namer == nil {
 		o.Namer = ClaudeNamer(o.Claude, "/tmp", o.Log)
 	}
+	if o.BranchNaming == nil {
+		o.BranchNaming = DefaultBranchNaming
+	}
 	if o.Home == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -214,7 +220,7 @@ func (o Options) withDefaults() (Options, error) {
 		}
 	}
 	def(&o.NamingTimeout, 20*time.Second)
-	def(&o.SlugTimeout, 6*time.Second)
+	def(&o.SlugTimeout, 10*time.Second)
 	def(&o.NamingRetryDelay, 2*time.Second)
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
@@ -1127,11 +1133,12 @@ func (m *Manager) startNaming(id, msg string) {
 		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		start := time.Now()
-		name, err := m.opts.Namer(ctx, msg)
+		n, err := m.opts.Namer(ctx, NamingRequest{Message: msg})
 		if err != nil {
 			m.log.Warn("auto-naming failed", "thread", id, "err", err)
 			return
 		}
+		name := n.Title
 		applied := false
 		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(name) }); !ok {
 			return // removed meanwhile

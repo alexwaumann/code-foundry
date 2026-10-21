@@ -445,8 +445,12 @@ type RunInTarget struct {
 // NewWorktree configures the worktree Create makes.
 type NewWorktree struct {
 	// BaseRef to branch from. Empty means origin/<default branch>, else <default
-	// branch>.
+	// branch>. Ignored when Branch names an existing branch.
 	BaseRef string
+	// Branch steers the branch (`thread new --branch`): with a slash it is the branch,
+	// else the slug the projects.branch_naming mode wraps. An existing one is checked
+	// out. Empty: generated (branchname.go).
+	Branch string
 }
 
 // Store is the thread store API. *Manager implements it; threadtest.Fake is an

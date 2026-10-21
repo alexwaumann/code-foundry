@@ -2087,7 +2087,14 @@ func (x *CreateThreadRequest) GetEffortDefaulted() bool {
 type NewWorktree struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
-	BaseRef       string `protobuf:"bytes,1,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
+	// Ignored when branch names an existing branch.
+	BaseRef string `protobuf:"bytes,1,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
+	// Steers the branch. With a "/" it is the branch, verbatim; without one it is the
+	// slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a
+	// hint to custom instructions). An existing branch (local or on origin) is checked
+	// out rather than suffixed. Empty: generated from the naming model's reply, else
+	// cf/<thread id>.
+	Branch        string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2129,6 +2136,13 @@ func (x *NewWorktree) GetBaseRef() string {
 	return ""
 }
 
+func (x *NewWorktree) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
 type NewWorkspace struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Projects (id, name when unique, or an absolute path inside one), in member
@@ -2137,8 +2151,11 @@ type NewWorkspace struct {
 	// Ref every member without its own base branches from. Defaults to
 	// origin/<default branch>, else <default branch>, per project.
 	BaseRef string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Workspace name. Default: the slug (cf/<slug> without the prefix).
-	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Workspace name. Default: the branch's last component (feat/add-filter ->
+	// add-filter).
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Steers the one branch of every member, as NewWorktree.branch.
+	Branch        string `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2190,6 +2207,13 @@ func (x *NewWorkspace) GetBaseRef() string {
 func (x *NewWorkspace) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *NewWorkspace) GetBranch() string {
+	if x != nil {
+		return x.Branch
 	}
 	return ""
 }
@@ -5059,13 +5083,15 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"in_sidebar\x18\x15 \x01(\bH\x00R\tinSidebar\x88\x01\x01\x12'\n" +
 	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +
 	"\x10effort_defaulted\x18\x17 \x01(\bR\x0feffortDefaultedB\r\n" +
-	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"(\n" +
+	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"@\n" +
 	"\vNewWorktree\x12\x19\n" +
-	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"Y\n" +
+	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\x12\x16\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\"q\n" +
 	"\fNewWorkspace\x12\x1a\n" +
 	"\bprojects\x18\x01 \x03(\tR\bprojects\x12\x19\n" +
 	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"\x87\x01\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
+	"\x06branch\x18\x04 \x01(\tR\x06branch\"\x87\x01\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
