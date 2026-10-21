@@ -181,6 +181,8 @@ type Git struct {
 	files   fileCollector // live worktrees' file changes (files.go)
 	// autoPull is the daemon's auto pull hooks and the passes running (autopull.go).
 	autoPull autoPullState
+	// fetches runs the fetch loop's fetches (fetchpool.go).
+	fetches fetchPool
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -249,7 +251,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {
 		// Every project is due in the first round (zero seed), shortly after start.
 		s := newTierSched(t, time.Time{})
-		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetch) })
+		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchAsync) })
 	}
 	if t := tiers(opts.PollInterval, opts.IdlePollInterval, DefaultPollInterval, DefaultIdlePollInterval); t.live > 0 {
 		// The initial reconcile below refreshes everything, so each project's first
