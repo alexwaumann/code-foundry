@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // Wake subscriptions (docs/notes/agents-4-wake.md). Claude Code is turn-based: a
@@ -141,7 +142,10 @@ type Subscription struct {
 	// Args are a plugin target's (subscriptions_plugin.go); nil for the others.
 	Args map[string]string
 	// Repeat: fires on every transition into the condition; else it goes once it fired.
-	Repeat    bool
+	Repeat bool
+	// Note is why the subscriber asked to be woken (SubscribeOptions.Note); its wake
+	// carries it. "" for none.
+	Note      string
 	CreatedAt time.Time
 	// FiredCount counts the wakes it queued (one dropped by the wake limit does not
 	// count); LastFiredAt is the latest, zero before the first.
@@ -155,6 +159,31 @@ type Subscription struct {
 	// Filled by Subscriptions at read time, not persisted: the subscriber's and the
 	// target's names (a run's: its action's), and the target's state in words.
 	SubscriberName, TargetName, TargetStatus string
+	// A timer's next fire (its time, or its interval's next slot) and interval (zero
+	// for a one-shot), filled by Subscriptions (DescribeTimer); zero for the others.
+	NextAt time.Time
+	Every  time.Duration
+}
+
+// MaxNote is the longest SubscribeOptions.Note, in characters.
+const MaxNote = 200
+
+// SubscriptionsChanged is published on the bus (bus.Publish[SubscriptionsChanged])
+// whenever a subscriber's subscriptions change: one added, removed, fired (a repeat
+// one's count and a timer's next fire), or its note or repeat flag rewritten. The Ember
+// store follows its resident's timers with it.
+type SubscriptionsChanged struct {
+	SubscriberID string
+}
+
+// CleanNote is a subscription note as stored: on one line (whitespace runs as one
+// space), at most MaxNote characters (ErrInvalidArgument beyond).
+func CleanNote(note string) (string, error) {
+	note = strings.Join(strings.Fields(note), " ")
+	if n := utf8.RuneCountInString(note); n > MaxNote {
+		return "", fmt.Errorf("%w: a note is at most %d characters, not %d", ErrInvalidArgument, MaxNote, n)
+	}
+	return note, nil
 }
 
 // SubscribeOptions configures Store.Subscribe: exactly one of TargetThreadID,
@@ -176,6 +205,9 @@ type SubscribeOptions struct {
 	Args        map[string]string
 	Condition   Condition
 	Repeat      bool
+	// Note says why (at most MaxNote characters, kept on one line): the wake carries
+	// it, the listings show it. Subscribing again with a note replaces the note.
+	Note string
 }
 
 // SubscribeResult is Store.Subscribe's answer.
@@ -185,7 +217,7 @@ type SubscribeResult struct {
 	// one-shot subscription is then not kept).
 	Fired bool
 	// Existed: the same subscriber, target and condition was subscribed already; it is
-	// returned (Repeat updated) and nothing fired.
+	// returned (Repeat updated, and Note when one was given) and nothing fired.
 	Existed bool
 }
 
@@ -224,6 +256,9 @@ type subscriptions struct {
 	noted map[string]time.Time
 	// queues are the deliveries waiting for each subscriber's drain goroutine.
 	queues map[string]*wakeQueue
+	// changed tells the bus a subscriber's subscriptions changed (SubscriptionsChanged);
+	// nil: nobody is told.
+	changed func(subscriber string)
 	// watch is Options.WatchPullRequests; watched the set it was last told.
 	watch   func(targets []string)
 	watched []string
@@ -396,6 +431,10 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	if subscriber == "" {
 		return SubscribeResult{}, fmt.Errorf("%w: a subscriber thread is required", ErrInvalidArgument)
 	}
+	note, err := CleanNote(o.Note)
+	if err != nil {
+		return SubscribeResult{}, err
+	}
 	var run ActionRun
 	var pr *PullRequestInfo
 	var args map[string]string
@@ -433,7 +472,7 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	}
 	res, err := m.subscribe(Subscription{
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
-		Repeat: repeat, CreatedAt: now,
+		Repeat: repeat, Note: note, CreatedAt: now,
 	}, run, pr)
 	if err == nil {
 		m.rewait(subscriber) // it may wait on the target now (waiting.go)
@@ -503,11 +542,13 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	for _, r := range s.byID {
 		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
 			maps.Equal(r.s.Args, sub.Args) {
-			if r.s.Repeat != sub.Repeat {
+			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) {
 				r.s.Repeat = sub.Repeat
+				r.s.Note = cmp.Or(sub.Note, r.s.Note)
 				if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
 					return SubscribeResult{}, err
 				}
+				s.changedLocked(sub.SubscriberID)
 			}
 			return SubscribeResult{Subscription: r.s, Existed: true}, nil
 		}
@@ -541,6 +582,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	s.byID[sub.ID] = r
 	s.syncWatchLocked()
 	s.notePluginLocked(r.s, true)
+	s.changedLocked(sub.SubscriberID)
 	m.log.Info("wake subscription added", "subscription", sub.ID, "subscriber", sub.SubscriberID, "target_kind", sub.TargetKind,
 		"target", sub.TargetID, "condition", sub.Condition, "repeat", sub.Repeat, "fired", fired)
 	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
@@ -640,6 +682,15 @@ func (s *subscriptions) firedLocked(r *subRec) {
 	if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
 		s.log.Error("persist wake subscription", "subscription", r.s.ID, "err", err)
 	}
+	s.changedLocked(r.s.SubscriberID)
+}
+
+// changedLocked tells the bus subscriber's subscriptions changed. Callers hold s.mu
+// (bus.Publish never blocks).
+func (s *subscriptions) changedLocked(subscriber string) {
+	if s.changed != nil {
+		s.changed(subscriber)
+	}
 }
 
 // removeLocked forgets subscriptions, in memory and in the database. Callers hold s.mu.
@@ -647,9 +698,13 @@ func (s *subscriptions) removeLocked(ids []string) {
 	if len(ids) == 0 {
 		return
 	}
+	var subscribers []string
 	for _, id := range ids {
 		if r, ok := s.byID[id]; ok {
 			s.notePluginLocked(r.s, false)
+			if !slices.Contains(subscribers, r.s.SubscriberID) {
+				subscribers = append(subscribers, r.s.SubscriberID)
+			}
 		}
 		delete(s.byID, id)
 	}
@@ -658,6 +713,9 @@ func (s *subscriptions) removeLocked(ids []string) {
 		s.log.Error("delete wake subscriptions", "subscriptions", ids, "err", err)
 	}
 	s.syncWatchLocked()
+	for _, id := range subscribers {
+		s.changedLocked(id)
+	}
 }
 
 // syncWatchLocked tells Options.WatchPullRequests the pull requests the subscriptions
@@ -817,7 +875,7 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 		case TargetPlugin:
 			s.describePlugin(sub)
 		case TargetTimer:
-			describeTimer(sub, m.opts.Now())
+			DescribeTimer(sub, m.opts.Now())
 		}
 	}
 	sortSubscriptions(out)

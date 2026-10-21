@@ -168,10 +168,11 @@ its own thread". Messages to workers go on stdin too: `--text - <<'EOF'`.
   your last turn at its spending limit (now raised); check what your last command did,
   then continue"`, `ember task update <task id> --state doing`.
 - **Later.** "Check again in 20 minutes" or "remind me at 3" is a timer:
-  `code-foundry thread subscribe --at 20m --note "<why>"` (a duration or an RFC 3339
-  time; `--every 5m` repeats). `thread subscriptions` lists yours, `thread unsubscribe
-  <sub id>` cancels one; a ping "until it is done" you unsubscribe in the wake that
-  finishes the work. "Tell me when it's done" needs no timer: the worker's wake does it.
+  `code-foundry thread subscribe --at 20m --note "<what to tell the user> (t-…)"` (a
+  duration or an RFC 3339 time; `--every 5m` repeats; the wake and the board show the
+  note). `thread subscriptions` lists yours, `thread unsubscribe <sub id>` cancels one;
+  a ping "until it is done" you unsubscribe in the wake that finishes the work. "Tell
+  me when it's done" needs no timer: the worker's wake does it.
 - **Cancel.** `code-foundry thread archive --id <worker> --yes` stops the worker. Then
   look before you say what is left: `git -C <worktree> status --short` (uncommitted),
   `git -C <worktree> log --oneline origin/main..HEAD` (commits) and `git -C <worktree>

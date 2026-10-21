@@ -5,7 +5,7 @@
  * panel's scroll target.
  */
 import { create } from "zustand";
-import type { EmberBoardView, EmberTaskView } from "@/api/ember";
+import type { EmberBoardView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import { watchEmberBoard } from "@/api/ember";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream } from "@/api/stream";
@@ -34,6 +34,7 @@ interface EmberState {
 export const useEmberStore = create<EmberState>()(() => ({ board: null, error: null, focus: null }));
 
 const NO_TASKS: readonly EmberTaskView[] = [];
+const NO_TIMERS: readonly EmberTimerView[] = [];
 
 // ---------- the board stream ----------
 
@@ -144,11 +145,17 @@ export function useLinkMeta(taskId: string): string {
   return useEmberStore((s) => linkMeta(s.board?.tasks ?? NO_TASKS, taskId).join(" · "));
 }
 
-/** The Board panel's header counts: cards in progress and up next. */
-export function useBoardCounts(now: number): { inProgress: number; upNext: number } {
+/** The Board panel's header counts: cards in progress and up next, and Ember's pending timers. */
+export function useBoardCounts(now: number): { inProgress: number; upNext: number; scheduled: number } {
   const inProgress = useEmberStore((s) => boardSections(s.board?.tasks ?? NO_TASKS, now).inProgress.length);
   const upNext = useEmberStore((s) => boardSections(s.board?.tasks ?? NO_TASKS, now).upNext.length);
-  return { inProgress, upNext };
+  const scheduled = useEmberStore((s) => s.board?.timers.length ?? 0);
+  return { inProgress, upNext, scheduled };
+}
+
+/** Ember's pending timers, soonest first (the Board's Scheduled section). */
+export function useEmberTimers(): readonly EmberTimerView[] {
+  return useEmberStore((s) => s.board?.timers ?? NO_TIMERS);
 }
 
 // ---------- the Board panel's target ----------

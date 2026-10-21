@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 func TestFormatEvery(t *testing.T) {
@@ -94,13 +96,17 @@ func TestTimerWakeMessage(t *testing.T) {
 	due := time.Date(2026, 10, 20, 14, 30, 0, 0, time.UTC)
 	at := due.Add(4 * time.Second)
 	for _, tt := range []struct {
-		target, want, every, setAt string
+		target, note, want, every, setAt string
 	}{
-		{target: "every:30m", want: "Timer sub-1 fired at " + clockTime(at, at) + " (every 30m).", every: "30m"},
-		{target: timerTarget(due, 0), want: "Timer sub-1 fired at " + clockTime(at, at) + " (set for " + clockTime(due, at) + ").",
+		{target: "every:30m", want: "Timer sub-1 fired at " + ClockTime(at, at) + " (every 30m).", every: "30m"},
+		{target: timerTarget(due, 0), want: "Timer sub-1 fired at " + ClockTime(at, at) + " (set for " + ClockTime(due, at) + ").",
 			setAt: "2026-10-20T14:30:00.000Z"},
+		{target: timerTarget(due, 0), note: "remind the user to review the PWA branch (t-aa39dec3)",
+			want:  "Timer sub-1 fired at " + ClockTime(at, at) + " (set for " + ClockTime(due, at) + "): remind the user to review the PWA branch (t-aa39dec3).",
+			setAt: "2026-10-20T14:30:00.000Z"},
+		{target: "every:2m", note: "Ping the user.", want: "Timer sub-1 fired at " + ClockTime(at, at) + " (every 2m): Ping the user.", every: "2m"},
 	} {
-		msg := timerWake(Subscription{ID: "sub-1", TargetKind: TargetTimer, TargetID: tt.target, Condition: CondFired}, due, at)
+		msg := timerWake(Subscription{ID: "sub-1", TargetKind: TargetTimer, TargetID: tt.target, Condition: CondFired, Note: tt.note}, due, at)
 		if msg.WakeTitle != tt.want || msg.Origin != OriginWake || !strings.HasPrefix(msg.Text, wakePrefix+tt.want+"\n```json\n") {
 			t.Errorf("%s: wake = %+v", tt.target, msg)
 		}
@@ -109,7 +115,8 @@ func TestTimerWakeMessage(t *testing.T) {
 			t.Fatal(err)
 		}
 		if p["kind"] != "timer" || p["subscription_id"] != "sub-1" || p["condition"] != "fired" || p["fired_at"] != "2026-10-20T14:30:04.000Z" ||
-			p["due_at"] != "2026-10-20T14:30:00.000Z" || (tt.every != "" && p["every"] != tt.every) || (tt.setAt != "" && p["at"] != tt.setAt) {
+			p["due_at"] != "2026-10-20T14:30:00.000Z" || (tt.every != "" && p["every"] != tt.every) || (tt.setAt != "" && p["at"] != tt.setAt) ||
+			(tt.note != "" && p["note"] != tt.note) || (tt.note == "" && p["note"] != nil) {
 			t.Errorf("%s: payload = %v", tt.target, p)
 		}
 	}
@@ -286,4 +293,93 @@ func TestTimerWakeLimit(t *testing.T) {
 	}
 	clk.advance(time.Hour) // the window rolled
 	e.waitItems(sub.ID, "the wake after the window", func(items []Item) bool { return len(wakes(items)) == 2 })
+}
+
+func TestCleanNote(t *testing.T) {
+	for _, tt := range []struct {
+		in, want string
+		bad      bool
+	}{
+		{in: "", want: ""},
+		{in: "  remind the user\n  to review   t-aa39dec3 ", want: "remind the user to review t-aa39dec3"},
+		{in: strings.Repeat("é", MaxNote), want: strings.Repeat("é", MaxNote)},
+		{in: strings.Repeat("x", MaxNote+1), bad: true},
+	} {
+		got, err := CleanNote(tt.in)
+		if tt.bad != errors.Is(err, ErrInvalidArgument) || got != tt.want {
+			t.Errorf("CleanNote(%q) = %q, %v", tt.in, got, err)
+		}
+	}
+}
+
+// A timer's note is kept, listed, persisted, replaced by a second subscribe that gives
+// one, and carried by the wake; the changes are published as SubscriptionsChanged.
+func TestTimerNote(t *testing.T) {
+	clk := newTestClock()
+	e := newEnv(t, clk.opts(), timerOpts)
+	changes := bus.Subscribe[SubscriptionsChanged](e.bus, 64)
+	defer changes.Close()
+	sub := e.stopped("noted")
+	changed := func(what string) {
+		t.Helper()
+		select {
+		case ev := <-changes.C():
+			if ev.SubscriberID != sub.ID {
+				t.Errorf("%s: subscriber %q", what, ev.SubscriberID)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: no SubscriptionsChanged", what)
+		}
+	}
+	at := clk.Now().Add(10 * time.Minute)
+	if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: sub.ID, TargetAt: at, Note: strings.Repeat("x", MaxNote+1)}); !errors.Is(err, ErrInvalidArgument) {
+		t.Errorf("a long note: err = %v, want invalid argument", err)
+	}
+	res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: sub.ID, TargetAt: at, Note: "review the\nPWA branch"})
+	if err != nil || res.Subscription.Note != "review the PWA branch" {
+		t.Fatalf("Subscribe = %+v, %v", res, err)
+	}
+	changed("subscribe")
+	listed, ok := e.subscription(res.Subscription.ID)
+	if !ok || listed.Note != "review the PWA branch" || !listed.NextAt.Equal(at.Truncate(time.Millisecond)) || listed.Every != 0 {
+		t.Errorf("listed = %+v (%v)", listed, ok)
+	}
+	// Again without a note keeps it; with one replaces it.
+	if again, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: sub.ID, TargetAt: at}); err != nil || !again.Existed ||
+		again.Subscription.Note != "review the PWA branch" {
+		t.Errorf("again = %+v, %v", again, err)
+	}
+	if again, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: sub.ID, TargetAt: at, Note: "review PR #12"}); err != nil ||
+		!again.Existed || again.Subscription.Note != "review PR #12" {
+		t.Errorf("again with a note = %+v, %v", again, err)
+	}
+	changed("the note replaced")
+	every, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: sub.ID, TargetEvery: 30 * time.Minute, Note: "ping"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed("a second timer")
+	if got, _ := e.subscription(every.Subscription.ID); got.Every != 30*time.Minute || !got.NextAt.Equal(every.Subscription.CreatedAt.Add(30*time.Minute)) {
+		t.Errorf("every listed = %+v", got)
+	}
+
+	// The note survives a restart.
+	if err := e.m.Shutdown(e.ctx()); err != nil {
+		t.Fatal(err)
+	}
+	e.open(clk.opts(), timerOpts)
+	if got, ok := e.subscription(res.Subscription.ID); !ok || got.Note != "review PR #12" {
+		t.Errorf("after the restart = %+v (%v)", got, ok)
+	}
+
+	// The wake carries it; the one-shot goes.
+	clk.advance(11 * time.Minute)
+	e.waitItems(sub.ID, "the wake", func([]Item) bool { return len(e.timerWakes(sub.ID)) == 1 })
+	w := e.timerWakes(sub.ID)[0]
+	if !strings.HasSuffix(w.WakeTitle, "): review PR #12.") || !strings.Contains(w.WakeJSON, `"note": "review PR #12"`) {
+		t.Errorf("wake = %q %s", w.WakeTitle, w.WakeJSON)
+	}
+	if _, kept := e.subscription(res.Subscription.ID); kept {
+		t.Error("the one-shot was kept")
+	}
 }

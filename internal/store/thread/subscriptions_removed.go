@@ -27,6 +27,7 @@ const CondRemoved Condition = "removed"
 type wakeRemovedPayload struct {
 	Kind           string            `json:"kind"`
 	SubscriptionID string            `json:"subscription_id"`
+	Note           string            `json:"note,omitempty"`
 	Condition      Condition         `json:"condition"`
 	FiredAt        string            `json:"fired_at"`
 	Thread         wakeRemovedThread `json:"thread"`
@@ -73,7 +74,7 @@ func (m *Manager) fireRemovedLocked(r RemovedThread) {
 
 // removedWake is the removed wake of sub about r, fired at.
 func removedWake(sub Subscription, r RemovedThread, at time.Time) Message {
-	p := wakeRemovedPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: CondRemoved, FiredAt: wakeTime(at), Thread: wakeRemovedThread{
+	p := wakeRemovedPayload{Kind: "thread", SubscriptionID: sub.ID, Note: sub.Note, Condition: CondRemoved, FiredAt: wakeTime(at), Thread: wakeRemovedThread{
 		ID: r.ID, Name: r.Name, ProjectID: r.ProjectID, CreatedBy: r.CreatedBy, Labels: r.Labels,
 		RemovedAt: wakeTime(r.RemovedAt), Report: wakeReportOf(r.Report),
 	}}

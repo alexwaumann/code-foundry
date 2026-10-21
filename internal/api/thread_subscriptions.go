@@ -49,7 +49,7 @@ func subscriptionToProto(s thread.Subscription) *v1.ThreadSubscription {
 	p := &v1.ThreadSubscription{
 		Id: s.ID, SubscriberThreadId: s.SubscriberID, Target: subscriptionTargets[s.TargetKind], TargetId: s.TargetID,
 		Repeat: s.Repeat, FiredCount: int64(s.FiredCount),
-		SubscriberName: s.SubscriberName, TargetName: s.TargetName, TargetStatus: s.TargetStatus, Args: s.Args,
+		SubscriberName: s.SubscriberName, TargetName: s.TargetName, TargetStatus: s.TargetStatus, Args: s.Args, Note: s.Note,
 	}
 	for v, c := range subscriptionConditions {
 		if c == s.Condition {
@@ -82,7 +82,7 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 	o := thread.SubscribeOptions{
 		SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
 		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(), Args: m.GetArgs(),
-		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
+		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(), Note: m.GetNote(),
 	}
 	if m.GetTargetAt() != nil {
 		o.TargetAt = m.GetTargetAt().AsTime()

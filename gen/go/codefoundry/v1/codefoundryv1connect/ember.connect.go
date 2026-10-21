@@ -47,9 +47,10 @@ type EmberServiceClient interface {
 	GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error)
 	// ListTasks lists the board's tasks, each with its worker thread's progress.
 	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
-	// WatchBoard sends the whole board (status and every task) at once, then again on
-	// every change: a task, Ember's state, or a task's worker thread (its status or
-	// report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
+	// WatchBoard sends the whole board (status, every task and Ember's timers) at once,
+	// then again on every change: a task, Ember's state, a task's worker thread (its
+	// status or report), or one of Ember's timers (added, fired, cancelled). A quiet
+	// board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
 	WatchBoard(context.Context, *connect.Request[v1.WatchEmberBoardRequest]) (*connect.ServerStreamForClient[v1.EmberBoard], error)
 }
 
@@ -113,9 +114,10 @@ type EmberServiceHandler interface {
 	GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error)
 	// ListTasks lists the board's tasks, each with its worker thread's progress.
 	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
-	// WatchBoard sends the whole board (status and every task) at once, then again on
-	// every change: a task, Ember's state, or a task's worker thread (its status or
-	// report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
+	// WatchBoard sends the whole board (status, every task and Ember's timers) at once,
+	// then again on every change: a task, Ember's state, a task's worker thread (its
+	// status or report), or one of Ember's timers (added, fired, cancelled). A quiet
+	// board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
 	WatchBoard(context.Context, *connect.Request[v1.WatchEmberBoardRequest], *connect.ServerStream[v1.EmberBoard]) error
 }
 

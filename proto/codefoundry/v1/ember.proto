@@ -16,9 +16,10 @@ service EmberService {
   rpc GetStatus(GetEmberStatusRequest) returns (GetEmberStatusResponse) {}
   // ListTasks lists the board's tasks, each with its worker thread's progress.
   rpc ListTasks(ListEmberTasksRequest) returns (ListEmberTasksResponse) {}
-  // WatchBoard sends the whole board (status and every task) at once, then again on
-  // every change: a task, Ember's state, or a task's worker thread (its status or
-  // report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
+  // WatchBoard sends the whole board (status, every task and Ember's timers) at once,
+  // then again on every change: a task, Ember's state, a task's worker thread (its
+  // status or report), or one of Ember's timers (added, fired, cancelled). A quiet
+  // board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
   rpc WatchBoard(WatchEmberBoardRequest) returns (stream EmberBoard) {}
 }
 
@@ -139,13 +140,30 @@ message EmberTaskDescendant {
   int32 depth = 9;
 }
 
-// EmberBoard is the status and every task, in board order.
+// EmberBoard is the status, every task in board order, and Ember's pending timers.
 message EmberBoard {
   EmberStatus status = 1;
   repeated EmberTask tasks = 2;
   // WatchBoard only: nothing else was sent for a while (see StreamHeartbeat). A
   // heartbeat carries no board: status and tasks are unset, and the last board stands.
   StreamHeartbeat heartbeat = 3;
+  // The resident thread's timer wake subscriptions (thread subscribe --at/--every), by
+  // next fire, soonest first (docs/notes/ember-fixes-2-timers.md). Cancel one with
+  // thread.unsubscribe <id>.
+  repeated EmberTimer timers = 4;
+}
+
+// EmberTimer is one of Ember's pending timers: a wake subscription of its thread.
+message EmberTimer {
+  // The subscription id, "sub-" + 12 hex digits.
+  string id = 1;
+  // When it fires next: a one-shot's time, or a repeating timer's next slot.
+  google.protobuf.Timestamp next_at = 2;
+  // A repeating timer's interval as people write it ("2m", "1h30m"); "" for a one-shot.
+  string every = 3;
+  // Why Ember set it (thread subscribe --note); "" for none.
+  string note = 4;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 message GetEmberStatusRequest {}

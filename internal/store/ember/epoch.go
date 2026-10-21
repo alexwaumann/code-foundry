@@ -86,7 +86,8 @@ func (s *Store) buildSeed(ctx context.Context, id string) (seedParts, error) {
 	s.memMu.Lock()
 	memory := s.readFile(memoryFile)
 	s.memMu.Unlock()
-	board := RenderBoard(s.Snapshot().Tasks, now, loc)
+	snap := s.Snapshot()
+	board := RenderBoard(snap.Tasks, snap.Timers, now, loc)
 	projects := RenderProjects(s.projectSeeds()) + RenderSkills(s.opts.OrchestrateSkill)
 	var msgs []Message
 	if id != "" {

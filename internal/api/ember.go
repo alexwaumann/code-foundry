@@ -10,6 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // EmberStore is the Ember store (*ember.Store) as EmberService reads it. The board is
@@ -96,6 +97,18 @@ func EmberBoardToProto(s *ember.Snapshot) *v1.EmberBoard {
 	out := &v1.EmberBoard{Status: EmberStatusToProto(s.Status), Tasks: make([]*v1.EmberTask, len(s.Tasks))}
 	for i, t := range s.Tasks {
 		out.Tasks[i] = EmberTaskToProto(t)
+	}
+	for _, t := range s.Timers {
+		out.Timers = append(out.Timers, EmberTimerToProto(t))
+	}
+	return out
+}
+
+// EmberTimerToProto converts one of Ember's timers.
+func EmberTimerToProto(t ember.Timer) *v1.EmberTimer {
+	out := &v1.EmberTimer{Id: t.ID, NextAt: optionalTime(t.NextAt), Note: t.Note, CreatedAt: optionalTime(t.CreatedAt)}
+	if t.Every > 0 {
+		out.Every = thread.FormatEvery(t.Every)
 	}
 	return out
 }

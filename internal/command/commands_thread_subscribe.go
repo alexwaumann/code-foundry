@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	threadstore "github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // Wake subscriptions (docs/notes/agents-4-wake.md, docs/notes/gh-events-3-pr-wake.md,
@@ -151,8 +152,17 @@ func parseWakeArgs(raw string) (map[string]string, error) {
 }
 
 // subscriptionLine is one subscription in a message: "sub-1: s-p wakes when thread s-c
-// is settled (repeat)".
+// is settled (repeat)", then " · <note>" when it has one.
 func subscriptionLine(s *v1.ThreadSubscription) string {
+	line := subscriptionWhat(s)
+	if n := s.GetNote(); n != "" {
+		line += " · " + n
+	}
+	return line
+}
+
+// subscriptionWhat is subscriptionLine without the note.
+func subscriptionWhat(s *v1.ThreadSubscription) string {
 	how := "once"
 	if s.GetRepeat() {
 		how = "repeat"
@@ -180,13 +190,14 @@ func subscriptionLine(s *v1.ThreadSubscription) string {
 	return s.GetId() + ": " + s.GetSubscriberThreadId() + " wakes when " + subscriptionTarget(s) + " " + verb + " (" + how + ")"
 }
 
-// timerWhen is a timer subscription's schedule: "every 30m" or "at 2026-10-20T14:00:00Z"
-// (UTC like every other command).
+// timerWhen is a timer subscription's schedule: "every 30m", or "at 14:00 CDT" in local
+// time ("at Oct 21 14:00 CDT" when not today), as thread subscriptions lists it and the
+// wake says it; --json keeps the UTC target id.
 func timerWhen(s *v1.ThreadSubscription) string {
 	kind, v, _ := strings.Cut(s.GetTargetId(), ":")
 	if kind == "at" {
 		if t, err := time.Parse(time.RFC3339Nano, v); err == nil {
-			v = t.UTC().Format(time.RFC3339)
+			v = threadstore.ClockTime(t, time.Now())
 		}
 	}
 	return kind + " " + v
@@ -273,6 +284,8 @@ func threadSubscribe(b ThreadBackend) Command {
 			{Name: "until", Type: Enum, Enum: SubscriptionConditions,
 				Description: "Default: settled for a thread, finished for a run, checks_done for a pull request"},
 			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition, not once"},
+			{Name: "note", Type: String, Description: "Why: what to do when it fires (one line, at most 200 characters); " +
+				"the wake carries it and thread subscriptions lists it. Subscribing again with a note replaces it"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -300,6 +313,9 @@ func threadSubscribe(b ThreadBackend) Command {
 			if err != nil {
 				return Result{}, err
 			}
+			if _, err := threadstore.CleanNote(a.String("note")); err != nil {
+				return Result{}, InvalidArg("note", "is at most %d characters", threadstore.MaxNote)
+			}
 			until := a.String("until")
 			isPR := slices.Contains(pullRequestConditions, until)
 			switch {
@@ -323,6 +339,7 @@ func threadSubscribe(b ThreadBackend) Command {
 			res, err := b.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{
 				SubscriberThreadId: a.String("id"), TargetThreadId: thread, TargetRunId: run, TargetPullRequest: pr,
 				TargetPlugin: plugin, TargetAt: at, TargetEvery: every, Args: args, Condition: cond, Repeat: a.Bool("repeat"),
+				Note: a.String("note"),
 			}))
 			if err != nil {
 				return Result{}, err
@@ -416,7 +433,8 @@ func threadSubscriptions(b ThreadBackend) Command {
 	}
 }
 
-// formatSubscriptions is thread.subscriptions' table.
+// formatSubscriptions is thread.subscriptions' table, with a NOTE column when any has
+// a note.
 func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) string {
 	if len(subs) == 0 {
 		if subscriber != "" {
@@ -430,9 +448,14 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 		}
 		return id
 	}
+	notes := slices.ContainsFunc(subs, func(s *v1.ThreadSubscription) bool { return s.GetNote() != "" })
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tSUBSCRIBER\tTARGET\tUNTIL\tREPEAT\tFIRED\tLAST FIRED\tTARGET STATUS")
+	header := "ID\tSUBSCRIBER\tTARGET\tUNTIL\tREPEAT\tFIRED\tLAST FIRED\tTARGET STATUS"
+	if notes {
+		header += "\tNOTE"
+	}
+	_, _ = fmt.Fprintln(tw, header)
 	for _, s := range subs {
 		repeat, last := "no", "-"
 		if s.GetRepeat() {
@@ -452,10 +475,17 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 		case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER:
 			target = subscriptionTarget(s) // "timer every 30m"
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), named(s.GetSubscriberThreadId(), s.GetSubscriberName()),
-			target,
-			conditionName(s.GetCondition()), repeat, strconv.FormatInt(s.GetFiredCount(), 10), last, s.GetTargetStatus())
+		row := strings.Join([]string{s.GetId(), named(s.GetSubscriberThreadId(), s.GetSubscriberName()), target,
+			conditionName(s.GetCondition()), repeat, strconv.FormatInt(s.GetFiredCount(), 10), last, s.GetTargetStatus()}, "\t")
+		if notes {
+			row += "\t" + s.GetNote()
+		}
+		_, _ = fmt.Fprintln(tw, row)
 	}
 	_ = tw.Flush()
-	return strings.TrimRight(sb.String(), "\n")
+	lines := strings.Split(strings.TrimRight(sb.String(), "\n"), "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " ") // a row without a note
+	}
+	return strings.Join(lines, "\n")
 }

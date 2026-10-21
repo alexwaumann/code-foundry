@@ -156,6 +156,38 @@ test("the board's sections, cards and worker rows; one board stream", async ({ p
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ember-notes");
 });
 
+test("Scheduled lists Ember's timers before Done today; the × cancels one", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  await page.getByTestId("ember-board-toggle").click();
+  await expect(board(page).getByTestId("ember-section-scheduled")).toHaveCount(0);
+  const note = "Remind the user to review the PWA branch (t-aa39dec3)";
+  const { id: once } = (await mockPost(`ember/timer?minutes=90&note=${encodeURIComponent(note)}`)) as { id: string };
+  const { id: ping } = (await mockPost("ember/timer?minutes=2&every=2m")) as { id: string };
+  const scheduled = board(page).getByTestId("ember-section-scheduled");
+  await expect(scheduled.getByTestId("ember-timer")).toHaveCount(2);
+  await expect(board(page).getByTestId("ember-board-counts")).toHaveText("3 in progress · 0 up next · 2 scheduled");
+  // Soonest first: the ping (no note), then the reminder.
+  expect(await scheduled.getByTestId("ember-timer").evaluateAll((els) => els.map((e) => e.getAttribute("data-timer")))).toEqual([ping, once]);
+  const first = scheduled.locator(`[data-timer="${ping}"]`);
+  await expect(first.getByTestId("ember-timer-note")).toHaveText("Reminder");
+  await expect(first.getByTestId("ember-timer-every")).toHaveText("every 2m");
+  const second = scheduled.locator(`[data-timer="${once}"]`);
+  await expect(second.getByTestId("ember-timer-note")).toHaveText(note);
+  await expect(second.getByTestId("ember-timer-every")).toHaveCount(0);
+  await expect(second.getByTestId("ember-timer-when")).toHaveText(/^(\w{3} )?\d{1,2}:\d{2} [AP]M$/);
+  // Between Up next (none here) and Done today.
+  const order = await board(page).locator("section[data-testid^='ember-section-']").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+  expect(order).toEqual(["ember-section-in-progress", "ember-section-scheduled", "ember-section-done-today"]);
+  // The × cancels it through thread.unsubscribe; the row goes with the board's next update.
+  await second.getByTestId("ember-timer-cancel").click();
+  await expect(scheduled.getByTestId("ember-timer")).toHaveCount(1);
+  await expect(board(page).getByTestId("ember-board-counts")).toHaveText("3 in progress · 0 up next · 1 scheduled");
+  await first.getByTestId("ember-timer-cancel").click();
+  await expect(board(page).getByTestId("ember-section-scheduled")).toHaveCount(0);
+});
+
 test("a lead's team: worker rows under its card, counted as working", async ({ page }) => {
   await enable();
   await openApp(page);

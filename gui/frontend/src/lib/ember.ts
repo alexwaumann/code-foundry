@@ -4,11 +4,12 @@
  * task links in Ember's text, and the chat's rows, where every run of work between two
  * visible messages folds into one "Worked for" row.
  */
-import type { EmberTaskDescendantView, EmberTaskStateView, EmberTaskThreadView, EmberTaskView } from "@/api/ember";
+import type { EmberTaskDescendantView, EmberTaskStateView, EmberTaskThreadView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
+import { snoozeTimeShort } from "./snooze";
 import { isWaiting } from "./waiting";
 import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
@@ -620,6 +621,34 @@ export function shortDuration(ms: number): string {
   const m = Math.round(s / 60);
   if (m < 60) return `${String(m)}m`;
   return `${String(Math.floor(m / 60))}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+// ---------- the Board's Scheduled section ----------
+
+/** A row of the Board's Scheduled section: one of Ember's timers. */
+export interface TimerRow {
+  /** The subscription id (the × cancels it with thread.unsubscribe). */
+  id: string;
+  /** "2:12 PM" today, "Thu 9:00 AM" this week, else "Oct 19, 9:00 AM"; "" when unknown. */
+  when: string;
+  /** "every 2m" for a repeating timer; "" for a one-shot. */
+  every: string;
+  /** Its note, or "Reminder" when it has none (then `noted` is false). */
+  title: string;
+  noted: boolean;
+}
+
+/** The Scheduled rows, soonest first (a timer without a time last). */
+export function timerRows(timers: readonly EmberTimerView[], now: number): TimerRow[] {
+  return [...timers]
+    .sort((a, b) => (a.nextAtMs ?? Infinity) - (b.nextAtMs ?? Infinity) || a.id.localeCompare(b.id))
+    .map((t) => ({
+      id: t.id,
+      when: t.nextAtMs === null ? "" : snoozeTimeShort(t.nextAtMs, now),
+      every: t.every ? `every ${t.every}` : "",
+      title: t.note || "Reminder",
+      noted: t.note !== "",
+    }));
 }
 
 // ---------- ember.worker_models ----------

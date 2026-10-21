@@ -27,35 +27,51 @@ func TestRenderBoard(t *testing.T) {
 		{ID: "t-00000006", Title: "Old work", State: StateDone, DoneAt: today.Add(-24 * time.Hour)},
 		{ID: "t-00000007", Title: "Dropped", State: StateCancelled},
 	}
+	timers := []Timer{
+		{ID: "sub-aaaaaaaaaaaa", NextAt: now.Add(55 * time.Minute), Note: "remind the user to review the PWA branch (t-00000003)"},
+		{ID: "sub-bbbbbbbbbbbb", NextAt: now.Add(2 * time.Minute), Every: 2 * time.Minute, Note: "ping the user"},
+		{ID: "sub-cccccccccccc", NextAt: now.Add(24 * time.Hour)},
+	}
 	tests := []struct {
-		name  string
-		tasks []Task
-		want  []string
-		not   []string
+		name   string
+		tasks  []Task
+		timers []Timer
+		want   []string
+		not    []string
 	}{
-		{"empty", nil, []string{"# Task board", "As of 2026-10-20 14:05 UTC.", "\nTime zone: UTC, local times.", "No tasks yet."}, []string{"## In progress"}},
-		{"every section", tasks, []string{
+		{"empty", nil, nil, []string{"# Task board", "As of 2026-10-20 14:05 UTC.", "\nTime zone: UTC, local times.", "No tasks yet."}, []string{"## In progress", "## Scheduled"}},
+		{"timers only", nil, timersOf(nil), []string{"No tasks yet."}, []string{"## Scheduled"}},
+		{"every section", tasks, nil, []string{
 			"## In progress\n\n- t-00000001 Write docs · worker s-111111111111 busy, report progress: Drafting the line, 12m\n  - t-00000002 README part\n",
 			"## Up next\n\n- t-00000003 Changelog part\n",
 			"## Blocked\n\n- t-00000004 Fix login · worker s-222222222222 removed — needs a token\n",
 			"## Done today\n\n- t-00000005 Bump deps — merged #12\n",
 			"Earlier: 1 done, 1 cancelled",
-		}, []string{"Old work", "Dropped"}},
-		{"only closed", tasks[5:], []string{"Earlier: 1 done, 1 cancelled"}, []string{"No tasks yet", "## "}},
+		}, []string{"Old work", "Dropped", "## Scheduled"}},
+		{"only closed", tasks[5:], nil, []string{"Earlier: 1 done, 1 cancelled"}, []string{"No tasks yet", "## "}},
 		{"a done-today parent keeps its cancelled piece", []Task{
 			{ID: "t-00000010", Title: "Streaks", State: StateDone, DoneAt: today},
 			{ID: "t-00000011", Title: "Counter", State: StateDone, DoneAt: today, ParentID: "t-00000010", Branch: "cf/counter", Outcome: "pushed"},
 			{ID: "t-00000012", Title: "Freeze", State: StateCancelled, UpdatedAt: today.Add(-30 * time.Hour), ParentID: "t-00000010"},
 			{ID: "t-00000013", Title: "Dropped today", State: StateCancelled, UpdatedAt: today},
 			{ID: "t-00000014", Title: "Dropped before", State: StateCancelled, UpdatedAt: today.Add(-24 * time.Hour)},
-		}, []string{
+		}, nil, []string{
 			"## Done today\n\n- t-00000010 Streaks\n  - t-00000011 Counter · branch cf/counter — pushed\n  - t-00000012 Freeze\n- t-00000013 Dropped today\n",
 			"Earlier: 0 done, 1 cancelled",
 		}, []string{"Dropped before"}},
+		// Scheduled sits before Done today, soonest first as given, the date when not today.
+		{"scheduled", tasks, timers, []string{
+			"## Blocked\n\n- t-00000004 Fix login · worker s-222222222222 removed — needs a token\n\n## Scheduled\n\n" +
+				"Your timers; `code-foundry thread unsubscribe <id>` cancels one.\n\n" +
+				"- 15:00 UTC · once · remind the user to review the PWA branch (t-00000003) · sub-aaaaaaaaaaaa\n" +
+				"- 14:07 UTC · every 2m · ping the user · sub-bbbbbbbbbbbb\n" +
+				"- Oct 21 14:05 UTC · once · sub-cccccccccccc\n\n## Done today\n",
+		}, nil},
+		{"scheduled with no tasks", nil, timers[:1], []string{"No tasks yet.", "## Scheduled", "· sub-aaaaaaaaaaaa\n"}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := RenderBoard(tt.tasks, now, utc)
+			got := RenderBoard(tt.tasks, tt.timers, now, utc)
 			for _, w := range tt.want {
 				if !strings.Contains(got, w) {
 					t.Errorf("board lacks %q:\n%s", w, got)
@@ -102,7 +118,7 @@ func TestZoneLine(t *testing.T) {
 	if got := zoneLine(now, chicago); !strings.HasPrefix(got, "Time zone: America/Chicago (CDT), local times.") {
 		t.Errorf("named zone = %q", got)
 	}
-	if got := RenderBoard(nil, now, chicago); !strings.Contains(got, "As of 2026-10-20 09:05 CDT.") {
+	if got := RenderBoard(nil, nil, now, chicago); !strings.Contains(got, "As of 2026-10-20 09:05 CDT.") {
 		t.Errorf("board in Chicago:\n%s", got)
 	}
 	t.Setenv("TZ", "Europe/Berlin")
@@ -234,5 +250,22 @@ func TestTruncate(t *testing.T) {
 	}
 	if got := truncate("abc", 5, "…"); got != "abc" {
 		t.Errorf("truncate = %q", got)
+	}
+}
+
+// timersOf keeps a subscriber's timers, soonest first.
+func TestTimersOf(t *testing.T) {
+	subs := []thread.Subscription{
+		{ID: "sub-1", TargetKind: thread.TargetThread, TargetID: "s-1"},
+		{ID: "sub-3", TargetKind: thread.TargetTimer, TargetID: "every:2m", NextAt: now.Add(2 * time.Minute), Every: 2 * time.Minute, Note: "ping"},
+		{ID: "sub-2", TargetKind: thread.TargetTimer, TargetID: "at:x", NextAt: now.Add(time.Minute), CreatedAt: today},
+	}
+	got := timersOf(subs)
+	if len(got) != 2 || got[0] != (Timer{ID: "sub-2", NextAt: now.Add(time.Minute), CreatedAt: today}) ||
+		got[1] != (Timer{ID: "sub-3", NextAt: now.Add(2 * time.Minute), Every: 2 * time.Minute, Note: "ping"}) {
+		t.Errorf("timersOf = %+v", got)
+	}
+	if timersOf(subs[:1]) != nil {
+		t.Error("no timers is not nil")
 	}
 }

@@ -334,6 +334,7 @@ func (r *runner) onWakeLimit() Item {
 type wakeThreadPayload struct {
 	Kind           string    `json:"kind"`
 	SubscriptionID string    `json:"subscription_id"`
+	Note           string    `json:"note,omitempty"`
 	Condition      Condition `json:"condition"`
 	FiredAt        string    `json:"fired_at"`
 	// AfterRestart: fired by the daemon's stop or for a thread it interrupted, sent
@@ -366,6 +367,12 @@ type wakeThread struct {
 	// Siblings counts the subscriber's own children when this thread is one of them
 	// (subscriptions_batch.go); nil otherwise.
 	Siblings *wakeSiblings `json:"siblings,omitempty"`
+	// StartedAt is the thread's last user message (its brief, a follow-up or a wake):
+	// when the turn the wake is about started. RanFor is how long it ran from then to
+	// its end (a turn still going, or waiting on a prompt: to the fire), "2m 22s"; both
+	// left out for a thread that never got a message.
+	StartedAt string `json:"started_at,omitempty"`
+	RanFor    string `json:"ran_for,omitempty"`
 }
 
 // wakePending is a pending permission prompt or question: what `thread respond` needs.
@@ -407,6 +414,7 @@ type wakeReport struct {
 type wakeRunPayload struct {
 	Kind           string    `json:"kind"`
 	SubscriptionID string    `json:"subscription_id"`
+	Note           string    `json:"note,omitempty"`
 	Condition      Condition `json:"condition"`
 	FiredAt        string    `json:"fired_at"`
 	Run            wakeRun   `json:"run"`
@@ -456,6 +464,9 @@ type wakeDetail struct {
 	// afterRestart: sent by a restart (subscriptions_restart.go); appStopped: the
 	// target's turn was cut by the stop.
 	afterRestart, appStopped bool
+	// startedAt is the last top-level user message's time; endedAt the turn end after
+	// it when the thread is idle (zero while it works or waits on a prompt).
+	startedAt, endedAt time.Time
 }
 
 // Wake detail bounds: the last assistant message (runes, one line) and a pending
@@ -472,7 +483,7 @@ const (
 // Subagents' items are skipped.
 func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	d := wakeDetail{children: kids}
-	var lastUser, lastAt time.Time
+	var lastUser, lastAt, turnEnd time.Time
 	var last string
 	for _, it := range items {
 		if it.ParentToolUseID != "" {
@@ -480,12 +491,18 @@ func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 		}
 		switch it.Kind {
 		case KindUserMessage:
-			lastUser, last, lastAt = it.CreatedAt, "", time.Time{}
+			lastUser, last, lastAt, turnEnd = it.CreatedAt, "", time.Time{}, time.Time{}
 		case KindAssistantText:
 			if s := strings.TrimSpace(it.Text); s != "" {
 				last, lastAt = s, it.CreatedAt
 			}
+		case KindTurnEnd:
+			turnEnd = it.CreatedAt
 		}
+	}
+	d.startedAt = lastUser
+	if Meets(CondIdle, t) && !lastUser.IsZero() && !turnEnd.Before(lastUser) {
+		d.endedAt = turnEnd
 	}
 	hasReport := t.Report.Status != ReportNone
 	d.staleReport = hasReport && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
@@ -571,7 +588,7 @@ func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message 
 
 // threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.
 func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) wakeThreadPayload {
-	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
+	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Note: sub.Note, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
 		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
 		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending, Siblings: d.siblings,
@@ -580,6 +597,13 @@ func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) w
 		p.Thread.Labels = []string{}
 	}
 	p.Thread.Report = wakeReportOf(t.Report)
+	if !d.startedAt.IsZero() {
+		end := d.endedAt
+		if end.IsZero() {
+			end = at
+		}
+		p.Thread.StartedAt, p.Thread.RanFor = wakeTime(d.startedAt), RunTime(end.Sub(d.startedAt))
+	}
 	if d.children.Total > 0 {
 		kids := d.children
 		p.Thread.Children = &kids
@@ -663,6 +687,27 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 	return line
 }
 
+// RunTime is how long a turn ran, to the second: "42s", "2m 22s", "3m", "1h 5m" (whole
+// minutes past an hour); "0s" for none or less.
+func RunTime(d time.Duration) string {
+	d = d.Round(time.Second)
+	if d <= 0 {
+		return "0s"
+	}
+	h, m, s := int(d/time.Hour), int(d%time.Hour/time.Minute), int(d%time.Minute/time.Second)
+	switch {
+	case h > 0 && m > 0:
+		return strconv.Itoa(h) + "h " + strconv.Itoa(m) + "m"
+	case h > 0:
+		return strconv.Itoa(h) + "h"
+	case m > 0 && s > 0:
+		return strconv.Itoa(m) + "m " + strconv.Itoa(s) + "s"
+	case m > 0:
+		return strconv.Itoa(m) + "m"
+	}
+	return strconv.Itoa(s) + "s"
+}
+
 // endSentence ends s with a period unless it ends in one, "!", "?" or "…".
 func endSentence(s string) string {
 	if strings.HasSuffix(s, ".") || strings.HasSuffix(s, "!") || strings.HasSuffix(s, "?") || strings.HasSuffix(s, "…") {
@@ -673,7 +718,7 @@ func endSentence(s string) string {
 
 // runWake is the wake message of sub about run, fired at.
 func runWake(sub Subscription, run ActionRun, at time.Time) Message {
-	p := wakeRunPayload{Kind: "action_run", SubscriptionID: sub.ID, Condition: CondFinished, FiredAt: wakeTime(at), Run: wakeRun{
+	p := wakeRunPayload{Kind: "action_run", SubscriptionID: sub.ID, Note: sub.Note, Condition: CondFinished, FiredAt: wakeTime(at), Run: wakeRun{
 		ID: run.ID, ActionID: run.ActionID, ActionName: run.ActionName, ProjectID: run.ProjectID, ExitCode: run.ExitCode,
 		StartedAt: wakeTime(run.StartedAt), FinishedAt: wakeTime(run.FinishedAt), OutputTail: outputTail(run.Output, maxOutputTail),
 	}}

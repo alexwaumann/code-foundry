@@ -67,3 +67,30 @@ func TestThreadSubscriptionArgsMigration(t *testing.T) {
 		}
 	}
 }
+
+// Migration 0044 adds thread_subscriptions.note, empty for rows that do not give it.
+func TestThreadSubscriptionNoteMigration(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	for _, q := range []string{
+		`INSERT INTO threads (id, worktree_path, created_at, state) VALUES ('s1', '/w', 1, 4)`,
+		`INSERT INTO thread_subscriptions (id, subscriber_thread_id, target_kind, target_id, condition, created_at)
+			VALUES ('sub-1', 's1', 'timer', 'every:30m', 'fired', 1)`,
+		`INSERT INTO thread_subscriptions (id, subscriber_thread_id, target_kind, target_id, condition, created_at, note)
+			VALUES ('sub-2', 's1', 'timer', 'every:1h', 'fired', 1, 'check the deploy')`,
+	} {
+		if _, err := db.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for id, want := range map[string]string{"sub-1": "", "sub-2": "check the deploy"} {
+		var note string
+		if err := db.QueryRowContext(ctx, `SELECT note FROM thread_subscriptions WHERE id = ?`, id).Scan(&note); err != nil || note != want {
+			t.Errorf("%s note = %q, %v; want %q", id, note, err, want)
+		}
+	}
+}

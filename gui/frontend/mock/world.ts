@@ -2781,6 +2781,24 @@ export class World {
       },
       {
         cmd: {
+          name: "thread.unsubscribe",
+          title: "Unsubscribe Thread from Wakes",
+          category: "Thread",
+          description: "Remove a wake subscription by id, or every subscription of a thread (default: the thread this runs in) to a target.",
+          keybindings: [],
+          args: [{ name: "subscription", type: ArgType.STRING, required: false, description: "Subscription id (sub-…)" }],
+        },
+        when: always,
+        // The mock keeps only Ember's timers (mock/ember.ts): the Board's × cancels one by id.
+        run: (_ctx, args) => {
+          const id = args.subscription ?? "";
+          if (!id) throw new CommandError("invalid", "give a subscription id");
+          if (!this.ember.removeTimer(id)) throw new CommandError("notfound", `subscription ${id} not found`);
+          return `removed ${id}`;
+        },
+      },
+      {
+        cmd: {
           name: "workspace.add-project",
           title: "Add Project to Workspace",
           category: "Workspace",

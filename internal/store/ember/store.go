@@ -32,6 +32,7 @@ type Threads interface {
 	SetPermissionMode(ctx context.Context, id string, mode thread.PermissionMode) (thread.Thread, error)
 	Close(ctx context.Context, id string) error
 	Unsubscribe(ctx context.Context, o thread.UnsubscribeOptions) ([]thread.Subscription, error)
+	Subscriptions(ctx context.Context, subscriber string) ([]thread.Subscription, error)
 	SetCreateDefaults(fn thread.CreateDefaultsFunc)
 	SetResidentTools(name string, t thread.ResidentTools)
 }
@@ -159,6 +160,8 @@ type Store struct {
 	applied bool
 	// consolidating: an epoch boundary runs (boundary).
 	consolidating bool
+	// timers are the resident's timers as last read (refreshTimers).
+	timers []Timer
 
 	// configChanged wakes the loop to apply the settings (ConfigChanged).
 	configChanged chan struct{}
@@ -218,10 +221,12 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	opts.Threads.SetResidentTools(Name, Tools)
 	opts.Threads.SetCreateDefaults(s.workerDefaults)
 	threadSub := bus.Subscribe[thread.Event](opts.Bus, 256)
+	subsSub := bus.Subscribe[thread.SubscriptionsChanged](opts.Bus, 64)
 	s.applySettings(ctx)
 	s.onThreads()
+	s.refreshTimers()
 	s.wg.Add(1)
-	go s.run(threadSub)
+	go s.run(threadSub, subsSub)
 	return s, nil
 }
 
@@ -272,10 +277,12 @@ func (s *Store) Await(ctx context.Context, done func(*Snapshot) bool) (*Snapshot
 	}
 }
 
-// run follows thread and settings changes and checks the epoch rules on a tick.
-func (s *Store) run(threadSub *bus.Subscription[thread.Event]) {
+// run follows thread, subscription and settings changes and checks the epoch rules on a
+// tick.
+func (s *Store) run(threadSub *bus.Subscription[thread.Event], subsSub *bus.Subscription[thread.SubscriptionsChanged]) {
 	defer s.wg.Done()
 	defer threadSub.Close()
+	defer subsSub.Close()
 	tick := time.NewTicker(s.opts.CheckInterval)
 	defer tick.Stop()
 	for {
@@ -285,9 +292,13 @@ func (s *Store) run(threadSub *bus.Subscription[thread.Event]) {
 		case <-threadSub.C():
 			drain(threadSub.C())
 			s.onThreads()
+		case <-subsSub.C():
+			drain(subsSub.C())
+			s.refreshTimers()
 		case <-s.configChanged:
 			s.applySettings(s.ctx)
 			s.onThreads()
+			s.refreshTimers()
 		case <-tick.C:
 			s.onThreads()
 		}
@@ -525,6 +536,28 @@ func residentOf(snap *thread.Snapshot) (thread.Thread, bool) {
 	return snap.Threads[i], true
 }
 
+// refreshTimers reads the resident's timers (none without a resident) and republishes
+// when they changed. It runs on every SubscriptionsChanged: a timer added, fired (a
+// one-shot goes, an interval's next slot moves) or cancelled.
+func (s *Store) refreshTimers() {
+	var timers []Timer
+	if res, ok := residentOf(s.opts.Threads.Snapshot()); ok {
+		subs, err := s.opts.Threads.Subscriptions(s.ctx, res.ID)
+		if err != nil {
+			if !errors.Is(err, thread.ErrNotFound) {
+				s.log.Warn("ember: read its timers", "thread", res.ID, "err", err)
+			}
+			return
+		}
+		timers = timersOf(subs)
+	}
+	snap := s.opts.Threads.Snapshot()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.timers = timers
+	s.publishLocked(snap)
+}
+
 // publish rebuilds the snapshot from the current threads.
 func (s *Store) publish() {
 	snap := s.opts.Threads.Snapshot()
@@ -536,7 +569,7 @@ func (s *Store) publish() {
 // publishLocked builds the snapshot (tasks with their workers' progress, the status)
 // and publishes it when it differs from the last one.
 func (s *Store) publishLocked(threads *thread.Snapshot) {
-	out := &Snapshot{Tasks: make([]Task, len(s.tasks))}
+	out := &Snapshot{Tasks: make([]Task, len(s.tasks)), Timers: slices.Clone(s.timers)}
 	var teams *teamIndex
 	for i, t := range s.tasks {
 		if t.ThreadID != "" {

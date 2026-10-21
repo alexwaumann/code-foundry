@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ember.proto.
  */
 export const file_codefoundry_v1_ember: GenFile = /*@__PURE__*/
-  fileDesc("Chpjb2RlZm91bmRyeS92MS9lbWJlci5wcm90bxIOY29kZWZvdW5kcnkudjEi0AIKC0VtYmVyU3RhdHVzEg8KB2VuYWJsZWQYASABKAgSEQoJdGhyZWFkX2lkGAIgASgJEg0KBWVwb2NoGAMgASgFEjQKEGVwb2NoX3N0YXJ0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDmNvbnRleHRfdG9rZW5zGAUgASgDEhwKFGVwb2NoX2NvbnRleHRfdG9rZW5zGAYgASgDEhUKDWNvbnNvbGlkYXRpbmcYByABKAgSOAoUbGFzdF9jb25zb2xpZGF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiAKGGxhc3RfY29uc29saWRhdGlvbl9lcnJvchgJIAEoCRIvCgZjb3VudHMYCiABKAsyHy5jb2RlZm91bmRyeS52MS5FbWJlclRhc2tDb3VudHMiYAoPRW1iZXJUYXNrQ291bnRzEgwKBHRvZG8YASABKAUSDQoFZG9pbmcYAiABKAUSDwoHYmxvY2tlZBgDIAEoBRIMCgRkb25lGAQgASgFEhEKCWNhbmNlbGxlZBgFIAEoBSL8AgoJRW1iZXJUYXNrEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEg4KBmRldGFpbBgDIAEoCRItCgVzdGF0ZRgEIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkVtYmVyVGFza1N0YXRlEhEKCXBhcmVudF9pZBgFIAEoCRIRCgl0aHJlYWRfaWQYBiABKAkSDwoHb3V0Y29tZRgHIAEoCRIQCghwb3NpdGlvbhgIIAEoBRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdkb25lX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgZ0aHJlYWQYDCABKAsyHy5jb2RlZm91bmRyeS52MS5FbWJlclRhc2tUaHJlYWQSDgoGYnJhbmNoGA0gASgJIrYECg9FbWJlclRhc2tUaHJlYWQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIqCgVzdGF0ZRgDIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN0YXRlEiwKBnN0YXR1cxgEIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN0YXR1cxIVCg1zdGF0dXNfcmVhc29uGAUgASgJEjkKDXJlcG9ydF9zdGF0dXMYBiABKA4yIi5jb2RlZm91bmRyeS52MS5UaHJlYWRSZXBvcnRTdGF0dXMSFgoOcmVwb3J0X3N1bW1hcnkYByABKAkSLQoJcmVwb3J0X2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBsYXN0X2FjdGl2aXR5X2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCghhcmNoaXZlZBgLIAEoCBIPCgdyZW1vdmVkGAwgASgIEhsKE2Rlc2NlbmRhbnRzX3dvcmtpbmcYDSABKAUSGwoTZGVzY2VuZGFudHNfd2FpdGluZxgOIAEoBRIZChFkZXNjZW5kYW50c190b3RhbBgPIAEoBRI4CgtkZXNjZW5kYW50cxgQIAMoCzIjLmNvZGVmb3VuZHJ5LnYxLkVtYmVyVGFza0Rlc2NlbmRhbnQiuAIKE0VtYmVyVGFza0Rlc2NlbmRhbnQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIsCgZzdGF0dXMYAyABKA4yHC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdGF0dXMSFQoNc3RhdHVzX3JlYXNvbhgEIAEoCRI5Cg1yZXBvcnRfc3RhdHVzGAUgASgOMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVwb3J0U3RhdHVzEhYKDnJlcG9ydF9zdW1tYXJ5GAYgASgJEioKBXN0YXRlGAcgASgOMhsuY29kZWZvdW5kcnkudjEuVGhyZWFkU3RhdGUSNAoQbGFzdF9hY3Rpdml0eV9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZGVwdGgYCSABKAUilwEKCkVtYmVyQm9hcmQSKwoGc3RhdHVzGAEgASgLMhsuY29kZWZvdW5kcnkudjEuRW1iZXJTdGF0dXMSKAoFdGFza3MYAiADKAsyGS5jb2RlZm91bmRyeS52MS5FbWJlclRhc2sSMgoJaGVhcnRiZWF0GAMgASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0IhcKFUdldEVtYmVyU3RhdHVzUmVxdWVzdCJFChZHZXRFbWJlclN0YXR1c1Jlc3BvbnNlEisKBnN0YXR1cxgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkVtYmVyU3RhdHVzIiUKFUxpc3RFbWJlclRhc2tzUmVxdWVzdBIMCgRvcGVuGAEgASgIIkIKFkxpc3RFbWJlclRhc2tzUmVzcG9uc2USKAoFdGFza3MYASADKAsyGS5jb2RlZm91bmRyeS52MS5FbWJlclRhc2siGAoWV2F0Y2hFbWJlckJvYXJkUmVxdWVzdCrCAQoORW1iZXJUYXNrU3RhdGUSIAocRU1CRVJfVEFTS19TVEFURV9VTlNQRUNJRklFRBAAEhkKFUVNQkVSX1RBU0tfU1RBVEVfVE9ETxABEhoKFkVNQkVSX1RBU0tfU1RBVEVfRE9JTkcQAhIcChhFTUJFUl9UQVNLX1NUQVRFX0JMT0NLRUQQAxIZChVFTUJFUl9UQVNLX1NUQVRFX0RPTkUQBBIeChpFTUJFUl9UQVNLX1NUQVRFX0NBTkNFTExFRBAFMqACCgxFbWJlclNlcnZpY2USXAoJR2V0U3RhdHVzEiUuY29kZWZvdW5kcnkudjEuR2V0RW1iZXJTdGF0dXNSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuR2V0RW1iZXJTdGF0dXNSZXNwb25zZSIAElwKCUxpc3RUYXNrcxIlLmNvZGVmb3VuZHJ5LnYxLkxpc3RFbWJlclRhc2tzUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkxpc3RFbWJlclRhc2tzUmVzcG9uc2UiABJUCgpXYXRjaEJvYXJkEiYuY29kZWZvdW5kcnkudjEuV2F0Y2hFbWJlckJvYXJkUmVxdWVzdBoaLmNvZGVmb3VuZHJ5LnYxLkVtYmVyQm9hcmQiADABQsIBChJjb20uY29kZWZvdW5kcnkudjFCCkVtYmVyUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_thread_lifecycle, file_google_protobuf_timestamp]);
+  fileDesc("Chpjb2RlZm91bmRyeS92MS9lbWJlci5wcm90bxIOY29kZWZvdW5kcnkudjEi0AIKC0VtYmVyU3RhdHVzEg8KB2VuYWJsZWQYASABKAgSEQoJdGhyZWFkX2lkGAIgASgJEg0KBWVwb2NoGAMgASgFEjQKEGVwb2NoX3N0YXJ0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDmNvbnRleHRfdG9rZW5zGAUgASgDEhwKFGVwb2NoX2NvbnRleHRfdG9rZW5zGAYgASgDEhUKDWNvbnNvbGlkYXRpbmcYByABKAgSOAoUbGFzdF9jb25zb2xpZGF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiAKGGxhc3RfY29uc29saWRhdGlvbl9lcnJvchgJIAEoCRIvCgZjb3VudHMYCiABKAsyHy5jb2RlZm91bmRyeS52MS5FbWJlclRhc2tDb3VudHMiYAoPRW1iZXJUYXNrQ291bnRzEgwKBHRvZG8YASABKAUSDQoFZG9pbmcYAiABKAUSDwoHYmxvY2tlZBgDIAEoBRIMCgRkb25lGAQgASgFEhEKCWNhbmNlbGxlZBgFIAEoBSL8AgoJRW1iZXJUYXNrEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEg4KBmRldGFpbBgDIAEoCRItCgVzdGF0ZRgEIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkVtYmVyVGFza1N0YXRlEhEKCXBhcmVudF9pZBgFIAEoCRIRCgl0aHJlYWRfaWQYBiABKAkSDwoHb3V0Y29tZRgHIAEoCRIQCghwb3NpdGlvbhgIIAEoBRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdkb25lX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgZ0aHJlYWQYDCABKAsyHy5jb2RlZm91bmRyeS52MS5FbWJlclRhc2tUaHJlYWQSDgoGYnJhbmNoGA0gASgJIrYECg9FbWJlclRhc2tUaHJlYWQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIqCgVzdGF0ZRgDIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN0YXRlEiwKBnN0YXR1cxgEIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN0YXR1cxIVCg1zdGF0dXNfcmVhc29uGAUgASgJEjkKDXJlcG9ydF9zdGF0dXMYBiABKA4yIi5jb2RlZm91bmRyeS52MS5UaHJlYWRSZXBvcnRTdGF0dXMSFgoOcmVwb3J0X3N1bW1hcnkYByABKAkSLQoJcmVwb3J0X2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBsYXN0X2FjdGl2aXR5X2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCghhcmNoaXZlZBgLIAEoCBIPCgdyZW1vdmVkGAwgASgIEhsKE2Rlc2NlbmRhbnRzX3dvcmtpbmcYDSABKAUSGwoTZGVzY2VuZGFudHNfd2FpdGluZxgOIAEoBRIZChFkZXNjZW5kYW50c190b3RhbBgPIAEoBRI4CgtkZXNjZW5kYW50cxgQIAMoCzIjLmNvZGVmb3VuZHJ5LnYxLkVtYmVyVGFza0Rlc2NlbmRhbnQiuAIKE0VtYmVyVGFza0Rlc2NlbmRhbnQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIsCgZzdGF0dXMYAyABKA4yHC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdGF0dXMSFQoNc3RhdHVzX3JlYXNvbhgEIAEoCRI5Cg1yZXBvcnRfc3RhdHVzGAUgASgOMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVwb3J0U3RhdHVzEhYKDnJlcG9ydF9zdW1tYXJ5GAYgASgJEioKBXN0YXRlGAcgASgOMhsuY29kZWZvdW5kcnkudjEuVGhyZWFkU3RhdGUSNAoQbGFzdF9hY3Rpdml0eV9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZGVwdGgYCSABKAUiwwEKCkVtYmVyQm9hcmQSKwoGc3RhdHVzGAEgASgLMhsuY29kZWZvdW5kcnkudjEuRW1iZXJTdGF0dXMSKAoFdGFza3MYAiADKAsyGS5jb2RlZm91bmRyeS52MS5FbWJlclRhc2sSMgoJaGVhcnRiZWF0GAMgASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0EioKBnRpbWVycxgEIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkVtYmVyVGltZXIikgEKCkVtYmVyVGltZXISCgoCaWQYASABKAkSKwoHbmV4dF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXZlcnkYAyABKAkSDAoEbm90ZRgEIAEoCRIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIXChVHZXRFbWJlclN0YXR1c1JlcXVlc3QiRQoWR2V0RW1iZXJTdGF0dXNSZXNwb25zZRIrCgZzdGF0dXMYASABKAsyGy5jb2RlZm91bmRyeS52MS5FbWJlclN0YXR1cyIlChVMaXN0RW1iZXJUYXNrc1JlcXVlc3QSDAoEb3BlbhgBIAEoCCJCChZMaXN0RW1iZXJUYXNrc1Jlc3BvbnNlEigKBXRhc2tzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRW1iZXJUYXNrIhgKFldhdGNoRW1iZXJCb2FyZFJlcXVlc3QqwgEKDkVtYmVyVGFza1N0YXRlEiAKHEVNQkVSX1RBU0tfU1RBVEVfVU5TUEVDSUZJRUQQABIZChVFTUJFUl9UQVNLX1NUQVRFX1RPRE8QARIaChZFTUJFUl9UQVNLX1NUQVRFX0RPSU5HEAISHAoYRU1CRVJfVEFTS19TVEFURV9CTE9DS0VEEAMSGQoVRU1CRVJfVEFTS19TVEFURV9ET05FEAQSHgoaRU1CRVJfVEFTS19TVEFURV9DQU5DRUxMRUQQBTKgAgoMRW1iZXJTZXJ2aWNlElwKCUdldFN0YXR1cxIlLmNvZGVmb3VuZHJ5LnYxLkdldEVtYmVyU3RhdHVzUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkdldEVtYmVyU3RhdHVzUmVzcG9uc2UiABJcCglMaXN0VGFza3MSJS5jb2RlZm91bmRyeS52MS5MaXN0RW1iZXJUYXNrc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5MaXN0RW1iZXJUYXNrc1Jlc3BvbnNlIgASVAoKV2F0Y2hCb2FyZBImLmNvZGVmb3VuZHJ5LnYxLldhdGNoRW1iZXJCb2FyZFJlcXVlc3QaGi5jb2RlZm91bmRyeS52MS5FbWJlckJvYXJkIgAwAULCAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgpFbWJlclByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_thread_lifecycle, file_google_protobuf_timestamp]);
 
 /**
  * EmberStatus is Ember's state.
@@ -410,7 +410,7 @@ export const EmberTaskDescendantSchema: GenMessage<EmberTaskDescendant> = /*@__P
   messageDesc(file_codefoundry_v1_ember, 4);
 
 /**
- * EmberBoard is the status and every task, in board order.
+ * EmberBoard is the status, every task in board order, and Ember's pending timers.
  *
  * @generated from message codefoundry.v1.EmberBoard
  */
@@ -432,6 +432,15 @@ export type EmberBoard = Message<"codefoundry.v1.EmberBoard"> & {
    * @generated from field: codefoundry.v1.StreamHeartbeat heartbeat = 3;
    */
   heartbeat?: StreamHeartbeat | undefined;
+
+  /**
+   * The resident thread's timer wake subscriptions (thread subscribe --at/--every), by
+   * next fire, soonest first (docs/notes/ember-fixes-2-timers.md). Cancel one with
+   * thread.unsubscribe <id>.
+   *
+   * @generated from field: repeated codefoundry.v1.EmberTimer timers = 4;
+   */
+  timers: EmberTimer[];
 };
 
 /**
@@ -440,6 +449,53 @@ export type EmberBoard = Message<"codefoundry.v1.EmberBoard"> & {
  */
 export const EmberBoardSchema: GenMessage<EmberBoard> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ember, 5);
+
+/**
+ * EmberTimer is one of Ember's pending timers: a wake subscription of its thread.
+ *
+ * @generated from message codefoundry.v1.EmberTimer
+ */
+export type EmberTimer = Message<"codefoundry.v1.EmberTimer"> & {
+  /**
+   * The subscription id, "sub-" + 12 hex digits.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * When it fires next: a one-shot's time, or a repeating timer's next slot.
+   *
+   * @generated from field: google.protobuf.Timestamp next_at = 2;
+   */
+  nextAt?: Timestamp | undefined;
+
+  /**
+   * A repeating timer's interval as people write it ("2m", "1h30m"); "" for a one-shot.
+   *
+   * @generated from field: string every = 3;
+   */
+  every: string;
+
+  /**
+   * Why Ember set it (thread subscribe --note); "" for none.
+   *
+   * @generated from field: string note = 4;
+   */
+  note: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 5;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.EmberTimer.
+ * Use `create(EmberTimerSchema)` to create a new message.
+ */
+export const EmberTimerSchema: GenMessage<EmberTimer> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_ember, 6);
 
 /**
  * @generated from message codefoundry.v1.GetEmberStatusRequest
@@ -452,7 +508,7 @@ export type GetEmberStatusRequest = Message<"codefoundry.v1.GetEmberStatusReques
  * Use `create(GetEmberStatusRequestSchema)` to create a new message.
  */
 export const GetEmberStatusRequestSchema: GenMessage<GetEmberStatusRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ember, 6);
+  messageDesc(file_codefoundry_v1_ember, 7);
 
 /**
  * @generated from message codefoundry.v1.GetEmberStatusResponse
@@ -469,7 +525,7 @@ export type GetEmberStatusResponse = Message<"codefoundry.v1.GetEmberStatusRespo
  * Use `create(GetEmberStatusResponseSchema)` to create a new message.
  */
 export const GetEmberStatusResponseSchema: GenMessage<GetEmberStatusResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ember, 7);
+  messageDesc(file_codefoundry_v1_ember, 8);
 
 /**
  * @generated from message codefoundry.v1.ListEmberTasksRequest
@@ -488,7 +544,7 @@ export type ListEmberTasksRequest = Message<"codefoundry.v1.ListEmberTasksReques
  * Use `create(ListEmberTasksRequestSchema)` to create a new message.
  */
 export const ListEmberTasksRequestSchema: GenMessage<ListEmberTasksRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ember, 8);
+  messageDesc(file_codefoundry_v1_ember, 9);
 
 /**
  * @generated from message codefoundry.v1.ListEmberTasksResponse
@@ -505,7 +561,7 @@ export type ListEmberTasksResponse = Message<"codefoundry.v1.ListEmberTasksRespo
  * Use `create(ListEmberTasksResponseSchema)` to create a new message.
  */
 export const ListEmberTasksResponseSchema: GenMessage<ListEmberTasksResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ember, 9);
+  messageDesc(file_codefoundry_v1_ember, 10);
 
 /**
  * @generated from message codefoundry.v1.WatchEmberBoardRequest
@@ -518,7 +574,7 @@ export type WatchEmberBoardRequest = Message<"codefoundry.v1.WatchEmberBoardRequ
  * Use `create(WatchEmberBoardRequestSchema)` to create a new message.
  */
 export const WatchEmberBoardRequestSchema: GenMessage<WatchEmberBoardRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ember, 10);
+  messageDesc(file_codefoundry_v1_ember, 11);
 
 /**
  * A task's state on the board.
@@ -597,9 +653,10 @@ export const EmberService: GenService<{
     output: typeof ListEmberTasksResponseSchema;
   },
   /**
-   * WatchBoard sends the whole board (status and every task) at once, then again on
-   * every change: a task, Ember's state, or a task's worker thread (its status or
-   * report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
+   * WatchBoard sends the whole board (status, every task and Ember's timers) at once,
+   * then again on every change: a task, Ember's state, a task's worker thread (its
+   * status or report), or one of Ember's timers (added, fired, cancelled). A quiet
+   * board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
    *
    * @generated from rpc codefoundry.v1.EmberService.WatchBoard
    */
