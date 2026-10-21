@@ -34,7 +34,7 @@ func TestThreadReseedCommand(t *testing.T) {
 		{name: "a busy thread waits", args: map[string]string{"id": "s-1"}, current: &v1.Thread{State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
 			wantMsg: "reseeded thread s-1 (epoch 2); Claude stops when its turn ends; the next message starts the new session"},
 		{name: "a relative add-dir", args: map[string]string{"id": "s-1", "add-dir": "rel/dir"}, wantErr: command.ErrInvalidArgs},
-		{name: "no thread", wantErr: command.ErrUnavailable},
+		{name: "no thread", wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

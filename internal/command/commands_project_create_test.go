@@ -57,7 +57,7 @@ func TestProjectCreateAndPublish(t *testing.T) {
 			wantMsg: "deleted r-made", wantCall: `id:"r-made"`},
 		{name: "delete is unavailable elsewhere", cmd: "project.delete", uctx: command.Context{ActiveProjectID: "r1"},
 			wantErr: "not in the projects directory"},
-		{name: "delete needs a project", cmd: "project.delete", wantErr: "not available"},
+		{name: "delete needs a project", cmd: "project.delete", wantErr: "missing --project (default: the active project; there is none)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

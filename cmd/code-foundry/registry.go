@@ -242,7 +242,8 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	vals := make(map[string]string, len(flags))
 	for _, f := range flags {
-		if !f.set && f.spec.GetDefaultToCwd() {
+		// A worktree arg defaulting to the cwd gives way to an explicit --context-worktree.
+		if !f.set && f.spec.GetDefaultToCwd() && !(f.spec.GetContextBound() && cf.worktree != "") {
 			wd, err := cl.getwd()
 			if err != nil {
 				return fmt.Errorf("--%s defaults to the working directory: %w", f.spec.GetName(), err)

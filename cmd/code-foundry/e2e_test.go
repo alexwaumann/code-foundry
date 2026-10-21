@@ -88,9 +88,11 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"unknown command", []string{"bogus", "thing"}, errUsage, "", `unknown command "bogus thing"`},
 		{"missing required arg", []string{"workspace", "new"}, errUsage, "", `code-foundry workspace.new: missing required argument "name"`},
 		{"bad enum", []string{"ui.notify", "--title", "x", "--level", "loud"}, errUsage, "", "want one of info, warning, error"},
-		{"unavailable", []string{"terminal", "kill"}, errUsage, "", "terminal.kill: not available in this context"},
+		{"missing the active id", []string{"terminal", "kill"}, errUsage, "", "terminal.kill: missing --id (default: the active terminal; there is none)"},
 		{"unknown flag", []string{"ui.notify", "--nope"}, errUsage, "", "flag provided but not defined: -nope"},
 		{"stray positional", []string{"ui.notify", "--title", "x", "extra"}, errUsage, "", "unexpected arguments [extra]"},
+		{"no thread outside one", []string{"thread", "get"}, errUsage, "", "thread.get: missing --id (default: the active thread; there is none)"},
+		{"git fetch defaults to the working directory", []string{"git", "fetch"}, errUsage, "", "/work"},
 		{"workspace list", []string{"workspace", "list"}, nil, "no workspaces", ""},
 		{"workspace members defaults to the working directory", []string{"workspace", "members"}, errUsage, "", "/work is not inside a workspace worktree"},
 		{"kebab-case verb with a positional", []string{"workspace", "add-project", "api", "--fetch=false"}, errUsage, "", "workspace.add-project: not found: /work is not inside"},
@@ -106,7 +108,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		// The test daemon's config home is under /tmp, outside the home directory.
 		{"project create keeps projects under home", []string{"project", "create", "demo"}, errUsage, "", "outside your home directory"},
 		{"project github publish needs a project", []string{"project", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
-			"project.github.publish: not available in this context"},
+			"project.github.publish: missing --project (default: the active project; there is none)"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}

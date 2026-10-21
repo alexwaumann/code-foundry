@@ -253,6 +253,17 @@ func checkRequired(specs []ArgSpec, a Args) error {
 	return nil
 }
 
+// missingContextArg returns an *ArgError for the first required context-bound spec
+// without a value: "missing --id (default: the active thread; there is none)".
+func missingContextArg(specs []ArgSpec, a Args) error {
+	for _, s := range specs {
+		if s.Required && s.Context != NoContext && !a.Has(s.Name) {
+			return &ArgError{Arg: s.Name, Msg: fmt.Sprintf("missing --%s (default: %s; there is none)", s.Name, s.Context.Describe())}
+		}
+	}
+	return nil
+}
+
 // parse converts one non-empty raw value to its typed form.
 func (s ArgSpec) parse(v string) (any, error) {
 	switch s.Type {

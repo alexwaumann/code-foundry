@@ -169,7 +169,7 @@ func TestTerminalClose(t *testing.T) {
 	}{
 		{name: "from context", ctx: command.Context{ActiveTerminalID: "t4"}, wantID: "t4"},
 		{name: "explicit id", args: map[string]string{"id": "t5"}, wantID: "t5"},
-		{name: "no terminal", wantErr: command.ErrUnavailable},
+		{name: "no terminal", wantErr: command.ErrInvalidArgs},
 		{name: "backend error passes through", args: map[string]string{"id": "t6"},
 			backend: connect.NewError(connect.CodeNotFound, errors.New("no such terminal")), wantID: "t6"},
 	}

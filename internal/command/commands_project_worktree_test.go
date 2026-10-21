@@ -37,8 +37,10 @@ func TestProjectWorktreeRemoveProject(t *testing.T) {
 			wantReq: &v1.RemoveWorktreeRequest{ProjectId: "r9", Path: "/wt/app-fix"}},
 		{name: "a path no project has", args: map[string]string{"path": "/elsewhere"}, wantErr: command.ErrInvalidArgs,
 			wantMsg: "/elsewhere is not a worktree of a registered project; give its project with --project"},
-		{name: "no path", ctx: command.Context{ActiveProjectID: "r1"}, wantErr: command.ErrUnavailable,
+		{name: "no path", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "projects"}, wantErr: command.ErrUnavailable,
 			wantMsg: "give the worktree with --path"},
+		{name: "no path from the CLI", ctx: command.Context{ActiveProjectID: "r1"}, wantErr: command.ErrInvalidArgs,
+			wantMsg: "missing --path (default: the active worktree; there is none)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
