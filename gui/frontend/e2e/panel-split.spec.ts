@@ -8,7 +8,7 @@ import { invocations, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
-  // Wide enough for a 760px panel beside a 280px sidebar (panelMax 776).
+  // Wide enough for a 760px panel beside the sidebar.
   await page.setViewportSize({ width: 1440, height: 900 });
 });
 
@@ -68,6 +68,11 @@ async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
 }
 
+/** The expanded panel's derived width (stores/ui.ts expandedPanelWidth) for the window and sidebar now. */
+function expandedWidth(page: Page): Promise<number> {
+  return page.evaluate(`import("/src/stores/ui.ts").then((m) => { const s = m.useUiStore.getState(); return m.expandedPanelWidth(s.windowWidth, m.visibleSidebarWidth(s)); })`);
+}
+
 async function invokeSplit(): Promise<void> {
   const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
     method: "POST",
@@ -85,7 +90,7 @@ async function controlsGroup(page: Page): Promise<string | null> {
     .evaluate((el) => el.closest("[data-panel-group]")?.getAttribute("data-panel-group") ?? null);
 }
 
-test("view.panel.split from the palette splits a stacked panel; it goes side by side when wider and when expanded; the buttons stay top right", async ({ page }) => {
+test("view.panel.split from the palette splits a stacked panel; it goes side by side from 721px, expanded or not; the buttons stay top right", async ({ page }) => {
   await worktreeAndDiff(page);
   // Unsplit: one group, the buttons in its header.
   await expect(split(page)).not.toHaveAttribute("data-split");
@@ -121,11 +126,14 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="worktree"]')).toHaveClass(/bg-accent\/40/);
   await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/dark:bg-accent\/50/);
 
-  // Just under the threshold: still stacked. At it: side by side.
-  await setPanelWidth(page, 584);
-  await expect(split(page)).toHaveAttribute("data-orientation", "stack");
+  // Just under the threshold (two 360px groups and the divider): still stacked. At it: side by side.
   await setPanelWidth(page, 585);
+  await expect(split(page)).toHaveAttribute("data-orientation", "stack");
+  await setPanelWidth(page, 720);
+  await expect(split(page)).toHaveAttribute("data-orientation", "stack");
+  await setPanelWidth(page, 721);
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
+  expect((await rect(page.getByTestId("side-panel-wrapper"))).width).toBe(721);
   await setPanelWidth(page, 760);
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
   [g0, g1, d] = await Promise.all([rect(group(page, 0)), rect(group(page, 1)), rect(divider(page))]);
@@ -142,13 +150,33 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   const [toggle, p] = await Promise.all([rect(panel(page).getByTestId("panel-toggle")), rect(panel(page))]);
   expect(p.right - toggle.right).toBeLessThan(16);
 
-  // Expanded at a stacked width: side by side all the same.
+  // Expanded, it follows the width it renders at, whatever the stored one: side by side
+  // in a wide window, stacked in a narrow one.
   await setPanelWidth(page, 420);
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
   await panel(page).getByTestId("panel-expand").click();
   await expect(page.getByTestId("side-panel-wrapper")).toHaveAttribute("data-expanded", "true");
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
   expect(await controlsGroup(page)).toBe("1");
+  // The derived width (expandedPanelWidth) is the one the wrapper renders at.
+  expect((await rect(page.getByTestId("side-panel-wrapper"))).width).toBe(await expandedWidth(page));
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(split(page)).toHaveAttribute("data-orientation", "stack");
+  expect(await controlsGroup(page)).toBe("0");
+  const narrow = await rect(page.getByTestId("side-panel-wrapper"));
+  expect(narrow.width).toBe(await expandedWidth(page));
+  expect(narrow.width).toBeLessThan(721);
+  // Nothing clipped: both groups sit inside the panel, full width.
+  const [n0, n1, np] = await Promise.all([rect(group(page, 0)), rect(group(page, 1)), rect(panel(page))]);
+  for (const g of [n0, n1]) {
+    expect(g.left).toBeGreaterThanOrEqual(np.left);
+    expect(g.right).toBeLessThanOrEqual(np.right);
+  }
+  expect(n1.top).toBeGreaterThanOrEqual(n0.bottom);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await expect(split(page)).toHaveAttribute("data-orientation", "side");
+  expect(await controlsGroup(page)).toBe("1");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await panel(page).getByTestId("panel-expand").click();
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
   expect(await controlsGroup(page)).toBe("0");
@@ -181,7 +209,7 @@ test("cmd+\\ joins and splits again; the CLI's view.panel.split does too", async
 });
 
 test("the orientation flips when the panel's resize drag ends, not during it", async ({ page }) => {
-  await worktreeAndDiff(page, 540);
+  await worktreeAndDiff(page, 620);
   await page.keyboard.press("Meta+Backslash");
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
 
@@ -193,7 +221,7 @@ test("the orientation flips when the panel's resize drag ends, not during it", a
   await page.mouse.down();
   await page.mouse.move(x - 120, y, { steps: 6 });
   // Past the threshold mid-drag: the panel is wider, the groups still stacked.
-  await expect.poll(async () => (await rect(page.getByTestId("side-panel-wrapper"))).width).toBeGreaterThan(640);
+  await expect.poll(async () => (await rect(page.getByTestId("side-panel-wrapper"))).width).toBeGreaterThan(730);
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
   await page.mouse.up();
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
@@ -204,7 +232,7 @@ test("the orientation flips when the panel's resize drag ends, not during it", a
   await page.mouse.move(h2.x + h2.width / 2, y);
   await page.mouse.down();
   await page.mouse.move(h2.x + h2.width / 2 + 150, y, { steps: 6 });
-  await expect.poll(async () => (await rect(page.getByTestId("side-panel-wrapper"))).width).toBeLessThan(560);
+  await expect.poll(async () => (await rect(page.getByTestId("side-panel-wrapper"))).width).toBeLessThan(700);
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
   await page.mouse.up();
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");

@@ -7,7 +7,7 @@ import { openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
-  // Wide enough for a 760px panel beside a 280px sidebar (panelMax 776).
+  // Wide enough for a 760px panel beside the sidebar.
   await page.setViewportSize({ width: 1440, height: 900 });
 });
 
@@ -131,6 +131,35 @@ test("dropping a tab on the band splits the panel with it in the second group: t
   await expect(split(page)).toHaveAttribute("data-orientation", "side");
   await expect(tabsOf(page, 1)).toHaveText(["Files"]);
   expect((await groups(page)).map((g) => g.tabs)).toEqual([["pullrequest?number=12", "diff"], ["files"]]);
+});
+
+test("the band's edge follows the threshold, and an expanded panel's real width: bottom in a narrow window, right in a wide one", async ({ page }) => {
+  await panelWith(page, 720, THREE);
+  const body = bodyOf(page, 0);
+  await startDrag(page, tabIn(page, 0, "Files"), ...(await at(body, 0.5, 0.5)));
+  await expect(band(page)).toHaveAttribute("data-side", "stack");
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await setPanelWidth(page, 721);
+  await startDrag(page, tabIn(page, 0, "Files"), ...(await at(body, 0.5, 0.5)));
+  await expect(band(page)).toHaveAttribute("data-side", "side");
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+
+  // Expanded in a 900px window the panel renders under 721px: the bottom band, and the drop stacks.
+  await store(page, "setPanelWidth", "current", 760);
+  await store(page, "expandPanel", "current", true);
+  await expect(page.getByTestId("side-panel-wrapper")).toHaveAttribute("data-expanded", "true");
+  await page.setViewportSize({ width: 900, height: 900 });
+  await startDrag(page, tabIn(page, 0, "Diff"), ...(await at(body, 0.5, 0.85)));
+  await expect(band(page)).toHaveAttribute("data-side", "stack");
+  await expect(band(page)).toHaveAttribute("data-over", "true");
+  await page.mouse.up();
+  await expect(split(page)).toHaveAttribute("data-orientation", "stack");
+  await expect(tabsOf(page, 1)).toHaveText(["Diff"]);
+  // Widened, the same expanded panel goes side by side.
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await expect(split(page)).toHaveAttribute("data-orientation", "side");
 });
 
 test("a single-tab panel shows no band; a drop on the body outside the band, or Escape, puts the tab back", async ({ page }) => {

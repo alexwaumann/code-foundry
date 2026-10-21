@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SHELL_GAP } from "@/design/tokens";
-import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
+import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, expandedPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
 
 describe("shell gaps", () => {
   it("the panes' horizontal gaps are three shell gaps (sidebar | gap | content | gap | panel | gap), 36px", () => {
@@ -32,6 +32,19 @@ describe("panelMax", () => {
         expect(windowWidth - sidebar - PANE_GAPS - max).toBeGreaterThanOrEqual(CONTENT_MIN);
       }
     }
+  });
+});
+
+describe("expandedPanelWidth", () => {
+  const cases: [string, number, number, number][] = [
+    ["the row beside the sidebar less the panel's two margins", 1400, SIDEBAR_DEFAULT, 1400 - SIDEBAR_DEFAULT - 2 * SHELL_GAP],
+    ["sidebar hidden", 900, 0, 876],
+    ["900px window, default sidebar: stacks a split", 900, SIDEBAR_DEFAULT, 596],
+    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 496],
+    ["never negative", 200, SIDEBAR_MAX, 0],
+  ];
+  it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
+    expect(expandedPanelWidth(windowWidth, sidebar)).toBe(want);
   });
 });
 

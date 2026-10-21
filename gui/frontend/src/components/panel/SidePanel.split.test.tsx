@@ -25,7 +25,7 @@ const tabWrapper = (g: 0 | 1, id: string) => group(g)?.querySelector<HTMLElement
 
 beforeEach(() => {
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });
-  // panelMax 776: room for a 760px panel.
+  // panelMax 764: room for a 760px panel; expanded, the panel renders 1136px wide.
   useUiStore.setState({ selection: { kind: "thread", id: "a" }, windowWidth: 1440, sidebarVisible: true, sidebarWidth: 280, focus: "panel" });
   useCommandsStore.setState({ commands: [command("view.panel.new-tab"), command("view.panel.expand"), command("view.panel.toggle")] });
   // jsdom has no pointer capture.
@@ -57,7 +57,7 @@ describe("a split side panel", () => {
     ["the default width stacks, buttons in the top group", {}, "stack", "0"],
     ["just under the threshold stacks", { width: PANEL_SIDE_BY_SIDE_MIN - 1 }, "stack", "0"],
     ["at the threshold, side by side, buttons in the right group", { width: PANEL_SIDE_BY_SIDE_MIN }, "side", "1"],
-    ["expanded, side by side at any width", { expanded: true }, "side", "1"],
+    ["expanded in a wide window, side by side whatever the stored width", { expanded: true }, "side", "1"],
   ])("%s", (_name, e, orientation, controls) => {
     setEntry(e);
     render(<SidePanel />);
@@ -67,24 +67,47 @@ describe("a split side panel", () => {
     expect(controlsIn()).toBe(controls);
   });
 
+  it("expanded, follows the width it renders at: stacked in a narrow window, side by side in a wide one", () => {
+    // 900 - 280 - 24 = 596px: stacked, though the old rule put an expanded panel side by side.
+    useUiStore.setState({ windowWidth: 900 });
+    setEntry({ expanded: true, width: 760 });
+    render(<SidePanel />);
+    expect(split().getAttribute("data-orientation")).toBe("stack");
+    expect(controlsIn()).toBe("0");
+    // Hiding the sidebar widens it to 876px.
+    act(() => {
+      useUiStore.setState({ sidebarVisible: false });
+    });
+    expect(split().getAttribute("data-orientation")).toBe("side");
+    // 745 - 24 = 721: the threshold exactly.
+    act(() => {
+      useUiStore.setState({ windowWidth: 745 });
+    });
+    expect(split().getAttribute("data-orientation")).toBe("side");
+    act(() => {
+      useUiStore.setState({ windowWidth: 744 });
+    });
+    expect(split().getAttribute("data-orientation")).toBe("stack");
+  });
+
   it("follows a window resize at once", () => {
-    setEntry({ width: 700 });
+    setEntry({ width: 760 });
     render(<SidePanel />);
     expect(split().getAttribute("data-orientation")).toBe("side");
     act(() => {
-      useUiStore.setState({ windowWidth: 1200 }); // panelMax 536: rendered narrower
+      useUiStore.setState({ windowWidth: 1200 }); // panelMax 524: rendered narrower
     });
     expect(split().getAttribute("data-orientation")).toBe("stack");
   });
 
   it("holds its orientation while the panel's resize handle is dragged, and catches up on release", () => {
-    setEntry({ width: 560 });
+    setEntry({ width: 640 });
     render(<SidePanel />);
     const handle = screen.getByTestId("panel-resize-handle");
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: 560, bottom: 800, width: 560, height: 800, x: 0, y: 0, toJSON: () => ({}) });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: 640, bottom: 800, width: 640, height: 800, x: 0, y: 0, toJSON: () => ({}) });
     fireEvent.pointerDown(handle, { pointerId: 1, clientX: 1000 });
     fireEvent.pointerMove(handle, { pointerId: 1, clientX: 900 });
-    expect(getPanel(KEY).width).toBe(660);
+    expect(getPanel(KEY).width).toBe(740);
     expect(split().getAttribute("data-orientation")).toBe("stack");
     fireEvent.pointerUp(handle, { pointerId: 1, clientX: 900 });
     expect(split().getAttribute("data-orientation")).toBe("side");

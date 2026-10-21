@@ -18,7 +18,7 @@ import {
   usePanelWidth,
   type GroupIndex,
 } from "@/stores/panel";
-import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
+import { PANEL_MIN, expandedPanelWidth, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { selectPageOpen, useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces } from "@/surfaces/registry";
 import { closeTab, hidePanel, liftedTab } from "./actions";
@@ -65,15 +65,19 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   // when the room does). Expanded, it takes the whole row instead and keeps the width
   // for when the split comes back.
   const width = Math.min(usePanelWidth(panelKey), max);
+  // Expanded, the width it renders at is derived from the window and sidebar (the row
+  // less the wrapper's margins), never measured, like the width above.
+  const fullWidth = useUiStore((s) => expandedPanelWidth(s.windowWidth, visibleSidebarWidth(s)));
   const split = usePanelSplit(panelKey);
   const ratio = usePanelRatio(panelKey);
   const focused = usePanelFocusedGroup(panelKey);
   // The aside's data-picking is the focused group's (each group carries its own too).
   const picking = usePanelPicking(panelKey);
-  // A split panel's orientation follows its rendered width (never stored). While the
-  // panel's resize handle is dragged it holds still (the groups would jump between rows
-  // and columns under the pointer) and catches up on release; a window resize applies at once.
-  const live = splitOrientation(width, expanded);
+  // A split panel's orientation follows its rendered width (never stored), expanded or
+  // not. While the panel's resize handle is dragged it holds still (the groups would jump
+  // between rows and columns under the pointer) and catches up on release; a window
+  // resize applies at once.
+  const live = splitOrientation(expanded ? fullWidth : width);
   const [held, setHeld] = useState<SplitOrientation | null>(null);
   const orientation = held ?? live;
 

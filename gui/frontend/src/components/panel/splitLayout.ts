@@ -15,11 +15,12 @@ export const DIVIDER = 1;
 
 /**
  * The orientation for a panel rendered `width` px wide: side by side from
- * PANEL_SIDE_BY_SIDE_MIN (room for two PANEL_MIN groups), stacked below it, and always
- * side by side while expanded.
+ * PANEL_SIDE_BY_SIDE_MIN (room for two PANEL_GROUP_SIDE_MIN groups), stacked below it.
+ * An expanded panel follows its rendered width too (stores/ui.ts expandedPanelWidth), so
+ * a narrow window stacks it rather than clipping the second group.
  */
-export function splitOrientation(width: number, expanded: boolean): SplitOrientation {
-  return expanded || width >= PANEL_SIDE_BY_SIDE_MIN ? "side" : "stack";
+export function splitOrientation(width: number): SplitOrientation {
+  return width >= PANEL_SIDE_BY_SIDE_MIN ? "side" : "stack";
 }
 
 /** The least a group gets on the split's axis: PANEL_MIN wide side by side, PANEL_GROUP_MIN_HEIGHT tall stacked. */
