@@ -83,6 +83,33 @@ func TestPanelKeybindings(t *testing.T) {
 	}
 }
 
+// Back and forward through the window's selection history: a browser's and Finder's
+// chords. Commands, not GUI view actions, so they stay unreserved and rebindable.
+func TestHistoryKeybindings(t *testing.T) {
+	f := newFixture(t)
+	tests := []struct{ name, title, chord string }{
+		{name: "view.back", title: "Back", chord: "cmd+["},
+		{name: "view.forward", title: "Forward", chord: "cmd+]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, ok := f.reg.Get(tt.name)
+			if !ok {
+				t.Fatalf("%s not registered", tt.name)
+			}
+			if c.Title != tt.title || c.Category != "View" {
+				t.Errorf("%s title, category = %q, %q; want %q, View", tt.name, c.Title, c.Category, tt.title)
+			}
+			if !slices.Equal(c.Keybindings, []string{tt.chord}) {
+				t.Errorf("%s keybindings = %v, want [%s]", tt.name, c.Keybindings, tt.chord)
+			}
+			if got, err := command.ValidateBinding(tt.chord); err != nil || got != tt.chord {
+				t.Errorf("ValidateBinding(%q) = %q, %v; want it bindable", tt.chord, got, err)
+			}
+		})
+	}
+}
+
 // The chords the GUI (phase 2c) expects on the thread commands.
 func TestThreadKeybindings(t *testing.T) {
 	f := newFixture(t)

@@ -3,6 +3,9 @@ import { persist } from "zustand/middleware";
 import type { UiContextView } from "@/api/command";
 import { SHELL_GAP } from "@/design/tokens";
 import { bool, finite, persistedRecord } from "./persisted";
+import { useProjectsStore } from "./projects";
+import { useThreadsStore } from "./threads";
+import { useWorkspacesStore } from "./workspaces";
 
 /**
  * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
@@ -101,8 +104,18 @@ export function nextZoom(zoom: number, direction: 1 | -1): number {
   return ZOOM_MIN;
 }
 
+/** How many selections back/forward (view.back, view.forward) remember; the oldest go first. */
+export const HISTORY_MAX = 50;
+
 interface UiState {
   selection: Selection;
+  /**
+   * The selections this window visited, oldest first, for view.back and view.forward
+   * (docs/notes/selection-history.md): browser semantics, `historyIndex` being the current
+   * one. Not persisted, like the selection: a window starts with just the dashboard.
+   */
+  history: Selection[];
+  historyIndex: number;
   focus: FocusRegion;
   /**
    * Incremented to ask the selected thread's prompt to take focus (its composer,
@@ -162,6 +175,13 @@ interface UiState {
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
   select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
+  /**
+   * view.back: selects the entry before the current one in `history`, skipping (and
+   * dropping) ones whose thread, project or workspace is gone. False when there is none.
+   */
+  back: () => boolean;
+  /** view.forward: selects the entry after the current one, like back. False when there is none. */
+  forward: () => boolean;
   setFocus: (f: FocusRegion) => void;
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
@@ -269,10 +289,74 @@ export function sameSelection(a: Selection, b: Selection): boolean {
   }
 }
 
+/**
+ * Whether a remembered selection can no longer be shown: a removed thread (an archived one
+ * still exists), or a composer whose project or workspace was removed. Unknown before the
+ * store holding it has loaded.
+ */
+function gone(sel: Selection): boolean {
+  switch (sel.kind) {
+    case "thread": {
+      const threads = useThreadsStore.getState();
+      return threads.loaded && !(sel.id in threads.byId);
+    }
+    case "compose": {
+      if (sel.workspaceId) {
+        const workspaces = useWorkspacesStore.getState();
+        return workspaces.loaded && !(sel.workspaceId in workspaces.byId);
+      }
+      if (sel.noProject) return false;
+      const projects = useProjectsStore.getState();
+      return projects.loaded && !(sel.projectId in projects.byId);
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * `history` without the entries that are gone (the current one stays, whatever it is) and
+ * with the duplicates that leaves next to each other collapsed; `index` follows the current
+ * entry.
+ */
+export function pruneHistory(history: readonly Selection[], index: number, isGone: (sel: Selection) => boolean = gone): { history: Selection[]; index: number } {
+  const out: Selection[] = [];
+  let at = 0;
+  history.forEach((e, i) => {
+    if (i !== index && isGone(e)) return;
+    const last = out[out.length - 1];
+    if (last && sameSelection(last, e)) {
+      if (i === index) at = out.length - 1;
+      return;
+    }
+    if (i === index) at = out.length;
+    out.push(e);
+  });
+  return { history: out, index: at };
+}
+
+/**
+ * The state a selection change sets. `push` (a normal select) records it after the current
+ * history entry, dropping the forward ones, unless it is the current entry already; back
+ * and forward move the index themselves and do not push.
+ */
+function selectionUpdate(s: UiState, sel: Selection, opts: { focusPrompt?: boolean; push: boolean }): Partial<UiState> {
+  const next: Partial<UiState> = {
+    selection: sameSelection(s.selection, sel) ? s.selection : sel,
+    promptFocusSeq: opts.focusPrompt && sel.kind === "thread" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
+  };
+  const current = s.history[s.historyIndex];
+  if (!opts.push || (current && sameSelection(current, sel))) return next;
+  const history = [...s.history.slice(0, s.historyIndex + 1), sel].slice(-HISTORY_MAX);
+  return { ...next, history, historyIndex: history.length - 1 };
+}
+
 export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       selection: DASHBOARD,
+      history: [DASHBOARD],
+      historyIndex: 0,
       focus: "content",
       promptFocusSeq: 0,
       sidebarFocusSeq: 0,
@@ -297,11 +381,10 @@ export const useUiStore = create<UiState>()(
       emberShowWork: false,
 
       select: (sel, opts) => {
-        set((s) => ({
-          selection: sameSelection(s.selection, sel) ? s.selection : sel,
-          promptFocusSeq: opts?.focusPrompt && sel.kind === "thread" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
-        }));
+        set((s) => selectionUpdate(s, sel, { focusPrompt: opts?.focusPrompt, push: true }));
       },
+      back: () => stepHistory(-1),
+      forward: () => stepHistory(1),
       setRenaming: (renamingThreadId) => {
         set({ renamingThreadId });
       },
@@ -438,3 +521,16 @@ export const useUiStore = create<UiState>()(
     },
   ),
 );
+
+/** Moves through history by one live entry (view.back, view.forward); false, after pruning, when there is none. */
+function stepHistory(by: 1 | -1): boolean {
+  const s = useUiStore.getState();
+  const { history, index } = pruneHistory(s.history, s.historyIndex);
+  const target = history[index + by];
+  if (!target) {
+    if (history.length !== s.history.length) useUiStore.setState({ history, historyIndex: index });
+    return false;
+  }
+  useUiStore.setState((cur) => ({ ...selectionUpdate(cur, target, { focusPrompt: true, push: false }), history, historyIndex: index + by }));
+  return true;
+}
