@@ -50,6 +50,49 @@ func TestCleanupHold(t *testing.T) {
 	}
 }
 
+// A worktree is abandoned once every thread that was on it is archived or removed.
+func TestCleanupAbandoned(t *testing.T) {
+	const wt = "/wt/cf-a"
+	now := time.Date(2026, 10, 21, 4, 0, 0, 0, time.UTC)
+	on := func(id, cwd string, archived bool) thread.Thread {
+		s := thread.Thread{ID: id, WorktreePath: cwd}
+		if archived {
+			s.ArchivedAt = now
+		}
+		return s
+	}
+	gone := func(cwd string) thread.RemovedThread {
+		return thread.RemovedThread{ID: "s-gone", WorktreePath: cwd, RemovedAt: now}
+	}
+	tests := []struct {
+		name    string
+		threads []thread.Thread
+		removed []thread.RemovedThread
+		want    bool
+	}{
+		{name: "no thread was on it (an orchestrator just made it)", want: false},
+		{name: "a live thread", threads: []thread.Thread{on("s1", wt, false)}, want: false},
+		{name: "its thread archived", threads: []thread.Thread{on("s1", wt, true)}, want: true},
+		{name: "its thread archived, from a subdirectory", threads: []thread.Thread{on("s1", wt+"/web", true)}, want: true},
+		{name: "its thread removed", removed: []thread.RemovedThread{gone(wt)}, want: true},
+		{name: "one archived, one still on it", threads: []thread.Thread{on("s1", wt, true), on("s2", wt, false)}, want: false},
+		{name: "removed, and a live one on it", threads: []thread.Thread{on("s2", wt+"/sub", false)}, removed: []thread.RemovedThread{gone(wt)}, want: false},
+		{name: "archived thread in a sibling with a common prefix", threads: []thread.Thread{on("s1", wt+"-other", true)}, want: false},
+		{name: "removed thread elsewhere", removed: []thread.RemovedThread{gone("/wt/cf-b")}, want: false},
+		{name: "live thread elsewhere, archived one here", threads: []thread.Thread{on("s1", wt, true), on("s2", "/wt/cf-b", false)}, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cleanupAbandoned(wt, &thread.Snapshot{Threads: tt.threads}, tt.removed); got != tt.want {
+				t.Errorf("cleanupAbandoned = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	if cleanupAbandoned(wt, nil, nil) {
+		t.Error("nil snapshot")
+	}
+}
+
 // The threads that hold a worktree (cleanup, workspace removal): every one but an archived
 // one, whatever its process state.
 func TestWorktreeThreads(t *testing.T) {

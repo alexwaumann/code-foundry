@@ -16,6 +16,8 @@ the lead follows.
   the same code, stack them (`--base`) or let them conflict and say so in the first
   progress report; never move part of one piece into another's branch, unless the
   parent said to.
+- A lead that needs scratch files (prompt drafts, notes) writes them under `$TMPDIR`,
+  never in the skills directory or the project checkout.
 - Before a lead ends a turn while its workers still run, it posts `code-foundry thread
   report progress "<n> workers started: <ids>"` (with the ids its `thread new` calls
   printed), so its parent's `thread reports` shows where it stands. No settle of a lead

@@ -109,6 +109,47 @@ func TestCleanupVerdict(t *testing.T) {
 	}
 }
 
+// A worktree whose threads are all archived or removed is not kept for being new: no
+// one is about to commit in it. Every other rule still holds.
+func TestCleanupVerdictAbandoned(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	fresh := Worktree{
+		Path: "/wt/a", Branch: "cf/a", Head: "c1", Managed: true, CreatedAt: now.Add(-time.Minute), CreatedHead: "c1",
+		Status: Status{BaseRef: "origin/main", RefreshedAt: now},
+	}
+	with := func(f func(*Worktree)) Worktree {
+		w := fresh
+		f(&w)
+		return w
+	}
+	tests := []struct {
+		name      string
+		w         Worktree
+		abandoned bool
+		removable bool
+		reason    string
+	}{
+		{"fresh, a thread may still commit", fresh, false, false, "no commits yet, made less than 10 minutes ago"},
+		{"fresh, its thread archived", fresh, true, true, AbandonedReason},
+		{"fresh, head unknown, its thread archived", with(func(w *Worktree) { w.CreatedHead = "" }), true, true, AbandonedReason},
+		{"fresh and dirty, its thread archived", with(func(w *Worktree) { w.Status.Untracked = 1 }), true, false, UncommittedReason},
+		{"fresh, unmanaged, its thread archived", with(func(w *Worktree) { w.Managed = false }), true, false, NotManagedReason},
+		{"fresh from a branch with commits not in the base", with(func(w *Worktree) { w.Status.BaseAhead = 2 }), true, false, "2 commits not in origin/main"},
+		{"fresh from a branch whose copy landed", with(func(w *Worktree) { w.Status.BaseAhead, w.Status.BaseMerged = 2, true }), true, true,
+			"a rebased or squash-merged copy is in origin/main"},
+		{"old, its thread archived", with(func(w *Worktree) { w.CreatedAt = now.Add(-time.Hour) }), true, true, "no commits since it was made"},
+		{"committed and merged, its thread archived", with(func(w *Worktree) { w.Head = "c2" }), true, true, "branch is in origin/main"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			removable, reason := cleanupVerdict(tt.w, now, tt.abandoned)
+			if removable != tt.removable || reason != tt.reason {
+				t.Errorf("cleanupVerdict = %v, %q; want %v, %q", removable, reason, tt.removable, tt.reason)
+			}
+		})
+	}
+}
+
 func TestInsideRoot(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -261,7 +302,14 @@ func TestCleanupRealProject(t *testing.T) {
 	if err := h.store.Refresh(ctx, r.ID); err != nil {
 		t.Fatal(err)
 	}
-	dry, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, DryRun: true, Hold: hold})
+	removing := map[string]string{}
+	told := func(_ context.Context, w Worktree) {
+		if _, err := os.Stat(w.Path); err != nil {
+			t.Errorf("told of %s after it was removed", w.Path)
+		}
+		removing[w.Path] = wantRemoved[w.Path]
+	}
+	dry, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, DryRun: true, Hold: hold, Removing: told})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,12 +317,25 @@ func TestCleanupRealProject(t *testing.T) {
 	if _, err := os.Stat(wt["merged"]); err != nil {
 		t.Fatalf("dry run removed something: %v", err)
 	}
+	if len(removing) != 0 {
+		t.Errorf("a dry run told Removing of %v", removing)
+	}
+	// The fresh worktree of an archived thread would go at once.
+	abandoned, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Path: wt["fresh"], DryRun: true, Hold: hold,
+		Abandoned: func(w Worktree) bool { return w.Path == wt["fresh"] }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("dry run, abandoned", abandoned, map[string]string{wt["fresh"]: AbandonedReason}, map[string]string{})
 
-	res, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold})
+	res, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold, Removing: told})
 	if err != nil {
 		t.Fatal(err)
 	}
 	check("cleanup", res, wantRemoved, wantKept)
+	if !maps.Equal(removing, wantRemoved) {
+		t.Errorf("Removing told of %v, want %v", removing, wantRemoved)
+	}
 	for p := range wantRemoved {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("%s still on disk: %v", p, err)

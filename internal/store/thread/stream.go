@@ -882,6 +882,35 @@ func (r *runner) kill() {
 	_ = conn.CloseStdin()
 }
 
+// killGroup is the last step of every end of a Claude process, after the graceful
+// close (interrupt, stdin closed, CloseTimeout, SIGTERM, SIGKILL; beginClose) or a
+// crash: what is left in its process group (a tool it started that stayed there) gets
+// SIGTERM, and SIGKILL streamKillGrace later, or at once on shutdown. What a Bash call
+// left in the background has a group of its own; Archive and Remove stop that
+// (strays.go).
+func (r *runner) killGroup(proc *claudestream.Process) {
+	left, err := proc.SignalGroup(syscall.SIGTERM)
+	if err != nil {
+		r.log().warn("signal claude's process group", "err", err)
+		return
+	}
+	if !left {
+		return
+	}
+	r.log().info("stopping what claude left in its process group", "pgid", proc.Pid())
+	r.m.wg.Add(1)
+	go func() {
+		defer r.m.wg.Done()
+		t := time.NewTimer(streamKillGrace)
+		defer t.Stop()
+		select {
+		case <-t.C:
+		case <-r.m.ctx.Done():
+		}
+		_, _ = proc.SignalGroup(syscall.SIGKILL)
+	}()
+}
+
 // abandon ends a process whose runner never ran (spawn found the store shutting down):
 // killed and reaped, its pipes and transcript tailer closed.
 func (r *runner) abandon() {
@@ -911,10 +940,11 @@ func (r *runner) shutdown() {
 	case <-time.After(streamKillGrace):
 		_ = st.proc.Signal(syscall.SIGKILL)
 	}
+	r.killGroup(st.proc)
 	st.sd.pending = nil
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
-	closeOpenTurn(st.proj.w, r.m.opts.Now())
+	st.proj.cutTurn(r.m.opts.Now())
 	r.endRuns(orphanDaemonStopped)
 	r.endBgShells(orphanDaemonStopped)
 	st.log.dropMcpChecks()
@@ -947,6 +977,7 @@ func (r *runner) maybeExited() {
 	if !st.exited || !st.outputEnded || r.finished {
 		return
 	}
+	r.killGroup(st.proc)
 	if st.restart == restartClosing && !r.closing {
 		r.respawn()
 		return
@@ -978,7 +1009,7 @@ func (r *runner) maybeExited() {
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	// A turn still open had no result: a close or archive while busy, a crash.
-	closeOpenTurn(st.proj.w, r.m.opts.Now())
+	st.proj.cutTurn(r.m.opts.Now())
 	r.endRuns(orphanProcessEnded)
 	r.endBgShells(orphanProcessEnded)
 	st.log.dropMcpChecks()

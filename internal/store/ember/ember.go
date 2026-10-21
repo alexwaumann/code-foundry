@@ -156,8 +156,9 @@ type Status struct {
 	// Epoch is the resident thread's epoch (Thread.Epoch); EpochStartedAt when it began.
 	Epoch          int
 	EpochStartedAt time.Time
-	// ContextTokens is the current session's context size (Thread.ContextTokens);
-	// EpochContextTokens the ember.epoch_context_tokens limit.
+	// ContextTokens is the current epoch's context size (epochContext): 0 from a reseed
+	// until the new session's first turn; EpochContextTokens the
+	// ember.epoch_context_tokens limit.
 	ContextTokens      int64
 	EpochContextTokens int64
 	// Consolidating: an epoch boundary runs (consolidation, then the reseed).

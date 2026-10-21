@@ -39,15 +39,20 @@ func (s *Thread) Label(_ context.Context, r *connect.Request[v1.LabelThreadReque
 	return connect.NewResponse(&v1.LabelThreadResponse{Thread: cur}), nil
 }
 
-// Report returns Current with the report set, report_at at unix ms 1.
+// Report returns Current with the report set, report_at at unix ms 1; a summary over
+// 1000 characters is cut like the store's (thread.CutReportSummary, without the trim).
 func (s *Thread) Report(_ context.Context, r *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
 	cur := s.current(r.Msg.GetId())
-	cur.ReportStatus, cur.ReportSummary, cur.ReportData = r.Msg.GetStatus(), r.Msg.GetSummary(), r.Msg.GetData()
+	summary, cutFrom := []rune(r.Msg.GetSummary()), 0
+	if len(summary) > 1000 {
+		summary, cutFrom = append(summary[:999:999], '…'), len(summary)
+	}
+	cur.ReportStatus, cur.ReportSummary, cur.ReportData = r.Msg.GetStatus(), string(summary), r.Msg.GetData()
 	cur.ReportAt = timestamppb.New(time.UnixMilli(1))
-	return connect.NewResponse(&v1.ReportThreadResponse{Thread: cur}), nil
+	return connect.NewResponse(&v1.ReportThreadResponse{Thread: cur, SummaryCutFrom: int32(cutFrom)}), nil
 }
 
 // SetBudget returns Current with the budget set.

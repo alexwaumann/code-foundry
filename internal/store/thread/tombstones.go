@@ -32,6 +32,9 @@ type RemovedThread struct {
 	ID, Name    string
 	ProjectID   string
 	WorkspaceID string
+	// WorktreePath is the thread's cwd when it was removed: worktree cleanup lets the
+	// worktree of a removed thread go at once (docs/notes/ember-fixes-2-small.md).
+	WorktreePath string
 	// CreatedBy is the creator's id ("" for the user); Owner the owner (owner.go).
 	CreatedBy string
 	Owner     string
@@ -52,7 +55,7 @@ type RemovedThread struct {
 // removedThread is the tombstone of t, removed at.
 func removedThread(t Thread, at time.Time) RemovedThread {
 	return RemovedThread{
-		ID: t.ID, Name: t.Name, ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID, CreatedBy: t.CreatedBy, Owner: t.Owner,
+		ID: t.ID, Name: t.Name, ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Owner: t.Owner,
 		Labels: slices.Clone(t.Labels), CreatedAt: t.CreatedAt, Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
 	}
 }

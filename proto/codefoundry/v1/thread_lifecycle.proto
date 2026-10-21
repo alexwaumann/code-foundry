@@ -899,7 +899,8 @@ message ReportThreadRequest {
   string id = 1;
   // Required (not UNSPECIFIED).
   ThreadReportStatus status = 2;
-  // At most 1000 characters (trimmed).
+  // Trimmed; a longer one than 1000 characters is cut to 1000, its last one "…"
+  // (ReportThreadResponse.summary_cut_from says so).
   string summary = 3;
   // A JSON object, at most 16 KiB once compacted; empty for none.
   string data = 4;
@@ -907,6 +908,8 @@ message ReportThreadRequest {
 
 message ReportThreadResponse {
   Thread thread = 1;
+  // The summary's length in characters when it was cut to 1000; 0 when it was kept whole.
+  int32 summary_cut_from = 2;
 }
 
 message SetThreadBudgetRequest {

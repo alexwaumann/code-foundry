@@ -18,6 +18,14 @@ func (h *Project) WithCleanupHold(hold func(project.Worktree) string) *Project {
 	return h
 }
 
+// WithCleanupAbandoned sets how CleanupWorktrees tells a worktree whose threads are all
+// archived or removed (project.CleanupOptions.Abandoned), and what it tells of each
+// worktree right before removing it (Removing); nil for either is nothing.
+func (h *Project) WithCleanupAbandoned(abandoned func(project.Worktree) bool, removing func(context.Context, project.Worktree)) *Project {
+	h.cleanupAbandoned, h.cleanupRemoving = abandoned, removing
+	return h
+}
+
 // CleanupWorktrees removes the project's merged, clean, unheld worktrees
 // (project.Cleanup), or with dry_run lists them.
 func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
@@ -27,6 +35,7 @@ func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.
 	}
 	res, err := project.Cleanup(ctx, h.store, project.CleanupOptions{
 		ProjectID: r.ID, Path: req.Msg.GetPath(), DryRun: req.Msg.GetDryRun(), Force: req.Msg.GetForce(), Hold: h.cleanupHold,
+		Abandoned: h.cleanupAbandoned, Removing: h.cleanupRemoving,
 	})
 	if err != nil {
 		return nil, projectError(err)

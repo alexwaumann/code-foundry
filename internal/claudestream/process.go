@@ -58,6 +58,10 @@ func (p *Process) LastStderrLine() string { return p.proc.LastStderrLine() }
 // Signal sends sig to the process group (the CLI and the tools it started).
 func (p *Process) Signal(sig syscall.Signal) error { return p.proc.Signal(sig) }
 
+// SignalGroup sends sig to what is left of the process group after the CLI exited,
+// and reports whether anything was (childproc.Process.SignalGroup).
+func (p *Process) SignalGroup(sig syscall.Signal) (bool, error) { return p.proc.SignalGroup(sig) }
+
 // CloseOutput closes the read end of stdout, ending Events if a grandchild kept the
 // pipe open after the process exited.
 func (p *Process) CloseOutput() { p.proc.CloseOutput() }
