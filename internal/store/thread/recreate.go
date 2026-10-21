@@ -90,11 +90,12 @@ func (m *Manager) recreateWorktree(ctx context.Context, s Thread) (recreatedWork
 		return recreatedWorktree{}, gone(r.Name + " is not a git repository")
 	}
 	rw := recreatedWorktree{projectID: r.ID, branch: s.Branch}
-	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: s.Branch, Fetch: true}
+	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: s.Branch, Fetch: true, BaseFromOrigin: m.opts.BaseFromOrigin()}
 	local := m.opts.RefExists(ctx, r.Path, "refs/heads/"+s.Branch)
 	remote := !local && (m.opts.RefExists(ctx, r.Path, "refs/remotes/origin/"+s.Branch) || m.opts.FetchBranch(ctx, r.Path, s.Branch))
 	if !local && !remote {
-		// No BaseRef: the project store's default base, origin/<default> (fetched).
+		// No BaseRef: the project store's default base (origin/<default>, fetched, or
+		// the local default with projects.base_from_origin off).
 		opts.BaseRef = s.BaseRef
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, opts)
@@ -102,7 +103,7 @@ func (m *Manager) recreateWorktree(ctx context.Context, s Thread) (recreatedWork
 		return recreatedWorktree{}, projectError("recreate worktree "+s.Branch, err)
 	}
 	if !local && !remote {
-		rw.base = cmp.Or(s.BaseRef, wt.Status.BaseRef, "origin/"+cmp.Or(r.DefaultBranch, "main"))
+		rw.base = cmp.Or(wt.StartPoint, s.BaseRef, wt.Status.BaseRef, "origin/"+cmp.Or(r.DefaultBranch, "main"))
 	}
 	if !samePath(wt.Path, s.WorktreePath) {
 		return recreatedWorktree{}, fmt.Errorf("%w: recreated the worktree of branch %s at %s, not at the thread's %s; "+

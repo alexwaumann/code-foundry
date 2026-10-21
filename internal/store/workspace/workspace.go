@@ -37,6 +37,11 @@ type Workspace struct {
 type Member struct {
 	ProjectID    string
 	WorktreePath string
+	// StartPoint is the ref the member's branch was created from
+	// (project.Worktree.StartPoint). Set only in the Workspace that Create and
+	// AddProject return, never in a snapshot or the database; "" when the branch
+	// existed.
+	StartPoint string
 }
 
 // Member returns the member for projectID.
@@ -92,7 +97,8 @@ type MemberSpec struct {
 	// Project is a project id, its name when unique, or a path inside it.
 	Project string
 	// BaseRef is where the branch starts when it does not exist yet. Empty: the
-	// operation's default base, else the project store's default (origin/<default>).
+	// operation's default base, else the project store's default (origin/<default>,
+	// or the local default branch with projects.base_from_origin off).
 	BaseRef string
 }
 

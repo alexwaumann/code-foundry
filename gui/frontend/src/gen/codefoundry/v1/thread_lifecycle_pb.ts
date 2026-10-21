@@ -1152,8 +1152,9 @@ export const CreateThreadRequestSchema: GenMessage<CreateThreadRequest> = /*@__P
  */
 export type NewWorktree = Message<"codefoundry.v1.NewWorktree"> & {
   /**
-   * Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
-   * Ignored when branch names an existing branch.
+   * Ref to branch from. Defaults to the default branch; projects.base_from_origin
+   * (CreateWorktreeRequest.base_ref) says whether that, or a bare branch name, is
+   * origin's copy. Ignored when branch names an existing branch.
    *
    * @generated from field: string base_ref = 1;
    */
@@ -1191,8 +1192,8 @@ export type NewWorkspace = Message<"codefoundry.v1.NewWorkspace"> & {
   projects: string[];
 
   /**
-   * Ref every member without its own base branches from. Defaults to
-   * origin/<default branch>, else <default branch>, per project.
+   * Ref every member without its own base branches from. Defaults to each project's
+   * default branch, resolved as NewWorktree.base_ref.
    *
    * @generated from field: string base_ref = 2;
    */

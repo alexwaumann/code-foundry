@@ -195,6 +195,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 			}
 			return s.thread.PreTrust(dir)
 		},
+		BaseFromOrigin: baseFromOrigin(s.settings),
 		// `workspace new` without a branch follows projects.branch_naming.
 		DefaultBranch: func(ctx context.Context, name string) string {
 			if s.thread == nil {
@@ -223,6 +224,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", threadLog)),
 		BranchNaming:   branchNaming(s.settings),
+		BaseFromOrigin: baseFromOrigin(s.settings),
 		AttachmentsDir: p.Attachments(), SkillsDir: p.Claude(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
 		// Development aids: how long a thread's process stays up at least, and how often
 		// idle threads are checked against their cache expiry (Go durations; unset or

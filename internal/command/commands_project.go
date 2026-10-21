@@ -117,8 +117,8 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Args: []ArgSpec{
 				projectArg,
 				{Name: "branch", Type: String, Required: true, Description: "Branch to check out"},
-				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch)"},
-				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy)"},
+				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
+				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy; never with projects.base_from_origin off)"},
 			},
 			When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
 			WhyUnavailable: notGit.whyNotGit,

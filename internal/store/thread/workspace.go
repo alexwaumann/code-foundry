@@ -294,7 +294,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		return cw, fmt.Errorf("%w: workspace %s has no member for project %s", ErrFailedPrecondition, w.ID, cwdProject)
 	}
 	cw.workspaceID, cw.projectID, cw.path, cw.members, cw.branch = w.ID, mem.ProjectID, mem.WorktreePath, w.Members, branch
-	cw.baseRef = cwdBase
+	cw.baseRef = cmp.Or(mem.StartPoint, cwdBase)
 	if cw.baseRef == "" {
 		if r, ok := m.opts.Projects.Snapshot().Project(cwdProject); ok {
 			cw.baseRef = r.DefaultBranch

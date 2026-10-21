@@ -37,6 +37,9 @@ type Project struct {
 	// cleanupHold backs CleanupWorktrees' non-git check (project_cleanup.go); nil holds
 	// nothing.
 	cleanupHold func(project.Worktree) string
+	// baseFromOrigin reads projects.base_from_origin for CreateWorktree and ListRefs'
+	// default ref; nil is on (WithBaseFromOrigin).
+	baseFromOrigin func() bool
 }
 
 var _ codefoundryv1connect.ProjectServiceHandler = (*Project)(nil)
@@ -45,6 +48,15 @@ var _ codefoundryv1connect.ProjectServiceHandler = (*Project)(nil)
 func NewProject(store project.Store, b *bus.Bus) *Project {
 	return &Project{store: store, bus: b}
 }
+
+// WithBaseFromOrigin sets how CreateWorktree resolves a base and which default ref
+// ListRefs reports (project.CreateWorktreeOptions.BaseFromOrigin), read per call.
+func (h *Project) WithBaseFromOrigin(f func() bool) *Project {
+	h.baseFromOrigin = f
+	return h
+}
+
+func (h *Project) fromOrigin() bool { return h.baseFromOrigin == nil || h.baseFromOrigin() }
 
 // Route mounts the service.
 func (h *Project) Route(opts ...connect.HandlerOption) Route {
@@ -98,7 +110,7 @@ func (h *Project) CreateWorktree(ctx context.Context, req *connect.Request[v1.Cr
 	m := req.Msg
 	w, err := h.store.CreateWorktree(ctx, project.CreateWorktreeOptions{
 		ProjectID: m.GetProjectId(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(),
-		Fetch: m.GetFetch(),
+		Fetch: m.GetFetch(), BaseFromOrigin: h.fromOrigin(),
 	})
 	if err != nil {
 		return nil, projectError(err)
@@ -107,7 +119,8 @@ func (h *Project) CreateWorktree(ctx context.Context, req *connect.Request[v1.Cr
 }
 
 // ListRefs lists the refs a new branch can start from: local branches, then
-// remote-tracking refs.
+// remote-tracking refs. The default ref is what CreateWorktree starts from without a
+// base under projects.base_from_origin, so the composer, which sends it, gets the same.
 func (h *Project) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
 	refs, err := h.store.ListRefs(ctx, req.Msg.GetProjectId())
 	if err != nil {
@@ -115,7 +128,7 @@ func (h *Project) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefs
 	}
 	all := make([]string, 0, len(refs.Local)+len(refs.Remote))
 	all = append(append(all, refs.Local...), refs.Remote...)
-	return connect.NewResponse(&v1.ListRefsResponse{Refs: all, DefaultRef: refs.DefaultRef}), nil
+	return connect.NewResponse(&v1.ListRefsResponse{Refs: all, DefaultRef: refs.Default(h.fromOrigin())}), nil
 }
 
 // RemoveWorktree removes a worktree.

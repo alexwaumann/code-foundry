@@ -2086,8 +2086,9 @@ func (x *CreateThreadRequest) GetEffortDefaulted() bool {
 
 type NewWorktree struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
-	// Ignored when branch names an existing branch.
+	// Ref to branch from. Defaults to the default branch; projects.base_from_origin
+	// (CreateWorktreeRequest.base_ref) says whether that, or a bare branch name, is
+	// origin's copy. Ignored when branch names an existing branch.
 	BaseRef string `protobuf:"bytes,1,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Steers the branch. With a "/" it is the branch, verbatim; without one it is the
 	// slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a
@@ -2148,8 +2149,8 @@ type NewWorkspace struct {
 	// Projects (id, name when unique, or an absolute path inside one), in member
 	// order. At least one. "<project>:<base ref>" gives that member its own base.
 	Projects []string `protobuf:"bytes,1,rep,name=projects,proto3" json:"projects,omitempty"`
-	// Ref every member without its own base branches from. Defaults to
-	// origin/<default branch>, else <default branch>, per project.
+	// Ref every member without its own base branches from. Defaults to each project's
+	// default branch, resolved as NewWorktree.base_ref.
 	BaseRef string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Workspace name. Default: the branch's last component (feat/add-filter ->
 	// add-filter).

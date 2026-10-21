@@ -38,6 +38,9 @@ type Options struct {
 	// Trust pre-trusts a new member worktree for Claude, as a thread's worktree is
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
+	// BaseFromOrigin reads projects.base_from_origin at every member worktree
+	// (project.CreateWorktreeOptions.BaseFromOrigin). Nil: on.
+	BaseFromOrigin func() bool
 	// DefaultBranch names the branch of a workspace created without one from its name
 	// (the daemon: the thread store's WorkspaceBranch, which follows
 	// projects.branch_naming). Nil, or "": cf/<slug of the name>.
@@ -71,6 +74,9 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
+	}
+	if opts.BaseFromOrigin == nil {
+		opts.BaseFromOrigin = func() bool { return true }
 	}
 	rows, err := loadWorkspaces(ctx, opts.DB)
 	if err != nil {
@@ -186,7 +192,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	}
 	m.put(w)
 	m.log.Info("workspace created", "workspace", w.ID, "name", w.Name, "branch", w.Branch, "members", len(w.Members))
-	return w, nil
+	return withStartPoints(w, made), nil
 }
 
 // AddProject implements Store.
@@ -221,7 +227,7 @@ func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspac
 	w.Members = append(slices.Clone(w.Members), c.member)
 	m.put(w)
 	m.log.Info("workspace project added", "workspace", w.ID, "project", r.ID, "path", c.member.WorktreePath)
-	return w, nil
+	return withStartPoints(w, []created{c}), nil
 }
 
 // RemoveProject implements Store.
@@ -318,6 +324,20 @@ type created struct {
 	member Member
 	// newBranch: the branch did not exist before, so rollback deletes it too.
 	newBranch bool
+	// startPoint is the ref the branch was created from (Member.StartPoint).
+	startPoint string
+}
+
+// withStartPoints is w with made's start points on its members, for Create's and
+// AddProject's caller; the stored snapshot keeps none.
+func withStartPoints(w Workspace, made []created) Workspace {
+	w.Members = slices.Clone(w.Members)
+	for i, mem := range w.Members {
+		if j := slices.IndexFunc(made, func(c created) bool { return c.member.ProjectID == mem.ProjectID }); j >= 0 {
+			w.Members[i].StartPoint = made[j].startPoint
+		}
+	}
+	return w
 }
 
 // createMember makes r's worktree on branch (the same path a new thread's worktree
@@ -334,7 +354,7 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 		}
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch,
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch, BaseFromOrigin: m.opts.BaseFromOrigin(),
 	})
 	if err != nil {
 		return created{}, projectError("create worktree "+branch+" in "+r.Name, err)
@@ -344,8 +364,8 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 			m.log.Warn("pre-trust workspace worktree failed; claude will ask", "path", wt.Path, "err", err)
 		}
 	}
-	m.log.Info("workspace worktree created", "project", r.ID, "branch", branch, "path", wt.Path, "base", base)
-	return created{member: Member{ProjectID: r.ID, WorktreePath: wt.Path}, newBranch: !existed}, nil
+	m.log.Info("workspace worktree created", "project", r.ID, "branch", branch, "path", wt.Path, "base", base, "start_point", wt.StartPoint)
+	return created{member: Member{ProjectID: r.ID, WorktreePath: wt.Path}, newBranch: !existed, startPoint: wt.StartPoint}, nil
 }
 
 // rollback removes worktrees an operation made before it failed, newest first. It
