@@ -38,7 +38,7 @@ vi.mock("@/api/threads", async (orig) => ({
 }));
 vi.mock("@/stores/attachments", async (orig) => ({
   ...(await orig<typeof import("@/stores/attachments")>()),
-  loadAttachment: (path: string) => Promise.resolve({ url: "blob:x", file: new Blob(["x"], { type: path.endsWith(".pdf") ? "application/pdf" : "image/png" }) }),
+  readAttachmentFile: (path: string) => Promise.resolve(new Blob(["x"], { type: path.endsWith(".pdf") ? "application/pdf" : "image/png" })),
 }));
 vi.mock("@/lib/pdf", () => ({ pdfSummary: () => new Promise(() => undefined) }));
 

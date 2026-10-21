@@ -55,7 +55,7 @@ import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, stagedPdfPages, tagsByProject } from "@/lib/prompt";
 import type { Citation } from "@/lib/citation";
-import { loadAttachment } from "./attachments";
+import { readAttachmentFile } from "./attachments";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
@@ -282,10 +282,12 @@ interface StagedPath {
 /** Stages one dropped or picked path and reads it back as a File named like the original. */
 async function stagePath(path: string): Promise<StagedPath> {
   const stagedPath = await stageAttachmentPath(path);
-  const loaded = await loadAttachment(stagedPath);
-  if (!loaded) throw new Error("staged, but the daemon did not serve it back");
+  // Read straight from the daemon: the draft keeps its own File, so the thread's shared
+  // cache (stores/attachments) need not hold a second copy.
+  const blob = await readAttachmentFile(stagedPath);
+  if (!blob) throw new Error("staged, but the daemon did not serve it back");
   const name = baseName(path);
-  const file = new File([loaded.file], name, { type: loaded.file.type });
+  const file = new File([blob], name, { type: blob.type });
   return { name, type: file.type, size: file.size, pages: file.type === PDF_MIME_TYPE ? stagedPdfPages(stagedPath) : null, file, stagedPath };
 }
 
