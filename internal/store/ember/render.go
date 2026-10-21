@@ -49,6 +49,8 @@ type Message struct {
 type ProjectSeed struct {
 	ID, Name, Path, DefaultBranch string
 	Git                           bool
+	// GitHubSlug is "owner/name" when origin is on GitHub (pull requests possible).
+	GitHubSlug string
 	// Threads are its latest threads the user sees, newest first (at most
 	// recentThreads).
 	Threads []ThreadLine
@@ -249,8 +251,8 @@ func ThreadState(tt *TaskThread) string {
 	return s
 }
 
-// RenderProjects is PROJECTS.md: every project with its id, path, default branch, and
-// its latest threads.
+// RenderProjects is PROJECTS.md: every project with its id, path, default branch, its
+// origin's kind (originKind) and its latest threads.
 func RenderProjects(ps []ProjectSeed) string {
 	var b strings.Builder
 	b.WriteString("# Projects\n\n")
@@ -266,6 +268,7 @@ func RenderProjects(ps []ProjectSeed) string {
 			if p.DefaultBranch != "" {
 				kind += ", default branch " + p.DefaultBranch
 			}
+			kind += ", " + originKind(p.GitHubSlug)
 		}
 		fmt.Fprintf(&b, "- **%s** (`%s`) · %s · %s\n", p.Name, p.ID, p.Path, kind)
 		if len(p.Threads) == 0 {
@@ -278,6 +281,16 @@ func RenderProjects(ps []ProjectSeed) string {
 		b.WriteString("  Latest threads: " + strings.Join(parts, "; ") + "\n")
 	}
 	return b.String()
+}
+
+// originKind says where a git project's origin is, so Ember knows whether pull requests
+// are possible: "origin: GitHub (owner/name)", else "origin: local/other (no pull
+// requests)" (a local path, another host, or no origin at all).
+func originKind(slug string) string {
+	if slug != "" {
+		return "origin: GitHub (" + slug + ")"
+	}
+	return "origin: local/other (no pull requests)"
 }
 
 // RenderSkills is PROJECTS.md's closing section: where the code-foundry-orchestrate
