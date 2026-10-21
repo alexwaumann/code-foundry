@@ -108,12 +108,22 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
         {body}
       </button>
     );
-  if (!row.branch) return line;
+  if (!row.branch && !row.outcome) return line;
+  // Under the title, past the dot (size-2 + gap-2 + px-1): the branch, then what the piece came to.
   return (
     <>
       {line}
-      {/* Under the title, past the dot (size-2 + gap-2 + px-1). */}
-      <BranchLine branch={row.branch} className="-mt-0.5 mb-0.5 pl-5" testId="ember-worker-branch" />
+      <div className="-mt-0.5 mb-0.5 flex min-w-0 items-center gap-1 pl-5 text-caption text-muted-foreground">
+        {row.branch && <BranchLine branch={row.branch} className="max-w-[60%] shrink-0" testId="ember-worker-branch" />}
+        {row.branch && row.outcome && <span aria-hidden>·</span>}
+        {row.outcome && (
+          <Tip label={row.outcome} whenTruncated>
+            <span className="min-w-0 truncate" data-testid="ember-worker-outcome">
+              {row.outcome}
+            </span>
+          </Tip>
+        )}
+      </div>
     </>
   );
 }

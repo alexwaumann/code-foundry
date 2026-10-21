@@ -209,6 +209,8 @@ export interface WorkerRow {
   atMs: number | null;
   /** A done subtask's branch (ember task done --branch); "" for none. */
   branch: string;
+  /** A done or cancelled subtask's outcome (what the piece came to); "" for none. Drawn under the row with the branch. */
+  outcome: string;
   subtask: boolean;
   /** 0 for a task's own worker or a subtask; 1+ for a thread of a lead's team, by how far below the lead it is. */
   depth: number;
@@ -290,25 +292,22 @@ function teamRows(th: EmberTaskThreadView, t: EmberTaskView, shown: ReadonlySet<
         meta: workerMeta(d, t.state === "doing", names),
         atMs: d.lastActivityAtMs,
         branch: "",
+        outcome: "",
         subtask: false,
         depth: Math.max(1, d.depth),
       }),
     );
   const more = th.descendantsTotal - th.descendants.length;
   if (more > 0)
-    rows.push({ key: `d:${t.id}:more`, threadId: "", title: `+${String(more)} more ${more === 1 ? "thread" : "threads"}`, dot: "open", meta: { text: "", tone: "muted" }, atMs: null, branch: "", subtask: false, depth: 1 });
+    rows.push({ key: `d:${t.id}:more`, threadId: "", title: `+${String(more)} more ${more === 1 ? "thread" : "threads"}`, dot: "open", meta: { text: "", tone: "muted" }, atMs: null, branch: "", outcome: "", subtask: false, depth: 1 });
   return rows;
 }
 
-/**
- * A subtask row's words: a blocked one's outcome (amber); its worker's while it is open; a
- * done or cancelled one's outcome (muted: what the piece came to), else its state.
- */
+/** A subtask row's words: a blocked one's outcome (amber); its worker's while it is open; else its state (a done one's outcome goes under it). */
 function subtaskMeta(s: EmberTaskView, names: ReadonlyMap<string, string>): Words {
   const th = s.thread;
   if (s.state === "blocked" && s.outcome) return { text: s.outcome, tone: "amber" };
   if (th && (s.state === "doing" || s.state === "blocked")) return workerMeta(th, s.state === "doing", names);
-  if ((s.state === "done" || s.state === "cancelled") && s.outcome) return { text: s.outcome, tone: "muted" };
   return { text: stateWords[s.state], tone: "muted" };
 }
 
@@ -327,6 +326,7 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       meta: workerMeta(own, c.task.state === "doing", names),
       atMs: own.lastActivityAtMs,
       branch: "",
+      outcome: "",
       subtask: false,
       depth: 0,
     });
@@ -342,6 +342,7 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       meta: subtaskMeta(s, names),
       atMs: th?.lastActivityAtMs ?? s.updatedAtMs,
       branch: s.state === "done" ? s.branch : "",
+      outcome: s.state === "done" || s.state === "cancelled" ? s.outcome : "",
       subtask: true,
       depth: 0,
     });

@@ -427,10 +427,10 @@ describe("the board", () => {
     const piece = task("t-dp1", { title: "Go side", state: "done", parentId: "t-dp", outcome: "Bumped; tests pass", branch: "cf/wails-go", doneAtMs: NOW - MIN });
     const dropped = task("t-dp2", { title: "Docs", state: "cancelled", parentId: "t-dp" });
     const [card] = boardSections([doneParent, piece, dropped], NOW).doneToday;
-    expect((card ? workerRows(card) : []).map((r) => [r.title, r.meta.text, r.branch])).toEqual([
-      ["Worker", "Finished", ""],
-      ["Go side", "Bumped; tests pass", "cf/wails-go"],
-      ["Docs", "cancelled", ""],
+    expect((card ? workerRows(card) : []).map((r) => [r.title, r.meta.text, r.branch, r.outcome])).toEqual([
+      ["Worker", "Finished", "", ""],
+      ["Go side", "done", "cf/wails-go", "Bumped; tests pass"],
+      ["Docs", "cancelled", "", ""],
     ]);
   });
 

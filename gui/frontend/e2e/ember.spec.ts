@@ -421,7 +421,8 @@ test("the board: labelled ages, a done piece's outcome and branch, no repeated t
   const notes = board(page).locator('[data-testid="ember-task"][data-task="t-1a2b3c4d"]');
   const piece = notes.locator('[data-testid="ember-worker"][data-subtask]').first();
   await expect(piece.getByTestId("ember-worker-title")).toHaveText("List the PRs merged since v0.19.1");
-  await expect(piece.getByTestId("ember-worker-meta")).toHaveText("42 PRs in docs/release-notes/prs.txt");
+  await expect(piece.getByTestId("ember-worker-meta")).toHaveText("done");
+  await expect(notes.getByTestId("ember-worker-outcome")).toHaveText("42 PRs in docs/release-notes/prs.txt");
   await expect(notes.getByTestId("ember-worker-branch")).toHaveText("cf/release-notes-prs");
   // The wails worker is named after its task: its row says Worker, not the title again.
   const wails = board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-wails"]');
