@@ -1,25 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { RATIO_DEFAULT, RATIO_MAX, RATIO_MIN } from "@/stores/panel";
-import { PANEL_GROUP_MIN_HEIGHT, PANEL_MIN, PANEL_SIDE_BY_SIDE_MIN } from "@/stores/ui";
+import { CONTENT_MIN, PANEL_GROUP_MIN_HEIGHT, PANEL_GROUP_SIDE_MIN, PANEL_MIN, PANEL_SIDE_BY_SIDE_MIN } from "@/stores/ui";
 import { clampSplitRatio, dividerKeyRatio, groupMin, ratioBounds, splitOrientation, type SplitOrientation } from "./splitLayout";
 
 describe("PANEL_SIDE_BY_SIDE_MIN", () => {
-  it("is two group minimums, the divider and 24px of room", () => {
-    expect(PANEL_SIDE_BY_SIDE_MIN).toBe(585);
+  it("is two readable groups (CONTENT_MIN each) and the divider", () => {
+    expect(PANEL_GROUP_SIDE_MIN).toBe(CONTENT_MIN);
+    expect(PANEL_SIDE_BY_SIDE_MIN).toBe(721);
   });
 });
 
 describe("splitOrientation", () => {
-  it.each<[string, number, boolean, SplitOrientation]>([
-    ["the minimum width stacks", PANEL_MIN, false, "stack"],
-    ["the default width stacks", 420, false, "stack"],
-    ["just under the threshold stacks", PANEL_SIDE_BY_SIDE_MIN - 1, false, "stack"],
-    ["at the threshold, side by side", PANEL_SIDE_BY_SIDE_MIN, false, "side"],
-    ["wide, side by side", 760, false, "side"],
-    ["expanded, side by side whatever the stored width", 420, true, "side"],
-    ["expanded at the minimum, side by side", PANEL_MIN, true, "side"],
-  ])("%s", (_name, width, expanded, want) => {
-    expect(splitOrientation(width, expanded)).toBe(want);
+  it.each<[string, number, SplitOrientation]>([
+    ["the minimum width stacks", PANEL_MIN, "stack"],
+    ["the default width stacks", 420, "stack"],
+    ["the old threshold stacks", 585, "stack"],
+    ["just under the threshold stacks", 720, "stack"],
+    ["at the threshold, side by side", 721, "side"],
+    ["wide, side by side", 1200, "side"],
+    ["no width (a window too narrow for anything) stacks", 0, "stack"],
+  ])("%s", (_name, width, want) => {
+    expect(splitOrientation(width)).toBe(want);
   });
 });
 

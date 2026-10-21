@@ -60,11 +60,17 @@ export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;
 export const PANEL_DEFAULT = 420;
 /**
- * A split side panel shows its two tab groups side by side from this rendered width
- * (two PANEL_MIN groups, the 1px divider, and 24px of room), stacked below it, and side
- * by side whenever it is expanded (components/panel/splitLayout.ts).
+ * The width a tab group needs to be worth reading side by side: CONTENT_MIN, the least the
+ * content pane gets. PANEL_MIN (narrower) stays the CSS minimum a side-by-side group is
+ * squeezed to by the split's ratio.
  */
-export const PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_MIN + 1 + 24;
+export const PANEL_GROUP_SIDE_MIN = 360;
+/**
+ * A split side panel shows its two tab groups side by side from this rendered width (two
+ * PANEL_GROUP_SIDE_MIN groups and the 1px divider), stacked below it, expanded or not
+ * (components/panel/splitLayout.ts).
+ */
+export const PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_GROUP_SIDE_MIN + 1;
 /** A stacked split panel's tab group is never shorter than this (its header and some body). */
 export const PANEL_GROUP_MIN_HEIGHT = 160;
 /** The content pane never gets narrower than this to make room for the side panel. */
@@ -244,6 +250,15 @@ export function clamp(n: number, lo: number, hi: number): number {
  */
 export function panelMax(windowWidth: number, sidebarWidth: number): number {
   return Math.floor(Math.min(windowWidth * PANEL_MAX_FRACTION, windowWidth - sidebarWidth - PANE_GAPS - CONTENT_MIN));
+}
+
+/**
+ * The expanded side panel's rendered width: it replaces the content column, so it fills
+ * the row beside a sidebar this wide (0 when hidden), less its own shell-gap margins on
+ * both sides (SidePanel.tsx m-shell).
+ */
+export function expandedPanelWidth(windowWidth: number, sidebarWidth: number): number {
+  return Math.max(0, windowWidth - sidebarWidth - 2 * SHELL_GAP);
 }
 
 /** The content pane keeps at least this much height above the bottom panel. */
