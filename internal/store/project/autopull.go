@@ -82,8 +82,8 @@ func AutoPullCandidates(p Project) []Worktree {
 
 // afterFetch follows a successful scheduled fetch of project id. With auto pull on
 // and the project live, a pass refreshes the project and pulls its candidates in the
-// background; otherwise (or while the project's last pass still runs) it requests the
-// reconcile every fetch is followed by.
+// background; otherwise it requests the reconcile every fetch is followed by. The
+// fetch loop skips a project while its pass runs (fetch), so passes never overlap.
 func (g *Git) afterFetch(ctx context.Context, id string) {
 	a := g.autoPullHooks()
 	if !a.on() || !g.projectLive(id, g.now()) || !g.startAutoPull(id) {
@@ -107,6 +107,13 @@ func (g *Git) startAutoPull(id string) bool {
 	}
 	g.autoPull.running[id] = true
 	return true
+}
+
+// autoPulling reports whether project id has an auto pull pass running.
+func (g *Git) autoPulling(id string) bool {
+	g.autoPull.mu.Lock()
+	defer g.autoPull.mu.Unlock()
+	return g.autoPull.running[id]
 }
 
 func (g *Git) endAutoPull(id string) {

@@ -1227,7 +1227,9 @@ func (g *Git) fetch(ctx context.Context, id string) {
 		return
 	}
 	m := st.meta.Load()
-	if m.OriginURL == "" || m.Error != "" {
+	if m.OriginURL == "" || m.Error != "" || g.autoPulling(id) {
+		// An auto pull pass still running fetches itself (git pull): a second fetch
+		// writing FETCH_HEAD under it makes the pull fail.
 		return
 	}
 	fctx, cancel := context.WithTimeout(ctx, fetchTimeout)
