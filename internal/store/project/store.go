@@ -697,7 +697,7 @@ func (g *Git) ensureBorn(ctx context.Context, m *projectMeta, base string) error
 	if unborn == "" || (base != "" && base != unborn && base != "refs/heads/"+unborn) {
 		return nil
 	}
-	if _, err := g.runner.Run(ctx, m.Path, "commit", "--quiet", "--allow-empty", "-m", initialCommitMessage); err != nil {
+	if err := g.commitEmptyRoot(ctx, m.Path, unborn); err != nil {
 		return fmt.Errorf("%w: %s has no commits yet and the initial commit failed: %w", ErrFailedPrecondition, m.Name, err)
 	}
 	g.log.Info("initial commit made for unborn branch", "project", m.ID, "path", m.Path, "branch", unborn)
@@ -705,6 +705,24 @@ func (g *Git) ensureBorn(ctx context.Context, m *projectMeta, base string) error
 		return err
 	}
 	return nil
+}
+
+// commitEmptyRoot points the unborn branch at a new root commit of the empty tree,
+// with plumbing: `git commit --allow-empty` would commit whatever the user staged in
+// their checkout and run their hooks and signing (fuzz finding git 5). The index is
+// left alone, so staged files stay staged; update-ref's empty old value refuses a
+// branch someone made meanwhile.
+func (g *Git) commitEmptyRoot(ctx context.Context, dir, branch string) error {
+	tree, err := g.runner.Run(ctx, dir, "hash-object", "-w", "-t", "tree", os.DevNull)
+	if err != nil {
+		return err
+	}
+	commit, err := g.runner.Run(ctx, dir, "commit-tree", "--no-gpg-sign", "-m", initialCommitMessage, string(trimNL(tree)))
+	if err != nil {
+		return err
+	}
+	_, err = g.runner.Run(ctx, dir, "update-ref", "-m", "commit (initial): "+initialCommitMessage, "refs/heads/"+branch, string(trimNL(commit)), "")
+	return err
 }
 
 // originFetches reports whether one of origin's configured fetch refspecs writes the

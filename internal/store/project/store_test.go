@@ -706,6 +706,14 @@ func TestCreateWorktreeUnbornBase(t *testing.T) {
 			dir := filepath.Join(base, "pad")
 			git(t, base, "init", "-q", "-b", "main", dir)
 			writeFile(t, filepath.Join(dir, "notes.md"), "todo\n")
+			// Staged work and a hook that refuses every commit: the initial commit must
+			// neither take the one nor run the other (fuzz finding git 5).
+			writeFile(t, filepath.Join(dir, "staged.txt"), "secret\n")
+			git(t, dir, "add", "staged.txt")
+			hook := filepath.Join(dir, ".git", "hooks", "pre-commit")
+			if err := os.WriteFile(hook, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
 			if tt.breakGit {
 				git(t, dir, "config", "user.name", "")
 				git(t, dir, "config", "user.email", "")
@@ -738,9 +746,16 @@ func TestCreateWorktreeUnbornBase(t *testing.T) {
 			if subj := git(t, dir, "log", "--format=%s"); subj != tt.wantLog {
 				t.Fatalf("log = %q", subj)
 			}
-			// The untracked file stays untracked; the main checkout now has a head.
+			// The commit is empty; the untracked file stays untracked and the staged one
+			// staged; the main checkout now has a head.
+			if files := git(t, dir, "ls-tree", "-r", "--name-only", "HEAD"); files != "" {
+				t.Fatalf("initial commit has %q", files)
+			}
+			if staged := git(t, dir, "diff", "--cached", "--name-only"); staged != "staged.txt" {
+				t.Fatalf("staged after = %q", staged)
+			}
 			got, _ := h.store.Snapshot().Project(r.ID)
-			if m := got.Worktrees[0]; !m.IsMain || len(m.Head) != 40 || m.Status.Untracked != 1 {
+			if m := got.Worktrees[0]; !m.IsMain || len(m.Head) != 40 || m.Status.Untracked != 1 || m.Status.Staged != 1 {
 				t.Fatalf("main worktree = %+v", m)
 			}
 			// A second worktree makes no second commit.
