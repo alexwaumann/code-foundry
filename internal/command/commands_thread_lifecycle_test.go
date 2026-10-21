@@ -223,3 +223,21 @@ func TestThreadNewKeybindingAndEnums(t *testing.T) {
 		}
 	}
 }
+
+// thread.focus only emits an intent, so it looks the id up first: a short or mistyped
+// one (which resolution passes through) is not found, not "delivered".
+func TestThreadFocusUnknown(t *testing.T) {
+	reg, _ := newBulkRegistry(t, idle("s-aaaa11112222", "one"))
+	for _, tt := range []struct {
+		id       string
+		wantCode connect.Code
+	}{{"x", connect.CodeNotFound}, {"s-ffff00000000", connect.CodeNotFound}, {"1111", connect.CodeNotFound}, {"2222", 0}} {
+		res, err := reg.Invoke(context.Background(), command.Context{}, "thread.focus", map[string]string{"id": tt.id})
+		if connect.CodeOf(err) != tt.wantCode && !(tt.wantCode == 0 && err == nil) {
+			t.Errorf("focus %s: err %v, want code %v", tt.id, err, tt.wantCode)
+		}
+		if tt.wantCode == 0 && res.Message != "delivered=1" {
+			t.Errorf("focus %s: %q", tt.id, res.Message)
+		}
+	}
+}

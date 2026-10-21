@@ -105,6 +105,24 @@ func (r *Registry) SetIDFallback(kind IDKind, list IDLister) {
 	r.idFallbacks[kind] = list
 }
 
+// known returns a NotFound error unless id is one of kind's listed ids: for a command
+// that only emits an intent (thread.focus), so a short or mistyped id, which resolution
+// passes through, is not reported as delivered. A kind without a lister knows any id.
+func (r *Registry) known(ctx context.Context, kind IDKind, id string) error {
+	list := r.idLister(kind)
+	if list == nil {
+		return nil
+	}
+	ids, err := list(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(ids, id) {
+		return connect.NewError(connect.CodeNotFound, fmt.Errorf("no %s %s", idKinds[kind].noun, id))
+	}
+	return nil
+}
+
 // resolveRef resolves one suffix ref of kind against ids, then, when none ends in it,
 // against the kind's fallback ids.
 func (r *Registry) resolveRef(ctx context.Context, kind IDKind, arg, ref string, ids []string) (string, error) {

@@ -71,7 +71,10 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Args: []ArgSpec{
 				{Name: "id", Type: String, Required: true, Context: ContextTerminal, ID: TerminalID, Description: "Terminal id" + IDHelp},
 			},
-			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				if err := r.known(ctx, TerminalID, a.String("id")); err != nil {
+					return Result{}, err
+				}
 				return emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{
 					FocusTerminal: &v1.UiIntent_FocusTerminal{TerminalId: a.String("id")},
 				}}), nil

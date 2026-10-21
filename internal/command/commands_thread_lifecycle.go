@@ -216,7 +216,10 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			NoKeybinding: true,
 			Args:         []ArgSpec{idArg},
 			When:         hasThread,
-			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
+					return Result{}, err
+				}
 				n := focus(a.String("id"))
 				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
 			},
