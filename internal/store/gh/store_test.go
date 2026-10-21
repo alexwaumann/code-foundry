@@ -313,6 +313,30 @@ func TestStorePollErrorBackoff(t *testing.T) {
 	}
 }
 
+// A 200 poll answer without a viewer decodes as not authenticated, but the request
+// itself succeeded, so nothing pauses the store: the poll backs off instead of running
+// again at MinGap.
+func TestStorePollNoViewerBacksOff(t *testing.T) {
+	f := &fakeRunner{}
+	f.set(func(string, map[string]any) (json.RawMessage, error) {
+		return json.RawMessage(`{"viewer":null,"rateLimit":{"limit":5000,"cost":1,"remaining":4000,"resetAt":"2030-01-01T00:00:00Z"}}`), nil
+	})
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.MaxBackoff = time.Hour
+	s := startStore(t, opts)
+	waitFor(t, "the failed poll", func() bool { return s.Snapshot().Poll.LastError != "" })
+	time.Sleep(300 * time.Millisecond) // 15 MinGaps
+	if n := f.count("Poll"); n != 1 {
+		t.Errorf("polls = %d, want 1 (backed off)", n)
+	}
+	s.mu.Lock()
+	next, failures := s.pollNext, s.pollFailures
+	s.mu.Unlock()
+	if failures != 1 || time.Until(next) < 30*time.Minute {
+		t.Errorf("pollFailures = %d, next poll in %v, want 1 and a backoff", failures, time.Until(next))
+	}
+}
+
 func TestStorePullRequestDetail(t *testing.T) {
 	f := &fakeRunner{}
 	p1, p2 := fixtureData(t, "pull_request_14586_page1.json"), fixtureData(t, "pull_request_14586_page2.json")

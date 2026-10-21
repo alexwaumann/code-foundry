@@ -270,8 +270,10 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 	switch {
 	case retryNow:
 		s.schedulePollLocked(now, now)
-	case isGlobal(err):
-		// Left due: the store-wide pause (or the auth check) holds it.
+	case isGlobal(err) && (s.authBad || now.Before(s.pauseUntil)):
+		// Left due: the store-wide pause (or the auth check) holds it. A global error
+		// that set neither (a 200 answer without a viewer) backs off below instead of
+		// polling again at MinGap.
 	default:
 		s.pollFailures++
 		s.pollAgain = false // a failing poll is not retried early
