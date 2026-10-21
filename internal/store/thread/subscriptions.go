@@ -267,8 +267,11 @@ type subscriptions struct {
 	plugins PluginWakes
 	notes   []pluginNote
 	noting  bool
-	// restarted: DeliverRestartWakes ran (subscriptions_restart.go).
-	restarted bool
+	// restarted: DeliverRestartWakes ran (subscriptions_restart.go). reportedAtStop are
+	// the threads the daemon's death cut after their final report (New, restartcut.go):
+	// their settle never fired, so the restart fires it.
+	restarted      bool
+	reportedAtStop map[string]bool
 	// held are leads' settled wakes held while their children work, by lead, then
 	// subscription id (subscriptions_hold.go). In memory only.
 	held map[string]map[string]Subscription

@@ -52,7 +52,13 @@ type runner struct {
 	// startFailed: the process did not come up (no handshake); the thread ends with
 	// status error ReasonStartFailed.
 	startFailed bool
-	readyClosed bool
+	// crashed: the process died on its own mid-turn (maybeExited): a busy thread ends
+	// error ReasonCrashed, not ReasonInterrupted (disconnectedStatus).
+	crashed bool
+	// reportedAtStop: the daemon's stop cut a turn that had already filed its final
+	// report (shutdown, reportCoversTurn): the thread ends finished, not interrupted.
+	reportedAtStop bool
+	readyClosed    bool
 	// closeStatus/closeReason are the status when the close began: the close interrupts
 	// a running turn, so the reading at exit no longer says it was busy (see finish).
 	closeStatus Status
@@ -367,7 +373,10 @@ func (r *runner) finish(fn func(*Thread)) {
 	if r.closing {
 		st, reason = r.closeStatus, r.closeReason
 	}
-	st, reason = disconnectedStatus(st, reason)
+	st, reason = disconnectedStatus(st, reason, r.crashed)
+	if r.reportedAtStop && st == StatusError {
+		st, reason = StatusNeedsAttention, "finished"
+	}
 	if r.startFailed {
 		st, reason = StatusError, ReasonStartFailed
 	}

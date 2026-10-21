@@ -367,16 +367,27 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		return nil, err
 	}
 	var lost []string
+	reported := map[string]bool{}
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
 		if s.State != StateDisconnected {
 			lost = append(lost, s.ID)
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
-			if midTurn(s) {
+			st, reason := disconnectedStatus(s.Status, s.StatusReason, false)
+			switch {
+			case reportedAtLoad(ctx, m, s):
+				// Its final report came after its last message: it finished
+				// (restartcut.go); its subscribers hear so after the start.
+				reported[s.ID] = true
+				st, reason = StatusNeedsAttention, "finished"
+				opts.Log.Info("the daemon died after a thread's final report: finished, not interrupted", "thread", s.ID)
+			case s.PendingFirst != nil:
+				// Its first message never went out: no turn to resume (firstprompt.go).
+				opts.Log.Warn("first message not delivered: the daemon died; it goes at the next start", "thread", s.ID)
+			case midTurn(s):
 				// The turn died with the daemon (resumenote.go).
 				s.ResumeNote = ResumeNote{Cause: ResumeRestart, At: opts.Now()}
 			}
-			st, reason := disconnectedStatus(s.Status, s.StatusReason)
 			s.setStatus(st, reason, opts.Now())
 			if err := saveThread(ctx, opts.DB, s); err != nil {
 				return nil, err
@@ -393,6 +404,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		return nil, err
 	}
 	m.subs.changed = func(id string) { bus.Publish(opts.Bus, SubscriptionsChanged{SubscriberID: id}) }
+	m.subs.reportedAtStop = reported
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()
@@ -688,8 +700,11 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	rec := &record{s: s, namingTried: namingTried}
 	if prompt != "" {
-		// The prompt goes in as the first user message; the item keeps it as typed.
-		rec.first = &outgoing{text: strings.TrimSpace(o.InitialPrompt), composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt}
+		// The prompt goes in as the first user message; the item keeps it as typed. It is
+		// on the row until Claude has it, so a daemon stop before the handshake keeps it
+		// for the next start (firstprompt.go); spawn's commit writes it with the row.
+		rec.s.PendingFirst = pendingFirstOf(&outgoing{text: strings.TrimSpace(o.InitialPrompt),
+			composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt})
 	}
 	m.recs[id] = rec
 	m.mu.Unlock()
@@ -832,7 +847,8 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (Thread, error) {
 }
 
 // spawn starts claude for record id (claude -p over stream-json, stream.go) and its
-// runner. The record's first prompt, if any, is sent once the handshake succeeds.
+// runner. The thread's pending first message (firstprompt.go), then the record's
+// message that started it, if any, are sent once the handshake succeeds.
 func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.mu.Lock()
 	rec, err := m.record(id)
@@ -841,7 +857,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		return err
 	}
 	s := rec.s
-	first := rec.first
+	first := firstMessages(s, rec.first)
 	rec.first = nil
 	m.mu.Unlock()
 
@@ -882,7 +898,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	rec.s.State = StateStarting
 	// The fresh process owns status from here: the persisted one is cleared, or, with a
 	// message waiting for the handshake, the thread is on that turn already.
-	if first != nil {
+	if len(first) > 0 {
 		rec.s.setStatus(StatusBusy, "working", now)
 	} else {
 		rec.s.setStatus(StatusUnknown, "", now)
@@ -892,13 +908,17 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
-	if first != nil && first.itemID == "" {
+	if len(first) > 0 && first[0].itemID == "" {
 		// A new thread's prompt goes into the timeline now, before the handshake (the
 		// row is written, so the item can be): a start that fails leaves the message,
 		// then why, for the user to copy or send again. sendMessage delivers it under
-		// this id. Before run starts, so nothing else writes the log yet.
-		if _, err := recordUser(r.st.proj.w, first); err != nil {
+		// this id. Before run starts, so nothing else writes the log yet. The row's
+		// pending first message keeps the id, so a later start does not write it again
+		// (firstprompt.go).
+		if _, err := recordUser(r.st.proj.w, first[0]); err != nil {
 			m.log.Warn("record the first prompt before the handshake", "thread", id, "err", err)
+		} else if first[0].first {
+			m.setPendingFirstItem(id, first[0].itemID)
 		}
 	}
 	m.log.Info("thread spawned", "thread", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)

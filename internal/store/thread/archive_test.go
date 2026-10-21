@@ -89,7 +89,7 @@ func TestArchiveStatus(t *testing.T) {
 		{name: "busy", setup: busySetup, want: StatusIdle, wantReason: ReasonArchived},
 		{name: "at a permission prompt", setup: permissionSetup, want: StatusIdle, wantReason: ReasonArchived},
 		{name: "idle", setup: idleSetup, want: StatusIdle, wantReason: "at prompt"},
-		{name: "interrupted before", setup: busySetup, want: StatusError, wantReason: ReasonInterrupted,
+		{name: "crashed before", setup: busySetup, want: StatusError, wantReason: ReasonCrashed,
 			before: func(e *env, s Thread) {
 				e.exit(s.ID, 1)
 				e.waitFor(s.ID, "crashed", func(s Thread) bool { return s.State == StateDisconnected })

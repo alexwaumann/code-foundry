@@ -29,6 +29,8 @@ func TestResumeNoteText(t *testing.T) {
 			"[code-foundry] Your previous turn was interrupted by thread s-1a2b through Code Foundry" + tail},
 		{"restart", ResumeNote{Cause: ResumeRestart}, 3,
 			"[code-foundry] Your previous turn was stopped because the Code Foundry app restarted" + tail},
+		{"crash", ResumeNote{Cause: ResumeCrash}, 0,
+			"[code-foundry] Your previous turn ended because its process died (not stopped by anyone); your last tool call may have run partially, so check its effects before repeating it."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -2,6 +2,7 @@ package thread
 
 import (
 	"cmp"
+	"context"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,8 +29,10 @@ import (
 // and removed wakes are not batched.
 //
 // A wake about one of the subscriber's own children (created_by the subscriber) carries
-// "siblings": how many of the subscriber's live children have settled, and the others
-// still working or waiting on an answer, counted when the wake is sent.
+// "siblings": how many of the subscriber's live children in the current batch have
+// settled, and the others still working or waiting on an answer, counted when the wake
+// is sent. The batch is the children at work since the subscriber's last message from
+// the user (not a wake): a child that settled before it belongs to an earlier request.
 //
 // A lead that ends a turn while its own children work is only waiting on them: its
 // settled wake is held (counted in FiredCount, logged "wake held: lead still has N
@@ -192,7 +195,16 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		}
 		parts, subs = append(parts, p), append(subs, d.sub)
 	}
+	if rw != nil && rw.notice.self {
+		// The user's message its cut turn was handling (restartcut.go).
+		if items, err := m.Items(ctx, subscriber); err != nil {
+			m.log.Warn("restart notice: read the thread's items", "thread", subscriber, "err", err)
+		} else {
+			rw.ownTurn(items.Items)
+		}
+	}
 	snap := m.Snapshot()
+	parts = archivedTargets(snap, parts) // archive_wakes.go
 	if rw != nil {
 		var left bool
 		if parts, left = rw.keepLive(snap, parts); !left {
@@ -211,7 +223,7 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		m.log.Info("wake not delivered: the subscriber is gone or archived", "thread", subscriber, "subscriptions", subs)
 		return
 	}
-	if sib := siblingsOf(snap, subscriber, parts); sib != nil {
+	if sib := siblingsOf(snap, subscriber, parts, m.requestStart(ctx, subscriber, parts)); sib != nil {
 		for i := range parts {
 			if parts[i].t.CreatedBy == subscriber {
 				parts[i].d.siblings = sib
@@ -244,10 +256,33 @@ func (s *subscriptions) refundLocked(subscriber string, slots []time.Time) {
 	}
 }
 
+// requestStart is when subscriber's current request began, for the siblings count: its
+// last top-level message from the user (not a wake); zero when parts are about none of
+// its children, or it has no such message.
+func (m *Manager) requestStart(ctx context.Context, subscriber string, parts []threadWakePart) time.Time {
+	if !slices.ContainsFunc(parts, func(p threadWakePart) bool { return p.t.CreatedBy == subscriber }) {
+		return time.Time{}
+	}
+	items, err := m.Items(ctx, subscriber)
+	if err != nil {
+		m.log.Warn("siblings: read the subscriber's items", "thread", subscriber, "err", err)
+		return time.Time{}
+	}
+	for i := len(items.Items) - 1; i >= 0; i-- {
+		if it := items.Items[i]; it.Kind == KindUserMessage && it.ParentToolUseID == "" && it.Origin == OriginUser {
+			return it.CreatedAt
+		}
+	}
+	return time.Time{}
+}
+
 // siblingsOf counts subscriber's live children for parts' wakes about them, nil when
 // none is about one: the targets as they fired, the others as snap has them. A child
 // whose own children still work (teamWorking), a target included, counts as working.
-func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wakeSiblings {
+// Only the current batch counts: a child settled whose last activity and creation are
+// both before since (requestStart; zero: every child) settled for an earlier request
+// and is left out, unless a wake is about it.
+func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart, since time.Time) *wakeSiblings {
 	fired := map[string]Thread{}
 	for _, p := range parts {
 		if p.t.CreatedBy == subscriber {
@@ -271,10 +306,13 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart) *wake
 		if isTarget {
 			k = f
 		}
-		s.Total++
 		// A lead whose workers run is waiting on them (its settled wake is held, or
 		// went for a prompt or a report of its own): still working.
 		settled := Meets(CondSettled, k) && teamWorking(k.ID, all) == 0
+		if settled && !isTarget && k.LastActivityAt.Before(since) && k.CreatedAt.Before(since) {
+			continue // settled before the current request: not in this batch
+		}
+		s.Total++
 		if settled {
 			s.Settled++
 		}

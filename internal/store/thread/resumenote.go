@@ -19,7 +19,8 @@ import (
 //
 // Causes: the budget stop (budget.go); an interrupt another thread asked for
 // (Store.Interrupt with by, the CLI's thread interrupt inside a thread) while the
-// thread was mid-turn; the daemon stopping (shutdown) or dying (New) mid-turn. The
+// thread was mid-turn; the daemon stopping (shutdown) or dying (New) mid-turn; the
+// thread's own process dying mid-turn with no one asking (maybeExited: crashed). The
 // user's own interrupt (the GUI's button, the CLI outside a thread) leaves none:
 // "interrupted by user" is the truth then.
 
@@ -32,6 +33,9 @@ const (
 	ResumeBudget    ResumeCause = "budget"
 	ResumeInterrupt ResumeCause = "interrupt"
 	ResumeRestart   ResumeCause = "restart"
+	// ResumeCrash: the thread's process died mid-turn on its own (status reason
+	// ReasonCrashed): no one stopped it.
+	ResumeCrash ResumeCause = "crash"
 )
 
 // resumeNotePrefix starts every resume note line, as "[code-foundry wake] " starts a
@@ -57,7 +61,8 @@ func (n ResumeNote) Pending() bool { return n.Cause != ResumeNone }
 // Text is the line Claude gets before the message; budget is the thread's budget now
 // (the budget note says when it changed). "" for no note or an unknown cause.
 func (n ResumeNote) Text(budget float64) string {
-	const tail = ", not rejected by anyone; your last tool call may have run partially, so check its effects before repeating it."
+	const check = "your last tool call may have run partially, so check its effects before repeating it."
+	tail := ", not rejected by anyone; " + check
 	var why string
 	switch n.Cause {
 	case ResumeBudget:
@@ -76,6 +81,8 @@ func (n ResumeNote) Text(budget float64) string {
 		why = "was interrupted by thread " + who + " through Code Foundry"
 	case ResumeRestart:
 		why = "was stopped because the Code Foundry app restarted"
+	case ResumeCrash:
+		why, tail = "ended because its process died (not stopped by anyone)", "; "+check
 	default:
 		return ""
 	}

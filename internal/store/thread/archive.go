@@ -48,6 +48,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		for i, t := range targets {
 			tried[t.ID] = true
 			was[i], _ = m.interrupted(t.ID) // gone meanwhile: archiveFrom says so
+			m.unwatchForArchive(t.ID)       // before its close: its settle must wake no one
 		}
 		for _, t := range targets {
 			m.requestClose(t.ID)
@@ -125,9 +126,10 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 
 // archiveOne archives one thread, and reports whether anything changed.
 //
-// It closes the thread like Close (a no-op when it is disconnected), kills and removes
-// its shells and stops what it left running in its worktree like Remove, then, under
-// m.mu, unpins and unsnoozes it and stamps
+// It forgets the thread's wake subscriptions and the wakes about it first
+// (unwatchForArchive), closes the thread like Close (a no-op when it is disconnected),
+// kills and removes its shells and stops what it left running in its worktree like
+// Remove, then, under m.mu, unpins and unsnoozes it and stamps
 // ArchivedAt unless it already has one (a second archive keeps the first time). A turn
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
@@ -137,11 +139,12 @@ func (m *Manager) archiveOne(ctx context.Context, id string) (Thread, bool, erro
 	if err != nil {
 		return Thread{}, false, err
 	}
+	m.unwatchForArchive(id) // before the close: its settle must wake no one
 	return m.archiveFrom(ctx, id, wasInterrupted)
 }
 
 // archiveFrom is archiveOne with whether the thread was interrupted before its close
-// began (interrupted) read already.
+// began (interrupted) read already, and its wakes forgotten (unwatchForArchive).
 func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool) (Thread, bool, error) {
 	if err := m.Close(ctx, id); err != nil {
 		return Thread{}, false, err

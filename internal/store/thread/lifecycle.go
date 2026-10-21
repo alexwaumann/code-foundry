@@ -200,6 +200,14 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	var it Item
 	if log != nil {
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
+		if pf := prev.PendingFirst; pf != nil && pf.ItemID == "" {
+			// The first message a stop kept goes out first (firstprompt.go): its item too.
+			po := pf.outgoing()
+			if _, err := recordUser(w, po); err != nil {
+				return Item{}, m.failStart(id, nil, err)
+			}
+			m.setPendingFirstItem(id, po.itemID)
+		}
 		if it, err = recordUser(w, o.first); err != nil {
 			return Item{}, m.failStart(id, nil, err)
 		}

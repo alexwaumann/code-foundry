@@ -13,21 +13,26 @@ func TestDisconnectedStatus(t *testing.T) {
 		name       string
 		st         Status
 		reason     string
+		crashed    bool
 		want       Status
 		wantReason string
 	}{
-		{"busy is interrupted", StatusBusy, "working: Say hi", StatusError, ReasonInterrupted},
-		{"busy without a reason is interrupted", StatusBusy, "", StatusError, ReasonInterrupted},
-		{"a question is kept", StatusNeedsAttention, "question: Which color do you prefer?", StatusNeedsAttention, "question: Which color do you prefer?"},
-		{"a permission prompt is kept", StatusNeedsAttention, "permission: Do you want to proceed?", StatusNeedsAttention, "permission: Do you want to proceed?"},
-		{"a claude error stays attention", StatusNeedsAttention, "error: model_not_found", StatusNeedsAttention, "error: model_not_found"},
-		{"idle is kept", StatusIdle, "at prompt", StatusIdle, "at prompt"},
-		{"unknown is kept", StatusUnknown, "", StatusUnknown, ""},
-		{"interrupted stays interrupted", StatusError, ReasonInterrupted, StatusError, ReasonInterrupted},
+		{"busy is interrupted", StatusBusy, "working: Say hi", false, StatusError, ReasonInterrupted},
+		{"busy without a reason is interrupted", StatusBusy, "", false, StatusError, ReasonInterrupted},
+		{"busy whose process died on its own crashed", StatusBusy, "working", true, StatusError, ReasonCrashed},
+		{"a question is kept", StatusNeedsAttention, "question: Which color do you prefer?", false, StatusNeedsAttention, "question: Which color do you prefer?"},
+		{"a question is kept on a crash", StatusNeedsAttention, "question: Which color do you prefer?", true, StatusNeedsAttention, "question: Which color do you prefer?"},
+		{"a permission prompt is kept", StatusNeedsAttention, "permission: Do you want to proceed?", false, StatusNeedsAttention, "permission: Do you want to proceed?"},
+		{"a claude error stays attention", StatusNeedsAttention, "error: model_not_found", false, StatusNeedsAttention, "error: model_not_found"},
+		{"idle is kept", StatusIdle, "at prompt", false, StatusIdle, "at prompt"},
+		{"idle is kept on a crash", StatusIdle, "at prompt", true, StatusIdle, "at prompt"},
+		{"unknown is kept", StatusUnknown, "", false, StatusUnknown, ""},
+		{"interrupted stays interrupted", StatusError, ReasonInterrupted, false, StatusError, ReasonInterrupted},
+		{"crashed stays crashed", StatusError, ReasonCrashed, false, StatusError, ReasonCrashed},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st, reason := disconnectedStatus(tt.st, tt.reason)
+			st, reason := disconnectedStatus(tt.st, tt.reason, tt.crashed)
 			if st != tt.want || reason != tt.wantReason {
 				t.Errorf("disconnectedStatus(%v, %q) = %v, %q; want %v, %q", tt.st, tt.reason, st, reason, tt.want, tt.wantReason)
 			}
@@ -91,7 +96,8 @@ func (ss statusSetup) start(t *testing.T) (*env, Thread) {
 
 // TestStatusSurvivesDisconnect covers every way a live process ends: the thread keeps
 // the status it had, persisted. A turn that was running is interrupted, and so is one
-// waiting on a request: the request dies with the process.
+// waiting on a request: the request dies with the process. One whose process died on
+// its own (no close, no daemon stop) crashed.
 func TestStatusSurvivesDisconnect(t *testing.T) {
 	type end func(e *env, s Thread)
 	exit := func(code int) end {
@@ -111,9 +117,9 @@ func TestStatusSurvivesDisconnect(t *testing.T) {
 		want       Status
 		wantReason string
 	}{
-		{"exit while busy", busySetup, exit(0), ReasonExited, StatusError, ReasonInterrupted},
-		{"crash while busy", busySetup, exit(1), ReasonCrashed, StatusError, ReasonInterrupted},
-		{"crash at a question", questionSetup, exit(1), ReasonCrashed, StatusError, ReasonInterrupted},
+		{"exit while busy", busySetup, exit(0), ReasonExited, StatusError, ReasonCrashed},
+		{"crash while busy", busySetup, exit(1), ReasonCrashed, StatusError, ReasonCrashed},
+		{"crash at a question", questionSetup, exit(1), ReasonCrashed, StatusError, ReasonCrashed},
 		{"exit idle", idleSetup, exit(0), ReasonExited, StatusIdle, "at prompt"},
 		{"exit after an unseen turn", finishedSetup, exit(0), ReasonExited, StatusNeedsAttention, "finished"},
 		{"closed while busy", busySetup, closeIt, ReasonClosed, StatusError, ReasonInterrupted},

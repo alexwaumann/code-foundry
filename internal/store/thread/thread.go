@@ -96,9 +96,12 @@ func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= Per
 
 // Disconnect reasons recorded in Thread.DisconnectReason.
 const (
-	ReasonClosed         = "closed"           // closed through Close (archive, snooze, remove)
-	ReasonExited         = "exited"           // process exited 0 without a close request (/exit)
-	ReasonCrashed        = "crashed"          // process exited non-zero without a close request
+	ReasonClosed = "closed" // closed through Close (archive, snooze, remove)
+	ReasonExited = "exited" // process exited 0 without a close request (/exit)
+	// ReasonCrashed: the process exited non-zero without a close request. Also the
+	// StatusReason, with StatusError, of a turn whose process died on its own mid-turn
+	// (disconnectedStatus): "crashed", not "interrupted", since no one stopped it.
+	ReasonCrashed        = "crashed"
 	ReasonDaemonStopped  = "daemon stopped"   // daemon shut down while connected
 	ReasonDaemonRestarts = "daemon restarted" // row was live when the daemon last died
 	ReasonSpawnFailed    = "spawn failed"     // claude could not be started, or never answered its handshake
@@ -264,6 +267,10 @@ type Thread struct {
 	// other than the user stopped its turn (resumenote.go); the zero value when none.
 	// Persisted.
 	ResumeNote ResumeNote
+	// PendingFirst is the thread's first message until Claude has it (firstprompt.go):
+	// a daemon stop before the handshake keeps it for the next start. nil when none.
+	// Persisted; not on the API. Copy on write: replaced, never written through.
+	PendingFirst *PendingFirst
 	// Flags are the plugins' flags on the thread (flags.go): one per source, errors
 	// first, then newest first. Persisted (thread_flags). Copy on write.
 	Flags []Flag
