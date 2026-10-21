@@ -281,6 +281,29 @@ func TestEpochDue(t *testing.T) {
 	}
 }
 
+// ember status right after a reseed shows the new epoch's context (0 until its first
+// turn), not the old session's, which the row keeps until the old process is gone.
+func TestEpochContext(t *testing.T) {
+	tests := []struct {
+		name string
+		t    thread.Thread
+		want int64
+	}{
+		{"a turn this epoch", thread.Thread{ContextTokens: 59000}, 59000},
+		{"reseed waits on the old session", thread.Thread{ContextTokens: 59000, ReseedPending: true}, 0},
+		{"fresh session not started", thread.Thread{ContextTokens: 59000, FreshStart: true}, 0},
+		{"fresh session started, no turn yet", thread.Thread{}, 0},
+		{"first turn of the new epoch", thread.Thread{ContextTokens: 1200, Epoch: 2}, 1200},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := epochContext(tt.t); got != tt.want {
+				t.Errorf("epochContext = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 // Past the context limit after a turn, the store consolidates the memory, rebuilds the
 // seed with the conversation, and reseeds: a new epoch.
 func TestAutomaticEpoch(t *testing.T) {

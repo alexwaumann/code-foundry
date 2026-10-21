@@ -513,6 +513,18 @@ func epochDue(t thread.Thread, cfg Config, started, now time.Time) string {
 	return ""
 }
 
+// epochContext is the context size of t's current epoch. A reseed returns before the
+// old session's process is gone (it stops once its turn ends; the thread store resets
+// the row's context size then), so while the reseed waits (ReseedPending) or the fresh
+// session has not started (FreshStart) the row still holds the old session's size: the
+// new epoch has none yet.
+func epochContext(t thread.Thread) int64 {
+	if t.ReseedPending || t.FreshStart {
+		return 0
+	}
+	return t.ContextTokens
+}
+
 // residentOf is Ember's resident thread in snap.
 func residentOf(snap *thread.Snapshot) (thread.Thread, bool) {
 	if snap == nil {
@@ -574,7 +586,7 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 	}
 	st.ConsolidationUsageTotal = s.st.ConsolidationUsageTotal
 	if t, ok := residentOf(threads); ok {
-		st.ThreadID, st.Epoch, st.ContextTokens = t.ID, t.Epoch, t.ContextTokens
+		st.ThreadID, st.Epoch, st.ContextTokens = t.ID, t.Epoch, epochContext(t)
 		st.EpochStartedAt = s.st.EpochStartedAt
 	}
 	if prev := s.snap.Load(); prev != nil && reflect.DeepEqual(prev, out) {
