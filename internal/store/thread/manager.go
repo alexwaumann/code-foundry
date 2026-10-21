@@ -872,6 +872,15 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
+	if first != nil && first.itemID == "" {
+		// A new thread's prompt goes into the timeline now, before the handshake (the
+		// row is written, so the item can be): a start that fails leaves the message,
+		// then why, for the user to copy or send again. sendMessage delivers it under
+		// this id. Before run starts, so nothing else writes the log yet.
+		if _, err := recordUser(r.st.proj.w, first); err != nil {
+			m.log.Warn("record the first prompt before the handshake", "thread", id, "err", err)
+		}
+	}
 	m.log.Info("thread spawned", "thread", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
