@@ -54,9 +54,11 @@ skill rewrite are other PRs (B, D, E).
 - **Done today on BOARD.md** takes a task cancelled today (`UpdatedAt` since midnight,
   as the GUI's `boardSections` does) and any closed subtask of a parent closed today;
   "Earlier" counts only the rest.
-- **Skill** (`code-foundry-ember/SKILL.md` steps 2 and 3 only): add every piece as a
-  subtask at once, dependent ones too, then start each with `ember task start --task
-  <subtask id> …`; a one-piece request still uses `ember task start "<title>"`.
+- **Skill**: no change in this PR. The skill rewrite (#290, `ember-fixes-2-skill.md`)
+  already puts every piece on the board as a todo subtask and starts each with `ember
+  task start --task <task id> …`; this PR's own edit of those lines was dropped in the
+  rebase in favour of it. The live check below ran this PR's earlier wording, which
+  said the same.
 - **Mock**: tasks carry `branch`; the seeded done task t-3a4b5c6d has one;
   `/__mock/ember/task` takes `&branch=`.
 
