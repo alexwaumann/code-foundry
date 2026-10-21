@@ -1,31 +1,104 @@
 package daemon
 
 import (
+	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestLockIsExclusive(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "daemon.lock")
-	first, err := acquireLock(path)
+	sock := filepath.Join(t.TempDir(), "none.sock")
+	first, _, err := acquireLock(ctx, path, sock, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := acquireLock(path); !errors.Is(err, ErrAlreadyRunning) {
+	if _, _, err := acquireLock(ctx, path, sock, 0); !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("second acquire err = %v, want ErrAlreadyRunning", err)
 	}
 	if err := first.release(); err != nil {
 		t.Fatal(err)
 	}
-	again, err := acquireLock(path)
+	again, w, err := acquireLock(ctx, path, sock, 0)
 	if err != nil {
 		t.Fatalf("acquire after release: %v", err)
 	}
+	if w.busy {
+		t.Fatalf("free lock reported busy: %+v", w)
+	}
 	_ = again.release()
+}
+
+// An auto-started daemon (LockWait) waits out a previous daemon that is still closing
+// its stores (no socket), but not one that answers or never lets go.
+func TestLockWait(t *testing.T) {
+	tests := []struct {
+		name      string
+		wait      time.Duration
+		releaseIn time.Duration // 0: the holder keeps the lock
+		listen    bool          // the holder answers on the socket
+		wantErr   bool
+		wantMsg   string
+		maxTime   time.Duration
+	}{
+		{name: "holder shutting down", wait: 3 * time.Second, releaseIn: 300 * time.Millisecond, maxTime: 2 * time.Second},
+		{name: "holder never lets go", wait: 400 * time.Millisecond, wantErr: true, wantMsg: "still held by pid", maxTime: 2 * time.Second},
+		{name: "holder answers", wait: 3 * time.Second, listen: true, wantErr: true, maxTime: time.Second},
+		{name: "no wait", wantErr: true, maxTime: time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			dir, err := os.MkdirTemp("/tmp", "cf-lock-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.RemoveAll(dir) })
+			path, sock := filepath.Join(dir, "daemon.lock"), filepath.Join(dir, "daemon.sock")
+			holder, _, err := acquireLock(ctx, path, sock, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.listen {
+				ln, err := net.Listen("unix", sock)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = ln.Close() })
+			}
+			if tt.releaseIn > 0 {
+				time.AfterFunc(tt.releaseIn, func() { _ = holder.release() })
+			} else {
+				t.Cleanup(func() { _ = holder.release() })
+			}
+			start := time.Now()
+			l, w, err := acquireLock(ctx, path, sock, tt.wait)
+			if took := time.Since(start); took > tt.maxTime {
+				t.Errorf("took %s, want under %s", took, tt.maxTime)
+			}
+			if tt.wantErr {
+				if !errors.Is(err, ErrAlreadyRunning) || !strings.Contains(err.Error(), tt.wantMsg) {
+					t.Fatalf("err = %v, want ErrAlreadyRunning containing %q", err, tt.wantMsg)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = l.release() }()
+			if !w.busy || w.holder != os.Getpid() || w.waited < tt.releaseIn/2 {
+				t.Fatalf("wait = %+v, want busy, holder %d, waited about %s", w, os.Getpid(), tt.releaseIn)
+			}
+		})
+	}
 }
 
 func TestNewToken(t *testing.T) {

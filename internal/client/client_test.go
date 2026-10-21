@@ -21,13 +21,20 @@ import (
 // TestMain lets the test binary act as `code-foundry daemon`, so the auto-start test can
 // spawn a real, separate daemon process without building cmd/code-foundry.
 func TestMain(m *testing.M) {
-	if len(os.Args) == 2 && os.Args[1] == "daemon" && os.Getenv("CF_TEST_DAEMON") == "1" {
+	if len(os.Args) >= 2 && os.Args[1] == "daemon" && os.Getenv("CF_TEST_DAEMON") == "1" {
+		var wait time.Duration
+		if len(os.Args) == 4 && os.Args[2] == FlagWaitLock {
+			wait, _ = time.ParseDuration(os.Args[3])
+		}
 		p, err := paths.Resolve()
 		if err == nil {
-			err = daemon.Run(context.Background(), daemon.Options{Paths: p, Version: version.Info{Version: "test"}})
+			err = daemon.Run(context.Background(), daemon.Options{Paths: p, Version: version.Info{Version: "test"}, LockWait: wait})
 		}
 		if err != nil {
-			_, _ = os.Stderr.WriteString(err.Error() + "\n")
+			_, _ = os.Stderr.WriteString("code-foundry: " + err.Error() + "\n")
+			if errors.Is(err, daemon.ErrAlreadyRunning) {
+				os.Exit(ExitLockHeld)
+			}
 			os.Exit(1)
 		}
 		os.Exit(0)

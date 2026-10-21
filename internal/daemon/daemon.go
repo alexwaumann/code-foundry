@@ -62,12 +62,16 @@ type Options struct {
 	// Dev also logs text at debug level to Stderr.
 	Dev    bool
 	Stderr io.Writer
+	// LockWait is how long to wait for the lock while the daemon holding it does not
+	// answer (it is still shutting down): auto-started daemons (daemon --wait-lock).
+	// Zero fails at once with ErrAlreadyRunning.
+	LockWait time.Duration
 }
 
 // Run starts the daemon and blocks until ctx is cancelled or the process receives
 // SIGINT or SIGTERM, then shuts down gracefully. It returns ErrAlreadyRunning if
 // another daemon owns the same config home.
-func Run(ctx context.Context, opts Options) error {
+func Run(ctx context.Context, opts Options) (retErr error) {
 	if opts.Stderr == nil {
 		opts.Stderr = os.Stderr
 	}
@@ -75,7 +79,7 @@ func Run(ctx context.Context, opts Options) error {
 	if err := p.Ensure(); err != nil {
 		return err
 	}
-	lock, err := acquireLock(p.Lock())
+	lock, waited, err := acquireLock(ctx, p.Lock(), p.Socket(), opts.LockWait)
 	if err != nil {
 		return err
 	}
@@ -86,6 +90,25 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer func() { _ = logFile.Close() }()
+	if waited.busy {
+		log.Info("the previous daemon was still shutting down; waited for its lock",
+			"pid", waited.holder, "waited", waited.waited.Round(time.Millisecond).String())
+	}
+	// Runs after every other deferred close (the stores, the plugins), so the line
+	// says when the daemon really let go, and how long closing took.
+	var started, stopping time.Time
+	defer func() {
+		switch {
+		case !stopping.IsZero():
+			log.Info("daemon stopped", "uptime", time.Since(started).Round(time.Millisecond).String(),
+				"shutdown", time.Since(stopping).Round(time.Millisecond).String())
+		case retErr != nil:
+			// In the log file too: an auto-started daemon's stderr goes nowhere a user
+			// looks (db.ErrNewerSchema, say, after reinstalling an older build), and
+			// client.Connect reports this line when the daemon it started exits.
+			log.Error("daemon cannot start", "err", retErr)
+		}
+	}()
 
 	// Before any store starts a process: children must not inherit an enclosing
 	// Claude Code session's variables, or another daemon's endpoint, and they find
@@ -124,9 +147,6 @@ func Run(ctx context.Context, opts Options) error {
 	clients := api.NewClients(pres)
 	st, err := openStores(ctx, log, p, threadEnv(port, token), pres)
 	if err != nil {
-		// In the log file too: an auto-started daemon's stderr goes nowhere a user
-		// looks (db.ErrNewerSchema, say, after reinstalling an older build).
-		log.Error("daemon cannot start", "err", err)
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down
@@ -141,7 +161,7 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	})
 
-	started := time.Now()
+	started = time.Now()
 	events := st.bus
 	projectAPI := api.NewProject(st.project, events).WithGitHub(st.gh, st.cloner).WithNewProjects(st.newProjects, st.gh).
 		WithCleanupHold(func(w project.Worktree) string {
@@ -332,6 +352,7 @@ func Run(ctx context.Context, opts Options) error {
 		log.Error("listener failed, shutting down", "err", runErr)
 	}
 
+	stopping = time.Now()
 	cancelRequests()
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancel()
@@ -341,7 +362,7 @@ func Run(ctx context.Context, opts Options) error {
 			_ = s.Close()
 		}
 	}
-	log.Info("daemon stopped", "uptime", time.Since(started).Round(time.Millisecond).String())
+	log.Info("listeners closed, closing stores")
 	return runErr
 }
 

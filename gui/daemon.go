@@ -24,11 +24,20 @@ type DaemonEndpoint struct {
 	Token   string `json:"token"`
 }
 
+// startBackoff is how long the host does not start the daemon again after it exited at
+// start (a newer schema, a corrupt database, a hung daemon holding the lock): the
+// frontend asks on every failed request and the relaunch watcher retries, so it would
+// otherwise spawn a doomed daemon every second or two.
+const startBackoff = 5 * time.Second
+
 // DaemonService is bound to the frontend. It is the only thing the Wails host exposes.
 type DaemonService struct {
 	paths paths.Paths
 	log   *slog.Logger
 	mu    sync.Mutex // serialises auto-start attempts from concurrent calls
+	// failed is the last start failure (client.ErrDaemonExited), at failedAt; mu held.
+	failed   error
+	failedAt time.Time
 }
 
 // NewDaemonService returns a DaemonService for the daemon at p.
@@ -63,13 +72,27 @@ func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
 	if err != nil {
 		s.log.Debug("no code-foundry binary found; can only use an already running daemon", "err", err)
 	}
+	// Within the backoff, only a daemon someone else started will do; the error is
+	// the one that says why ours could not start (the frontend shows it).
+	backoff := s.failed != nil && time.Since(s.failedAt) < startBackoff
 	// NoAutoStart when bin is empty: client.Connect would otherwise default to
 	// os.Executable(), which here is the GUI, and spawn windows recursively.
-	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, NoAutoStart: bin == "", Logger: s.log})
-	if err != nil {
-		return nil, fmt.Errorf("connect to daemon: %w", err)
+	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, NoAutoStart: bin == "" || backoff, Logger: s.log})
+	switch {
+	case err == nil:
+		s.failed = nil
+		return c, nil
+	case backoff:
+		return nil, s.failed
 	}
-	return c, nil
+	err = fmt.Errorf("connect to daemon: %w", err)
+	if errors.Is(err, client.ErrDaemonExited) {
+		if s.failed == nil || s.failed.Error() != err.Error() {
+			s.log.Warn("daemon cannot start", "err", err)
+		}
+		s.failed, s.failedAt = err, time.Now()
+	}
+	return nil, err
 }
 
 // exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the
