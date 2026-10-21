@@ -155,28 +155,75 @@ const fileHeader = `# code-foundry settings.
 # picked up immediately. Commented-out lines show defaults. Settings marked
 # "applies after a daemon restart" are read when the daemon starts.
 #
-# Saving from the app rewrites this file: comments you add and unknown keys are not kept.
+# Saving from the app rewrites this file: comments you add are not kept. Values the app
+# cannot use (unknown keys, values that fail validation) are kept, under a "# Ignored:"
+# line that says why, until you fix or remove them.
 `
 
 // unitWords spells a field's Unit out for the file's comments, which have no input to
 // show it in (" seconds" in "Range 60 to 86400 seconds.").
 var unitWords = map[string]string{"s": " seconds", "pt": " points", "%": " percent"}
 
-// render produces the file for the accepted values (canonical, keyed by settings key).
-// Every static field is listed with its description; unset ones are commented out at
-// their default. Keybinding overrides are listed under [keybindings].
-func render(accepted map[string]string) []byte {
+// render produces the file for values (resolved.fileValues: the accepted values,
+// canonical, and the raw text of keys with issues), keyed by settings key. Every static
+// field is listed with its description; unset ones are commented out at their default.
+// Keybinding overrides are listed under [keybindings]. A key with an issue is written
+// as it was, under a "# Ignored: <why>" line; unknown keys follow their table's
+// fields, unknown tables come last, and keys outside any table come first.
+func render(values map[string]string, issues []Issue) []byte {
+	why := map[string][]string{}
+	for _, is := range issues {
+		why[is.Key] = append(why[is.Key], is.Message)
+	}
+	ignored := func(b *bytes.Buffer, key string) {
+		if msgs := why[key]; len(msgs) > 0 {
+			writeComment(b, "Ignored: "+strings.Join(msgs, "; ")+".")
+		}
+	}
+	known := map[string]bool{}
+	for _, f := range staticFields {
+		known[f.Key] = true
+	}
+	groups := map[string]bool{}
+	for _, g := range Groups {
+		groups[g.ID] = true
+	}
+	// Keys that are not static fields or keybindings, by table ("" for none).
+	extra := map[string][]string{}
+	for _, k := range slices.Sorted(maps.Keys(values)) {
+		if known[k] || isKeybindingKey(k) {
+			continue
+		}
+		g, _, _ := strings.Cut(k, ".")
+		if g == k {
+			g = ""
+		}
+		extra[g] = append(extra[g], k)
+	}
+	writeExtra := func(b *bytes.Buffer, group string) {
+		for _, k := range extra[group] {
+			b.WriteString("\n")
+			ignored(b, k)
+			name := k
+			if group != "" {
+				name = strings.TrimPrefix(k, group+".")
+			}
+			fmt.Fprintf(b, "%s = %s\n", tomlKey(name), encodeLiteral(values[k]))
+		}
+	}
+
 	var b bytes.Buffer
 	b.WriteString(fileHeader)
+	writeExtra(&b, "")
 	for _, g := range Groups {
 		fmt.Fprintf(&b, "\n[%s]\n", g.ID)
 		if g.ID == GroupKeybindings {
 			writeComment(&b, g.Description)
 			b.WriteString(`# "thread.new" = "cmd+shift+n"` + "\n")
-			keys := slices.Sorted(maps.Keys(accepted))
-			for _, k := range keys {
+			for _, k := range slices.Sorted(maps.Keys(values)) {
 				if isKeybindingKey(k) {
-					fmt.Fprintf(&b, "%s = %s\n", tomlString(strings.TrimPrefix(k, keybindingKeyPrefix)), tomlString(accepted[k]))
+					ignored(&b, k)
+					fmt.Fprintf(&b, "%s = %s\n", tomlString(strings.TrimPrefix(k, keybindingKeyPrefix)), tomlString(values[k]))
 				}
 			}
 			continue
@@ -197,14 +244,44 @@ func render(accepted map[string]string) []byte {
 				desc += " Applies after a daemon restart."
 			}
 			writeComment(&b, desc)
-			if v, ok := accepted[f.Key]; ok {
+			if v, ok := values[f.Key]; ok {
+				ignored(&b, f.Key)
 				fmt.Fprintf(&b, "%s = %s\n", f.Name(), encodeValue(f, v))
 			} else {
 				fmt.Fprintf(&b, "# %s = %s\n", f.Name(), encodeValue(f, f.Default))
 			}
 		}
+		writeExtra(&b, g.ID)
+	}
+	for _, g := range slices.Sorted(maps.Keys(extra)) {
+		if g == "" || groups[g] {
+			continue
+		}
+		fmt.Fprintf(&b, "\n[%s]\n", tomlKey(g))
+		writeExtra(&b, g)
 	}
 	return b.Bytes()
+}
+
+// encodeLiteral writes a raw value of an unknown key: a bare integer or boolean when
+// that reads back as the same string, else a string. (The raw values are strings, so
+// either way the file reads back as it was.)
+func encodeLiteral(v string) string {
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil && strconv.FormatInt(n, 10) == v {
+		return v
+	}
+	if v == "true" || v == "false" {
+		return v
+	}
+	return tomlString(v)
+}
+
+// tomlKey is k as a TOML key: bare when it can be, else quoted.
+func tomlKey(k string) string {
+	if k != "" && strings.Trim(k, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == "" {
+		return k
+	}
+	return tomlString(k)
 }
 
 func encodeValue(f Field, v string) string {
@@ -263,9 +340,16 @@ func tomlString(s string) string {
 }
 
 // writeAtomic writes data to path through a temp file in the same directory and a
-// rename, so readers (and the watcher) never see a partial file.
+// rename, so readers (and the watcher) never see a partial file. A symlink at path
+// (settings.toml kept in a dotfiles repo) is followed: its target is replaced, the link
+// stays. An existing file keeps its permissions; a new one gets 0600.
 func writeAtomic(path string, data []byte) error {
-	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
+	target := resolveLink(path)
+	mode := os.FileMode(0o600)
+	if fi, err := os.Stat(target); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	f, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".*")
 	if err != nil {
 		return fmt.Errorf("settings: write %s: %w", path, err)
 	}
@@ -282,11 +366,36 @@ func writeAtomic(path string, data []byte) error {
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("settings: write %s: %w", path, err)
 	}
-	if err := os.Chmod(tmp, 0o600); err != nil {
+	if err := os.Chmod(tmp, mode); err != nil {
 		return fmt.Errorf("settings: chmod %s: %w", path, err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := os.Rename(tmp, target); err != nil {
 		return fmt.Errorf("settings: replace %s: %w", path, err)
 	}
 	return nil
+}
+
+// maxLinks bounds resolveLink on a symlink loop.
+const maxLinks = 40
+
+// resolveLink follows path while it is a symlink and returns the file it ends at (which
+// need not exist: a dangling link resolves to where it points). Symlinked directories on
+// the way are left as they are; a rename works through them.
+func resolveLink(path string) string {
+	p := path
+	for range maxLinks {
+		fi, err := os.Lstat(p)
+		if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+			return p
+		}
+		t, err := os.Readlink(p)
+		if err != nil {
+			return p
+		}
+		if !filepath.IsAbs(t) {
+			t = filepath.Join(filepath.Dir(p), t)
+		}
+		p = t
+	}
+	return path
 }

@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -52,7 +53,9 @@ type Service interface {
 	// called.
 	Pages() []Page
 	// Update applies a partial change (key -> string-encoded value; "" resets the key).
-	// It fails with *ValidationError or ErrFileInvalid and then changes nothing.
+	// It fails with *ValidationError or ErrFileInvalid and then changes nothing. Values
+	// already in the file that the app cannot use stay in it and in the returned
+	// snapshot's Issues.
 	Update(ctx context.Context, partial map[string]string) (*Snapshot, error)
 	// Watch returns the current snapshot followed by every change until ctx ends.
 	Watch(ctx context.Context) <-chan *Snapshot
@@ -88,6 +91,8 @@ type Store struct {
 	hooks   []func(*Snapshot)
 
 	snap atomic.Pointer[Snapshot]
+	// lastGood is what lastGoodPath holds as far as this store wrote it.
+	lastGood []byte
 
 	watcher *fsnotify.Watcher
 	stop    chan struct{}
@@ -96,10 +101,16 @@ type Store struct {
 
 var _ Service = (*Store)(nil)
 
+// LastGoodSuffix names the copy of the last settings file that parsed, kept beside it
+// (settings.toml.lastgood): when the file does not parse at Open, its values apply
+// instead of the defaults.
+const LastGoodSuffix = ".lastgood"
+
 // Open loads the settings file (creating it with every default commented out if it
 // does not exist) and starts watching it. A file that does not parse is reported in
-// Snapshot.LoadError and the defaults apply; Open fails only on I/O errors. Close stops
-// the watcher.
+// Snapshot.LoadError and the values of the last file that parsed apply (the
+// settings.toml.lastgood copy every successful load and save refreshes), else the
+// defaults; Open fails only on I/O errors. Close stops the watcher.
 func Open(ctx context.Context, opts Options) (*Store, error) {
 	if opts.Path == "" {
 		return nil, errors.New("settings: Options.Path is required")
@@ -118,7 +129,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	data, err := os.ReadFile(opts.Path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		if err := writeAtomic(opts.Path, render(nil)); err != nil {
+		if err := writeAtomic(opts.Path, render(nil, nil)); err != nil {
 			return nil, err
 		}
 	case err != nil:
@@ -126,9 +137,15 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	default:
 		if raw, err := decode(data); err != nil {
 			s.loadErr = err.Error()
-			s.log.Warn("settings file does not parse; using defaults", "path", opts.Path, "err", err)
+			if good, ok := s.readLastGood(); ok {
+				s.raw = good
+				s.log.Warn("settings file does not parse; using the last one that did", "path", opts.Path, "err", err, "copy", s.lastGoodPath())
+			} else {
+				s.log.Warn("settings file does not parse; using defaults", "path", opts.Path, "err", err)
+			}
 		} else {
 			s.raw = raw
+			s.saveLastGood(data)
 		}
 	}
 	r := resolve(s.raw, nil)
@@ -199,8 +216,10 @@ func (s *Store) SetCommands(cmds []CommandInfo) {
 		s.cmds = []CommandInfo{}
 	}
 	r := resolve(s.raw, s.cmds)
+	// The plugin store calls this whenever plugins' commands come or go: log only what
+	// is new.
 	for _, is := range r.issues {
-		if isKeybindingKey(is.Key) {
+		if isKeybindingKey(is.Key) && !slices.Contains(s.Snapshot().Issues, is) {
 			s.log.Warn("settings: keybinding ignored", "key", is.Key, "reason", is.Message)
 		}
 	}
@@ -219,7 +238,8 @@ func (s *Store) OnChange(fn func(*Snapshot)) {
 }
 
 // Update applies a partial change, validates the result, writes the file atomically,
-// and publishes. Unknown keys and invalid values are rejected with *ValidationError.
+// and publishes. Unknown keys and invalid values in partial are rejected with
+// *ValidationError; those already in the file are kept in it (resolved.fileValues).
 func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -254,12 +274,18 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 		slices.SortFunc(bad, func(a, b Issue) int { return strings.Compare(a.Key, b.Key) })
 		return nil, &ValidationError{Issues: dedupeIssues(bad)}
 	}
-	if err := writeAtomic(s.opts.Path, render(r.accepted)); err != nil {
+	keep, dropped := r.fileValues(next)
+	data := render(keep, r.issues)
+	if err := writeAtomic(s.opts.Path, data); err != nil {
 		return nil, err
 	}
-	// The file now holds exactly the accepted values; keeping raw equal to it makes the
+	s.saveLastGood(data)
+	for _, k := range dropped {
+		s.log.Warn("settings: value dropped from the file; its name is also a table", "key", k)
+	}
+	// The file now holds exactly these values; keeping raw equal to it makes the
 	// watcher's reload of our own write a no-op.
-	s.raw = r.accepted
+	s.raw = keep
 	s.publishLocked(resolve(s.raw, s.cmds))
 	return s.Snapshot(), nil
 }
@@ -289,9 +315,40 @@ func (s *Store) reload() {
 			s.loadErr = derr.Error()
 		} else {
 			s.raw, s.loadErr = raw, ""
+			s.saveLastGood(data)
 		}
 	}
 	s.publishLocked(resolve(s.raw, s.cmds))
+}
+
+// lastGoodPath is the copy of the last settings file that parsed.
+func (s *Store) lastGoodPath() string { return s.opts.Path + LastGoodSuffix }
+
+// readLastGood decodes the last-good copy, if there is one that parses.
+func (s *Store) readLastGood() (map[string]string, bool) {
+	data, err := os.ReadFile(s.lastGoodPath())
+	if err != nil {
+		return nil, false
+	}
+	raw, err := decode(data)
+	if err != nil {
+		return nil, false
+	}
+	s.lastGood = data
+	return raw, true
+}
+
+// saveLastGood refreshes the last-good copy with data, a file that parsed. A failure
+// only costs the fallback, so it is logged. s.mu held (or Open).
+func (s *Store) saveLastGood(data []byte) {
+	if bytes.Equal(data, s.lastGood) {
+		return
+	}
+	if err := writeAtomic(s.lastGoodPath(), data); err != nil {
+		s.log.Warn("settings: could not keep a copy of the file", "err", err)
+		return
+	}
+	s.lastGood = slices.Clone(data)
 }
 
 // publishLocked publishes r if it changes anything observable. s.mu must be held.
@@ -322,18 +379,28 @@ func (s *Store) build(r resolved, rev uint64) *Snapshot {
 }
 
 // startWatcher watches the file's directory (an atomic save replaces the file, which
-// would end a watch on the file itself) and reloads after a quiet period.
+// would end a watch on the file itself) and reloads after a quiet period. When the file
+// is a symlink (a dotfiles repo), the target's directory is watched too, so edits made
+// there are picked up.
 func (s *Store) startWatcher(ctx context.Context) error {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
+	names := map[string]bool{filepath.Clean(s.opts.Path): true}
 	if err := w.Add(filepath.Dir(s.opts.Path)); err != nil {
 		_ = w.Close()
 		return err
 	}
+	if target := resolveLink(s.opts.Path); target != s.opts.Path {
+		names[filepath.Clean(target)] = true
+		if filepath.Dir(target) != filepath.Dir(s.opts.Path) {
+			if err := w.Add(filepath.Dir(target)); err != nil {
+				s.log.Warn("settings: not watching the settings file's link target", "target", target, "err", err)
+			}
+		}
+	}
 	s.watcher = w
-	name := filepath.Base(s.opts.Path)
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
@@ -351,7 +418,7 @@ func (s *Store) startWatcher(ctx context.Context) error {
 				if !ok {
 					return
 				}
-				if filepath.Base(ev.Name) != name {
+				if !names[filepath.Clean(ev.Name)] {
 					continue
 				}
 				if timer == nil {

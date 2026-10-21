@@ -114,7 +114,7 @@ func TestDecodeRetiredKeys(t *testing.T) {
 					t.Errorf("retired key reported: %+v", is)
 				}
 			}
-			if strings.Contains(string(render(r.accepted)), "worktree_dir") {
+			if strings.Contains(string(render(r.accepted, nil)), "worktree_dir") {
 				t.Errorf("rendered file still has worktree_dir")
 			}
 		})
@@ -130,7 +130,7 @@ func TestRenderRoundTrip(t *testing.T) {
 		KeybindingKey("thread.new"):   "cmd+shift+n",
 		KeybindingKey("terminal.new"): "none",
 	}
-	out := render(accepted)
+	out := render(accepted, nil)
 	text := string(out)
 	for _, want := range []string{
 		"[threads]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
@@ -153,7 +153,7 @@ func TestRenderRoundTrip(t *testing.T) {
 		t.Fatalf("resolve after round trip: issues %v accepted %v", r.issues, r.accepted)
 	}
 	// The defaults file parses to nothing set.
-	if raw, err := decode(render(nil)); err != nil || len(raw) != 0 {
+	if raw, err := decode(render(nil, nil)); err != nil || len(raw) != 0 {
 		t.Fatalf("defaults file = %v, %v", raw, err)
 	}
 }
@@ -232,7 +232,7 @@ func TestOlderFileGetsNotificationDefaults(t *testing.T) {
 		}
 	}
 	// Rendering keeps them commented out at their defaults.
-	text := string(render(r.accepted))
+	text := string(render(r.accepted, nil))
 	for _, want := range []string{"[notifications]\n", "# dock_badge = true\n", "# sound_volume = 50\n", "# cooldown_seconds = 60\n"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("rendered file lacks %q", want)
