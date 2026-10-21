@@ -47,9 +47,31 @@ export function isAbort(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
 }
 
+/** What the GUI says when a call never reached the daemon (it is down, restarting or updating). */
+export const DAEMON_UNREACHABLE = "Code Foundry's daemon is not reachable";
+
+/**
+ * Whether a call failed in transport, never reaching the daemon: fetch rejects with a
+ * TypeError (WebKit's bare "Load failed", "Failed to fetch") that connect-web wraps as
+ * Unknown, or something between answered a bare HTTP error that maps to Unavailable. The
+ * daemon's own Unavailable errors carry a message and are not this.
+ */
+export function isUnreachable(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (!(err instanceof ConnectError)) return false;
+  if (err.code === Code.Unknown && err.cause instanceof TypeError) return true;
+  return err.code === Code.Unavailable && (err.rawMessage === "" || /^HTTP \d+$/.test(err.rawMessage));
+}
+
 export function errorMessage(err: unknown): string {
+  if (isUnreachable(err)) return `${DAEMON_UNREACHABLE}.`;
   if (err instanceof ConnectError) return err.rawMessage || Code[err.code];
   return err instanceof Error ? err.message : String(err);
+}
+
+/** A failed send's message under the composer, which keeps the draft: says so when the daemon was not reachable. */
+export function sendErrorMessage(err: unknown): string {
+  return isUnreachable(err) ? `${DAEMON_UNREACHABLE}; your message is kept. Retry when it is back.` : errorMessage(err);
 }
 
 /** Errors after which retrying will not help (the stream is closed for good). */

@@ -11,19 +11,19 @@ import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
 
 /** A link: through openUrl (resolveLink: relative ones are github.com paths), or plain text when it goes nowhere. */
-function Link({ href, children, title }: { href?: string | undefined; children?: ReactNode; title?: string | undefined }) {
+function Link({ href, children, tip }: { href?: string | undefined; children?: ReactNode; tip?: string | undefined }) {
   const url = resolveLink(href);
   // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
   // no pointer, nothing to click.
   // The tooltip is the link's markdown title, else where it goes (the window has no status bar).
   if (!url)
     return (
-      <Tip label={title}>
+      <Tip label={tip}>
         <span>{children}</span>
       </Tip>
     );
   return (
-    <Tip label={title ?? url}>
+    <Tip label={tip ?? url}>
       <a
         href={url}
         onClick={(e) => {
@@ -39,7 +39,7 @@ function Link({ href, children, title }: { href?: string | undefined; children?:
 }
 
 const baseComponents: Components = {
-  a: ({ href, children, title }) => <Link href={href} title={title}>{children}</Link>,
+  a: ({ href, children, title }) => <Link href={href} tip={title}>{children}</Link>,
   img: ({ src, alt }) => (typeof src === "string" && /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : null),
 };
 
@@ -111,7 +111,7 @@ function withExtras(extras: MarkdownExtras): Components {
         typeof href === "string" && isRelativeHref(href) ? (
           <>{link(href, children)}</>
         ) : (
-          <Link href={href} title={title}>
+          <Link href={href} tip={title}>
             {children}
           </Link>
         ),

@@ -24,7 +24,7 @@ import { create } from "zustand";
 import { listRefs, type ProjectView } from "@/api/project";
 import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment, stageAttachmentPath } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
-import { errorMessage } from "@/api/stream";
+import { errorMessage, sendErrorMessage } from "@/api/stream";
 import {
   checkAttachments,
   createdThreadId,
@@ -709,7 +709,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });
     return true;
   } catch (err) {
-    updateDraft(key, { phase: "idle", error: errorMessage(err) });
+    updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });
     return false;
   } finally {
     void refreshCommands();

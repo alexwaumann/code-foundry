@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
-import { backoffDelay, runStream, type StreamStatus } from "./stream";
+import { backoffDelay, errorMessage, isUnreachable, runStream, sendErrorMessage, type StreamStatus } from "./stream";
 
 /** A controllable server stream: push events, end, or fail it from the test. */
 function fakeStream<T>() {
@@ -153,5 +153,22 @@ describe("runStream", () => {
     await tick();
     await tick();
     expect(statuses.length).toBe(before);
+  });
+});
+
+describe("transport failures", () => {
+  // connect-web wraps a rejected fetch as Unknown with the TypeError as its cause.
+  const fetchFailed = ConnectError.from(new TypeError("Load failed"));
+  it.each<[string, unknown, boolean, string]>([
+    ["a failed fetch (WebKit)", fetchFailed, true, "Code Foundry's daemon is not reachable."],
+    ["a bare TypeError", new TypeError("Failed to fetch"), true, "Code Foundry's daemon is not reachable."],
+    ["a bare HTTP 503", new ConnectError("HTTP 503", Code.Unavailable), true, "Code Foundry's daemon is not reachable."],
+    ["the daemon's own Unavailable", new ConnectError("the daemon is stopping", Code.Unavailable), false, "the daemon is stopping"],
+    ["an application error", new ConnectError("no such thread", Code.NotFound), false, "no such thread"],
+    ["a plain error", new Error("boom"), false, "boom"],
+  ])("%s", (_, err, unreachable, message) => {
+    expect(isUnreachable(err)).toBe(unreachable);
+    expect(errorMessage(err)).toBe(message);
+    expect(sendErrorMessage(err)).toBe(unreachable ? "Code Foundry's daemon is not reachable; your message is kept. Retry when it is back." : message);
   });
 });
