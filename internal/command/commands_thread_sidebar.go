@@ -53,7 +53,7 @@ func threadSidebarCmd(b ThreadBackend, idArg ArgSpec) Command {
 
 // sidebarCreateArg is thread.new's sidebar.
 var sidebarCreateArg = ArgSpec{Name: "sidebar", Type: Bool,
-	Description: "With created-by: show the new thread in the sidebar (or with false, hide it) whatever settings threads.show_created_threads says; " +
+	Description: "With created-by: show the new thread in the sidebar (--sidebar=false: hide it) whatever settings threads.show_created_threads says; " +
 		"a thread another thread creates is hidden by default and archived with its creator"}
 
 // createSidebar sets thread.new's sidebar on req: only with a creator.

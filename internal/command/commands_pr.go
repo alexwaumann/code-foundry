@@ -82,7 +82,7 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 			Args: []ArgSpec{slug, number,
 				{Name: "login", Type: String, Required: true, Positional: true, Description: `User login, or a team as "org/team" (or its slug)`},
 				{Name: "kind", Type: Enum, Enum: []string{"user", "team"}, Default: "user", Description: "Whether login is a user or a team"},
-				{Name: "requested", Type: Bool, Default: "true", Description: "Request the review (false withdraws the request)"},
+				{Name: "requested", Type: Bool, Default: "true", Description: "Request the review (--requested=false withdraws the request)"},
 			},
 			When: hasPullRequest,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

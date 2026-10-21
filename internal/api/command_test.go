@@ -72,7 +72,8 @@ func newTestRegistry(t *testing.T) *command.Registry {
 		},
 		command.Command{
 			Name: "fake.register", Title: "Fake Register", Category: "Fake",
-			Args: []command.ArgSpec{{Name: "path", Type: command.Path, Required: true}},
+			Args: []command.ArgSpec{{Name: "path", Type: command.Path, Required: true},
+				{Name: "project", Type: command.String, Context: command.ContextProject, Description: "Project (default: all)"}},
 			Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
 				return command.Result{}, nil
 			},
@@ -112,7 +113,7 @@ func TestCommandList(t *testing.T) {
 		t.Fatalf("terminal.kill = %v", kill)
 	}
 	id, sig := kill.GetArgs()[0], kill.GetArgs()[1]
-	if id.GetRequired() || id.GetDescription() != "Terminal id (default: the active terminal)" || id.GetType() != v1.ArgType_ARG_TYPE_STRING {
+	if id.GetRequired() || id.GetDescription() != "Terminal id (default: the active terminal)" || id.GetType() != v1.ArgType_ARG_TYPE_STRING || !id.GetContextBound() {
 		t.Errorf("context-bound arg = %v, want not required with default note", id)
 	}
 	if sig.GetType() != v1.ArgType_ARG_TYPE_ENUM || len(sig.GetEnumValues()) != 2 || sig.GetDefaultValue() != "hup" {
@@ -120,6 +121,10 @@ func TestCommandList(t *testing.T) {
 	}
 	if p := cmds[0].GetArgs()[0]; !p.GetRequired() || p.GetType() != v1.ArgType_ARG_TYPE_PATH {
 		t.Errorf("path arg = %v, want required path", p)
+	}
+	// A description with its own default is not given the context's as well.
+	if p := cmds[0].GetArgs()[1]; p.GetDescription() != "Project (default: all)" {
+		t.Errorf("description = %q, want its own default only", p.GetDescription())
 	}
 }
 

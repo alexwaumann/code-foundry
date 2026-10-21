@@ -27,7 +27,13 @@ func WriteHelp(w io.Writer, cmd *v1.Command, common bool) {
 	if len(cmd.GetArgs()) > 0 {
 		fmt.Fprintln(tw, "\nFlags:")
 		for _, a := range cmd.GetArgs() {
-			fmt.Fprintf(tw, "  --%s %s\t%s\n", a.GetName(), ArgPlaceholder(a), ArgDetail(a))
+			flag, detail := helpFlag(a), ArgDetail(a)
+			if ph := ArgPlaceholder(a); len(ph) > maxHelpPlaceholder {
+				// A long enum (every model) would push every description far right.
+				flag = "--" + a.GetName() + " value"
+				detail += " (one of: " + strings.ReplaceAll(ph, "|", ", ") + ")"
+			}
+			fmt.Fprintf(tw, "  %s\t%s\n", flag, detail)
 		}
 	}
 	if common {
@@ -40,6 +46,20 @@ func WriteHelp(w io.Writer, cmd *v1.Command, common bool) {
 	if kb := cmd.GetKeybindings(); len(kb) > 0 {
 		fmt.Fprintf(w, "\nKeybindings: %s\n", strings.Join(kb, ", "))
 	}
+}
+
+// maxHelpPlaceholder is the longest value placeholder WriteHelp puts in the flag column;
+// a longer enum is "value" there and its values follow the description.
+const maxHelpPlaceholder = 32
+
+// helpFlag is a flag as WriteHelp's column shows it: "--until idle|attention",
+// "--for string", and a bool "--sidebar[=false]" (a bool flag takes no separate word:
+// `--sidebar false` is a flag and a stray word).
+func helpFlag(a *v1.ArgSpec) string {
+	if a.GetType() == v1.ArgType_ARG_TYPE_BOOL {
+		return "--" + a.GetName() + "[=false]"
+	}
+	return "--" + a.GetName() + " " + ArgPlaceholder(a)
 }
 
 // WriteCommonFlags writes the flags every command takes, as WriteHelp lists them
