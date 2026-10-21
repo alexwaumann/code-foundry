@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -291,6 +292,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if errors.Is(err, errConnLost) {
 		res, err = cl.rewait(ctx, cmd, uctx, vals, time.Since(start), err)
 	}
+	if te := (*timeoutError)(nil); errors.As(err, &te) && *asJSON {
+		fmt.Fprintln(cl.stdout, timeoutJSON(te))
+	}
 	if err != nil {
 		return err
 	}
@@ -386,6 +390,9 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
 		fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage.\n", name)
 		return errUsage
+	case connect.CodeDeadlineExceeded:
+		// thread.wait's timeout: --json still prints an object (timedOut).
+		return &timeoutError{name: name, msg: msg}
 	case connect.CodeUnknown:
 		// The tool's own words (several lines from gh repo clone or create): as is.
 		if strings.Contains(msg, "\n") {
@@ -394,6 +401,21 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %s (%s)", name, msg, ce.Code())
+}
+
+// timeoutError is a command that timed out (thread wait --for): exit 1 with its
+// message, and with --json an object on stdout so a pipeline into jq gets input.
+type timeoutError struct{ name, msg string }
+
+func (e *timeoutError) Error() string { return e.name + ": " + e.msg }
+
+// timeoutJSON is what --json prints for a timeoutError.
+func timeoutJSON(e *timeoutError) string {
+	b, _ := json.Marshal(struct {
+		TimedOut bool   `json:"timedOut"`
+		Error    string `json:"error"`
+	}{true, e.msg})
+	return string(b)
 }
 
 // commandFailed reports whether ce carries a CommandFailed detail: the command could not

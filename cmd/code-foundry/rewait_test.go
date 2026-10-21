@@ -120,6 +120,16 @@ func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
 	}
 }
 
+// thread wait --json prints an object on a timeout, so `| jq` gets input.
+func TestCLIWaitTimeoutJSON(t *testing.T) {
+	f := &dropOnce{code: connect.CodeDeadlineExceeded}
+	cl, stdout, _ := fakeCommandCLI(t, f)
+	err := cl.dispatch(context.Background(), []string{"thread", "wait", "s-1", "--json"})
+	if err == nil || stdout.String() != `{"timedOut":true,"error":"context canceled"}`+"\n" {
+		t.Fatalf("err %v, stdout %q", err, stdout.String())
+	}
+}
+
 // closeDuration: a and b are durations at most a second apart (the test's own time).
 func closeDuration(a, b string) bool {
 	da, err1 := time.ParseDuration(a)

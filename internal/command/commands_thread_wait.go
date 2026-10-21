@@ -33,8 +33,8 @@ const maxThreadWait = 24 * time.Hour
 // threadWait is thread.wait: block until a thread is idle (or needs attention, fails,
 // or is disconnected), for an agent that drives other threads from the CLI. It waits in
 // the daemon (ThreadService.Wait, which follows the thread list on the bus), like
-// action.wait. A timeout is an error (DEADLINE_EXCEEDED, the CLI exits 1, nothing on
-// stdout with --json) naming the thread's status then. See
+// action.wait. A timeout is an error (DEADLINE_EXCEEDED, the CLI exits 1; with --json
+// it prints {"timedOut": true, "error": ...}) naming the thread's status then. See
 // docs/notes/agents-1-wait-events.md.
 func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
