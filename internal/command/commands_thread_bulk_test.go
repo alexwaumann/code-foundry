@@ -70,6 +70,17 @@ func TestThreadRemoveIDs(t *testing.T) {
 		{name: "an unknown suffix removes nothing", args: map[string]string{"ids": "11112222,ffff"}, wantCode: connect.CodeNotFound},
 		{name: "an ambiguous suffix removes nothing", args: map[string]string{"ids": "11112222,2222,4444"}, wantErr: command.ErrInvalidArgs},
 		{name: "neither id nor ids", wantErr: command.ErrInvalidArgs},
+		// A list built from nothing ("$(... | join(","))" with no children) is an error,
+		// not the context thread, the caller's own.
+		{name: "ids of only blanks", ctx: command.Context{ActiveThreadID: "s-cccc55556666"}, args: map[string]string{"ids": " , "},
+			wantErr: command.ErrInvalidArgs},
+		// The CLI in a thread removes its own thread only when --id names it.
+		{name: "the CLI does not remove the thread it runs in by default", ctx: command.Context{ActiveThreadID: "s-cccc55556666"},
+			wantErr: command.ErrInvalidArgs},
+		{name: "the CLI removes the thread it runs in given --id", ctx: command.Context{ActiveThreadID: "s-cccc55556666"},
+			args: map[string]string{"id": "55556666"}, wantMsg: "removed thread s-cccc55556666", wantIDs: []string{"s-cccc55556666"}},
+		{name: "the GUI removes the thread in view", ctx: command.Context{ActiveThreadID: "s-cccc55556666", ActiveView: "thread"},
+			wantMsg: "removed thread s-cccc55556666", wantIDs: []string{"s-cccc55556666"}},
 		{name: "the GUI still needs a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {

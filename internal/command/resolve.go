@@ -140,7 +140,8 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 
 // resolveIDList resolves each entry of v, an IDList arg, listing the ids once (only
 // when an entry is a suffix): the full ids joined by commas, blanks and repeats dropped.
-// One entry that does not resolve fails them all, so a typo acts on none.
+// One entry that does not resolve fails them all, so a typo acts on none, and a list of
+// only blanks is an *ArgError.
 func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (string, error) {
 	list := r.idLister(s.ID)
 	var (
@@ -166,6 +167,11 @@ func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (stri
 		if !slices.Contains(out, full) {
 			out = append(out, full)
 		}
+	}
+	if len(out) == 0 {
+		// "," or " , ": a list built from nothing. Run would fall back to id, which in a
+		// thread is the caller's own.
+		return "", InvalidArg(s.Name, "%s holds no %s ids", s.Name, idKinds[s.ID].noun)
 	}
 	return strings.Join(out, ","), nil
 }

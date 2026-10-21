@@ -190,7 +190,14 @@ type ArgSpec struct {
 	FileOrStdin bool `protobuf:"varint,10,opt,name=file_or_stdin,json=fileOrStdin,proto3" json:"file_or_stdin,omitempty"`
 	// The CLI takes the flag more than once and sends the values joined by newlines
 	// (thread.subscribe's --arg k=v).
-	Repeatable    bool `protobuf:"varint,11,opt,name=repeatable,proto3" json:"repeatable,omitempty"`
+	Repeatable bool `protobuf:"varint,11,opt,name=repeatable,proto3" json:"repeatable,omitempty"`
+	// The arg is an id (a full id or a unique suffix of one). The CLI refuses an
+	// explicitly empty value, and names it when a stray word looks like one.
+	Id bool `protobuf:"varint,12,opt,name=id,proto3" json:"id,omitempty"`
+	// The arg defaults to a field of the caller's context (the active thread, terminal,
+	// project, worktree). The CLI refuses an explicitly empty value, which would
+	// otherwise mean the active one.
+	ContextBound  bool `protobuf:"varint,13,opt,name=context_bound,json=contextBound,proto3" json:"context_bound,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -298,6 +305,20 @@ func (x *ArgSpec) GetFileOrStdin() bool {
 func (x *ArgSpec) GetRepeatable() bool {
 	if x != nil {
 		return x.Repeatable
+	}
+	return false
+}
+
+func (x *ArgSpec) GetId() bool {
+	if x != nil {
+		return x.Id
+	}
+	return false
+}
+
+func (x *ArgSpec) GetContextBound() bool {
+	if x != nil {
+		return x.ContextBound
 	}
 	return false
 }
@@ -813,7 +834,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
-	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\x8b\x03\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\xc0\x03\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -831,7 +852,9 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	" \x01(\bR\vfileOrStdin\x12\x1e\n" +
 	"\n" +
 	"repeatable\x18\v \x01(\bR\n" +
-	"repeatable\"\x93\x02\n" +
+	"repeatable\x12\x0e\n" +
+	"\x02id\x18\f \x01(\bR\x02id\x12#\n" +
+	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\"\x93\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

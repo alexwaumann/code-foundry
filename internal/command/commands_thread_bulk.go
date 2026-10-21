@@ -47,6 +47,19 @@ func targetThreads(a Args) ([]string, error) {
 	return nil, InvalidArg("id", "missing required argument %q (or ids, for several threads)", "id")
 }
 
+// notSelf refuses a CLI call of thread.remove or thread.archive (verb) whose thread is
+// only the context default: inside a thread that is the caller's own thread
+// ($CODE_FOUNDRY_THREAD), which an agent rarely means to archive or forget (an empty
+// "$CHILD" it meant to pass, or a forgotten --id). An explicit id, ids or
+// descendants-of, and every GUI call (whose context thread is the one in view), pass.
+func notSelf(c Context, a Args, verb string) error {
+	if c.ActiveView != "" || a.Given("id") || a.Has("ids") || a.String("descendants-of") != "" || !a.Has("id") {
+		return nil
+	}
+	id := a.String("id")
+	return InvalidArg("id", "not %s the thread this runs in (%s) without --id; pass --id %s to mean it", verb, id, id)
+}
+
 // ThreadsResult is the --json answer of thread.remove and thread.archive given ids:
 // the threads done, and those that failed with why.
 type ThreadsResult struct {

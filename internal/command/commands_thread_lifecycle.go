@@ -263,12 +263,15 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			When:        hasThreadOrCLI,
 			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
 			// Without a thread Run says what is missing; with ids the message counts them.
-			ConfirmIf: func(_ context.Context, _ Context, a Args) bool {
+			ConfirmIf: func(_ context.Context, c Context, a Args) bool {
 				_, err := targetThreads(a)
-				return err == nil
+				return err == nil && notSelf(c, a, "removing") == nil
 			},
 			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string { return removeConfirm(ctx, b, a) },
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				if err := notSelf(c, a, "removing"); err != nil {
+					return Result{}, err
+				}
 				ids, err := targetThreads(a)
 				if err != nil {
 					return Result{}, err

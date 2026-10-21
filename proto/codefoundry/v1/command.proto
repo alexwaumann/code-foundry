@@ -60,6 +60,13 @@ message ArgSpec {
   // The CLI takes the flag more than once and sends the values joined by newlines
   // (thread.subscribe's --arg k=v).
   bool repeatable = 11;
+  // The arg is an id (a full id or a unique suffix of one). The CLI refuses an
+  // explicitly empty value, and names it when a stray word looks like one.
+  bool id = 12;
+  // The arg defaults to a field of the caller's context (the active thread, terminal,
+  // project, worktree). The CLI refuses an explicitly empty value, which would
+  // otherwise mean the active one.
+  bool context_bound = 13;
 }
 
 message Command {

@@ -232,6 +232,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if err := cl.assignPositionals(fs, flags, words); err != nil {
 		return err
 	}
+	if err := cl.refuseEmptyIDs(cmd.GetName(), flags); err != nil {
+		return err
+	}
 
 	uctx, err := cl.uiContext(cf)
 	if err != nil {
@@ -311,6 +314,37 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 	}
 	return nil
+}
+
+// refuseEmptyIDs refuses an id or context-bound flag given an empty value (`--id ""`,
+// `--id "$CHILD"` with CHILD unset): the daemon takes an empty value as absent and
+// falls back to the context, the thread this runs in, so an agent would act on itself.
+// A DefaultToThreadEnv flag's empty value is its documented opt-out (--created-by=).
+func (cl *cli) refuseEmptyIDs(name string, flags []*argFlag) error {
+	for _, f := range flags {
+		s := f.spec
+		if !f.set || strings.TrimSpace(f.value) != "" || s.GetDefaultToThreadEnv() || (!s.GetId() && !s.GetContextBound()) {
+			continue
+		}
+		hint := "give an id"
+		if def := contextDefault(s.GetDescription()); def != "" {
+			hint = "leave it out to mean " + def
+		}
+		fmt.Fprintf(cl.stderr, "code-foundry %s: --%s is empty; %s\n", name, s.GetName(), hint)
+		return errUsage
+	}
+	return nil
+}
+
+// contextDefault is what a context-bound arg defaults to, from the "(default: the
+// active thread)" its description ends in; "" without one.
+func contextDefault(desc string) string {
+	i := strings.LastIndex(desc, "(default: ")
+	if i < 0 {
+		return ""
+	}
+	def, _, _ := strings.Cut(desc[i+len("(default: "):], ")")
+	return def
 }
 
 // badFlag follows the flag package's one-line error ("flag provided but not defined:

@@ -42,7 +42,7 @@ func TestThreadArchive(t *testing.T) {
 		wantMsg    string
 		wantReqs   []proto.Message
 	}{
-		{name: "toggle archives an idle thread without asking", ctx: command.Context{ActiveThreadID: "s5"},
+		{name: "toggle archives an idle thread without asking", ctx: command.Context{ActiveThreadID: "s5", ActiveView: "thread"},
 			current: live(v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"),
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, cascade, get, archive}},
 		{name: "a finished turn archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
@@ -57,7 +57,7 @@ func TestThreadArchive(t *testing.T) {
 		{name: "a closing thread archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_CLOSING, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
 			wantMsg: "archived thread drv (s5)"},
-		{name: "a working thread asks", ctx: command.Context{ActiveThreadID: "s5"}, current: busy,
+		{name: "a working thread asks", ctx: command.Context{ActiveThreadID: "s5", ActiveView: "thread"}, current: busy,
 			wantAsk: working, wantReqs: []proto.Message{get, cascade, get, cascade}},
 		{name: "a starting thread asks", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_STARTING}, wantAsk: working},
@@ -93,6 +93,12 @@ func TestThreadArchive(t *testing.T) {
 		{name: "re-archiving an archived thread", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ArchivedAt: archivedAt},
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, cascade, archive}},
+		// The CLI in a thread: its own thread only when --id names it (an empty "$CHILD").
+		{name: "the CLI does not archive the thread it runs in by default", ctx: command.Context{ActiveThreadID: "s5"},
+			current: busy, wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "the CLI archives the thread it runs in given --id", ctx: command.Context{ActiveThreadID: "s5"},
+			args: map[string]string{"id": "s5", "archived": "true"}, current: live(v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"),
+			wantMsg: "archived thread drv (s5)"},
 		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		// The CLI may name its threads with ids alone, so Run says what is missing.
 		{name: "the CLI without a thread names what is missing", wantErr: command.ErrInvalidArgs},

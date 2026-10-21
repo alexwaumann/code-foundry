@@ -36,13 +36,16 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 		},
 		When:    hasThreadOrCLI,
 		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
-		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
-			return archiveConfirm(ctx, b, a) != ""
+		ConfirmIf: func(ctx context.Context, c Context, a Args) bool {
+			return notSelf(c, a, "archiving") == nil && archiveConfirm(ctx, b, a) != ""
 		},
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 			return archiveConfirm(ctx, b, a)
 		},
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+			if err := notSelf(c, a, "archiving"); err != nil {
+				return Result{}, err
+			}
 			if a.String("descendants-of") != "" {
 				if a.Has("ids") {
 					return Result{}, InvalidArg("ids", "give ids or descendants-of, not both")
