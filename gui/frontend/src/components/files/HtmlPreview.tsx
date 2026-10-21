@@ -16,7 +16,8 @@ export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allo
 
 /**
  * An HTML file rendered live: the daemon serves it, and everything under its scope (its
- * checkout, else its directory), at a granted URL (FilesystemService.PreviewFile), so its
+ * checkout, else its directory; the file alone when that directory is home or another
+ * folder too broad to hand a page), at a granted URL (FilesystemService.PreviewFile), so its
  * scripts run and its relative links, stylesheets, scripts and images resolve; the network
  * is open for CDNs. A srcdoc frame could do none of that: its links resolved against the
  * app's own URL and navigated the frame into the app's blank shell (docs/notes/
@@ -84,7 +85,9 @@ export function HtmlPreview({ path, text, name }: { path: string; text: string; 
       />
       <div className="flex shrink-0 items-center gap-1.5 border-t border-pane-border px-3 py-1 text-caption-sm" data-testid="file-html-footer">
         <ShieldCheck className="size-3 shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">Sandboxed from Code Foundry · scripts and network on · loads files under {tildify(current.preview.scope)}</span>
+        <span className="min-w-0 truncate">
+          Sandboxed from Code Foundry · scripts and network on · {current.preview.singleFile ? "loads this file only" : `loads files under ${tildify(current.preview.scope)}`}
+        </span>
       </div>
     </div>
   );

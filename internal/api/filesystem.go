@@ -191,7 +191,9 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 }
 
 // PreviewFile grants the HTML preview a URL for one file (see package preview): the
-// grant's scope is the registered checkout holding the file, else its directory.
+// grant's scope is the registered checkout holding the file, else its directory, else
+// (home itself, an ancestor of the config home) the file alone. A file in a guarded
+// folder (the config home outside its checkouts, ~/.ssh, ~/Library) is refused.
 func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	m := req.Msg
 	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), 1)
@@ -207,27 +209,34 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	case f.IsDir:
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is a directory", f.Path))
 	}
-	scope := h.previewScope(f.Path)
-	rel, err := filepath.Rel(scope, f.Path)
+	// The file, or where its symlinks lead, may be guarded; the route would 404 it.
+	if real, err := filepath.EvalSymlinks(f.Path); h.grants.Guarded(f.Path) || (err == nil && h.grants.Guarded(real)) {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("%s is in a protected folder (Code Foundry's own data, credentials or ~/Library), so it cannot be previewed", f.Path))
+	}
+	scope, single := h.previewScope(f.Path)
+	var grant, rel string
+	if single {
+		grant, err = h.grants.GrantFile(f.Path)
+		rel = filepath.Base(f.Path)
+	} else if grant, err = h.grants.Grant(scope); err == nil {
+		rel, err = filepath.Rel(scope, f.Path)
+	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
-	grant, err := h.grants.Grant(scope)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	return connect.NewResponse(&v1.PreviewFileResponse{Url: preview.URL(grant, filepath.ToSlash(rel)), Scope: scope}), nil
+	return connect.NewResponse(&v1.PreviewFileResponse{Url: preview.URL(grant, filepath.ToSlash(rel)), Scope: scope, SingleFile: single}), nil
 }
 
-// previewScope is the directory a preview of file may read: the deepest registered
-// project or worktree path holding it (so "../assets/app.css" from docs/ resolves), else
-// the file's own directory.
-func (h *Filesystem) previewScope(file string) string {
-	scope := filepath.Dir(file)
-	best := -1
+// previewScope is what a preview of file may read: the deepest registered project or
+// worktree path holding it (so "../assets/app.css" from docs/ resolves), else the file's
+// own directory, as long as the grants allow that tree (never home, an ancestor of the
+// config home, or a guarded folder). Otherwise it is the file alone (single).
+func (h *Filesystem) previewScope(file string) (scope string, single bool) {
+	best := ""
 	consider := func(p string) {
-		if p != "" && len(p) > best && fsx.Within(p, file) && p != file {
-			scope, best = p, len(p)
+		if p != "" && len(p) > len(best) && fsx.Within(p, file) && p != file && h.grants.Allows(p) {
+			best = p
 		}
 	}
 	for _, r := range h.projects.Snapshot().Projects {
@@ -236,5 +245,11 @@ func (h *Filesystem) previewScope(file string) string {
 			consider(w.Path)
 		}
 	}
-	return scope
+	if best != "" {
+		return best, false
+	}
+	if dir := filepath.Dir(file); h.grants.Allows(dir) {
+		return dir, false
+	}
+	return file, true
 }

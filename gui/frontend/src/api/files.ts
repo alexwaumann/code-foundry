@@ -84,21 +84,23 @@ export async function readFile(baseDir: string, path: string, conn: DaemonConnec
 export interface FilePreview {
   /** Absolute URL on the daemon's loopback listener; no bearer token needed (the grant is in the path). */
   url: string;
-  /** Absolute directory the page may load files from: its checkout, else its directory. */
+  /** Absolute directory the page may load files from: its checkout, else its directory; the file itself when singleFile. */
   scope: string;
+  /** The page may load only itself: its directory is home or otherwise too broad to hand it. */
+  singleFile: boolean;
 }
 
 /**
  * Grants the HTML preview a URL for `path` (as for readFile) and joins it to the daemon's
- * base URL. A missing file is NotFound; a directory or a path outside home is
- * InvalidArgument. A daemon older than the RPC fails with OutdatedDaemonError.
+ * base URL. A missing file is NotFound; a directory, a path outside home or a file in a
+ * protected folder (Code Foundry's own data, ~/.ssh, ~/Library) is InvalidArgument. A daemon older than the RPC fails with OutdatedDaemonError.
  */
 export async function previewFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FilePreview> {
   const c = await conn.client(FilesystemService);
   try {
     const r = await c.previewFile({ baseDir, path }, { signal });
     const { baseUrl } = await conn.resolveEndpoint();
-    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope };
+    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

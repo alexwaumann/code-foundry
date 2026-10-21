@@ -1,10 +1,12 @@
 // Package preview serves files to the File tab's HTML preview. The frame cannot send the
 // daemon's bearer token (an <iframe src> carries no headers), so the GUI asks
 // FilesystemService.PreviewFile for a grant: an unguessable id bound to one directory
-// tree (the registered checkout holding the file, else its directory). The grant goes in
-// the URL and is the credential for GET /preview/<grant>/<path> on the loopback
-// listener, mounted outside the bearer check. A grant reads only its tree, never above it
-// or outside the home directory (symlinks resolved), and lasts until the daemon stops.
+// tree (the registered checkout holding the file, else its directory) or, when that
+// directory is too broad for the Floor (home itself, an ancestor of the config home), to
+// the one file. The grant goes in the URL and is the credential for
+// GET /preview/<grant>/<path> on the loopback listener, mounted outside the bearer check.
+// A grant reads only its tree, never above it, outside the home directory or inside a
+// guarded folder (symlinks resolved), and lasts until the daemon stops.
 //
 // The page loads with the frame's sandbox (scripts on, same-origin off) and a CSP sandbox
 // header that keeps it opaque even if its URL is opened in a browser, so it cannot become
@@ -32,24 +34,54 @@ import (
 // Prefix is the route the handler is mounted on.
 const Prefix = "/preview/"
 
-// Grants maps grant ids to the directory each may serve. One grant per directory: asking
-// again for the same directory returns the same id.
+// ErrGuarded is returned for a grant the Floor forbids.
+var ErrGuarded = errors.New("preview: path is guarded")
+
+// Grants maps grant ids to what each may serve: a directory tree, or one file. One grant
+// per tree or file: asking again returns the same id. Every grant clears the Floor.
 type Grants struct {
+	floor Floor
 	mu    sync.Mutex
-	byDir map[string]string
-	byID  map[string]string
+	byKey map[entry]string
+	byID  map[string]entry
 }
 
-// NewGrants returns an empty grant table.
-func NewGrants() *Grants {
-	return &Grants{byDir: map[string]string{}, byID: map[string]string{}}
+// entry is what a grant serves: the tree dir, or only file (in dir) when file is set.
+type entry struct{ dir, file string }
+
+// NewGrants returns an empty grant table whose grants clear floor.
+func NewGrants(floor Floor) *Grants {
+	return &Grants{floor: floor, byKey: map[entry]string{}, byID: map[string]entry{}}
 }
 
-// Grant returns the id that serves dir (absolute, cleaned), minting one on first use.
+// Allows reports whether dir may be a grant's whole tree (Floor.ScopeOK).
+func (g *Grants) Allows(dir string) bool { return g.floor.ScopeOK(dir) }
+
+// Guarded reports whether no grant may serve p (Floor.Guarded).
+func (g *Grants) Guarded(p string) bool { return g.floor.Guarded(p) }
+
+// Grant returns the id that serves the tree dir (absolute, cleaned), minting one on first
+// use; ErrGuarded when the Floor does not allow dir as a tree.
 func (g *Grants) Grant(dir string) (string, error) {
+	if !g.floor.ScopeOK(dir) {
+		return "", fmt.Errorf("%w: %s", ErrGuarded, dir)
+	}
+	return g.mint(entry{dir: dir})
+}
+
+// GrantFile returns the id that serves file (absolute, cleaned) and nothing else, for a
+// file whose directory may not be a tree; ErrGuarded when the file itself is guarded.
+func (g *Grants) GrantFile(file string) (string, error) {
+	if g.floor.Guarded(file) || !fsx.Within(g.floor.Home(), file) {
+		return "", fmt.Errorf("%w: %s", ErrGuarded, file)
+	}
+	return g.mint(entry{dir: filepath.Dir(file), file: file})
+}
+
+func (g *Grants) mint(e entry) (string, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if id, ok := g.byDir[dir]; ok {
+	if id, ok := g.byKey[e]; ok {
 		return id, nil
 	}
 	b := make([]byte, 16)
@@ -57,16 +89,21 @@ func (g *Grants) Grant(dir string) (string, error) {
 		return "", fmt.Errorf("preview: mint grant: %w", err)
 	}
 	id := hex.EncodeToString(b)
-	g.byDir[dir], g.byID[id] = id, dir
+	g.byKey[e], g.byID[id] = id, e
 	return id, nil
 }
 
-// Dir returns the directory a grant serves.
-func (g *Grants) Dir(id string) (string, bool) {
+func (g *Grants) lookup(id string) (entry, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	dir, ok := g.byID[id]
-	return dir, ok
+	e, ok := g.byID[id]
+	return e, ok
+}
+
+// Dir returns the directory a grant serves (the file's directory for a one-file grant).
+func (g *Grants) Dir(id string) (string, bool) {
+	e, ok := g.lookup(id)
+	return e.dir, ok
 }
 
 // URL is the root-relative URL of rel (slash-separated, relative to the grant's
@@ -97,12 +134,14 @@ func escapeSegment(s string) string {
 	return b.String()
 }
 
-// Handler serves GET /preview/<grant>/<path> from the grant's directory. root is the
-// home directory, resolved (fsx.ResolveRoot): a file whose symlinks lead outside it, or
+// Handler serves GET /preview/<grant>/<path> from the grant's directory (only its file,
+// for a one-file grant). A file whose symlinks lead outside the home directory or into a
+// guarded folder (the Floor: the config home's token and database, ~/.ssh), or a path
 // above the grant's directory, is 404 like a missing one. A directory serves its
-// index.html. Responses are never cached (the thread edits these files) and carry no
-// referrer, so the grant does not leak to the sites a page loads from.
-func Handler(root string, g *Grants, log *slog.Logger) http.Handler {
+// index.html. Responses are never cached (the thread edits these files), carry no
+// referrer, so the grant does not leak to the sites a page loads from, and allow any
+// origin: the page is opaque-origin and reads its own files with fetch().
+func Handler(g *Grants, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -114,12 +153,16 @@ func Handler(root string, g *Grants, log *slog.Logger) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		dir, ok := g.Dir(grant)
+		e, ok := g.lookup(grant)
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		p, err := resolve(root, dir, rel)
+		if e.file != "" && filepath.Join(e.dir, filepath.FromSlash(path.Clean("/"+rel))) != e.file {
+			http.NotFound(w, r)
+			return
+		}
+		p, err := resolve(g.floor, e.dir, rel)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				log.Warn("preview read failed", "path", rel, "err", err)
@@ -132,7 +175,7 @@ func Handler(root string, g *Grants, log *slog.Logger) http.Handler {
 }
 
 // resolve maps a request path to the regular file it names under dir, or ErrNotExist.
-func resolve(root, dir, rel string) (string, error) {
+func resolve(floor Floor, dir, rel string) (string, error) {
 	clean := path.Clean("/" + rel)
 	p := filepath.Join(dir, filepath.FromSlash(clean))
 	if !fsx.Within(dir, p) {
@@ -142,7 +185,7 @@ func resolve(root, dir, rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !fsx.Within(root, real) {
+	if !fsx.Within(floor.Home(), real) || floor.Guarded(real) {
 		return "", fs.ErrNotExist
 	}
 	fi, err := os.Stat(real)
@@ -150,7 +193,7 @@ func resolve(root, dir, rel string) (string, error) {
 		return "", err
 	}
 	if fi.IsDir() {
-		return resolve(root, dir, path.Join(clean, "index.html"))
+		return resolve(floor, dir, path.Join(clean, "index.html"))
 	}
 	if !fi.Mode().IsRegular() {
 		return "", fs.ErrNotExist
@@ -185,6 +228,7 @@ func serve(w http.ResponseWriter, r *http.Request, p string) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Access-Control-Allow-Origin", "*")
 	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads")
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }

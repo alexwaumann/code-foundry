@@ -256,7 +256,7 @@ func Run(ctx context.Context, opts Options) error {
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
-	grants := preview.NewGrants()
+	grants := preview.NewGrants(preview.NewFloor(st.home, p))
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),
@@ -310,7 +310,7 @@ func Run(ctx context.Context, opts Options) error {
 	reqCtx, cancelRequests := context.WithCancel(ctx)
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
-	previewH := preview.Handler(st.home, grants, log.With("component", "preview"))
+	previewH := preview.Handler(grants, log.With("component", "preview"))
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, previewH, mux)))
 
 	errc := make(chan error, 2)

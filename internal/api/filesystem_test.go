@@ -12,7 +12,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
@@ -34,7 +33,7 @@ func TestFilesystemListDirectories(t *testing.T) {
 		{ProjectID: "p", Path: filepath.Join(root, "proj-wt")},
 	}})
 
-	route := NewFilesystem(root, fake, preview.NewGrants()).Route()
+	route := NewFilesystem(root, fake, testGrants(root)).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewServer(mux)
