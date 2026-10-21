@@ -4450,7 +4450,8 @@ type ReportThreadRequest struct {
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Required (not UNSPECIFIED).
 	Status ThreadReportStatus `protobuf:"varint,2,opt,name=status,proto3,enum=codefoundry.v1.ThreadReportStatus" json:"status,omitempty"`
-	// At most 1000 characters (trimmed).
+	// Trimmed; a longer one than 1000 characters is cut to 1000, its last one "…"
+	// (ReportThreadResponse.summary_cut_from says so).
 	Summary string `protobuf:"bytes,3,opt,name=summary,proto3" json:"summary,omitempty"`
 	// A JSON object, at most 16 KiB once compacted; empty for none.
 	Data          string `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
@@ -4517,10 +4518,12 @@ func (x *ReportThreadRequest) GetData() string {
 }
 
 type ReportThreadResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The summary's length in characters when it was cut to 1000; 0 when it was kept whole.
+	SummaryCutFrom int32 `protobuf:"varint,2,opt,name=summary_cut_from,json=summaryCutFrom,proto3" json:"summary_cut_from,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ReportThreadResponse) Reset() {
@@ -4558,6 +4561,13 @@ func (x *ReportThreadResponse) GetThread() *Thread {
 		return x.Thread
 	}
 	return nil
+}
+
+func (x *ReportThreadResponse) GetSummaryCutFrom() int32 {
+	if x != nil {
+		return x.SummaryCutFrom
+	}
+	return 0
 }
 
 type SetThreadBudgetRequest struct {
@@ -5241,9 +5251,10 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12:\n" +
 	"\x06status\x18\x02 \x01(\x0e2\".codefoundry.v1.ThreadReportStatusR\x06status\x12\x18\n" +
 	"\asummary\x18\x03 \x01(\tR\asummary\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\tR\x04data\"F\n" +
+	"\x04data\x18\x04 \x01(\tR\x04data\"p\n" +
 	"\x14ReportThreadResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"G\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12(\n" +
+	"\x10summary_cut_from\x18\x02 \x01(\x05R\x0esummaryCutFrom\"G\n" +
 	"\x16SetThreadBudgetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +

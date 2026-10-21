@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/pricing"
@@ -150,7 +151,10 @@ func EditLabels(cur, add, remove []string, clear bool) ([]string, error) {
 	return CleanLabels(append(out, add...))
 }
 
-// CleanReport validates a report's status, summary and data; data is compacted.
+// CleanReport validates a report's status, summary and data; data is compacted. A
+// summary over MaxReportSummaryRunes is cut (CutReportSummary), not refused: a worker
+// that wrote too much still reports, and ReportSummaryCut tells the caller so
+// (docs/notes/ember-fixes-2-small.md).
 func CleanReport(r Report) (Report, error) {
 	if r.Status == ReportNone || !r.Status.valid() {
 		return Report{}, fmt.Errorf("%w: report status %d: give done, blocked, failed or progress", ErrInvalidArgument, r.Status)
@@ -159,9 +163,7 @@ func CleanReport(r Report) (Report, error) {
 	if strings.ContainsRune(r.Summary, 0) {
 		return Report{}, fmt.Errorf("%w: report summary contains a NUL byte", ErrInvalidArgument)
 	}
-	if n := utf8.RuneCountInString(r.Summary); n > MaxReportSummaryRunes {
-		return Report{}, fmt.Errorf("%w: report summary is %d characters; at most %d", ErrInvalidArgument, n, MaxReportSummaryRunes)
-	}
+	r.Summary = CutReportSummary(r.Summary)
 	data := bytes.TrimSpace([]byte(r.Data))
 	if len(data) == 0 {
 		r.Data = ""
@@ -180,6 +182,32 @@ func CleanReport(r Report) (Report, error) {
 	}
 	r.Data = buf.String()
 	return r, nil
+}
+
+// ReportSummaryCut is how many characters summary (trimmed) has when CleanReport cuts
+// it, else 0.
+func ReportSummaryCut(summary string) int {
+	if n := utf8.RuneCountInString(strings.TrimSpace(summary)); n > MaxReportSummaryRunes {
+		return n
+	}
+	return 0
+}
+
+// CutReportSummary is s, trimmed, and when that is over MaxReportSummaryRunes
+// characters cut to that many, the last one "…".
+func CutReportSummary(s string) string {
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) <= MaxReportSummaryRunes {
+		return s
+	}
+	n := 0
+	for i := range s {
+		if n == MaxReportSummaryRunes-1 {
+			return strings.TrimRightFunc(s[:i], unicode.IsSpace) + "…"
+		}
+		n++
+	}
+	return s
 }
 
 // CheckBudget refuses a negative or non-finite budget.

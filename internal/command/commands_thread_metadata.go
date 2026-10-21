@@ -231,7 +231,7 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Args: []ArgSpec{
 			idArg,
 			{Name: "status", Type: Enum, Enum: ThreadReportStatuses, Required: true, Positional: true, Description: "done, blocked, failed or progress"},
-			{Name: "summary", Type: String, Positional: true, Description: "What happened, in at most 1000 characters"},
+			{Name: "summary", Type: String, Positional: true, Description: "What happened, in at most 1000 characters (a longer one is cut)"},
 			{Name: "data", Type: String, FileOrStdin: true, Description: "A JSON object of results, at most 16 KiB (@file: from a file, -: stdin)"},
 		},
 		When: hasThread,
@@ -244,6 +244,9 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 			}
 			s := res.Msg.GetThread()
 			msg := "reported " + reportStatusName(s.GetReportStatus()) + " on thread " + threadLabel(s)
+			if n := res.Msg.GetSummaryCutFrom(); n > 0 {
+				msg += fmt.Sprintf(" (the summary had %d characters and was cut to 1000; details belong in --data)", n)
+			}
 			if s.GetReportSummary() != "" {
 				msg += ": " + s.GetReportSummary()
 			}

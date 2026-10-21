@@ -62,6 +62,11 @@ func TestThreadMetadataCommands(t *testing.T) {
 		{name: "report on another thread", cmd: "thread.report", ctx: inThread, args: map[string]string{"id": "s-9", "status": "blocked"},
 			wantMsg:  "reported blocked on thread s-9",
 			wantReqs: []proto.Message{&v1.ReportThreadRequest{Id: "s-9", Status: v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED}}},
+		{name: "report says a long summary was cut", cmd: "thread.report", ctx: inThread,
+			args: map[string]string{"status": "done", "summary": strings.Repeat("x", 1200)},
+			wantMsg: "reported done on thread s-me (the summary had 1200 characters and was cut to 1000; details belong in --data): " +
+				strings.Repeat("x", 999) + "…",
+			wantReqs: []proto.Message{&v1.ReportThreadRequest{Id: "s-me", Status: done, Summary: strings.Repeat("x", 1200)}}},
 		{name: "report needs a status", cmd: "thread.report", ctx: inThread, args: map[string]string{"summary": "x"}, wantErr: command.ErrInvalidArgs},
 		{name: "report refuses an unknown status", cmd: "thread.report", ctx: inThread, args: map[string]string{"status": "meh"}, wantErr: command.ErrInvalidArgs},
 

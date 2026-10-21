@@ -47,7 +47,7 @@ func (h *Thread) Report(ctx context.Context, req *connect.Request[v1.ReportThrea
 	if err != nil {
 		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.ReportThreadResponse{Thread: threadToProto(s)}), nil
+	return connect.NewResponse(&v1.ReportThreadResponse{Thread: threadToProto(s), SummaryCutFrom: int32(thread.ReportSummaryCut(m.GetSummary()))}), nil
 }
 
 // SetBudget sets a thread's spending limit.

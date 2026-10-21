@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
@@ -96,7 +97,10 @@ func TestCleanReport(t *testing.T) {
 		{"empty object", Report{Status: ReportDone, Data: "{}"}, Report{Status: ReportDone, Data: "{}"}, false},
 		{"no status", Report{Summary: "x"}, Report{}, true},
 		{"unknown status", Report{Status: 9}, Report{}, true},
-		{"summary too long", Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes+1)}, Report{}, true},
+		{"summary too long is cut", Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes+200)},
+			Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes-1) + "…"}, false},
+		{"cut drops the space before the ellipsis", Report{Status: ReportDone, Summary: strings.Repeat("a", MaxReportSummaryRunes-2) + "  " + strings.Repeat("b", 5)},
+			Report{Status: ReportDone, Summary: strings.Repeat("a", MaxReportSummaryRunes-2) + "…"}, false},
 		{"summary at the limit", Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes)}, Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes)}, false},
 		{"array", Report{Status: ReportDone, Data: "[1]"}, Report{}, true},
 		{"null", Report{Status: ReportDone, Data: "null"}, Report{}, true},
@@ -112,6 +116,33 @@ func TestCleanReport(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Errorf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReportSummaryCut(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		summary string
+		want    int
+	}{
+		{"empty", "", 0},
+		{"at the limit", strings.Repeat("é", MaxReportSummaryRunes), 0},
+		{"at the limit once trimmed", "  " + strings.Repeat("x", MaxReportSummaryRunes) + "\n", 0},
+		{"one over", strings.Repeat("é", MaxReportSummaryRunes+1), MaxReportSummaryRunes + 1},
+		{"1200", strings.Repeat("x", 1200), 1200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ReportSummaryCut(tc.summary); got != tc.want {
+				t.Errorf("ReportSummaryCut = %d, want %d", got, tc.want)
+			}
+			cut := CutReportSummary(tc.summary)
+			if n := utf8.RuneCountInString(cut); n > MaxReportSummaryRunes {
+				t.Errorf("CutReportSummary has %d characters", n)
+			}
+			if (tc.want > 0) != strings.HasSuffix(cut, "…") {
+				t.Errorf("CutReportSummary = …%q", cut[max(0, len(cut)-8):])
 			}
 		})
 	}
