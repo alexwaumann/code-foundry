@@ -510,6 +510,17 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 			n.Repos[slug] = r
 		}
+		for _, rp := range plan.repos {
+			canon := canonicalSlug(rp.slug, res.Repos[rp.slug])
+			if r, ok := n.Repos[rp.slug]; ok && canon != nil && r.CanonicalSlug != *canon {
+				s.log.Info("gh repository moved", "slug", rp.slug, "now", *canon)
+				r.CanonicalSlug = *canon
+				n.Repos[rp.slug] = r
+				if !slices.Contains(repoChanged, rp.slug) {
+					repoChanged = append(repoChanged, rp.slug)
+				}
+			}
+		}
 	})
 	slices.Sort(repoChanged)
 
@@ -582,6 +593,23 @@ func (s *Store) applyViewer(ctx context.Context, res *pollResult) {
 	s.updateViewer(func(vs *ViewerState) {
 		vs.Viewer, vs.Authenticated, vs.FetchedAt, vs.LastError = &v, true, now, ""
 	})
+}
+
+// canonicalSlug is RepoState.CanonicalSlug for slug from its poll block: the name
+// GitHub reports when it differs, "" when it is the same; nil when the block says nothing
+// (failed, or no name).
+func canonicalSlug(slug string, rr repoResult) *string {
+	if rr.Err != nil || rr.NameWithOwner == "" {
+		return nil
+	}
+	canon, err := NormalizeSlug(rr.NameWithOwner)
+	if err != nil {
+		return nil
+	}
+	if canon == slug {
+		canon = ""
+	}
+	return &canon
 }
 
 // knownPullRequests indexes the pull requests the published state already holds, by

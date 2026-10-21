@@ -498,6 +498,39 @@ func TestStoreChecks(t *testing.T) {
 	}
 }
 
+// A renamed repository: the poll learns its new name, and its pull requests (search
+// results carry the new name) are found under the tracked slug.
+func TestStoreRenamedRepository(t *testing.T) {
+	g := newFakeGitHub()
+	g.setRepo("old/app", &fakeRepo{name: "new/app", branch: "main", sha: "s1"})
+	g.addPR(fakePR("PR_1", "new/app", 7, time.Now()), sectionAuthored)
+	f := (&fakeRunner{}).serve(g)
+	s := startStore(t, testOptions(openTestDB(t), f, nil))
+	if err := s.Track("old/app"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the canonical slug", func() bool { return s.Snapshot().Repos["old/app"].CanonicalSlug == "new/app" })
+	waitFor(t, "the dashboard", func() bool { return len(s.Snapshot().Dashboard.Authored) == 1 })
+	snap := s.Snapshot()
+	if got := snap.LocalRepo("new/app"); got != "old/app" {
+		t.Errorf("LocalRepo(new/app) = %q", got)
+	}
+	if got := snap.LocalRepo("x/other"); got != "x/other" {
+		t.Errorf("LocalRepo(x/other) = %q", got)
+	}
+	if p, ok := s.CachedPullRequest("old/app", 7); !ok || p.Repo != "old/app" {
+		t.Errorf("CachedPullRequest(old/app, 7) = %+v, %v", p, ok)
+	}
+	// Renamed back (or the remote updated): the alias goes.
+	g.editRepo("old/app", func(r *fakeRepo) { r.name = "" })
+	if err := s.Refresh(context.Background(), "old/app"); err != nil {
+		t.Fatal(err)
+	}
+	if c := s.Snapshot().Repos["old/app"].CanonicalSlug; c != "" {
+		t.Errorf("CanonicalSlug = %q after the names agree again", c)
+	}
+}
+
 func TestStoreTrackRefreshUntrack(t *testing.T) {
 	b := bus.New()
 	dash := bus.Subscribe[DashboardUpdated](b, 16)

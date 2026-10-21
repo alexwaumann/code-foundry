@@ -31,6 +31,16 @@ func (s *Store) SetActivity(slug string, a gh.RepoActivity) {
 	}
 }
 
+// SetCanonicalSlug records that the repository slug is now named canon on GitHub
+// (gh.RepoState.CanonicalSlug; "" for none).
+func (s *Store) SetCanonicalSlug(slug, canon string) {
+	s.update(func(n *gh.Snapshot) {
+		r := n.Repos[slug]
+		r.Slug, r.CanonicalSlug = slug, canon
+		n.Repos[slug] = r
+	})
+}
+
 // SetBranchPullRequests sets what BranchPullRequests returns for b.Slug and b.HeadRef
 // and publishes gh.BranchPullRequestsUpdated.
 func (s *Store) SetBranchPullRequests(b gh.BranchPullRequests) {
