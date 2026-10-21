@@ -126,6 +126,56 @@ line of the orchestrate skill. Follows `orch-restart-wakes.md`, `orch-wakes-cont
   again; the next turn the user or a child starts waits as before.
 * No "reminder" reason: the GUI words and sort stay "Finished".
 
+## Live evidence (2026-10-21, isolated home, Haiku 5.5 medium)
+
+`make build`; `CODE_FOUNDRY_HOME=/tmp/ember-fix-b bin/code-foundry daemon --dev`, models
+`claude-haiku-5-5[1m]` medium (naming too), scratch project `~/ember-fix-b-scratch/todo`
+with a local bare origin. Home and scratch deleted afterwards; no ERROR lines in the
+three daemon logs.
+
+**Crash.** "Orchestrator" (s-8ac3315b5377, told to describe each wake and run nothing)
+created "Sleeper" (`--created-by … --notify`), which ran a foreground
+`python3 -c 'import time; time.sleep(240)'`. `kill -KILL` on Sleeper's claude:
+
+```
+thread disconnected thread=s-93b36f5c0965 reason=crashed exit_code=-1
+woke thread thread=s-8ac3315b5377 wake="Thread \"Sleeper\" (s-93b36f5c0965) crashed: its process died (not stopped by anyone)."
+```
+
+`thread get` said `status: error (crashed), disconnected`; the wake's JSON had
+`"status": "error", "status_reason": "crashed"`. A `thread send` to Sleeper carried
+`[code-foundry] Your previous turn ended because its process died (not stopped by
+anyone); your last tool call may have run partially, …`, and Haiku answered that the
+sleep's outcome was unknown and the report not yet filed.
+
+**Cut turn, no subscriptions.** "Lone" (no creator, no subscriptions) was asked to count
+calc.py's lines after a 60 s foreground sleep; SIGTERM to the daemon during the sleep,
+then a start:
+
+```
+restart wake queued thread=s-62a95fb065e7 interrupted=0 wakes=0 own_turn_interrupted=true subscriptions=0 own_turn_only=true
+woke thread … wake="The app restarted at 09:39 CDT; your own turn was interrupted while handling the user's message: \"Count the lines of calc.py. …\""
+```
+
+The message carried the restart resume note; Lone said the run was cut by the restart,
+reran the sleep and answered `2`. The Orchestrator and Sleeper, at their prompts, got
+nothing.
+
+**First prompt.** The Orchestrator's child "Quick" (`--notify`) was created and the
+daemon got SIGTERM 6 ms after its spawn:
+
+```
+thread spawned thread=s-1126b1995809 pid=35674
+WARN first message not delivered: the daemon stopped; it goes at the next start thread=s-1126b1995809
+```
+
+The row had `pending_first` set, status error "interrupted", no resume note. After the
+start the Orchestrator got `The app restarted at 09:40 CDT; 1 of your child threads was
+interrupted: "Quick" (…); its session resumes on your next send.` A `thread send
+"the app restarted; continue"` (what an orchestrator does) started Quick: its timeline
+reads `#2 you: Reply with the number of lines in README.md …`, then the send, and Claude
+counted 3 lines and reported done; `pending_first` was cleared.
+
 ## Gotchas
 
 * The thread package's fake claude answers the handshake at once; the first-message
