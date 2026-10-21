@@ -135,10 +135,11 @@ message SettingsSnapshot {
   string path = 2;
   // Increments with every published change.
   uint64 revision = 3;
-  // Set when the file could not be parsed; the previous values stay in effect.
+  // Set when the file could not be parsed; the last settings that loaded stay in
+  // effect (at the daemon's start, the last file that parsed; else the defaults).
   string load_error = 4;
   // Values in the file that were rejected (and replaced by their defaults), and unknown
-  // keys.
+  // keys. Saving keeps them in the file.
   repeated SettingIssue issues = 5;
   // restart_required keys whose value differs from the one the daemon started with.
   repeated string restart_pending = 6;

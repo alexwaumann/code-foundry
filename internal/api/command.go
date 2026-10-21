@@ -48,7 +48,7 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode)}), nil
+	return connect.NewResponse(&v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode), Warnings: res.Warnings}), nil
 }
 
 // commandError maps registry and command errors to Connect errors. Errors that already
@@ -69,7 +69,7 @@ func commandError(name string, err error) error {
 		}
 		if res := confirm.Declined; res != nil {
 			js, _ := res.EncodeJSON()
-			cr.Declined = &v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode)}
+			cr.Declined = &v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode), Warnings: res.Warnings}
 		}
 		if d, derr := connect.NewErrorDetail(cr); derr == nil {
 			out.AddDetail(d)

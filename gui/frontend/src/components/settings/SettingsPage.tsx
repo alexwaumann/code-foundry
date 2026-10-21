@@ -53,7 +53,7 @@ function Banners() {
         <div className="mb-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-body-sm" data-testid="settings-load-error">
           <TriangleAlert className="size-4 shrink-0 text-destructive" />
           <div>
-            <p className="font-medium">The settings file does not parse; the previous values stay in effect and saving is paused.</p>
+            <p className="font-medium">The settings file does not parse; the last settings that loaded stay in effect (the defaults if none have) and saving is paused until you fix it.</p>
             <p className="mt-0.5 font-mono break-words text-muted-foreground">{loadError}</p>
           </div>
         </div>
