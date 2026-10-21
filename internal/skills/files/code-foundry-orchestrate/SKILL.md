@@ -40,18 +40,19 @@ them over. You create and drive other threads with the `code-foundry` CLI.
 
    It prints `created thread <name> (<id>) in <worktree>`; its branch follows settings
    (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's report,
-   never from its name. The prompt is all the child knows (`reference/patterns.md` §0 is the
-   checklist): say what done means and which files it owns. Edits at one spot of one file
-   conflict: new code and its tests go in the child's own new files, each child gets a
-   distinct anchor in a shared switch or list, and a README or changelog has one owner
-   (or you, after the merge). Tell it to stage only the files it changed (never `git add
-   -A`), to push with `git push origin HEAD` (not `-u`), never `git stash`, to open a PR
-   only if `origin` is on GitHub (else pushing is done), to check `git diff
-   origin/<default> --stat` against what it claims, and to finish, as its LAST step, with
-   `code-foundry thread report done "<summary>" --data '{"branch": "...", "files":
-   [...]}'` (or `blocked`/`failed`), the summary carrying every caveat, and again after
-   any later message. Work that builds on a sibling's branch: once that branch is
-   pushed, `thread new --new-worktree --base origin/<its branch>` (§2b).
+   never from its name. The prompt is all the child knows (`reference/patterns.md` §0 is
+   the checklist): say what done means, which files it owns, and how to verify ("no new
+   errors against the base", never "must pass"). Edits at one spot of one file conflict:
+   new code and its tests go in the child's own new files, each child gets a distinct
+   anchor in a shared switch or list, and a README or changelog has one owner (or you,
+   after the merge). Tell it to stage only the files it changed (never `git add -A`), to
+   push with `git push origin HEAD` (not `-u`), never `git stash`, to open a PR only if
+   `origin` is on GitHub (else pushing is done), to check `git diff origin/<default>
+   --stat` against what it claims, and to finish, as its LAST step, with `code-foundry
+   thread report done "<summary>" --data '{"branch": "...", "files": [...]}'` (or
+   `blocked`/`failed`), the summary at most 1000 characters with its caveats first, and
+   again after any later message. Work that builds on a sibling's branch: once that
+   branch is pushed, `thread new --new-worktree --base origin/<its branch>` (§2b).
 2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
    - `code-foundry thread wait <id> --for 30m` blocks until the thread stops working.
    - `code-foundry thread send --id <id> "..." --wait --for 30m` sends a follow-up and
@@ -130,7 +131,6 @@ for the merged ones (if it refuses, tell the user; never `git branch -D` or `git
 - `reference/patterns.md`: §0 the child's prompt; worked examples: one child and a wait;
   fanning out; a branch built on a sibling's; a review loop; a PR's CI and review; §5 a
   supervised child; §6 budget stops; §7 discarding a child's work; §8 the batch check.
-- `reference/wakes.md`: reading a wake and the turn it starts; plugin wake sources.
-  `reference/leads.md`: children that orchestrate. `reference/sidebar.md`: which threads
-  the user sees, handing one over, what archiving takes along.
+- `reference/wakes.md`: reading a wake and its turn. `reference/leads.md`: leads.
+  `reference/sidebar.md`: which threads the user sees, handover, what archiving takes.
 - `code-foundry help <command>`: one command's flags. `code-foundry guide`: the CLI guide.

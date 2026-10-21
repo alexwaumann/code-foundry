@@ -22,14 +22,24 @@ The prompt is all the child knows. Every child prompt says:
   binary would be committed), `git push origin HEAD` (not `-u`), never `git stash`
   (sibling worktrees share one stash), build output inside the worktree, a PR only if
   `origin` is on GitHub (else the pushed branch is done, not blocked).
+- How to verify: tests for new logic when the project has a test runner; for lint,
+  types and existing tests "no new errors against the base: run them before and after
+  your change", never "must pass" (the base may already be red). Name the project's
+  package manager and commands as its lockfile and scripts say (`pnpm-lock.yaml`: pnpm).
+- The toolchain as installed: never another package-manager version (`npx pnpm@N`,
+  corepack, npm in a pnpm repo) and never a relaxed policy (a release-age rule,
+  ignore-scripts, `--no-verify`) to get past an error; it reports `blocked` with the
+  error. Done means usable: when the goal cannot be met or checked (a missing key,
+  account or service), it builds what it can, pushes, and reports `blocked`, not done.
 - Before reporting: `git diff origin/<default> --stat` and the diff of each file it
   names must match what it claims (a scripted edit can match nothing and still "pass").
 - Its LAST step: `code-foundry thread report done "<summary>" --data '{"branch":
   "<branch>", "files": [every file the branch changes]}'` (or `blocked`/`failed`), as its
-  own command after the push succeeded (never after `;`), the summary carrying every
-  caveat (not done, not verified, found but not fixed). A later report replaces the
-  earlier one, so it restates the whole branch. After any later message from you or the
-  user, it reports again.
+  own command after the push succeeded (never after `;`). The summary is at most 1000
+  characters: its caveats first (not done, not verified, found
+  but not fixed), one line each; details go in `--data` (`"caveats": [...]`). A later
+  report replaces the earlier one, so it restates the whole branch. After any later
+  message from you or the user, it reports again.
 - The shell is zsh on macOS: BSD `sed -i ''`, quote variables.
 
 ## 1. One child, and wait for it
