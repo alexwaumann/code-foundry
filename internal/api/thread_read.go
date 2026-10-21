@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -69,7 +70,7 @@ func nextSince(items []thread.Item, since string) string {
 }
 
 // sinceOrdinal reads a since: the ordinal of the item with that id, else the number
-// itself. ok is false for "".
+// itself ("5" or "#5"). ok is false for "".
 func sinceOrdinal(items []thread.Item, since string) (ord int64, ok bool, err error) {
 	if since == "" {
 		return 0, false, nil
@@ -79,7 +80,8 @@ func sinceOrdinal(items []thread.Item, since string) (ord int64, ok bool, err er
 			return it.Ordinal, true, nil
 		}
 	}
-	if n, err := strconv.ParseInt(since, 10, 64); err == nil && n >= 0 {
+	// "#5" is how thread read prints an ordinal.
+	if n, err := strconv.ParseInt(strings.TrimPrefix(since, "#"), 10, 64); err == nil && n >= 0 {
 		return n, true, nil
 	}
 	return 0, false, connect.NewError(connect.CodeNotFound, fmt.Errorf("the thread has no item %s (give an item id or an ordinal)", since))
