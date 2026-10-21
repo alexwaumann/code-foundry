@@ -305,6 +305,11 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		fmt.Fprintln(cl.stdout, res.GetMessage())
 	}
 	if code := res.GetExitCode(); code != 0 {
+		if code >= 2 {
+			// action run --wait exits with the action's code: 2 from make is not a usage
+			// mistake, and stderr says so where the two would read the same.
+			fmt.Fprintf(cl.stderr, "code-foundry %s: exited with code %d from what it ran, not a usage mistake\n", cmd.GetName(), code)
+		}
 		return exitCodeError(code)
 	}
 	if f, ok := cliFollowers[cmd.GetName()]; ok && !*asJSON && cl.wantsFollow(f, flags) {
