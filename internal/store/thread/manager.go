@@ -130,6 +130,9 @@ type Options struct {
 	StartTimeout  time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
 	CloseTimeout  time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
 	Tick          time.Duration // transcript poll and housekeeping; default 1s
+	// ControlTimeout bounds the answer to a control request a Store call makes for its
+	// caller (Interrupt, SetModel, SetPermissionMode; boundedControl); default 10s.
+	ControlTimeout time.Duration
 	// WakeTimeout is how long a background end at the prompt holds the thread for the turn
 	// Claude starts by itself (wake.go); default 10s.
 	WakeTimeout    time.Duration
@@ -230,6 +233,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.NamingRetryDelay, 2*time.Second)
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
+	def(&o.ControlTimeout, 10*time.Second)
 	def(&o.Tick, time.Second)
 	def(&o.WakeTimeout, 10*time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
