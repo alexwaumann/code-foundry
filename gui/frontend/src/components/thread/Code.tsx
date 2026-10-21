@@ -1,10 +1,13 @@
 import { memo, useMemo, type ReactNode } from "react";
 import { ImageIcon } from "lucide-react";
-import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
+import { Markdown, MarkdownContent, type MarkdownExtras } from "@/components/pr/Markdown";
 import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type Token } from "@/lib/highlight";
+import { markdownBlocks } from "@/lib/markdownBlocks";
+import { cn } from "@/lib/utils";
 import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
+import { CodeRunContext, type CodeRunCtx } from "./codeContext";
 import { PathChip } from "./PathChip";
 
 /** One line's tokens as spans. */
@@ -78,5 +81,30 @@ export function ThreadMarkdown({ children, className }: { children: string; clas
     <Markdown className={className} extras={threadExtras}>
       {children}
     </Markdown>
+  );
+}
+
+/**
+ * Claude's reply while it streams: cut into top-level blocks (lib/markdownBlocks), each
+ * rendered once and memoized, inside one .cf-markdown wrapper (the blocks' elements are its
+ * children, as in a whole render), so a delta re-parses only the growing last block instead
+ * of the whole answer. The finished blocks' code is complete, so their Run in terminal
+ * needs no text (a stable context); only the last block's context changes per delta. When
+ * the stream ends the reply renders whole (ThreadMarkdown) once.
+ */
+export function StreamingMarkdown({ text, threadId, className }: { text: string; threadId: string; className?: string }) {
+  const blocks = useMemo(() => markdownBlocks(text), [text]);
+  const last = blocks.length - 1;
+  const tail = blocks[last] ?? "";
+  const done = useMemo<CodeRunCtx>(() => ({ threadId, text: "", streaming: false }), [threadId]);
+  const live = useMemo<CodeRunCtx>(() => ({ threadId, text: tail, streaming: true }), [threadId, tail]);
+  return (
+    <div className={cn("cf-markdown cf-streaming", className)}>
+      {blocks.map((b, i) => (
+        <CodeRunContext.Provider key={i} value={i === last ? live : done}>
+          <MarkdownContent extras={threadExtras}>{b}</MarkdownContent>
+        </CodeRunContext.Provider>
+      ))}
+    </div>
   );
 }

@@ -142,13 +142,24 @@ function rehypeFor(extras: MarkdownExtras | undefined): RehypePlugins {
  * stable object).
  */
 export const Markdown = memo(function Markdown({ children, className, extras }: { children: string; className?: string; extras?: MarkdownExtras }) {
+  return (
+    <div className={cn("cf-markdown", className)}>
+      <MarkdownContent extras={extras}>{children}</MarkdownContent>
+    </div>
+  );
+});
+
+/**
+ * Markdown's elements without the .cf-markdown wrapper: a streaming answer renders its
+ * finished blocks as one of these each, inside one wrapper (components/thread/Code
+ * StreamingMarkdown), so only the growing last block re-parses. Memoized on the source.
+ */
+export const MarkdownContent = memo(function MarkdownContent({ children, extras }: { children: string; extras?: MarkdownExtras | undefined }) {
   const components = useMemo(() => (extras ? withExtras(extras) : baseComponents), [extras]);
   const rehype = useMemo(() => rehypeFor(extras), [extras]);
   return (
-    <div className={cn("cf-markdown", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
-        {children}
-      </ReactMarkdown>
-    </div>
+    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
+      {children}
+    </ReactMarkdown>
   );
 });
