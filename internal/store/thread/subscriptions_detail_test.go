@@ -209,6 +209,60 @@ func TestThreadWakeDetailJSON(t *testing.T) {
 	}
 }
 
+func TestRunTime(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		0: "0s", -time.Second: "0s", 400 * time.Millisecond: "0s", 42 * time.Second: "42s", 142 * time.Second: "2m 22s",
+		3 * time.Minute: "3m", time.Hour: "1h", 65*time.Minute + 30*time.Second: "1h 5m", 26 * time.Hour: "26h",
+	} {
+		if got := RunTime(d); got != want {
+			t.Errorf("RunTime(%s) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+// A thread wake says when the turn started (the last user message) and how long it ran:
+// to its turn end when it settled, else to the fire (e13-7).
+func TestThreadWakeRunTime(t *testing.T) {
+	t0 := time.Date(2026, 10, 21, 1, 36, 1, 0, time.UTC)
+	at := t0.Add(5 * time.Minute)
+	user := func(at time.Time) Item { return Item{Kind: KindUserMessage, Text: "do it", CreatedAt: at} }
+	end := func(at time.Time) Item { return Item{Kind: KindTurnEnd, CreatedAt: at} }
+	finished := Thread{ID: "s-1", State: StateConnected, Status: StatusNeedsAttention, StatusReason: "finished"}
+	for _, tt := range []struct {
+		name            string
+		t               Thread
+		items           []Item
+		started, ranFor string
+	}{
+		{name: "settled: to its turn end", t: finished, items: []Item{user(t0), end(t0.Add(142 * time.Second))},
+			started: "2026-10-21T01:36:01.000Z", ranFor: "2m 22s"},
+		{name: "the last turn only", t: finished,
+			items:   []Item{user(t0.Add(-time.Hour)), end(t0.Add(-50 * time.Minute)), user(t0), end(t0.Add(30 * time.Second))},
+			started: "2026-10-21T01:36:01.000Z", ranFor: "30s"},
+		{name: "a subagent's turn end is not the thread's", t: finished,
+			items:   []Item{user(t0), {Kind: KindTurnEnd, CreatedAt: t0.Add(time.Second), ParentToolUseID: "tu1"}, end(t0.Add(time.Minute))},
+			started: "2026-10-21T01:36:01.000Z", ranFor: "1m"},
+		{name: "waiting on a prompt: to the fire", t: Thread{ID: "s-1", State: StateConnected, Status: StatusNeedsAttention, StatusReason: "permission: Bash"},
+			items: []Item{user(t0), end(t0.Add(-time.Minute))}, started: "2026-10-21T01:36:01.000Z", ranFor: "5m"},
+		{name: "no turn end yet: to the fire", t: finished, items: []Item{user(t0)}, started: "2026-10-21T01:36:01.000Z", ranFor: "5m"},
+		{name: "never got a message", t: finished, items: []Item{end(t0)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := threadWake(Subscription{ID: "sub-1", Condition: CondSettled}, tt.t, at, wakeDetailOf(tt.t, tt.items, wakeChildren{}))
+			var p wakeThreadPayload
+			if err := json.Unmarshal([]byte(msg.WakeJSON), &p); err != nil {
+				t.Fatal(err)
+			}
+			if p.Thread.StartedAt != tt.started || p.Thread.RanFor != tt.ranFor {
+				t.Errorf("started_at %q ran_for %q, want %q %q", p.Thread.StartedAt, p.Thread.RanFor, tt.started, tt.ranFor)
+			}
+			if tt.started == "" && (strings.Contains(msg.WakeJSON, "started_at") || strings.Contains(msg.WakeJSON, "ran_for")) {
+				t.Errorf("JSON has the run time:\n%s", msg.WakeJSON)
+			}
+		})
+	}
+}
+
 // End to end in the store: the wake reads the target's items when it is sent and counts
 // its children when it fires. An attention subscription: a settled one about a lead
 // whose workers run is held (subscriptions_hold.go).

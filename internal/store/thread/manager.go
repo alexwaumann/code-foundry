@@ -373,6 +373,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs, opts.WatchPullRequests); err != nil {
 		return nil, err
 	}
+	m.subs.changed = func(id string) { bus.Publish(opts.Bus, SubscriptionsChanged{SubscriberID: id}) }
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()

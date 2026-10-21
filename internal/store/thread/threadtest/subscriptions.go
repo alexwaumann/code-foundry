@@ -8,12 +8,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // Wake subscriptions in the fake: kept in memory, validated like the store (one target,
-// the condition, self and the reverse of an existing one refused), never fired. Fired
-// is set when a thread target already meets the condition, as the store would.
+// the condition, self and the reverse of an existing one refused, the note), never
+// fired. Fired is set when a thread target already meets the condition, as the store
+// would. Every change publishes thread.SubscriptionsChanged, as the store does.
 
 // Subscribe records "Subscribe <subscriber> <kind> <target> <condition> repeat=<bool>"
 // (and " args=k=v,…" for a plugin target) and keeps the subscription as "sub-<n>". A run
@@ -70,6 +72,10 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 	if _, err := f.get(o.SubscriberID); err != nil {
 		return thread.SubscribeResult{}, err
 	}
+	note, err := thread.CleanNote(o.Note)
+	if err != nil {
+		return thread.SubscribeResult{}, err
+	}
 	fired := false
 	if kind == thread.TargetThread {
 		t, err := f.get(target)
@@ -89,13 +95,14 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 	f.nextSub++
 	sub := thread.Subscription{
 		ID: fmt.Sprintf("sub-%d", f.nextSub), SubscriberID: o.SubscriberID, TargetKind: kind, TargetID: target, Condition: cond,
-		Repeat: o.Repeat && kind != thread.TargetActionRun, CreatedAt: f.Now(), Args: maps.Clone(o.Args),
+		Repeat: o.Repeat && kind != thread.TargetActionRun, Note: note, CreatedAt: f.Now(), Args: maps.Clone(o.Args),
 	}
 	if fired {
 		sub.FiredCount, sub.LastFiredAt = 1, sub.CreatedAt
 	}
 	if !fired || sub.Repeat {
 		f.subs = append(f.subs, sub)
+		bus.Publish(f.bus, thread.SubscriptionsChanged{SubscriberID: sub.SubscriberID})
 	}
 	return thread.SubscribeResult{Subscription: sub, Fired: fired}, nil
 }
@@ -131,6 +138,9 @@ func (f *Fake) Unsubscribe(_ context.Context, o thread.UnsubscribeOptions) ([]th
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%w: no such subscription", thread.ErrNotFound)
 	}
+	for _, s := range out {
+		bus.Publish(f.bus, thread.SubscriptionsChanged{SubscriberID: s.SubscriberID})
+	}
 	return out, nil
 }
 
@@ -155,6 +165,7 @@ func (f *Fake) Subscriptions(_ context.Context, subscriber string) ([]thread.Sub
 		case thread.TargetPlugin:
 			s.TargetName, s.TargetStatus = s.TargetID, "running"
 		case thread.TargetTimer:
+			thread.DescribeTimer(&s, f.Now()) // NextAt and Every
 			s.TargetName, s.TargetStatus = strings.Replace(s.TargetID, ":", " ", 1), "next"
 		}
 		if t, ok := f.byID[s.TargetID]; ok {
@@ -170,6 +181,7 @@ func (f *Fake) PutSubscription(s thread.Subscription) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.subs = append(f.subs, s)
+	bus.Publish(f.bus, thread.SubscriptionsChanged{SubscriberID: s.SubscriberID})
 }
 
 // formatArgs is a plugin target's args as "k=v,…", sorted ("-" for none).

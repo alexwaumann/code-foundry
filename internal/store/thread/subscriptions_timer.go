@@ -172,25 +172,32 @@ type wakeTimerPayload struct {
 	// Every is a repeating timer's interval ("30m"); At a one-shot's time.
 	Every string `json:"every,omitempty"`
 	At    string `json:"at,omitempty"`
+	// Note is the subscription's note (thread subscribe --note).
+	Note string `json:"note,omitempty"`
 }
 
 // timerWake is the wake message of timer sub, due at due, fired at: "Timer sub-… fired
-// at 09:30 CDT (every 30m)." or "(set for 09:00 CDT)".
+// at 09:30 CDT (every 30m)." or "(set for 09:00 CDT)", then ": <note>" when the
+// subscription has one.
 func timerWake(sub Subscription, due, at time.Time) Message {
-	p := wakeTimerPayload{Kind: "timer", SubscriptionID: sub.ID, Condition: CondFired, FiredAt: wakeTime(at), DueAt: wakeTime(due)}
+	p := wakeTimerPayload{Kind: "timer", SubscriptionID: sub.ID, Condition: CondFired, FiredAt: wakeTime(at), DueAt: wakeTime(due), Note: sub.Note}
 	t, every, _ := parseTimerTarget(sub.TargetID)
-	what := "set for " + clockTime(t, at)
+	what := "set for " + ClockTime(t, at)
 	if every > 0 {
 		p.Every, what = FormatEvery(every), "every "+FormatEvery(every)
 	} else {
 		p.At = wakeTime(t)
 	}
-	return wakeMessage("Timer "+sub.ID+" fired at "+clockTime(at, at)+" ("+what+").", p)
+	title := "Timer " + sub.ID + " fired at " + ClockTime(at, at) + " (" + what + ")"
+	if sub.Note != "" {
+		title += ": " + sub.Note
+	}
+	return wakeMessage(endSentence(title), p)
 }
 
-// clockTime is t in local time for a header or a listing: "09:30 CDT" on now's day,
+// ClockTime is t in local time for a header or a listing: "09:30 CDT" on now's day,
 // else "Oct 21 09:30 CDT".
-func clockTime(t, now time.Time) string {
+func ClockTime(t, now time.Time) string {
 	t, now = t.Local(), now.Local()
 	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
 		return t.Format("15:04 MST")
@@ -198,20 +205,21 @@ func clockTime(t, now time.Time) string {
 	return t.Format("Jan 2 15:04 MST")
 }
 
-// describeTimer fills a timer subscription's TargetName ("every 30m", "at 09:00 CDT")
-// and TargetStatus ("next 09:30 CDT", "due") for a listing at now.
-func describeTimer(sub *Subscription, now time.Time) {
+// DescribeTimer fills a timer subscription's TargetName ("every 30m", "at 09:00 CDT"),
+// TargetStatus ("next 09:30 CDT", "due"), NextAt and Every for a listing at now.
+func DescribeTimer(sub *Subscription, now time.Time) {
 	at, every, ok := parseTimerTarget(sub.TargetID)
 	if !ok {
 		sub.TargetName, sub.TargetStatus = sub.TargetID, "malformed"
 		return
 	}
-	sub.TargetName = "at " + clockTime(at, now)
+	sub.TargetName = "at " + ClockTime(at, now)
 	if every > 0 {
 		sub.TargetName = "every " + FormatEvery(every)
 	}
 	next := timerNext(*sub)
-	sub.TargetStatus = "next " + clockTime(next, now)
+	sub.NextAt, sub.Every = next, every
+	sub.TargetStatus = "next " + ClockTime(next, now)
 	if !next.After(now) {
 		sub.TargetStatus = "due"
 	}
