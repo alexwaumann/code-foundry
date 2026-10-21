@@ -560,6 +560,49 @@ func TestDevOutsideHome(t *testing.T) {
 	}
 }
 
+// TestLinkInsidePluginsDir: `plugin dev` / `plugin install <folder>` on a folder inside
+// the plugins directory (where `plugin list` tells users to write plugins) is refused,
+// even with --force, and the package is left alone.
+func TestLinkInsidePluginsDir(t *testing.T) {
+	for _, tc := range []struct{ name, sub string }{
+		{"package itself", ""},
+		{"folder inside the package", "sub"},
+	} {
+		for _, via := range []string{"dev", "install"} {
+			t.Run(tc.name+"/"+via, func(t *testing.T) {
+				e := newEnv(t, nil)
+				e.opts.Home, _ = filepath.EvalSymlinks(e.root)
+				pkg := e.install(e.opts.Dir, "hello", "ok", testManifest("hello"))
+				target := pkg
+				if tc.sub != "" {
+					target = e.install(pkg, tc.sub, "ok", testManifest("hello"))
+				}
+				m := e.start()
+				ctx := context.Background()
+				var err error
+				if via == "dev" {
+					_, err = m.Dev(ctx, target, true, false, true)
+				} else {
+					_, err = m.Install(ctx, plugin.InstallRequest{Ref: target, Force: true, Consent: true})
+				}
+				if !errors.Is(err, plugin.ErrFailedPrecondition) || !strings.Contains(err.Error(), "plugin restart hello") || strings.Contains(err.Error(), "--force") {
+					t.Fatalf("err = %v", err)
+				}
+				fi, err := os.Lstat(pkg)
+				if err != nil || fi.Mode()&os.ModeSymlink != 0 {
+					t.Fatalf("the package was replaced: %v %v", fi, err)
+				}
+				if _, err := os.Stat(filepath.Join(target, "plugin.json")); err != nil {
+					t.Fatalf("the folder was touched: %v", err)
+				}
+				if p, ok := m.Snapshot().Plugin("hello"); !ok || p.Dev {
+					t.Fatalf("plugin = %+v %v", p, ok)
+				}
+			})
+		}
+	}
+}
+
 func TestCloseStopsPlugins(t *testing.T) {
 	e := newEnv(t, nil)
 	e.install(e.opts.Dir, "hello", "ok", testManifest("hello"))

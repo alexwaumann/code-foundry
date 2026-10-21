@@ -691,6 +691,9 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	if m.opts.Home != "" && !fsx.Within(m.opts.Home, real) {
 		return EnableResult{}, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, real)
 	}
+	if err := m.refuseInsidePlugins(real); err != nil {
+		return EnableResult{}, err
+	}
 	mf, warnings, err := readManifest(real)
 	if err != nil {
 		return EnableResult{}, fmt.Errorf("%w: %s: %v", ErrInvalidArgument, real, err)
