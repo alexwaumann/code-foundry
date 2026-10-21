@@ -72,6 +72,9 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 		if err == nil {
 			return res.Msg, nil
 		}
+		if connLost(ctx, err) {
+			return nil, fmt.Errorf("%s: %w", name, errConnLost)
+		}
 		cr := confirmationOf(err)
 		if cr == nil || stage >= maxConfirmStages {
 			return nil, cl.invokeFailed(name, err)

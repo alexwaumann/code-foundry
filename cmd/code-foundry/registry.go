@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -284,7 +285,11 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 		return present(ctx, cl, c, vals, *asJSON)
 	}
+	start := time.Now()
 	res, err := cl.invoke(ctx, cmd, uctx, vals, *yes)
+	if errors.Is(err, errConnLost) {
+		res, err = cl.rewait(ctx, cmd, uctx, vals, time.Since(start), err)
+	}
 	if err != nil {
 		return err
 	}
