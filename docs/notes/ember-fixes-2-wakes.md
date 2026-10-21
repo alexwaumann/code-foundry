@@ -62,10 +62,10 @@ waiting). Daemon (`internal/store/thread`), migration 0045, the GUI's status wor
   (`sendMessage`).
 * Every spawn delivers a pending first message before anything else
   (`firstMessages`): the next send, wake or reconnect after a stop starts the thread and
-  Claude gets the first message, then the one that started it. A message queued behind
-  it records the first message's item id on the row, and a start for a message writes
-  the first message's item before its own, so the timeline keeps the order and nothing
-  is written twice.
+  Claude gets the first message, then the one that started it. Spawn writes the first
+  message's item before the handshake (main's lifecycle fixes) and records its id on the
+  row; a start for a message writes it before its own when it has none, so the timeline
+  keeps the order and nothing is written twice.
 * Only the daemon's stop or death keeps it: `shutdown` logs `first message not
   delivered: the daemon stopped; it goes at the next start` (WARN), `New` logs `… the
   daemon died …`. A start that failed or a close while starting clears it, as before
@@ -88,7 +88,8 @@ waiting). Daemon (`internal/store/thread`), migration 0045, the GUI's status wor
 
 ### Archive forgets its wakes first (e12-2)
 
-* `archiveOne` calls `unwatchForArchiveLocked` before the close: the thread's
+* The archive calls `unwatchForArchive` before any close (in `archiveOne`, and for a
+  cascade before its closes begin together, `requestClose`): the thread's
   subscriptions and those to it go (`forgetLocked`, held wakes included), and thread
   wakes about it queued for other subscribers are dropped (their wake limit slots
   refunded). The close's settle then fires nothing.

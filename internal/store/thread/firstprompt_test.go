@@ -90,8 +90,9 @@ func TestFirstPromptSurvivesStop(t *testing.T) {
 			if got.PendingFirst == nil || got.PendingFirst.Text != "write the tests" || got.ResumeNote.Pending() {
 				t.Fatalf("after the stop: pending first %+v, note %+v", got.PendingFirst, got.ResumeNote)
 			}
-			if n := len(e.items(s.ID).Items); n != 0 {
-				t.Fatalf("%d items before the next start", n)
+			// Its item was written before the handshake; the row keeps its id.
+			if users := userItems(e.items(s.ID).Items); !slices.Equal(users, []string{"write the tests"}) || got.PendingFirst.ItemID == "" {
+				t.Fatalf("before the next start: user items %q, pending first %+v", users, got.PendingFirst)
 			}
 			gate.open()
 			tt.start(e, s.ID)
