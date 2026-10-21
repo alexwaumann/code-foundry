@@ -1,8 +1,7 @@
 # Auto pull the default branch
 
 Status: done on `cf/auto-pull` (one PR of the branch naming + auto pull series).
-`make check` is green. Run end to end on 2026-10-20 with a scratch daemon (see "End to
-end" below).
+`make check` is green. Run end to end on 2026-10-20 (see "End to end").
 
 ## What changed
 
@@ -103,6 +102,42 @@ history like a user's pull; gitops logs it at Info as every op.
   after every op; the cost is one `git status` per worktree per fetch.
 * A pass waits for the refresh rather than reading the snapshot right after the fetch:
   the fetch moves `origin/main`, and only a fresh status knows the checkout is behind.
+
+## End to end
+
+The branch binary, `daemon --dev` with `CODE_FOUNDRY_HOME=/tmp/cf-ap/home` and
+`projects.fetch_interval_seconds = 15`; a bare origin in `/tmp/cf-ap`, its clone at
+`~/cf-scratch-autopull/proj` registered with `project add`, and a Haiku 5.5 (medium)
+thread in a new worktree of it so the project is live. A second clone pushed commits.
+
+```
+# a commit lands on origin; the next live fetch pulls the main checkout
+19:52:22.134 msg=fetch project=e40da9c1f8fb tier=live
+19:52:22.261 msg=gitops op=op-1 kind=pull path=…/proj ok=true summary="fast-forwarded: 1 file changed, 1 insertion(+)"
+19:52:22.261 msg="auto pulled" project=e40da9c1f8fb path=…/proj upstream=origin/main behind=1
+# README.md modified, another commit pushed: three live fetches, no pull ([behind 1], M README.md)
+# edit reverted, an untracked three.txt where the incoming commit adds one: refused, retried each fetch, file kept
+19:55:49.900 msg="auto pull refused; retrying after the next fetch" … err="The following untracked working tree files would be overwritten by merge:"
+19:56:04.903 msg=gitops op=op-2 kind=pull ok=false summary="The following untracked working tree files would be overwritten by merge:"
+# three.txt removed: pulled at the next fetch
+19:56:19.916 msg="auto pulled" … behind=1
+# settings set projects.auto_pull false (no restart), a commit pushed: three fetches, no pull;
+# set back to true at 19:57:08: pulled at the next fetch
+19:57:19.930 msg="auto pulled" … behind=1
+```
+
+`code-foundry events --source gitops --json` then showed the ops with their titles:
+
+```
+op-4  Auto pull origin/main  SUCCEEDED  fast-forwarded: 1 file changed, 1 insertion(+)
+op-3  Auto pull origin/main  SUCCEEDED  fast-forwarded: 1 file changed, 1 insertion(+)
+op-2  Auto pull origin/main  FAILED     The following untracked working tree files would be overwritten by merge:
+op-1  Auto pull origin/main  FAILED     The following untracked working tree files would be overwritten by merge:
+```
+
+(The daemon was restarted on the fixed binary between the first pull and the rest, so
+op ids restart at 1.) The Settings page shows the toggle under Fetch interval on Source
+control › Projects; the screenshots are in the PR body.
 
 ## Tests
 
