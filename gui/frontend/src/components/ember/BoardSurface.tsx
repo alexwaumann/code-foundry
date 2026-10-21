@@ -5,9 +5,8 @@ import type { EmberTaskView } from "@/api/ember";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { boardSections, cardMeta, cardProgress, timerRows, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
+import { boardSections, cardMeta, cardProgress, timerRows, updatedAgo, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
-import { shortAge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
 import { holdEmberBoard, useBoardCounts, useEmberStore, useEmberTasks, useEmberTimers } from "@/stores/ember";
@@ -45,12 +44,30 @@ function openThread(id: string): void {
 /** A lead's team member's indent by its depth below the lead (lib/ember teamRows). */
 const INDENT = ["", "pl-4", "pl-7", "pl-10"] as const;
 
-/** A worker under a card: its dot, the subtask's title or the worker's name, its report or status, and its age; a lead's team indented beneath it. */
+/** A done subtask's branch, under its row. */
+function BranchLine({ branch, className, testId }: { branch: string; className?: string; testId: string }) {
+  return (
+    <Tip label={branch} whenTruncated>
+      <p className={cn("flex min-w-0 items-center gap-1 text-caption text-muted-foreground", className)} data-testid={testId}>
+        <GitBranch className="size-3 shrink-0" aria-hidden />
+        <span className="truncate font-mono">{branch}</span>
+      </p>
+    </Tip>
+  );
+}
+
+/**
+ * A worker under a card: its dot, the subtask's title or the worker's name, its report or
+ * status (a done subtask's outcome), and when it was last updated; a done subtask's branch
+ * under it; a lead's team indented beneath it.
+ */
 function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
   const body = (
     <>
       <Dot dot={row.dot} />
-      <span className={cn("min-w-0 flex-1 truncate", row.threadId === "" && row.depth > 0 ? "text-muted-foreground" : "text-foreground/90")}>{row.title}</span>
+      <span className={cn("min-w-0 flex-1 truncate", row.threadId === "" && row.depth > 0 ? "text-muted-foreground" : "text-foreground/90")} data-testid="ember-worker-title">
+        {row.title}
+      </span>
       {row.meta.text && (
         <Tip label={row.meta.text} whenTruncated>
           <span className={cn("max-w-[55%] min-w-0 shrink truncate", TONE[row.meta.tone])} data-testid="ember-worker-meta">
@@ -58,7 +75,11 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
           </span>
         </Tip>
       )}
-      {row.atMs !== null && <span className="shrink-0 text-muted-foreground tabular-nums">{shortAge(row.atMs, now)}</span>}
+      {row.atMs !== null && (
+        <span className="shrink-0 text-muted-foreground tabular-nums" data-testid="ember-worker-age">
+          {updatedAgo(row.atMs, now)}
+        </span>
+      )}
     </>
   );
   const cls = cn(
@@ -67,26 +88,33 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
     row.threadId === "" && "cursor-default",
   );
   const team = row.depth > 0 || undefined;
-  if (row.threadId === "")
-    return (
+  const line =
+    row.threadId === "" ? (
       <div className={cls} data-testid="ember-worker" data-subtask={row.subtask || undefined} data-team={team}>
         {body}
       </div>
+    ) : (
+      <button
+        type="button"
+        className={cn(cls, "cursor-pointer outline-none hover:bg-accent/50 focus-visible:bg-accent/50")}
+        data-testid="ember-worker"
+        data-thread={row.threadId}
+        data-subtask={row.subtask || undefined}
+        data-team={team}
+        onClick={() => {
+          openThread(row.threadId);
+        }}
+      >
+        {body}
+      </button>
     );
+  if (!row.branch) return line;
   return (
-    <button
-      type="button"
-      className={cn(cls, "cursor-pointer outline-none hover:bg-accent/50 focus-visible:bg-accent/50")}
-      data-testid="ember-worker"
-      data-thread={row.threadId}
-      data-subtask={row.subtask || undefined}
-      data-team={team}
-      onClick={() => {
-        openThread(row.threadId);
-      }}
-    >
-      {body}
-    </button>
+    <>
+      {line}
+      {/* Under the title, past the dot (size-2 + gap-2 + px-1). */}
+      <BranchLine branch={row.branch} className="-mt-0.5 mb-0.5 pl-5" testId="ember-worker-branch" />
+    </>
   );
 }
 
@@ -150,14 +178,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
           </p>
         </Tip>
       )}
-      {t.branch && (
-        <Tip label={t.branch} whenTruncated>
-          <p className="mt-0.5 flex min-w-0 items-center gap-1 text-caption text-muted-foreground" data-testid="ember-task-branch">
-            <GitBranch className="size-3 shrink-0" aria-hidden />
-            <span className="truncate font-mono">{t.branch}</span>
-          </p>
-        </Tip>
-      )}
+      {t.branch && <BranchLine branch={t.branch} className="mt-0.5" testId="ember-task-branch" />}
       {rows.length > 0 && (
         <div className={cn("flex min-w-0 flex-col", !progress && "mt-1.5")}>
           {rows.map((r) => (

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { projectPlace, type ProjectRoot } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
-import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, useHeaderSummary, useWorkingThreads } from "@/stores/ember";
+import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, useHeaderDot, useHeaderSummary } from "@/stores/ember";
 import { toggleEmberBoard, useEmberBoardShown } from "@/stores/emberPanel";
 import { keyOf } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
@@ -27,13 +27,17 @@ const BUSY_PLACEHOLDER = "Tell Ember more; it reads it mid-turn…";
 const TOGGLE = "gap-1.5 px-2 text-label font-medium text-muted-foreground [--wails-draggable:no-drag] [&_svg]:size-3.5";
 const TOGGLE_ON = "bg-accent text-foreground hover:bg-accent dark:bg-accent/50";
 
-/** "2 threads working · 1 queued" from the board, with a sky dot while workers run. */
+/**
+ * "1 needs you · 2 threads working · 1 blocked · 1 queued" from the board, with an amber
+ * dot while something waits on the user, a sky one while workers run.
+ */
 function HeaderStatus() {
   const summary = useHeaderSummary();
-  const working = useWorkingThreads();
+  const dot = useHeaderDot();
   return (
     <span className="flex min-w-0 shrink items-center gap-1.5 px-1 text-caption whitespace-nowrap text-muted-foreground" data-testid="ember-header-status">
-      {working > 0 && <span className="size-1.5 shrink-0 rounded-full bg-info shadow-[0_0_0_2px_color-mix(in_oklab,var(--info)_25%,transparent)]" aria-hidden />}
+      {dot === "sky" && <span className="size-1.5 shrink-0 rounded-full bg-info shadow-[0_0_0_2px_color-mix(in_oklab,var(--info)_25%,transparent)]" data-dot="sky" aria-hidden />}
+      {dot === "amber" && <span className="size-1.5 shrink-0 rounded-full bg-warning" data-dot="amber" aria-hidden />}
       <span className="truncate">{summary || "Nothing in progress"}</span>
     </span>
   );

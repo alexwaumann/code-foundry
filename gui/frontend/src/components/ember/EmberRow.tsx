@@ -5,7 +5,18 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { emberStatusWords } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
-import { holdEmberBoard, useDoingCount, useFirstDoingTitle, useFlameState, useShownEmberThreadId, useWaitingThreads, useWorkingThreads } from "@/stores/ember";
+import {
+  holdEmberBoard,
+  useBlockedCount,
+  useDoingCount,
+  useFlameState,
+  usePendingTimers,
+  useRowTitle,
+  useShownEmberThreadId,
+  useWaitingThreads,
+  useWaitingWords,
+  useWorkingThreads,
+} from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber, openEmberBoard, openEmberSettings } from "@/stores/emberPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -26,7 +37,11 @@ function useEmberSelected(threadId: string): boolean {
   return useUiStore((s) => (s.selection.kind === "thread" && s.selection.id === threadId) || (s.selection.kind === "view" && s.selection.name === EMBER_VIEW));
 }
 
-/** "<Status> · <first doing task> · N threads", the status in the thread rows' colours (Needs input while a worker waits on the user). */
+/**
+ * "<Status> · <task> · N threads · N blocked · N scheduled", the status in the thread rows'
+ * colours: Needs input (or a budget stop's words) while a worker waits on the user, naming
+ * that worker's task; Blocked while a task is blocked and nothing else goes on.
+ */
 function EmberLine({ threadId }: { threadId: string }) {
   const doing = useDoingCount();
   const t = useThreadsStore(
@@ -36,8 +51,11 @@ function EmberLine({ threadId }: { threadId: string }) {
     }),
   );
   const waiting = useWaitingThreads();
-  const words = emberStatusWords(t, doing, waiting);
-  const title = useFirstDoingTitle();
+  const waitingWords = useWaitingWords();
+  const blocked = useBlockedCount();
+  const timers = usePendingTimers();
+  const words = emberStatusWords(t, { doing, waiting, waitingWords, blocked });
+  const title = useRowTitle();
   const working = useWorkingThreads();
   return (
     <span className="min-w-0 truncate text-caption-sm" data-testid="ember-row-line">
@@ -55,6 +73,22 @@ function EmberLine({ threadId }: { threadId: string }) {
           <span aria-hidden> · </span>
           <span className="tabular-nums" data-testid="ember-row-threads">
             {working} {working === 1 ? "thread" : "threads"}
+          </span>
+        </>
+      )}
+      {(words.text === "Blocked" ? blocked > 1 : blocked > 0) && (
+        <>
+          <span aria-hidden> · </span>
+          <span className="tabular-nums" data-testid="ember-row-blocked">
+            {blocked} blocked
+          </span>
+        </>
+      )}
+      {timers > 0 && (
+        <>
+          <span aria-hidden> · </span>
+          <span className="tabular-nums" data-testid="ember-row-scheduled">
+            {timers} scheduled
           </span>
         </>
       )}
