@@ -32,7 +32,9 @@
 #   --version vX.Y.Z   install that release (any tag, e.g. v0.15.0-tip.3) instead of the
 #                      channel's latest
 #   --yes              never prompt
-#   --force            reinstall even if that version is already installed
+#   --force            reinstall even if that version is already installed, and point
+#                      the code-foundry link here even when it leads to another
+#                      install (without it, only a prompt the user agrees to does)
 #   --skip-path        do not touch ~/.zshrc
 #   --skip-link        do not create or replace the code-foundry link (updates of an
 #                      existing install: the in-app updater and `code-foundry update`)
@@ -325,11 +327,30 @@ elif [ -e "$APP_DIR" ] && { [ ! -d "$APP_DIR" ] || [ -n "$(ls -A "$APP_DIR" 2>/d
 	die "$APP_DIR exists and is not a Code Foundry install (no VERSION file); remove it or pass another --app-dir"
 fi
 
+# link_cli [keep]: point BIN_DIR/code-foundry at this install. A link (or file) there
+# that leads to another existing install is someone's working code-foundry command: it
+# is replaced only with --force or when the user agrees, never with "keep" (a rerun that
+# installed nothing). A missing or dangling link is (re)created.
 link_cli() {
 	[ "$SKIP_LINK" = 0 ] || return 0
+	local link="$BIN_DIR/code-foundry" want="$APP_DIR/code-foundry" cur=""
+	if [ -L "$link" ]; then
+		cur="$(readlink "$link")"
+	fi
+	if [ "$cur" != "$want" ] && [ -e "$link" ] && ! [ "$link" -ef "$want" ]; then
+		local what="${cur:-a file that is not a link}"
+		if [ "${1:-}" = keep ]; then
+			say "left $link -> $what (pass --force to point it here)"
+			return 0
+		fi
+		if [ "$FORCE" = 0 ] && ! { [ "$INTERACTIVE" = 1 ] && confirm "$link points at $what. Point it at $want instead?"; }; then
+			warn "left $link -> $what; run $want directly, or pass --force to point the link here"
+			return 0
+		fi
+	fi
 	mkdir -p "$BIN_DIR"
-	ln -sfn "$APP_DIR/code-foundry" "$BIN_DIR/code-foundry"
-	say "linked $BIN_DIR/code-foundry -> $APP_DIR/code-foundry"
+	ln -sfn "$want" "$link"
+	say "linked $link -> $want"
 }
 
 setup_path() {
@@ -360,7 +381,7 @@ setup_path() {
 if [ -n "$CURRENT" ] && [ "$CURRENT" = "$TAG" ] && [ "$FORCE" = 0 ]; then
 	say "Code Foundry $TAG is already installed in $APP_DIR"
 	[ "$STAGE_ONLY" = 1 ] && exit 0
-	link_cli
+	link_cli keep
 	setup_path
 	exit 0
 fi
