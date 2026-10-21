@@ -267,7 +267,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				_, err := targetThreads(a)
 				return err == nil
 			},
-			DynamicConfirm: func(_ context.Context, _ Context, a Args) string { return removeConfirm(a) },
+			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string { return removeConfirm(ctx, b, a) },
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				ids, err := targetThreads(a)
 				if err != nil {

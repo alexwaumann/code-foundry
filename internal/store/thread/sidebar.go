@@ -13,7 +13,8 @@ import (
 // is the user's to manage; a hidden one is its creator's: it stays out of the sidebar
 // and the Dock badge, and archiving its creator archives it too (archive.go,
 // ArchiveCascade). The GUI reimplements InSidebar from created_by, in_sidebar and the
-// setting.
+// setting. A thread whose creator was removed is shown by its override, set by the
+// removal (or at load for older data: orphans.go), so neither needs the creator.
 
 // InSidebar is the thread's effective visibility in the sidebar given the
 // threads.show_created_threads setting: a thread no thread created is always shown; a

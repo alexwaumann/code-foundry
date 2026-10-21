@@ -347,6 +347,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	// Threads whose creator was removed are the user's now (orphans.go).
+	if err := adoptLoadedOrphans(ctx, m, rows); err != nil {
+		return nil, err
+	}
 	var lost []string
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
@@ -1019,8 +1023,9 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 // (terminals labelled termlabel.KindShell with its id), then forgets it, keeping a
 // tombstone for RemovedTTL (tombstones.go). Meanwhile the thread is Removing, so the
 // closing snapshot meets no wait or wake condition; once it is forgotten its
-// subscribers get a CondRemoved wake (subscriptions_removed.go). When it fails the
-// thread stays, no longer Removing.
+// subscribers get a CondRemoved wake (subscriptions_removed.go). The threads it
+// created that are not archived are shown in the sidebar from then on, still running
+// (orphans.go). When it fails the thread stays, no longer Removing.
 func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.refuseResident(id, "removed"); err != nil {
 		return err
@@ -1055,6 +1060,8 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
+	// Its hidden children would be out of reach: they are the user's now (orphans.go).
+	m.adoptOrphansLocked(id)
 	delete(m.recs, id)
 	m.tmu.Lock()
 	delete(m.threads, id)
