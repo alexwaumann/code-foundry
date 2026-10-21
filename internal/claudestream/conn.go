@@ -10,7 +10,9 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 // Errors.
@@ -23,7 +25,16 @@ var (
 	ErrCancelled = errors.New("claudestream: request withdrawn by claude")
 	// ErrAnswered: PermissionRequest.Answer called twice.
 	ErrAnswered = errors.New("claudestream: request already answered")
+	// ErrStalled: a write to the CLI's stdin did not finish by its deadline: the CLI
+	// stopped reading it (its event loop is stuck). When part of the line went out,
+	// stdin is closed: nothing written after half a line would parse.
+	ErrStalled = errors.New("claudestream: claude is not reading its input")
 )
+
+// WriteTimeout bounds a write to the CLI's stdin whose ctx has no deadline (answers
+// to the CLI's own requests). A pipe's buffer is 64 KB: a large message (an inline
+// image) waits for the CLI to read it.
+const WriteTimeout = 30 * time.Second
 
 // ControlError is a control_response with subtype "error".
 type ControlError struct {
@@ -55,8 +66,10 @@ type Conn struct {
 	opts Options
 	log  *slog.Logger
 
-	wmu     sync.Mutex
-	wclosed bool
+	// wmu orders writes; stdinClosed is set without it, so CloseStdin never waits
+	// behind a write the CLI does not read (closing the pipe ends that write).
+	wmu         sync.Mutex
+	stdinClosed atomic.Bool
 
 	mu      sync.Mutex
 	next    int
@@ -270,10 +283,13 @@ func (c *Conn) reply(id string, payload any, msg string) error {
 	} else if payload != nil {
 		resp["response"] = payload
 	}
-	return c.write(map[string]any{"type": "control_response", "response": resp})
+	return c.write(context.Background(), map[string]any{"type": "control_response", "response": resp})
 }
 
-func (c *Conn) write(v any) error {
+// write writes v as one line by ctx's deadline (WriteTimeout without one), when the
+// writer takes deadlines (an *os.File pipe does); ErrStalled past it. Writers without
+// deadlines block until the line is written or stdin is closed.
+func (c *Conn) write(ctx context.Context, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("claudestream: encode: %w", err)
@@ -281,16 +297,33 @@ func (c *Conn) write(v any) error {
 	b = append(b, '\n')
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	if c.wclosed {
+	if c.stdinClosed.Load() {
 		return fmt.Errorf("claudestream: write: %w", ErrClosed)
 	}
-	if _, err := c.w.Write(b); err != nil {
-		if stdinGone(err) {
-			return fmt.Errorf("claudestream: write: %w: %w", ErrClosed, err)
-		}
-		return fmt.Errorf("claudestream: write: %w", err)
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(WriteTimeout)
 	}
-	return nil
+	dw, timed := c.w.(interface{ SetWriteDeadline(time.Time) error })
+	if timed && dw.SetWriteDeadline(deadline) != nil {
+		timed = false // not pollable, or closed meanwhile (the write says which)
+	}
+	n, err := c.w.Write(b)
+	if timed {
+		_ = dw.SetWriteDeadline(time.Time{})
+	}
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		if n > 0 {
+			_ = c.CloseStdin()
+		}
+		return fmt.Errorf("claudestream: write (%d of %d bytes): %w", n, len(b), ErrStalled)
+	case stdinGone(err) || c.stdinClosed.Load():
+		return fmt.Errorf("claudestream: write: %w: %w", ErrClosed, err)
+	}
+	return fmt.Errorf("claudestream: write: %w", err)
 }
 
 // stdinGone reports whether a write failed because the CLI's stdin has no reader any
@@ -305,21 +338,21 @@ func stdinGone(err error) bool {
 // Send writes a user message. The CLI accepts one while a turn runs: Claude picks it
 // up mid-turn, inside the running turn (one result at its end), as typing while busy
 // does in the TUI.
-func (c *Conn) Send(_ context.Context, m UserMessage) error {
+// The write ends by ctx's deadline (WriteTimeout without one): ErrStalled when the
+// CLI does not read it by then.
+func (c *Conn) Send(ctx context.Context, m UserMessage) error {
 	if len(m.Blocks) == 0 {
 		return errors.New("claudestream: empty user message")
 	}
-	return c.write(m.wire())
+	return c.write(ctx, m.wire())
 }
 
 // CloseStdin closes the CLI's stdin: an idle CLI exits; a running turn finishes first.
+// It does not wait for a write under way, which it ends (ErrClosed).
 func (c *Conn) CloseStdin() error {
-	c.wmu.Lock()
-	defer c.wmu.Unlock()
-	if c.wclosed {
+	if !c.stdinClosed.CompareAndSwap(false, true) {
 		return nil
 	}
-	c.wclosed = true
 	return c.w.Close()
 }
 
@@ -342,7 +375,7 @@ func (c *Conn) Request(ctx context.Context, req ControlRequest) (json.RawMessage
 		delete(c.waiting, id)
 		c.mu.Unlock()
 	}
-	if err := c.write(map[string]any{"type": "control_request", "request_id": id, "request": req}); err != nil {
+	if err := c.write(ctx, map[string]any{"type": "control_request", "request_id": id, "request": req}); err != nil {
 		forget()
 		return nil, err
 	}

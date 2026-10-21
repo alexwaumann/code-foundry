@@ -133,6 +133,9 @@ type Options struct {
 	// ControlTimeout bounds the answer to a control request a Store call makes for its
 	// caller (Interrupt, SetModel, SetPermissionMode; boundedControl); default 10s.
 	ControlTimeout time.Duration
+	// SendTimeout bounds writing a message to Claude's stdin: a Claude that stopped
+	// reading it fails the send and the thread closes (onStalled); default 30s.
+	SendTimeout time.Duration
 	// WakeTimeout is how long a background end at the prompt holds the thread for the turn
 	// Claude starts by itself (wake.go); default 10s.
 	WakeTimeout    time.Duration
@@ -234,6 +237,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
 	def(&o.ControlTimeout, 10*time.Second)
+	def(&o.SendTimeout, 30*time.Second)
 	def(&o.Tick, time.Second)
 	def(&o.WakeTimeout, 10*time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
@@ -1105,7 +1109,8 @@ func (m *Manager) setRemoving(id string, on bool) error {
 
 // Shutdown stops every runner, which terminates its claude process (it talks to the
 // daemon over pipes and cannot outlive it), and records live threads as DISCONNECTED
-// ("daemon stopped"). The Manager is unusable afterwards.
+// ("daemon stopped"). A runner still going when ctx ends is stuck: its process group
+// is killed (runner.kill). The Manager is unusable afterwards.
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	m.closed = true
@@ -1126,6 +1131,15 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
+		// A runner still going is stuck (a write Claude does not read): its process
+		// must not outlive the daemon.
+		for _, r := range runners {
+			select {
+			case <-r.done:
+			default:
+				r.kill()
+			}
+		}
 		return fmt.Errorf("thread: shutdown: %w", ctx.Err())
 	}
 }

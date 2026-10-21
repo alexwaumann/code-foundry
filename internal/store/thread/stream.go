@@ -571,9 +571,12 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 			return Item{}, err
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), r.m.opts.SendTimeout)
 	defer cancel()
 	if err := st.conn.Send(ctx, claudestream.UserMessage{UUID: id, Blocks: blocks}); err != nil {
+		if errors.Is(err, claudestream.ErrStalled) {
+			r.onStalled(err)
+		}
 		return Item{}, fmt.Errorf("%w: send to claude: %v", ErrFailedPrecondition, err)
 	}
 	// Claude reads a message sent while it works at its next tool call (queued.go).
@@ -608,6 +611,15 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		r.publishStatus()
 	}
 	return it, nil
+}
+
+// onStalled: Claude stopped reading its stdin (a message could not be written by
+// Options.SendTimeout; its event loop is stuck). Nothing more can reach it, so the
+// thread closes, with SIGTERM and SIGKILL to follow if it does not exit (beginClose).
+func (r *runner) onStalled(err error) {
+	r.log().warn("claude stopped reading its input; closing the thread", "err", err)
+	r.addErrorOnce("Claude stopped reading its input; the thread is closing. Send the message again once it has stopped.")
+	r.requestClose()
 }
 
 // mediaBlock reads a staged attachment as a base64 block, its media type sniffed from
@@ -853,6 +865,19 @@ func (r *runner) closeNext() {
 			_ = r.st.proc.Signal(syscall.SIGKILL)
 		}
 	}
+}
+
+// kill is Manager.Shutdown's last resort for a runner that did not finish in time (its
+// goroutine stuck): the process group is killed, so the process cannot outlive the
+// daemon, and stdin closed, which ends a write the runner is stuck in. Safe off the
+// run goroutine.
+func (r *runner) kill() {
+	r.st.connMu.Lock()
+	proc, conn := r.st.proc, r.st.conn
+	r.st.connMu.Unlock()
+	r.log().warn("claude still running at the end of the daemon's shutdown; killing it")
+	_ = proc.Signal(syscall.SIGKILL)
+	_ = conn.CloseStdin()
 }
 
 // abandon ends a process whose runner never ran (spawn found the store shutting down):
