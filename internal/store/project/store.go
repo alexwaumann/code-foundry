@@ -889,16 +889,28 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	}
 	args = append(args, path)
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
-		if !opts.Force {
-			// git refuses a worktree with modified or untracked files: read its status
-			// again, so the caller can show what --force would delete.
-			if g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}) == nil {
-				if now, ok := g.Snapshot().Worktree(m.ID, path); ok && now.Status.HasUncommitted() {
-					return &UncommittedError{Worktrees: []Worktree{now}}
-				}
-			}
+		if opts.Force {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 		}
-		return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		// git refuses a worktree with modified or untracked files: read its status
+		// again, so the caller can show what --force would delete.
+		if werr := g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}); werr != nil {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
+		now, ok := g.Snapshot().Worktree(m.ID, path)
+		if ok && now.Status.HasUncommitted() {
+			return &UncommittedError{Worktrees: []Worktree{now}}
+		}
+		if !ok || now.Status.Error != "" || !refusedForSubmodules(err) || !g.submodulesSafe(ctx, path) {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
+		// git refuses any worktree with an initialized submodule, clean or not (fuzz
+		// finding git 8). Clean (status counts a modified or untracked submodule) and
+		// nothing in a submodule that its remote lacks: --force loses nothing.
+		g.log.Info("worktree has submodules and nothing to lose; removing with --force", "project", m.ID, "path", path)
+		if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", "--force", path); err != nil {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
 	}
 	g.log.Info("worktree removed", "project", m.ID, "path", path)
 	g.forgetMade(ctx, g.now(), path)
