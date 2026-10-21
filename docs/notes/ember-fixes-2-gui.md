@@ -145,7 +145,8 @@ the memo as "<id> <ms>" strings through a shallow selector.
 ## Verification
 
 - `make check` green; `e2e/ember.spec.ts` 17 passed after the rebase (before it, 48 of 48
-  with `--repeat-each 3`).
+  with `--repeat-each 3`). Full `make gui-e2e`: 506 passed, 30 skipped (live specs), 1
+  failed: `panel.spec.ts:713` (tab drag reorder), unrelated, 5 of 5 on a rerun.
 - Live (2026-10-21): `make build`, `CODE_FOUNDRY_HOME=/tmp/ember-fix-e bin/code-foundry daemon
   --dev` (with `CODE_FOUNDRY_BIN`); every model `claude-haiku-5-5[1m]`, efforts medium; a
   scratch Go repo `tally` with a local bare origin under `~/ember-fix-e-scratch`; `ember.enabled`
