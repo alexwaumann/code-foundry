@@ -148,7 +148,11 @@ func TestPushFetchPullRoundTrip(t *testing.T) {
 	if git(t, w.b, "rev-parse", "HEAD") != git(t, w.a, "rev-parse", "HEAD") {
 		t.Error("b is not at a's HEAD after pull")
 	}
-	wantOK(t, mustOp(t)(w.m.Pull(ctx, PullOptions{WorktreePath: w.b})), "already up to date")
+	op = mustOp(t)(w.m.Pull(ctx, PullOptions{WorktreePath: w.b, Title: "Auto pull origin/main"}))
+	wantOK(t, op, "already up to date")
+	if op.Title != "Auto pull origin/main" {
+		t.Errorf("title = %q, want the one given", op.Title)
+	}
 
 	// Prune: the branch deleted on origin disappears from b's remote-tracking refs.
 	git(t, w.a, "push", "-q", "origin", "--delete", "feat")

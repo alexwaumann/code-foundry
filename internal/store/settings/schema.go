@@ -199,6 +199,7 @@ const (
 	KeyGhPollInterval       = "github.poll_interval_seconds"
 	KeyDashboards           = "github.dashboards_enabled"
 	KeyFetchInterval        = "projects.fetch_interval_seconds"
+	KeyAutoPull             = "projects.auto_pull"
 	KeyEditorCommand        = "gitops.editor_command"
 	KeyTheme                = "appearance.theme"
 	KeyThemeDark            = "appearance.theme_dark"
@@ -483,6 +484,14 @@ var staticFields = []Field{
 		Description: "How often a project with an active thread (or an open worktree panel) runs git fetch --prune. Other projects fetch every 15 minutes, or at this interval if longer. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
 		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
+	},
+	{
+		Key: KeyAutoPull, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Pull the default branch automatically",
+		Description: "After each background fetch of a project with an active thread (or an open worktree panel), fast-forward its checkouts that are on the default branch and only behind their upstream. " +
+			"A checkout is skipped while it has staged, modified or conflicted files, a rebase or merge in progress, a thread working in it or an action running. " +
+			"Untracked files don't block it; if git refuses the pull, it is tried again after the next fetch. Does nothing while background fetching is off.",
+		Default: "true",
+		bind:    func(s *Settings) any { return &s.Projects.AutoPull },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",
