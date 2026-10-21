@@ -854,6 +854,117 @@ func (x *ReadFileResponse) GetIsDir() bool {
 	return false
 }
 
+type PreviewFileRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absolute directory a relative path is resolved against. Ignored for an absolute
+	// path.
+	BaseDir string `protobuf:"bytes,1,opt,name=base_dir,json=baseDir,proto3" json:"base_dir,omitempty"`
+	// Absolute, "~/"-prefixed, or relative to base_dir.
+	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewFileRequest) Reset() {
+	*x = PreviewFileRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewFileRequest) ProtoMessage() {}
+
+func (x *PreviewFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewFileRequest.ProtoReflect.Descriptor instead.
+func (*PreviewFileRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PreviewFileRequest) GetBaseDir() string {
+	if x != nil {
+		return x.BaseDir
+	}
+	return ""
+}
+
+func (x *PreviewFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type PreviewFileResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Root-relative URL of the file on the daemon's loopback listener
+	// ("/preview/<grant>/docs/index.html"); the GUI joins it to the daemon's base URL.
+	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	// Absolute directory the grant serves: the checkout holding the file, else its
+	// directory.
+	Scope         string `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewFileResponse) Reset() {
+	*x = PreviewFileResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewFileResponse) ProtoMessage() {}
+
+func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewFileResponse.ProtoReflect.Descriptor instead.
+func (*PreviewFileResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PreviewFileResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *PreviewFileResponse) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
 var File_codefoundry_v1_filesystem_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
@@ -916,18 +1027,25 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"modifiedAt\x12#\n" +
 	"\rresolved_path\x18\a \x01(\tR\fresolvedPath\x12\x1b\n" +
 	"\tnot_found\x18\b \x01(\bR\bnotFound\x12\x15\n" +
-	"\x06is_dir\x18\t \x01(\bR\x05isDir*X\n" +
+	"\x06is_dir\x18\t \x01(\bR\x05isDir\"C\n" +
+	"\x12PreviewFileRequest\x12\x19\n" +
+	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"=\n" +
+	"\x13PreviewFileResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
+	"\x05scope\x18\x02 \x01(\tR\x05scope*X\n" +
 	"\n" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SKILL_SCOPE_USER\x10\x01\x12\x17\n" +
-	"\x13SKILL_SCOPE_PROJECT\x10\x022\xfb\x02\n" +
+	"\x13SKILL_SCOPE_PROJECT\x10\x022\xd5\x03\n" +
 	"\x11FilesystemService\x12d\n" +
 	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00\x12U\n" +
 	"\n" +
 	"ListSkills\x12!.codefoundry.v1.ListSkillsRequest\x1a\".codefoundry.v1.ListSkillsResponse\"\x00\x12X\n" +
 	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00\x12O\n" +
-	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00B\xc7\x01\n" +
+	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00\x12X\n" +
+	"\vPreviewFile\x12\".codefoundry.v1.PreviewFileRequest\x1a#.codefoundry.v1.PreviewFileResponse\"\x00B\xc7\x01\n" +
 	"\x12com.codefoundry.v1B\x0fFilesystemProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -943,7 +1061,7 @@ func file_codefoundry_v1_filesystem_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_filesystem_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(SkillScope)(0),                 // 0: codefoundry.v1.SkillScope
 	(*ListDirectoriesRequest)(nil),  // 1: codefoundry.v1.ListDirectoriesRequest
@@ -958,6 +1076,8 @@ var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(*SearchFilesResponse)(nil),     // 10: codefoundry.v1.SearchFilesResponse
 	(*ReadFileRequest)(nil),         // 11: codefoundry.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),        // 12: codefoundry.v1.ReadFileResponse
+	(*PreviewFileRequest)(nil),      // 13: codefoundry.v1.PreviewFileRequest
+	(*PreviewFileResponse)(nil),     // 14: codefoundry.v1.PreviewFileResponse
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
@@ -969,12 +1089,14 @@ var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	5,  // 6: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
 	8,  // 7: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
 	11, // 8: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
-	3,  // 9: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	7,  // 10: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
-	10, // 11: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
-	12, // 12: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
+	13, // 9: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
+	3,  // 10: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 11: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	10, // 12: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	12, // 13: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
+	14, // 14: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -991,7 +1113,7 @@ func file_codefoundry_v1_filesystem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_filesystem_proto_rawDesc), len(file_codefoundry_v1_filesystem_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

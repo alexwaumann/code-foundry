@@ -496,6 +496,56 @@ export function migratePanelV2(byKey: Readonly<Record<string, PanelEntryV2>>): R
   return out;
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** A stored tab with every field the surface registry needs; anything else is dropped. */
+function sanitizeTab(v: unknown): Tab | null {
+  if (!isRecord(v) || typeof v.id !== "string" || typeof v.kind !== "string" || typeof v.title !== "string" || !isRecord(v.params)) return null;
+  const params: Record<string, string> = {};
+  for (const [k, x] of Object.entries(v.params)) if (typeof x === "string") params[k] = x;
+  return { id: v.id, kind: v.kind, title: v.title, params };
+}
+
+function sanitizeGroup(v: unknown): PanelGroup {
+  if (!isRecord(v)) return emptyGroup;
+  const tabs = Array.isArray(v.tabs) ? v.tabs.map(sanitizeTab).filter((t): t is Tab => t !== null) : [];
+  const has = (id: unknown): id is string => typeof id === "string" && tabs.some((t) => t.id === id);
+  const activeTabId = has(v.activeTabId) ? v.activeTabId : null;
+  // Picking (tabs, no active tab) is only meaningful with a tab to come back to.
+  return { tabs, activeTabId, ...(activeTabId === null && has(v.pickFrom) ? { pickFrom: v.pickFrom } : {}) };
+}
+
+/**
+ * Repairs a stored `byKey` of any shape into entries the reducers and selectors can
+ * trust: groups with a tabs array (one or two), an active tab that exists, numbers where
+ * numbers go. The persisted store is shared by every build that runs on this machine
+ * (the same WebKit localStorage), and an older build reading a newer store writes it
+ * back in its own shape: version 2 entries that still carry `groups`, then version 3
+ * entries whose groups are `{}`. Before this, one such entry threw in a selector
+ * (`groups[0].tabs.length`) and the whole app unmounted to a black window
+ * (docs/notes/html-preview-interactive.md). Runs on every rehydrate (persist `merge`),
+ * after any migration.
+ */
+export function sanitizePanelState(byKey: unknown): Record<string, PanelEntry> {
+  const out: Record<string, PanelEntry> = {};
+  if (!isRecord(byKey)) return out;
+  for (const [key, v] of Object.entries(byKey)) {
+    if (!isRecord(v)) continue;
+    // A downgraded entry (version 2 shape written over a version 3 store) keeps its groups if it has them.
+    const raw = Array.isArray(v.groups) && v.groups.length > 0 ? v.groups : [{ tabs: v.tabs, activeTabId: v.activeTabId, pickFrom: v.pickFrom }];
+    const groups = raw.slice(0, 2).map(sanitizeGroup);
+    // A split with nothing in either group is no split.
+    const bare = groups.length === 2 && groups.every((g) => g.tabs.length === 0);
+    const e: PanelEntry = { open: v.open === true, groups: bare ? [emptyGroup] : groups };
+    if (typeof v.width === "number" && Number.isFinite(v.width)) e.width = v.width;
+    if (v.expanded === true) e.expanded = true;
+    if (typeof v.ratio === "number" && v.ratio >= RATIO_MIN && v.ratio <= RATIO_MAX) e.ratio = v.ratio;
+    if (v.focused === 1 && e.groups.length > 1) e.focused = 1;
+    out[key] = e;
+  }
+  return out;
+}
+
 /**
  * Focus requests for the panel go through the ui store (panelFocusSeq), which the palette
  * also uses. Persisted whole: open state, groups (tabs in strip order, active tab,
@@ -509,8 +559,12 @@ export const usePanelStore = create<PanelState>()(
     version: 3,
     migrate: (persisted, version) => {
       const byKey = ((persisted ?? {}) as { byKey?: Record<string, PanelEntryV2> }).byKey ?? {};
+      if (version >= 3) return { byKey }; // a store from a newer build: merge repairs what it can
       return { byKey: migratePanelV2(version < 2 ? migratePanelV1(byKey) : byKey) };
     },
+    // Every rehydrate, migrated or not, goes through sanitizePanelState: a store another
+    // build wrote is never trusted as is.
+    merge: (persisted, current) => ({ ...current, byKey: sanitizePanelState((persisted as { byKey?: unknown } | undefined)?.byKey) }),
     partialize: (s) => ({ byKey: s.byKey }),
   }),
 );

@@ -57,15 +57,19 @@ export class DaemonConnection {
     this.resolve = resolve;
   }
 
-  async client<T extends DescService>(service: T): Promise<Client<T>> {
+  /** The daemon's endpoint, resolved once and cached (for a URL the GUI builds itself, such as the HTML preview's). */
+  async resolveEndpoint(): Promise<DaemonEndpoint> {
     const pending = (this.endpoint ??= this.resolve());
-    let ep: DaemonEndpoint;
     try {
-      ep = await pending;
+      return await pending;
     } catch (err) {
       if (this.endpoint === pending) this.endpoint = null;
       throw err;
     }
+  }
+
+  async client<T extends DescService>(service: T): Promise<Client<T>> {
+    const ep = await this.resolveEndpoint();
     const key = `${ep.baseUrl}\n${ep.token}\n${service.typeName}`;
     const cached = this.clients.get(key);
     if (cached) return cached as Client<T>;

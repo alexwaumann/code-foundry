@@ -175,12 +175,28 @@ test("a TypeScript file at a line, the HTML sandbox, an image, a binary, a folde
   await openFile(page, "docs/preview.html");
   await expect(file(page)).toHaveAttribute("data-mode", "rendered");
   const frame = file(page).getByTestId("file-html-frame");
-  await expect(frame).toHaveAttribute("sandbox", "");
+  // Served by the daemon at a granted URL, in a sandbox without same-origin or top navigation.
+  await expect(frame).toHaveAttribute("src", /\/preview\/mock-preview-\d+\/docs\/preview\.html$/);
+  const sandbox = (await frame.getAttribute("sandbox")) ?? "";
+  expect(sandbox).toContain("allow-scripts");
+  expect(sandbox).not.toContain("allow-same-origin");
+  expect(sandbox).not.toContain("allow-top-navigation");
   await expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
-  expect(await frame.getAttribute("srcdoc")).toContain("default-src 'none'");
-  // The page's script did not run.
-  await expect(page.frameLocator('[data-testid="file-html-frame"]').locator("#title")).toHaveText("Hello from the preview");
-  await expect(file(page).getByTestId("file-html-footer")).toHaveText("Rendered in a sandbox: no scripts, no network, local assets not loaded");
+  await expect(file(page).getByTestId("file-html-footer")).toHaveText("Sandboxed from Code Foundry · scripts and network on · loads files under ~/src/code-foundry");
+  // The page is interactive: its script ran, a relative image loaded, a button's handler fires,
+  // and an in-page anchor stays in the page (a srcdoc frame navigated into the app's blank shell).
+  const inner = page.frameLocator('[data-testid="file-html-frame"]');
+  await expect(inner.locator("#title")).toHaveText("script ran");
+  await expect(inner.locator("#local")).toHaveJSProperty("naturalWidth", 2);
+  await inner.locator("#count").click();
+  await inner.locator("#count").click();
+  await expect(inner.locator("#count")).toHaveText("2 clicks");
+  await inner.locator("#anchor").click();
+  await expect(inner.locator("#count")).toHaveText("2 clicks");
+  // A relative link to a sibling file loads it from the same grant.
+  await inner.locator("#sibling").click();
+  await expect(inner.locator("img")).toHaveJSProperty("naturalWidth", 2);
+  await expect(inner.locator("#count")).toHaveCount(0);
   await file(page).getByTestId("file-mode-source").click();
   await expect(file(page).getByTestId("file-code")).toBeVisible();
 

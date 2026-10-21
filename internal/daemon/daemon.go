@@ -32,6 +32,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/presence"
+	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -255,6 +256,7 @@ func Run(ctx context.Context, opts Options) error {
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
+	grants := preview.NewGrants()
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),
@@ -271,7 +273,7 @@ func Run(ctx context.Context, opts Options) error {
 		pluginAPI.Route(),
 		api.NewSkill(st.skills, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
-		api.NewFilesystem(st.home, st.project).Route(),
+		api.NewFilesystem(st.home, st.project, grants).Route(),
 		eventsAPI.Route(),
 	}
 	mux := http.NewServeMux()
@@ -308,7 +310,8 @@ func Run(ctx context.Context, opts Options) error {
 	reqCtx, cancelRequests := context.WithCancel(ctx)
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", cors(requireBearer(token, mux))))
+	previewH := preview.Handler(st.home, grants, log.With("component", "preview"))
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", cors(loopbackHandler(token, previewH, mux))))
 
 	errc := make(chan error, 2)
 	go func() { errc <- serve(unixSrv, unixLn) }()

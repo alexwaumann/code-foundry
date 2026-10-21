@@ -53,6 +53,35 @@ func TestWriteFileAtomicPerms(t *testing.T) {
 	}
 }
 
+func TestLoopbackHandlerPreviewNeedsNoBearer(t *testing.T) {
+	previewH := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
+	rest := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := loopbackHandler("secret", previewH, rest)
+	tests := []struct {
+		name, path, auth string
+		want             int
+	}{
+		{"preview without token", "/preview/abc/index.html", "", http.StatusTeapot},
+		{"preview root without token", "/preview/", "", http.StatusTeapot},
+		{"rpc without token", "/codefoundry.v1.ThreadService/List", "", http.StatusUnauthorized},
+		{"rpc with token", "/codefoundry.v1.ThreadService/List", "Bearer secret", http.StatusOK},
+		{"preview-ish path outside the prefix", "/previewx", "", http.StatusUnauthorized},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.auth != "" {
+				req.Header.Set("Authorization", tc.auth)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Errorf("status %d, want %d", rec.Code, tc.want)
+			}
+		})
+	}
+}
+
 func TestRequireBearerAndCORS(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
 	h := cors(requireBearer("secret", ok))

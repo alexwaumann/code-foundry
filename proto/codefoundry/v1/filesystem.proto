@@ -40,6 +40,17 @@ service FilesystemService {
   // errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
   // capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse) {}
+
+  // PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+  // listener that serves the file, and everything else under its scope, without the
+  // bearer token: the scope is the registered checkout holding the file, else its
+  // directory. A sandboxed frame loads the page from there so its scripts run and its
+  // relative links, stylesheets, scripts and images resolve. The grant is an
+  // unguessable id in the URL, scoped to that directory tree and never reaching above
+  // it or outside the home directory (symlinks resolved); it lasts until the daemon
+  // stops. path is as for ReadFile: InvalidArgument when it is outside the home
+  // directory, relative without an absolute base_dir, or not a regular file.
+  rpc PreviewFile(PreviewFileRequest) returns (PreviewFileResponse) {}
 }
 
 message ListDirectoriesRequest {
@@ -168,4 +179,21 @@ message ReadFileResponse {
   bool not_found = 8;
   // resolved_path is a directory; only size and modified_at are set.
   bool is_dir = 9;
+}
+
+message PreviewFileRequest {
+  // Absolute directory a relative path is resolved against. Ignored for an absolute
+  // path.
+  string base_dir = 1;
+  // Absolute, "~/"-prefixed, or relative to base_dir.
+  string path = 2;
+}
+
+message PreviewFileResponse {
+  // Root-relative URL of the file on the daemon's loopback listener
+  // ("/preview/<grant>/docs/index.html"); the GUI joins it to the daemon's base URL.
+  string url = 1;
+  // Absolute directory the grant serves: the checkout holding the file, else its
+  // directory.
+  string scope = 2;
 }

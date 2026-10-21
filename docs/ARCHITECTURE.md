@@ -657,7 +657,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
-  File and Diff (one file read from disk as code, rendered markdown or sandboxed HTML, or
+  File and Diff (one file read from disk as code, rendered markdown or live HTML in a
+  sandboxed frame served by the daemon's `/preview/<grant>/` route (`internal/preview`,
+  `docs/notes/html-preview-interactive.md`), or
   an image; one changed file of a worktree against its base, working tree or branch;
   opened from the worktree overview's Changes rows, the Diff tab's Open file, and path
   chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
