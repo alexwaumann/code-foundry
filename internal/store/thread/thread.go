@@ -444,8 +444,9 @@ type RunInTarget struct {
 
 // NewWorktree configures the worktree Create makes.
 type NewWorktree struct {
-	// BaseRef to branch from. Empty means origin/<default branch>, else <default
-	// branch>. Ignored when Branch names an existing branch.
+	// BaseRef to branch from. Empty is the default branch; the project store resolves
+	// either by projects.base_from_origin (project.CreateWorktreeOptions). Ignored
+	// when Branch names an existing branch.
 	BaseRef string
 	// Branch steers the branch (`thread new --branch`): with a slash it is the branch,
 	// else the slug the projects.branch_naming mode wraps. An existing one is checked

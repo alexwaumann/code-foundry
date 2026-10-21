@@ -546,8 +546,9 @@ message CreateThreadRequest {
 }
 
 message NewWorktree {
-  // Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
-  // Ignored when branch names an existing branch.
+  // Ref to branch from. Defaults to the default branch; projects.base_from_origin
+  // (CreateWorktreeRequest.base_ref) says whether that, or a bare branch name, is
+  // origin's copy. Ignored when branch names an existing branch.
   string base_ref = 1;
   // Steers the branch. With a "/" it is the branch, verbatim; without one it is the
   // slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a
@@ -561,8 +562,8 @@ message NewWorkspace {
   // Projects (id, name when unique, or an absolute path inside one), in member
   // order. At least one. "<project>:<base ref>" gives that member its own base.
   repeated string projects = 1;
-  // Ref every member without its own base branches from. Defaults to
-  // origin/<default branch>, else <default branch>, per project.
+  // Ref every member without its own base branches from. Defaults to each project's
+  // default branch, resolved as NewWorktree.base_ref.
   string base_ref = 2;
   // Workspace name. Default: the branch's last component (feat/add-filter ->
   // add-filter).

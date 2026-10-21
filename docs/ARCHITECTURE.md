@@ -727,7 +727,11 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   command; `docs/notes/worktree-op-state.md`). Every worktree the app makes goes to
   `<config home>/worktrees/<owner>/<repo>/<branch>` (`_local/<name>` without a GitHub
   origin); no setting or request field moves it (`docs/notes/drop-worktree-dir.md`).
-  CreateWorktree records each worktree it makes (`project_worktrees`: path, HEAD, time),
+  CreateWorktree resolves the new branch's start point in one place
+  (`startpoint.go`): with `projects.base_from_origin` (every daemon caller passes it)
+  no base or a bare branch name is origin's copy when origin has it, fetched first;
+  off, the local default and the base as typed, no fetch
+  (`docs/notes/base-from-origin.md`). CreateWorktree records each worktree it makes (`project_worktrees`: path, HEAD, time),
   and only a recorded one is `Managed` (cleanable); a `git worktree add` under the root
   is not. Cleanup keeps one made in the last 10 minutes with no commit since, and counts
   a branch whose rebased or squash-merged copy landed as merged (`Status.BaseMerged`, a

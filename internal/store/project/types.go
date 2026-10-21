@@ -63,6 +63,11 @@ type Worktree struct {
 	// recorded heads). Cleanup keeps a worktree made moments ago with no commits yet.
 	CreatedAt   time.Time
 	CreatedHead string
+	// StartPoint is the ref CreateWorktree created the branch from, after
+	// CreateWorktreeOptions.BaseFromOrigin ("origin/main" for a base typed as "main").
+	// Set only on CreateWorktree's return value, never in a snapshot; "" when it
+	// checked out an existing branch.
+	StartPoint string
 }
 
 // Status is the git status of a worktree.
@@ -191,13 +196,22 @@ type CreateWorktreeOptions struct {
 	// Branch to check out. If neither a local branch nor origin/<Branch> exists (or
 	// BaseRef is set and the local branch does not exist), it is created from BaseRef.
 	Branch string
-	// BaseRef to branch from. Defaults to origin/<default branch>, else <default branch>.
+	// BaseRef to branch from. Empty is the default branch; BaseFromOrigin says which
+	// copy of it, and of a base typed as a bare branch name.
 	BaseRef string
+	// BaseFromOrigin is projects.base_from_origin (startpoint.go). On: no BaseRef, or a
+	// bare branch name ("main", "release/2.3"), starts from origin's copy of that branch
+	// when origin has it (fetched first with Fetch), else from the local branch. A
+	// remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an expression
+	// ("HEAD~2") is used as typed. Off: no BaseRef is the local default branch, a
+	// BaseRef is used as typed, and the base is never fetched.
+	BaseFromOrigin bool
 	// Fetch refreshes the start point before branching from it: when the new branch
-	// starts at a remote-tracking ref ("<remote>/<branch>": BaseRef, the default base
-	// origin/<default>, or origin/<Branch> for git's DWIM), that one remote branch is
-	// fetched first. The fetch is bounded; on failure it is logged and the existing
-	// (possibly stale) ref is used. Ignored when Branch already exists locally.
+	// starts at a remote branch (origin's copy of a bare name with BaseFromOrigin, a
+	// remote-tracking BaseRef with it, or origin/<Branch> for git's DWIM), that one
+	// remote branch is fetched first. The fetch is bounded; on failure it is logged and
+	// the existing (possibly stale) ref is used. Ignored when Branch already exists
+	// locally.
 	Fetch bool
 }
 
@@ -209,8 +223,20 @@ type Refs struct {
 	// symbolic "<remote>/HEAD".
 	Remote []string
 	// DefaultRef is "origin/<default branch>" when that ref exists, else
-	// "<default branch>". It is what CreateWorktree branches from without a BaseRef.
+	// "<default branch>": what CreateWorktree branches from without a BaseRef when
+	// BaseFromOrigin is on (Default gives either).
 	DefaultRef string
+	// DefaultBranch is the local default branch ("main").
+	DefaultBranch string
+}
+
+// Default is the ref CreateWorktree branches from without a BaseRef: DefaultRef with
+// fromOrigin (CreateWorktreeOptions.BaseFromOrigin), else the local default branch.
+func (r Refs) Default(fromOrigin bool) string {
+	if fromOrigin || r.DefaultBranch == "" {
+		return r.DefaultRef
+	}
+	return r.DefaultBranch
 }
 
 // RemoveWorktreeOptions configures Store.RemoveWorktree.

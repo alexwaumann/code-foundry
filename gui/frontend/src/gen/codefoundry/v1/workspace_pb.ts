@@ -149,7 +149,7 @@ export type WorkspaceMemberSpec = Message<"codefoundry.v1.WorkspaceMemberSpec"> 
 
   /**
    * Ref to branch from when the branch does not exist yet. Empty: the request's
-   * base_ref, else origin/<default branch>, else <default branch>.
+   * base_ref, else the default branch (resolved as CreateWorktreeRequest.base_ref).
    *
    * @generated from field: string base_ref = 2;
    */

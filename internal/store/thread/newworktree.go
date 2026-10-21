@@ -86,13 +86,13 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 		base = ""
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true,
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true, BaseFromOrigin: m.opts.BaseFromOrigin(),
 	})
 	if err != nil {
 		return nw, projectError("create worktree "+branch, err)
 	}
 	nw.projectID, nw.path, nw.branch = r.ID, wt.Path, branch
-	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
+	nw.baseRef = cmp.Or(wt.StartPoint, base, wt.Status.BaseRef, r.DefaultBranch)
 	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
 		"existing", existing, "path", wt.Path, "base", nw.baseRef)
 	return nw, nil

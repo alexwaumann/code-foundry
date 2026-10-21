@@ -247,3 +247,19 @@ func TestBranchNaming(t *testing.T) {
 		t.Error("an unknown mode was accepted")
 	}
 }
+
+// TestBaseFromOrigin checks projects.base_from_origin reaches every CreateWorktree
+// caller per call: no restart.
+func TestBaseFromOrigin(t *testing.T) {
+	st := openSettings(t)
+	get := baseFromOrigin(st)
+	if !get() {
+		t.Error("default is off, want on")
+	}
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyBaseFromOrigin: "false"}); err != nil {
+		t.Fatal(err)
+	}
+	if get() {
+		t.Error("still on after turning it off")
+	}
+}

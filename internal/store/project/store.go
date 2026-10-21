@@ -627,6 +627,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	local := g.refExists(ctx, m.Path, "refs/heads/"+opts.Branch)
 	remote := g.refExists(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	var args []string
+	base := "" // the start point of a new branch
 	switch {
 	case local:
 		args = []string{"worktree", "add", path, opts.Branch}
@@ -640,13 +641,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		if err := g.ensureBorn(ctx, m, opts.BaseRef); err != nil {
 			return Worktree{}, err
 		}
-		base := opts.BaseRef
-		if base == "" {
-			base = g.defaultBase(ctx, m)
-		}
-		if opts.Fetch {
-			g.fetchStartPoint(ctx, m, base)
-		}
+		base = g.startPoint(ctx, m, opts)
 		// --no-track: branching from origin/main must not make origin/main the
 		// upstream, or ahead/behind and `git push` would target main. The exception is
 		// a base of origin/<branch> itself (pr.fix.findings checking out a pull
@@ -669,7 +664,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
 	}
-	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch)
+	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch, "base", base)
 	g.recordMade(ctx, m.ID, path) // before the refresh, so its snapshot has it Managed
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return Worktree{}, err
@@ -678,6 +673,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if !ok {
 		return Worktree{}, fmt.Errorf("project: created worktree %s is missing from git worktree list", path)
 	}
+	wt.StartPoint = base
 	return wt, nil
 }
 
@@ -748,15 +744,32 @@ func refspecWrites(spec, ref string) bool {
 // The fetch is bounded by startFetchTimeout. A failure is logged and ignored: the
 // worktree is then created from the existing, possibly stale, ref.
 func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
-	out, err := g.runner.Run(ctx, m.Path, "remote")
+	remotes, err := g.remoteNames(ctx, m)
 	if err != nil {
 		g.log.Warn("fetch before worktree: listing remotes failed", "project", m.ID, "ref", ref, "err", err)
 		return
 	}
-	remote, branch := splitRemoteRef(strings.Fields(string(out)), ref)
+	remote, branch := splitRemoteRef(remotes, ref)
 	if remote == "" {
 		return
 	}
+	if err := g.fetchRemoteBranch(ctx, m, remote, branch); err != nil {
+		g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", ref, "err", err)
+	}
+}
+
+// remoteNames lists the project's configured remotes.
+func (g *Git) remoteNames(ctx context.Context, m *projectMeta) ([]string, error) {
+	out, err := g.runner.Run(ctx, m.Path, "remote")
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(out)), nil
+}
+
+// fetchRemoteBranch fetches remote's branch into refs/remotes/<remote>/<branch>,
+// bounded by startFetchTimeout.
+func (g *Git) fetchRemoteBranch(ctx context.Context, m *projectMeta, remote, branch string) error {
 	fctx, cancel := context.WithTimeout(ctx, startFetchTimeout)
 	defer cancel()
 	// An explicit refspec updates refs/remotes/<remote>/<branch> whatever the
@@ -765,10 +778,10 @@ func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
 	refspec := "+refs/heads/" + branch + ":refs/remotes/" + remote + "/" + branch
 	start := time.Now()
 	if _, err := g.runner.Run(fctx, m.Path, "fetch", "--quiet", "--no-tags", remote, refspec); err != nil {
-		g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", ref, "err", err)
-		return
+		return err
 	}
-	g.log.Debug("fetched start point", "project", m.ID, "ref", ref, "took", time.Since(start))
+	g.log.Debug("fetched start point", "project", m.ID, "ref", remote+"/"+branch, "took", time.Since(start))
+	return nil
 }
 
 // splitRemoteRef splits ref into (remote, branch) when it starts with "<remote>/" for
@@ -804,20 +817,11 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 		_, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin")
 		def = g.defaultBranch(ctx, m.Path, "", err == nil)
 	}
-	refs.DefaultRef = def
+	refs.DefaultRef, refs.DefaultBranch = def, def
 	if _, ok := slices.BinarySearch(refs.Remote, "origin/"+def); ok {
 		refs.DefaultRef = "origin/" + def
 	}
 	return refs, nil
-}
-
-// defaultBase is origin/<default branch> when that ref exists, else <default branch>.
-func (g *Git) defaultBase(ctx context.Context, m *projectMeta) string {
-	def := cmp.Or(m.DefaultBranch, "main")
-	if g.refExists(ctx, m.Path, "refs/remotes/origin/"+def) {
-		return "origin/" + def
-	}
-	return def
 }
 
 func (g *Git) refExists(ctx context.Context, dir, ref string) bool {

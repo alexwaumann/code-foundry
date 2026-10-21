@@ -250,7 +250,7 @@ type WorkspaceMemberSpec struct {
 	// Project id, name (when unique), or a path inside it.
 	Project string `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
 	// Ref to branch from when the branch does not exist yet. Empty: the request's
-	// base_ref, else origin/<default branch>, else <default branch>.
+	// base_ref, else the default branch (resolved as CreateWorktreeRequest.base_ref).
 	BaseRef       string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

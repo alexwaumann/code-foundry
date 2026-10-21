@@ -153,12 +153,16 @@ func TestCreate(t *testing.T) {
 		{ProjectID: id("web"), WorktreePath: h.wt("web", "cf/login-fix")},
 		{ProjectID: id("api"), WorktreePath: h.wt("api", "cf/login-fix")},
 	}
-	if !slices.Equal(w.Members, want) {
-		t.Fatalf("members = %+v, want %+v", w.Members, want)
+	// The caller gets each member's start point (the fake's is the base as given);
+	// the snapshot and the database keep none.
+	returned := slices.Clone(want)
+	returned[0].StartPoint, returned[1].StartPoint = "origin/develop", "origin/main"
+	if !slices.Equal(w.Members, returned) {
+		t.Fatalf("members = %+v, want %+v", w.Members, returned)
 	}
 	creates := h.projects.Creates
 	if len(creates) != 2 || creates[0].BaseRef != "origin/develop" || creates[1].BaseRef != "origin/main" ||
-		!creates[0].Fetch || creates[0].Branch != "cf/login-fix" {
+		!creates[0].Fetch || creates[0].Branch != "cf/login-fix" || !creates[0].BaseFromOrigin || !creates[1].BaseFromOrigin {
 		t.Fatalf("creates = %+v", creates)
 	}
 	if !slices.Equal(h.trusted, []string{want[0].WorktreePath, want[1].WorktreePath}) {
@@ -172,7 +176,7 @@ func TestCreate(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("no Updated event")
 	}
-	if got, ok := h.m.Snapshot().Workspace(w.ID); !ok || len(got.Members) != 2 {
+	if got, ok := h.m.Snapshot().Workspace(w.ID); !ok || !slices.Equal(got.Members, want) {
 		t.Fatalf("snapshot = %+v", h.m.Snapshot())
 	}
 	// Persisted: a new Manager over the same database sees it.
@@ -512,5 +516,27 @@ func TestCreateExistingRemoteBranchIgnoresBase(t *testing.T) {
 	creates := h.projects.Creates
 	if len(creates) != 2 || creates[0].BaseRef != "" || creates[1].BaseRef != "origin/dev" {
 		t.Errorf("creates = %+v", creates)
+	}
+}
+
+// projects.base_from_origin is read at every member worktree.
+func TestCreateBaseFromOrigin(t *testing.T) {
+	h := newHarness(t)
+	on := false
+	m, err := New(context.Background(), Options{DB: h.db, Projects: h.projects, Bus: h.bus, BaseFromOrigin: func() bool { return on }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name string
+		on   bool
+	}{{"off", false}, {"on", true}} {
+		on = tt.on
+		if _, err := m.Create(context.Background(), CreateOptions{Name: "ws " + tt.name, Members: []MemberSpec{{Project: "web"}}, Fetch: true}); err != nil {
+			t.Fatal(err)
+		}
+		if got := h.projects.Creates[len(h.projects.Creates)-1]; got.BaseFromOrigin != tt.on {
+			t.Errorf("%s: BaseFromOrigin = %v", tt.name, got.BaseFromOrigin)
+		}
 	}
 }

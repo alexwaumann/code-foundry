@@ -55,6 +55,9 @@ type Options struct {
 	// BranchNaming returns the branch naming settings, read at every new worktree or
 	// workspace (branchname.go). Default: DefaultBranchNaming.
 	BranchNaming func() BranchNaming
+	// BaseFromOrigin reads projects.base_from_origin at every new or recreated
+	// worktree (project.CreateWorktreeOptions.BaseFromOrigin). Default: on.
+	BaseFromOrigin func() bool
 	// AttachmentsDir is where StageAttachment writes images and PDFs. Empty disables
 	// attachments. New creates it and removes files older than
 	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
@@ -200,6 +203,9 @@ func (o Options) withDefaults() (Options, error) {
 	}
 	if o.BranchNaming == nil {
 		o.BranchNaming = DefaultBranchNaming
+	}
+	if o.BaseFromOrigin == nil {
+		o.BaseFromOrigin = func() bool { return true }
 	}
 	if o.Home == "" {
 		home, err := os.UserHomeDir()

@@ -174,7 +174,7 @@ func TestCreateWorktreeFetch(t *testing.T) {
 		{
 			name: "default base is fetched",
 			setup: func(t *testing.T, f fixture) (CreateWorktreeOptions, string) {
-				return CreateWorktreeOptions{Branch: "cf/fix-bug", Fetch: true}, pushCommit(t, f.other, "a")
+				return CreateWorktreeOptions{Branch: "cf/fix-bug", Fetch: true, BaseFromOrigin: true}, pushCommit(t, f.other, "a")
 			},
 			wantFetch: 1,
 		},
@@ -183,7 +183,7 @@ func TestCreateWorktreeFetch(t *testing.T) {
 			setup: func(t *testing.T, f fixture) (CreateWorktreeOptions, string) {
 				stale := git(t, f.project, "rev-parse", "origin/main")
 				pushCommit(t, f.other, "a")
-				return CreateWorktreeOptions{Branch: "cf/fix-bug"}, stale
+				return CreateWorktreeOptions{Branch: "cf/fix-bug", BaseFromOrigin: true}, stale
 			},
 		},
 		{
@@ -191,12 +191,12 @@ func TestCreateWorktreeFetch(t *testing.T) {
 			setup: func(t *testing.T, f fixture) (CreateWorktreeOptions, string) {
 				git(t, f.other, "checkout", "-q", "-b", "dev")
 				sha := pushCommit(t, f.other, "d")
-				return CreateWorktreeOptions{Branch: "cf/on-dev", BaseRef: "origin/dev", Fetch: true}, sha
+				return CreateWorktreeOptions{Branch: "cf/on-dev", BaseRef: "origin/dev", Fetch: true, BaseFromOrigin: true}, sha
 			},
 			wantFetch: 1,
 		},
 		{
-			name: "local base is not fetched",
+			name: "local base is not fetched without BaseFromOrigin",
 			setup: func(t *testing.T, f fixture) (CreateWorktreeOptions, string) {
 				head := git(t, f.project, "rev-parse", "HEAD")
 				pushCommit(t, f.other, "a")
@@ -219,7 +219,7 @@ func TestCreateWorktreeFetch(t *testing.T) {
 			setup: func(t *testing.T, f fixture) (CreateWorktreeOptions, string) {
 				stale := git(t, f.project, "rev-parse", "origin/main")
 				git(t, f.project, "remote", "set-url", "origin", filepath.Join(f.base, "gone.git"))
-				return CreateWorktreeOptions{Branch: "cf/offline", Fetch: true}, stale
+				return CreateWorktreeOptions{Branch: "cf/offline", Fetch: true, BaseFromOrigin: true}, stale
 			},
 			wantFetch: 1,
 			wantWarn:  "fetch before worktree failed",

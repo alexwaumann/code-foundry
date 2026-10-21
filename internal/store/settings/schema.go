@@ -204,6 +204,7 @@ const (
 	KeyBranchNaming         = "projects.branch_naming"
 	KeyBranchPrefix         = "projects.branch_prefix"
 	KeyBranchInstructions   = "projects.branch_instructions"
+	KeyBaseFromOrigin       = "projects.base_from_origin"
 	KeyEditorCommand        = "gitops.editor_command"
 	KeyTheme                = "appearance.theme"
 	KeyThemeDark            = "appearance.theme_dark"
@@ -550,6 +551,14 @@ var staticFields = []Field{
 			"Spaces in its answer become dashes; a name git refuses falls back to cf/<thread id>.",
 		Placeholder: "ab/<slug of 2 to 4 words>",
 		bind:        func(s *Settings) any { return &s.Projects.BranchInstructions },
+	},
+	{
+		// Read at every new worktree (project.CreateWorktreeOptions.BaseFromOrigin), live.
+		Key: KeyBaseFromOrigin, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Branch from origin",
+		Description: "Start a new worktree's branch from origin's copy of its base, fetched first: origin/<default branch> when no base is given, and origin/<name> for a base given as a branch name (main, release/2.3) when origin has that branch. " +
+			"Off: no base means the local default branch, a base is used exactly as given, and nothing is fetched. A remote branch (origin/x), a tag or a commit is always used as given.",
+		Default: "true",
+		bind:    func(s *Settings) any { return &s.Projects.BaseFromOrigin },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",

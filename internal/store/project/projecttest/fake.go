@@ -221,6 +221,7 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	path := filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
 	w := project.Worktree{ProjectID: r.ID, Path: path, Branch: o.Branch}
 	r.Worktrees = append(slices.Clone(r.Worktrees), w)
+	w.StartPoint = o.BaseRef // the real store's resolution is not modelled
 	makeDirs := f.MakeDirs
 	f.mu.Unlock()
 	if makeDirs {
@@ -315,7 +316,7 @@ func (f *Fake) ListRefs(_ context.Context, projectID string) (project.Refs, erro
 		}
 	}
 	slices.Sort(local)
-	return project.Refs{Local: slices.Compact(local), DefaultRef: r.DefaultBranch}, nil
+	return project.Refs{Local: slices.Compact(local), DefaultRef: r.DefaultBranch, DefaultBranch: r.DefaultBranch}, nil
 }
 
 func (f *Fake) rebuild() {

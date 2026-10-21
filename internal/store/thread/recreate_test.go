@@ -186,7 +186,7 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 			if len(all) != creates+1 {
 				t.Fatalf("CreateWorktree calls %+v", all)
 			}
-			want := project.CreateWorktreeOptions{ProjectID: "r1", Branch: b, BaseRef: tt.wantBase, Fetch: true}
+			want := project.CreateWorktreeOptions{ProjectID: "r1", Branch: b, BaseRef: tt.wantBase, Fetch: true, BaseFromOrigin: true}
 			if all[creates] != want {
 				t.Errorf("recreated with %+v, want %+v", all[creates], want)
 			}

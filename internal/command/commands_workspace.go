@@ -38,7 +38,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		Name: "cwd", Type: Path, Context: ContextWorktree, DefaultToCwd: true,
 		Description: "A path inside a member worktree, used to find the workspace when none is named (CLI default: the working directory)",
 	}
-	fetchArg := ArgSpec{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch each remote base branch first (bounded; a failed fetch uses the local copy)"}
+	fetchArg := ArgSpec{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch each remote base branch first (bounded; a failed fetch uses the local copy; never with projects.base_from_origin off)"}
 	return r.RegisterAll(
 		Command{
 			Name:  "workspace.new",
@@ -50,7 +50,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Workspace name"},
 				{Name: "projects", Type: String, Required: true, Description: "Comma-separated projects (id, name, or absolute path), each optionally project:base-ref"},
 				{Name: "branch", Type: String, Description: "Branch for every worktree (default: the name's slug in the settings' projects.branch_naming mode, e.g. feat/<slug>; an existing branch is checked out)"},
-				{Name: "base", Type: String, Description: "Ref to branch from for projects without their own (default: origin/<default branch>)"},
+				{Name: "base", Type: String, Description: "Ref to branch from for projects without their own (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
 				fetchArg,
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -124,7 +124,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or absolute path"},
 				wsArg, cwdArg,
-				{Name: "base", Type: String, Description: "Ref to branch from when the branch does not exist (default: origin/<default branch>)"},
+				{Name: "base", Type: String, Description: "Ref to branch from when the branch does not exist (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
 				fetchArg,
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

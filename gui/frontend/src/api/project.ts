@@ -175,7 +175,7 @@ export async function listProjects(conn: DaemonConnection = daemon, signal?: Abo
 export interface RefsView {
   /** Local branches, then remote-tracking refs ("origin/main"), each sorted. */
   refs: string[];
-  /** "origin/<default branch>" when it exists, else "<default branch>" (always so without a remote). */
+  /** What a new worktree starts from without a base: "origin/<default branch>" when it exists, else "<default branch>" (always so without a remote, or with projects.base_from_origin off). */
   defaultRef: string;
 }
 

@@ -994,10 +994,14 @@ type CreateWorktreeRequest struct {
 	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Branch to check out. Created from base_ref when it does not exist.
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	// Ref to branch from when creating. Defaults to the default branch.
+	// Ref to branch from when creating. Defaults to the default branch. With
+	// projects.base_from_origin (default on) the default branch, or a base_ref that is
+	// a bare branch name, is origin's copy when origin has it; off, the local default
+	// branch and base_ref exactly as given.
 	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Fetch base_ref's remote branch first when base_ref is a remote-tracking ref
-	// (origin/<name>). Bounded; a failed fetch is logged and the stale ref is used.
+	// Fetch the remote branch the new branch starts from first (origin's copy of a
+	// bare name, or a remote-tracking base_ref). Bounded; a failed fetch is logged and
+	// the stale ref is used. Nothing is fetched with projects.base_from_origin off.
 	Fetch         bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1696,7 +1700,9 @@ type ListRefsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Local branch names, then remote-tracking refs ("origin/main"), each sorted.
 	Refs []string `protobuf:"bytes,1,rep,name=refs,proto3" json:"refs,omitempty"`
-	// "origin/<default branch>" when it exists, else "<default branch>".
+	// What CreateWorktree starts from without a base_ref: "origin/<default branch>"
+	// when it exists, else "<default branch>"; always "<default branch>" with
+	// projects.base_from_origin off.
 	DefaultRef    string `protobuf:"bytes,2,opt,name=default_ref,json=defaultRef,proto3" json:"default_ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

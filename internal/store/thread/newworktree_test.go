@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -439,5 +440,52 @@ func TestBuildPrompt(t *testing.T) {
 				t.Errorf("buildPrompt = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// resolvingProjects resolves a bare base to origin's like the real store with
+// BaseFromOrigin, so the thread records the start point, not the base as typed.
+type resolvingProjects struct{ *recordingProjects }
+
+func (r resolvingProjects) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
+	wt, err := r.recordingProjects.CreateWorktree(ctx, o)
+	if o.BaseFromOrigin {
+		wt.StartPoint = "origin/" + cmp.Or(o.BaseRef, "main")
+	} else {
+		wt.StartPoint = cmp.Or(o.BaseRef, "main")
+	}
+	return wt, err
+}
+
+// projects.base_from_origin is read at every new worktree, and the thread records the
+// project store's start point as its base.
+func TestNewWorktreeBaseFromOrigin(t *testing.T) {
+	on := true
+	e, rr := newWorktreeEnv(t, nil, func(o *Options) {
+		o.BaseFromOrigin = func() bool { return on }
+		o.Projects = resolvingProjects{o.Projects.(*recordingProjects)}
+	})
+	for _, tt := range []struct {
+		on       bool
+		base     string
+		wantBase string
+	}{
+		{true, "main", "origin/main"},
+		{true, "", "origin/main"},
+		{false, "main", "main"},
+		{false, "", "main"},
+	} {
+		on = tt.on
+		s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: tt.base}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := rr.created()
+		if last := got[len(got)-1]; last.BaseFromOrigin != tt.on || last.BaseRef != tt.base {
+			t.Errorf("on=%v base %q: CreateWorktree got %+v", tt.on, tt.base, last)
+		}
+		if s.BaseRef != tt.wantBase {
+			t.Errorf("on=%v base %q: thread base = %q, want %q", tt.on, tt.base, s.BaseRef, tt.wantBase)
+		}
 	}
 }

@@ -29,6 +29,10 @@ import (
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - projects.auto_pull -> the project store's AutoPull.Enabled (autopull.go), read
 //     after every scheduled fetch.
+//   - projects.base_from_origin -> project.CreateWorktreeOptions.BaseFromOrigin, read
+//     at every new worktree by each caller (baseFromOrigin): the thread store (new
+//     and recreated worktrees), the workspace store (members), and ProjectService
+//     (CreateWorktree, and ListRefs' default ref).
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
 //   - update.channel -> update.Store.SetChannel on every change (applyUpdateChannel),
@@ -105,6 +109,12 @@ func branchNaming(st *settings.Store) func() thread.BranchNaming {
 		p := st.Settings().Projects
 		return thread.BranchNaming{Mode: p.BranchNaming, Prefix: p.BranchPrefixValue(), Instructions: p.BranchInstructions}
 	}
+}
+
+// baseFromOrigin reads projects.base_from_origin at every new worktree, so a change
+// applies without a restart.
+func baseFromOrigin(st *settings.Store) func() bool {
+	return func() bool { return st.Settings().Projects.BaseFromOrigin }
 }
 
 // cacheTTLSetter is the thread store's live cache TTL (*thread.Manager).

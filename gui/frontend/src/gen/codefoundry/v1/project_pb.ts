@@ -418,15 +418,19 @@ export type CreateWorktreeRequest = Message<"codefoundry.v1.CreateWorktreeReques
   branch: string;
 
   /**
-   * Ref to branch from when creating. Defaults to the default branch.
+   * Ref to branch from when creating. Defaults to the default branch. With
+   * projects.base_from_origin (default on) the default branch, or a base_ref that is
+   * a bare branch name, is origin's copy when origin has it; off, the local default
+   * branch and base_ref exactly as given.
    *
    * @generated from field: string base_ref = 3;
    */
   baseRef: string;
 
   /**
-   * Fetch base_ref's remote branch first when base_ref is a remote-tracking ref
-   * (origin/<name>). Bounded; a failed fetch is logged and the stale ref is used.
+   * Fetch the remote branch the new branch starts from first (origin's copy of a
+   * bare name, or a remote-tracking base_ref). Bounded; a failed fetch is logged and
+   * the stale ref is used. Nothing is fetched with projects.base_from_origin off.
    *
    * @generated from field: bool fetch = 5;
    */
@@ -756,7 +760,9 @@ export type ListRefsResponse = Message<"codefoundry.v1.ListRefsResponse"> & {
   refs: string[];
 
   /**
-   * "origin/<default branch>" when it exists, else "<default branch>".
+   * What CreateWorktree starts from without a base_ref: "origin/<default branch>"
+   * when it exists, else "<default branch>"; always "<default branch>" with
+   * projects.base_from_origin off.
    *
    * @generated from field: string default_ref = 2;
    */
