@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EmberTaskThreadView, EmberTaskView } from "@/api/ember";
+import type { EmberTaskThreadView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import type { ThreadItemView } from "@/api/thread";
 import {
   boardSections,
@@ -14,6 +14,7 @@ import {
   runMs,
   shortDuration,
   splitTaskLinks,
+  timerRows,
   toggleModel,
   turnEndAfter,
   waitingThreads,
@@ -375,5 +376,26 @@ describe("worker models", () => {
     expect(toggleModel(["a", "b"], "c")).toEqual(["a", "b", "c"]);
     expect(toggleModel(["a", "b"], "a")).toEqual(["b"]);
     expect(toggleModel(["a"], "a")).toEqual(["a"]);
+  });
+});
+
+describe("the Scheduled section", () => {
+  const timer = (id: string, at: number | null, every = "", note = ""): EmberTimerView => ({ id, nextAtMs: at, every, note });
+
+  it.each([
+    ["a one-shot today with a note", timer("sub-1", NOW + 32 * MIN, "", "Remind the user to review the PWA branch (t-aa39dec3)"),
+      { id: "sub-1", when: "3:32 PM", every: "", title: "Remind the user to review the PWA branch (t-aa39dec3)", noted: true }],
+    ["a repeating one", timer("sub-2", NOW + 2 * MIN, "2m", "ping"), { id: "sub-2", when: "3:02 PM", every: "every 2m", title: "ping", noted: true }],
+    ["no note", timer("sub-3", NOW + 60 * MIN), { id: "sub-3", when: "4:00 PM", every: "", title: "Reminder", noted: false }],
+    ["tomorrow", timer("sub-4", NOW + 24 * 60 * MIN), { id: "sub-4", when: "Wed 3:00 PM", every: "", title: "Reminder", noted: false }],
+    ["no time", timer("sub-5", null), { id: "sub-5", when: "", every: "", title: "Reminder", noted: false }],
+  ])("%s", (_name, t, want) => {
+    expect(timerRows([t], NOW)).toEqual([want]);
+  });
+
+  it("puts the soonest first and one without a time last", () => {
+    const rows = timerRows([timer("sub-c", null), timer("sub-b", NOW + 60 * MIN), timer("sub-a", NOW + 5 * MIN)], NOW);
+    expect(rows.map((r) => r.id)).toEqual(["sub-a", "sub-b", "sub-c"]);
+    expect(timerRows([], NOW)).toEqual([]);
   });
 });

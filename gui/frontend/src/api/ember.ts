@@ -3,7 +3,7 @@
  * models. The board is read-only here: Ember changes it through the `ember.*` commands.
  */
 import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread } from "@/gen/codefoundry/v1/ember_pb";
+import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread, type EmberTimer } from "@/gen/codefoundry/v1/ember_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { reportStatusMap, stateMap, statusMap, type ThreadReportStatusView, type ThreadStateView, type ThreadStatusView } from "./threads";
@@ -86,11 +86,25 @@ export interface EmberStatusView {
   counts: EmberCountsView;
 }
 
+/** One of Ember's pending timers (a timer wake subscription of its thread; docs/notes/ember-fixes-2-timers.md). */
+export interface EmberTimerView {
+  /** The subscription id: thread.unsubscribe takes it. */
+  id: string;
+  /** When it fires next: a one-shot's time, a repeating timer's next slot. */
+  nextAtMs: number | null;
+  /** A repeating timer's interval ("2m", "1h30m"); "" for a one-shot. */
+  every: string;
+  /** Why Ember set it (thread subscribe --note); "" for none. */
+  note: string;
+}
+
 /** The whole board: what WatchBoard sends first and again on every change. */
 export interface EmberBoardView {
   status: EmberStatusView;
   /** In board order. */
   tasks: readonly EmberTaskView[];
+  /** Soonest first. */
+  timers: readonly EmberTimerView[];
 }
 
 const stateViews: Readonly<Partial<Record<number, EmberTaskStateView>>> = {
@@ -171,8 +185,12 @@ export function toEmberStatusView(s: EmberStatus | undefined): EmberStatusView {
   };
 }
 
+export function toEmberTimerView(t: EmberTimer): EmberTimerView {
+  return { id: t.id, nextAtMs: ms(t.nextAt), every: t.every, note: t.note };
+}
+
 export function toEmberBoardView(b: EmberBoard): EmberBoardView {
-  return { status: toEmberStatusView(b.status), tasks: b.tasks.map(toEmberTaskView) };
+  return { status: toEmberStatusView(b.status), tasks: b.tasks.map(toEmberTaskView), timers: b.timers.map(toEmberTimerView) };
 }
 
 /**

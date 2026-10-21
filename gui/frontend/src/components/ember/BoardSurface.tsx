@@ -1,13 +1,16 @@
 import { GitBranch } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AlarmClock, X } from "lucide-react";
 import type { EmberTaskView } from "@/api/ember";
+import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { boardSections, cardMeta, cardProgress, workerRows, type BoardCard, type TaskDot, type WorkerRow } from "@/lib/ember";
+import { boardSections, cardMeta, cardProgress, timerRows, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
 import { shortAge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
-import { holdEmberBoard, useBoardCounts, useEmberStore, useEmberTasks } from "@/stores/ember";
+import { runCommandForResult } from "@/stores/commands";
+import { holdEmberBoard, useBoardCounts, useEmberStore, useEmberTasks, useEmberTimers } from "@/stores/ember";
 import { useUiStore } from "@/stores/ui";
 import { Flame } from "./Flame";
 
@@ -166,6 +169,60 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
   );
 }
 
+/**
+ * One of Ember's timers, laid out as a worker line: a clock where the dot sits, its note
+ * (or "Reminder"), "every 2m" for a repeating one, when it fires, and an × that cancels it
+ * (thread.unsubscribe; the row goes when the board says so).
+ */
+function TimerLine({ row }: { row: TimerRow }) {
+  const [cancelling, setCancelling] = useState(false);
+  return (
+    <div className="flex h-6 w-full min-w-0 items-center gap-2 rounded-sm pl-1 text-caption" data-testid="ember-timer" data-timer={row.id}>
+      <AlarmClock className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+      <Tip label={row.title} whenTruncated>
+        <span className={cn("min-w-0 flex-1 truncate", row.noted ? "text-foreground/90" : "text-muted-foreground")} data-testid="ember-timer-note">
+          {row.title}
+        </span>
+      </Tip>
+      {row.every && (
+        <span className="shrink-0 text-muted-foreground" data-testid="ember-timer-every">
+          {row.every}
+        </span>
+      )}
+      <span className="shrink-0 text-muted-foreground tabular-nums" data-testid="ember-timer-when">
+        {row.when}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="-my-1 shrink-0 text-muted-foreground hover:text-foreground"
+        aria-label={`Cancel the timer${row.noted ? `: ${row.title}` : ""}`}
+        disabled={cancelling}
+        data-testid="ember-timer-cancel"
+        onClick={() => {
+          setCancelling(true);
+          void runCommandForResult("thread.unsubscribe", { subscription: row.id }, { quiet: true }).then(() => {
+            setCancelling(false);
+          });
+        }}
+      >
+        <X aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+/** The Scheduled section's one card: Ember's timers, soonest first. */
+function TimersCard({ rows }: { rows: readonly TimerRow[] }) {
+  return (
+    <li className="flex min-w-0 flex-col rounded-lg border border-pane-border py-1.5 pr-1.5 pl-2.5" data-testid="ember-timers">
+      {rows.map((r) => (
+        <TimerLine key={r.id} row={r} />
+      ))}
+    </li>
+  );
+}
+
 function Section({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-col gap-1.5" data-testid={`ember-section-${id}`}>
@@ -199,9 +256,10 @@ function useFocusedTask(scroller: React.RefObject<HTMLDivElement | null>, tasks:
 /**
  * The side panel's Board (docs/notes/ember-3-gui.md): Ember's task board, live from one
  * WatchBoard stream (held while the tab shows). In progress (doing and blocked), Up next
- * (todo) and Done today (done or cancelled since midnight, ten until "+N more"); a card per
- * top-level task with its subtasks' workers beneath. A worker row opens its thread. The
- * board is Ember's to change; nothing here edits it.
+ * (todo), Scheduled (Ember's timers, each with an × that cancels it) and Done today (done or
+ * cancelled since midnight, ten until "+N more"); a card per top-level task with its
+ * subtasks' workers beneath. A worker row opens its thread. The tasks are Ember's to change;
+ * nothing here edits them.
  */
 export function BoardSurface() {
   useEffect(() => holdEmberBoard("core"), []);
@@ -211,18 +269,20 @@ export function BoardSurface() {
   const now = useNow(30_000);
   const counts = useBoardCounts(now);
   const sections = boardSections(tasks, now);
+  const timers = timerRows(useEmberTimers(), now);
   const [allDone, setAllDone] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const marked = useFocusedTask(scroller, tasks);
   const done = allDone ? sections.doneToday : sections.doneToday.slice(0, DONE_CAP);
   const more = sections.doneToday.length - done.length;
-  const empty = sections.inProgress.length + sections.upNext.length + sections.doneToday.length === 0;
+  const empty = sections.inProgress.length + sections.upNext.length + sections.doneToday.length + timers.length === 0;
   return (
     <div className="@container flex min-h-0 flex-1 flex-col" data-testid="ember-board">
       <header className="flex min-w-0 items-baseline gap-2 border-b border-pane-border px-4 pt-2 pb-2.5" data-testid="ember-board-header">
         <h2 className="text-heading">Board</h2>
         <span className="min-w-0 truncate text-caption text-muted-foreground tabular-nums" data-testid="ember-board-counts">
           {counts.inProgress} in progress · {counts.upNext} up next
+          {counts.scheduled > 0 && ` · ${String(counts.scheduled)} scheduled`}
         </span>
       </header>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -247,6 +307,11 @@ export function BoardSurface() {
                 {sections.upNext.map((c) => (
                   <TaskCard key={c.task.id} card={c} now={now} focused={marked} />
                 ))}
+              </Section>
+            )}
+            {timers.length > 0 && (
+              <Section id="scheduled" label="Scheduled">
+                <TimersCard rows={timers} />
               </Section>
             )}
             {sections.doneToday.length > 0 && (

@@ -159,6 +159,7 @@
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
  *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…]
  *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
+ *   POST /__mock/ember/timer?minutes=…[&every=2m][&note=…]   ({ id }: a timer of Ember's thread; thread.unsubscribe cancels it)
  *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
  *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
  */
@@ -635,7 +636,7 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
   }
 }
 
-/** Ember controls: POST /__mock/ember[/task|/task/add|/consolidating|/epoch]. */
+/** Ember controls: POST /__mock/ember[/task|/task/add|/timer|/consolidating|/epoch]. */
 function emberControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const e = world.ember;
   const bool = (name: string): boolean => {
@@ -658,6 +659,11 @@ function emberControl(res: ServerResponse, action: string, q: URLSearchParams): 
         break;
       case "/task/add": {
         const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });
+        json(res, 200, { id });
+        return;
+      }
+      case "/timer": {
+        const id = e.addTimer({ minutes: Number(q.get("minutes") ?? ""), every: q.get("every") ?? "", note: q.get("note") ?? "" });
         json(res, 200, { id });
         return;
       }
@@ -901,7 +907,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     threadControl(res, thread[1], q);
     return;
   }
-  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/consolidating|\/epoch)$/.exec(path);
+  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/timer|\/consolidating|\/epoch)$/.exec(path);
   if (req.method === "POST" && emberCtl) {
     emberControl(res, emberCtl[1] ?? "", q);
     return;

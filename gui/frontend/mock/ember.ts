@@ -4,8 +4,10 @@
  * ember.enabled setting (world.ts wires it: turning it on adds the resident thread
  * s-resident-ember and the worker threads below). A task's worker thread is derived from
  * the world's thread when it exists, else from its fixture here; an unknown id reads as
- * removed. Controls: POST /__mock/ember[?enabled=], /__mock/ember/task, /__mock/ember/task/add,
- * /__mock/ember/consolidating, /__mock/ember/epoch; GET /__mock/ember (server.ts).
+ * removed. Ember's timers (EmberBoard.timers) are none after a reset; /__mock/ember/timer adds
+ * one and thread.unsubscribe <id> cancels it. Controls: POST /__mock/ember[?enabled=],
+ * /__mock/ember/task, /__mock/ember/task/add, /__mock/ember/timer, /__mock/ember/consolidating,
+ * /__mock/ember/epoch; GET /__mock/ember (server.ts).
  */
 import { randomBytes } from "node:crypto";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -17,6 +19,7 @@ import {
   type EmberTaskDescendantSchema,
   type EmberTaskSchema,
   type EmberTaskThreadSchema,
+  type EmberTimerSchema,
 } from "../src/gen/codefoundry/v1/ember_pb";
 import { ThreadReportStatus, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { CommandError } from "./errors";
@@ -27,6 +30,17 @@ type EmberStatusInit = MessageInitShape<typeof EmberStatusSchema>;
 type EmberTaskInit = MessageInitShape<typeof EmberTaskSchema>;
 type EmberTaskThreadInit = MessageInitShape<typeof EmberTaskThreadSchema>;
 type EmberTaskDescendantInit = MessageInitShape<typeof EmberTaskDescendantSchema>;
+type EmberTimerInit = MessageInitShape<typeof EmberTimerSchema>;
+
+/** One of Ember's timers: a timer wake subscription of its thread. */
+interface MockTimer {
+  id: string;
+  nextAt: Date;
+  /** "2m" for a repeating timer; "" for a one-shot. */
+  every: string;
+  note: string;
+  createdAt: Date;
+}
 
 export const EMBER_THREAD = "s-resident-ember";
 
@@ -173,6 +187,7 @@ function teamAsks(t: EmberThreadView): boolean {
 
 export class MockEmber {
   private tasks: MockTask[] = [];
+  private timers: MockTimer[] = [];
   private workers = new Map<string, EmberWorkerFixture>();
   epoch = 2;
   epochStartedAt = ago(180);
@@ -187,6 +202,7 @@ export class MockEmber {
   /** The seeded state; republished so connected WatchBoard streams converge on it. */
   reset(): void {
     this.tasks = seedTasks();
+    this.timers = [];
     this.workers = new Map(emberWorkers().map((w) => [w.id, w]));
     this.epoch = 2;
     this.epochStartedAt = ago(180);
@@ -252,7 +268,33 @@ export class MockEmber {
   }
 
   board(): EmberBoardInit {
-    return { status: this.status(), tasks: this.list() };
+    return { status: this.status(), tasks: this.list(), timers: this.timerMsgs() };
+  }
+
+  /** Ember's timers, soonest first. */
+  private timerMsgs(): EmberTimerInit[] {
+    return [...this.timers]
+      .sort((a, b) => a.nextAt.getTime() - b.nextAt.getTime())
+      .map((t) => ({ id: t.id, nextAt: timestampFromDate(t.nextAt), every: t.every, note: t.note, createdAt: timestampFromDate(t.createdAt) }));
+  }
+
+  /** POST /__mock/ember/timer: a timer of Ember's thread firing in `minutes` (every: repeating, "2m"); returns its id. */
+  addTimer(o: { minutes: number; every?: string; note?: string }): string {
+    if (!Number.isFinite(o.minutes) || o.minutes <= 0) throw new CommandError("invalid", "minutes must be a positive number");
+    const id = `sub-${randomBytes(6).toString("hex")}`;
+    const now = new Date();
+    this.timers.push({ id, nextAt: new Date(now.getTime() + o.minutes * 60_000), every: o.every ?? "", note: o.note ?? "", createdAt: now });
+    this.changed();
+    return id;
+  }
+
+  /** thread.unsubscribe <id> for one of Ember's timers: false when it is not one. */
+  removeTimer(id: string): boolean {
+    const before = this.timers.length;
+    this.timers = this.timers.filter((t) => t.id !== id);
+    if (this.timers.length === before) return false;
+    this.changed();
+    return true;
   }
 
   private taskMsg(t: MockTask): EmberTaskInit {
@@ -389,6 +431,7 @@ export class MockEmber {
         epochContextTokens: this.deps.epochContextTokens(), consolidating: this.consolidating, lastConsolidatedAt: this.lastConsolidatedAt?.toISOString() ?? null,
         lastConsolidationError: this.lastConsolidationError, counts: s.counts,
       },
+      timers: [...this.timers].sort((a, b) => a.nextAt.getTime() - b.nextAt.getTime()).map((t) => ({ id: t.id, nextAt: t.nextAt.toISOString(), every: t.every, note: t.note })),
       tasks: [...this.tasks].sort((a, b) => a.position - b.position).map((t) => {
         const th = t.threadId ? this.threadMsg(t.threadId) : undefined;
         return {
