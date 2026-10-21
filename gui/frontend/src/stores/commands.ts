@@ -88,7 +88,8 @@ const MAX_CONFIRM_STAGES = 3;
  * confirm dialog (or the command's own presenter: confirmPresenter, e.g. the plugin
  * consent dialog) and invokes again with confirmed set when the user agrees. A
  * second-stage confirmation (one with args: deleting a worktree's uncommitted work)
- * asks again and merges its args (force) into the re-invoke. Resolves null when the
+ * asks again and merges its args (force) into the re-invoke; a confirmation's bind args
+ * (the digest of the consent text shown) are merged too. Resolves null when the
  * user declines (or a declined second stage's result: what the command already did);
  * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
  * intent), shown in the dialog.
@@ -115,6 +116,8 @@ export async function invokeConfirmed(
       if (!yes) return confirm.declined ?? null;
       confirmed = true;
       if (confirm.args) callArgs = { ...callArgs, ...confirm.args };
+      // Binds the yes to what was shown (plugin consent), for the command invoked only.
+      if (confirm.bind && confirm.command === name) callArgs = { ...callArgs, ...confirm.bind };
     }
   }
 }

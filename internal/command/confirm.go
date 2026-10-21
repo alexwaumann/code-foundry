@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -30,6 +32,17 @@ type ConfirmError struct {
 	// second-stage confirmation; nil when declining leaves nothing done (the CLI's
 	// --yes then fails with Message).
 	Declined *Result
+	// Bind are args a command's own (first-stage) confirmation asks the re-invoke to
+	// carry, binding the yes to what was shown (Command.BindConfirm). Unlike Args they are
+	// not a second stage: clients still use the command's own presenter.
+	Bind map[string]string
+}
+
+// ConfirmDigest is the digest of a confirmation message that Command.BindConfirm
+// carries: a store compares it with the digest of what it would ask now.
+func ConfirmDigest(message string) string {
+	sum := sha256.Sum256([]byte(message))
+	return hex.EncodeToString(sum[:16])
 }
 
 func (e *ConfirmError) Error() string { return e.Message }

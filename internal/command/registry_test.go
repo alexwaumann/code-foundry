@@ -64,6 +64,15 @@ func TestRegisterValidation(t *testing.T) {
 		{"bad enum default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, Default: "b"}} }), "default: want one of"},
 		{"relative path default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Path, Default: "rel"}} }), "absolute"},
 		{"context on bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Bool, Context: ContextProject}} }), "string or path"},
+		{"bind confirm", valid(func(c *Command) {
+			c.Confirm, c.BindConfirm, c.Args = "Sure?", "d", []ArgSpec{{Name: "d", Type: String}}
+		}), ""},
+		{"bind confirm without confirm", valid(func(c *Command) { c.BindConfirm, c.Args = "d", []ArgSpec{{Name: "d", Type: String}} }), "BindConfirm"},
+		{"bind confirm to no arg", valid(func(c *Command) { c.Confirm, c.BindConfirm = "Sure?", "d" }), "BindConfirm"},
+		{"bind confirm to a bool", valid(func(c *Command) { c.Confirm, c.BindConfirm, c.Args = "Sure?", "d", []ArgSpec{{Name: "d", Type: Bool}} }), "BindConfirm"},
+		{"bind confirm to a positional", valid(func(c *Command) {
+			c.Confirm, c.BindConfirm, c.Args = "Sure?", "d", []ArgSpec{{Name: "d", Type: String, Positional: true}}
+		}), "BindConfirm"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

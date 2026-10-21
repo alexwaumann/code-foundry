@@ -556,10 +556,23 @@ func (m *Manager) stopActor(e *entry, final State) {
 func (m *Manager) Enable(ctx context.Context, name string, consent bool) (EnableResult, error) {
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
-	return m.enableLocked(ctx, name, consent)
+	return m.enableLocked(ctx, name, consent, "")
 }
 
-func (m *Manager) enableLocked(ctx context.Context, name string, consent bool) (EnableResult, error) {
+// EnableShown implements Store.
+func (m *Manager) EnableShown(ctx context.Context, name, shown string) (EnableResult, error) {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	return m.enableLocked(ctx, name, true, shown)
+}
+
+// errConsentChanged refuses a consent given to another consent text than the plugin's
+// current one (EnableShown, DevShown).
+func errConsentChanged(name string) error {
+	return fmt.Errorf("%w: plugin %s: its permissions changed since you were asked; review them again", ErrFailedPrecondition, name)
+}
+
+func (m *Manager) enableLocked(ctx context.Context, name string, consent bool, shown string) (EnableResult, error) {
 	if m.isClosed() {
 		return EnableResult{}, ErrClosed
 	}
@@ -576,6 +589,9 @@ func (m *Manager) enableLocked(ctx context.Context, name string, consent bool) (
 	needs := needsConsent(mf.Permissions, r.Granted)
 	if needs && !consent {
 		return EnableResult{Plugin: m.public(name), NeedsConsent: true, Consent: ConsentText(mf)}, nil
+	}
+	if needs && shown != "" && command.ConfirmDigest(ConsentText(mf)) != shown {
+		return EnableResult{}, errConsentChanged(name)
 	}
 	r.Name, r.Enabled = name, true
 	if needs {
@@ -676,6 +692,15 @@ func (m *Manager) Restart(ctx context.Context, name string) (Plugin, error) {
 // source (another folder's link, an installed package, which it removes), deleting what
 // that one left (origin.go); the consent text then says so.
 func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bool) (EnableResult, error) {
+	return m.dev(ctx, dir, consent, dryRun, force, "")
+}
+
+// DevShown implements Store.
+func (m *Manager) DevShown(ctx context.Context, dir, shown string, force bool) (EnableResult, error) {
+	return m.dev(ctx, dir, true, false, force, shown)
+}
+
+func (m *Manager) dev(ctx context.Context, dir string, consent, dryRun, force bool, shown string) (EnableResult, error) {
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	if m.isClosed() {
@@ -714,16 +739,23 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	}
 	r := rows[name]
 	needs := took != nil || needsConsent(mf.Permissions, r.Granted)
+	text := ConsentText(mf)
+	if took != nil {
+		text += takeoverConsent(name, took)
+	}
 	if dryRun || (needs && !consent) {
 		p := Plugin{Name: name, Dir: real, Dev: true, DevPath: real, Manifest: mf, Issues: warnings, State: StateDisabled, NeedsConsent: needs}
 		if cur, ok := m.Snapshot().Plugin(name); ok {
 			p.State, p.Enabled = cur.State, cur.Enabled
 		}
-		text := ConsentText(mf)
-		if took != nil {
-			text += takeoverConsent(name, took)
-		}
 		return EnableResult{Plugin: p, NeedsConsent: needs, Consent: text}, nil
+	}
+	if needs && shown != "" && command.ConfirmDigest(text) != shown {
+		return EnableResult{}, errConsentChanged(name)
+	}
+	if shown != "" {
+		// Enabling re-reads plugin.json after linking: bind it to the manifest checked here.
+		shown = command.ConfirmDigest(ConsentText(mf))
 	}
 	took, err = m.claimLocked(ctx, name, origin, force)
 	if err != nil {
@@ -743,7 +775,7 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	if err := m.reloadLocked(ctx); err != nil {
 		return EnableResult{}, err
 	}
-	res, err := m.enableLocked(ctx, name, true)
+	res, err := m.enableLocked(ctx, name, true, shown)
 	if took != nil {
 		res.RemovedThreads = took.removed
 	}

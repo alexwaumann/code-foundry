@@ -217,6 +217,11 @@ type Store interface {
 	// Enable turns a plugin on. Without consent it only reports what needs consent
 	// (when anything does); with consent it records the grant and starts it.
 	Enable(ctx context.Context, name string, consent bool) (EnableResult, error)
+	// EnableShown is Enable with consent bound to what the user was shown: shown is
+	// command.ConfirmDigest of the consent text they agreed to, and when the plugin needs
+	// consent and its consent text now differs, nothing is enabled
+	// (ErrFailedPrecondition). An empty shown is Enable with consent.
+	EnableShown(ctx context.Context, name, shown string) (EnableResult, error)
 	// Disable stops a plugin and removes its commands. Its secrets stay.
 	Disable(ctx context.Context, name string) (Plugin, error)
 	// Restart re-reads the manifest and starts the plugin afresh (also from failed).
@@ -225,6 +230,9 @@ type Store interface {
 	// dryRun only reads the folder's manifest and reports the consent needed. force takes
 	// the name from a package of another source, deleting what it left (origin.go).
 	Dev(ctx context.Context, dir string, consent, dryRun, force bool) (EnableResult, error)
+	// DevShown is Dev with consent, bound like EnableShown to the dry run's consent text
+	// (takeover included).
+	DevShown(ctx context.Context, dir, shown string, force bool) (EnableResult, error)
 	// Reload rescans the plugins dir.
 	Reload(ctx context.Context) error
 	// Logs returns the last n lines of a plugin's log (all kept when n <= 0).

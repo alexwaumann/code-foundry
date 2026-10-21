@@ -54,6 +54,9 @@ func pluginByName(ctx context.Context, b PluginBackend, name string) (*v1.Plugin
 func RegisterPlugin(r *Registry, b PluginBackend) error {
 	nameArg := ArgSpec{Name: "name", Type: String, Required: true, Positional: true, Description: "Plugin name (code-foundry plugin list)"}
 	followArg := ArgSpec{Name: "follow", Type: Bool, Description: "CLI: keep printing new log lines until interrupted"}
+	// consentArg binds the consent to the text the prompt showed (Command.BindConfirm).
+	consentArg := ArgSpec{Name: "consent-digest", Type: String, Description: "Set by the consent prompt: the digest of the " +
+		"permissions you were shown; enabling refuses if the plugin asks for anything else by then (--yes alone consents to what it asks)"}
 	return r.RegisterAll(
 		Command{
 			Name:  "plugin.list",
@@ -76,9 +79,10 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Title: "Enable Plugin",
 			Description: "Enable a plugin: start it and register its commands. The first time, and whenever an update asks " +
 				"for more permissions, it lists what the plugin may do and asks for consent (--yes consents).",
-			Category: "Plugin",
-			Args:     []ArgSpec{nameArg},
-			Confirm:  "Enable plugin {name}?",
+			Category:    "Plugin",
+			Args:        []ArgSpec{nameArg, consentArg},
+			Confirm:     "Enable plugin {name}?",
+			BindConfirm: consentArg.Name,
 			ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 				p, ok := pluginByName(ctx, b, a.String("name"))
 				return ok && p.GetNeedsConsent()
@@ -90,7 +94,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				return ""
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Enable(ctx, connect.NewRequest(&v1.EnablePluginRequest{Name: a.String("name"), Consent: true}))
+				res, err := b.Enable(ctx, connect.NewRequest(&v1.EnablePluginRequest{Name: a.String("name"), Consent: true, ConsentDigest: a.String(consentArg.Name)}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -170,8 +174,10 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				{Name: "force", Type: Bool, Description: "Take the name from a plugin of another source (a link to another folder, " +
 					"an installed package, which it removes, or its leftovers), deleting its secrets, data and consent and removing its threads"},
 				followArg,
+				consentArg,
 			},
-			Confirm: "Link {path} as a dev plugin and enable it?",
+			Confirm:     "Link {path} as a dev plugin and enable it?",
+			BindConfirm: consentArg.Name,
 			ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true, Force: a.Bool("force")}))
 				return err == nil && res.Msg.GetNeedsConsent()
@@ -184,7 +190,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				return res.Msg.GetConsentText()
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), Consent: true, Force: a.Bool("force")}))
+				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), Consent: true, Force: a.Bool("force"), ConsentDigest: a.String(consentArg.Name)}))
 				if err != nil {
 					return Result{}, err
 				}

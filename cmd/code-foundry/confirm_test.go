@@ -109,6 +109,67 @@ func TestInvokeSecondStage(t *testing.T) {
 	}
 }
 
+// TestInvokeBindConfirm: a command whose confirmation binds the yes to what was shown
+// (plugin consent) gets the digest back on the re-invoke after a yes on a terminal;
+// --yes is never asked, so it sends none, and without a terminal the first question
+// still points at --yes.
+func TestInvokeBindConfirm(t *testing.T) {
+	var got []string // the digests the command ran with
+	reg := command.NewRegistry()
+	if err := reg.Register(command.Command{
+		Name: "x.enable", Title: "X", Category: "X",
+		Args:        []command.ArgSpec{{Name: "name", Type: command.String}, {Name: "digest", Type: command.String}},
+		Confirm:     "Enable {name}?",
+		BindConfirm: "digest",
+		Run: func(_ context.Context, _ command.Context, a command.Args) (command.Result, error) {
+			got = append(got, a.String("digest"))
+			return command.Result{Message: "enabled"}, nil
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	path, h := codefoundryv1connect.NewCommandServiceHandler(api.NewCommand(reg))
+	mux := http.NewServeMux()
+	mux.Handle(path, h)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	c := &client.Client{Command: codefoundryv1connect.NewCommandServiceClient(srv.Client(), srv.URL)}
+	shown := command.ConfirmDigest("Enable hello?")
+
+	tests := []struct {
+		name        string
+		yes         bool
+		interactive bool
+		want        []string
+		wantErr     error
+		wantStderr  string
+	}{
+		{name: "terminal: yes sends the digest", interactive: true, want: []string{shown}, wantStderr: "Enable hello? [y/N] "},
+		{name: "--yes: no digest", yes: true, want: []string{""}},
+		{name: "no terminal: points at --yes", wantErr: errUsage, wantStderr: "Re-run with --yes to confirm."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got = nil
+			var stdout, stderr bytes.Buffer
+			cl := &cli{stdout: &stdout, stderr: &stderr, connect: func(context.Context) (*client.Client, error) { return c, nil },
+				stdin: strings.NewReader("y\n"), interactive: func() bool { return tt.interactive }}
+			_, err := cl.invoke(context.Background(), &v1.Command{Name: "x.enable"}, nil, map[string]string{"name": "hello"}, tt.yes)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v\nstderr: %s", err, tt.wantErr, stderr.String())
+			}
+			if strings.Join(got, ",") != strings.Join(tt.want, ",") {
+				t.Errorf("ran with digests %q, want %q", got, tt.want)
+			}
+			if !strings.Contains(stderr.String(), tt.wantStderr) {
+				t.Errorf("stderr = %q, want containing %q", stderr.String(), tt.wantStderr)
+			}
+		})
+	}
+}
+
 func TestArgFlags(t *testing.T) {
 	if got := argFlags(map[string]string{"force": "true", "mode": "x"}); got != "--force --mode=x" {
 		t.Fatalf("argFlags = %q", got)

@@ -667,7 +667,15 @@ type ConfirmationRequired struct {
 	// confirmation (a bulk worktree cleanup removed the clean worktrees before asking
 	// about the ones with uncommitted changes). Clients show it as the result. Unset:
 	// declining leaves nothing done, and the CLI's --yes fails with the message.
-	Declined      *InvokeCommandResponse `protobuf:"bytes,5,opt,name=declined,proto3" json:"declined,omitempty"`
+	Declined *InvokeCommandResponse `protobuf:"bytes,5,opt,name=declined,proto3" json:"declined,omitempty"`
+	// Set on a command's own (first) confirmation when its yes must stay bound to what
+	// was shown (plugin consent: {"consent-digest": "<digest of the message>"}). If the
+	// user agrees, invoke again with these args merged over the original ones and
+	// confirmed set; unlike args it is not a second stage, so the command's own presenter
+	// still asks. A client applies them only to the command it invoked. The CLI's --yes
+	// never sees this confirmation and sends none: the command then does what it does
+	// today.
+	Bind          map[string]string `protobuf:"bytes,6,rep,name=bind,proto3" json:"bind,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -733,6 +741,13 @@ func (x *ConfirmationRequired) GetArgs() map[string]string {
 func (x *ConfirmationRequired) GetDeclined() *InvokeCommandResponse {
 	if x != nil {
 		return x.Declined
+	}
+	return nil
+}
+
+func (x *ConfirmationRequired) GetBind() map[string]string {
+	if x != nil {
+		return x.Bind
 	}
 	return nil
 }
@@ -844,14 +859,18 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
 	"resultJson\x12\x1b\n" +
 	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12\x1a\n" +
-	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xa0\x02\n" +
+	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\x9d\x03\n" +
 	"\x14ConfirmationRequired\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12B\n" +
 	"\x04args\x18\x04 \x03(\v2..codefoundry.v1.ConfirmationRequired.ArgsEntryR\x04args\x12A\n" +
-	"\bdeclined\x18\x05 \x01(\v2%.codefoundry.v1.InvokeCommandResponseR\bdeclined\x1a7\n" +
+	"\bdeclined\x18\x05 \x01(\v2%.codefoundry.v1.InvokeCommandResponseR\bdeclined\x12B\n" +
+	"\x04bind\x18\x06 \x03(\v2..codefoundry.v1.ConfirmationRequired.BindEntryR\x04bind\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a7\n" +
+	"\tBindEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\rCommandFailed\x12\x18\n" +
@@ -881,7 +900,7 @@ func file_codefoundry_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_codefoundry_v1_command_proto_goTypes = []any{
 	(ArgType)(0),                  // 0: codefoundry.v1.ArgType
 	(*UiContext)(nil),             // 1: codefoundry.v1.UiContext
@@ -895,6 +914,7 @@ var file_codefoundry_v1_command_proto_goTypes = []any{
 	(*CommandFailed)(nil),         // 9: codefoundry.v1.CommandFailed
 	nil,                           // 10: codefoundry.v1.InvokeCommandRequest.ArgsEntry
 	nil,                           // 11: codefoundry.v1.ConfirmationRequired.ArgsEntry
+	nil,                           // 12: codefoundry.v1.ConfirmationRequired.BindEntry
 }
 var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
@@ -905,15 +925,16 @@ var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	10, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
 	11, // 6: codefoundry.v1.ConfirmationRequired.args:type_name -> codefoundry.v1.ConfirmationRequired.ArgsEntry
 	7,  // 7: codefoundry.v1.ConfirmationRequired.declined:type_name -> codefoundry.v1.InvokeCommandResponse
-	4,  // 8: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
-	6,  // 9: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
-	5,  // 10: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
-	7,  // 11: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	12, // 8: codefoundry.v1.ConfirmationRequired.bind:type_name -> codefoundry.v1.ConfirmationRequired.BindEntry
+	4,  // 9: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
+	6,  // 10: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
+	5,  // 11: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
+	7,  // 12: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
+	11, // [11:13] is the sub-list for method output_type
+	9,  // [9:11] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_command_proto_init() }
@@ -927,7 +948,7 @@ func file_codefoundry_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_command_proto_rawDesc), len(file_codefoundry_v1_command_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

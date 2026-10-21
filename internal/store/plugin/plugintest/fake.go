@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
@@ -114,6 +115,18 @@ func (f *Fake) Enable(_ context.Context, name string, consent bool) (plugin.Enab
 	return plugin.EnableResult{Plugin: p}, nil
 }
 
+// EnableShown implements plugin.Store: a shown digest other than the consent text's
+// (command.ConfirmDigest) is refused while consent is needed.
+func (f *Fake) EnableShown(ctx context.Context, name, shown string) (plugin.EnableResult, error) {
+	if p, err := f.getLocked(name); err == nil && p.NeedsConsent && shown != "" && command.ConfirmDigest(plugin.ConsentText(p.Manifest)) != shown {
+		f.mu.Lock()
+		f.calls = append(f.calls, fmt.Sprintf("enable %s refused: consent text changed", name))
+		f.mu.Unlock()
+		return plugin.EnableResult{}, fmt.Errorf("%w: plugin %s: its permissions changed since you were asked; review them again", plugin.ErrFailedPrecondition, name)
+	}
+	return f.Enable(ctx, name, true)
+}
+
 func (f *Fake) mutate(call, name string, fn func(p *plugin.Plugin)) (plugin.Plugin, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, call+" "+name)
@@ -157,6 +170,14 @@ func (f *Fake) Dev(ctx context.Context, dir string, consent, dryRun, _ bool) (pl
 		return plugin.EnableResult{Plugin: p, NeedsConsent: p.NeedsConsent, Consent: plugin.ConsentText(p.Manifest)}, nil
 	}
 	return f.Enable(ctx, name, consent)
+}
+
+// DevShown implements plugin.Store like EnableShown.
+func (f *Fake) DevShown(ctx context.Context, dir, shown string, force bool) (plugin.EnableResult, error) {
+	if _, err := f.Dev(ctx, dir, false, true, force); err != nil {
+		return plugin.EnableResult{}, err
+	}
+	return f.EnableShown(ctx, lastElem(dir), shown)
 }
 
 func (f *Fake) getLocked(name string) (plugin.Plugin, error) {

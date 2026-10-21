@@ -107,14 +107,23 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 		}
 		req.Confirmed = true
 		if escalates {
-			merged := maps.Clone(req.Args)
-			if merged == nil {
-				merged = map[string]string{}
-			}
-			maps.Copy(merged, cr.GetArgs())
-			req.Args = merged
+			req.Args = mergeArgs(req.Args, cr.GetArgs())
+		}
+		if b := cr.GetBind(); len(b) > 0 && cr.GetCommand() == name {
+			// Binds the yes to the message just shown (plugin consent's digest).
+			req.Args = mergeArgs(req.Args, b)
 		}
 	}
+}
+
+// mergeArgs returns a copy of args with over merged in.
+func mergeArgs(args, over map[string]string) map[string]string {
+	merged := maps.Clone(args)
+	if merged == nil {
+		merged = map[string]string{}
+	}
+	maps.Copy(merged, over)
+	return merged
 }
 
 // notAnsweredByYes handles a second-stage confirmation the user was not asked (--yes,

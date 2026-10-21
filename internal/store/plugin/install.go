@@ -540,7 +540,7 @@ func (m *Manager) finishInstall(ctx context.Context, req InstallRequest, res Ins
 // finishLocked: opMu held.
 func (m *Manager) finishLocked(ctx context.Context, req InstallRequest, res InstallResult, name string) (InstallResult, error) {
 	if req.Enable {
-		er, err := m.enableLocked(ctx, name, req.Consent)
+		er, err := m.enableLocked(ctx, name, req.Consent, "")
 		if err != nil {
 			return InstallResult{}, err
 		}
