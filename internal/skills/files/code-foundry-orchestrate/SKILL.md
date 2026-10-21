@@ -54,10 +54,11 @@ them over. You create and drive other threads with the `code-foundry` CLI.
    again after any later message. Work that builds on a sibling's branch: once that
    branch is pushed, `thread new --new-worktree --base origin/<its branch>` (§2b).
 2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
-   - `code-foundry thread wait <id> --for 30m` blocks until the thread stops working.
+   - `code-foundry thread wait <id> --for 30m` returns when the child finishes, fails, or
+     asks you something: answer with the `thread respond` line it prints, then wait again.
    - `code-foundry thread send --id <id> "..." --wait --for 30m` sends a follow-up and
-     returns once it has been answered (the user cannot reach you meanwhile: for work
-     longer than a minute, prefer `--notify`, or run the wait as a background Bash task).
+     waits the same way (the user cannot reach you meanwhile: for work longer than a
+     minute, prefer `--notify`, or run the wait as a background Bash task).
    - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
      child settles; best for long work or several children.
    - For a pull request's CI or review: `code-foundry thread subscribe --pr <owner/name#N>
@@ -68,11 +69,10 @@ them over. You create and drive other threads with the `code-foundry` CLI.
    waits for the answer to that message (`--after <ordinal>`). A timed-out wait exits 1.
 
    A wake carries the child's state, its report, and when it needs you, a `pending`
-   permission prompt or question, or a stale report's `last_message`. While siblings
-   still work, a wake turn ends silently or with one line: no analysis, no promised
-   check. Before you act on a wake, read `reference/wakes.md`: pending prompts, stale
-   reports, batches, restarts, interrupts, and following up from a wake turn (never
-   `send --wait` there).
+   permission prompt or question, or a stale report's `last_message`. While siblings still
+   work, a wake turn ends silently or with one line: no analysis, no promised check. Before
+   you act on a wake, read `reference/wakes.md`: pending prompts, stale reports, batches,
+   restarts, interrupts, and following up from a wake turn (never `send --wait` there).
 3. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`-`: no report yet; `--json` for the data). `thread read <id>` prints
    its last 20 items (`--since <nextSince>` reads on); answer with `thread respond --id`.

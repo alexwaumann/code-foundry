@@ -90,8 +90,8 @@ func TestGuide(t *testing.T) {
 		// Hidden children (two sentences in Conventions; thread.sidebar among the commands).
 		"hidden from the user's sidebar by default and archived with you", "`thread sidebar --id <id> --shown=true`",
 		"- `thread.sidebar <id>` ", "## More commands: `code-foundry guide <topic>`", "- `settings`: ",
-		"### Thread", "- `thread.wait <id>` Wait until a thread is idle",
-		"  - `--until idle|attention|error|disconnected`: The condition; attention",
+		"### Thread", "- `thread.wait <id>` Wait until a thread settles",
+		"  - `--until settled|idle|attention|error|disconnected`: The condition: settled",
 		"blocks until a thread has answered its latest message", "default: the thread's latest message",
 		"## Discover more", "code-foundry events --json",
 		// Confirmation, children, project refs, and --all composing.
