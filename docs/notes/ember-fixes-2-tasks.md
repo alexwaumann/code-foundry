@@ -29,7 +29,9 @@ skill rewrite are other PRs (B, D, E).
   (`Store.CheckTask`: title, detail, parent), gets its id up front
   (`ember.NewTaskID`, injectable as `EmberDeps.NewTaskID`) for the worker's labels and
   request id, and `AddTask` (new `NewTask.ID`) writes it doing with the thread id in one
-  row. A failed start writes nothing ("the worker did not start, so no task was
+  row. That write runs on a detached 10 s context (as main's fuzz fix #288 did for the
+  old link step), so a caller that went away while the worker started still leaves
+  the worker with its task. A failed start writes nothing ("the worker did not start, so no task was
   added"); with `--task` the task stays as it was. The old "cancel the task when the
   worker did not start" path is gone.
 - **Orphans at load** (`resetOrphansLocked`). A doing task with no worker and no
