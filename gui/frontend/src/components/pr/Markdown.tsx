@@ -5,38 +5,41 @@ import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "r
 import remarkGfm from "remark-gfm";
 import { Tip } from "@/components/ui/tooltip";
 import { INLINE_HTML_TAGS, rehypeInlineHtml } from "@/lib/inlineHtml";
-import { CHIP_PROP, matchPath, rehypePathChips, type PathMatch } from "@/lib/pathChips";
+import { CHIP_PROP, isRelativeHref, matchPath, rehypePathChips, type PathMatch } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
 
-const baseComponents: Components = {
-  a: ({ href, children, title }) => {
-    const url = resolveLink(href);
-    // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
-    // no pointer, nothing to click.
-    // The tooltip is the link's markdown title, else where it goes (the window has no status bar).
-    if (!url)
-      return (
-        <Tip label={title}>
-          <span>{children}</span>
-        </Tip>
-      );
+/** A link: through openUrl (resolveLink: relative ones are github.com paths), or plain text when it goes nowhere. */
+function Link({ href, children, tip }: { href?: string | undefined; children?: ReactNode; tip?: string | undefined }) {
+  const url = resolveLink(href);
+  // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
+  // no pointer, nothing to click.
+  // The tooltip is the link's markdown title, else where it goes (the window has no status bar).
+  if (!url)
     return (
-      <Tip label={title ?? url}>
-        <a
-          href={url}
-          onClick={(e) => {
-            // Never navigate the app's own webview: links open in the browser.
-            e.preventDefault();
-            void openUrl(url);
-          }}
-        >
-          {children}
-        </a>
+      <Tip label={tip}>
+        <span>{children}</span>
       </Tip>
     );
-  },
+  return (
+    <Tip label={tip ?? url}>
+      <a
+        href={url}
+        onClick={(e) => {
+          // Never navigate the app's own webview: links open in the browser.
+          e.preventDefault();
+          void openUrl(url);
+        }}
+      >
+        {children}
+      </a>
+    </Tip>
+  );
+}
+
+const baseComponents: Components = {
+  a: ({ href, children, title }) => <Link href={href} tip={title}>{children}</Link>,
   img: ({ src, alt }) => (typeof src === "string" && /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : null),
 };
 
@@ -91,12 +94,28 @@ export interface MarkdownExtras {
    * rehype pass over the text). Not in fenced code or links. Without it, paths stay text.
    */
   pathChip?: (m: PathMatch) => ReactNode;
+  /**
+   * A link with a relative href (lib/pathChips isRelativeHref): what renders instead. Without
+   * it, relative links resolve against github.com (right for a GitHub body, not for a
+   * thread's answer, where `[main.go](src/main.go)` means a file).
+   */
+  link?: (href: string, children: ReactNode) => ReactNode;
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image, table, pathChip } = extras;
+  const { code, image, table, pathChip, link } = extras;
   return {
     ...baseComponents,
+    ...(link && {
+      a: ({ href, children, title }) =>
+        typeof href === "string" && isRelativeHref(href) ? (
+          <>{link(href, children)}</>
+        ) : (
+          <Link href={href} tip={title}>
+            {children}
+          </Link>
+        ),
+    }),
     ...(code && {
       pre: ({ node, children }) => {
         // The hast <pre>'s <code>: its language class and its text.
@@ -142,13 +161,24 @@ function rehypeFor(extras: MarkdownExtras | undefined): RehypePlugins {
  * stable object).
  */
 export const Markdown = memo(function Markdown({ children, className, extras }: { children: string; className?: string; extras?: MarkdownExtras }) {
+  return (
+    <div className={cn("cf-markdown", className)}>
+      <MarkdownContent extras={extras}>{children}</MarkdownContent>
+    </div>
+  );
+});
+
+/**
+ * Markdown's elements without the .cf-markdown wrapper: a streaming answer renders its
+ * finished blocks as one of these each, inside one wrapper (components/thread/Code
+ * StreamingMarkdown), so only the growing last block re-parses. Memoized on the source.
+ */
+export const MarkdownContent = memo(function MarkdownContent({ children, extras }: { children: string; extras?: MarkdownExtras | undefined }) {
   const components = useMemo(() => (extras ? withExtras(extras) : baseComponents), [extras]);
   const rehype = useMemo(() => rehypeFor(extras), [extras]);
   return (
-    <div className={cn("cf-markdown", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
-        {children}
-      </ReactMarkdown>
-    </div>
+    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
+      {children}
+    </ReactMarkdown>
   );
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chipTarget, projectPlace, matchPath, rehypePathChips, splitProse, type PathContext } from "./pathChips";
+import { chipTarget, isRelativeHref, linkPath, projectPlace, matchPath, rehypePathChips, splitProse, type PathContext } from "./pathChips";
 
 describe("matchPath: chips", () => {
   it.each<[string, PathContext, string, number?, number?]>([
@@ -111,6 +111,36 @@ describe("matchPath: paths with spaces (a code span, quotes, a line of their own
     ["https://x.com/my report.pdf", "a URL"],
   ])("%s: not a chip (%s)", (token) => {
     expect(matchPath(token, "code")).toBeNull();
+  });
+});
+
+describe("linkPath (relative links in Claude's answers)", () => {
+  it.each<[string, { path: string; line?: number; text: string } | null]>([
+    ["src/main.go", { path: "src/main.go", text: "src/main.go" }],
+    ["./docs/a.md#L3", { path: "./docs/a.md", line: 3, text: "./docs/a.md:3" }],
+    ["internal/x.go#L12-L30", { path: "internal/x.go", line: 12, text: "internal/x.go:12" }],
+    ["/Users/me/src/a.go:7", { path: "/Users/me/src/a.go", line: 7, text: "/Users/me/src/a.go:7" }],
+    ["docs/My%20Notes.md#intro", { path: "docs/My Notes.md", text: "docs/My Notes.md" }],
+    ["README.md?plain=1", { path: "README.md", text: "README.md" }],
+    // Not a path: plain text.
+    ["about", null],
+    ["#section", null],
+    ["https://example.com/a.go", null],
+    ["//cdn.example.com/a.js", null],
+    ["mailto:a@b.c", null],
+    ["%E0%A4%A", null],
+  ])("%s", (href, want) => {
+    const m = linkPath(href);
+    if (want === null) expect(m).toBeNull();
+    else expect(m).toMatchObject(want);
+  });
+
+  it("isRelativeHref", () => {
+    expect(isRelativeHref("a/b")).toBe(true);
+    expect(isRelativeHref("/a/b")).toBe(true);
+    expect(isRelativeHref("http://x")).toBe(false);
+    expect(isRelativeHref("#x")).toBe(false);
+    expect(isRelativeHref("")).toBe(false);
   });
 });
 

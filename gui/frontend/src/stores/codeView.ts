@@ -6,6 +6,7 @@
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { bool, oneOf, persistedRecord } from "./persisted";
 
 export type DiffStyle = "unified" | "split";
 
@@ -20,10 +21,23 @@ interface CodeViewState {
   preview: Readonly<Record<PreviewKind, PreviewMode>>;
 }
 
+const MODES: readonly PreviewMode[] = ["rendered", "source"];
+
 export const useCodeViewStore = create<CodeViewState>()(
   persist((): CodeViewState => ({ diffStyle: "unified", wrap: false, preview: { markdown: "rendered", html: "rendered" } }), {
     name: "code-foundry.codeView",
     version: 1,
+    // Only known fields of the right type (stores/persisted.ts); a kind missing from an older store gets its default.
+    merge: (persisted, current) => {
+      const p = persistedRecord(persisted);
+      const preview = persistedRecord(p.preview);
+      return {
+        ...current,
+        diffStyle: oneOf<DiffStyle>(p.diffStyle, ["unified", "split"], current.diffStyle),
+        wrap: bool(p.wrap, current.wrap),
+        preview: { markdown: oneOf(preview.markdown, MODES, current.preview.markdown), html: oneOf(preview.html, MODES, current.preview.html) },
+      };
+    },
   }),
 );
 

@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
+import { ErrorBoundary } from "./components/error/ErrorBoundary";
+import { AppError } from "./components/error/fallbacks";
 import { loadBundledFont } from "./terminal/fonts";
 
 const root = document.getElementById("root");
@@ -11,7 +13,11 @@ if (!root) throw new Error("missing #root");
 void loadBundledFont().then(() => {
   createRoot(root).render(
     <StrictMode>
-      <App />
+      {/* Anything that escapes the inner boundaries (rows, panel tabs, bottom panel) shows
+          the error and a Reload button instead of a blank window. */}
+      <ErrorBoundary label="app" fallback={AppError}>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
 });

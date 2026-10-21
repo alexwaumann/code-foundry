@@ -26,9 +26,9 @@ vi.mock("@/api/threads", async (orig) => ({
   },
 }));
 vi.mock("./attachments", () => ({
-  loadAttachment: (staged: string) => {
+  readAttachmentFile: (staged: string) => {
     const f = [...daemon.files.values()].find((x) => x.staged === staged);
-    return Promise.resolve(f ? { url: "blob:cache", file: { type: f.type, size: f.size } } : null);
+    return Promise.resolve(f ? { type: f.type, size: f.size } : null);
   },
 }));
 

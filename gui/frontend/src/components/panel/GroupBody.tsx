@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { PaneError } from "@/components/error/fallbacks";
 import { PluginSurfaceRows } from "@/components/plugin/PluginSurfaceRows";
 import { activeTab, usePanelStore, type GroupIndex } from "@/stores/panel";
 import { useUiStore } from "@/stores/ui";
@@ -51,7 +53,10 @@ export function GroupBody({ panelKey, group }: { panelKey: string; group: GroupI
       data-surface={active.kind}
       data-tab-id={active.id}
     >
-      {spec ? spec.render(active) : null}
+      {/* A surface that throws degrades to its tab; keyed by tab above, so switching retries. */}
+      <ErrorBoundary label={`${active.kind} panel tab`} fallback={PaneError}>
+        {spec ? spec.render(active) : null}
+      </ErrorBoundary>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { RunInPicker } from "./RunInPicker";
 import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
+import { rankCommands } from "@/palette/rank";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useUiStore } from "@/stores/ui";
@@ -74,6 +75,9 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
 
   const available = useMemo(() => commands.filter(inPalette), [commands]);
   const groups = useMemo(() => groupByCategory(available), [available]);
+  // A query lists one flat group ranked by rankCommands; categories only for an empty one.
+  const searching = !prompt && query.trim() !== "";
+  const ranked = useMemo(() => (searching ? rankCommands(available, query) : []), [searching, available, query]);
 
   const invoke = (c: CommandView, values: Record<string, string>) => {
     close();
@@ -197,7 +201,8 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
       key={prompt ? `${prompt.command.name}:${String(prompt.index)}` : "commands"}
       defaultValue={prompt ? initialSelection(prompt) : undefined}
       loop
-      shouldFilter={!prompt || choices !== null}
+      // Commands are ranked here (rankCommands); cmdk filters the arg choices.
+      shouldFilter={prompt ? choices !== null : false}
       ref={rootRef}
       onKeyDown={(e) => {
         if (!prompt && e.key === "Enter" && !fresh) {
@@ -246,13 +251,21 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
         {!prompt && (
           <>
             <CommandEmpty>{loading && available.length === 0 ? "Loading commands…" : error ? `Cannot list commands: ${error}` : "No matching commands."}</CommandEmpty>
-            {groups.map(([category, list]) => (
-              <CommandGroup key={category} heading={category}>
-                {list.map((c) => (
+            {searching ? (
+              <CommandGroup heading="Results">
+                {ranked.map((c) => (
                   <CommandRow key={c.name} c={c} onPick={pick} />
                 ))}
               </CommandGroup>
-            ))}
+            ) : (
+              groups.map(([category, list]) => (
+                <CommandGroup key={category} heading={category}>
+                  {list.map((c) => (
+                    <CommandRow key={c.name} c={c} onPick={pick} />
+                  ))}
+                </CommandGroup>
+              ))
+            )}
           </>
         )}
         {prompt && spec && choices && (

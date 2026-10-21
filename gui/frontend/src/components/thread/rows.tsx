@@ -47,7 +47,7 @@ import { useModelChoices } from "@/stores/settings";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
-import { ThreadMarkdown } from "./Code";
+import { StreamingMarkdown, ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
 import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
@@ -382,14 +382,16 @@ function CopyAnswer({ answer }: { answer: string }) {
 const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final: boolean; answer?: string }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
-  const text = it?.kind === "text" ? it.text : "";
-  const streaming = it?.kind === "text" && it.streaming;
-  // Claude's reply: its shell blocks offer Run in terminal (CodeActions).
-  const run = useMemo(() => ({ threadId, text, streaming }), [threadId, text, streaming]);
+  // Claude's reply: its shell blocks offer Run in terminal (CodeActions). A finished reply's
+  // blocks are all complete, so the context needs no text and stays put across renders;
+  // while it streams StreamingMarkdown gives the growing last block its own.
+  const run = useMemo(() => ({ threadId, text: "", streaming: false }), [threadId]);
   if (it?.kind !== "text") return null;
-  const md = (
+  const md = it.streaming ? (
+    <StreamingMarkdown text={it.text} threadId={threadId} />
+  ) : (
     <CodeRunContext.Provider value={run}>
-      <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
+      <ThreadMarkdown>{it.text}</ThreadMarkdown>
     </CodeRunContext.Provider>
   );
   // The thread's own answers can be cited (components/thread/cite); a subagent's text cannot.

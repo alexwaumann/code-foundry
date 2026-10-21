@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCallView } from "@/api/thread";
-import { diffStats, diffText, exitCode, formatDuration, parseObject, splitPath, firstPatchLine, structuredPatchText, toolDiff, toolDiffFiles, toolFileTarget, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
+import { agentReport, diffStats, diffText, exitCode, formatDuration, num, obj, parseObject, patchHunks, splitPath, str, firstPatchLine, structuredPatchText, toolDiff, toolDiffFiles, toolFileTarget, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
 
 function call(name: string, input: object, over: Partial<ToolCallView> = {}): ToolCallView {
   return { toolUseId: "t", name, inputJson: JSON.stringify(input), status: "done", output: "", isError: false, resultJson: "", ...over };
@@ -141,5 +141,47 @@ describe("toolFileTarget", () => {
   it("firstPatchLine skips hunks without a change", () => {
     expect(firstPatchLine([])).toBeNull();
     expect(firstPatchLine([{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }, { oldStart: 9, oldLines: 1, newStart: 9, newLines: 1, lines: ["+b"] }])).toBe(9);
+  });
+});
+
+// Malformed payloads from the fuzz pass: each used to throw while rendering and blank the
+// window. They now degrade to what the well-formed parts say.
+describe("malformed payloads", () => {
+  it.each<[string, ToolCallView]>([
+    ["an Edit with a null hunk", call("Edit", { file_path: "/w/a.go", old_string: "x", new_string: "y" }, { resultJson: '{"structuredPatch":[null]}' })],
+    ["an Edit hunk without lines", call("Edit", { file_path: "/w/a.go" }, { resultJson: '{"structuredPatch":[{"oldStart":1}]}' })],
+    ["a MultiEdit with a null edit", call("MultiEdit", { file_path: "/w/a.go", edits: [null, { old_string: "a", new_string: "b" }] })],
+    ["a TodoWrite with a null todo", call("TodoWrite", { todos: [null, { content: "x", status: "completed" }] })],
+    ["an Agent result with null content", call("Agent", { description: "d" }, { resultJson: '{"content":[null,{"text":"done"}]}' })],
+  ])("%s does not throw", (_, t) => {
+    expect(() => {
+      sum(t);
+      const d = toolDiff(t);
+      if (d) toolDiffFiles(d);
+      toolFileTarget(t);
+      agentReport(t);
+    }).not.toThrow();
+  });
+
+  it("skips bad hunks and edits, keeping the good ones", () => {
+    const bad = call("Edit", { file_path: "/w/a.go", old_string: "x", new_string: "y" }, { resultJson: '{"structuredPatch":[null]}' });
+    expect(toolDiff(bad)).toMatchObject({ kind: "contents", pairs: [{ oldText: "x\n", newText: "y\n" }] });
+    const multi = call("MultiEdit", { file_path: "/w/a.go", edits: [null, 3, { old_string: "a", new_string: "b" }] });
+    expect(toolDiff(multi)).toMatchObject({ pairs: [{ oldText: "a\n", newText: "b\n" }] });
+    expect(sum(call("TodoWrite", { todos: [null, { status: "completed" }] })).meta).toBe("1/1 done");
+    expect(agentReport(call("Agent", {}, { resultJson: '{"content":[null,{"text":"done"}]}' }))).toBe("done");
+  });
+
+  it("str, num and obj read defaults from non-objects", () => {
+    for (const v of [null, undefined, 3, "s", [1]]) {
+      expect(str(v, "k")).toBe("");
+      expect(num(v, "k")).toBeNull();
+      expect(obj(v, "k")).toEqual({});
+    }
+  });
+
+  it("patchHunks keeps hunks with a lines array, defaulting their numbers", () => {
+    expect(patchHunks([null, { oldStart: 1 }, { lines: ["+a", 2] }, "x"])).toEqual([{ oldStart: 0, oldLines: 0, newStart: 0, newLines: 0, lines: ["+a"] }]);
+    expect(patchHunks({ lines: [] })).toEqual([]);
   });
 });

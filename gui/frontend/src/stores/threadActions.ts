@@ -13,7 +13,7 @@
 import { toast } from "sonner";
 import { isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/threads";
-import { errorMessage } from "@/api/stream";
+import { sendErrorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
 import { inSidebar } from "@/lib/inSidebar";
 import type { PermissionDecision } from "@/lib/threadRequest";
@@ -176,7 +176,7 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
     clearDraft(key);
     return true;
   } catch (err) {
-    updateDraft(key, { phase: "idle", error: errorMessage(err) });
+    updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });
     return false;
   } finally {
     void refreshCommands();

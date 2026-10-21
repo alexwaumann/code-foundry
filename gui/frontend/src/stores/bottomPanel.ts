@@ -17,6 +17,7 @@ import { basename } from "@/lib/path";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, isPluginLabels, isSetupLabels, THREAD_LABEL, TITLE_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { keyOf } from "./panel";
+import { finite, isRecord, persistedRecord, recordOf } from "./persisted";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { BOTTOM_DEFAULT, useUiStore, type Selection } from "./ui";
 
@@ -195,10 +196,27 @@ export interface BottomState {
   starting: Readonly<Record<string, number>>;
 }
 
+/**
+ * A stored `byKey` of any shape as entries the reducers can trust: objects only, `open` a
+ * boolean, a finite positive height, a string active tab. A `byKey: null` (another build's
+ * store, a hand edit) used to throw in getBottom and stop the app booting.
+ */
+export function sanitizeBottomState(byKey: unknown): Record<string, BottomEntry> {
+  return recordOf(byKey, (v) => {
+    if (!isRecord(v)) return undefined;
+    const e: BottomEntry = { open: v.open === true };
+    const height = finite(v.height);
+    if (height !== undefined && height > 0) e.height = height;
+    if (typeof v.activeTerminalId === "string" && v.activeTerminalId) e.activeTerminalId = v.activeTerminalId;
+    return e;
+  });
+}
+
 export const useBottomStore = create<BottomState>()(
   persist((): BottomState => ({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} }), {
     name: "code-foundry.bottom",
     version: 1,
+    merge: (persisted, current) => ({ ...current, byKey: sanitizeBottomState(persistedRecord(persisted).byKey) }),
     partialize: (s) => ({ byKey: s.byKey }),
   }),
 );

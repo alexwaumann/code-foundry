@@ -2,7 +2,7 @@ import { memo, useMemo, type ReactNode } from "react";
 import { Check, Circle, CircleDot } from "lucide-react";
 import type { ToolCallView } from "@/api/thread";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
-import { obj, parseObject, relPath, str, toolDiff, type Json } from "@/lib/toolSummary";
+import { obj, objects, parseObject, relPath, str, toolDiff } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
 import { CopyButton } from "./CodeActions";
 import { ToolDiffView } from "./ToolDiffView";
@@ -129,8 +129,7 @@ function GrepDetail({ t, cwd }: { t: ToolCallView; cwd: string }) {
 
 /** Claude's todo list (TodoWrite) with each item's state. */
 function TodoDetail({ t }: { t: ToolCallView }) {
-  const todos = (parseObject(t.inputJson).todos ?? []) as Json[];
-  if (!Array.isArray(todos)) return null;
+  const todos = objects(parseObject(t.inputJson).todos);
   return (
     <ul className="flex flex-col gap-0.5 text-body-sm">
       {todos.map((td, i) => {
