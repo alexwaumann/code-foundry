@@ -84,7 +84,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"json result", []string{"daemon.version", "--json"}, nil, `"version":"test"`, ""},
 		{"notify with no GUI", []string{"ui", "notify", "--title", "hi", "--body", "there"}, nil, "delivered=0", ""},
 		{"help for a command", []string{"help", "ui", "notify"}, nil, "--level info|warning|error", ""},
-		{"-h on a command", []string{"ui.notify", "-h"}, nil, "", "--title string"},
+		{"-h on a command", []string{"ui.notify", "-h"}, nil, "--title string", ""},
 		{"unknown command", []string{"bogus", "thing"}, errUsage, "", `unknown command "bogus thing"`},
 		{"missing required arg", []string{"workspace", "new"}, errUsage, "", `code-foundry workspace.new: missing required argument "name"`},
 		{"bad enum", []string{"ui.notify", "--title", "x", "--level", "loud"}, errUsage, "", "want one of info, warning, error"},

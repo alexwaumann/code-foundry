@@ -121,6 +121,8 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 		return cl.help(ctx, rest)
 	case "--update":
 		return runUpdate(ctx, cl, rest)
+	case "--version", "-version", "-v":
+		return runVersion(ctx, cl, rest)
 	}
 	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0]) || verbTakesWords[name]) {
 		return sc.run(ctx, cl, rest)

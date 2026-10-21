@@ -223,7 +223,8 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	cf := cl.addContextFlags(fs)
 	words, err := cl.parseWithPositionals(fs, rest)
 	if errors.Is(err, errHelp) {
-		guide.WriteHelp(cl.stderr, cmd, true)
+		// Asked for (-h), so stdout: `thread new -h | less` reads it.
+		guide.WriteHelp(cl.stdout, cmd, true)
 		return nil
 	}
 	if err != nil {

@@ -38,6 +38,8 @@ func TestDispatchLocal(t *testing.T) {
 		{"help for a local verb", []string{"help", "status"}, nil, "Show daemon status", ""},
 		{"version", []string{"version"}, nil, "code-foundry ", ""},
 		{"version -h", []string{"version", "-h"}, nil, "", "Usage of code-foundry version"},
+		{"--version", []string{"--version"}, nil, "code-foundry ", ""},
+		{"-v", []string{"-v"}, nil, "code-foundry ", ""},
 		{"version bad flag", []string{"version", "--bogus"}, errUsage, "", "flag provided but not defined"},
 		{"unknown leading flag", []string{"--bogus"}, errUsage, "", `unknown flag "--bogus"`},
 		// A bare word that is not a local verb is a daemon command, which needs the daemon.
