@@ -356,6 +356,10 @@ test("the header and the row count blocked tasks and workers waiting on the user
   const link = pane(page).locator('[data-testid="ember-task-link"][data-task="t-4c5d6e7f"]');
   await expect(link.getByTestId("ember-task-link-meta")).toContainText("· needs you");
   await expect(link.getByTestId("ember-task-link-meta")).toHaveClass(/text-warning/);
+  // A timer Ember set counts too.
+  await mockPost(`ember/timer?minutes=30&note=${encodeURIComponent("check the notes draft")}`);
+  await expect(header).toHaveText("2 need you · 2 threads working · 1 blocked · 1 queued · 1 scheduled");
+  await expect(emberRow(page).getByTestId("ember-row-scheduled")).toHaveText("1 scheduled");
 });
 
 test("a budget stop reads Stopped at budget on the row and the board", async ({ page }) => {

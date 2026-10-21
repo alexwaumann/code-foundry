@@ -3,8 +3,8 @@
 PR E of the second Ember battle test (`/tmp/ember-r2/results/SYNTHESIS.md`, findings e4-1/3/7,
 e5-1/2/5, e6-7, e1-1/6, e11-4/5/7, e9-5/6, e13-6, e10-4, e3-6, e2-10). Frontend only: no
 proto or daemon change. It reads what the daemon already writes (status reasons, the
-`process_ended` turn end, wake JSON, `EmberTask.branch` from #294) and, when the board
-carries them, Ember's pending timers (#293).
+`process_ended` turn end, wake JSON, `EmberTask.branch` from #294, the board's timers from
+#293).
 
 ## Header and pinned row
 
@@ -18,10 +18,8 @@ carries them, Ember's pending timers (#293).
   as its pieces) and leaves out one whose worker or team asks (that one is "needs you").
 - "needs you" covers a question, a permission and a budget stop alike: all three need the
   user, and "needs your answer" reads wrong for a budget stop.
-- Timers: `pendingTimers(board)` reads `board.timers` when the field exists (`"timers" in
-  board`), else 0, so this PR builds before #293 and counts timers after it without an edit.
-  The mock has no timers on its board yet (no proto field here); the row's "N scheduled" is
-  covered by the unit test only.
+- Timers: `pendingTimers(board)` is the board's `timers` (#293) count; the row says "· N
+  scheduled" too. In e2e through #293's `/__mock/ember/timer`.
 - Pinned row words (`emberStatusWords(t, {doing, waiting, waitingWords, blocked})`): Ember's
   own prompt or error; a turn the app's restart cut ("error" + "interrupted") reads
   **Interrupted** in amber, not a red Error; then the first waiting worker's words (Needs
@@ -146,7 +144,8 @@ the memo as "<id> <ms>" strings through a shallow selector.
 
 ## Verification
 
-- `make check` green; `e2e/ember.spec.ts` 16 passed (48 of 48 with `--repeat-each 3`).
+- `make check` green; `e2e/ember.spec.ts` 17 passed after the rebase (before it, 48 of 48
+  with `--repeat-each 3`).
 - Live (2026-10-21): `make build`, `CODE_FOUNDRY_HOME=/tmp/ember-fix-e bin/code-foundry daemon
   --dev` (with `CODE_FOUNDRY_BIN`); every model `claude-haiku-5-5[1m]`, efforts medium; a
   scratch Go repo `tally` with a local bare origin under `~/ember-fix-e-scratch`; `ember.enabled`
@@ -186,6 +185,8 @@ the memo as "<id> <ms>" strings through a shallow selector.
   alone on their line become pointers.
 - A Bash call the restart cut still counts in its run ("started 1 worker"): the summary reads
   the command, not its outcome.
-- The parallel PRs: #293 adds the board's timers and a "Scheduled" section (this PR reads
-  `board.timers` only through `pendingTimers`); the crashed-status PR adds `crashed` to
-  `workerWords`' switch, two hunks below this PR's budget check. Expect a small rebase.
+- Rebased onto main after #293 (timers) and #296 (crashed status, restart notice for cut
+  turns) merged: only import lines and the mock's control regex conflicted. A crashed Ember
+  still reads Error (red) on the row; only "interrupted" (the app's restart) reads
+  Interrupted (amber). The live run above was on the pre-rebase build; main's daemon already
+  sent the restart wake there.

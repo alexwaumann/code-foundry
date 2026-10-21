@@ -134,14 +134,9 @@ export function useDoingCount(): number {
   return useEmberStore((s) => s.board?.tasks.filter((t) => t.state === "doing").length ?? 0);
 }
 
-/**
- * Ember's pending timers on the board, 0 while the board does not carry them (a daemon
- * before the board listed them).
- */
+/** How many timers Ember has pending (the board's Scheduled section). */
 export function pendingTimers(board: EmberBoardView | null): number {
-  if (!board || !("timers" in board)) return 0;
-  const timers: unknown = board.timers;
-  return Array.isArray(timers) ? timers.length : 0;
+  return board?.timers.length ?? 0;
 }
 
 /** The chat header's "1 needs you · 2 threads working · 1 blocked · 1 queued". */
