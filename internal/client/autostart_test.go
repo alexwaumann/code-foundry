@@ -85,11 +85,15 @@ func TestConnectWaitsForShuttingDownDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = f.Close() }()
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		t.Fatal(err)
 	}
-	time.AfterFunc(time.Second, func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) })
+	released := make(chan struct{})
+	time.AfterFunc(time.Second, func() {
+		_ = f.Close() // releases the flock
+		close(released)
+	})
+	t.Cleanup(func() { <-released })
 	t.Setenv("CF_TEST_DAEMON", "1")
 	c, err := Connect(context.Background(), p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: 10 * time.Second})
 	if err != nil {
