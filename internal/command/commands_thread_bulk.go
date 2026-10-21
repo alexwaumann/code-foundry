@@ -96,17 +96,50 @@ func listSome(items []string) string {
 	return strings.Join(items[:confirmListMax], ", ") + fmt.Sprintf(" and %d more", len(items)-confirmListMax)
 }
 
-// removeConfirm is thread.remove's confirmation given ids of several threads; "" for
-// one, which the Confirm template says.
-func removeConfirm(a Args) string {
+// removeConfirm is thread.remove's confirmation: of the one thread, or of several
+// given ids; "" without a target (Run says what is missing). It names the hidden child
+// threads of the removed ones still working (orphanedWorking): they keep running and the
+// daemon shows them in the sidebar.
+func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	ids, err := targetThreads(a)
-	if err != nil || len(ids) < 2 {
-		if len(ids) == 1 {
-			return "Remove thread " + ids[0] + "? Claude stops if it runs, and the thread is forgotten."
-		}
+	var ask string
+	switch {
+	case err != nil || len(ids) == 0:
 		return ""
+	case len(ids) == 1:
+		ask = "Remove thread " + ids[0] + "? Claude stops if it runs, and the thread is forgotten."
+	default:
+		ask = fmt.Sprintf("Remove %d threads? Claude stops in each that runs, and they are forgotten: %s.", len(ids), listSome(ids))
 	}
-	return fmt.Sprintf("Remove %d threads? Claude stops in each that runs, and they are forgotten: %s.", len(ids), listSome(ids))
+	if n := orphanedWorking(ctx, b, ids); n > 0 {
+		ask += " " + orphanedWorkingText(n)
+	}
+	return ask
+}
+
+// orphanedWorking counts the hidden threads that ids created, not among ids, that are
+// mid-turn (hiddenWorking): removing their creator leaves them running.
+func orphanedWorking(ctx context.Context, b ThreadBackend, ids []string) int {
+	removed := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		removed[id] = true
+	}
+	n := 0
+	for _, s := range hiddenWorking(ctx, b, ids) {
+		if removed[s.GetCreatedBy()] {
+			n++
+		}
+	}
+	return n
+}
+
+// orphanedWorkingText is the clause thread.remove adds for n hidden child threads still
+// working.
+func orphanedWorkingText(n int) string {
+	if n == 1 {
+		return "1 hidden child thread is still working; it keeps running and is shown in the sidebar."
+	}
+	return fmt.Sprintf("%d hidden child threads are still working; they keep running and are shown in the sidebar.", n)
 }
 
 // removeThreads is thread.remove given ids.

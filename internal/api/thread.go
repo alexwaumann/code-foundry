@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"connectrpc.com/connect"
@@ -57,11 +58,16 @@ func (h *Thread) ListItems(ctx context.Context, req *connect.Request[v1.ListThre
 
 // WatchThread sends the thread's snapshot, then its events. It counts as a viewer of the
 // thread while open (Store.WatchItems). After dropped events it resends the snapshot.
-// A quiet thread gets a heartbeat every HeartbeatInterval (see heartbeat.proto).
+// A quiet thread gets a heartbeat every HeartbeatInterval (see heartbeat.proto). The
+// thread's removal ends the stream with the NOT_FOUND a new WatchThread would get, so a
+// client stops retrying and lets the stream go.
 func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchThreadRequest], stream *connect.ServerStream[v1.ThreadEvent]) error {
 	id := req.Msg.GetThreadId()
 	// Subscribe first: events published between the snapshot and the loop are in the
-	// queue, and their seq says whether the snapshot has them already.
+	// queue, and their seq says whether the snapshot has them already. A removal
+	// between the subscription and WatchItems fails WatchItems.
+	gone := bus.Subscribe[thread.Event](h.bus, watchBuffer)
+	defer gone.Close()
 	sub := bus.Subscribe[thread.ThreadEvent](h.bus, threadWatchBuffer)
 	defer sub.Close()
 	snap, err := h.store.WatchItems(ctx, id)
@@ -78,11 +84,26 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 		return err
 	}
 	seen := snap.Seq
-	var dropped uint64
+	var dropped, goneDropped uint64
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case ev, ok := <-gone.C():
+			if !ok {
+				return nil
+			}
+			removed := false
+			if d := gone.Dropped(); d != goneDropped {
+				goneDropped = d // missed events: ask the store
+				_, ok := h.store.Snapshot().Thread(id)
+				removed = !ok
+			} else if r, ok := ev.(thread.Removed); ok && r.ID == id {
+				removed = true
+			}
+			if removed {
+				return h.watchGone(ctx, id)
+			}
 		case <-beat.C():
 			if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
 				return err
@@ -112,6 +133,15 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 			}
 		}
 	}
+}
+
+// watchGone is WatchThread's end for a thread that was removed: the store's NOT_FOUND
+// (its tombstone when it keeps one).
+func (h *Thread) watchGone(ctx context.Context, id string) error {
+	if _, err := h.store.Items(ctx, id); err != nil {
+		return threadError(err)
+	}
+	return threadError(fmt.Errorf("%w: thread %s was removed", thread.ErrNotFound, id))
 }
 
 // Send sends a user message.

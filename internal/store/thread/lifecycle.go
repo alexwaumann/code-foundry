@@ -257,6 +257,7 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 		}
 		r.s.DisconnectReason, r.s.LastError = ReasonSpawnFailed, msg
 		r.s.setStatus(StatusError, ReasonStartFailed, now)
+		r.noteStartFailed() // wakes back off (wakebackoff.go)
 	})
 	if log != nil {
 		return nil

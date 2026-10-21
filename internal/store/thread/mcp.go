@@ -412,6 +412,9 @@ func (m *Manager) McpStatus(ctx context.Context, id string, refresh bool) (*McpS
 	return s, nil
 }
 
+// mcpReconnectTimeout bounds mcp_reconnect: Claude starts the server again first.
+const mcpReconnectTimeout = 60 * time.Second
+
 // McpReconnect implements Store.
 func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpReconnectResult, error) {
 	if strings.TrimSpace(server) == "" {
@@ -437,7 +440,8 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 	}
 	var res McpReconnectResult
 	var ce *claudestream.ControlError
-	switch err := conn.McpReconnect(ctx, server); {
+	reconnect := func(ctx context.Context) error { return conn.McpReconnect(ctx, server) }
+	switch err := boundedControl(ctx, "MCP reconnect", mcpReconnectTimeout, reconnect); {
 	case err == nil:
 	case errors.As(err, &ce) && strings.HasPrefix(ce.Message, "Server not found"):
 		return res, fmt.Errorf("%w: thread %s has no MCP server %q", ErrNotFound, id, server)

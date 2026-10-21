@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
@@ -178,17 +179,18 @@ func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
 	if err != nil {
 		return err
 	}
-	if err := controlErr(conn.Interrupt(ctx)); err != nil {
+	if err := controlErr(m.boundedControl(ctx, "interrupt", conn.Interrupt)); err != nil {
 		return err
 	}
 	m.noteInterrupt(id, by, midTurn(s))
 	return nil
 }
 
-// setLive applies a setting: through Claude's control protocol (apply) on a live
-// thread, then on the row; only on the row (persisted) for a thread that is not
-// running, which the next spawn reads (claudeCommand).
-func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestream.Conn) error, row func(*Thread)) (Thread, error) {
+// setLive applies a setting: through Claude's control protocol on a live thread (apply,
+// the request named what, bounded by Manager.boundedControl), then on the row; only on
+// the row (persisted) for a thread that is not running, which the next spawn reads
+// (claudeCommand).
+func (m *Manager) setLive(ctx context.Context, id, what string, apply func(context.Context, *claudestream.Conn) error, row func(*Thread)) (Thread, error) {
 	for {
 		r, _, err := m.liveOrStopped(ctx, id)
 		if err != nil {
@@ -212,7 +214,8 @@ func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestre
 		if err != nil {
 			return Thread{}, err
 		}
-		if err := apply(conn); errors.Is(err, claudestream.ErrClosed) {
+		err = m.boundedControl(ctx, what, func(ctx context.Context) error { return apply(ctx, conn) })
+		if errors.Is(err, claudestream.ErrClosed) {
 			// The process ended under the request (an idle stop raced it): once the
 			// runner is gone the row takes the setting (updateStopped).
 			select {
@@ -237,7 +240,7 @@ func (m *Manager) SetModel(ctx context.Context, id, model string) (Thread, error
 	if err := validateModelEffort(model, ""); err != nil {
 		return Thread{}, err
 	}
-	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetModel(ctx, model) },
+	s, err := m.setLive(ctx, id, "model change", func(ctx context.Context, c *claudestream.Conn) error { return c.SetModel(ctx, model) },
 		func(s *Thread) { s.Model = model })
 	if err == nil {
 		m.log.Info("thread model changed", "thread", id, "model", model)
@@ -260,13 +263,47 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 	default:
 		return Thread{}, fmt.Errorf("%w: permission mode %d (want supervised, accept edits or auto)", ErrInvalidArgument, mode)
 	}
-	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetPermissionMode(ctx, wire) },
+	s, err := m.setLive(ctx, id, "permission mode change", func(ctx context.Context, c *claudestream.Conn) error {
+		return c.SetPermissionMode(ctx, wire)
+	},
 		func(s *Thread) { s.PermissionMode = mode })
 	if err == nil {
 		m.log.Info("thread permission mode changed", "thread", id, "mode", mode.Flag())
 	}
 	return s, err
 }
+
+// boundedControl runs call, a control request named what ("interrupt"), with ctx
+// bounded by Options.ControlTimeout: the caller's ctx often has no deadline, and a
+// Claude that is stuck never answers. When that bound, not ctx, ends it, the error is a
+// *NoAnswerError.
+func (m *Manager) boundedControl(ctx context.Context, what string, call func(context.Context) error) error {
+	return boundedControl(ctx, what, m.opts.ControlTimeout, call)
+}
+
+func boundedControl(ctx context.Context, what string, timeout time.Duration, call func(context.Context) error) error {
+	bounded, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	err := call(bounded)
+	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+		return &NoAnswerError{What: what, After: timeout}
+	}
+	return err
+}
+
+// NoAnswerError: Claude did not answer a control request in time (boundedControl). It
+// is a context.DeadlineExceeded.
+type NoAnswerError struct {
+	What  string // the request: "interrupt"
+	After time.Duration
+}
+
+func (e *NoAnswerError) Error() string {
+	return fmt.Sprintf("Claude did not answer the %s within %s; close or restart the thread", e.What, e.After)
+}
+
+// Unwrap makes a NoAnswerError a context.DeadlineExceeded.
+func (e *NoAnswerError) Unwrap() error { return context.DeadlineExceeded }
 
 // controlErr maps the CLI's refusal to InvalidArgument and a gone process to
 // FailedPrecondition.

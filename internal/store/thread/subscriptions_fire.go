@@ -207,6 +207,9 @@ func (m *Manager) enqueueLocked(subscriber string, d delivery) {
 		q = &wakeQueue{}
 		s.queues[subscriber] = q
 	}
+	if m.heldLocked(subscriber) && q.coalesceLocked(d) {
+		return // a held queue keeps a subscription's latest wake (wakebackoff.go)
+	}
 	q.items = append(q.items, d)
 	if q.running {
 		return
@@ -239,6 +242,9 @@ func (s *subscriptions) next(subscriber string, batching bool) (delivery, bool) 
 func (m *Manager) drain(subscriber string) {
 	defer m.wg.Done()
 	for {
+		// After a failed start the queue waits, rather than start Claude again for every
+		// wake (wakebackoff.go).
+		m.holdWakes(subscriber)
 		d, ok := m.subs.next(subscriber, m.opts.WakeBatch > 0)
 		if !ok {
 			// Quiet now, unless the wake started a turn: a wake held about it may go.

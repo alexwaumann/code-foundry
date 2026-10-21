@@ -130,6 +130,15 @@ type Options struct {
 	StartTimeout  time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
 	CloseTimeout  time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
 	Tick          time.Duration // transcript poll and housekeeping; default 1s
+	// WakeStartBackoff is how long wakes to a thread wait after its Claude failed to
+	// start, doubling with each failure in a row (wakebackoff.go); default 1m.
+	WakeStartBackoff time.Duration
+	// ControlTimeout bounds the answer to a control request a Store call makes for its
+	// caller (Interrupt, SetModel, SetPermissionMode; boundedControl); default 10s.
+	ControlTimeout time.Duration
+	// SendTimeout bounds writing a message to Claude's stdin: a Claude that stopped
+	// reading it fails the send and the thread closes (onStalled); default 30s.
+	SendTimeout time.Duration
 	// WakeTimeout is how long a background end at the prompt holds the thread for the turn
 	// Claude starts by itself (wake.go); default 10s.
 	WakeTimeout    time.Duration
@@ -230,6 +239,9 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.NamingRetryDelay, 2*time.Second)
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
+	def(&o.ControlTimeout, 10*time.Second)
+	def(&o.WakeStartBackoff, time.Minute)
+	def(&o.SendTimeout, 30*time.Second)
 	def(&o.Tick, time.Second)
 	def(&o.WakeTimeout, 10*time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
@@ -311,6 +323,9 @@ type record struct {
 	envPrint *extrasPrint
 	// wait is the waiting overlay's state (waiting.go).
 	wait waitState
+	// startFails counts the failed starts since the last one that came up: wakes
+	// back off (wakebackoff.go).
+	startFails failedStarts
 }
 
 var _ Store = (*Manager)(nil)
@@ -347,6 +362,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	// Threads whose creator was removed are the user's now (orphans.go).
+	if err := adoptLoadedOrphans(ctx, m, rows); err != nil {
+		return nil, err
+	}
 	var lost []string
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
@@ -872,6 +891,15 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
+	if first != nil && first.itemID == "" {
+		// A new thread's prompt goes into the timeline now, before the handshake (the
+		// row is written, so the item can be): a start that fails leaves the message,
+		// then why, for the user to copy or send again. sendMessage delivers it under
+		// this id. Before run starts, so nothing else writes the log yet.
+		if _, err := recordUser(r.st.proj.w, first); err != nil {
+			m.log.Warn("record the first prompt before the handshake", "thread", id, "err", err)
+		}
+	}
 	m.log.Info("thread spawned", "thread", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
@@ -1010,8 +1038,9 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 // (terminals labelled termlabel.KindShell with its id), then forgets it, keeping a
 // tombstone for RemovedTTL (tombstones.go). Meanwhile the thread is Removing, so the
 // closing snapshot meets no wait or wake condition; once it is forgotten its
-// subscribers get a CondRemoved wake (subscriptions_removed.go). When it fails the
-// thread stays, no longer Removing.
+// subscribers get a CondRemoved wake (subscriptions_removed.go). The threads it
+// created that are not archived are shown in the sidebar from then on, still running
+// (orphans.go). When it fails the thread stays, no longer Removing.
 func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.refuseResident(id, "removed"); err != nil {
 		return err
@@ -1046,6 +1075,8 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
+	// Its hidden children would be out of reach: they are the user's now (orphans.go).
+	m.adoptOrphansLocked(id)
 	delete(m.recs, id)
 	m.tmu.Lock()
 	delete(m.threads, id)
@@ -1085,7 +1116,8 @@ func (m *Manager) setRemoving(id string, on bool) error {
 
 // Shutdown stops every runner, which terminates its claude process (it talks to the
 // daemon over pipes and cannot outlive it), and records live threads as DISCONNECTED
-// ("daemon stopped"). The Manager is unusable afterwards.
+// ("daemon stopped"). A runner still going when ctx ends is stuck: its process group
+// is killed (runner.kill). The Manager is unusable afterwards.
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	m.closed = true
@@ -1106,6 +1138,15 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
+		// A runner still going is stuck (a write Claude does not read): its process
+		// must not outlive the daemon.
+		for _, r := range runners {
+			select {
+			case <-r.done:
+			default:
+				r.kill()
+			}
+		}
 		return fmt.Errorf("thread: shutdown: %w", ctx.Err())
 	}
 }
@@ -1115,6 +1156,9 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
 			rec.run = nil
+			if r.startFailed {
+				rec.noteStartFailed() // wakes back off (wakebackoff.go)
+			}
 			// The process is gone: the next spawn gets the current extras.
 			rec.envPrint = nil
 			rec.s.PluginEnvStale, rec.s.PluginEnvChange = false, ""

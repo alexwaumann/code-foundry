@@ -170,3 +170,48 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 		})
 	}
 }
+
+// TestThreadRemoveHiddenChildren: thread.remove names the hidden children of the
+// removed threads still working; they keep running (the daemon shows them in the
+// sidebar). A working grandchild has a creator still, and a listed child goes too.
+func TestThreadRemoveHiddenChildren(t *testing.T) {
+	connected := v1.ThreadState_THREAD_STATE_CONNECTED
+	busy := v1.ThreadStatus_THREAD_STATUS_BUSY
+	busyKid := &v1.Thread{Id: "k1", CreatedBy: "s5", State: connected, Status: busy}
+	askingKid := &v1.Thread{Id: "k2", CreatedBy: "s5", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "permission: Bash ls"}
+	idleKid := &v1.Thread{Id: "k3", CreatedBy: "s5", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE}
+	busyGrand := &v1.Thread{Id: "g1", CreatedBy: "k3", State: connected, Status: busy}
+	const plain = "Remove thread s5? Claude stops if it runs, and the thread is forgotten."
+	tests := []struct {
+		name    string
+		args    map[string]string
+		cascade map[string][]*v1.Thread
+		wantAsk string
+	}{
+		{name: "no hidden children", wantAsk: plain},
+		{name: "idle children and a working grandchild", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyGrand}}, wantAsk: plain},
+		{name: "one working child", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyKid}},
+			wantAsk: plain + " 1 hidden child thread is still working; it keeps running and is shown in the sidebar."},
+		{name: "two working children", cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
+			wantAsk: plain + " 2 hidden child threads are still working; they keep running and are shown in the sidebar."},
+		{name: "ids: a listed child is removed too", args: map[string]string{"ids": "s5,k1"},
+			cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
+			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s5, k1. " +
+				"1 hidden child thread is still working; it keeps running and is shown in the sidebar."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, b, _ := newLifecycleRegistry(t)
+			b.Cascade = tt.cascade
+			args := tt.args
+			if args == nil {
+				args = map[string]string{"id": "s5"}
+			}
+			_, err := reg.Invoke(context.Background(), command.Context{}, "thread.remove", args)
+			var ce *command.ConfirmError
+			if !errors.As(err, &ce) || ce.Message != tt.wantAsk {
+				t.Fatalf("err = %v,\nwant the confirmation %q", err, tt.wantAsk)
+			}
+		})
+	}
+}

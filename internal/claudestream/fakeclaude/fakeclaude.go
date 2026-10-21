@@ -38,6 +38,11 @@
 // CF_FAKE_CLAUDE_INIT_GATE=<path> holds it until <path> exists (the lifecycle tests'
 // slow start).
 //
+// A stuck Claude: with CF_FAKE_CLAUDE_STALL set, the first user message starts its turn
+// (the turn's lines but its result), then the process stops reading stdin for good
+// and ignores SIGTERM (its event loop is stuck): control requests go unanswered, and a
+// write bigger than the pipe's buffer blocks. SIGKILL ends it.
+//
 // Turns Claude starts by itself (a background shell or agent ended while the thread was
 // idle): with CF_FAKE_CLAUDE_UNPROMPTED=<dir>, only the first turn waits for a user
 // message; turn n (2, 3, …) replays once the file <dir>/turn-<n> exists, and pauses
@@ -318,6 +323,15 @@ func Run(fixture string) int {
 		case "user":
 			if next >= len(turns) || (unprompted != "" && next > 0) {
 				continue
+			}
+			if os.Getenv("CF_FAKE_CLAUDE_STALL") != "" {
+				if turn := turns[next]; len(turn) > 0 {
+					play(turn[:len(turn)-1], "")
+				}
+				signal.Ignore(syscall.SIGTERM)
+				for {
+					time.Sleep(time.Hour)
+				}
 			}
 			turn, first := turns[next], next == 0
 			next++
