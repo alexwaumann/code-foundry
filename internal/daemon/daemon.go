@@ -167,7 +167,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		WithCleanupHold(func(w project.Worktree) string {
 			return cleanupHold(w.Path, worktreeThreads(st.thread.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
 		}).
-		WithCleanupAbandoned(abandonedBy(st.thread)).
+		WithCleanupAbandoned(abandonedBy(st.thread), logLeftovers(log)).
 		WithBaseFromOrigin(baseFromOrigin(st.settings))
 	terminalAPI := api.NewTerminal(st.terminal)
 	threadAPI := api.NewThread(st.thread, events)

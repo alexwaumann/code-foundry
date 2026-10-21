@@ -3,6 +3,7 @@ package childproc
 import (
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -80,6 +81,52 @@ func TestSignalGroup(t *testing.T) {
 	}
 	if err := p.Signal(syscall.SIGTERM); err != nil {
 		t.Errorf("signal after exit: %v", err)
+	}
+}
+
+// SignalGroup reaches what the process left in its group after it exited, and says
+// whether anything was left.
+func TestSignalGroupAfterExit(t *testing.T) {
+	tests := []struct {
+		name string
+		// script runs under /bin/sh in the new group; it prints the pid of what it
+		// leaves behind, or nothing.
+		script   string
+		wantLeft bool
+	}{
+		{"leaves a sleep behind", "sleep 30 > /dev/null 2>&1 & echo $!", true},
+		{"leaves nothing", "true", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := Start(Spec{Argv: []string{"/bin/sh", "-c", tt.script}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, _ := io.ReadAll(p.Stdout())
+			<-p.Done()
+			left, err := p.SignalGroup(syscall.SIGKILL)
+			if err != nil || left != tt.wantLeft {
+				t.Fatalf("SignalGroup = %v, %v; want %v", left, err, tt.wantLeft)
+			}
+			if !tt.wantLeft {
+				return
+			}
+			pid, err := strconv.Atoi(strings.TrimSpace(string(out)))
+			if err != nil {
+				t.Fatalf("pid %q", out)
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for syscall.Kill(pid, 0) == nil {
+				if time.Now().After(deadline) {
+					t.Fatalf("pid %d is still running", pid)
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			if left, _ := p.SignalGroup(syscall.SIGKILL); left {
+				t.Error("the group still had a process")
+			}
+		})
 	}
 }
 

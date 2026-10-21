@@ -126,7 +126,8 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // archiveOne archives one thread, and reports whether anything changed.
 //
 // It closes the thread like Close (a no-op when it is disconnected), kills and removes
-// its shells like Remove, then, under m.mu, unpins and unsnoozes it and stamps
+// its shells and stops what it left running in its worktree like Remove, then, under
+// m.mu, unpins and unsnoozes it and stamps
 // ArchivedAt unless it already has one (a second archive keeps the first time). A turn
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
@@ -148,6 +149,7 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	if err := m.removeShells(ctx, id); err != nil {
 		return Thread{}, false, err
 	}
+	m.stopStrays(ctx, id) // what its Bash calls left running in its worktree (strays.go)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)

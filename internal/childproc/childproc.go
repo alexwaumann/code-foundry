@@ -226,6 +226,25 @@ func (p *Process) Signal(sig syscall.Signal) error {
 	return nil
 }
 
+// SignalGroup sends sig to what is left of the process group once the process itself
+// exited (Done): the tools it started that stayed in its group. It reports whether the
+// group still had a process. Before Done it is Signal. The group's id stays the
+// process's id while any member lives, so it cannot be another's then.
+func (p *Process) SignalGroup(sig syscall.Signal) (bool, error) {
+	select {
+	case <-p.done:
+	default:
+		return true, p.Signal(sig)
+	}
+	switch err := syscall.Kill(-p.cmd.Process.Pid, sig); {
+	case errors.Is(err, syscall.ESRCH):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("childproc: signal the group %v: %w", sig, err)
+	}
+	return true, nil
+}
+
 // CloseOutput closes the read end of stdout, ending a reader if a grandchild kept the
 // pipe open after the process exited.
 func (p *Process) CloseOutput() { _ = p.stdout.Close() }

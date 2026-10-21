@@ -1035,7 +1035,8 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 }
 
 // Remove closes the thread if needed, kills and removes the shells that belong to it
-// (terminals labelled termlabel.KindShell with its id), then forgets it, keeping a
+// (terminals labelled termlabel.KindShell with its id), stops what it left running in
+// its worktree (stopStrays), then forgets it, keeping a
 // tombstone for RemovedTTL (tombstones.go). Meanwhile the thread is Removing, so the
 // closing snapshot meets no wait or wake condition; once it is forgotten its
 // subscribers get a CondRemoved wake (subscriptions_removed.go). The threads it
@@ -1059,6 +1060,7 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.removeShells(ctx, id); err != nil {
 		return err
 	}
+	m.stopStrays(ctx, id) // what its Bash calls left running in its worktree (strays.go)
 	// Its process is gone, and a start meanwhile fails the removal below: its TMPDIR
 	// goes (a failed removal leaves the thread to make it again at its next spawn).
 	m.removeThreadTmp(id)

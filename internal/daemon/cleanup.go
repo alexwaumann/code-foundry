@@ -2,8 +2,11 @@ package daemon
 
 import (
 	"context"
+	"log/slog"
+	"strconv"
 	"strings"
 
+	"github.com/alexwaumann/code-foundry/internal/procscan"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -17,6 +20,27 @@ func abandonedBy(threads *thread.Manager) func(project.Worktree) bool {
 	return func(w project.Worktree) bool {
 		removed, _ := threads.ListRemoved(context.Background(), thread.ListOptions{})
 		return cleanupAbandoned(w.Path, threads.Snapshot(), removed)
+	}
+}
+
+// logLeftovers is project.CleanupOptions.Removing: it logs the processes still
+// running in a worktree cleanup is about to remove (archive and remove stop what a
+// thread left; anything else, a user's own server, is only named).
+func logLeftovers(log *slog.Logger) func(context.Context, project.Worktree) {
+	return func(ctx context.Context, w project.Worktree) {
+		procs, err := procscan.In(ctx, w.Path, nil)
+		if err != nil {
+			log.Debug("look for processes in a worktree cleanup removes", "path", w.Path, "err", err)
+			return
+		}
+		if len(procs) == 0 {
+			return
+		}
+		names := make([]string, len(procs))
+		for i, p := range procs {
+			names[i] = p.Name() + " (" + strconv.Itoa(p.PID) + ")"
+		}
+		log.Warn("processes still run in a worktree cleanup removes", "path", w.Path, "processes", names)
 	}
 }
 

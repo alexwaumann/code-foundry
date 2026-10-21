@@ -40,6 +40,8 @@ type Project struct {
 	// cleanupAbandoned backs CleanupWorktrees' project.CleanupOptions.Abandoned; nil
 	// abandons nothing.
 	cleanupAbandoned func(project.Worktree) bool
+	// cleanupRemoving backs project.CleanupOptions.Removing; nil is nothing.
+	cleanupRemoving func(context.Context, project.Worktree)
 	// baseFromOrigin reads projects.base_from_origin for CreateWorktree and ListRefs'
 	// default ref; nil is on (WithBaseFromOrigin).
 	baseFromOrigin func() bool

@@ -147,6 +147,9 @@ type CleanupOptions struct {
 	// Abandoned reports whether every thread that worked in w is archived or removed
 	// (and there was one): the FreshFor rule then does not keep it. Nil: none is.
 	Abandoned func(w Worktree) bool
+	// Removing is told of each worktree right before a real run removes it (the daemon
+	// logs the processes still running in it). Nil: nothing.
+	Removing func(ctx context.Context, w Worktree)
 	// Now is the time CleanupVerdict judges at. Nil: time.Now.
 	Now func() time.Time
 }
@@ -232,6 +235,9 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 			continue
 		}
 		if !opts.DryRun {
+			if opts.Removing != nil {
+				opts.Removing(ctx, w)
+			}
 			if err := s.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path, Force: uncommitted}); err != nil {
 				if ctx.Err() != nil {
 					return res, ctx.Err()

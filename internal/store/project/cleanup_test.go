@@ -302,7 +302,14 @@ func TestCleanupRealProject(t *testing.T) {
 	if err := h.store.Refresh(ctx, r.ID); err != nil {
 		t.Fatal(err)
 	}
-	dry, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, DryRun: true, Hold: hold})
+	removing := map[string]string{}
+	told := func(_ context.Context, w Worktree) {
+		if _, err := os.Stat(w.Path); err != nil {
+			t.Errorf("told of %s after it was removed", w.Path)
+		}
+		removing[w.Path] = wantRemoved[w.Path]
+	}
+	dry, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, DryRun: true, Hold: hold, Removing: told})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,12 +317,25 @@ func TestCleanupRealProject(t *testing.T) {
 	if _, err := os.Stat(wt["merged"]); err != nil {
 		t.Fatalf("dry run removed something: %v", err)
 	}
+	if len(removing) != 0 {
+		t.Errorf("a dry run told Removing of %v", removing)
+	}
+	// The fresh worktree of an archived thread would go at once.
+	abandoned, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Path: wt["fresh"], DryRun: true, Hold: hold,
+		Abandoned: func(w Worktree) bool { return w.Path == wt["fresh"] }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("dry run, abandoned", abandoned, map[string]string{wt["fresh"]: AbandonedReason}, map[string]string{})
 
-	res, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold})
+	res, err := Cleanup(ctx, h.store, CleanupOptions{ProjectID: r.ID, Hold: hold, Removing: told})
 	if err != nil {
 		t.Fatal(err)
 	}
 	check("cleanup", res, wantRemoved, wantKept)
+	if !maps.Equal(removing, wantRemoved) {
+		t.Errorf("Removing told of %v, want %v", removing, wantRemoved)
+	}
 	for p := range wantRemoved {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("%s still on disk: %v", p, err)
