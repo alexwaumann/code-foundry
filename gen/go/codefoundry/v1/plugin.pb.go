@@ -1185,7 +1185,11 @@ type EnablePluginRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// The user consents to the permissions in the plugin's consent_text.
-	Consent       bool `protobuf:"varint,2,opt,name=consent,proto3" json:"consent,omitempty"`
+	Consent bool `protobuf:"varint,2,opt,name=consent,proto3" json:"consent,omitempty"`
+	// With consent: the digest of the consent text the user was shown
+	// (ConfirmationRequired.bind). Enabling fails with FailedPrecondition when the
+	// plugin's consent text has changed since. Empty: consent to what it asks now.
+	ConsentDigest string `protobuf:"bytes,3,opt,name=consent_digest,json=consentDigest,proto3" json:"consent_digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1232,6 +1236,13 @@ func (x *EnablePluginRequest) GetConsent() bool {
 		return x.Consent
 	}
 	return false
+}
+
+func (x *EnablePluginRequest) GetConsentDigest() string {
+	if x != nil {
+		return x.ConsentDigest
+	}
+	return ""
 }
 
 type EnablePluginResponse struct {
@@ -1480,7 +1491,9 @@ type DevPluginRequest struct {
 	// Take the name from a plugin of another source (a link to another folder, an
 	// installed package's leftovers): its secrets, data and consent are deleted first, and
 	// enabling asks for consent again.
-	Force         bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
+	Force bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
+	// With consent: as EnablePluginRequest.consent_digest, over the dry run's consent_text.
+	ConsentDigest string `protobuf:"bytes,5,opt,name=consent_digest,json=consentDigest,proto3" json:"consent_digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1541,6 +1554,13 @@ func (x *DevPluginRequest) GetForce() bool {
 		return x.Force
 	}
 	return false
+}
+
+func (x *DevPluginRequest) GetConsentDigest() string {
+	if x != nil {
+		return x.ConsentDigest
+	}
+	return ""
 }
 
 type DevPluginResponse struct {
@@ -4911,10 +4931,11 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\x12\x1f\n" +
 	"\vplugins_dir\x18\x02 \x01(\tR\n" +
 	"pluginsDir\x12\x19\n" +
-	"\bdata_dir\x18\x03 \x01(\tR\adataDir\"C\n" +
+	"\bdata_dir\x18\x03 \x01(\tR\adataDir\"j\n" +
 	"\x13EnablePluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
-	"\aconsent\x18\x02 \x01(\bR\aconsent\"\x8e\x01\n" +
+	"\aconsent\x18\x02 \x01(\bR\aconsent\x12%\n" +
+	"\x0econsent_digest\x18\x03 \x01(\tR\rconsentDigest\"\x8e\x01\n" +
 	"\x14EnablePluginResponse\x12.\n" +
 	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\x12#\n" +
 	"\rneeds_consent\x18\x02 \x01(\bR\fneedsConsent\x12!\n" +
@@ -4926,12 +4947,13 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x14RestartPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"G\n" +
 	"\x15RestartPluginResponse\x12.\n" +
-	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\"o\n" +
+	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\"\x96\x01\n" +
 	"\x10DevPluginRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\aconsent\x18\x02 \x01(\bR\aconsent\x12\x17\n" +
 	"\adry_run\x18\x03 \x01(\bR\x06dryRun\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"\xb9\x01\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\x12%\n" +
+	"\x0econsent_digest\x18\x05 \x01(\tR\rconsentDigest\"\xb9\x01\n" +
 	"\x11DevPluginResponse\x12.\n" +
 	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\x12#\n" +
 	"\rneeds_consent\x18\x02 \x01(\bR\fneedsConsent\x12!\n" +

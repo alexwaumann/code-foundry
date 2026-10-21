@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -141,4 +142,49 @@ func TestKeychainArgv(t *testing.T) {
 	if strings.Contains(got, "-A") || strings.Contains(got, "-T") {
 		t.Error("the item would trust more applications than its creator")
 	}
+}
+
+// TestKeychainSetRefused: anything security -i prints is a failed store. Set removes the
+// item it may have written (security cuts a long line and stores the cut value) and says
+// so without quoting security, whose output echoes the value's hex. A value over the cap
+// never reaches security.
+func TestKeychainSetRefused(t *testing.T) {
+	if n := 2*MaxSecretBytes + maxAddPrefix; n > securityLineMax {
+		t.Fatalf("the longest add line is %d bytes, security -i reads %d", n, securityLineMax)
+	}
+	tests := []struct {
+		name, output string // what the fake prints on -i, and where
+		code         int
+	}{
+		{"stderr", `echo 'security: unknown command "7a7a7a"' >&2`, 0},
+		{"stdout", `echo 'Usage: add-generic-password 7a7a7a'`, 0},
+		{"exit status", ``, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			rec := filepath.Join(dir, "calls")
+			fake := filepath.Join(dir, "security")
+			script := "#!/bin/sh\necho \"$1\" >> '" + rec + "'\n" +
+				"if [ \"$1\" = -i ]; then cat >/dev/null; " + tt.output + "\nexit " + strconv.Itoa(tt.code) + "; fi\n"
+			if err := os.WriteFile(fake, []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			k := Keychain{Security: fake, Service: "code-foundry-plugin-test"}
+			err := k.Set(context.Background(), "hello", "word", "zzz")
+			if err == nil || !strings.Contains(err.Error(), "the Keychain refused the value (3 bytes)") || strings.Contains(err.Error(), "7a") {
+				t.Fatalf("err = %v", err)
+			}
+			if b, _ := os.ReadFile(rec); string(b) != "-i\ndelete-generic-password\n" {
+				t.Errorf("security calls: %q", b)
+			}
+		})
+	}
+	t.Run("over the cap", func(t *testing.T) {
+		k := Keychain{Security: filepath.Join(t.TempDir(), "never-run"), Service: strings.Repeat("s", 128)}
+		err := k.Set(context.Background(), "hello", "word", strings.Repeat("z", MaxSecretBytes+1))
+		if err == nil || !strings.Contains(err.Error(), "at most") {
+			t.Fatalf("err = %v", err)
+		}
+	})
 }

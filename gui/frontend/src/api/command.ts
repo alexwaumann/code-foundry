@@ -45,6 +45,12 @@ export interface ConfirmationView {
    * command's own (first) confirmation.
    */
   args?: Record<string, string>;
+  /**
+   * Args a command's own confirmation binds the yes to (plugin consent: the digest of
+   * the text shown): on yes, invoke again with them merged. Not a second stage, so the
+   * command's own presenter still asks.
+   */
+  bind?: Record<string, string>;
   /** What the command already did, the result when the user declines a second stage. */
   declined?: InvokeResultView;
 }
@@ -105,6 +111,7 @@ export function confirmationOf(err: unknown): ConfirmationView | null {
   if (!d) return null;
   const view: ConfirmationView = { command: d.command, title: d.title, message: d.message };
   if (Object.keys(d.args).length > 0) view.args = { ...d.args };
+  if (Object.keys(d.bind).length > 0) view.bind = { ...d.bind };
   if (d.declined) view.declined = { message: d.declined.message, resultJson: d.declined.resultJson };
   return view;
 }

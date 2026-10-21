@@ -197,11 +197,21 @@ func FuzzViewMutate(f *testing.F) {
 	})
 }
 
+// mutateBudget bounds the view mutateView builds: twice what the daemon reads at all, so
+// a view over maxRawView is still tried, but nothing grows without bound (an inflate of a
+// tree deep sections grew made a 1.5 GB view that took minutes to build).
+const mutateBudget = 2 * maxRawView
+
+// maxDeepSections bounds op 8: each nests 40 levels, ten times ui.MaxDepth already.
+const maxDeepSections = 3
+
 // mutateView applies ops to tree and encodes it. Each op is a path (bytes, until one is
-// 0 mod 4 or a leaf is reached) and a mutation byte.
+// 0 mod 4 or a leaf is reached) and a mutation byte. It stops once its estimate of the
+// encoded size (only ever grown) passes mutateBudget.
 func mutateView(tree any, ops []byte) []byte {
-	dup, inflated := "", false
-	for len(ops) > 0 {
+	dup, inflated, deep := "", false, 0
+	size := jsonSize(tree)
+	for len(ops) > 0 && size <= mutateBudget {
 		var path []any
 		cur := tree
 	walk:
@@ -250,21 +260,28 @@ func mutateView(tree any, ops []byte) []byte {
 			set("")
 		case 4:
 			set(strings.Repeat("x", 70000))
+			size += 70000
 		case 5:
 			set(-1)
 		case 6:
 			set(math.MaxFloat64)
 		case 7: // a huge array of it (once: arrays of arrays grow past any memory)
-			if inflated {
+			n := 499 * jsonSize(cur)
+			if inflated || size+n > 2*mutateBudget {
 				break
 			}
-			inflated = true
+			inflated, size = true, size+n
 			l := make([]any, 500)
 			for i := range l {
 				l[i] = cur
 			}
 			set(l)
 		case 8: // deep sections
+			if deep == maxDeepSections {
+				break
+			}
+			deep++
+			size += 40 * 64
 			v := cur
 			for i := range 40 {
 				v = map[string]any{"key": fmt.Sprintf("deep-%d", i), "section": map[string]any{"children": []any{v}}}
@@ -275,6 +292,7 @@ func mutateView(tree any, ops []byte) []byte {
 		case 10: // a copy of it beside it in its array (duplicate keys)
 			if len(path) > 0 {
 				if _, ok := path[len(path)-1].(int); ok {
+					size += jsonSize(cur)
 					tree = edit(tree, path[:len(path)-1], func(p any) (any, bool) {
 						l, _ := p.([]any)
 						return append(l, copyJSON(cur)), true
@@ -345,6 +363,12 @@ func edit(node any, path []any, fn func(any) (any, bool)) any {
 		return x
 	}
 	return node
+}
+
+// jsonSize is the length of v encoded.
+func jsonSize(v any) int {
+	b, _ := json.Marshal(v)
+	return len(b)
 }
 
 func copyJSON(v any) any {

@@ -245,6 +245,10 @@ message EnablePluginRequest {
   string name = 1;
   // The user consents to the permissions in the plugin's consent_text.
   bool consent = 2;
+  // With consent: the digest of the consent text the user was shown
+  // (ConfirmationRequired.bind). Enabling fails with FailedPrecondition when the
+  // plugin's consent text has changed since. Empty: consent to what it asks now.
+  string consent_digest = 3;
 }
 
 message EnablePluginResponse {
@@ -279,6 +283,8 @@ message DevPluginRequest {
   // installed package's leftovers): its secrets, data and consent are deleted first, and
   // enabling asks for consent again.
   bool force = 4;
+  // With consent: as EnablePluginRequest.consent_digest, over the dry run's consent_text.
+  string consent_digest = 5;
 }
 
 message DevPluginResponse {

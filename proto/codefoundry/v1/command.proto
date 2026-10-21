@@ -129,6 +129,14 @@ message ConfirmationRequired {
   // about the ones with uncommitted changes). Clients show it as the result. Unset:
   // declining leaves nothing done, and the CLI's --yes fails with the message.
   InvokeCommandResponse declined = 5;
+  // Set on a command's own (first) confirmation when its yes must stay bound to what
+  // was shown (plugin consent: {"consent-digest": "<digest of the message>"}). If the
+  // user agrees, invoke again with these args merged over the original ones and
+  // confirmed set; unlike args it is not a second stage, so the command's own presenter
+  // still asks. A client applies them only to the command it invoked. The CLI's --yes
+  // never sees this confirmation and sends none: the command then does what it does
+  // today.
+  map<string, string> bind = 6;
 }
 
 // CommandFailed is the error detail of an Invoke whose command could not do what it was

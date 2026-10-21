@@ -540,7 +540,7 @@ func (m *Manager) finishInstall(ctx context.Context, req InstallRequest, res Ins
 // finishLocked: opMu held.
 func (m *Manager) finishLocked(ctx context.Context, req InstallRequest, res InstallResult, name string) (InstallResult, error) {
 	if req.Enable {
-		er, err := m.enableLocked(ctx, name, req.Consent)
+		er, err := m.enableLocked(ctx, name, req.Consent, "")
 		if err != nil {
 			return InstallResult{}, err
 		}
@@ -624,6 +624,9 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 	if m.opts.Home != "" && !fsx.Within(m.opts.Home, real) {
 		return InstallResult{}, fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, real)
 	}
+	if err := m.refuseInsidePlugins(real); err != nil {
+		return InstallResult{}, err
+	}
 	mf, warnings, err := readManifest(real)
 	if err != nil {
 		return InstallResult{}, fmt.Errorf("%w: %s: %v", ErrInvalidArgument, real, err)
@@ -671,6 +674,26 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 	}
 	m.progress(InstallProgress{Ref: req.Ref, Name: name, Version: mf.Version, Phase: InstallDone, Message: "linked " + real})
 	return m.finishLocked(ctx, req, res, name)
+}
+
+// refuseInsidePlugins refuses a dev link to a folder inside the plugins directory: a
+// package there already runs as installed, and linking its own name over it would move
+// the folder aside, delete it, and leave a link to nothing.
+func (m *Manager) refuseInsidePlugins(real string) error {
+	dir := filepath.Clean(m.opts.Dir)
+	if r, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = r
+	}
+	if !fsx.Within(dir, real) {
+		return nil
+	}
+	rel, err := filepath.Rel(dir, real)
+	if err != nil || rel == "." {
+		return fmt.Errorf("%w: %s is the plugins folder; point at a plugin's own folder outside it", ErrInvalidArgument, real)
+	}
+	pkg, _, _ := strings.Cut(rel, string(filepath.Separator))
+	return fmt.Errorf("%w: %s is inside the plugins folder, so it already runs as the installed package %s (code-foundry plugin restart %s picks up a rebuild); to develop it as a dev plugin, move it out of %s first",
+		ErrFailedPrecondition, real, pkg, pkg, dir)
 }
 
 // linkOverPackage points link at real; an installed package there (a directory, not a

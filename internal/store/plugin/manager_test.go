@@ -560,6 +560,110 @@ func TestDevOutsideHome(t *testing.T) {
 	}
 }
 
+// TestLinkInsidePluginsDir: `plugin dev` / `plugin install <folder>` on a folder inside
+// the plugins directory (where `plugin list` tells users to write plugins) is refused,
+// even with --force, and the package is left alone.
+func TestLinkInsidePluginsDir(t *testing.T) {
+	for _, tc := range []struct{ name, sub string }{
+		{"package itself", ""},
+		{"folder inside the package", "sub"},
+	} {
+		for _, via := range []string{"dev", "install"} {
+			t.Run(tc.name+"/"+via, func(t *testing.T) {
+				e := newEnv(t, nil)
+				e.opts.Home, _ = filepath.EvalSymlinks(e.root)
+				pkg := e.install(e.opts.Dir, "hello", "ok", testManifest("hello"))
+				target := pkg
+				if tc.sub != "" {
+					target = e.install(pkg, tc.sub, "ok", testManifest("hello"))
+				}
+				m := e.start()
+				ctx := context.Background()
+				var err error
+				if via == "dev" {
+					_, err = m.Dev(ctx, target, true, false, true)
+				} else {
+					_, err = m.Install(ctx, plugin.InstallRequest{Ref: target, Force: true, Consent: true})
+				}
+				if !errors.Is(err, plugin.ErrFailedPrecondition) || !strings.Contains(err.Error(), "plugin restart hello") || strings.Contains(err.Error(), "--force") {
+					t.Fatalf("err = %v", err)
+				}
+				fi, err := os.Lstat(pkg)
+				if err != nil || fi.Mode()&os.ModeSymlink != 0 {
+					t.Fatalf("the package was replaced: %v %v", fi, err)
+				}
+				if _, err := os.Stat(filepath.Join(target, "plugin.json")); err != nil {
+					t.Fatalf("the folder was touched: %v", err)
+				}
+				if p, ok := m.Snapshot().Plugin("hello"); !ok || p.Dev {
+					t.Fatalf("plugin = %+v %v", p, ok)
+				}
+			})
+		}
+	}
+}
+
+// TestConsentBoundToWhatWasShown: consent given to the consent text a prompt showed
+// (EnableShown, DevShown) is refused once plugin.json asks for more, so editing it
+// while the dialog is open gains nothing; the text now shown is accepted, and no
+// digest (--yes) consents to whatever it asks.
+func TestConsentBoundToWhatWasShown(t *testing.T) {
+	ctx := context.Background()
+	bare := testManifest("hello")
+	bare.Permissions = pluginsdk.Permissions{}
+	more := testManifest("hello")
+	more.Permissions = pluginsdk.Permissions{SessionEnv: true, Commands: []string{"thread.**"}}
+
+	t.Run("dev", func(t *testing.T) {
+		e := newEnv(t, nil)
+		src := e.install(filepath.Join(e.root, "src"), "hello", "ok", bare)
+		m := e.start()
+		res, err := m.Dev(ctx, src, false, true, false)
+		if err != nil || !res.NeedsConsent {
+			t.Fatalf("dry run = %+v, %v", res, err)
+		}
+		shown := command.ConfirmDigest(res.Consent)
+		e.install(filepath.Join(e.root, "src"), "hello", "ok", more) // edited while the dialog is open
+		if _, err := m.DevShown(ctx, src, shown, false); !errors.Is(err, plugin.ErrFailedPrecondition) || !strings.Contains(err.Error(), "review them again") {
+			t.Fatalf("DevShown with the old text: %v", err)
+		}
+		if _, err := os.Lstat(filepath.Join(e.opts.Dir, "hello")); !os.IsNotExist(err) {
+			t.Fatal("linked anyway")
+		}
+		if res, err = m.Dev(ctx, src, false, true, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := m.DevShown(ctx, src, command.ConfirmDigest(res.Consent), false); err != nil {
+			t.Fatalf("DevShown with the text shown now: %v", err)
+		}
+		if p := e.waitState("hello", plugin.StateRunning); p.Granted == nil || !p.Granted.SessionEnv {
+			t.Fatalf("granted %+v", p.Granted)
+		}
+	})
+
+	t.Run("enable", func(t *testing.T) {
+		e := newEnv(t, nil)
+		e.install(e.opts.Dir, "hello", "ok", bare)
+		m := e.start()
+		p, _ := m.Snapshot().Plugin("hello")
+		shown := command.ConfirmDigest(plugin.ConsentText(p.Manifest))
+		e.install(e.opts.Dir, "hello", "ok", more)
+		if err := m.Reload(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := m.EnableShown(ctx, "hello", shown); !errors.Is(err, plugin.ErrFailedPrecondition) {
+			t.Fatalf("EnableShown with the old text: %v", err)
+		}
+		if p, _ := m.Snapshot().Plugin("hello"); p.Enabled || p.Granted != nil {
+			t.Fatalf("enabled anyway: %+v", p)
+		}
+		if _, err := m.EnableShown(ctx, "hello", ""); err != nil {
+			t.Fatalf("no digest (--yes): %v", err)
+		}
+		e.waitState("hello", plugin.StateRunning)
+	})
+}
+
 func TestCloseStopsPlugins(t *testing.T) {
 	e := newEnv(t, nil)
 	e.install(e.opts.Dir, "hello", "ok", testManifest("hello"))

@@ -53,7 +53,13 @@ func (h *Plugin) List(_ context.Context, req *connect.Request[v1.ListPluginsRequ
 
 // Enable turns a plugin on, or reports the consent it needs.
 func (h *Plugin) Enable(ctx context.Context, req *connect.Request[v1.EnablePluginRequest]) (*connect.Response[v1.EnablePluginResponse], error) {
-	res, err := h.store.Enable(ctx, req.Msg.GetName(), req.Msg.GetConsent())
+	var res plugin.EnableResult
+	var err error
+	if d := req.Msg.GetConsentDigest(); d != "" && req.Msg.GetConsent() {
+		res, err = h.store.EnableShown(ctx, req.Msg.GetName(), d)
+	} else {
+		res, err = h.store.Enable(ctx, req.Msg.GetName(), req.Msg.GetConsent())
+	}
 	if err != nil {
 		return nil, pluginError(err)
 	}
@@ -83,7 +89,13 @@ func (h *Plugin) Restart(ctx context.Context, req *connect.Request[v1.RestartPlu
 // Dev links a plugin folder and enables it.
 func (h *Plugin) Dev(ctx context.Context, req *connect.Request[v1.DevPluginRequest]) (*connect.Response[v1.DevPluginResponse], error) {
 	m := req.Msg
-	res, err := h.store.Dev(ctx, m.GetPath(), m.GetConsent(), m.GetDryRun(), m.GetForce())
+	var res plugin.EnableResult
+	var err error
+	if d := m.GetConsentDigest(); d != "" && m.GetConsent() && !m.GetDryRun() {
+		res, err = h.store.DevShown(ctx, m.GetPath(), d, m.GetForce())
+	} else {
+		res, err = h.store.Dev(ctx, m.GetPath(), m.GetConsent(), m.GetDryRun(), m.GetForce())
+	}
 	if err != nil {
 		return nil, pluginError(err)
 	}

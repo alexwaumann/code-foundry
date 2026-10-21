@@ -76,3 +76,35 @@ describe("invokeConfirmed second-stage confirmation", () => {
     expect(useConfirmStore.getState().pending).toBeNull();
   });
 });
+
+describe("invokeConfirmed bind args", () => {
+  beforeEach(() => {
+    invokeCommand.mockReset();
+  });
+  const consent = new NeedsConfirm({
+    command: "plugin.enable",
+    title: "Enable Plugin",
+    message: "Enable Hello 0.1.0? It runs bin/hello as you and asks for no permissions.",
+    bind: { "consent-digest": "d1" },
+  });
+
+  it("asks through the command's own presenter and sends the bind args with the yes", async () => {
+    const { useConsentStore, answerConsent } = await import("./pluginConsent");
+    invokeCommand.mockRejectedValueOnce(consent).mockResolvedValue(ok);
+    const done = invokeConfirmed("plugin.enable", { name: "hello" }, ctx);
+    await vi.waitFor(() => {
+      expect(useConsentStore.getState().pending?.text).toBe(consent.confirm.message);
+    });
+    answerConsent(true);
+    expect(await done).toEqual(ok);
+    expect(invokeCommand).toHaveBeenLastCalledWith("plugin.enable", ctx, { name: "hello", "consent-digest": "d1" }, undefined, { confirmed: true });
+  });
+
+  it("does not send another command's bind args (plugin.act's button)", async () => {
+    invokeCommand.mockRejectedValueOnce(consent).mockResolvedValue(ok);
+    const done = invokeConfirmed("plugin.act", { key: "on" }, ctx);
+    await answer(consent.confirm.message, true);
+    await done;
+    expect(invokeCommand).toHaveBeenLastCalledWith("plugin.act", ctx, { key: "on" }, undefined, { confirmed: true });
+  });
+});

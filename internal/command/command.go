@@ -64,6 +64,12 @@ type Command struct {
 	// Listing still reports the command as requiring confirmation, so clients offer
 	// their confirm flag. It sees the effective context and validated args.
 	ConfirmIf func(ctx context.Context, uctx Context, args Args) bool
+	// BindConfirm, when set with Confirm, names a String arg the confirmation fills in:
+	// the ConfirmError carries Bind {BindConfirm: ConfirmDigest(message)}, which clients
+	// send back on the confirmed re-invoke, so Run can refuse when what it would ask now
+	// differs from what the user agreed to (plugin consent). A call confirmed without
+	// being asked (the CLI's --yes) has it empty.
+	BindConfirm string
 }
 
 // Available reports whether c is available in uctx.
@@ -233,6 +239,12 @@ func (c *Command) validate() error {
 	}
 	if err := validateConfirm(c.Confirm, c.Args); err != nil {
 		return invalid("%v", err)
+	}
+	if c.BindConfirm != "" {
+		i := slices.IndexFunc(c.Args, func(a ArgSpec) bool { return a.Name == c.BindConfirm })
+		if c.Confirm == "" || i < 0 || c.Args[i].Type != String || c.Args[i].Required || c.Args[i].Positional {
+			return invalid("BindConfirm %q must name an optional String flag of a command with Confirm", c.BindConfirm)
+		}
 	}
 	return nil
 }

@@ -65,7 +65,7 @@ func commandError(name string, err error) error {
 	case errors.As(err, &confirm):
 		out := connect.NewError(connect.CodeFailedPrecondition, err)
 		cr := &v1.ConfirmationRequired{
-			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title, Args: confirm.Args,
+			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title, Args: confirm.Args, Bind: confirm.Bind,
 		}
 		if res := confirm.Declined; res != nil {
 			js, _ := res.EncodeJSON()

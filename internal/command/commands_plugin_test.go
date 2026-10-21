@@ -108,3 +108,45 @@ func TestPluginCommands(t *testing.T) {
 		})
 	}
 }
+
+// TestPluginConsentBind: plugin.enable's and plugin.dev's consent prompt binds the yes
+// to the text shown: the confirmation carries its digest, and the confirmed re-invoke
+// sends it to the daemon, which refuses if the plugin asks for anything else by then.
+func TestPluginConsentBind(t *testing.T) {
+	for _, tc := range []struct {
+		cmd  string
+		args map[string]string
+		want func(digest string) proto.Message
+	}{
+		{"plugin.enable", map[string]string{"name": "hello"}, func(d string) proto.Message {
+			return &v1.EnablePluginRequest{Name: "hello", Consent: true, ConsentDigest: d}
+		}},
+		{"plugin.dev", map[string]string{"path": "/src/hello"}, func(d string) proto.Message {
+			return &v1.DevPluginRequest{Path: "/src/hello", Consent: true, ConsentDigest: d}
+		}},
+	} {
+		t.Run(tc.cmd, func(t *testing.T) {
+			reg, b := pluginFixture(t)
+			_, err := reg.Invoke(context.Background(), command.Context{}, tc.cmd, tc.args)
+			var ce *command.ConfirmError
+			if !errors.As(err, &ce) {
+				t.Fatalf("err = %v, want a confirmation", err)
+			}
+			d := ce.Bind["consent-digest"]
+			if len(ce.Bind) != 1 || d != command.ConfirmDigest(ce.Message) || len(ce.Args) != 0 {
+				t.Fatalf("bind %v args %v for %q", ce.Bind, ce.Args, ce.Message)
+			}
+			args := map[string]string{"consent-digest": d}
+			for k, v := range tc.args {
+				args[k] = v
+			}
+			if _, err := reg.Invoke(context.Background(), command.Context{}, tc.cmd, args, command.Confirmed(true)); err != nil {
+				t.Fatal(err)
+			}
+			reqs := b.Requests()
+			if !proto.Equal(reqs[len(reqs)-1], tc.want(d)) {
+				t.Errorf("request %v, want %v", reqs[len(reqs)-1], tc.want(d))
+			}
+		})
+	}
+}
