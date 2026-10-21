@@ -181,6 +181,8 @@ type Git struct {
 	files   fileCollector // live worktrees' file changes (files.go)
 	// autoPull is the daemon's auto pull hooks and the passes running (autopull.go).
 	autoPull autoPullState
+	// fetches runs the fetch loop's fetches (fetchpool.go).
+	fetches fetchPool
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -249,7 +251,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {
 		// Every project is due in the first round (zero seed), shortly after start.
 		s := newTierSched(t, time.Time{})
-		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetch) })
+		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetchAsync) })
 	}
 	if t := tiers(opts.PollInterval, opts.IdlePollInterval, DefaultPollInterval, DefaultIdlePollInterval); t.live > 0 {
 		// The initial reconcile below refreshes everything, so each project's first
@@ -620,10 +622,14 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
 		slug = parseGitHubSlug(string(trimNL(out)))
 	}
-	path := filepath.Clean(defaultWorktreePath(g.wtRoot, slug, m.Name, opts.Branch))
+	path := filepath.Clean(defaultWorktreePath(g.wtRoot, g.worktreeDirKey(m, slug), opts.Branch))
 
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()
+	g.dropStaleWorktrees(ctx, m, path, opts.Branch)
+	if err := requireFree(path); err != nil {
+		return Worktree{}, err
+	}
 	local := g.refExists(ctx, m.Path, "refs/heads/"+opts.Branch)
 	remote := g.refExists(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	var args []string
@@ -885,16 +891,28 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	}
 	args = append(args, path)
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
-		if !opts.Force {
-			// git refuses a worktree with modified or untracked files: read its status
-			// again, so the caller can show what --force would delete.
-			if g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}) == nil {
-				if now, ok := g.Snapshot().Worktree(m.ID, path); ok && now.Status.HasUncommitted() {
-					return &UncommittedError{Worktrees: []Worktree{now}}
-				}
-			}
+		if opts.Force {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 		}
-		return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		// git refuses a worktree with modified or untracked files: read its status
+		// again, so the caller can show what --force would delete.
+		if werr := g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}); werr != nil {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
+		now, ok := g.Snapshot().Worktree(m.ID, path)
+		if ok && now.Status.HasUncommitted() {
+			return &UncommittedError{Worktrees: []Worktree{now}}
+		}
+		if !ok || now.Status.Error != "" || !refusedForSubmodules(err) || !g.submodulesSafe(ctx, path) {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
+		// git refuses any worktree with an initialized submodule, clean or not (fuzz
+		// finding git 8). Clean (status counts a modified or untracked submodule) and
+		// nothing in a submodule that its remote lacks: --force loses nothing.
+		g.log.Info("worktree has submodules and nothing to lose; removing with --force", "project", m.ID, "path", path)
+		if _, err := g.runner.Run(ctx, m.Path, "worktree", "remove", "--force", path); err != nil {
+			return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
 	}
 	g.log.Info("worktree removed", "project", m.ID, "path", path)
 	g.forgetMade(ctx, g.now(), path)

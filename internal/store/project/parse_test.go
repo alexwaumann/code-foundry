@@ -284,7 +284,7 @@ func TestDefaultWorktreePathAndID(t *testing.T) {
 		{"", "foundry", "a/b/c", "/wt/_local/foundry/a-b-c"},
 	}
 	for _, tt := range tests {
-		if got := defaultWorktreePath("/wt", tt.slug, tt.name, tt.branch); got != tt.want {
+		if got := defaultWorktreePath("/wt", worktreeKey(tt.slug, tt.name), tt.branch); got != tt.want {
 			t.Errorf("defaultWorktreePath(/wt, %q, %q, %q) = %q, want %q", tt.slug, tt.name, tt.branch, got, tt.want)
 		}
 	}

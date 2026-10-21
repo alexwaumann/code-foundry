@@ -126,22 +126,16 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	if err != nil {
 		return Workspace{}, err
 	}
-	branch, err := branchFor(ctx, name, o.Branch, m.opts.DefaultBranch)
-	if err != nil {
-		return Workspace{}, err
-	}
+	// Everything cheap is checked before the branch is named: naming one from the name
+	// may ask the namer, a model call bounded by its timeout (fuzz finding api 4).
 	if err := validateRef("base ref", o.BaseRef); err != nil {
 		return Workspace{}, err
 	}
 	if len(o.Members) == 0 {
 		return Workspace{}, fmt.Errorf("%w: a workspace needs at least one project", ErrInvalidArgument)
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, w := range m.byID {
-		if w.Name == name {
-			return Workspace{}, fmt.Errorf("%w: a workspace named %q exists (%s)", ErrFailedPrecondition, name, w.ID)
-		}
+	if err := nameFree(m.Snapshot(), name); err != nil {
+		return Workspace{}, err
 	}
 	projects := m.opts.Projects.Snapshot()
 	type plan struct {
@@ -169,6 +163,15 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 		}
 		plans = append(plans, plan{r: r, base: base})
 	}
+	branch, err := branchFor(ctx, name, o.Branch, m.opts.DefaultBranch)
+	if err != nil {
+		return Workspace{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := nameFree(m.Snapshot(), name); err != nil { // again: one may have been made meanwhile
+		return Workspace{}, err
+	}
 	id, err := newID()
 	if err != nil {
 		return Workspace{}, err
@@ -193,6 +196,16 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	m.put(w)
 	m.log.Info("workspace created", "workspace", w.ID, "name", w.Name, "branch", w.Branch, "members", len(w.Members))
 	return withStartPoints(w, made), nil
+}
+
+// nameFree refuses a name a workspace in snap has.
+func nameFree(snap *Snapshot, name string) error {
+	for _, w := range snap.Workspaces {
+		if w.Name == name {
+			return fmt.Errorf("%w: a workspace named %q exists (%s)", ErrFailedPrecondition, name, w.ID)
+		}
+	}
+	return nil
 }
 
 // AddProject implements Store.

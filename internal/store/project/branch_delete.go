@@ -57,6 +57,10 @@ func (g *Git) DeleteBranch(ctx context.Context, o DeleteBranchOptions) (DeleteBr
 		return res, fmt.Errorf("%w: %s is the default branch of %s", ErrInvalidArgument, o.Branch, m.Name)
 	}
 	localTip := g.revParse(ctx, m.Path, "refs/heads/"+o.Branch)
+	if localTip != "" {
+		// A worktree deleted by hand still "uses" the branch for git.
+		g.dropStaleWorktrees(ctx, m, "", o.Branch)
+	}
 	remoteTip := ""
 	if o.Remote {
 		if _, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err != nil {
