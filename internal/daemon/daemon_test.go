@@ -84,7 +84,8 @@ func TestLoopbackHandlerPreviewNeedsNoBearer(t *testing.T) {
 
 func TestRequireBearerAndCORS(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
-	h := cors(requireBearer("secret", ok))
+	// Through loopbackHandler, so the test covers CORS being mounted on the API side.
+	h := loopbackHandler("secret", http.NotFoundHandler(), ok)
 	tests := []struct {
 		name       string
 		method     string
@@ -100,9 +101,27 @@ func TestRequireBearerAndCORS(t *testing.T) {
 			map[string]string{"Authorization": "Bearer secret", "Origin": "wails://localhost"}, http.StatusTeapot, "wails://localhost"},
 		{"wrong token with origin", http.MethodPost,
 			map[string]string{"Origin": "wails://localhost"}, http.StatusUnauthorized, "wails://localhost"},
+		{"wails3 dev origin", http.MethodPost,
+			map[string]string{"Authorization": "Bearer secret", "Origin": "wails://localhost:9245"}, http.StatusTeapot, "wails://localhost:9245"},
+		{"dev browser origin", http.MethodPost,
+			map[string]string{"Authorization": "Bearer secret", "Origin": "http://127.0.0.1:9245"}, http.StatusTeapot, "http://127.0.0.1:9245"},
 		{"preflight skips auth", http.MethodOptions,
 			map[string]string{"Origin": "http://localhost:9245", "Access-Control-Request-Method": "POST"}, http.StatusNoContent, "http://localhost:9245"},
 		{"bare OPTIONS needs auth", http.MethodOptions, nil, http.StatusUnauthorized, ""},
+		// An opaque-origin page (the HTML preview's sandboxed frame) is never let in,
+		// even holding the token.
+		{"null origin preflight", http.MethodOptions,
+			map[string]string{"Origin": "null", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"null origin with token", http.MethodPost,
+			map[string]string{"Authorization": "Bearer secret", "Origin": "null"}, http.StatusTeapot, ""},
+		{"web origin preflight", http.MethodOptions,
+			map[string]string{"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"localhost lookalike", http.MethodOptions,
+			map[string]string{"Origin": "http://localhost.evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"wails scheme, other host", http.MethodOptions,
+			map[string]string{"Origin": "wails://evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"file origin", http.MethodOptions,
+			map[string]string{"Origin": "file://", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

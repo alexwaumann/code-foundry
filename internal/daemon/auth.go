@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,11 +64,12 @@ func requireBearer(token string, next http.Handler) http.Handler {
 
 // loopbackHandler is what the TCP listener serves: the HTML preview's route, whose
 // credential is the grant in its URL because an <iframe src> cannot send a header
-// (package preview), and behind the bearer token everything else.
+// (package preview) and which sets its own CORS header, and behind CORS and the bearer
+// token everything else.
 func loopbackHandler(token string, previewH, rest http.Handler) http.Handler {
 	m := http.NewServeMux()
 	m.Handle(preview.Prefix, previewH)
-	m.Handle("/", requireBearer(token, rest))
+	m.Handle("/", cors(requireBearer(token, rest)))
 	return m
 }
 
@@ -84,15 +86,19 @@ var (
 	}, ", ")
 )
 
-// cors lets the Wails webview (origin wails://localhost, or the Vite dev server in
-// `wails3 dev`) call the loopback listener. Any origin is reflected: the bearer token,
-// which only the Wails host can read from disk, is the security boundary, and no
-// cookies or other ambient credentials are accepted. Preflights are answered before
-// auth because browsers never attach Authorization to them.
+// cors lets the Wails webview (origin wails://localhost, or wails://localhost:9245 in
+// `wails3 dev`) and a dev frontend in a browser (http://localhost:<port> or
+// http://127.0.0.1:<port>, docs/notes/phase1e-gui.md) call the bearer-protected API.
+// The bearer token is the boundary, but no other origin is reflected, `null` least of
+// all: the HTML preview's pages run with an opaque origin and must not be able to call
+// the API even with a token in hand (docs/notes/preview-scope-floor.md). A request from
+// another origin gets no CORS headers, so the browser blocks it (a preflight falls
+// through to the bearer check and is 401). Preflights are answered before auth because
+// browsers never attach Authorization to them.
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" {
+		if !allowedOrigin(origin) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -111,4 +117,23 @@ func cors(next http.Handler) http.Handler {
 		h.Set("Access-Control-Expose-Headers", corsExposeHeaders)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// allowedOrigin reports whether a browser page at origin may call the API: the Wails
+// webview (wails://localhost, any port) or a page served from loopback over http(s).
+func allowedOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.User != nil || (u.Path != "" && u.Path != "/") {
+		return false
+	}
+	switch u.Scheme {
+	case "wails":
+		return u.Hostname() == "localhost"
+	case "http", "https":
+		switch u.Hostname() {
+		case "localhost", "127.0.0.1", "::1":
+			return true
+		}
+	}
+	return false
 }

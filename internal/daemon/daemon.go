@@ -311,7 +311,7 @@ func Run(ctx context.Context, opts Options) error {
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
 	previewH := preview.Handler(st.home, grants, log.With("component", "preview"))
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", cors(loopbackHandler(token, previewH, mux))))
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, previewH, mux)))
 
 	errc := make(chan error, 2)
 	go func() { errc <- serve(unixSrv, unixLn) }()
