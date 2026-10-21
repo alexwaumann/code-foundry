@@ -45,9 +45,22 @@ function TabGhost({ tab }: { tab: Tab }) {
  * slides to where a reorder would put it. A drop anywhere else puts it back.
  *
  * `orientation` is the panel's (splitOrientation): the band's edge while unsplit.
- * `panel` is the aside, the ghost's bounds.
+ * `panel` is the aside, the ghost's bounds. `onDragChange` hears a tab lifted (true) and
+ * dropped or cancelled (false): the aside marks the drag for its iframes (Panel).
  */
-export function PanelDnd({ panelKey, orientation, panel, children }: { panelKey: string; orientation: SplitOrientation; panel: RefObject<HTMLElement | null>; children: ReactNode }) {
+export function PanelDnd({
+  panelKey,
+  orientation,
+  panel,
+  onDragChange,
+  children,
+}: {
+  panelKey: string;
+  orientation: SplitOrientation;
+  panel: RefObject<HTMLElement | null>;
+  onDragChange?: (dragging: boolean) => void;
+  children: ReactNode;
+}) {
   const [drag, setDrag] = useState<PanelDrag | null>(null);
   const [target, setTarget] = useState<DropTarget | null>(null);
   // dnd-kit's sensor outlives the context: a release after the panel unmounted (the
@@ -80,12 +93,15 @@ export function PanelDnd({ panelKey, orientation, panel, children }: { panelKey:
   const end = () => {
     setDrag(null);
     setTarget(null);
+    onDragChange?.(false);
   };
   const onDragStart = ({ active }: DragStartEvent) => {
     announcer.track(null);
     const d = dropDataOf(active.data.current);
     const tab = allTabs(getPanel(panelKey)).find((t) => t.id === active.id);
-    if (d?.kind === "tab" && tab) setDrag({ tab, group: d.group });
+    if (d?.kind !== "tab" || !tab) return;
+    setDrag({ tab, group: d.group });
+    onDragChange?.(true);
   };
   const onDragEnd = ({ active, collisions }: DragEndEvent) => {
     end();
