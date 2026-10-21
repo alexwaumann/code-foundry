@@ -126,6 +126,40 @@ names them.
 - Frontend: `timerRows` (vitest); e2e `ember.spec.ts` "Scheduled lists Ember's timers
   before Done today; the × cancels one".
 
+## End to end (2026-10-21, scratch home)
+
+`make build`; `CODE_FOUNDRY_HOME=/tmp/ember-fix-c bin/code-foundry daemon --dev`; Ember
+and its workers on Haiku 5.5 at medium; `cf` pins that home.
+
+```
+$ cf thread send --id <ember> --text "Remind me in 1 minute to stretch my legs and refill my water. Put a note on the reminder." --wait
+# Haiku reached for Claude Code's own ScheduleWakeup tool, not the skill (a PR D matter);
+# asked again to use the code-foundry timer from its skill's Later line, it ran:
+code-foundry thread subscribe --at 1m --note "Reminder: stretch your legs and refill your water."
+→ subscribed sub-e1c6b6bc0708: s-9524e28859e1 wakes at 09:36 CDT (once) · Reminder: stretch your legs and refill your water.
+$ cf thread subscriptions --id <ember>
+ID                SUBSCRIBER              TARGET              UNTIL  REPEAT  FIRED  LAST FIRED  TARGET STATUS   NOTE
+sub-e1c6b6bc0708  s-9524e28859e1 (Ember)  timer at 09:36 CDT  fired  no      0      -           next 09:36 CDT  Reminder: stretch your legs and refill your water.
+$ cf ember board
+## Scheduled
+
+Your timers; `code-foundry thread unsubscribe <id>` cancels one.
+
+- 09:36 CDT · once · Reminder: stretch your legs and refill your water. · sub-e1c6b6bc0708
+# the wake:
+Timer sub-e1c6b6bc0708 fired at 09:36 CDT (set for 09:36 CDT): Reminder: stretch your legs and refill your water.
+{ "kind": "timer", …, "at": "2026-10-21T14:36:50.656Z", "note": "Reminder: stretch your legs and refill your water." }
+```
+
+Then two timers by hand (`--at 2h --note …`, `--every 30m --note …`) and `ember reseed`:
+seed/BOARD.md had both under Scheduled, soonest first. A plain parent subscribed to a
+child (`--note "check the child's answer"`) got a settled wake with `"note"` and
+`"started_at": "…14:37:14.755Z", "ran_for": "5s"` (the turn itself took 2.8 s; the rest
+is the spawn after the message). In the GUI (Vite against the scratch daemon, WebKit)
+the Board showed both timers; the × on the repeating one removed it from the board and
+from `thread subscriptions`. Then the daemon was stopped and the scratch home and its
+transcripts deleted.
+
 ## Daemon restart
 
 Needed after merging: migration 0043, new proto fields, the ember store's timers.
