@@ -4,6 +4,7 @@ import {
   closePanelTab,
   closeTab,
   emptyEntry,
+  emptyGroup,
   expandPanel,
   getPanel,
   isPicking,
@@ -16,6 +17,7 @@ import {
   openSurface,
   openTab,
   resetPanelWidth,
+  sanitizePanelState,
   setExpanded,
   setPanelWidth,
   setWidth,
@@ -129,6 +131,53 @@ describe("migratePanelV2", () => {
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
     expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 3, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    localStorage.clear();
+    usePanelStore.setState({ byKey: {} });
+  });
+});
+
+describe("sanitizePanelState", () => {
+  it("repairs groups without a tabs array (a version 3 store rewritten by an older build)", () => {
+    expect(sanitizePanelState({ "view:projects": { open: true, width: 420, groups: [{}] }, "thread:s-1": { open: true, groups: [{}], width: 765, focused: 1 } })).toEqual({
+      "view:projects": { open: true, width: 420, groups: [emptyGroup] },
+      "thread:s-1": { open: true, groups: [emptyGroup], width: 765 },
+    });
+  });
+
+  it("keeps a sound entry as it is, split and picking included", () => {
+    const split: PanelEntry = { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [diff, pr], activeTabId: null, pickFrom: pr.id }], ratio: 0.3, focused: 1, width: 600, expanded: true };
+    expect(sanitizePanelState({ k: split })).toEqual({ k: split });
+  });
+
+  it("takes a version 2 shape that still carries groups from the groups, else from the flat list", () => {
+    expect(sanitizePanelState({ a: { ...legacy(true, [], null), groups: [{ tabs: [files], activeTabId: files.id }] }, b: legacy(true, [files, diff], null, diff.id) })).toEqual({
+      a: entry(true, [files], files.id),
+      b: picking([files, diff], diff.id),
+    });
+  });
+
+  it("drops what it cannot use: junk entries, malformed tabs, an active tab that is not there, a pickFrom with an active tab, a bad ratio or focus", () => {
+    expect(
+      sanitizePanelState({
+        junk: 7,
+        list: [],
+        k: { open: "yes", groups: [{ tabs: [files, { id: 1 }, { id: "x", kind: "y", title: "t", params: { a: 1, b: "c" } }], activeTabId: "gone", pickFrom: files.id }], ratio: 3, focused: 1, width: "wide" },
+        extra: { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [diff], activeTabId: diff.id }, { tabs: [pr], activeTabId: pr.id }] },
+      }),
+    ).toEqual({
+      k: { open: false, groups: [{ tabs: [files, { id: "x", kind: "y", title: "t", params: { b: "c" } }], activeTabId: null, pickFrom: files.id }] },
+      extra: { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [diff], activeTabId: diff.id }] },
+    });
+    expect(sanitizePanelState(null)).toEqual({});
+  });
+
+  it("rehydrates a broken version 3 store without throwing, and a store from a newer version through the repair", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 3, state: { byKey: { "view:projects": { open: true, groups: [{}] } } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("view:projects")).toEqual({ open: true, groups: [emptyGroup] });
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 9, state: { byKey: { "thread:s-2": { open: true, groups: [{ tabs: [files], activeTabId: files.id, future: 1 }], future: true } } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("thread:s-2")).toEqual(entry(true, [files], files.id));
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });
