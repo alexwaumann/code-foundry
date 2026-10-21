@@ -568,3 +568,54 @@ func TestTasks(t *testing.T) {
 		t.Errorf("reloaded = %+v", c)
 	}
 }
+
+// The board lists the resident's timers (not another thread's), follows them as they
+// are added and cancelled, and BOARD.md shows them under Scheduled.
+func TestTimers(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newEnv(t)
+	e.set(on)
+	r := e.resident()
+	other, err := e.threads.Create(ctx, thread.CreateOptions{Name: "other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.threads.Subscribe(ctx, thread.SubscribeOptions{SubscriberID: other.ID, TargetEvery: time.Hour}); err != nil {
+		t.Fatal(err)
+	}
+	at := now.Add(55 * time.Minute)
+	res, err := e.threads.Subscribe(ctx, thread.SubscribeOptions{SubscriberID: r.ID, TargetAt: at, Note: "remind the user to review t-00000003"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := e.await("the timer", func(s *Snapshot) bool { return len(s.Timers) == 1 })
+	if got := snap.Timers[0]; got.ID != res.Subscription.ID || !got.NextAt.Equal(at) || got.Every != 0 || got.Note != "remind the user to review t-00000003" {
+		t.Errorf("timer = %+v", got)
+	}
+	every, err := e.threads.Subscribe(ctx, thread.SubscribeOptions{SubscriberID: r.ID, TargetEvery: 2 * time.Minute, Note: "ping"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap = e.await("both timers", func(s *Snapshot) bool { return len(s.Timers) == 2 })
+	if snap.Timers[0].ID != every.Subscription.ID || snap.Timers[0].Every != 2*time.Minute {
+		t.Errorf("soonest first: %+v", snap.Timers)
+	}
+
+	if _, err := e.s.Reseed(ctx); err != nil {
+		t.Fatal(err)
+	}
+	board, err := os.ReadFile(filepath.Join(e.dir, "seed", "BOARD.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "- 14:07 UTC · every 2m · ping · " + every.Subscription.ID + "\n- 15:00 UTC · once · remind the user to review t-00000003 · " +
+		res.Subscription.ID + "\n"; !strings.Contains(string(board), "## Scheduled") || !strings.Contains(string(board), want) {
+		t.Errorf("BOARD.md lacks %q:\n%s", want, board)
+	}
+
+	if _, err := e.threads.Unsubscribe(ctx, thread.UnsubscribeOptions{ID: every.Subscription.ID}); err != nil {
+		t.Fatal(err)
+	}
+	e.await("the cancel", func(s *Snapshot) bool { return len(s.Timers) == 1 && s.Timers[0].ID == res.Subscription.ID })
+}

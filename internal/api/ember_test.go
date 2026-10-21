@@ -97,11 +97,24 @@ func TestEmberService(t *testing.T) {
 	if !stream.Receive() || len(stream.Msg().GetTasks()) != 2 {
 		t.Fatalf("first board: %v, %v", stream.Msg(), stream.Err())
 	}
+	if len(stream.Msg().GetTimers()) != 0 {
+		t.Errorf("timers on the first board: %v", stream.Msg().GetTimers())
+	}
 	next := emberFixture()
 	next.Tasks = next.Tasks[:1]
 	next.Status.Consolidating = true
+	next.Timers = []ember.Timer{
+		{ID: "sub-1", NextAt: emberAt.Add(2 * time.Minute), Every: 90 * time.Minute, Note: "ping", CreatedAt: emberAt},
+		{ID: "sub-2", NextAt: emberAt.Add(time.Hour)},
+	}
 	f.put(next)
 	if !stream.Receive() || len(stream.Msg().GetTasks()) != 1 || !stream.Msg().GetStatus().GetConsolidating() {
 		t.Errorf("second board: %v, %v", stream.Msg(), stream.Err())
+	}
+	tm := stream.Msg().GetTimers()
+	if len(tm) != 2 || tm[0].GetId() != "sub-1" || tm[0].GetEvery() != "1h30m" || tm[0].GetNote() != "ping" ||
+		!tm[0].GetNextAt().AsTime().Equal(emberAt.Add(2*time.Minute)) || !tm[0].GetCreatedAt().AsTime().Equal(emberAt) ||
+		tm[1].GetEvery() != "" || tm[1].GetCreatedAt() != nil {
+		t.Errorf("timers = %v", tm)
 	}
 }

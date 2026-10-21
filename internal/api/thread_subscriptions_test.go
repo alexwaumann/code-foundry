@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -150,13 +151,22 @@ func TestThreadSubscriptionsTimer(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()
 	fake.Put(thread.Thread{ID: "s-p", Name: "Parent", State: thread.StateDisconnected, Status: thread.StatusIdle})
-	res, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetEvery: durationpb.New(30 * time.Minute)}))
+	res, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetEvery: durationpb.New(30 * time.Minute),
+		Note: "check the\ndeploy"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s := res.Msg.GetSubscription(); s.GetTarget() != v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER || s.GetTargetId() != "every:30m" ||
-		s.GetCondition() != v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED || !s.GetRepeat() {
+		s.GetCondition() != v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED || !s.GetRepeat() || s.GetNote() != "check the deploy" {
 		t.Errorf("Subscribe every = %v", res.Msg)
+	}
+	if _, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetEvery: durationpb.New(time.Hour),
+		Note: strings.Repeat("x", 201)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("a long note = %v", err)
+	}
+	if list, err := c.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-p"})); err != nil ||
+		len(list.Msg.GetSubscriptions()) != 1 || list.Msg.GetSubscriptions()[0].GetNote() != "check the deploy" {
+		t.Errorf("listed = %v, %v", list, err)
 	}
 	at := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
 	res, err = c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetAt: timestamppb.New(at)}))

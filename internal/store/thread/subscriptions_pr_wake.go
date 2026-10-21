@@ -21,6 +21,7 @@ import (
 type wakePRPayload struct {
 	Kind           string         `json:"kind"`
 	SubscriptionID string         `json:"subscription_id"`
+	Note           string         `json:"note,omitempty"`
 	Condition      Condition      `json:"condition"`
 	FiredAt        string         `json:"fired_at"`
 	PullRequest    wakePR         `json:"pull_request"`
@@ -121,7 +122,7 @@ func prWake(sub Subscription, p PullRequestInfo, changes []PullRequestChange, at
 	for _, r := range p.LatestReviews {
 		pr.LatestReviews = append(pr.LatestReviews, wakePRReview{Author: r.Author, State: r.State, SubmittedAt: wakeTime(r.SubmittedAt)})
 	}
-	payload := wakePRPayload{Kind: "pull_request", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at),
+	payload := wakePRPayload{Kind: "pull_request", SubscriptionID: sub.ID, Note: sub.Note, Condition: sub.Condition, FiredAt: wakeTime(at),
 		PullRequest: pr, Changes: []wakePRChange{}}
 	for _, c := range changes {
 		payload.Changes = append(payload.Changes, wakePRChangeOf(c))

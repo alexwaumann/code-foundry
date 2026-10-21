@@ -113,6 +113,9 @@ message ThreadSubscription {
   string target_status = 12;
   // A plugin target's args: given, defaulted or taken from the subscriber's context.
   map<string, string> args = 20;
+  // Why the subscriber asked to be woken (SubscribeThreadRequest.note); its wake
+  // carries it. "" for none.
+  string note = 21;
 }
 
 message SubscribeThreadRequest {
@@ -141,6 +144,10 @@ message SubscribeThreadRequest {
   // to the subscriber's (its id, pull request or project); a required one without a
   // value is INVALID_ARGUMENT naming it.
   map<string, string> args = 11;
+  // Why: kept on the subscription (on one line, at most 200 characters; longer is
+  // INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
+  // JSON) and listed. Subscribing again with a note replaces the note.
+  string note = 14;
 }
 
 message SubscribeThreadResponse {

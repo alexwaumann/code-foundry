@@ -218,12 +218,16 @@ Services (v1):
   never archived, snoozed, removed or forked, left out of a filtered List unless
   `include_resident`, kept out of the user's lists by the GUI. Wake subscriptions also
   take a timer target (`target_at` once, `target_every` repeating; wall clock, persisted,
-  one catch-up wake after a stop; `thread subscribe --at/--every`).
+  one catch-up wake after a stop; `thread subscribe --at/--every`). Any subscription
+  takes a note (`--note`, why: in a timer's wake header, every wake's JSON and the
+  listings); a thread wake's JSON has the turn's `started_at` and `ran_for`
+  (`docs/notes/ember-fixes-2-timers.md`).
 * `EmberService` — GetStatus, ListTasks, WatchBoard (server stream: the whole board, then
-  again on every change of a task, of Ember's state or of a task's worker thread, and a
-  heartbeat when quiet): Ember,
-  the resident agent, and its task board, each task with its worker's derived status and
-  report (`docs/notes/ember-2-store.md`). Read only: Ember and the CLI change the board
+  again on every change of a task, of Ember's state, of a task's worker thread or of its
+  timers, and a heartbeat when quiet): Ember, the resident agent, and its task board,
+  each task with its worker's derived status and report (`docs/notes/ember-2-store.md`),
+  and its pending timers (`EmberBoard.timers`, followed through the thread store's
+  `SubscriptionsChanged`). Read only: Ember and the CLI change the board
   with the `ember.*` commands; `ember.*` settings turn it on and pick its models. Its
   chat is its resident thread. A thread Ember or a thread below it creates without a
   model runs on `ember.worker_models` (round robin) at `ember.worker_effort`

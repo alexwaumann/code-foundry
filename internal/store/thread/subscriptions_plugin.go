@@ -220,6 +220,7 @@ func (s *subscriptions) describePlugin(sub *Subscription) {
 type wakePluginPayload struct {
 	Kind           string            `json:"kind"`
 	SubscriptionID string            `json:"subscription_id"`
+	Note           string            `json:"note,omitempty"`
 	Plugin         string            `json:"plugin"`
 	Source         string            `json:"source"`
 	Args           map[string]string `json:"args"`
@@ -232,7 +233,7 @@ type wakePluginPayload struct {
 // <title>" and the payload (null when empty).
 func pluginWake(sub Subscription, display, title string, payload json.RawMessage, at time.Time) Message {
 	plugin, source, _ := strings.Cut(sub.TargetID, "/")
-	p := wakePluginPayload{Kind: "plugin", SubscriptionID: sub.ID, Plugin: plugin, Source: source, Args: sub.Args,
+	p := wakePluginPayload{Kind: "plugin", SubscriptionID: sub.ID, Note: sub.Note, Plugin: plugin, Source: source, Args: sub.Args,
 		Title: title, Payload: payload, FiredAt: wakeTime(at)}
 	if p.Args == nil {
 		p.Args = map[string]string{}

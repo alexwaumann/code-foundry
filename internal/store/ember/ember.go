@@ -29,8 +29,11 @@
 package ember
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -170,11 +173,42 @@ type Status struct {
 	Counts                  Counts
 }
 
-// Snapshot is the published state: Ember's status and every task in board order
-// (position, then creation). Never mutate it.
+// Snapshot is the published state: Ember's status, every task in board order
+// (position, then creation) and its pending timers. Never mutate it.
 type Snapshot struct {
 	Status Status
 	Tasks  []Task
+	// Timers are the resident thread's timer wake subscriptions (thread subscribe
+	// --at/--every), soonest first; nil for none.
+	Timers []Timer
+}
+
+// Timer is one of Ember's pending timers: a timer wake subscription of its thread
+// (docs/notes/ember-fixes-2-timers.md).
+type Timer struct {
+	// ID is the subscription's ("sub-…"): thread unsubscribe takes it.
+	ID string
+	// NextAt is when it fires next: a one-shot's time, an interval's next slot.
+	NextAt time.Time
+	// Every is a repeating timer's interval; zero for a one-shot.
+	Every time.Duration
+	// Note is why Ember set it (thread subscribe --note).
+	Note      string
+	CreatedAt time.Time
+}
+
+// timersOf are the timers among subs (a subscriber's, as thread.Store.Subscriptions
+// lists them), soonest first.
+func timersOf(subs []thread.Subscription) []Timer {
+	var out []Timer
+	for _, s := range subs {
+		if s.TargetKind != thread.TargetTimer {
+			continue
+		}
+		out = append(out, Timer{ID: s.ID, NextAt: s.NextAt, Every: s.Every, Note: s.Note, CreatedAt: s.CreatedAt})
+	}
+	slices.SortFunc(out, func(a, b Timer) int { return cmp.Or(a.NextAt.Compare(b.NextAt), strings.Compare(a.ID, b.ID)) })
+	return out
 }
 
 // Task returns the task with id.
@@ -191,7 +225,7 @@ func (s *Snapshot) Task(id string) (Task, bool) {
 }
 
 // Changed is published on the bus after every change to the snapshot: a task, Ember's
-// status, or a task's worker thread.
+// status, a task's worker thread, or one of its timers.
 type Changed struct {
 	Snapshot *Snapshot
 }

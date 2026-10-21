@@ -16,6 +16,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 func TestThreadSubscriptionCommands(t *testing.T) {
@@ -46,8 +47,12 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{Id: "sub-6", SubscriberThreadId: "s-timed", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
 			TargetId: "every:30m", TargetName: "every 30m", Condition: fired, Repeat: true, FiredCount: 1, TargetStatus: "next 10:30 CDT"},
 		{Id: "sub-7", SubscriberThreadId: "s-timed", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
-			TargetId: "at:2026-10-20T19:00:00.000Z", TargetName: "at 14:00 CDT", Condition: fired, TargetStatus: "next 14:00 CDT"},
+			TargetId: "at:2026-10-20T19:00:00.000Z", TargetName: "at 14:00 CDT", Condition: fired, TargetStatus: "next 14:00 CDT",
+			Note: "remind the user to review the PWA branch (t-aa39dec3)"},
 	}
+	// Times print local, as the store's listing and the wake say them (e13-5).
+	sevenPM := thread.ClockTime(time.Date(2026, 10, 20, 19, 0, 0, 0, time.UTC), time.Now())
+	at2099 := thread.ClockTime(time.Date(2099, 10, 20, 19, 0, 0, 0, time.UTC), time.Now())
 	tests := []struct {
 		name           string
 		cmd            string
@@ -115,10 +120,14 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantMsg:  "subscribed sub-1: s-me wakes every 30m (repeat)",
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(30 * time.Minute), Condition: unset}}},
 		{name: "a timer at a time", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2099-10-20T14:00:00-05:00"},
-			wantMsg: "subscribed sub-1: s-me wakes at 2099-10-20T19:00:00Z (once)",
+			wantMsg: "subscribed sub-1: s-me wakes at " + at2099 + " (once)",
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me",
 				TargetAt: timestamppb.New(time.Date(2099, 10, 20, 19, 0, 0, 0, time.UTC)), Condition: unset}}},
 		{name: "a timer in two hours", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"at": "2h"}},
+		{name: "a timer with a note", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "2m", "note": "ping the user (t-aa39dec3)"},
+			wantMsg:  "subscribed sub-1: s-me wakes every 2m (repeat) · ping the user (t-aa39dec3)",
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(2 * time.Minute), Condition: unset, Note: "ping the user (t-aa39dec3)"}}},
+		{name: "a note too long", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "2m", "note": strings.Repeat("x", 201)}, wantErr: command.ErrInvalidArgs},
 		{name: "a timer until settled", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "1h", "until": "settled"},
 			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetEvery: durationpb.New(time.Hour), Condition: unset}}},
 		{name: "a timer under a minute", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"every": "30s"}, wantErr: command.ErrInvalidArgs},
@@ -143,7 +152,8 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantMsg:  "removed sub-5: s-other wakes when plugin hello/tick fires (a=b every=2s) (once)",
 			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-other", TargetPlugin: "hello/tick"}}},
 		{name: "unsubscribe the timers", cmd: "thread.unsubscribe", args: map[string]string{"id": "s-timed", "timers": "true"},
-			wantMsg:  "removed sub-6: s-timed wakes every 30m (repeat)\nremoved sub-7: s-timed wakes at 2026-10-20T19:00:00Z (once)",
+			wantMsg: "removed sub-6: s-timed wakes every 30m (repeat)\nremoved sub-7: s-timed wakes at " + sevenPM +
+				" (once) · remind the user to review the PWA branch (t-aa39dec3)",
 			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-timed", TargetTimer: true}}},
 		{name: "unsubscribe timers and a thread", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"timers": "true", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe nothing", cmd: "thread.unsubscribe", ctx: inThread, wantErr: command.ErrInvalidArgs},
@@ -165,9 +175,9 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 				"sub-3  s-other     thread s-me                                   attention  no      0      -           busy (working)\n" +
 				"sub-5  s-other     plugin hello/tick a=b every=2s (Hello: Tick)  fired      no      0      -           running"},
 		{name: "list timers", cmd: "thread.subscriptions", args: map[string]string{"id": "s-timed"},
-			wantMsg: "ID     SUBSCRIBER  TARGET              UNTIL  REPEAT  FIRED  LAST FIRED  TARGET STATUS\n" +
+			wantMsg: "ID     SUBSCRIBER  TARGET              UNTIL  REPEAT  FIRED  LAST FIRED  TARGET STATUS   NOTE\n" +
 				"sub-6  s-timed     timer every 30m     fired  yes     1      -           next 10:30 CDT\n" +
-				"sub-7  s-timed     timer at 14:00 CDT  fired  no      0      -           next 14:00 CDT"},
+				"sub-7  s-timed     timer at 14:00 CDT  fired  no      0      -           next 14:00 CDT  remind the user to review the PWA branch (t-aa39dec3)"},
 		{name: "list none", cmd: "thread.subscriptions", args: map[string]string{"id": "s-none"}, wantMsg: "thread s-none has no wake subscriptions"},
 		{name: "list needs a thread", cmd: "thread.subscriptions", wantErr: command.ErrInvalidArgs},
 

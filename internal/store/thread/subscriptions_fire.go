@@ -328,6 +328,7 @@ func (r *runner) onWakeLimit() Item {
 type wakeThreadPayload struct {
 	Kind           string    `json:"kind"`
 	SubscriptionID string    `json:"subscription_id"`
+	Note           string    `json:"note,omitempty"`
 	Condition      Condition `json:"condition"`
 	FiredAt        string    `json:"fired_at"`
 	// AfterRestart: fired by the daemon's stop or for a thread it interrupted, sent
@@ -407,6 +408,7 @@ type wakeReport struct {
 type wakeRunPayload struct {
 	Kind           string    `json:"kind"`
 	SubscriptionID string    `json:"subscription_id"`
+	Note           string    `json:"note,omitempty"`
 	Condition      Condition `json:"condition"`
 	FiredAt        string    `json:"fired_at"`
 	Run            wakeRun   `json:"run"`
@@ -580,7 +582,7 @@ func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message 
 
 // threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.
 func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) wakeThreadPayload {
-	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
+	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Note: sub.Note, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
 		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
 		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending, Siblings: d.siblings,
@@ -710,7 +712,7 @@ func endSentence(s string) string {
 
 // runWake is the wake message of sub about run, fired at.
 func runWake(sub Subscription, run ActionRun, at time.Time) Message {
-	p := wakeRunPayload{Kind: "action_run", SubscriptionID: sub.ID, Condition: CondFinished, FiredAt: wakeTime(at), Run: wakeRun{
+	p := wakeRunPayload{Kind: "action_run", SubscriptionID: sub.ID, Note: sub.Note, Condition: CondFinished, FiredAt: wakeTime(at), Run: wakeRun{
 		ID: run.ID, ActionID: run.ActionID, ActionName: run.ActionName, ProjectID: run.ProjectID, ExitCode: run.ExitCode,
 		StartedAt: wakeTime(run.StartedAt), FinishedAt: wakeTime(run.FinishedAt), OutputTail: outputTail(run.Output, maxOutputTail),
 	}}

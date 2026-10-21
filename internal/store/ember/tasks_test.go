@@ -211,7 +211,7 @@ func TestStaleReportHidden(t *testing.T) {
 	if err != nil || got.Thread == nil || got.Thread.Report.Status != thread.ReportNone {
 		t.Fatalf("reopened = %+v, %v; want no report", got.Thread, err)
 	}
-	if line := RenderBoard(e.s.Snapshot().Tasks, e.clock(), utc); strings.Contains(line, "pushed cf/notes") {
+	if line := RenderBoard(e.s.Snapshot().Tasks, nil, e.clock(), utc); strings.Contains(line, "pushed cf/notes") {
 		t.Errorf("board shows the stale report:\n%s", line)
 	}
 	report(thread.ReportProgress, "markdown next")

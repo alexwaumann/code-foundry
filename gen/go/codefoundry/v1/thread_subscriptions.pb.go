@@ -245,7 +245,10 @@ type ThreadSubscription struct {
 	// next fire ("next 09:30", "due"); "gone" when the target no longer exists.
 	TargetStatus string `protobuf:"bytes,12,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"`
 	// A plugin target's args: given, defaulted or taken from the subscriber's context.
-	Args          map[string]string `protobuf:"bytes,20,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Args map[string]string `protobuf:"bytes,20,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Why the subscriber asked to be woken (SubscribeThreadRequest.note); its wake
+	// carries it. "" for none.
+	Note          string `protobuf:"bytes,21,opt,name=note,proto3" json:"note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -371,6 +374,13 @@ func (x *ThreadSubscription) GetArgs() map[string]string {
 	return nil
 }
 
+func (x *ThreadSubscription) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 type SubscribeThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The subscriber thread.
@@ -397,7 +407,11 @@ type SubscribeThreadRequest struct {
 	// A plugin target's args, by the source's arg names. An arg with a context defaults
 	// to the subscriber's (its id, pull request or project); a required one without a
 	// value is INVALID_ARGUMENT naming it.
-	Args          map[string]string `protobuf:"bytes,11,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Args map[string]string `protobuf:"bytes,11,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Why: kept on the subscription (on one line, at most 200 characters; longer is
+	// INVALID_ARGUMENT), carried by its wake (a timer's header and JSON, the others'
+	// JSON) and listed. Subscribing again with a note replaces the note.
+	Note          string `protobuf:"bytes,14,opt,name=note,proto3" json:"note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -500,6 +514,13 @@ func (x *SubscribeThreadRequest) GetArgs() map[string]string {
 		return x.Args
 	}
 	return nil
+}
+
+func (x *SubscribeThreadRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
 }
 
 type SubscribeThreadResponse struct {
@@ -800,7 +821,7 @@ var File_codefoundry_v1_thread_subscriptions_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\n" +
-	")codefoundry/v1/thread_subscriptions.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x05\n" +
+	")codefoundry/v1/thread_subscriptions.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x05\n" +
 	"\x12ThreadSubscription\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
 	"\x14subscriber_thread_id\x18\x02 \x01(\tR\x12subscriberThreadId\x12@\n" +
@@ -818,10 +839,11 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\vtarget_name\x18\v \x01(\tR\n" +
 	"targetName\x12#\n" +
 	"\rtarget_status\x18\f \x01(\tR\ftargetStatus\x12@\n" +
-	"\x04args\x18\x14 \x03(\v2,.codefoundry.v1.ThreadSubscription.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\x14 \x03(\v2,.codefoundry.v1.ThreadSubscription.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04note\x18\x15 \x01(\tR\x04note\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc6\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xda\x04\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
@@ -833,7 +855,8 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"\ftarget_every\x18\r \x01(\v2\x19.google.protobuf.DurationR\vtargetEvery\x12I\n" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\x12D\n" +
-	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\v \x03(\v20.codefoundry.v1.SubscribeThreadRequest.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04note\x18\x0e \x01(\tR\x04note\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x01\n" +

@@ -126,11 +126,11 @@ func RenderRecent(msgs []Message, budget int, loc *time.Location) string {
 }
 
 // RenderBoard is BOARD.md: the tasks (in board order) by section: In progress (doing),
-// Up next (todo), Blocked, Done today (done or cancelled since local midnight, as the
-// GUI's board, with a closed subtask of such a parent whenever it closed); a subtask
-// under its parent when both are in one section, else marked as part of it; then a line
-// counting the other done and cancelled tasks.
-func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
+// Up next (todo), Blocked, Scheduled (the timers, soonest first), Done today (done or
+// cancelled since local midnight, as the GUI's board, with a closed subtask of such a
+// parent whenever it closed); a subtask under its parent when both are in one section,
+// else marked as part of it; then a line counting the other done and cancelled tasks.
+func RenderBoard(tasks []Task, timers []Timer, now time.Time, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString("# Task board\n\n")
 	fmt.Fprintf(&b, "As of %s. `code-foundry ember board` prints it live; `ember task show <id>` one task.\n", now.In(loc).Format("2006-01-02 15:04 MST"))
@@ -167,7 +167,10 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 		{"Done today", doneToday},
 	}
 	shown := 0
-	for _, sec := range sections {
+	for i, sec := range sections {
+		if i == len(sections)-1 && len(timers) > 0 {
+			b.WriteString(renderTimers(timers, now, loc))
+		}
 		var list []Task
 		for _, t := range tasks {
 			if sec.in(t) {
@@ -214,6 +217,33 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 		b.WriteString("\nNothing open.\n")
 	}
 	return b.String()
+}
+
+// renderTimers is BOARD.md's Scheduled section: one line per timer, "- 15:00 CDT · once
+// · <note> · sub-…" ("every 2m", the date when not today, no note part without one).
+func renderTimers(timers []Timer, now time.Time, loc *time.Location) string {
+	var b strings.Builder
+	b.WriteString("\n## Scheduled\n\nYour timers; `code-foundry thread unsubscribe <id>` cancels one.\n\n")
+	for _, t := range timers {
+		parts := []string{clock(t.NextAt, now, loc), "once"}
+		if t.Every > 0 {
+			parts[1] = "every " + thread.FormatEvery(t.Every)
+		}
+		if t.Note != "" {
+			parts = append(parts, t.Note)
+		}
+		b.WriteString("- " + strings.Join(append(parts, t.ID), " · ") + "\n")
+	}
+	return b.String()
+}
+
+// clock is t in loc for the board: "15:04 CDT" on now's day, else "Oct 21 15:04 CDT".
+func clock(t, now time.Time, loc *time.Location) string {
+	t, now = t.In(loc), now.In(loc)
+	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
+		return t.Format("15:04 MST")
+	}
+	return t.Format("Jan 2 15:04 MST")
 }
 
 // taskLine is one task on the board: id, title, its worker's progress, its branch and

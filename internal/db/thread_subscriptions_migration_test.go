@@ -68,7 +68,7 @@ func TestThreadSubscriptionArgsMigration(t *testing.T) {
 	}
 }
 
-// Migration 0043 adds thread_subscriptions.note, ” for rows that do not give it.
+// Migration 0043 adds thread_subscriptions.note, empty for rows that do not give it.
 func TestThreadSubscriptionNoteMigration(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open(ctx, filepath.Join(t.TempDir(), "db.sqlite"))
