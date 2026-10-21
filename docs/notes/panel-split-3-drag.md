@@ -49,7 +49,7 @@ moves nothing, and a release after the panel unmounted (selection switched) move
 ## The band rule
 
 While a tab is dragged in an **unsplit** panel with **two or more tabs**, the body shows a
-band over its far edge: the right 45% when `splitOrientation(width, expanded)` is `side`,
+band over its far edge: the right 45% when `splitOrientation` (on the rendered width) is `side`,
 the bottom 45% when `stack`, 8px in from the body's other edges (`left-[55%]` or
 `top-[55%]`, the rest `2`). It is faint (`bg-accent/20`, `ring-ring/40`) while the pointer
 is elsewhere and takes the mockup's look while over it: `bg-accent/55`, a 1px inset

@@ -7,15 +7,20 @@ PR 3 adds dragging a tab between groups and the drop-to-split band.
 
 ## Layout
 
-* **Orientation is derived, never stored.** `splitOrientation(width, expanded)`
+* **Orientation is derived, never stored.** `splitOrientation(width)`
   (`components/panel/splitLayout.ts`): side by side (`flex-row`, a vertical divider) when
   the rendered panel width is at least `PANEL_SIDE_BY_SIDE_MIN`, stacked (`flex-col`, a
-  horizontal divider) below it, and always side by side while expanded. The rendered
-  width is `min(stored width, panelMax)`, the same number the wrapper's style uses, so
-  no measuring is involved and a window or sidebar resize flips it at once.
-* **The threshold** is `PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_MIN + 1 + 24 = 585` px
-  (`stores/ui.ts`): two 280px groups, the 1px divider, and 24px of room. The default
-  420px panel stacks; 585px and up sits side by side.
+  horizontal divider) below it, expanded or not. The rendered width is
+  `min(stored width, panelMax)`, the same number the wrapper's style uses; expanded, it is
+  `expandedPanelWidth(windowWidth, sidebar)` (`stores/ui.ts`: the row beside the sidebar
+  less the wrapper's two shell-gap margins). No measuring is involved, so a window or
+  sidebar resize flips it at once.
+* **The threshold** is `PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_GROUP_SIDE_MIN + 1 = 721` px
+  (`stores/ui.ts`): two groups of `CONTENT_MIN` (360px, the least a pane is worth reading
+  at) and the 1px divider. The default 420px panel stacks; 721px and up sits side by side.
+  Changed from 585px (two `PANEL_MIN` groups and 24px) and from "always side by side while
+  expanded", which clipped the second group off the right edge of a narrow window
+  (`panel-split-threshold.md`).
 * **Held during a resize drag.** While the panel's resize handle is dragged
   (`PanelResizeHandle`'s new `onDragChange`), `Panel` keeps the orientation it had at
   pointerdown and catches up on pointerup or lost capture. Keyboard resizing flips at once.
