@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -85,6 +86,10 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 				raw["new-worktree"] = "true"
 			}
 			res, err := r.Invoke(ctx, uctx, "thread.new", raw)
+			// The task's follow-up is bookkeeping for what already happened: a caller that
+			// went away must not leave it doing with no worker.
+			bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
 			if err != nil {
 				// No worker: the task does not stay doing. Ember starts the piece again.
 				why := "the worker did not start: " + err.Error()
@@ -92,7 +97,7 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 					why = "the worker did not start: " + ce.Message()
 				}
 				s := ember.StateCancelled
-				if _, cerr := d.Ember.UpdateTask(ctx, t.ID, ember.TaskUpdate{State: &s, Outcome: &why}); cerr != nil {
+				if _, cerr := d.Ember.UpdateTask(bctx, t.ID, ember.TaskUpdate{State: &s, Outcome: &why}); cerr != nil {
 					err = errors.Join(err, cerr)
 				}
 				return Result{}, fmt.Errorf("task %s cancelled, its worker did not start: %w", t.ID, err)
@@ -102,7 +107,7 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 				return Result{}, Failed(fmt.Errorf("thread.new answered no thread for task %s", t.ID))
 			}
 			tid := w.GetId()
-			if t, err = d.Ember.UpdateTask(ctx, t.ID, ember.TaskUpdate{ThreadID: &tid}); err != nil {
+			if t, err = d.Ember.UpdateTask(bctx, t.ID, ember.TaskUpdate{ThreadID: &tid}); err != nil {
 				return Result{}, fmt.Errorf("thread %s started, but task %s is not linked to it: %w", tid, raw["request-id"], emberErr("", err))
 			}
 			return Result{
