@@ -46,15 +46,7 @@ import (
 // hook runs before each change is published, so a client that re-lists commands on a
 // settings event sees the new keybindings.
 func applySettings(st *settings.Store, reg *command.Registry, level *slog.LevelVar, dev bool) {
-	listed := reg.List(command.Context{}, true)
-	cmds := make([]settings.CommandInfo, len(listed))
-	for i, l := range listed {
-		cmds[i] = settings.CommandInfo{
-			Name: l.Name, Title: l.Title, Description: l.Description, Category: l.Category, Keybindings: l.Keybindings,
-			NoKeybinding: l.NoKeybinding,
-		}
-	}
-	st.SetCommands(cmds)
+	setSettingsCommands(st, reg)
 	st.OnChange(func(snap *settings.Snapshot) {
 		reg.SetOverrides(registryOverrides(snap.Settings))
 		if !dev { // dev mode always logs at debug

@@ -162,7 +162,7 @@ func Run(ctx context.Context, opts Options) error {
 	// so a last host/invoke still has a registry and stores behind it.
 	plugins, err := plugin.New(plugin.Options{
 		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
-		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
+		DB: st.db, Commands: settingsCommandHost{Registry: commands, settings: st.settings}, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
 		Facts: facts, Emitter: command.BusEmitter{Bus: events},
 		Flags: pluginFlags{threads: st.thread},
