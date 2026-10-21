@@ -86,6 +86,16 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	if p := s.GetPending(); p != nil {
 		lines = append(lines, "pending: "+pendingLine(p))
 	}
+	// Where the thread is listed: an agent sending to an archived child unarchives it.
+	if at := s.GetArchivedAt(); at != nil {
+		lines = append(lines, "archived: "+at.AsTime().Local().Format(time.DateTime))
+	}
+	if at := s.GetSnoozedUntil(); at != nil {
+		lines = append(lines, "snoozed until: "+at.AsTime().Local().Format(time.DateTime))
+	}
+	if s.GetPinned() {
+		lines = append(lines, "pinned")
+	}
 	lines = append(lines, "worktree: "+s.GetWorktreePath())
 	if s.GetBranch() != "" {
 		// The branch the worktree was made for (what a recreation checks out again).
