@@ -307,8 +307,12 @@ type EmberTask struct {
 	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	// When it became done; unset otherwise.
 	DoneAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=done_at,json=doneAt,proto3" json:"done_at,omitempty"`
-	// The worker thread's progress, derived when read; unset without thread_id.
-	Thread        *EmberTaskThread `protobuf:"bytes,12,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The worker thread's progress, derived when read; unset without thread_id. Its
+	// report is left out while the task is doing and the report predates the task's
+	// last change (a reopened task's old report).
+	Thread *EmberTaskThread `protobuf:"bytes,12,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The branch its worker pushed (ember task done --branch); "" for none.
+	Branch        string `protobuf:"bytes,13,opt,name=branch,proto3" json:"branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -425,6 +429,13 @@ func (x *EmberTask) GetThread() *EmberTaskThread {
 		return x.Thread
 	}
 	return nil
+}
+
+func (x *EmberTask) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
 }
 
 // EmberTaskThread is a task's worker thread as the board shows it.
@@ -1003,7 +1014,7 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x05doing\x18\x02 \x01(\x05R\x05doing\x12\x18\n" +
 	"\ablocked\x18\x03 \x01(\x05R\ablocked\x12\x12\n" +
 	"\x04done\x18\x04 \x01(\x05R\x04done\x12\x1c\n" +
-	"\tcancelled\x18\x05 \x01(\x05R\tcancelled\"\xd3\x03\n" +
+	"\tcancelled\x18\x05 \x01(\x05R\tcancelled\"\xeb\x03\n" +
 	"\tEmberTask\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x16\n" +
@@ -1019,7 +1030,8 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
 	"\adone_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x06doneAt\x127\n" +
-	"\x06thread\x18\f \x01(\v2\x1f.codefoundry.v1.EmberTaskThreadR\x06thread\"\xf9\x05\n" +
+	"\x06thread\x18\f \x01(\v2\x1f.codefoundry.v1.EmberTaskThreadR\x06thread\x12\x16\n" +
+	"\x06branch\x18\r \x01(\tR\x06branch\"\xf9\x05\n" +
 	"\x0fEmberTaskThread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +

@@ -1,3 +1,4 @@
+import { GitBranch } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { EmberTaskView } from "@/api/ember";
 import { Tip } from "@/components/ui/tooltip";
@@ -110,7 +111,7 @@ function BlockedOutcome({ text }: { text: string }) {
   );
 }
 
-/** A task's card: dot, title, "x of y" or its worker's status, a progress bar for a parent, a blocked task's outcome, its workers. */
+/** A task's card: dot, title, "x of y" or its worker's status, a progress bar for a parent, a blocked task's outcome, its branch, its workers. */
 function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focused: string | null }) {
   const t = card.task;
   const meta = cardMeta(card);
@@ -143,6 +144,14 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
         <Tip label={t.outcome} whenTruncated>
           <p className="mt-0.5 truncate text-caption text-muted-foreground" data-testid="ember-task-outcome">
             {t.outcome}
+          </p>
+        </Tip>
+      )}
+      {t.branch && (
+        <Tip label={t.branch} whenTruncated>
+          <p className="mt-0.5 flex min-w-0 items-center gap-1 text-caption text-muted-foreground" data-testid="ember-task-branch">
+            <GitBranch className="size-3 shrink-0" aria-hidden />
+            <span className="truncate font-mono">{t.branch}</span>
           </p>
         </Tip>
       )}

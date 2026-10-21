@@ -157,7 +157,7 @@
  *        Every change below reaches WatchBoard streams.
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
- *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…]
+ *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…]
  *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
  *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
  *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
@@ -654,7 +654,7 @@ function emberControl(res: ServerResponse, action: string, q: URLSearchParams): 
         world.settings.update({ "ember.enabled": String(bool("enabled")) });
         break;
       case "/task":
-        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"));
+        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"), q.get("branch"));
         break;
       case "/task/add": {
         const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });

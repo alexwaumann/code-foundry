@@ -142,6 +142,10 @@ test("the board's sections, cards and worker rows; one board stream", async ({ p
   await expect(notes.getByTestId("ember-worker")).toHaveCount(2);
   const blocked = board(page).locator('[data-testid="ember-task"][data-task="t-9c0d1e2f"]');
   await expect(blocked.getByTestId("ember-task-outcome")).toHaveText("wails v3.1 needs Go 1.27; the toolchain here is 1.26");
+  await expect(blocked.getByTestId("ember-task-branch")).toHaveCount(0);
+  // A done task's branch sits under its outcome.
+  const flaky = board(page).locator('[data-testid="ember-task"][data-task="t-3a4b5c6d"]');
+  await expect(flaky.getByTestId("ember-task-branch")).toHaveText("cf/spawn-timeout-race");
   // The sidebar row, the chat and the panel share one WatchBoard.
   expect((await openStreams())["EmberService/WatchBoard"]).toBe(1);
   // A new todo task lands in Up next, live.

@@ -117,7 +117,7 @@ func EmberStatusToProto(s ember.Status) *v1.EmberStatus {
 func EmberTaskToProto(t ember.Task) *v1.EmberTask {
 	out := &v1.EmberTask{
 		Id: t.ID, Title: t.Title, Detail: t.Detail, State: v1.EmberTaskState(t.State), ParentId: t.ParentID, ThreadId: t.ThreadID,
-		Outcome: t.Outcome, Position: int32(t.Position), CreatedAt: optionalTime(t.CreatedAt), UpdatedAt: optionalTime(t.UpdatedAt),
+		Outcome: t.Outcome, Branch: t.Branch, Position: int32(t.Position), CreatedAt: optionalTime(t.CreatedAt), UpdatedAt: optionalTime(t.UpdatedAt),
 		DoneAt: optionalTime(t.DoneAt),
 	}
 	if w := t.Thread; w != nil {

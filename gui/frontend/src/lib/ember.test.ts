@@ -52,7 +52,7 @@ function thread(over: Partial<EmberTaskThreadView> = {}): EmberTaskThreadView {
 }
 
 function task(id: string, over: Partial<EmberTaskView> = {}): EmberTaskView {
-  return { id, title: id, detail: "", state: "todo", parentId: "", threadId: "", outcome: "", position: 0, createdAtMs: NOW - 60 * MIN, updatedAtMs: NOW - 60 * MIN, doneAtMs: null, thread: null, ...over };
+  return { id, title: id, detail: "", state: "todo", parentId: "", threadId: "", outcome: "", branch: "", position: 0, createdAtMs: NOW - 60 * MIN, updatedAtMs: NOW - 60 * MIN, doneAtMs: null, thread: null, ...over };
 }
 
 describe("flameState", () => {
