@@ -120,7 +120,8 @@ echo "API Error: 429 rate limited"; exit 1`,
 			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.NewTextHandler(&logs, nil)))
 			ctx := WithNamingModel(withNamingThread(context.Background(), "s123"), "claude-opus-4-8[1m]")
 			for i := range 2 {
-				name, err := namer(ctx, "-fix the login bug")
+				n, err := namer(ctx, NamingRequest{Message: "-fix the login bug"})
+				name := n.Title
 				if tt.wantErr == nil {
 					if err != nil || name != "Fix the login bug" {
 						t.Fatalf("call %d = %q, %v", i, name, err)
@@ -230,7 +231,7 @@ func TestClaudeNamerModel(t *testing.T) {
 	bin, dir := fakeClaude(t, `echo fix-login-bug`)
 	namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.DiscardHandler))
 	for _, ctx := range []context.Context{context.Background(), WithNamingModel(context.Background(), "claude-4.5-haiku[1m]")} {
-		if _, err := namer(ctx, "-fix the login bug"); err != nil {
+		if _, err := namer(ctx, NamingRequest{Message: "-fix the login bug"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -240,5 +241,29 @@ func TestClaudeNamerModel(t *testing.T) {
 	}
 	if got := fakeCalls(t, dir); !slices.EqualFunc(got, want, slices.Equal) {
 		t.Errorf("calls =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestClaudeNamerBranch checks one call returns both fields when a branch is asked for,
+// and that a reply with neither is an error.
+func TestClaudeNamerBranch(t *testing.T) {
+	tests := []struct {
+		name, body string
+		want       Naming
+		wantErr    bool
+	}{
+		{"both", `printf 'Title: Fix the login bug\nBranch: fix/login-bug\n'`, Naming{"Fix the login bug", "fix/login-bug"}, false},
+		{"branch only", `printf 'Branch: fix/login-bug\n'`, Naming{"Login bug", "fix/login-bug"}, false},
+		{"nothing usable", `printf 'Title: \nBranch: \n'`, Naming{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin, _ := fakeClaude(t, tt.body)
+			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.DiscardHandler))
+			got, err := namer(context.Background(), NamingRequest{Message: "-fix the login bug", Branch: &BranchRequest{Mode: BranchModeSemantic}})
+			if (err != nil) != tt.wantErr || got != tt.want {
+				t.Errorf("namer = %+v, %v; want %+v (err %v)", got, err, tt.want, tt.wantErr)
+			}
+		})
 	}
 }

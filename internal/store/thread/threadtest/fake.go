@@ -152,11 +152,12 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 }
 
 // Create records the call and adds a STARTING thread ("s-N"). With
-// NewWorktree the thread's worktree is /worktrees/cf-<N> on branch cf/<N> (CreatedWorktree,
-// BaseRef as requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
+// NewWorktree the thread's worktree is /worktrees/cf-<N> on branch cf/<N>, the fallback
+// when naming gives nothing (CreatedWorktree, BaseRef as requested); a NewWorktree.Branch
+// with a slash is the branch, one without is chore/<it> (semantic mode without a model). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
 // workspace "w-new" and runs in /worktrees/<project>, project being ProjectID or the first project.
 // With NoProject it runs in /home. The call reads "Create <project> <path> <model>
-// <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
+// <effort>", then " perm=<n>", " new-worktree=<base>", " branch=<b>", " workspace=<id>",
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
 func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Thread, error) {
@@ -174,6 +175,14 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 		f.mu.Lock()
 		s.WorktreePath, s.Branch = fmt.Sprintf("/worktrees/cf-%d", f.next+1), fmt.Sprintf("cf/%d", f.next+1)
 		f.mu.Unlock()
+		if b := o.NewWorktree.Branch; b != "" {
+			call += " branch=" + b
+			s.Branch = b
+			if !strings.Contains(b, "/") {
+				s.Branch = "chore/" + b
+			}
+			s.WorktreePath = "/worktrees/" + strings.ReplaceAll(s.Branch, "/", "-")
+		}
 		s.CreatedWorktree, s.BaseRef = true, o.NewWorktree.BaseRef
 	}
 	if o.WorkspaceID != "" {

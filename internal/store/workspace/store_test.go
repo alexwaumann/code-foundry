@@ -473,3 +473,44 @@ func TestMembers(t *testing.T) {
 		t.Fatalf("main worktree resolved a workspace: %v", err)
 	}
 }
+
+// TestCreateDefaultBranch checks a workspace without a branch takes
+// Options.DefaultBranch's for its name, else cf/<slug>.
+func TestCreateDefaultBranch(t *testing.T) {
+	for _, tt := range []struct{ derived, want string }{{"feat/login-fix", "feat/login-fix"}, {"", "cf/login-fix"}} {
+		t.Run(tt.want, func(t *testing.T) {
+			h := newHarness(t)
+			var asked []string
+			h.m.opts.DefaultBranch = func(_ context.Context, name string) string {
+				asked = append(asked, name)
+				return tt.derived
+			}
+			w := h.create("Login fix", "web")
+			if w.Branch != tt.want || !slices.Equal(asked, []string{"Login fix"}) {
+				t.Errorf("branch = %q (asked %q), want %q", w.Branch, asked, tt.want)
+			}
+			if _, err := h.m.Create(context.Background(), CreateOptions{Name: "Other", Branch: "x/y", Members: []MemberSpec{{Project: "api"}}}); err != nil {
+				t.Fatal(err)
+			}
+			if len(asked) != 1 {
+				t.Errorf("DefaultBranch asked for an explicit branch: %q", asked)
+			}
+		})
+	}
+}
+
+// TestCreateExistingRemoteBranchIgnoresBase checks a member whose branch exists only on
+// origin checks it out (no base), while another member still branches from the base.
+func TestCreateExistingRemoteBranchIgnoresBase(t *testing.T) {
+	h := newHarness(t)
+	h.projects.SetRefs(id("web"), project.Refs{Remote: []string{"origin/feat/x"}})
+	if _, err := h.m.Create(context.Background(), CreateOptions{
+		Name: "x", Branch: "feat/x", BaseRef: "origin/dev", Members: []MemberSpec{{Project: "web"}, {Project: "api"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	creates := h.projects.Creates
+	if len(creates) != 2 || creates[0].BaseRef != "" || creates[1].BaseRef != "origin/dev" {
+		t.Errorf("creates = %+v", creates)
+	}
+}
