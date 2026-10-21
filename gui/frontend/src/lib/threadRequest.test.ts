@@ -19,6 +19,15 @@ describe("questions", () => {
     expect(questionsOf("not json")).toEqual([]);
   });
 
+  it("skips null questions, options and suggestions instead of throwing", () => {
+    expect(questionsOf('{"questions":[null]}')).toEqual([]);
+    expect(questionsOf('{"questions":[{"question":"Q","options":[null,{"label":"a"}]}]}')).toEqual([
+      { question: "Q", header: "", multiSelect: false, options: [{ label: "a", description: "" }] },
+    ]);
+    expect(suggestedRules('[null,{"rules":[null,{"toolName":"Bash"}]}]')).toEqual(["Bash"]);
+    expect(suggestedMode("[null]")).toBe("");
+  });
+
   it("picks: single-select replaces, multi-select toggles, the last index is Other", () => {
     let p = pickOption(single, NO_PICK, 1);
     expect(p).toMatchObject({ selected: [1], other: false });

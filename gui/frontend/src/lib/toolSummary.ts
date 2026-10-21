@@ -15,25 +15,42 @@ export function parseObject(s: string): Json {
   if (!s) return {};
   try {
     const v: unknown = JSON.parse(s);
-    return v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {};
+    return isObject(v) ? v : {};
   } catch {
     return {};
   }
 }
 
-export function str(o: Json, key: string): string {
-  const v = o[key];
+/** A JSON object (not null, not an array). */
+export function isObject(v: unknown): v is Json {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * The objects in a parsed array, skipping anything else (null, numbers, nested arrays);
+ * [] when v is not an array. Claude's payload formats drift without notice: one null in
+ * a list must not take the window down.
+ */
+export function objects(v: unknown): Json[] {
+  return Array.isArray(v) ? v.filter(isObject) : [];
+}
+
+// The getters take unknown (an element of a parsed array may be anything) and return
+// the default for a non-object or a wrong-typed field.
+
+export function str(o: unknown, key: string): string {
+  const v = isObject(o) ? o[key] : undefined;
   return typeof v === "string" ? v : "";
 }
 
-export function num(o: Json, key: string): number | null {
-  const v = o[key];
+export function num(o: unknown, key: string): number | null {
+  const v = isObject(o) ? o[key] : undefined;
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-export function obj(o: Json, key: string): Json {
-  const v = o[key];
-  return v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {};
+export function obj(o: unknown, key: string): Json {
+  const v = isObject(o) ? o[key] : undefined;
+  return isObject(v) ? v : {};
 }
 
 /** "a/b/c.go" → ["c.go", "a/b"]; the dir relative to `cwd` when it is inside it. */
@@ -147,6 +164,23 @@ export type ToolDiff =
   | { kind: "patch"; path: string; patch: string }
   | { kind: "contents"; path: string; name: string; pairs: readonly ContentPair[]; numbered: boolean };
 
+/** The well-formed hunks of a parsed structuredPatch (objects with a lines array; missing numbers read 0). */
+export function patchHunks(v: unknown): StructuredPatchHunk[] {
+  return objects(v).flatMap((h) =>
+    Array.isArray(h.lines)
+      ? [
+          {
+            oldStart: num(h, "oldStart") ?? 0,
+            oldLines: num(h, "oldLines") ?? 0,
+            newStart: num(h, "newStart") ?? 0,
+            newLines: num(h, "newLines") ?? 0,
+            lines: h.lines.filter((l): l is string => typeof l === "string"),
+          },
+        ]
+      : [],
+  );
+}
+
 /** Claude's structuredPatch as a git-style unified patch for one file. */
 export function structuredPatchText(path: string, hunks: readonly StructuredPatchHunk[]): string {
   const p = path.replace(/^\/+/, "");
@@ -175,8 +209,8 @@ export function toolDiff(t: Pick<ToolCallView, "name" | "inputJson" | "resultJso
   const result = parseObject(t.resultJson);
   const path = str(input, "file_path") || str(input, "notebook_path");
   const name = path.slice(path.lastIndexOf("/") + 1) || "file";
-  const patch = result.structuredPatch;
-  if (Array.isArray(patch) && patch.length > 0) return { kind: "patch", path, patch: structuredPatchText(path || "file", patch as StructuredPatchHunk[]) };
+  const patch = patchHunks(result.structuredPatch);
+  if (patch.length > 0) return { kind: "patch", path, patch: structuredPatchText(path || "file", patch) };
   const contents = (pairs: ContentPair[], numbered: boolean, n = name): ToolDiff | null => {
     const changed = pairs
       // A snippet (unnumbered) has no end of file: end its lines so none reads "No newline at end of file".
@@ -188,7 +222,7 @@ export function toolDiff(t: Pick<ToolCallView, "name" | "inputJson" | "resultJso
     case "Edit":
       return contents([{ oldText: str(input, "old_string"), newText: str(input, "new_string") }], false);
     case "MultiEdit": {
-      const edits = Array.isArray(input.edits) ? (input.edits as Json[]) : [];
+      const edits = objects(input.edits);
       return contents(
         edits.map((e) => ({ oldText: str(e, "old_string"), newText: str(e, "new_string") })),
         false,
@@ -358,7 +392,7 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
       s.target = str(input, "query");
       break;
     case "TodoWrite": {
-      const todos = Array.isArray(input.todos) ? (input.todos as Json[]) : [];
+      const todos = objects(input.todos);
       if (todos.length > 0) s.meta = `${String(todos.filter((x) => str(x, "status") === "completed").length)}/${String(todos.length)} done`;
       break;
     }
@@ -384,11 +418,11 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
 
 /** What a subagent reported back: the result's text blocks, else the tool output. */
 export function agentReport(t: Pick<ToolCallView, "resultJson" | "output">): string {
-  const content = parseObject(t.resultJson).content;
-  if (Array.isArray(content)) {
-    const text = (content as Json[]).map((c) => str(c, "text")).join("\n\n").trim();
-    if (text) return text;
-  }
+  const text = objects(parseObject(t.resultJson).content)
+    .map((c) => str(c, "text"))
+    .join("\n\n")
+    .trim();
+  if (text) return text;
   return t.output.replace(/^\[Subagent hand-back\][^\n]*\n+/, "").trim();
 }
 
@@ -421,7 +455,6 @@ export function toolFileTarget(t: Pick<ToolCallView, "name" | "inputJson" | "res
     const offset = num(input, "offset");
     return offset !== null && offset > 1 ? { path, line: Math.floor(offset) } : { path };
   }
-  const patch = parseObject(t.resultJson).structuredPatch;
-  const line = Array.isArray(patch) ? firstPatchLine(patch as StructuredPatchHunk[]) : null;
+  const line = firstPatchLine(patchHunks(parseObject(t.resultJson).structuredPatch));
   return line !== null ? { path, line } : { path };
 }

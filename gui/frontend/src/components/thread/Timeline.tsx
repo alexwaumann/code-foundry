@@ -5,6 +5,7 @@ import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/li
 import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { registerTimeline } from "@/stores/cite";
 import { KeepRowContext } from "./context";
+import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
 
 /** Within this many px of the bottom the list follows new content. */
@@ -301,7 +302,9 @@ export function TimelineList<R extends ListRow>({
                 ref={v.measureElement}
                 style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
               >
-                {renderRow(row)}
+                <RowBoundary threadId={threadId} row={row}>
+                  {renderRow(row)}
+                </RowBoundary>
               </div>
             );
           })}

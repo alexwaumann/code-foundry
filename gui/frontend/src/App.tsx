@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { BottomPanel } from "@/components/bottom/BottomPanel";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { PaneError } from "@/components/error/fallbacks";
 import { ActionDialog } from "@/components/actions/ActionDialog";
 import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
@@ -172,7 +174,9 @@ function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactN
       data-testid="content-column"
     >
       {children}
-      <BottomPanel columnHeight={height} />
+      <ErrorBoundary label="bottom panel" fallback={PaneError}>
+        <BottomPanel columnHeight={height} />
+      </ErrorBoundary>
     </div>
   );
 }
