@@ -194,7 +194,8 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
 	}
 	eff.CallerThreadID = uctx.ActiveThreadID
-	return c.Run(ctx, eff, args)
+	res, err := c.Run(ctx, eff, args)
+	return res, shortIDHint(c.Args, args, err)
 }
 
 // ReplacePrefix atomically replaces every command whose name starts with prefix with

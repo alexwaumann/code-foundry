@@ -116,3 +116,30 @@ func TestIDArgValidation(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// A value too short to be a suffix passes through as an id; when that is not found,
+// the error says how long a suffix must be.
+func TestShortIDHint(t *testing.T) {
+	notFound := connect.NewError(connect.CodeNotFound, errors.New("thread not found: 5b6"))
+	r := NewRegistry()
+	if err := r.Register(Command{Name: "test.get", Title: "T", Category: "Test",
+		Args: []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID}},
+		Run:  func(context.Context, Context, Args) (Result, error) { return Result{}, notFound },
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		ctx  Context
+		args map[string]string
+		want string
+	}{
+		{args: map[string]string{"id": "5b6"}, want: "not_found: thread not found: 5b6 (an id suffix needs at least 4 characters)"},
+		{args: map[string]string{"id": "s-5b6"}, want: "not_found: thread not found: 5b6"},
+		{ctx: Context{ActiveThreadID: "5b6"}, want: "not_found: thread not found: 5b6"},
+	} {
+		_, err := r.Invoke(context.Background(), tt.ctx, "test.get", tt.args)
+		if err == nil || err.Error() != tt.want || !errors.Is(err, notFound) {
+			t.Errorf("%v %v: err %v, want %q", tt.ctx, tt.args, err, tt.want)
+		}
+	}
+}

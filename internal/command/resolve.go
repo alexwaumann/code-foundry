@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -270,6 +271,40 @@ func ResolveID(kind IDKind, arg, ref string, ids []string) (string, error) {
 
 // ProjectRefHelp describes a ProjectID arg.
 const ProjectRefHelp = "Project id, name, or a path inside it"
+
+// shortIDHint adds to a NotFound err that an id suffix needs MinIDSuffix characters,
+// when an id arg was given a shorter value without its kind's prefix ("5b6"), which
+// resolution passed through as if it were a whole id.
+func shortIDHint(specs []ArgSpec, a Args, err error) error {
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		return err
+	}
+	for _, s := range specs {
+		k, ok := idKinds[s.ID]
+		v := a.String(s.Name)
+		if !ok || k.prefix == "" || !a.Given(s.Name) || v == "" || len(v) >= MinIDSuffix || strings.HasPrefix(v, k.prefix) {
+			continue
+		}
+		return connect.NewError(connect.CodeNotFound, hinted{err, fmt.Sprintf(" (an id suffix needs at least %d characters)", MinIDSuffix)})
+	}
+	return err
+}
+
+// hinted is err with a hint after its message; it unwraps to err.
+type hinted struct {
+	err  error
+	hint string
+}
+
+func (h hinted) Error() string {
+	var ce *connect.Error
+	if errors.As(h.err, &ce) {
+		return ce.Message() + h.hint
+	}
+	return h.err.Error() + h.hint
+}
+
+func (h hinted) Unwrap() error { return h.err }
 
 // IDHelp is the description suffix of an id arg: "id or unique suffix".
 const IDHelp = " (or a unique suffix of 4+ characters)"
