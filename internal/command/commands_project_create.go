@@ -140,7 +140,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 			Description: "Stop tracking a project made by New Project and delete its folder in ~/.code-foundry/projects. " +
 				"Only projects there can be deleted; a repository on GitHub is not touched.",
 			Category: "Project",
-			Args:     []ArgSpec{{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}},
+			Args:     []ArgSpec{{Name: "project", Type: String, Required: true, Positional: true, Context: ContextProject, Description: "Project id"}},
 			When:     func(c Context) bool { return hasProject(c) && deletable(c) },
 			WhyUnavailable: func(c Context) string {
 				if hasProject(c) && !deletable(c) {

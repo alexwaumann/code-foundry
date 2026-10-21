@@ -27,7 +27,7 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 			"clear unsnoozes. Pinning, archiving or sending a message unsnoozes a thread too.",
 		Category: "Thread",
 		Args: []ArgSpec{
-			idArg,
+			positional(idArg),
 			// The forms only here: the guide has no room for them twice.
 			{Name: "until", Type: String, Description: "When the thread wakes: " + SnoozeUntilHelp},
 			{Name: "clear", Type: Bool, Description: "Unsnooze the thread instead"},

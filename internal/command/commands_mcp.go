@@ -47,7 +47,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Category:     "Thread",
 			NoKeybinding: true,
 			Args: []ArgSpec{
-				idArg,
+				positional(idArg),
 				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check (starts Claude if it is not running)"},
 				{Name: "full", Type: Bool, Description: "List each server's tools with their hints"},
 			},

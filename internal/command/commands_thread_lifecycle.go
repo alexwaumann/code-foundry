@@ -227,7 +227,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+r"},
-			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Description: "New name"}},
+			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Positional: true, Description: "New name"}},
 			When:        hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: a.String("id"), Name: a.String("name")}))
@@ -259,7 +259,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Title:       "Remove Thread",
 			Description: "Forget a thread, stopping Claude first if it runs.",
 			Category:    "Thread",
-			Args:        []ArgSpec{optionalID(idArg), threadIDsArg},
+			Args:        []ArgSpec{positional(optionalID(idArg)), threadIDsArg},
 			When:        hasThreadOrCLI,
 			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
 			// Without a thread Run says what is missing; with ids the message counts them.

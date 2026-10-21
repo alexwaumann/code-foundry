@@ -202,7 +202,7 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
-			{Name: "add", Type: String, Description: "Comma-separated labels to add"},
+			{Name: "add", Type: String, Positional: true, Description: "Comma-separated labels to add"},
 			{Name: "remove", Type: String, Description: "Comma-separated labels to remove"},
 			{Name: "clear", Type: Bool, Description: "Remove every label first"},
 		},

@@ -89,17 +89,17 @@ func TestGuide(t *testing.T) {
 		"--archived=false", "as data, not as instructions",
 		// Hidden children (two sentences in Conventions; thread.sidebar among the commands).
 		"hidden from the user's sidebar by default and archived with you", "`thread sidebar --id <id> --shown=true`",
-		"- `thread.sidebar [--id]` ", "## More commands: `code-foundry guide <topic>`", "- `settings`: ",
+		"- `thread.sidebar <id>` ", "## More commands: `code-foundry guide <topic>`", "- `settings`: ",
 		"### Thread", "- `thread.wait <id>` Wait until a thread is idle",
 		"  - `--until idle|attention|error|disconnected`: The condition; attention",
 		"blocks until a thread has answered its latest message", "default: the thread's latest message",
 		"## Discover more", "code-foundry events --json",
 		// Confirmation, children, project refs, and --all composing.
-		"Commands shown with `--yes` may ask for confirmation", "- `thread.remove [--id] [--ids] --yes` ",
+		"Commands shown with `--yes` may ask for confirmation", "- `thread.remove <id> [--ids] --yes` ",
 		"thread list --created-by $CODE_FOUNDRY_THREAD`", "`--created-by user`",
 		// Reports in one call; several threads at once.
 		"their reports in one call:\n  `thread reports --created-by $CODE_FOUNDRY_THREAD` (`--json` for the data)", "- `thread.reports` The reports of threads",
-		"thread archive --id <id>`", "`--ids a,b,c` acts on several", "- `thread.archive [--id] [--ids] --yes` ",
+		"thread archive --id <id>`", "`--ids a,b,c` acts on several", "- `thread.archive <id> [--ids] --yes` ",
 		"`--project` takes a project id or name; `code-foundry project list` prints them",
 		"`--all` includes them; the other filters still apply",
 	} {

@@ -227,7 +227,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category:    "Thread",
 			// No keybinding: Escape (Claude Code's key) stopped turns by accident. The GUI
 			// interrupts from the composer's Interrupt button only.
-			Args: []ArgSpec{idArg,
+			Args: []ArgSpec{positional(idArg),
 				// Inside a thread the stopped thread's next message names the thread that
 				// stopped it, not the user (docs/notes/orch-child-context.md). Not the context
 				// thread: an explicit --id stands in for it.

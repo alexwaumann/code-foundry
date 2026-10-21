@@ -89,6 +89,12 @@ type ArgSpec struct {
 	Repeatable bool
 }
 
+// positional is s taking a bare word on the CLI too: `thread archive 8f3a`.
+func positional(s ArgSpec) ArgSpec {
+	s.Positional = true
+	return s
+}
+
 // validate checks the spec's static shape at Register time.
 func (s ArgSpec) validate() error {
 	switch {

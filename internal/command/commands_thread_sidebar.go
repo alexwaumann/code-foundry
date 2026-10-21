@@ -32,7 +32,7 @@ func threadSidebarCmd(b ThreadBackend, idArg ArgSpec) Command {
 			"(whatever settings threads.show_created_threads says). A hidden thread is archived with its creator; a shown one is not.",
 		Category: "Thread",
 		Args: []ArgSpec{
-			idArg,
+			positional(idArg),
 			{Name: "shown", Type: Bool, Required: true, Description: "Show (true) or hide (false) the thread in the sidebar"},
 		},
 		When: hasThread,

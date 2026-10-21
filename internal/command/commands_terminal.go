@@ -172,7 +172,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Title:       "Close Terminal",
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period) and remove it once it has exited.",
 			Category:    "Terminal",
-			Args:        []ArgSpec{idArg},
+			Args:        []ArgSpec{positional(idArg)},
 			// Only shells and action runs: an unlabelled terminal (TerminalService.Create) is ended with
 			// terminal.kill and terminal.remove. Close refuses it too.
 			When: func(c Context) bool {
@@ -200,7 +200,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Title:       "Kill Terminal",
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period).",
 			Category:    "Terminal",
-			Args:        []ArgSpec{idArg},
+			Args:        []ArgSpec{positional(idArg)},
 			When:        hasTerminal,
 			Confirm:     "Kill terminal {id}? Its process is terminated.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -216,7 +216,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Title:       "Remove Terminal",
 			Description: "Forget an exited terminal.",
 			Category:    "Terminal",
-			Args:        []ArgSpec{idArg},
+			Args:        []ArgSpec{positional(idArg)},
 			When:        hasTerminal,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
