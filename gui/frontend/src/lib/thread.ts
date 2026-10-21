@@ -43,7 +43,10 @@ export const badgeLabels: Record<ThreadBadge, string> = {
  * - "plan": "plan: <dialog text>" (ExitPlanMode approval)
  * - "error": "error: <code>" (a Claude API error at the prompt), or an "error" status with
  *   any other reason
- * - "interrupted": status "error", reason "interrupted" (the process ended mid-turn)
+ * - "interrupted": status "error", reason "interrupted" (the process ended mid-turn: a close,
+ *   the daemon's stop)
+ * - "crashed": status "error", reason "crashed" (the process died mid-turn on its own: no one
+ *   stopped it)
  * - "trust": "trust: <dialog text>" (folder trust dialog)
  * - "notification": "notification: <text>" (OSC 9/99/777) or "bell"
  * - "snoozeEnded": "snooze ended" (the daemon woke a snoozed thread; it waits on the user
@@ -52,7 +55,18 @@ export const badgeLabels: Record<ThreadBadge, string> = {
  *   untested "blocked: …", "continue: …", "menu: …" dialogs
  * Only "attention" and "error" statuses are classified; the rest are "other".
  */
-export type StatusKind = "done" | "permission" | "question" | "plan" | "error" | "interrupted" | "trust" | "notification" | "snoozeEnded" | "other";
+export type StatusKind =
+  | "done"
+  | "permission"
+  | "question"
+  | "plan"
+  | "error"
+  | "interrupted"
+  | "crashed"
+  | "trust"
+  | "notification"
+  | "snoozeEnded"
+  | "other";
 
 const reasonKinds: Readonly<Record<string, StatusKind>> = {
   finished: "done",
@@ -75,7 +89,7 @@ function splitReason(reason: string): [string, string] {
 }
 
 export function statusKind(s: Pick<ThreadView, "status" | "statusReason">): StatusKind {
-  if (s.status === "error") return s.statusReason === "interrupted" ? "interrupted" : "error";
+  if (s.status === "error") return s.statusReason === "interrupted" || s.statusReason === "crashed" ? s.statusReason : "error";
   if (s.status !== "attention") return "other";
   return reasonKinds[splitReason(s.statusReason)[0]] ?? "other";
 }
@@ -84,7 +98,7 @@ export function statusKind(s: Pick<ThreadView, "status" | "statusReason">): Stat
  * The human part of the status reason, after its "<kind>: " prefix: the dialog question for
  * "permission" ("Do you want to proceed?"), the tool name(s) for "waiting for approval"
  * ("Bash"), the question, plan or notification text, the error code. "" when the reason has
- * none ("finished", "bell", "waiting for input", "interrupted").
+ * none ("finished", "bell", "waiting for input", "interrupted", "crashed").
  */
 export function statusDetail(s: Pick<ThreadView, "statusReason">): string {
   return splitReason(s.statusReason)[1];
@@ -98,7 +112,7 @@ export function statusDetail(s: Pick<ThreadView, "statusReason">): string {
 export function statusNote(s: Pick<ThreadView, "statusReason">): string {
   const [head, detail] = splitReason(s.statusReason);
   if (detail) return detail;
-  return head in reasonKinds || head === "interrupted" ? "" : head;
+  return head in reasonKinds || head === "interrupted" || head === "crashed" ? "" : head;
 }
 
 /**

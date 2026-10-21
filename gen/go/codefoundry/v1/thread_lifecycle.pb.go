@@ -158,8 +158,9 @@ const (
 	ThreadStatus_THREAD_STATUS_IDLE        ThreadStatus = 2
 	// Claude is waiting on the user: a permission prompt, a question, or a dialog.
 	ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION ThreadStatus = 3
-	// The thread's process ended while Claude was working (status_reason
-	// "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
+	// The thread's process ended while Claude was working: status_reason "interrupted"
+	// when it was closed or the daemon stopped mid-turn, "crashed" when it died or exited
+	// on its own (no one stopped it); or
 	// Claude did not start for a message (status_reason "did not start"; the timeline has
 	// an error item saying why). Set only on a DISCONNECTED thread; the next start
 	// replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
@@ -545,10 +546,10 @@ type Thread struct {
 	// reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
 	// message, or once seen like "finished"), "wake limit" (NEEDS_ATTENTION: the thread's
 	// wake subscriptions woke it 60 times within an hour and further wakes are dropped;
-	// cleared by the next message, or once seen), or "interrupted" / "did not start" for
-	// ERROR. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
-	// ended (a busy one becomes ERROR "interrupted", or IDLE "archived" when an archive
-	// stopped it), across daemon restarts. Empty when
+	// cleared by the next message, or once seen), or "interrupted" / "crashed" / "did not
+	// start" for ERROR. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
+	// ended (a busy one becomes ERROR "interrupted", or "crashed" when its process died on
+	// its own, or IDLE "archived" when an archive stopped it), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// Permission mode passed to claude; re-passed on Reconnect.

@@ -28,7 +28,8 @@ export type ThreadStateView = "starting" | "connected" | "closing" | "disconnect
 /**
  * What Claude is doing. Persisted by the daemon: a stopped thread keeps the status it
  * ended with ("attention" with its reason survives a restart). "error" is set on a
- * thread whose process ended mid-turn (statusReason "interrupted") or did not start.
+ * thread whose process ended mid-turn (statusReason "interrupted", or "crashed" when it died
+ * on its own) or did not start.
  */
 export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as thread.new's `permission` arg spells it; "" = Claude's default. */
@@ -50,7 +51,7 @@ export interface ThreadView {
   status: ThreadStatusView;
   /**
    * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
-   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/thread), not by hand.
+   * "question: Which one?", or "interrupted" / "crashed" for "error". Classify it with statusKind / statusDetail (lib/thread), not by hand.
    */
   statusReason: string;
   /** When status or statusReason last changed, epoch ms; null if never known. */

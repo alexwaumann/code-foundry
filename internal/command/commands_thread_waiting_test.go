@@ -7,7 +7,7 @@ import (
 )
 
 func TestThreadStatusWordWaiting(t *testing.T) {
-	idle, attention := v1.ThreadStatus_THREAD_STATUS_IDLE, v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION
+	idle, attention, failed := v1.ThreadStatus_THREAD_STATUS_IDLE, v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, v1.ThreadStatus_THREAD_STATUS_ERROR
 	tests := []struct {
 		status v1.ThreadStatus
 		reason string
@@ -19,6 +19,8 @@ func TestThreadStatusWordWaiting(t *testing.T) {
 		{idle, "at prompt", "idle"},
 		{idle, "", "idle"},
 		{attention, "finished", "attention (finished)"},
+		{failed, "interrupted", "error (interrupted)"},
+		{failed, "crashed", "error (crashed)"},
 	}
 	for _, tt := range tests {
 		if got := threadStatusWord(&v1.Thread{Status: tt.status, StatusReason: tt.reason}); got != tt.want {

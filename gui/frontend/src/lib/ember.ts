@@ -74,6 +74,7 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
       return { text: "Finished", tone: "emerald" };
     case "error":
     case "interrupted":
+    case "crashed":
     case "flagError":
       return { text: "Error", tone: "red" };
     case "place":
