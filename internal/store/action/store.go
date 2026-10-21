@@ -31,6 +31,9 @@ const (
 	DefaultRunHistory = 50
 	// DefaultKillGrace is how long a background run gets after SIGTERM before SIGKILL.
 	DefaultKillGrace = 3 * time.Second
+	// DefaultHookTimeout is how long an on-worktree-create action may run before it is
+	// stopped and the next one starts.
+	DefaultHookTimeout = 10 * time.Minute
 	// MaxNameLen bounds an action's name (runes).
 	MaxNameLen = 64
 )
@@ -58,10 +61,12 @@ type Options struct {
 	// variables. Background runs start from os.Environ(); terminal runs from the
 	// terminal store's environment.
 	Env []string
-	// OutputLimit, RunHistory and KillGrace default to the package constants.
+	// OutputLimit, RunHistory, KillGrace and HookTimeout default to the package
+	// constants.
 	OutputLimit int
 	RunHistory  int
 	KillGrace   time.Duration
+	HookTimeout time.Duration
 	Now         func() time.Time
 }
 
@@ -106,6 +111,9 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	}
 	if opts.KillGrace <= 0 {
 		opts.KillGrace = DefaultKillGrace
+	}
+	if opts.HookTimeout <= 0 {
+		opts.HookTimeout = DefaultHookTimeout
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now

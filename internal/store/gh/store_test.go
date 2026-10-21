@@ -229,6 +229,49 @@ func TestStoreAuthPauseAndRecovery(t *testing.T) {
 	})
 }
 
+// While gh is not authenticated, a refresh or a GUI coming back checks the login at
+// once instead of waiting out the auth backoff.
+func TestStoreAuthCheckNow(t *testing.T) {
+	f := &fakeRunner{}
+	notAuthed := fmt.Errorf("%w: Bad credentials (HTTP 401)", ErrNotAuthenticated)
+	f.set(func(string, map[string]any) (json.RawMessage, error) { return nil, notAuthed })
+	f.auth = func() (AuthStatus, error) { return AuthStatus{Error: "Bad credentials"}, nil }
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.AuthRetry = time.Hour // no check unless one is asked for
+	s := startStore(t, opts)
+	waitFor(t, "unauthenticated", func() bool { return !s.Snapshot().Viewer.Authenticated })
+	time.Sleep(100 * time.Millisecond)
+	if _, n := f.snapshot(); n != 0 {
+		t.Fatalf("auth checks = %d before any was asked for", n)
+	}
+	if err := s.Refresh(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the refresh's auth check", func() bool { _, n := f.snapshot(); return n == 1 })
+	s.PresenceChanged(PresenceBackground, PresenceForeground)
+	waitFor(t, "the presence rise's auth check", func() bool { _, n := f.snapshot(); return n == 2 })
+	s.PresenceChanged(PresenceForeground, PresenceBackground)
+	time.Sleep(100 * time.Millisecond)
+	if _, n := f.snapshot(); n != 2 {
+		t.Errorf("auth checks = %d after a presence fall, want 2", n)
+	}
+}
+
+// The auth check backs off to a couple of minutes at most: it costs GitHub nothing
+// while the token stays the one it rejected.
+func TestAuthBackoffCap(t *testing.T) {
+	s := &Store{opts: Options{AuthRetry: DefaultAuthRetry, MaxBackoff: DefaultMaxBackoff, Rand: func() float64 { return 0.99 }}}
+	for _, tc := range []struct {
+		failures int
+		want     time.Duration
+	}{{1, DefaultAuthRetry}, {2, maxAuthBackoff}, {50, maxAuthBackoff}} {
+		s.authFailures = tc.failures
+		if got := s.authBackoffLocked(); got < tc.want || got > jitter(tc.want, 1) {
+			t.Errorf("failures %d: backoff = %v, want about %v", tc.failures, got, tc.want)
+		}
+	}
+}
+
 func TestStoreRateLimitBudgetPauses(t *testing.T) {
 	g := newFakeGitHub()
 	f := &fakeRunner{}
@@ -310,6 +353,30 @@ func TestStorePollErrorBackoff(t *testing.T) {
 	}
 	if d := s.Snapshot().Dashboard; d.LastError == "" {
 		t.Errorf("dashboard error not set: %+v", d)
+	}
+}
+
+// A 200 poll answer without a viewer decodes as not authenticated, but the request
+// itself succeeded, so nothing pauses the store: the poll backs off instead of running
+// again at MinGap.
+func TestStorePollNoViewerBacksOff(t *testing.T) {
+	f := &fakeRunner{}
+	f.set(func(string, map[string]any) (json.RawMessage, error) {
+		return json.RawMessage(`{"viewer":null,"rateLimit":{"limit":5000,"cost":1,"remaining":4000,"resetAt":"2030-01-01T00:00:00Z"}}`), nil
+	})
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.MaxBackoff = time.Hour
+	s := startStore(t, opts)
+	waitFor(t, "the failed poll", func() bool { return s.Snapshot().Poll.LastError != "" })
+	time.Sleep(300 * time.Millisecond) // 15 MinGaps
+	if n := f.count("Poll"); n != 1 {
+		t.Errorf("polls = %d, want 1 (backed off)", n)
+	}
+	s.mu.Lock()
+	next, failures := s.pollNext, s.pollFailures
+	s.mu.Unlock()
+	if failures != 1 || time.Until(next) < 30*time.Minute {
+		t.Errorf("pollFailures = %d, next poll in %v, want 1 and a backoff", failures, time.Until(next))
 	}
 }
 
@@ -428,6 +495,39 @@ func TestStoreChecks(t *testing.T) {
 	}
 	if _, err := s.Checks(ctx, "ghostty-org/ghostty", ""); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("empty ref err = %v", err)
+	}
+}
+
+// A renamed repository: the poll learns its new name, and its pull requests (search
+// results carry the new name) are found under the tracked slug.
+func TestStoreRenamedRepository(t *testing.T) {
+	g := newFakeGitHub()
+	g.setRepo("old/app", &fakeRepo{name: "new/app", branch: "main", sha: "s1"})
+	g.addPR(fakePR("PR_1", "new/app", 7, time.Now()), sectionAuthored)
+	f := (&fakeRunner{}).serve(g)
+	s := startStore(t, testOptions(openTestDB(t), f, nil))
+	if err := s.Track("old/app"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the canonical slug", func() bool { return s.Snapshot().Repos["old/app"].CanonicalSlug == "new/app" })
+	waitFor(t, "the dashboard", func() bool { return len(s.Snapshot().Dashboard.Authored) == 1 })
+	snap := s.Snapshot()
+	if got := snap.LocalRepo("new/app"); got != "old/app" {
+		t.Errorf("LocalRepo(new/app) = %q", got)
+	}
+	if got := snap.LocalRepo("x/other"); got != "x/other" {
+		t.Errorf("LocalRepo(x/other) = %q", got)
+	}
+	if p, ok := s.CachedPullRequest("old/app", 7); !ok || p.Repo != "old/app" {
+		t.Errorf("CachedPullRequest(old/app, 7) = %+v, %v", p, ok)
+	}
+	// Renamed back (or the remote updated): the alias goes.
+	g.editRepo("old/app", func(r *fakeRepo) { r.name = "" })
+	if err := s.Refresh(context.Background(), "old/app"); err != nil {
+		t.Fatal(err)
+	}
+	if c := s.Snapshot().Repos["old/app"].CanonicalSlug; c != "" {
+		t.Errorf("CanonicalSlug = %q after the names agree again", c)
 	}
 }
 

@@ -5,6 +5,7 @@
 import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread } from "@/gen/codefoundry/v1/ember_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { HEARTBEAT, type Heartbeat } from "./stream";
 import { reportStatusMap, stateMap, statusMap, type ThreadReportStatusView, type ThreadStateView, type ThreadStatusView } from "./threads";
 
 export type EmberTaskStateView = "todo" | "doing" | "blocked" | "done" | "cancelled";
@@ -171,8 +172,11 @@ export function toEmberBoardView(b: EmberBoard): EmberBoardView {
   return { status: toEmberStatusView(b.status), tasks: b.tasks.map(toEmberTaskView) };
 }
 
-/** EmberService.WatchBoard: the whole board, then again on every change. */
-export async function* watchEmberBoard(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EmberBoardView> {
+/**
+ * EmberService.WatchBoard: the whole board, then again on every change, and HEARTBEAT for
+ * a heartbeat (a message with no board), which arms runStream's liveness watchdog.
+ */
+export async function* watchEmberBoard(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EmberBoardView | Heartbeat> {
   const c = await conn.client(EmberService);
-  for await (const b of c.watchBoard({}, { signal })) yield toEmberBoardView(b);
+  for await (const b of c.watchBoard({}, { signal })) yield b.heartbeat ? HEARTBEAT : toEmberBoardView(b);
 }

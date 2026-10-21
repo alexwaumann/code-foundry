@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -17,7 +18,7 @@ service EmberService {
   rpc ListTasks(ListEmberTasksRequest) returns (ListEmberTasksResponse) {}
   // WatchBoard sends the whole board (status and every task) at once, then again on
   // every change: a task, Ember's state, or a task's worker thread (its status or
-  // report).
+  // report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
   rpc WatchBoard(WatchEmberBoardRequest) returns (stream EmberBoard) {}
 }
 
@@ -138,6 +139,9 @@ message EmberTaskDescendant {
 message EmberBoard {
   EmberStatus status = 1;
   repeated EmberTask tasks = 2;
+  // WatchBoard only: nothing else was sent for a while (see StreamHeartbeat). A
+  // heartbeat carries no board: status and tasks are unset, and the last board stands.
+  StreamHeartbeat heartbeat = 3;
 }
 
 message GetEmberStatusRequest {}

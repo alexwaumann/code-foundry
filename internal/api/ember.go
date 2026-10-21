@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -24,6 +25,7 @@ var _ EmberStore = (*ember.Store)(nil)
 type Ember struct {
 	store EmberStore
 	bus   *bus.Bus
+	beat  time.Duration // WatchBoard's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 }
 
 var _ codefoundryv1connect.EmberServiceHandler = (*Ember)(nil)
@@ -54,17 +56,25 @@ func (h *Ember) ListTasks(_ context.Context, req *connect.Request[v1.ListEmberTa
 	return connect.NewResponse(out), nil
 }
 
-// WatchBoard sends the board, then the board again after every change.
+// WatchBoard sends the board, then the board again after every change, and a heartbeat
+// after HeartbeatInterval without one (see heartbeat.proto).
 func (h *Ember) WatchBoard(ctx context.Context, _ *connect.Request[v1.WatchEmberBoardRequest], stream *connect.ServerStream[v1.EmberBoard]) error {
 	sub := bus.Subscribe[ember.Changed](h.bus, watchBuffer)
 	defer sub.Close()
 	if err := stream.Send(EmberBoardToProto(h.store.Snapshot())); err != nil {
 		return err
 	}
+	beat := newHeartbeat(h.beat)
+	defer beat.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-beat.C():
+			beat.Reset()
+			if err := stream.Send(&v1.EmberBoard{Heartbeat: &v1.StreamHeartbeat{}}); err != nil {
+				return err
+			}
 		case _, ok := <-sub.C():
 			if !ok {
 				return nil
@@ -73,6 +83,7 @@ func (h *Ember) WatchBoard(ctx context.Context, _ *connect.Request[v1.WatchEmber
 			for len(sub.C()) > 0 {
 				<-sub.C()
 			}
+			beat.Reset()
 			if err := stream.Send(EmberBoardToProto(h.store.Snapshot())); err != nil {
 				return err
 			}

@@ -13,7 +13,7 @@ import (
 func TestNoKeybindingCommands(t *testing.T) {
 	f := newFixture(t)
 	want := []string{
-		"action.list", "action.runs", "action.wait",
+		"action.list", "action.runs", "action.stop", "action.wait",
 		"app.version", "daemon.status", "daemon.version",
 		"ember.status", "ember.board", "ember.remember", "ember.reseed", "ember.enable", "ember.disable", "ember.task.add", "ember.task.update", "ember.task.done", "ember.task.start", "ember.task.cancel", "ember.task.list", "ember.task.show",
 		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads", "plugin.wakes",

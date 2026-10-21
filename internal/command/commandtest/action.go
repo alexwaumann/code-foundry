@@ -22,6 +22,10 @@ type Action struct {
 	Started *v1.ActionRun
 	// Finished is what WaitRun returns. Default: Started, exited 0.
 	Finished *v1.ActionRun
+	// WaitBlocks makes WaitRun wait for its ctx and fail with its error.
+	WaitBlocks bool
+	// Stopped is what StopRun returns. Default: the run, still running.
+	Stopped *v1.ActionRun
 }
 
 var _ command.ActionBackend = (*Action)(nil)
@@ -104,14 +108,30 @@ func (f *Action) Run(_ context.Context, r *connect.Request[v1.RunActionRequest])
 	return connect.NewResponse(&v1.RunActionResponse{Run: run}), nil
 }
 
-// WaitRun returns Finished.
-func (f *Action) WaitRun(_ context.Context, r *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error) {
+// WaitRun returns Finished (with WaitBlocks: ctx's error once it ends).
+func (f *Action) WaitRun(ctx context.Context, r *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error) {
 	if err := f.do(r.Msg); err != nil {
 		return nil, err
+	}
+	if f.WaitBlocks {
+		<-ctx.Done()
+		return nil, ctx.Err()
 	}
 	run := &v1.ActionRun{Id: r.Msg.GetRunId(), State: v1.ActionRunState_ACTION_RUN_STATE_EXITED, Mode: v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND}
 	if f.Finished != nil {
 		run = proto.CloneOf(f.Finished)
 	}
 	return connect.NewResponse(&v1.WaitActionRunResponse{Run: run}), nil
+}
+
+// StopRun returns Stopped (default: the run, still running).
+func (f *Action) StopRun(_ context.Context, r *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error) {
+	if err := f.do(r.Msg); err != nil {
+		return nil, err
+	}
+	run := &v1.ActionRun{Id: r.Msg.GetRunId(), ActionName: "Test", State: v1.ActionRunState_ACTION_RUN_STATE_RUNNING}
+	if f.Stopped != nil {
+		run = proto.CloneOf(f.Stopped)
+	}
+	return connect.NewResponse(&v1.StopActionRunResponse{Run: run}), nil
 }

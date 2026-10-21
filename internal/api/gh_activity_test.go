@@ -74,6 +74,28 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		t.Errorf("include_untracked lists: %d/%d", len(all.Msg.GetAuthored()), len(all.Msg.GetReviewRequested()))
 	}
 
+	// A renamed repository: search results carry its new name; they are the tracked
+	// slug's, under that slug.
+	store.SetCanonicalSlug("o/tracked", "neworg/tracked")
+	store.SetDashboard(gh.Dashboard{
+		Authored:       []gh.PullRequest{pr("neworg/tracked", 11, gh.PullRequestOpen), pr("x/other", 2, gh.PullRequestOpen)},
+		RecentlyMerged: []gh.PullRequest{pr("neworg/tracked", 12, gh.PullRequestMerged)},
+	})
+	moved, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := moved.Msg.GetAuthored(); len(a) != 1 || a[0].GetNumber() != 11 || a[0].GetRepoSlug() != "o/tracked" {
+		t.Errorf("renamed repository's authored = %v", a)
+	}
+	act, err := client.GetRepoActivity(ctx, connect.NewRequest(&v1.GetRepoActivityRequest{RepoSlug: "o/tracked"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rm := act.Msg.GetRecentlyMerged(); len(rm) != 1 || rm[0].GetNumber() != 12 {
+		t.Errorf("renamed repository's recently merged = %v", rm)
+	}
+
 	store.SetDashboard(gh.Dashboard{Disabled: true, FetchedAt: at})
 	off, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{}))
 	if err != nil || !off.Msg.GetDashboardsDisabled() || len(off.Msg.GetAuthored()) != 0 {

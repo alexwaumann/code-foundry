@@ -91,6 +91,31 @@ func setWinsize(f *os.File, cols, rows uint16) error {
 	return nil
 }
 
+// foregroundGroup returns the PTY's foreground process group (TIOCGPGRP on the master):
+// a job-control shell's running job, in a group of its own. 0 when it cannot be read
+// (the master is closed).
+func foregroundGroup(f *os.File) int {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return 0
+	}
+	pg := 0
+	if err := rc.Control(func(fd uintptr) {
+		if v, err := unix.IoctlGetInt(int(fd), unix.TIOCGPGRP); err == nil {
+			pg = v
+		}
+	}); err != nil {
+		return 0
+	}
+	return max(pg, 0)
+}
+
+// groupAlive reports whether process group pg still has a member.
+func groupAlive(pg int) bool {
+	err := syscall.Kill(-pg, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
 // signalGroup sends sig to the process group led by pid, falling back to pid alone.
 func signalGroup(pid int, sig syscall.Signal) error {
 	err := syscall.Kill(-pid, sig)

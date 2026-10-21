@@ -153,10 +153,13 @@ func (s *Store) setWatch(r PullRequestRef, fn func(*prWatch)) {
 }
 
 // cachedByRef indexes the cached lists (dashboards and branches) by pull request, the
-// first non-placeholder copy winning.
+// first non-placeholder copy winning. A renamed repository's pull requests are under
+// the slug the store knows it by (Snapshot.LocalRepo).
 func (s *Store) cachedByRef() map[PullRequestRef]PullRequest {
 	out := map[PullRequestRef]PullRequest{}
-	for _, p := range knownPullRequests(s.Snapshot(), &s.branches) {
+	snap := s.Snapshot()
+	for _, p := range knownPullRequests(snap, &s.branches) {
+		p.Repo = snap.LocalRepo(p.Repo)
 		r := PullRequestRef{strings.ToLower(p.Repo), p.Number}
 		if r.Slug == "" || r.Number <= 0 {
 			continue

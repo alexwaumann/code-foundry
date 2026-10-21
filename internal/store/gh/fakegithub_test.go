@@ -43,6 +43,8 @@ type fakeGitHub struct {
 }
 
 type fakeRepo struct {
+	// name is the repository's current nameWithOwner (renamed); its slug when "".
+	name    string
 	branch  string
 	sha     string
 	rollup  CheckRollup
@@ -247,6 +249,9 @@ func (g *fakeGitHub) poll(doc string, vars map[string]any, data map[string]any, 
 			continue
 		}
 		out := map[string]any{}
+		if strings.Contains(block, "nameWithOwner") {
+			out["nameWithOwner"] = cmpString(r.name, slug)
+		}
 		if strings.Contains(block, "...DefaultBranchFingerprint") {
 			out["defaultBranchRef"] = map[string]any{"name": r.branch, "target": map[string]any{
 				"oid": r.sha, "committedDate": "2026-10-08T12:00:00Z", "messageHeadline": "head of " + r.branch,

@@ -13,6 +13,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
@@ -96,7 +97,8 @@ func serveOnce(t *testing.T, r Route, done chan struct{}) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.Handle(r.Path, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		r.Handler.ServeHTTP(w, req)
-		if strings.HasSuffix(req.URL.Path, "/Watch") || strings.HasSuffix(req.URL.Path, "/WatchThread") || strings.HasSuffix(req.URL.Path, "/Attach") {
+		if strings.HasSuffix(req.URL.Path, "/Watch") || strings.HasSuffix(req.URL.Path, "/WatchThread") || strings.HasSuffix(req.URL.Path, "/Attach") ||
+			strings.HasSuffix(req.URL.Path, "/WatchBoard") {
 			close(done)
 		}
 	}))
@@ -206,6 +208,33 @@ func openEventBeats(t *testing.T, ctx context.Context, every time.Duration) beat
 	}
 }
 
+// emberSnap is a fixed Ember board for WatchBoard.
+type emberSnap struct{}
+
+func (emberSnap) Snapshot() *ember.Snapshot {
+	return &ember.Snapshot{Status: ember.Status{Enabled: true}}
+}
+
+func openEmberBeats(t *testing.T, ctx context.Context, every time.Duration) beatStream {
+	b := bus.New()
+	done := make(chan struct{})
+	srv := serveOnce(t, (&Ember{store: emberSnap{}, bus: b, beat: every}).Route(), done)
+	c := codefoundryv1connect.NewEmberServiceClient(srv.Client(), srv.URL)
+	s, err := c.WatchBoard(ctx, connect.NewRequest(&v1.WatchEmberBoardRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	if !s.Receive() || s.Msg().GetStatus() == nil || s.Msg().GetHeartbeat() != nil {
+		t.Fatalf("no board: %v", s.Err())
+	}
+	return beatStream{
+		msgs: pump(s, func(m *v1.EmberBoard) bool { return m.GetHeartbeat() != nil }),
+		poke: func(*testing.T) { bus.Publish(b, ember.Changed{}) },
+		done: done,
+	}
+}
+
 // count drains msgs for d and counts each kind.
 func count(msgs <-chan string, d time.Duration) map[string]int {
 	got := map[string]int{}
@@ -235,6 +264,7 @@ func TestStreamHeartbeats(t *testing.T) {
 		{"ThreadService.WatchThread", openThreadBeats},
 		{"TerminalService.Attach", openAttachBeats},
 		{"EventService.Watch", openEventBeats},
+		{"EmberService.WatchBoard", openEmberBeats},
 	}
 	scenarios := []struct {
 		name string

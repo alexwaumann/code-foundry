@@ -22,8 +22,9 @@ const (
 )
 
 // StreamHeartbeat is sent on a long-lived server stream the GUI holds
-// (ThreadService.Watch, TerminalService.Attach, EventService.Watch) once the stream has
-// carried nothing else for 5 s (api.HeartbeatInterval). It carries no state and no seq.
+// (ThreadService.Watch, TerminalService.Attach, EventService.Watch,
+// EmberService.WatchBoard, PluginService.WatchSurface) once the stream has carried
+// nothing else for 5 s (api.HeartbeatInterval). It carries no state and no seq.
 //
 // Two reasons (docs/notes/thread-render-stall.md): after the Wails window was hidden,
 // minimized or covered, WKWebView can hold back the last bytes of a streaming response

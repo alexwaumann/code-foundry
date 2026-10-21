@@ -125,6 +125,15 @@ func (h *Action) WaitRun(ctx context.Context, req *connect.Request[v1.WaitAction
 	return connect.NewResponse(&v1.WaitActionRunResponse{Run: actionRunToProto(r)}), nil
 }
 
+// StopRun ends a running run and returns it (usually still running).
+func (h *Action) StopRun(ctx context.Context, req *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error) {
+	r, err := h.store.StopRun(ctx, req.Msg.GetRunId())
+	if err != nil {
+		return nil, actionError(err)
+	}
+	return connect.NewResponse(&v1.StopActionRunResponse{Run: actionRunToProto(r)}), nil
+}
+
 // Watch sends a snapshot, then every action event; a fresh snapshot after drops.
 func (h *Action) Watch(ctx context.Context, _ *connect.Request[v1.WatchActionsRequest], stream *connect.ServerStream[v1.ActionEvent]) error {
 	sub := bus.Subscribe[action.Event](h.bus, watchBuffer)

@@ -3,10 +3,12 @@ package command
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -23,6 +25,7 @@ type ActionBackend interface {
 	Delete(context.Context, *connect.Request[v1.DeleteActionRequest]) (*connect.Response[v1.DeleteActionResponse], error)
 	Run(context.Context, *connect.Request[v1.RunActionRequest]) (*connect.Response[v1.RunActionResponse], error)
 	WaitRun(context.Context, *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error)
+	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
 }
 
 var (
@@ -243,7 +246,8 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				refArg,
 				{Name: "background", Type: Bool, Description: "Run in the background with captured output, whatever the action says"},
 				{Name: "terminal", Type: Bool, Description: "Run in a terminal in the bottom panel, whatever the action says"},
-				{Name: "wait", Type: Bool, Description: "Wait for the run to finish; print its output (background) and exit with its code"},
+				{Name: "wait", Type: Bool, Description: "Wait for the run to finish; print its output (background) and exit with its code. " +
+					"Interrupting the wait stops a background run"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread or worktree, " +
 					"the registered worktree containing it owns the run (CLI default: the working directory)"},
 			},
@@ -274,7 +278,14 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				}
 				run := res.Msg.GetRun()
 				if a.Bool("wait") {
-					return waitRun(ctx, d, run.GetId())
+					out, err := waitRun(ctx, d, run.GetId())
+					if err != nil && ctx.Err() != nil && run.GetMode() == v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND {
+						// The caller went away (Ctrl-C, a timed-out tool call): the background
+						// run it started for itself would go on unseen, so it stops too. A
+						// terminal run stays: it is on screen and closes with its tab.
+						stopAbandoned(ctx, d, run.GetId())
+					}
+					return out, err
 				}
 				if run.GetMode() == v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL {
 					return Result{Message: fmt.Sprintf("started %s in terminal %s (run %s)", run.GetActionName(), run.GetTerminalId(), run.GetId()), JSON: run}, nil
@@ -284,14 +295,35 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:         "action.wait",
-			Title:        "Wait for Action Run",
-			Description:  "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code.",
+			Name:  "action.wait",
+			Title: "Wait for Action Run",
+			Description: "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code. " +
+				"Interrupting the wait leaves the run going (action stop ends it).",
 			Category:     "Action",
 			NoKeybinding: true,
 			Args:         []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, ID: RunID, Description: "Run id (r-...)" + IDHelp}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				return waitRun(ctx, d, a.String("run"))
+			},
+		},
+		Command{
+			Name:  "action.stop",
+			Title: "Stop Action Run",
+			Description: "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's " +
+				"terminal is killed. A finished run is left as it is. `code-foundry action wait <run>` waits for the end.",
+			Category:     "Action",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, ID: RunID, Description: "Run id (r-...)" + IDHelp}},
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				res, err := d.Action.StopRun(ctx, connect.NewRequest(&v1.StopActionRunRequest{RunId: a.String("run")}))
+				if err != nil {
+					return Result{}, err
+				}
+				run := res.Msg.GetRun()
+				if run.GetState() == v1.ActionRunState_ACTION_RUN_STATE_EXITED {
+					return Result{Message: fmt.Sprintf("%s had finished already, with code %d (run %s)", run.GetActionName(), run.GetExitCode(), run.GetId()), JSON: run}, nil
+				}
+				return Result{Message: fmt.Sprintf("stopping %s (run %s)", run.GetActionName(), run.GetId()), JSON: run}, nil
 			},
 		},
 		Command{
@@ -394,6 +426,16 @@ func findAction(ctx context.Context, d ActionDeps, c Context, a Args) (*v1.Actio
 		}
 	}
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no action %q in this project (code-foundry action list)", ref))
+}
+
+// stopAbandoned stops run id, which action.run --wait started, after its caller went
+// away (ctx ended): the stop itself must not depend on ctx.
+func stopAbandoned(ctx context.Context, d ActionDeps, id string) {
+	sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if _, err := d.Action.StopRun(sctx, connect.NewRequest(&v1.StopActionRunRequest{RunId: id})); err != nil {
+		slog.Warn("action.run --wait: stop the abandoned run", "run", id, "err", err)
+	}
 }
 
 // waitRun waits for run id and reports it: a background run's output, then a line with

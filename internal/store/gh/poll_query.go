@@ -224,6 +224,9 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 			}
 			body.WriteString(" } } }\n")
 		}
+		// GitHub follows a renamed or transferred repository: its current name tells the
+		// store which search results are this repository's (RepoState.CanonicalSlug).
+		body.WriteString("    nameWithOwner\n")
 		body.WriteString("  }\n")
 	}
 	if st := p.stats; st != nil {

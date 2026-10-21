@@ -270,8 +270,10 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 	switch {
 	case retryNow:
 		s.schedulePollLocked(now, now)
-	case isGlobal(err):
-		// Left due: the store-wide pause (or the auth check) holds it.
+	case isGlobal(err) && (s.authBad || now.Before(s.pauseUntil)):
+		// Left due: the store-wide pause (or the auth check) holds it. A global error
+		// that set neither (a 200 answer without a viewer) backs off below instead of
+		// polling again at MinGap.
 	default:
 		s.pollFailures++
 		s.pollAgain = false // a failing poll is not retried early
@@ -508,6 +510,17 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 			n.Repos[slug] = r
 		}
+		for _, rp := range plan.repos {
+			canon := canonicalSlug(rp.slug, res.Repos[rp.slug])
+			if r, ok := n.Repos[rp.slug]; ok && canon != nil && r.CanonicalSlug != *canon {
+				s.log.Info("gh repository moved", "slug", rp.slug, "now", *canon)
+				r.CanonicalSlug = *canon
+				n.Repos[rp.slug] = r
+				if !slices.Contains(repoChanged, rp.slug) {
+					repoChanged = append(repoChanged, rp.slug)
+				}
+			}
+		}
 	})
 	slices.Sort(repoChanged)
 
@@ -580,6 +593,23 @@ func (s *Store) applyViewer(ctx context.Context, res *pollResult) {
 	s.updateViewer(func(vs *ViewerState) {
 		vs.Viewer, vs.Authenticated, vs.FetchedAt, vs.LastError = &v, true, now, ""
 	})
+}
+
+// canonicalSlug is RepoState.CanonicalSlug for slug from its poll block: the name
+// GitHub reports when it differs, "" when it is the same; nil when the block says nothing
+// (failed, or no name).
+func canonicalSlug(slug string, rr repoResult) *string {
+	if rr.Err != nil || rr.NameWithOwner == "" {
+		return nil
+	}
+	canon, err := NormalizeSlug(rr.NameWithOwner)
+	if err != nil {
+		return nil
+	}
+	if canon == slug {
+		canon = ""
+	}
+	return &canon
 }
 
 // knownPullRequests indexes the pull requests the published state already holds, by
@@ -1006,7 +1036,7 @@ func (s *Store) checkAuth(ctx context.Context) {
 		return
 	}
 	s.authFailures++
-	s.authNext = now.Add(backoff(s.opts.AuthRetry, s.opts.MaxBackoff, s.authFailures, s.opts.Rand()))
+	s.authNext = now.Add(s.authBackoffLocked())
 	s.mu.Unlock()
 	msg := ErrNotAuthenticated.Error()
 	switch {

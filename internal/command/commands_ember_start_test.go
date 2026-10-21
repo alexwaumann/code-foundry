@@ -22,6 +22,7 @@ type fakeEmber struct {
 	mu       sync.Mutex
 	threadID string
 	tasks    []ember.Task
+	afterAdd func() // runs after AddTask (the caller going away while the worker starts)
 }
 
 var _ command.EmberBackend = (*fakeEmber)(nil)
@@ -38,9 +39,15 @@ func (f *fakeEmber) AddTask(_ context.Context, n ember.NewTask) (ember.Task, err
 	defer f.mu.Unlock()
 	t := ember.Task{ID: fmt.Sprintf("t-%08d", len(f.tasks)+1), Title: n.Title, Detail: n.Detail, ParentID: n.ParentID, ThreadID: n.ThreadID, State: n.State}
 	f.tasks = append(f.tasks, t)
+	if f.afterAdd != nil {
+		f.afterAdd()
+	}
 	return t, nil
 }
-func (f *fakeEmber) UpdateTask(_ context.Context, id string, u ember.TaskUpdate) (ember.Task, error) {
+func (f *fakeEmber) UpdateTask(ctx context.Context, id string, u ember.TaskUpdate) (ember.Task, error) {
+	if err := ctx.Err(); err != nil {
+		return ember.Task{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	i := slices.IndexFunc(f.tasks, func(t ember.Task) bool { return t.ID == id })
@@ -72,6 +79,7 @@ func TestEmberTaskStart(t *testing.T) {
 		args      map[string]string
 		modelDflt string // the settings' thread.new model default
 		createErr error
+		cancel    bool  // the request's ctx ends while the worker starts
 		wantErr   error // errors.Is, or an *ArgError for command.ErrInvalidArgs
 		wantMsg   string
 		check     func(t *testing.T, req *v1.CreateThreadRequest)
@@ -132,6 +140,19 @@ func TestEmberTaskStart(t *testing.T) {
 			wantErr:  errors.New("no project p-9"),
 			wantTask: ember.Task{ID: "t-00000001", Title: "x", State: ember.StateCancelled, Outcome: "the worker did not start: no project p-9"},
 		},
+		{
+			name: "the caller goes away while the worker starts: the task is still linked", emberID: "s-ember", cancel: true,
+			args:     map[string]string{"title": "x", "project": "p-1", "prompt": "Go."},
+			wantMsg:  "started task t-00000001 with thread s1",
+			wantTask: ember.Task{ID: "t-00000001", Title: "x", State: ember.StateDoing, ThreadID: "s1"},
+		},
+		{
+			name: "the caller goes away and the worker fails: the task is still cancelled", emberID: "s-ember", cancel: true,
+			createErr: connect.NewError(connect.CodeCanceled, errors.New("context canceled")),
+			args:      map[string]string{"title": "x", "project": "p-1", "prompt": "Go."},
+			wantErr:   errors.New("context canceled"),
+			wantTask:  ember.Task{ID: "t-00000001", Title: "x", State: ember.StateCancelled, Outcome: "the worker did not start: context canceled"},
+		},
 		{name: "no Ember thread and no creator", args: map[string]string{"title": "x", "project": "p-1", "prompt": "Go."}, wantErr: command.ErrInvalidArgs},
 		{name: "a bad budget", emberID: "s-ember", args: map[string]string{"title": "x", "project": "p-1", "prompt": "Go.", "budget": "lots"}, wantErr: command.ErrInvalidArgs},
 		{name: "base without a new worktree", emberID: "s-ember", args: map[string]string{"title": "x", "project": "p-1", "prompt": "Go.", "base": "main", "new-worktree": "false"},
@@ -150,7 +171,12 @@ func TestEmberTaskStart(t *testing.T) {
 			if tt.modelDflt != "" {
 				reg.SetOverrides(command.Overrides{ArgDefaults: map[string]map[string]string{"thread.new": {"model": tt.modelDflt}}})
 			}
-			res, err := reg.Invoke(context.Background(), command.Context{}, "ember.task.start", tt.args)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				fe.afterAdd = cancel
+			}
+			res, err := reg.Invoke(ctx, command.Context{}, "ember.task.start", tt.args)
 			switch {
 			case tt.wantErr == nil && err != nil:
 				t.Fatalf("err = %v", err)

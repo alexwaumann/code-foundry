@@ -357,6 +357,27 @@ func TestConsolidationKeepsMemory(t *testing.T) {
 			if after, _ := os.ReadFile(filepath.Join(e.dir, memoryFile)); string(after) != string(before) {
 				t.Errorf("MEMORY.md changed to %q", after)
 			}
+			if !st.LastConsolidatedAt.IsZero() {
+				t.Errorf("LastConsolidatedAt = %v after a failed consolidation", st.LastConsolidatedAt)
+			}
+			// The next boundary consolidates the failed epoch's conversation too.
+			first := e.clock()
+			e.advance(time.Minute)
+			e.threads.PutItems(r.ID, thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi", CreatedAt: first},
+				thread.Item{ID: "u2", Kind: thread.KindUserMessage, Text: "later", CreatedAt: e.clock()})
+			e.mu.Lock()
+			e.answer, e.answerErr = "# Memory\n\n- consolidated\n", nil
+			e.mu.Unlock()
+			st, err = e.s.Reseed(context.Background())
+			if err != nil || st.Epoch != 3 || st.LastConsolidationError != "" || !st.LastConsolidatedAt.Equal(e.clock()) {
+				t.Fatalf("second Reseed = %+v, %v", st, err)
+			}
+			e.mu.Lock()
+			last := e.prompts[len(e.prompts)-1]
+			e.mu.Unlock()
+			if !strings.Contains(last, "\nhi\n") || !strings.Contains(last, "\nlater") {
+				t.Errorf("second consolidation prompt lacks the failed epoch's messages: %q", last)
+			}
 		})
 	}
 }

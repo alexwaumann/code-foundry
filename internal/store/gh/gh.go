@@ -290,9 +290,13 @@ type ViewerState struct {
 // RepoState is one repository's activity: the viewer's monthly stats there and its
 // default branch CI, each with its own fetch time and error.
 type RepoState struct {
-	Slug     string
-	Tracked  bool
-	Activity RepoActivity
+	Slug    string
+	Tracked bool
+	// CanonicalSlug is the repository's current name on GitHub when it differs from
+	// Slug (renamed or transferred; the remote URL still redirects), "" otherwise. Search
+	// results carry it, so readers map it back to Slug (Snapshot.LocalRepo).
+	CanonicalSlug string
+	Activity      RepoActivity
 }
 
 // PollState is the outcome of the last poll.
@@ -341,6 +345,24 @@ func (s *Snapshot) Repo(slug string) (RepoState, bool) {
 	}
 	r, ok := s.Repos[key]
 	return r, ok
+}
+
+// LocalRepo maps a pull request's repository (the name GitHub reports now) to the slug
+// the store knows it by: a repository whose CanonicalSlug it is, else repo itself.
+func (s *Snapshot) LocalRepo(repo string) string {
+	key, err := NormalizeSlug(repo)
+	if err != nil {
+		return repo
+	}
+	if _, ok := s.Repos[key]; ok {
+		return repo
+	}
+	for slug, r := range s.Repos {
+		if r.CanonicalSlug == key {
+			return slug
+		}
+	}
+	return repo
 }
 
 func (s *Snapshot) clone() *Snapshot {

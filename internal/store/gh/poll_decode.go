@@ -91,6 +91,9 @@ type branchFP struct {
 type repoResult struct {
 	// Err is set when the repository failed as a whole (not found, no access).
 	Err error
+	// NameWithOwner is the repository's current name ("" when missing): another than
+	// the plan's slug after a rename or transfer.
+	NameWithOwner string
 	// DefaultBranch is nil when not selected or the repository is empty.
 	DefaultBranch *branchFP
 	// Branches holds each watched branch's pull requests (every author); a branch
@@ -199,6 +202,7 @@ func decodeRepoBlock(rp repoPlan, raw json.RawMessage, aliasErr error) repoResul
 		out.Err = cmpErr(aliasErr, fmt.Errorf("repository: %w", ErrNotFound))
 		return out
 	}
+	_ = unmarshalField(fields, "nameWithOwner", &out.NameWithOwner)
 	if rp.defaultBranch {
 		var ref *defaultBranchJSON
 		if err := unmarshalField(fields, "defaultBranchRef", &ref); err != nil {

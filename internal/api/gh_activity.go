@@ -21,10 +21,10 @@ func (h *Gh) GetDashboard(_ context.Context, req *connect.Request[v1.GetDashboar
 	}
 	res := &v1.GetDashboardResponse{
 		Authenticated:      snap.Viewer.Authenticated,
-		Authored:           searchPullRequestsToProto(d.Authored, keep),
-		ReviewRequested:    searchPullRequestsToProto(d.ReviewRequested, keep),
-		Reviewed:           searchPullRequestsToProto(d.Reviewed, keep),
-		RecentlyMerged:     searchPullRequestsToProto(d.RecentlyMerged, keep),
+		Authored:           searchPullRequestsToProto(localRepos(snap, d.Authored), keep),
+		ReviewRequested:    searchPullRequestsToProto(localRepos(snap, d.ReviewRequested), keep),
+		Reviewed:           searchPullRequestsToProto(localRepos(snap, d.Reviewed), keep),
+		RecentlyMerged:     searchPullRequestsToProto(localRepos(snap, d.RecentlyMerged), keep),
 		Stats:              statsToProto(d.Stats),
 		FetchedAt:          timestamp(d.FetchedAt),
 		LastError:          d.LastError,
@@ -49,7 +49,7 @@ func (h *Gh) GetRepoActivity(_ context.Context, req *connect.Request[v1.GetRepoA
 		RepoSlug:       slug,
 		Tracked:        r.Tracked,
 		Stats:          statsToProto(r.Activity.Stats),
-		RecentlyMerged: searchPullRequestsToProto(snap.Dashboard.RecentlyMerged, func(p gh.PullRequest) bool { return p.Repo == slug }),
+		RecentlyMerged: searchPullRequestsToProto(localRepos(snap, snap.Dashboard.RecentlyMerged), func(p gh.PullRequest) bool { return p.Repo == slug }),
 	}
 	if ci := r.Activity.DefaultBranch; !ci.FetchedAt.IsZero() || ci.LastError != "" {
 		res.DefaultBranch = &v1.DefaultBranchStatus{
@@ -89,6 +89,26 @@ func trackedSlugs(snap *gh.Snapshot) []string {
 		}
 	}
 	slices.Sort(out)
+	return out
+}
+
+// localRepos is prs with each repository as the projects know it: a renamed one's
+// search results carry its new name (gh.Snapshot.LocalRepo). prs is not modified.
+func localRepos(snap *gh.Snapshot, prs []gh.PullRequest) []gh.PullRequest {
+	var out []gh.PullRequest
+	for i, p := range prs {
+		local := snap.LocalRepo(p.Repo)
+		if local == p.Repo {
+			continue
+		}
+		if out == nil {
+			out = slices.Clone(prs)
+		}
+		out[i].Repo = local
+	}
+	if out == nil {
+		return prs
+	}
 	return out
 }
 

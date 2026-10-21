@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -146,6 +147,62 @@ func TestActionRunWait(t *testing.T) {
 				t.Errorf("requests = %v", reqs)
 			}
 		})
+	}
+}
+
+// A caller that goes away while action.run --wait waits stops the background run it
+// started; a terminal run, on screen, stays.
+func TestActionRunWaitInterrupted(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		mode     string
+		wantStop bool
+	}{{"background", "background", true}, {"terminal", "terminal", false}} {
+		t.Run(tt.name, func(t *testing.T) {
+			act := &commandtest.Action{WaitBlocks: true}
+			reg := actionRegistry(t, act, nil)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			_, err := reg.Invoke(ctx, command.Context{ActiveThreadID: "s1"}, "action.run", map[string]string{"action": "test", "wait": "true", tt.mode: "true"})
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("err = %v, want the deadline", err)
+			}
+			var stops []*v1.StopActionRunRequest
+			for _, m := range act.Requests() {
+				if s, ok := m.(*v1.StopActionRunRequest); ok {
+					stops = append(stops, s)
+				}
+			}
+			if tt.wantStop != (len(stops) == 1 && stops[0].GetRunId() == "r1") || len(stops) > 1 {
+				t.Errorf("stop requests = %v, want a stop: %v", stops, tt.wantStop)
+			}
+		})
+	}
+	// action.wait on a run someone else started does not stop it.
+	act := &commandtest.Action{WaitBlocks: true}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := actionRegistry(t, act, nil).Invoke(ctx, command.Context{}, "action.wait", map[string]string{"run": "r1"}); err == nil {
+		t.Fatal("action.wait returned without its run")
+	}
+	for _, m := range act.Requests() {
+		if _, ok := m.(*v1.StopActionRunRequest); ok {
+			t.Errorf("action.wait stopped the run")
+		}
+	}
+}
+
+func TestActionStop(t *testing.T) {
+	act := &commandtest.Action{}
+	reg := actionRegistry(t, act, nil)
+	res, err := reg.Invoke(context.Background(), command.Context{}, "action.stop", map[string]string{"run": "r1"})
+	if err != nil || res.Message != "stopping Test (run r1)" {
+		t.Fatalf("action.stop = %+v, %v", res, err)
+	}
+	act.Stopped = &v1.ActionRun{Id: "r1", ActionName: "Test", State: v1.ActionRunState_ACTION_RUN_STATE_EXITED, ExitCode: 2}
+	res, err = reg.Invoke(context.Background(), command.Context{}, "action.stop", map[string]string{"run": "r1"})
+	if err != nil || res.Message != "Test had finished already, with code 2 (run r1)" {
+		t.Fatalf("action.stop on a finished run = %+v, %v", res, err)
 	}
 }
 
