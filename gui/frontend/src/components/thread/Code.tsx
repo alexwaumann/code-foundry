@@ -4,6 +4,7 @@ import { Markdown, MarkdownContent, type MarkdownExtras } from "@/components/pr/
 import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type Token } from "@/lib/highlight";
 import { markdownBlocks } from "@/lib/markdownBlocks";
+import { linkPath } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
@@ -66,6 +67,12 @@ const threadExtras: MarkdownExtras = {
   code: (lang, code) => <CodeBlock lang={lang} code={code} />,
   // File paths open the File tab, relative ones against the thread's checkout (PathChip).
   pathChip: (m) => <PathChip match={m} />,
+  // A relative link (`[main.go](src/main.go)`) is a file too: a chip when its target reads
+  // as a path, else its text (it is no github.com page).
+  link: (href, children) => {
+    const m = linkPath(href);
+    return m ? <PathChip match={m} /> : <span data-testid="link-plain">{children}</span>;
+  },
   image: (src, alt) => <LocalImage src={src} alt={alt} />,
   // The frame (rounded, scrolling sideways when too wide) is the wrapper's: thread.css.
   table: (rows) => (

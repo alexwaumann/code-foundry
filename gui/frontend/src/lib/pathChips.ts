@@ -188,6 +188,32 @@ const LEAD = /^[([{"'“‘«]+/;
 const TRAIL = /[.,;:!?)\]}"'”’»]+$/;
 
 /** A run of a text node: plain text, or a path chip. */
+/** Whether a markdown link's href is relative (no scheme, not protocol-relative, not a bare #anchor). */
+export function isRelativeHref(href: string): boolean {
+  return href !== "" && !href.startsWith("#") && !href.startsWith("//") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
+}
+
+/**
+ * The file a relative markdown link in Claude's answer points at (`[main.go](src/main.go)`,
+ * `[x](./docs/a.md#L3)`, `[y](/abs/a.go:12)`) as a path chip's match, or null when its target
+ * does not read as a path (matchPath, code strictness: a link target is explicit). A
+ * GitHub-style `#L12` or `#L12-L30` anchor is the line; any other anchor and a query are
+ * dropped. The match's text is the path with its line (what the chip shows).
+ */
+export function linkPath(href: string): PathMatch | null {
+  if (!isRelativeHref(href)) return null;
+  const hash = href.indexOf("#");
+  const anchor = hash < 0 ? "" : href.slice(hash + 1);
+  let path = (hash < 0 ? href : href.slice(0, hash)).replace(/\?.*$/, "");
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  const line = /^L(\d+)(?:-L?\d+)?$/.exec(anchor)?.[1];
+  return matchPath(line && !SUFFIX.test(path) ? `${path}:${line}` : path, "code");
+}
+
 export type ProsePiece = string | PathMatch;
 
 /** A stretch of a text node that is one chip. */
