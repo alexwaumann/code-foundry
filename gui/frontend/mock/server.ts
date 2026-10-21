@@ -152,16 +152,19 @@
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
  *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
- *        t-5e6f7a8b todo (its subtask), t-9c0d1e2f blocked (s-ember-wails reported blocked),
- *        t-3a4b5c6d done today (s-ember-flaky), t-7e8f9a0b cancelled. Reset restores them.
+ *        t-2b3c4d5e done and t-5e6f7a8b todo (its subtasks), t-9c0d1e2f blocked (s-ember-wails
+ *        reported blocked), t-3a4b5c6d done today (s-ember-flaky), t-7e8f9a0b cancelled. Reset restores them.
  *        Every change below reaches WatchBoard streams.
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
- *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…]
+ *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…][&title=…]
  *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
  *   POST /__mock/ember/timer?minutes=…[&every=2m][&note=…]   ({ id }: a timer of Ember's thread; thread.unsubscribe cancels it)
  *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
  *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
+ *   POST /__mock/ember/restart?step=cut|wake      (cut: the app's restart cuts a turn of Ember's, which
+ *        ends error "interrupted" with the daemon's process_ended turn end; wake: the restart notice
+ *        wakes it and it replies, finished; mock/emberChat.ts)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -655,7 +658,7 @@ function emberControl(res: ServerResponse, action: string, q: URLSearchParams): 
         world.settings.update({ "ember.enabled": String(bool("enabled")) });
         break;
       case "/task":
-        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"), q.get("branch"));
+        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"), q.get("branch"), q.get("title"));
         break;
       case "/task/add": {
         const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });
@@ -673,6 +676,12 @@ function emberControl(res: ServerResponse, action: string, q: URLSearchParams): 
       case "/epoch":
         e.nextEpoch();
         break;
+      case "/restart": {
+        const step = q.get("step");
+        if (step !== "cut" && step !== "wake") throw new CommandError("invalid", "step must be cut or wake");
+        world.emberRestart(step);
+        break;
+      }
       default:
         json(res, 404, { error: "unknown ember control" });
         return;
@@ -907,7 +916,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     threadControl(res, thread[1], q);
     return;
   }
-  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/timer|\/consolidating|\/epoch)$/.exec(path);
+  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/timer|\/consolidating|\/epoch|\/restart)$/.exec(path);
   if (req.method === "POST" && emberCtl) {
     emberControl(res, emberCtl[1] ?? "", q);
     return;

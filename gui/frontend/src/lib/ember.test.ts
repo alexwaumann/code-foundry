@@ -588,7 +588,7 @@ describe("blocked tasks, timers and budget stops", () => {
   it("reads Blocked on the row below Ember's own words and a doing task's Working", () => {
     const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
     expect(emberStatusWords(idle, { doing: 0, blocked: 1 })).toEqual({ text: "Blocked", tone: "amber" });
-    expect(emberStatusWords(idle, { doing: 2, blocked: 1 })).toEqual({ text: "Blocked", tone: "amber" });
+    expect(emberStatusWords(idle, { doing: 2, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
     expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { doing: 0, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
     // A turn the app's restart cut: amber, not a bare red Error.
     expect(emberStatusWords({ ...idle, status: "error", statusReason: "interrupted" }, { doing: 0 })).toEqual({ text: "Interrupted", tone: "amber" });

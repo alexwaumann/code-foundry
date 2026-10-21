@@ -39,7 +39,7 @@ import {
   type ThreadPendingRequestSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
 import { END_REPORTS, scriptAgents, type AgentRunInit } from "./agents";
-import { scriptEmberChat } from "./emberChat";
+import { scriptEmberChat, scriptEmberRestartCut, scriptEmberRestartWake, type EmberChatScript } from "./emberChat";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
@@ -1117,6 +1117,27 @@ export class MockThreadLogs {
     };
     scriptEmberChat({ it, tool });
     l.seq = l.items.length;
+  }
+
+  /** The Ember chat's script as live appends (each item reaches the thread's watchers). */
+  private emberScript(id: string): EmberChatScript {
+    const l = this.log(id);
+    const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => this.append(id, this.item(id, payload, over));
+    const tool = (name: string, input: object, value: { output?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
+      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
+    };
+    return { it, tool };
+  }
+
+  /** POST /__mock/ember/restart?step=cut: the app's restart cuts Ember's turn (mock/emberChat.ts). */
+  emberRestartCut(id: string): void {
+    scriptEmberRestartCut(this.emberScript(id));
+  }
+
+  /** POST /__mock/ember/restart?step=wake: the restart notice wakes Ember and it replies. */
+  emberRestartWake(id: string): void {
+    scriptEmberRestartWake(this.emberScript(id));
   }
 
   /**

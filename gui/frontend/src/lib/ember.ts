@@ -483,8 +483,8 @@ export interface RowCounts {
  * The pinned row's status: Ember's own prompt or error (a turn the app's restart cut reads
  * Interrupted, amber: the chat says what happened); else Needs input (or a budget stop's
  * words) while a worker waits on the user; else what Ember's own thread is doing
- * (Finished, Working); else Blocked while a task is blocked; else Working while a task is
- * doing, else Idle.
+ * (Finished, Working); else Working while a task is doing; else Blocked while a task is
+ * blocked (the row counts blocked tasks after Working), else Idle.
  */
 export function emberStatusWords(t: EmberThreadLike | undefined, c: RowCounts): Words {
   if (t && t.status === "error" && t.statusReason === "interrupted") return { text: "Interrupted", tone: "amber" };
@@ -492,8 +492,8 @@ export function emberStatusWords(t: EmberThreadLike | undefined, c: RowCounts): 
   if (own && (own.tone === "amber" || own.tone === "red")) return own;
   if ((c.waiting ?? 0) > 0) return c.waitingWords ?? NEEDS_INPUT;
   if (own && own.text !== "Idle") return own;
-  if ((c.blocked ?? 0) > 0) return { text: "Blocked", tone: "amber" };
-  return c.doing > 0 ? { text: "Working", tone: "sky" } : { text: "Idle", tone: "muted" };
+  if (c.doing > 0) return { text: "Working", tone: "sky" };
+  return (c.blocked ?? 0) > 0 ? { text: "Blocked", tone: "amber" } : { text: "Idle", tone: "muted" };
 }
 
 /** The words of the first worker waiting on the user (a budget stop says so), null when none waits. */

@@ -1079,6 +1079,27 @@ export class World {
   }
 
   /**
+   * POST /__mock/ember/restart (docs/notes/ember-fixes-2-gui.md): "cut", the app's restart
+   * cuts a turn of Ember's, as the daemon's shutdown does (a tool it stopped under, a
+   * process_ended turn end, error "interrupted"); "wake", the restart notice wakes Ember and
+   * it replies (finished).
+   */
+  emberRestart(step: "cut" | "wake"): void {
+    const id = this.addResident();
+    if (step === "cut") {
+      this.logs.emberRestartCut(id);
+      this.stopThread(id, "daemon stopped", 0, ThreadStatus.BUSY);
+      return;
+    }
+    this.logs.emberRestartWake(id);
+    const s = this.thread(id);
+    s.state = ThreadState.CONNECTED;
+    this.setStatus(s, ThreadStatus.NEEDS_ATTENTION, "finished");
+    s.lastActivityAt = new Date();
+    this.publishThread(s);
+  }
+
+  /**
    * Ember turned on (ember.enabled, POST /__mock/ember?enabled=true): the resident thread and
    * the seeded tasks' worker threads (mock/ember.ts), created by it, so hidden from the
    * sidebar while threads.show_created_threads is off. Held. Idempotent.

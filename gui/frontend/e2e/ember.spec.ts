@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { mockPost, mockUrl, openApp, openStreams, resetMock } from "./fixtures";
 
 /**
@@ -16,6 +16,19 @@ const board = (page: Page) => page.getByTestId("ember-board");
 
 async function enable(): Promise<void> {
   await mockPost("ember?enabled=true");
+}
+
+/** Wheels the chat up until `target` is inside it (the list stays pinned to its bottom until the user scrolls). */
+async function wheelTo(page: Page, target: Locator): Promise<void> {
+  const box = await page.getByTestId("thread-timeline").boundingBox();
+  if (!box) return;
+  await page.mouse.move(box.x + 200, box.y + 200);
+  for (let i = 0; i < 40; i++) {
+    const t = (await target.count()) > 0 ? await target.boundingBox() : null;
+    if (t && t.y >= box.y && t.y + t.height <= box.y + box.height) return;
+    await page.mouse.wheel(0, -300);
+    await page.waitForTimeout(50);
+  }
 }
 
 async function openChat(page: Page): Promise<void> {
@@ -56,7 +69,7 @@ test("the row opens the chat; its menu has no archive, snooze or rename", async 
   await expect(emberRow(page)).toHaveAttribute("aria-selected", "true");
   const header = page.getByTestId("thread-header");
   await expect(header.getByTestId("ember-title")).toHaveText("Ember");
-  await expect(header.getByTestId("ember-header-status")).toHaveText("4 threads working · 1 queued");
+  await expect(header.getByTestId("ember-header-status")).toHaveText("4 threads working · 1 blocked · 1 queued");
   await expect(header.getByTestId("ember-board-toggle")).toBeVisible();
   await expect(header.locator('[data-command-button="thread.archive"]')).toHaveCount(0);
   await expect(page.getByTestId("thread-composer").locator("[aria-placeholder]")).toHaveAttribute("aria-placeholder", "Tell Ember what you want done…");
@@ -88,14 +101,28 @@ test("work folds into Worked for rows; one opens in place, Show work opens all",
   await openApp(page);
   await openChat(page);
   const work = pane(page).getByTestId("ember-work");
-  await expect(work).toHaveCount(3);
-  await expect(work.nth(0)).toContainText("Worked for 1m");
-  await expect(work.nth(0).getByTestId("ember-work-summary")).toHaveText("read 2 files, created 2 threads, updated the board");
-  await expect(work.nth(1).getByTestId("ember-work-summary")).toHaveText("1 wake, read 1 thread, checked the board");
+  await expect(work).toHaveCount(7);
+  await expect(work.nth(0)).toContainText("Worked for 5s");
+  // What each run did, in Ember's words (docs/notes/ember-fixes-2-gui.md): workers started,
+  // what woke it, branches checked, tasks closed, a change sent, a timer.
+  await expect(work.getByTestId("ember-work-summary")).toHaveText([
+    "started 1 worker",
+    "wake from Fix flaky TestSendSpawnFailure, closed 1 task, checked 1 branch",
+    "read 2 files, started 2 workers, checked the board",
+    "wake from Bump wails to v3.1, read 1 thread, checked the board",
+    "sent a change to Release notes for 0.20, updated the board",
+    // A wake Ember only thought about, then replied to, keeps its row (and its time).
+    "wake from Lead: notes API input validation",
+    "timer: check the notes draft",
+  ]);
+  // Every run shows when it ended.
+  await expect(work.getByTestId("ember-work-time")).toHaveCount(7);
+  await expect(work.nth(6).getByTestId("ember-work-time")).toHaveText(/\d/);
   // Folded: no tool rows, no wake note.
   await expect(pane(page).getByTestId("thread-tool")).toHaveCount(0);
   await expect(pane(page).getByTestId("thread-wake-note")).toHaveCount(0);
   // One opens in place.
+  await wheelTo(page, work.nth(1));
   await work.nth(1).getByRole("button").click();
   await expect(work.nth(1)).toHaveAttribute("data-expanded", "true");
   await expect(pane(page).getByTestId("thread-wake-note")).toHaveCount(1);
@@ -103,9 +130,11 @@ test("work folds into Worked for rows; one opens in place, Show work opens all",
   // Show work opens every one, and stays on (the UI store).
   await page.getByTestId("ember-show-work").click();
   await expect(page.getByTestId("ember-show-work")).toHaveAttribute("aria-pressed", "true");
-  for (let i = 0; i < 3; i++) await expect(work.nth(i)).toHaveAttribute("data-expanded", "true");
+  // Every row on screen (the open runs push the rest out of the virtualized list).
+  const expanded = () => work.evaluateAll((els) => els.map((e) => e.hasAttribute("data-expanded")));
+  await expect.poll(async () => (await expanded()).every(Boolean)).toBe(true);
   await page.getByTestId("ember-show-work").click();
-  for (let i = 0; i < 3; i++) await expect(work.nth(i)).not.toHaveAttribute("data-expanded", "true");
+  await expect.poll(async () => (await expanded()).some(Boolean)).toBe(false);
 });
 
 test("a task link is a pointer line that opens the board at its task", async ({ page }) => {
@@ -137,9 +166,9 @@ test("the board's sections, cards and worker rows; one board stream", async ({ p
   expect(await ids("done-today")).toEqual(["t-3a4b5c6d", "t-7e8f9a0b"]);
   await expect(board(page).getByTestId("ember-section-up-next")).toHaveCount(0);
   const notes = board(page).locator('[data-testid="ember-task"][data-task="t-1a2b3c4d"]');
-  await expect(notes.getByTestId("ember-task-meta")).toHaveText("0 of 1");
+  await expect(notes.getByTestId("ember-task-meta")).toHaveText("1 of 2");
   await expect(notes.getByTestId("ember-task-progress")).toBeVisible();
-  await expect(notes.getByTestId("ember-worker")).toHaveCount(2);
+  await expect(notes.getByTestId("ember-worker")).toHaveCount(3);
   const blocked = board(page).locator('[data-testid="ember-task"][data-task="t-9c0d1e2f"]');
   await expect(blocked.getByTestId("ember-task-outcome")).toHaveText("wails v3.1 needs Go 1.27; the toolchain here is 1.26");
   await expect(blocked.getByTestId("ember-task-branch")).toHaveCount(0);
@@ -208,7 +237,7 @@ test("a lead's team: worker rows under its card, counted as working", async ({ p
   await expect(team.nth(1).locator("[data-dot]")).toHaveAttribute("data-dot", "doing");
   // A team member finishing leaves the header and the row, live.
   await mockPost(`thread/status?id=s-ember-team-post&status=attention&reason=finished`);
-  await expect(page.getByTestId("ember-header-status")).toHaveText("3 threads working · 1 queued");
+  await expect(page.getByTestId("ember-header-status")).toHaveText("3 threads working · 1 blocked · 1 queued");
   await expect(emberRow(page).getByTestId("ember-row-threads")).toHaveText("3 threads");
   await expect(team.nth(1).getByTestId("ember-worker-meta")).toHaveText("Finished");
   // A team row opens its thread.
@@ -253,10 +282,8 @@ test("paths in Ember's chat: an absolute one under a project is a chip; relative
   await enable();
   await openApp(page);
   await openChat(page);
-  const last = pane(page).getByTestId("ember-text").last();
-  await expect(last).toContainText("The notes API team is under way");
-  // Three work rows still: the lead's progress wake Ember only thought about draws none.
-  await expect(pane(page).getByTestId("ember-work")).toHaveCount(3);
+  const last = pane(page).getByTestId("ember-text").filter({ hasText: "The notes API team is under way" });
+  await expect(last).toHaveCount(1);
   await expect(last.getByTestId("path-chip")).toHaveCount(1);
   await expect(last.getByTestId("path-plain")).toHaveText(["README.md"]);
   await expect(last.locator("code", { hasText: "main..cf/notes-validation" })).toHaveCount(1);
@@ -301,4 +328,105 @@ test("settings: the flame in the nav, worker models as chips", async ({ page }) 
   await chip("claude-sonnet-5[1m]").click({ force: true });
   await expect(chip("claude-sonnet-5[1m]")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(value).toBe("claude-sonnet-5[1m]");
+});
+
+// ---------- docs/notes/ember-fixes-2-gui.md ----------
+
+test("the header and the row count blocked tasks and workers waiting on the user, naming the waiting worker's task", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  const header = page.getByTestId("ember-header-status");
+  const status = emberRow(page).getByTestId("ember-row-status");
+  // The blocked wails task: counted in the header (amber dot) and on the row after Working.
+  await expect(header).toHaveText("4 threads working · 1 blocked · 1 queued");
+  await expect(header.locator("[data-dot]")).toHaveAttribute("data-dot", "amber");
+  await expect(status).toHaveText("Working");
+  await expect(emberRow(page).getByTestId("ember-row-blocked")).toHaveText("1 blocked");
+  // A lead's worker asks: Needs input, naming the lead's task, not the first doing one.
+  await mockPost(`thread/status?id=s-ember-team-put&status=attention&reason=${encodeURIComponent("question: 404 or 422 for a bad id?")}`);
+  await expect(status).toHaveText("Needs input");
+  await expect(emberRow(page).getByTestId("ember-row-task")).toHaveText("Validate notes API input");
+  await expect(header).toHaveText("1 needs you · 3 threads working · 1 blocked · 1 queued");
+  // A second one: the task whose own worker asks first, "+1" for the other.
+  await mockPost(`thread/status?id=s-ember-notes&status=attention&reason=${encodeURIComponent("permission: Bash git push")}`);
+  await expect(emberRow(page).getByTestId("ember-row-task")).toHaveText("Add release notes for 0.20 +1");
+  await expect(header).toHaveText("2 need you · 2 threads working · 1 blocked · 1 queued");
+  // A task link whose worker waits says so, amber.
+  const link = pane(page).locator('[data-testid="ember-task-link"][data-task="t-4c5d6e7f"]');
+  await expect(link.getByTestId("ember-task-link-meta")).toContainText("· needs you");
+  await expect(link.getByTestId("ember-task-link-meta")).toHaveClass(/text-warning/);
+});
+
+test("a budget stop reads Stopped at budget on the row and the board", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  await mockPost(`thread/status?id=s-ember-notes&status=attention&reason=${encodeURIComponent("budget reached")}`);
+  await expect(emberRow(page).getByTestId("ember-row-status")).toHaveText("Stopped at budget");
+  await expect(emberRow(page).getByTestId("ember-row-task")).toHaveText("Add release notes for 0.20");
+  await page.getByTestId("ember-board-toggle").click();
+  await expect(board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-notes"]').getByTestId("ember-worker-meta")).toHaveText("Stopped at budget");
+});
+
+test("a task link shows the board's title, a board glyph with a tooltip, and a done task's branch", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  // Ember linked it as "Fix flaky TestSendSpawnFailure"; the board's title is newer.
+  const flaky = pane(page).locator('[data-testid="ember-task-link"][data-task="t-3a4b5c6d"]').first();
+  await expect(flaky.getByTestId("ember-task-link-title")).toHaveText("Fix the flaky TestSendSpawnFailure");
+  await expect(flaky.getByTestId("ember-task-link-meta")).toHaveText("· done");
+  await expect(flaky.getByTestId("ember-task-link-branch")).toHaveText("·cf/spawn-timeout-race");
+  // A board glyph, not a disclosure chevron, and the tooltip says where a click goes.
+  await expect(flaky.getByTestId("ember-task-link-glyph")).toBeVisible();
+  await wheelTo(page, flaky);
+  await flaky.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Open on the board");
+  // A rename on the board reaches every link to the task, live.
+  const wails = pane(page).locator('[data-testid="ember-task-link"][data-task="t-9c0d1e2f"]');
+  await mockPost(`ember/task?id=t-9c0d1e2f&state=blocked&title=${encodeURIComponent("Pin wails at 3.0")}`);
+  await expect(wails.getByTestId("ember-task-link-title")).toHaveText(["Pin wails at 3.0", "Pin wails at 3.0"]);
+});
+
+test("a restart that cut Ember's turn: a line in the chat, Interrupted on the row, no bare Error", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  const status = emberRow(page).getByTestId("ember-row-status");
+  await mockPost("ember/restart?step=cut");
+  const line = pane(page).getByTestId("ember-restart");
+  await expect(line).toHaveCount(1);
+  await expect(line).toHaveText(/^Code Foundry restarted at \S.* while Ember was working$/);
+  await expect(status).toHaveText("Interrupted");
+  await expect(status).toHaveClass(/text-warning/);
+  // The cut run still has its row, before the line.
+  await expect(pane(page).getByTestId("ember-work").last().getByTestId("ember-work-summary")).toHaveText("started 1 worker");
+  // The restart notice wakes Ember; it picks the request up; the line stays where the cut was.
+  await mockPost("ember/restart?step=wake");
+  await expect(status).not.toHaveText("Interrupted");
+  await expect(line).toHaveCount(1);
+  await expect(pane(page).getByTestId("ember-work").last().getByTestId("ember-work-summary")).toHaveText("restart, started 1 worker, checked the board");
+});
+
+test("the board: labelled ages, a done piece's outcome and branch, no repeated title, names for a lead's ids", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  await page.getByTestId("ember-board-toggle").click();
+  // Every age says what it is.
+  await expect(board(page).getByTestId("ember-worker-age").first()).toBeVisible();
+  for (const a of await board(page).getByTestId("ember-worker-age").allTextContents()) expect(a).toMatch(/^updated (just now|\d+[mhd] ago)$/);
+  // The notes card's done piece: its outcome and its branch.
+  const notes = board(page).locator('[data-testid="ember-task"][data-task="t-1a2b3c4d"]');
+  const piece = notes.locator('[data-testid="ember-worker"][data-subtask]').first();
+  await expect(piece.getByTestId("ember-worker-title")).toHaveText("List the PRs merged since v0.19.1");
+  await expect(piece.getByTestId("ember-worker-meta")).toHaveText("42 PRs in docs/release-notes/prs.txt");
+  await expect(notes.getByTestId("ember-worker-branch")).toHaveText("cf/release-notes-prs");
+  // The wails worker is named after its task: its row says Worker, not the title again.
+  const wails = board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-wails"]');
+  await expect(wails.getByTestId("ember-worker-title")).toHaveText("Worker");
+  // A lead's report names its workers by id: the board says their names.
+  const lead = board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-lead"]');
+  await expect(lead.getByTestId("ember-worker-meta")).toHaveText("Schema done; handlers in Notes API: validate POST /notes and Notes API: validate PUT /notes/:id");
 });
