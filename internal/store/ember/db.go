@@ -9,7 +9,7 @@ import (
 
 // loadTasks reads every task, in no particular order.
 func loadTasks(ctx context.Context, db *sql.DB) ([]Task, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id, title, detail, state, parent_id, thread_id, outcome, position,
+	rows, err := db.QueryContext(ctx, `SELECT id, title, detail, state, parent_id, thread_id, outcome, branch, position,
 		created_at, updated_at, done_at FROM ember_tasks`)
 	if err != nil {
 		return nil, fmt.Errorf("ember: load tasks: %w", err)
@@ -21,7 +21,7 @@ func loadTasks(ctx context.Context, db *sql.DB) ([]Task, error) {
 		var state string
 		var created, updated int64
 		var done sql.NullInt64
-		if err := rows.Scan(&t.ID, &t.Title, &t.Detail, &state, &t.ParentID, &t.ThreadID, &t.Outcome, &t.Position,
+		if err := rows.Scan(&t.ID, &t.Title, &t.Detail, &state, &t.ParentID, &t.ThreadID, &t.Outcome, &t.Branch, &t.Position,
 			&created, &updated, &done); err != nil {
 			return nil, fmt.Errorf("ember: load tasks: %w", err)
 		}
@@ -46,12 +46,12 @@ func saveTask(ctx context.Context, db *sql.DB, t Task) error {
 	if !t.DoneAt.IsZero() {
 		done = millis(t.DoneAt)
 	}
-	_, err := db.ExecContext(ctx, `INSERT INTO ember_tasks (id, title, detail, state, parent_id, thread_id, outcome, position,
-		created_at, updated_at, done_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := db.ExecContext(ctx, `INSERT INTO ember_tasks (id, title, detail, state, parent_id, thread_id, outcome, branch, position,
+		created_at, updated_at, done_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET title = excluded.title, detail = excluded.detail, state = excluded.state,
 		parent_id = excluded.parent_id, thread_id = excluded.thread_id, outcome = excluded.outcome,
-		position = excluded.position, updated_at = excluded.updated_at, done_at = excluded.done_at`,
-		t.ID, t.Title, t.Detail, t.State.String(), t.ParentID, t.ThreadID, t.Outcome, t.Position,
+		branch = excluded.branch, position = excluded.position, updated_at = excluded.updated_at, done_at = excluded.done_at`,
+		t.ID, t.Title, t.Detail, t.State.String(), t.ParentID, t.ThreadID, t.Outcome, t.Branch, t.Position,
 		millis(t.CreatedAt), millis(t.UpdatedAt), done)
 	if err != nil {
 		return fmt.Errorf("ember: save task %s: %w", t.ID, err)

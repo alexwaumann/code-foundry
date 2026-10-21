@@ -68,6 +68,8 @@ interface MockTask {
   parentId: string;
   threadId: string;
   outcome: string;
+  /** The branch its worker pushed (ember task done --branch); "" for none. */
+  branch: string;
   position: number;
   createdAt: Date;
   updatedAt: Date;
@@ -129,13 +131,13 @@ export function emberWorkers(): EmberWorkerFixture[] {
 function seedTasks(): MockTask[] {
   const today = earlierToday();
   const t = (o: Partial<MockTask> & Pick<MockTask, "id" | "title" | "state" | "position">, min: number): MockTask => ({
-    detail: "", parentId: "", threadId: "", outcome: "", createdAt: ago(min), updatedAt: ago(min), doneAt: null, ...o,
+    detail: "", parentId: "", threadId: "", outcome: "", branch: "", createdAt: ago(min), updatedAt: ago(min), doneAt: null, ...o,
   });
   return [
     t({ id: "t-1a2b3c4d", title: "Add release notes for 0.20", detail: "Write docs/release-notes/0.20.md from the PRs merged since v0.19.1.", state: EmberTaskState.DOING, threadId: "s-ember-notes", position: 1, updatedAt: ago(25) }, 30),
     t({ id: "t-5e6f7a8b", title: "Link each note to its PR", state: EmberTaskState.TODO, parentId: "t-1a2b3c4d", position: 2 }, 28),
     t({ id: "t-9c0d1e2f", title: "Bump wails to v3.1", state: EmberTaskState.BLOCKED, threadId: "s-ember-wails", outcome: "wails v3.1 needs Go 1.27; the toolchain here is 1.26", position: 3, updatedAt: ago(40) }, 90),
-    t({ id: "t-3a4b5c6d", title: "Fix the flaky TestSendSpawnFailure", state: EmberTaskState.DONE, threadId: "s-ember-flaky", outcome: "Raised the spawn timeout to 5s under -race; PR #251 merged", position: 4, updatedAt: today, doneAt: today }, 200),
+    t({ id: "t-3a4b5c6d", title: "Fix the flaky TestSendSpawnFailure", state: EmberTaskState.DONE, threadId: "s-ember-flaky", outcome: "Raised the spawn timeout to 5s under -race; PR #251 merged", branch: "cf/spawn-timeout-race", position: 4, updatedAt: today, doneAt: today }, 200),
     t({ id: "t-7e8f9a0b", title: "Rename the agents panel to Runs", state: EmberTaskState.CANCELLED, outcome: "Alex kept the name", position: 5, updatedAt: ago(120) }, 240),
     t({ id: "t-4c5d6e7f", title: "Validate notes API input", state: EmberTaskState.DOING, threadId: "s-ember-lead", position: 6, updatedAt: ago(20) }, 20),
   ];
@@ -262,6 +264,7 @@ export class MockEmber {
       parentId: t.parentId,
       threadId: t.threadId,
       outcome: t.outcome,
+      branch: t.branch,
       position: t.position,
       createdAt: timestampFromDate(t.createdAt),
       updatedAt: timestampFromDate(t.updatedAt),
@@ -325,12 +328,13 @@ export class MockEmber {
     return t;
   }
 
-  /** POST /__mock/ember/task: a task's state, and its outcome when given. */
-  setTask(id: string, state: EmberTaskState, outcome: string | null): EmberTaskInit {
+  /** POST /__mock/ember/task: a task's state, and its outcome and branch when given. */
+  setTask(id: string, state: EmberTaskState, outcome: string | null, branch: string | null = null): EmberTaskInit {
     const t = this.task(id);
     if (state !== t.state) t.doneAt = state === EmberTaskState.DONE ? new Date() : null;
     t.state = state;
     if (outcome !== null) t.outcome = outcome;
+    if (branch !== null) t.branch = branch;
     t.updatedAt = new Date();
     this.changed();
     return this.taskMsg(t);
@@ -349,7 +353,7 @@ export class MockEmber {
     const now = new Date();
     const state = o.state ?? EmberTaskState.TODO;
     this.tasks.push({
-      id, title: o.title.trim(), detail: o.detail ?? "", state, parentId: o.parentId ?? "", threadId: o.threadId ?? "", outcome: "",
+      id, title: o.title.trim(), detail: o.detail ?? "", state, parentId: o.parentId ?? "", threadId: o.threadId ?? "", outcome: "", branch: "",
       position: Math.max(0, ...this.tasks.map((t) => t.position)) + 1, createdAt: now, updatedAt: now, doneAt: state === EmberTaskState.DONE ? now : null,
     });
     this.changed();
@@ -388,7 +392,7 @@ export class MockEmber {
       tasks: [...this.tasks].sort((a, b) => a.position - b.position).map((t) => {
         const th = t.threadId ? this.threadMsg(t.threadId) : undefined;
         return {
-          id: t.id, title: t.title, detail: t.detail, state: EmberTaskState[t.state].toLowerCase(), parentId: t.parentId, threadId: t.threadId, outcome: t.outcome, position: t.position,
+          id: t.id, title: t.title, detail: t.detail, state: EmberTaskState[t.state].toLowerCase(), parentId: t.parentId, threadId: t.threadId, outcome: t.outcome, branch: t.branch, position: t.position,
           createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString(), doneAt: t.doneAt?.toISOString() ?? null,
           thread: th && {
             id: th.id, name: th.name, state: ThreadState[th.state ?? 0], status: ThreadStatus[th.status ?? 0], statusReason: th.statusReason ?? "",

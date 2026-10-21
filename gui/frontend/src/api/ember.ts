@@ -60,6 +60,8 @@ export interface EmberTaskView {
   threadId: string;
   /** Why it is done, cancelled or blocked. */
   outcome: string;
+  /** The branch its worker pushed (ember task done --branch); "" for none. */
+  branch: string;
   position: number;
   createdAtMs: number | null;
   updatedAtMs: number | null;
@@ -149,6 +151,7 @@ export function toEmberTaskView(t: EmberTask): EmberTaskView {
     parentId: t.parentId,
     threadId: t.threadId,
     outcome: t.outcome,
+    branch: t.branch,
     position: t.position,
     createdAtMs: ms(t.createdAt),
     updatedAtMs: ms(t.updatedAt),

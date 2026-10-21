@@ -105,14 +105,19 @@ type Task struct {
 	// ThreadID is the worker thread that owns the task; "" for none.
 	ThreadID string
 	// Outcome is what came of it (done) or why it stopped (blocked, cancelled).
-	Outcome   string
+	Outcome string
+	// Branch is the branch its worker pushed, recorded by ember task done --branch
+	// once origin/<branch> was seen in the worker's worktree; "" for none.
+	Branch    string
 	Position  int
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	// DoneAt is when it became done; zero otherwise.
 	DoneAt time.Time
 	// Thread is the worker thread's progress, derived when the snapshot is built; nil
-	// without ThreadID.
+	// without ThreadID. Its Report is left out (zero) while the task is doing and the
+	// report was filed before the task last changed: a reopened task's old report
+	// describes the earlier run (staleReport).
 	Thread *TaskThread
 }
 

@@ -126,9 +126,10 @@ func RenderRecent(msgs []Message, budget int, loc *time.Location) string {
 }
 
 // RenderBoard is BOARD.md: the tasks (in board order) by section: In progress (doing),
-// Up next (todo), Blocked, Done today (done since local midnight); a subtask under its
-// parent when both are in one section, else marked as part of it; then a line counting
-// older done and cancelled tasks.
+// Up next (todo), Blocked, Done today (done or cancelled since local midnight, as the
+// GUI's board, with a closed subtask of such a parent whenever it closed); a subtask
+// under its parent when both are in one section, else marked as part of it; then a line
+// counting the other done and cancelled tasks.
 func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString("# Task board\n\n")
@@ -136,6 +137,25 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 	b.WriteString(zoneLine(now, loc))
 	y, m, d := now.In(loc).Date()
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
+	closedToday := func(t Task) bool {
+		switch t.State {
+		case StateDone:
+			return !t.DoneAt.Before(midnight)
+		case StateCancelled:
+			return !t.UpdatedAt.Before(midnight)
+		}
+		return false
+	}
+	doneToday := func(t Task) bool {
+		if closedToday(t) {
+			return true
+		}
+		if t.State.Open() || t.ParentID == "" {
+			return false
+		}
+		i := slices.IndexFunc(tasks, func(p Task) bool { return p.ID == t.ParentID })
+		return i >= 0 && closedToday(tasks[i])
+	}
 	type section struct {
 		title string
 		in    func(Task) bool
@@ -144,7 +164,7 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 		{"In progress", func(t Task) bool { return t.State == StateDoing }},
 		{"Up next", func(t Task) bool { return t.State == StateTodo }},
 		{"Blocked", func(t Task) bool { return t.State == StateBlocked }},
-		{"Done today", func(t Task) bool { return t.State == StateDone && !t.DoneAt.Before(midnight) }},
+		{"Done today", doneToday},
 	}
 	shown := 0
 	for _, sec := range sections {
@@ -181,7 +201,8 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 	var done, cancelled int
 	for _, t := range tasks {
 		switch {
-		case t.State == StateDone && t.DoneAt.Before(midnight):
+		case t.State.Open() || doneToday(t):
+		case t.State == StateDone:
 			done++
 		case t.State == StateCancelled:
 			cancelled++
@@ -195,14 +216,17 @@ func RenderBoard(tasks []Task, now time.Time, loc *time.Location) string {
 	return b.String()
 }
 
-// taskLine is one task on the board: id, title, the parent it belongs to, its worker's
-// progress and its outcome.
+// taskLine is one task on the board: id, title, its worker's progress, its branch and
+// its outcome.
 func taskLine(t Task, now time.Time) string {
 	line := t.ID + " " + t.Title
 	if t.Thread != nil {
 		line += " · " + ThreadProgress(t.Thread, now)
 	} else if t.ThreadID != "" {
 		line += " · worker " + t.ThreadID
+	}
+	if t.Branch != "" {
+		line += " · branch " + t.Branch
 	}
 	if t.Outcome != "" {
 		line += " — " + oneLine(t.Outcome, 300)

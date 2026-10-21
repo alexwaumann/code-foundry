@@ -86,8 +86,12 @@ message EmberTask {
   google.protobuf.Timestamp updated_at = 10;
   // When it became done; unset otherwise.
   google.protobuf.Timestamp done_at = 11;
-  // The worker thread's progress, derived when read; unset without thread_id.
+  // The worker thread's progress, derived when read; unset without thread_id. Its
+  // report is left out while the task is doing and the report predates the task's
+  // last change (a reopened task's old report).
   EmberTaskThread thread = 12;
+  // The branch its worker pushed (ember task done --branch); "" for none.
+  string branch = 13;
 }
 
 // EmberTaskThread is a task's worker thread as the board shows it.

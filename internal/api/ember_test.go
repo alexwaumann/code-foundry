@@ -54,7 +54,7 @@ func emberFixture() *ember.Snapshot {
 			{ID: "t-00000001", Title: "Docs", State: ember.StateTodo, ThreadID: "s-w", CreatedAt: emberAt,
 				Thread: &ember.TaskThread{ID: "s-w", Name: "Docs", State: thread.StateConnected, Status: thread.StatusBusy,
 					Report: thread.Report{Status: thread.ReportBlocked, Summary: "needs a token", At: emberAt}}},
-			{ID: "t-00000002", Title: "Old", State: ember.StateDone, DoneAt: emberAt, Outcome: "merged"},
+			{ID: "t-00000002", Title: "Old", State: ember.StateDone, DoneAt: emberAt, Outcome: "merged", Branch: "cf/old"},
 		},
 	}
 }
@@ -80,7 +80,7 @@ func TestEmberService(t *testing.T) {
 		tk.GetDoneAt() != nil {
 		t.Errorf("task = %v", tk)
 	}
-	if done := all.Msg.GetTasks()[1]; done.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_DONE || done.GetThread() != nil || done.GetDoneAt() == nil {
+	if done := all.Msg.GetTasks()[1]; done.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_DONE || done.GetThread() != nil || done.GetDoneAt() == nil || done.GetBranch() != "cf/old" {
 		t.Errorf("done task = %v", done)
 	}
 	open, err := c.ListTasks(ctx, connect.NewRequest(&v1.ListEmberTasksRequest{Open: true}))

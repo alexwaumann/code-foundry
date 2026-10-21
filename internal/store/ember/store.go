@@ -150,6 +150,8 @@ type Store struct {
 	// mu guards everything below.
 	mu    sync.Mutex
 	tasks []Task // without Thread, in board order
+	// reset are the tasks New put back to todo (ResetAtStart).
+	reset []Task
 	st    persisted
 	// cfg and enabled are the settings last applied (applySettings).
 	cfg     Config
@@ -210,6 +212,9 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	sctx, cancel := context.WithCancel(context.Background())
 	s := &Store{opts: opts, log: opts.Log, ctx: sctx, cancel: cancel, tasks: tasks, st: loadState(opts.Log, opts.Dir),
 		configChanged: make(chan struct{}, 1)}
+	s.mu.Lock()
+	s.reset = s.resetOrphansLocked(ctx, opts.Now())
+	s.mu.Unlock()
 	opts.Threads.SetResidentTools(Name, Tools)
 	opts.Threads.SetCreateDefaults(s.workerDefaults)
 	threadSub := bus.Subscribe[thread.Event](opts.Bus, 256)
@@ -536,6 +541,9 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 	for i, t := range s.tasks {
 		if t.ThreadID != "" {
 			t.Thread = taskThread(threads, t.ThreadID)
+			if staleReport(t) {
+				t.Thread.Report = thread.Report{}
+			}
 			if t.State.Open() && !t.Thread.Removed {
 				if teams == nil {
 					teams = newTeamIndex(threads)
@@ -574,6 +582,22 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 	}
 	s.snap.Store(out)
 	bus.Publish(s.opts.Bus, Changed{Snapshot: out})
+}
+
+// staleReport reports whether t's worker report describes an earlier run: t is doing
+// and its worker's final report (done, failed or blocked) was filed before t last
+// changed, as when Ember reopens a done task and sends its worker more work. The same
+// rule keeps a failed report from blocking a task Ember set back to doing
+// (blockFailedLocked). A progress report always shows.
+func staleReport(t Task) bool {
+	if t.State != StateDoing || t.Thread == nil {
+		return false
+	}
+	switch t.Thread.Report.Status {
+	case thread.ReportDone, thread.ReportFailed, thread.ReportBlocked:
+		return t.Thread.Report.At.Before(t.UpdatedAt)
+	}
+	return false
 }
 
 // taskThread is the worker id's progress from threads.
