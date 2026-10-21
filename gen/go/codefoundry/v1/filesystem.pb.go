@@ -915,8 +915,12 @@ type PreviewFileResponse struct {
 	// ("/preview/<grant>/docs/index.html"); the GUI joins it to the daemon's base URL.
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	// Absolute directory the grant serves: the checkout holding the file, else its
-	// directory.
-	Scope         string `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	// directory; the file itself when single_file.
+	Scope string `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	// The grant serves only this file, not its directory: the directory is home, holds the
+	// config home, or is otherwise too broad to hand a page (so its relative links to other
+	// files do not load).
+	SingleFile    bool `protobuf:"varint,3,opt,name=single_file,json=singleFile,proto3" json:"single_file,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -963,6 +967,13 @@ func (x *PreviewFileResponse) GetScope() string {
 		return x.Scope
 	}
 	return ""
+}
+
+func (x *PreviewFileResponse) GetSingleFile() bool {
+	if x != nil {
+		return x.SingleFile
+	}
+	return false
 }
 
 var File_codefoundry_v1_filesystem_proto protoreflect.FileDescriptor
@@ -1030,10 +1041,12 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x06is_dir\x18\t \x01(\bR\x05isDir\"C\n" +
 	"\x12PreviewFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"=\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"^\n" +
 	"\x13PreviewFileResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
-	"\x05scope\x18\x02 \x01(\tR\x05scope*X\n" +
+	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1f\n" +
+	"\vsingle_file\x18\x03 \x01(\bR\n" +
+	"singleFile*X\n" +
 	"\n" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +

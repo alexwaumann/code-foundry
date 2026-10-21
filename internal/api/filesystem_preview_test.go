@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,10 +15,16 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
+
+// testGrants is a grant table for home root with the config home at root/.code-foundry.
+func testGrants(root string) *preview.Grants {
+	return preview.NewGrants(preview.NewFloor(root, paths.New(filepath.Join(root, ".code-foundry"))))
+}
 
 func TestFilesystemPreviewFile(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
@@ -26,7 +33,11 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	}
 	proj := filepath.Join(root, "proj")
 	wt := filepath.Join(root, "proj-wt")
-	for _, f := range []string{"proj/docs/index.html", "proj-wt/site/page.html", "loose/mock.html"} {
+	cfgWt := filepath.Join(root, ".code-foundry", "worktrees", "proj", "wt")
+	for _, f := range []string{
+		"proj/docs/index.html", "proj-wt/site/page.html", "loose/mock.html", "report.html",
+		".code-foundry/daemon.token", ".code-foundry/worktrees/proj/wt/index.html", ".ssh/page.html",
+	} {
 		p := filepath.Join(root, f)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -35,16 +46,28 @@ func TestFilesystemPreviewFile(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	for link, target := range map[string]string{
+		"linked.html":            filepath.Join(proj, "docs/index.html"),
+		"proj/docs/token.html":   filepath.Join(root, ".code-foundry/daemon.token"),
+		"loose/home-report.html": filepath.Join(root, "report.html"),
+	} {
+		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	fake := projecttest.New(nil)
 	fake.Put(project.Project{ID: "p", Path: proj, Worktrees: []project.Worktree{
 		{ProjectID: "p", Path: proj, IsMain: true},
 		{ProjectID: "p", Path: wt},
+		{ProjectID: "p", Path: cfgWt},
 	}})
-	grants := preview.NewGrants()
+	// A project registered at home itself must not widen any grant to home.
+	fake.Put(project.Project{ID: "h", Path: root, Worktrees: []project.Worktree{{ProjectID: "h", Path: root, IsMain: true}}})
+	grants := testGrants(root)
 	route := NewFilesystem(root, fake, grants).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
-	mux.Handle(preview.Prefix, preview.Handler(root, grants, slog.Default()))
+	mux.Handle(preview.Prefix, preview.Handler(grants, slog.Default()))
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	c := codefoundryv1connect.NewFilesystemServiceClient(srv.Client(), srv.URL)
@@ -53,11 +76,19 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	tests := []struct {
 		name, baseDir, path string
 		scope, rel          string
+		single              bool
 		code                connect.Code
 	}{
 		{name: "in the main checkout", path: filepath.Join(proj, "docs/index.html"), scope: proj, rel: "docs/index.html"},
 		{name: "in a worktree, relative", baseDir: wt, path: "site/page.html", scope: wt, rel: "site/page.html"},
-		{name: "outside every checkout", path: "~/loose/mock.html", scope: filepath.Join(root, "loose"), rel: "mock.html"},
+		{name: "in a worktree under the config home", path: filepath.Join(cfgWt, "index.html"), scope: cfgWt, rel: "index.html"},
+		{name: "outside every checkout, in a subfolder", path: "~/loose/mock.html", scope: filepath.Join(root, "loose"), rel: "mock.html"},
+		{name: "at the home root: the file alone", path: "~/report.html", scope: filepath.Join(root, "report.html"), rel: "report.html", single: true},
+		{name: "symlink at the home root into a project", path: "~/linked.html", scope: filepath.Join(root, "linked.html"), rel: "linked.html", single: true},
+		{name: "symlink in a subfolder to a home-root file", path: "~/loose/home-report.html", scope: filepath.Join(root, "loose"), rel: "home-report.html"},
+		{name: "the daemon token", path: "~/.code-foundry/daemon.token", code: connect.CodeInvalidArgument},
+		{name: "symlink in a project to the daemon token", path: filepath.Join(proj, "docs/token.html"), code: connect.CodeInvalidArgument},
+		{name: "in ~/.ssh", path: "~/.ssh/page.html", code: connect.CodeInvalidArgument},
 		{name: "missing", path: filepath.Join(proj, "docs/nope.html"), code: connect.CodeNotFound},
 		{name: "directory", path: filepath.Join(proj, "docs"), code: connect.CodeInvalidArgument},
 		{name: "outside home", path: "/etc/hosts", code: connect.CodeInvalidArgument},
@@ -75,10 +106,15 @@ func TestFilesystemPreviewFile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res.Msg.GetScope() != tc.scope {
-				t.Errorf("scope %q, want %q", res.Msg.GetScope(), tc.scope)
+			if res.Msg.GetScope() != tc.scope || res.Msg.GetSingleFile() != tc.single {
+				t.Errorf("scope %q single %v, want %q %v", res.Msg.GetScope(), res.Msg.GetSingleFile(), tc.scope, tc.single)
 			}
-			grant, _ := grants.Grant(tc.scope)
+			var grant string
+			if tc.single {
+				grant, _ = grants.GrantFile(tc.scope)
+			} else {
+				grant, _ = grants.Grant(tc.scope)
+			}
 			if want := preview.URL(grant, tc.rel); res.Msg.GetUrl() != want {
 				t.Errorf("url %q, want %q", res.Msg.GetUrl(), want)
 			}
@@ -93,4 +129,25 @@ func TestFilesystemPreviewFile(t *testing.T) {
 			}
 		})
 	}
+
+	// The fuzz repro: a page previewed from the home root reads nothing else through its
+	// grant, least of all the daemon token.
+	t.Run("a home-root grant cannot read the token", func(t *testing.T) {
+		res, err := c.PreviewFile(ctx, connect.NewRequest(&v1.PreviewFileRequest{Path: "~/report.html"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		base := strings.TrimSuffix(res.Msg.GetUrl(), "report.html")
+		for _, rel := range []string{".code-foundry/daemon.token", "loose/mock.html", "proj/docs/index.html", "../report.html/../.code-foundry/daemon.token"} {
+			r, err := srv.Client().Get(srv.URL + base + rel)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ := io.ReadAll(r.Body)
+			_ = r.Body.Close()
+			if r.StatusCode != http.StatusNotFound {
+				t.Errorf("GET %s: %d %q, want 404", base+rel, r.StatusCode, body)
+			}
+		}
+	})
 }

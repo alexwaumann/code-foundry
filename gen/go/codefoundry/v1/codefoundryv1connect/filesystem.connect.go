@@ -89,9 +89,13 @@ type FilesystemServiceClient interface {
 	// directory. A sandboxed frame loads the page from there so its scripts run and its
 	// relative links, stylesheets, scripts and images resolve. The grant is an
 	// unguessable id in the URL, scoped to that directory tree and never reaching above
-	// it or outside the home directory (symlinks resolved); it lasts until the daemon
-	// stops. path is as for ReadFile: InvalidArgument when it is outside the home
-	// directory, relative without an absolute base_dir, or not a regular file.
+	// it, outside the home directory or into a protected folder (symlinks resolved); it
+	// lasts until the daemon stops. A scope is never home itself, the config home or an
+	// ancestor of it, or a credentials folder: a file whose directory is one of those gets
+	// a grant for the file alone (single_file). path is as for ReadFile: InvalidArgument
+	// when it is outside the home directory, relative without an absolute base_dir, not a
+	// regular file, or in a protected folder (the config home outside its checkouts,
+	// ~/.ssh, ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 
@@ -212,9 +216,13 @@ type FilesystemServiceHandler interface {
 	// directory. A sandboxed frame loads the page from there so its scripts run and its
 	// relative links, stylesheets, scripts and images resolve. The grant is an
 	// unguessable id in the URL, scoped to that directory tree and never reaching above
-	// it or outside the home directory (symlinks resolved); it lasts until the daemon
-	// stops. path is as for ReadFile: InvalidArgument when it is outside the home
-	// directory, relative without an absolute base_dir, or not a regular file.
+	// it, outside the home directory or into a protected folder (symlinks resolved); it
+	// lasts until the daemon stops. A scope is never home itself, the config home or an
+	// ancestor of it, or a credentials folder: a file whose directory is one of those gets
+	// a grant for the file alone (single_file). path is as for ReadFile: InvalidArgument
+	// when it is outside the home directory, relative without an absolute base_dir, not a
+	// regular file, or in a protected folder (the config home outside its checkouts,
+	// ~/.ssh, ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 

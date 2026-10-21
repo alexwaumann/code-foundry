@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 func write(t *testing.T, p, s string) {
@@ -21,7 +24,7 @@ func write(t *testing.T, p, s string) {
 }
 
 func TestGrants(t *testing.T) {
-	g := NewGrants()
+	g := NewGrants(NewFloor("/home", paths.New("/home/.code-foundry")))
 	a, err := g.Grant("/home/a")
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +42,20 @@ func TestGrants(t *testing.T) {
 	}
 	if _, ok := g.Dir("nope"); ok {
 		t.Error("unknown grant resolved")
+	}
+	file, err := g.GrantFile("/home/a")
+	if err != nil || file == a {
+		t.Errorf("GrantFile(/home/a) = %q, %v; the tree grant is %q", file, err, a)
+	}
+	for _, dir := range []string{"/home", "/", "/home/.code-foundry", "/home/.ssh", "/elsewhere"} {
+		if _, err := g.Grant(dir); !errors.Is(err, ErrGuarded) {
+			t.Errorf("Grant(%s) err = %v, want ErrGuarded", dir, err)
+		}
+	}
+	for _, file := range []string{"/home/.code-foundry/daemon.token", "/home/.ssh/id_rsa", "/elsewhere/x.html"} {
+		if _, err := g.GrantFile(file); !errors.Is(err, ErrGuarded) {
+			t.Errorf("GrantFile(%s) err = %v, want ErrGuarded", file, err)
+		}
 	}
 }
 
@@ -70,9 +87,25 @@ func TestHandler(t *testing.T) {
 	if err := os.Symlink(filepath.Join(home, "secret.txt"), filepath.Join(proj, "docs", "up.txt")); err != nil {
 		t.Fatal(err)
 	}
-	g := NewGrants()
+	write(t, filepath.Join(home, ".code-foundry", "daemon.token"), "token")
+	write(t, filepath.Join(home, ".ssh", "id_rsa"), "key")
+	write(t, filepath.Join(home, "report.html"), "<p>report</p>")
+	write(t, filepath.Join(home, "notes.txt"), "sibling")
+	for link, target := range map[string]string{
+		"token.txt": filepath.Join(home, ".code-foundry", "daemon.token"),
+		"ssh":       filepath.Join(home, ".ssh"),
+	} {
+		if err := os.Symlink(target, filepath.Join(proj, "docs", link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := NewGrants(NewFloor(home, paths.New(filepath.Join(home, ".code-foundry"))))
 	grant, _ := g.Grant(proj)
-	srv := httptest.NewServer(Handler(home, g, slog.Default()))
+	one, err := g.GrantFile(filepath.Join(home, "report.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(Handler(g, slog.Default()))
 	t.Cleanup(srv.Close)
 
 	tests := []struct {
@@ -91,6 +124,12 @@ func TestHandler(t *testing.T) {
 		{"encoded dot-dot", "/preview/" + grant + "/docs/%2e%2e/%2e%2e/secret.txt", 404, "", ""},
 		{"symlink out of home", "/preview/" + grant + "/docs/link.html", 404, "", ""},
 		{"symlink above the scope within home", "/preview/" + grant + "/docs/up.txt", 200, "text/plain; charset=utf-8", "no"},
+		{"symlink to the daemon token", "/preview/" + grant + "/docs/token.txt", 404, "", ""},
+		{"symlink into ~/.ssh", "/preview/" + grant + "/docs/ssh/id_rsa", 404, "", ""},
+		{"one-file grant serves its file", "/preview/" + one + "/report.html", 200, "text/html; charset=utf-8", "<p>report</p>"},
+		{"one-file grant, a sibling", "/preview/" + one + "/notes.txt", 404, "", ""},
+		{"one-file grant, the daemon token", "/preview/" + one + "/.code-foundry/daemon.token", 404, "", ""},
+		{"one-file grant, dot-dot back to its file", "/preview/" + one + "/x/../report.html", 200, "text/html; charset=utf-8", "<p>report</p>"},
 		{"unknown grant", "/preview/deadbeef/docs/index.html", 404, "", ""},
 		{"no file", "/preview/" + grant, 404, "", ""},
 	}
@@ -104,6 +143,10 @@ func TestHandler(t *testing.T) {
 			defer func() { _ = res.Body.Close() }()
 			if res.StatusCode != tc.status {
 				t.Fatalf("status %d, want %d", res.StatusCode, tc.status)
+			}
+			// The opaque-origin page fetches its own files and sees their errors.
+			if got := res.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+				t.Errorf("Access-Control-Allow-Origin = %q, want *", got)
 			}
 			if tc.status != 200 {
 				return

@@ -58,6 +58,10 @@ image, no network.
 * **Scope = checkout, not file directory.** Alex's HTML lives in worktrees and references
   sibling directories; a per-directory scope would break `../`. A loose file outside every
   project gets its directory.
+* **Scope floor (2026-10-21).** A scope is never home, an ancestor of the config home or a
+  credential folder; such a file gets a one-file grant, and the route refuses guarded paths
+  whatever the grant. CORS no longer reflects the frame's `null` origin
+  (`preview-scope-floor.md`).
 * **No expiry.** A frame left open for a day must still reload; the table is tiny (one entry
   per scope) and dies with the daemon. A daemon restart invalidates grants, and the GUI's
   reconnect re-reads the tab, which asks for a new one.
