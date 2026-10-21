@@ -15,10 +15,12 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
 )
 
-// ember.task.start: one piece of Ember's work in one call (docs/notes/ember-fixes-1-skill-cli.md).
-// It adds the task (doing), starts its worker through thread.new exactly as the
-// code-foundry-ember skill prescribes and links the two, where Ember used to need three
-// model round trips (task add, thread new, task update).
+// ember.task.start: one piece of Ember's work in one call (docs/notes/ember-fixes-1-skill-cli.md,
+// docs/notes/ember-fixes-2-tasks.md). It starts the worker through thread.new exactly
+// as the code-foundry-ember skill prescribes, then writes the task (doing, linked to
+// it): a new one, or with --task an existing todo or blocked one (a piece Ember planned
+// up front, or one whose start an app restart cut). Nothing is written when the worker
+// does not start, so no doing task is left without a worker.
 
 // EmberStartView is ember.task.start's JSON: the task (linked) and its worker.
 type EmberStartView struct {
@@ -35,16 +37,19 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 	return Command{
 		Name:  "ember.task.start",
 		Title: "Ember: Start Task",
-		Description: "Add a task (doing) and start its worker thread in one call: thread.new with a new worktree, " +
-			"labels ember,<task id>, notify and request id <task id>, linked to the task. The worker gets Ember's worker model.",
+		Description: "Start a worker thread for a task in one call: thread.new with a new worktree, labels ember,<task id>, " +
+			"notify and request id <task id>, then the task as doing, linked to it. A new task takes its title (and detail, " +
+			"parent); --task <id> starts an existing todo or blocked task instead, with its own title. Nothing is written " +
+			"when the worker does not start. The worker gets Ember's worker model.",
 		Category:     emberCategory,
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "title", Type: String, Required: true, Positional: true, Description: "The task's title, also the worker's name (one line)"},
+			{Name: "title", Type: String, Positional: true, Description: "A new task's title, also the worker's name (one line); not with --task"},
+			{Name: "task", Type: String, ID: EmberTaskID, Description: "Start this existing todo or blocked task (its title names the worker) instead of adding one"},
 			{Name: "project", Type: String, Required: true, Description: "Project id or name the worker runs in"},
 			{Name: "prompt", Type: String, Required: true, FileOrStdin: true, Description: "The worker's whole task (@file: from a file, -: stdin)"},
-			{Name: "detail", Type: String, FileOrStdin: true, Description: "The task's detail on the board (@file: from a file, -: stdin)"},
-			{Name: "parent", Type: String, ID: EmberTaskID, Description: "The top-level task it is part of"},
+			{Name: "detail", Type: String, FileOrStdin: true, Description: "A new task's detail on the board (@file: from a file, -: stdin)"},
+			{Name: "parent", Type: String, ID: EmberTaskID, Description: "The top-level task a new task is part of"},
 			{Name: "brief", Type: String, Description: "What the worker is for, at most 500 characters"},
 			{Name: "labels", Type: String, Description: "More comma-separated labels (ember and the task id are always set)"},
 			{Name: "budget", Type: String, Description: "The worker's spending limit in USD, e.g. 2.00"},
@@ -69,13 +74,13 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 			if a.String("base") != "" && !a.Bool("new-worktree") {
 				return Result{}, InvalidArg("base", "only applies with new-worktree")
 			}
-			t, err := d.Ember.AddTask(ctx, ember.NewTask{Title: a.String("title"), Detail: a.String("detail"), ParentID: a.String("parent"), State: ember.StateDoing})
+			p, err := startPiece(d, a)
 			if err != nil {
-				return Result{}, emberErr("title", err)
+				return Result{}, err
 			}
 			raw := map[string]string{
-				"project": a.String("project"), "name": t.Title, "prompt": a.String("prompt"), "created-by": creator,
-				"labels": strings.Join(emberLabels(t.ID, a.String("labels")), ","), "notify": "true", "request-id": t.ID,
+				"project": a.String("project"), "name": p.title, "prompt": a.String("prompt"), "created-by": creator,
+				"labels": strings.Join(emberLabels(p.id, a.String("labels")), ","), "notify": "true", "request-id": p.id,
 			}
 			for _, name := range []string{"brief", "budget", "base"} {
 				if v := a.String(name); v != "" {
@@ -86,29 +91,31 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 				raw["new-worktree"] = "true"
 			}
 			res, err := r.Invoke(ctx, uctx, "thread.new", raw)
-			// The task's follow-up is bookkeeping for what already happened: a caller that
-			// went away must not leave it doing with no worker.
-			bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			defer cancel()
 			if err != nil {
-				// No worker: the task does not stay doing. Ember starts the piece again.
-				why := "the worker did not start: " + err.Error()
-				if ce := new(connect.Error); errors.As(err, &ce) {
-					why = "the worker did not start: " + ce.Message()
+				if p.existing {
+					return Result{}, fmt.Errorf("the worker did not start; task %s stays %s: %w", p.id, p.state, err)
 				}
-				s := ember.StateCancelled
-				if _, cerr := d.Ember.UpdateTask(bctx, t.ID, ember.TaskUpdate{State: &s, Outcome: &why}); cerr != nil {
-					err = errors.Join(err, cerr)
-				}
-				return Result{}, fmt.Errorf("task %s cancelled, its worker did not start: %w", t.ID, err)
+				return Result{}, fmt.Errorf("the worker did not start, so no task was added: %w", err)
 			}
 			w, ok := res.JSON.(*v1.Thread)
 			if !ok || w.GetId() == "" {
-				return Result{}, Failed(fmt.Errorf("thread.new answered no thread for task %s", t.ID))
+				return Result{}, Failed(fmt.Errorf("thread.new answered no thread for task %s", p.id))
 			}
 			tid := w.GetId()
-			if t, err = d.Ember.UpdateTask(bctx, t.ID, ember.TaskUpdate{ThreadID: &tid}); err != nil {
-				return Result{}, fmt.Errorf("thread %s started, but task %s is not linked to it: %w", tid, raw["request-id"], emberErr("", err))
+			// Writing the task is bookkeeping for a worker that already exists: a caller
+			// that went away must not leave the worker without its task.
+			bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			var t ember.Task
+			if p.existing {
+				doing, none := ember.StateDoing, ""
+				t, err = d.Ember.UpdateTask(bctx, p.id, ember.TaskUpdate{State: &doing, ThreadID: &tid, Outcome: &none})
+			} else {
+				t, err = d.Ember.AddTask(bctx, ember.NewTask{ID: p.id, Title: p.title, Detail: a.String("detail"), ParentID: a.String("parent"),
+					ThreadID: tid, State: ember.StateDoing})
+			}
+			if err != nil {
+				return Result{}, fmt.Errorf("thread %s started, but task %s is not written: %w", tid, p.id, emberErr("", err))
 			}
 			return Result{
 				Message: fmt.Sprintf("started task %s with thread %s in %s", t.ID, tid, w.GetWorktreePath()),
@@ -116,6 +123,52 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 			}, nil
 		},
 	}
+}
+
+// startedPiece is the task ember.task.start writes once the worker started: its id and
+// title (which names the worker), and, for --task, its state now.
+type startedPiece struct {
+	id, title string
+	existing  bool
+	state     ember.State
+}
+
+// startPiece checks ember.task.start's task before the worker starts: --task names an
+// existing todo or blocked task without subtasks (and takes no title, detail or
+// parent); else a new task's title, detail and parent must do, and it gets a fresh id.
+func startPiece(d EmberDeps, a Args) (startedPiece, error) {
+	id := a.String("task")
+	if id == "" {
+		n := ember.NewTask{Title: a.String("title"), Detail: a.String("detail"), ParentID: a.String("parent"), State: ember.StateDoing}
+		if strings.TrimSpace(n.Title) == "" {
+			return startedPiece{}, InvalidArg("title", "give the new task's title, or --task <id> to start a task on the board")
+		}
+		if err := d.Ember.CheckTask(n); err != nil {
+			return startedPiece{}, emberErr("title", err)
+		}
+		id, err := d.NewTaskID()
+		if err != nil {
+			return startedPiece{}, Failed(err)
+		}
+		return startedPiece{id: id, title: strings.TrimSpace(n.Title)}, nil
+	}
+	for _, name := range []string{"title", "detail", "parent"} {
+		if a.Has(name) {
+			return startedPiece{}, InvalidArg(name, "--task starts the task as it is on the board; change its %s with ember task update first", name)
+		}
+	}
+	snap := d.Ember.Snapshot()
+	t, ok := snap.Task(id)
+	if !ok {
+		return startedPiece{}, emberErr("task", fmt.Errorf("%w: no task %s", ember.ErrNotFound, id))
+	}
+	if t.State != ember.StateTodo && t.State != ember.StateBlocked {
+		return startedPiece{}, InvalidArg("task", "task %s is %s; only a todo or blocked task starts a worker", t.ID, t.State)
+	}
+	if slices.ContainsFunc(snap.Tasks, func(c ember.Task) bool { return c.ParentID == t.ID }) {
+		return startedPiece{}, InvalidArg("task", "task %s has subtasks: start each of them", t.ID)
+	}
+	return startedPiece{id: t.ID, title: t.Title, existing: true, state: t.State}, nil
 }
 
 // emberLabels are a worker's labels: ember, the task id, then extra (comma-separated),

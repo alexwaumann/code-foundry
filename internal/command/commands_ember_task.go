@@ -98,20 +98,23 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		Command{
 			Name:  "ember.task.done",
 			Title: "Ember: Task Done",
-			Description: "Mark a task done, with its outcome (what came of it: a PR, a branch, a finding). With branch, " +
-				"origin/<branch> must exist in its worker's worktree first.",
+			Description: "Mark a task done, with its outcome (what came of it: a PR, a finding). With branch, " +
+				"origin/<branch> must exist in its worker's worktree first; the task records it (the board shows it).",
 			Category:     emberCategory,
 			NoKeybinding: true,
 			Args: []ArgSpec{idArg, {Name: "outcome", Type: String, Positional: true, Description: "What came of it"},
-				{Name: "branch", Type: String, Description: "The branch the worker pushed: refused unless origin/<branch> exists in its worktree"}},
+				{Name: "branch", Type: String, Description: "The branch the worker pushed, recorded on the task: refused unless origin/<branch> exists in its worktree"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				s := ember.StateDone
+				u := ember.TaskUpdate{State: &s, Outcome: ptr(a, "outcome")}
 				if a.Has("branch") {
-					if err := checkTaskBranch(ctx, d, a.String("id"), a.String("branch")); err != nil {
+					branch := strings.TrimPrefix(strings.TrimSpace(a.String("branch")), "origin/")
+					if err := checkTaskBranch(ctx, d, a.String("id"), branch); err != nil {
 						return Result{}, err
 					}
+					u.Branch = &branch
 				}
-				s := ember.StateDone
-				return update(ctx, a.String("id"), "done:", ember.TaskUpdate{State: &s, Outcome: ptr(a, "outcome")})
+				return update(ctx, a.String("id"), "done:", u)
 			},
 		},
 		emberTaskStart(r, d),
@@ -179,6 +182,7 @@ type EmberTaskView struct {
 	ParentID  string     `json:"parentId,omitempty"`
 	ThreadID  string     `json:"threadId,omitempty"`
 	Outcome   string     `json:"outcome,omitempty"`
+	Branch    string     `json:"branch,omitempty"`
 	Position  int        `json:"position"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
@@ -211,7 +215,7 @@ func emberTaskViews(ts []ember.Task, now time.Time) []EmberTaskView {
 func emberTaskView(t ember.Task, now time.Time) EmberTaskView {
 	v := EmberTaskView{
 		ID: t.ID, Title: t.Title, Detail: t.Detail, State: t.State.String(), ParentID: t.ParentID, ThreadID: t.ThreadID,
-		Outcome: t.Outcome, Position: t.Position, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
+		Outcome: t.Outcome, Branch: t.Branch, Position: t.Position, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 	}
 	if !t.DoneAt.IsZero() {
 		at := t.DoneAt
@@ -231,11 +235,15 @@ func emberTaskView(t ember.Task, now time.Time) EmberTaskView {
 	return v
 }
 
-// emberTaskLine is one task in a sentence: "t-… [doing] Title · worker … — outcome".
+// emberTaskLine is one task in a sentence: "t-… [doing] Title · worker … · branch … —
+// outcome".
 func emberTaskLine(t ember.Task, now time.Time) string {
 	line := fmt.Sprintf("%s [%s] %s", t.ID, t.State, t.Title)
 	if t.Thread != nil {
 		line += " · " + ember.ThreadProgress(t.Thread, now)
+	}
+	if t.Branch != "" {
+		line += " · branch " + t.Branch
 	}
 	if t.Outcome != "" {
 		line += " — " + t.Outcome
@@ -244,7 +252,7 @@ func emberTaskLine(t ember.Task, now time.Time) string {
 }
 
 // formatEmberTasks is one line per task: id, state, title (a subtask indented), and
-// its worker's progress.
+// its worker's progress and branch.
 func formatEmberTasks(ts []ember.Task, now time.Time) string {
 	var b strings.Builder
 	w := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
@@ -256,6 +264,9 @@ func formatEmberTasks(ts []ember.Task, now time.Time) string {
 		worker := "-"
 		if t.Thread != nil {
 			worker = ember.ThreadProgress(t.Thread, now)
+		}
+		if t.Branch != "" {
+			worker += " · branch " + t.Branch
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", t.ID, t.State, title, worker)
 	}
@@ -294,6 +305,9 @@ func formatEmberTask(t ember.Task, all []ember.Task, now time.Time) string {
 	}
 	if t.Outcome != "" {
 		fmt.Fprintf(&b, "outcome: %s\n", t.Outcome)
+	}
+	if t.Branch != "" {
+		fmt.Fprintf(&b, "branch: %s\n", t.Branch)
 	}
 	if t.Detail != "" {
 		fmt.Fprintf(&b, "\n%s\n", t.Detail)

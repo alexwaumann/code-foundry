@@ -23,6 +23,7 @@ type EmberBackend interface {
 	Snapshot() *ember.Snapshot
 	Dir() string
 	TaskIDs() []string
+	CheckTask(n ember.NewTask) error
 	AddTask(ctx context.Context, n ember.NewTask) (ember.Task, error)
 	UpdateTask(ctx context.Context, id string, u ember.TaskUpdate) (ember.Task, error)
 	Remember(fact string) (string, error)
@@ -42,6 +43,9 @@ type EmberDeps struct {
 	// RemoteBranch reports whether origin/<branch> exists in a worktree. Default: git
 	// rev-parse there.
 	RemoteBranch func(ctx context.Context, worktree, branch string) (bool, error)
+	// NewTaskID makes the id of a task ember.task.start adds once its worker started.
+	// Default ember.NewTaskID.
+	NewTaskID func() (string, error)
 	// Now is the clock of the board's times. Default time.Now.
 	Now func() time.Time
 }
@@ -68,6 +72,9 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 	}
 	if d.RemoteBranch == nil {
 		d.RemoteBranch = gitRemoteBranch
+	}
+	if d.NewTaskID == nil {
+		d.NewTaskID = ember.NewTaskID
 	}
 	r.SetIDLister(EmberTaskID, func(context.Context) ([]string, error) { return d.Ember.TaskIDs(), nil })
 	setEnabled := func(ctx context.Context, on bool) (Result, error) {
@@ -284,9 +291,10 @@ type noEmber struct{}
 
 var errNoEmber = connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no Ember store"))
 
-func (noEmber) Snapshot() *ember.Snapshot { return &ember.Snapshot{} }
-func (noEmber) Dir() string               { return "" }
-func (noEmber) TaskIDs() []string         { return nil }
+func (noEmber) Snapshot() *ember.Snapshot     { return &ember.Snapshot{} }
+func (noEmber) Dir() string                   { return "" }
+func (noEmber) TaskIDs() []string             { return nil }
+func (noEmber) CheckTask(ember.NewTask) error { return errNoEmber }
 func (noEmber) AddTask(context.Context, ember.NewTask) (ember.Task, error) {
 	return ember.Task{}, errNoEmber
 }
