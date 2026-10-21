@@ -84,7 +84,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"},
+				{Name: "project", Type: String, Required: true, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
 			},
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {

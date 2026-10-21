@@ -33,6 +33,10 @@ const (
 	TerminalID
 	// EmberTaskID: a task on Ember's board, "t-" + 8 hex digits.
 	EmberTaskID
+	// ProjectID: a registered project, given by its id, its name (when unique) or a path
+	// inside it (resolveProjectRef), never by a suffix. It resolves through the
+	// registry's RefResolver (RegisterProject sets it).
+	ProjectID
 )
 
 // MinIDSuffix is the shortest suffix an id arg resolves.
@@ -45,6 +49,7 @@ var idKinds = map[IDKind]struct{ prefix, noun string }{
 	SubscriptionID: {"sub-", "subscription"},
 	TerminalID:     {"t-", "terminal"},
 	EmberTaskID:    {"t-", "task"},
+	ProjectID:      {"", "project"},
 }
 
 // IDLister returns every id of a kind the daemon knows now.
@@ -59,6 +64,27 @@ func (r *Registry) SetIDLister(kind IDKind, list IDLister) {
 		r.idListers = make(map[IDKind]IDLister)
 	}
 	r.idListers[kind] = list
+}
+
+// RefResolver turns a reference to an id of its kind into the id: a project's name or
+// path into its id. arg names the argument for errors.
+type RefResolver func(ctx context.Context, arg, ref string) (string, error)
+
+// SetRefResolver makes Invoke resolve every given arg of kind with resolve, instead of
+// as a suffix. A kind without one passes its values through.
+func (r *Registry) SetRefResolver(kind IDKind, resolve RefResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.refResolvers == nil {
+		r.refResolvers = make(map[IDKind]RefResolver)
+	}
+	r.refResolvers[kind] = resolve
+}
+
+func (r *Registry) refResolver(kind IDKind) RefResolver {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.refResolvers[kind]
 }
 
 func (r *Registry) idLister(kind IDKind) IDLister {
@@ -113,6 +139,21 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 				return eff, err
 			}
 			args.vals[s.Name] = full
+			continue
+		}
+		if res := r.refResolver(s.ID); res != nil {
+			// Only a value the caller gave: a context one is an id already.
+			if v == "" || !args.Given(s.Name) {
+				continue
+			}
+			full, err := res(ctx, s.Name, v)
+			if err != nil {
+				return eff, err
+			}
+			args.vals[s.Name] = full
+			if s.Context != NoContext {
+				eff = eff.With(s.Context, full)
+			}
 			continue
 		}
 		if s.ID == NoID || !needsResolve(s.ID, v) {
@@ -180,7 +221,7 @@ func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (stri
 // enough). Shorter values and prefixed ones pass through for the daemon to judge.
 func needsResolve(kind IDKind, v string) bool {
 	k, ok := idKinds[kind]
-	return ok && len(v) >= MinIDSuffix && !strings.HasPrefix(v, k.prefix)
+	return ok && k.prefix != "" && len(v) >= MinIDSuffix && !strings.HasPrefix(v, k.prefix)
 }
 
 // ResolveID resolves ref, an id or a suffix of one, against ids: the id itself when
@@ -208,6 +249,9 @@ func ResolveID(kind IDKind, arg, ref string, ids []string) (string, error) {
 	return "", InvalidArg(arg, "%q is ambiguous: %d %s ids end in it (%s); give more characters",
 		ref, len(matches), noun, strings.Join(matches, ", "))
 }
+
+// ProjectRefHelp describes a ProjectID arg.
+const ProjectRefHelp = "Project id, name, or a path inside it"
 
 // IDHelp is the description suffix of an id arg: "id or unique suffix".
 const IDHelp = " (or a unique suffix of 4+ characters)"

@@ -20,6 +20,8 @@ type Registry struct {
 	// idListers resolve id suffixes, idFallbacks those none of their ids end in
 	// (resolve.go).
 	idListers, idFallbacks map[IDKind]IDLister
+	// refResolvers resolve references that are not suffixes (a project's name).
+	refResolvers map[IDKind]RefResolver
 }
 
 // Overrides adjust registered commands without re-registering them. The daemon sets

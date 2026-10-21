@@ -23,7 +23,7 @@ func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 			"squash- or rebase-merged); otherwise nothing is deleted and the error counts the unmerged commits.",
 		Category: "Project",
 		Args: []ArgSpec{
-			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project id or name"},
+			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, ID: ProjectID, Description: ProjectRefHelp},
 			{Name: "branch", Type: String, Required: true, Positional: true, Description: "Branch name"},
 			{Name: "force", Type: Bool, Description: "Delete it even when not merged (its commits are lost, on origin too with --remote)"},
 			{Name: "remote", Type: Bool, Description: "Also delete the branch on origin"},
@@ -38,7 +38,7 @@ func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 			return ""
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			id, err := projectRef(ctx, b, a.String("project"))
+			id, err := resolveProjectRef(ctx, b, a.String("project"))
 			if err != nil {
 				return Result{}, err
 			}
@@ -63,29 +63,4 @@ func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	}
-}
-
-// projectRef is the id of the project ref names: its id, else its name when exactly
-// one project has it.
-func projectRef(ctx context.Context, b ProjectBackend, ref string) (string, error) {
-	res, err := b.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
-	if err != nil {
-		return "", err
-	}
-	var byName []string
-	for _, p := range res.Msg.GetProjects() {
-		if p.GetId() == ref {
-			return ref, nil
-		}
-		if p.GetName() == ref {
-			byName = append(byName, p.GetId())
-		}
-	}
-	switch len(byName) {
-	case 1:
-		return byName[0], nil
-	case 0:
-		return "", InvalidArg("project", "no project %q (code-foundry project list)", ref)
-	}
-	return "", InvalidArg("project", "%d projects are named %q; give its id (%s)", len(byName), ref, strings.Join(byName, ", "))
 }

@@ -120,7 +120,7 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg without a context or default can default to $CODE_FOUNDRY_THREAD")
 	case s.FileOrStdin && s.Type != String:
 		return errors.New("only a string arg can be read from a file or stdin")
-	case s.ID != NoID && (s.Type != String || idKinds[s.ID].prefix == ""):
+	case s.ID != NoID && (s.Type != String || !knownIDKind(s.ID)):
 		return errors.New("only a string arg can be an id, of a known kind")
 	case s.IDList && (s.ID == NoID || s.Context != NoContext):
 		return errors.New("an id list needs an id kind and no context")
@@ -133,6 +133,12 @@ func (s ArgSpec) validate() error {
 		}
 	}
 	return nil
+}
+
+// knownIDKind: kind is one idKinds lists.
+func knownIDKind(kind IDKind) bool {
+	_, ok := idKinds[kind]
+	return ok
 }
 
 // ArgError is an argument validation failure. It wraps ErrInvalidArgs.

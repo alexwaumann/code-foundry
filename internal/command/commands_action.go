@@ -375,6 +375,13 @@ func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string
 // resolveProjectRef finds a registered project by id, else by name (when unique), else as
 // the deepest worktree containing an absolute path.
 func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string) (string, error) {
+	return projectRef(ctx, projects, ref, true)
+}
+
+// projectRef is resolveProjectRef; unless strict, a ref that is neither an id, a name
+// nor a path is returned as it is, for the command's backend to report (a ProjectID
+// arg's RefResolver).
+func projectRef(ctx context.Context, projects ProjectBackend, ref string, strict bool) (string, error) {
 	res, err := projects.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 	if err != nil {
 		return "", err
@@ -399,6 +406,9 @@ func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string)
 			return id, nil
 		}
 		return "", InvalidArg("project", "%s %s", ref, notInProject)
+	}
+	if !strict {
+		return ref, nil
 	}
 	return "", InvalidArg("project", "no project %q (code-foundry project list)", ref)
 }
