@@ -263,6 +263,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
+	// Once thread, action and gitops exist: they decide what a scheduled fetch's auto
+	// pull leaves alone, and gitops runs the pull (autopull.go).
+	s.project.SetAutoPull(autoPullHooks(autoPullSources{
+		enabled: autoPullEnabled(s.settings), threads: s.thread.Snapshot, actions: s.action.Snapshot, ops: s.gitops,
+	}))
 	s.stopBranchLinks = startBranchLinks(ctx, log.With("store", "thread"), s.thread, s.project.Snapshot, s.workspace.Snapshot, s.gh, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")

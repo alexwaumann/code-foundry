@@ -736,7 +736,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   last 10 minutes: poll and fetch every 2 min) or a slower idle tier (poll 10 min,
   fetch 15 min); threads' edit-tool results and turn ends refresh their worktree's
   status directly, through daemon glue on the thread events
-  (`docs/notes/git-activity-tiers.md`). A project may be a plain folder (`Project.Git`
+  (`docs/notes/git-activity-tiers.md`). After a live project's fetch, checkouts on
+  its default branch that are only behind their upstream and not busy are
+  fast-forwarded through gitops (`projects.auto_pull`; busy is daemon glue over the
+  thread, action and gitops snapshots; `docs/notes/auto-pull.md`). A project may be a plain folder (`Project.Git`
   false): one synthetic checkout, no git commands; the stream (or the poll) notices a
   later `git init` (`docs/notes/add-project-2-nogit.md`).
 * `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP

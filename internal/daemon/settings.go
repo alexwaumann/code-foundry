@@ -27,6 +27,8 @@ import (
 //     change (applyShowCreatedThreads): which hidden threads archiving their creator
 //     takes with it (the GUI reads the setting itself for the sidebar);
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
+//   - projects.auto_pull -> the project store's AutoPull.Enabled (autopull.go), read
+//     after every scheduled fetch.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
 //   - update.channel -> update.Store.SetChannel on every change (applyUpdateChannel),

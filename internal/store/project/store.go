@@ -179,6 +179,8 @@ type Git struct {
 
 	details detailState   // worktree detail cache (detail.go)
 	files   fileCollector // live worktrees' file changes (files.go)
+	// autoPull is the daemon's auto pull hooks and the passes running (autopull.go).
+	autoPull autoPullState
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -1225,7 +1227,9 @@ func (g *Git) fetch(ctx context.Context, id string) {
 		return
 	}
 	m := st.meta.Load()
-	if m.OriginURL == "" || m.Error != "" {
+	if m.OriginURL == "" || m.Error != "" || g.autoPulling(id) {
+		// An auto pull pass still running fetches itself (git pull): a second fetch
+		// writing FETCH_HEAD under it makes the pull fail.
 		return
 	}
 	fctx, cancel := context.WithTimeout(ctx, fetchTimeout)
@@ -1236,6 +1240,7 @@ func (g *Git) fetch(ctx context.Context, id string) {
 		}
 		return
 	}
-	// The watcher sees FETCH_HEAD too; requesting here makes it independent of fs events.
-	g.sched.request(jobKey{kind: jobReconcile, projectID: id})
+	// The watcher sees FETCH_HEAD too; the reconcile afterFetch requests (or its auto
+	// pull pass runs) makes the refresh independent of fs events.
+	g.afterFetch(ctx, id)
 }

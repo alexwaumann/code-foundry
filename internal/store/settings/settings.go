@@ -78,6 +78,9 @@ type GitHub struct {
 // Projects configures the project store.
 type Projects struct {
 	FetchIntervalSeconds int // 0 = off
+	// AutoPull fast-forwards checkouts on the default branch after each scheduled
+	// fetch (project.AutoPull); read at every fetch.
+	AutoPull bool
 }
 
 // GitOps configures the gitops store.

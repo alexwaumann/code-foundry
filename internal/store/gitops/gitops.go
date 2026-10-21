@@ -146,6 +146,8 @@ type PullOptions struct {
 	WorktreePath string
 	// Rebase runs `git pull --rebase` instead of `--ff-only`.
 	Rebase bool
+	// Title replaces the default title ("Pull <branch>"), e.g. for an automatic pull.
+	Title string
 }
 
 // PushOptions configures Store.Push.

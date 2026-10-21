@@ -110,6 +110,7 @@ func (m *Manager) Pull(ctx context.Context, o PullOptions) (Op, error) {
 	if o.Rebase {
 		title, mode = "Pull --rebase "+t.label(), "--rebase"
 	}
+	title = cmp.Or(o.Title, title)
 	return m.submit(ctx, KindPull, title, t, true, func(ctx context.Context, x *run) (string, string, error) {
 		res, err := x.git(ctx, "pull", mode)
 		if err == nil {
