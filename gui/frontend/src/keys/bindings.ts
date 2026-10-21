@@ -161,6 +161,20 @@ function terminalYields(chord: string): CommandView | undefined {
   return commandBindings(useCommandsStore.getState().commands).get(chord);
 }
 
+/**
+ * Commands whose chords also leave a focused text field (the settings search, which the
+ * settings page focuses on open; a filter box): back and forward, as in Safari. Only cmd
+ * chords that do not move or delete text (a user may rebind these to cmd+arrow).
+ */
+const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward"]);
+
+/** The command a focused text field yields this chord to (see fieldYielded). */
+function fieldYields(chord: string): CommandView | undefined {
+  if (!terminalYieldable(chord) || /\+(arrow\w+|backspace|delete|home|end|enter|tab)$/.test(chord)) return undefined;
+  const c = commandBindings(useCommandsStore.getState().commands).get(chord);
+  return c && fieldYielded.has(c.name) ? c : undefined;
+}
+
 /** Some listed command declares the chord, whether or not it is available in this context. */
 function declaredChord(chord: string): boolean {
   return useCommandsStore.getState().commands.some((c) => c.keybindings.some((k) => normalizeChord(k) === chord));
@@ -405,7 +419,8 @@ function isEditable(el: Element | null): boolean {
  *     (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
  *     else, except cmd chords bound to commands (see terminalYields).
- *  3. A focused text field (palette input, rename field) consumes everything else.
+ *  3. A focused text field (palette input, rename field) consumes everything else, except
+ *     view.back and view.forward's cmd chords outside the palette (see fieldYielded).
  *  4. F2 renames the selected thread (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
  */
@@ -445,7 +460,16 @@ export function handleKeyDown(e: KeyboardEvent): void {
     }
     return;
   }
-  if (isEditable(target) || useUiStore.getState().palette.open) return;
+  if (useUiStore.getState().palette.open) return;
+  if (isEditable(target)) {
+    const yielded = fieldYields(chord);
+    if (yielded) {
+      e.preventDefault();
+      e.stopPropagation();
+      startCommand(yielded);
+    }
+    return;
+  }
   // In the tree, F2 renames the row under the cursor (Sidebar handles it).
   if (chord === "f2" && !target?.closest('[role="tree"]') && beginRename()) {
     e.preventDefault();

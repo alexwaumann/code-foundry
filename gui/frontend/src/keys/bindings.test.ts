@@ -309,6 +309,27 @@ describe("handleKeyDown precedence", () => {
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
+  it.each<[string, string, KeyboardEventInit & { key: string }, boolean]>([
+    ["view.back's cmd+[ leaves a text field (the settings search)", "cmd+[", { key: "[", code: "BracketLeft", metaKey: true }, true],
+    ["view.forward's cmd+] leaves a text field", "cmd+]", { key: "]", code: "BracketRight", metaKey: true }, true],
+    ["back rebound to cmd+arrowleft stays with the field (line start)", "cmd+arrowleft", { key: "ArrowLeft", code: "ArrowLeft", metaKey: true }, false],
+    ["back rebound to alt+[ stays with the field (no cmd)", "alt+[", { key: "[", code: "BracketLeft", altKey: true }, false],
+  ])("%s", (_name, chord, init, leaves) => {
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: chord === "cmd+]" ? "view.forward" : "view.back", keybindings: [chord] })] }));
+    useUiStore.setState({ selection: { kind: "view", name: "projects" }, history: [{ kind: "view", name: "dashboard" }, { kind: "view", name: "projects" }], historyIndex: 1 });
+    const e = press(input, init);
+    expect(e.defaultPrevented).toBe(leaves);
+    if (chord === "cmd+[") expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("view.back's chord does not leave the palette's input", () => {
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "view.back", keybindings: ["cmd+["] })] }));
+    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" }, history: [{ kind: "view", name: "dashboard" }, { kind: "view", name: "projects" }], historyIndex: 1 });
+    expect(press(input, { key: "[", code: "BracketLeft", metaKey: true }).defaultPrevented).toBe(false);
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
+  });
+
   it("command chords run outside the terminal", () => {
     const e = press(outside, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
