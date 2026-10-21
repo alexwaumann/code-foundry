@@ -84,12 +84,15 @@ func TestPanelKeybindings(t *testing.T) {
 }
 
 // Back and forward through the window's selection history: a browser's and Finder's
-// chords. Commands, not GUI view actions, so they stay unreserved and rebindable.
+// chords; previous and next thread in sidebar order. Commands, not GUI view actions, so they stay unreserved and rebindable.
 func TestHistoryKeybindings(t *testing.T) {
 	f := newFixture(t)
 	tests := []struct{ name, title, chord string }{
 		{name: "view.back", title: "Back", chord: "cmd+["},
 		{name: "view.forward", title: "Forward", chord: "cmd+]"},
+		// The positional companions: macOS tab switching (Safari, Terminal).
+		{name: "thread.previous", title: "Previous Thread", chord: "cmd+shift+["},
+		{name: "thread.next", title: "Next Thread", chord: "cmd+shift+]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

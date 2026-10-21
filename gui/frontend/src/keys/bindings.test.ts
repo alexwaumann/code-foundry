@@ -304,6 +304,77 @@ describe("handleKeyDown precedence", () => {
     });
   });
 
+  describe("cmd+shift+[ / cmd+shift+] step through the sidebar order", () => {
+    // The same sidebar as cmd+1..9's: f, d, b, e, c, then under Working: a.
+    beforeEach(() => {
+      useCommandsStore.setState((s) => ({
+        commands: [...s.commands, cmd({ name: "thread.previous", keybindings: ["cmd+shift+["] }), cmd({ name: "thread.next", keybindings: ["cmd+shift+]"] })],
+      }));
+      useThreadsStore.setState({
+        byId: {
+          a: thread("a", { status: "busy" }),
+          b: thread("b", { state: "disconnected", status: "error", statusReason: "interrupted" }),
+          c: thread("c"),
+          d: thread("d", { status: "attention", statusReason: "question: Which?" }),
+          e: thread("e", { status: "attention", statusReason: "finished" }),
+          f: thread("f", { status: "busy", pinned: true }),
+        },
+        order: ["a", "b", "c", "d", "e", "f"],
+      });
+      useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    });
+    const step = (by: 1 | -1, target: Element = outside) => {
+      const e = by === 1 ? press(target, { key: "}", code: "BracketRight", metaKey: true, shiftKey: true }) : press(target, { key: "{", code: "BracketLeft", metaKey: true, shiftKey: true });
+      expect(e.defaultPrevented).toBe(true);
+      const sel = useUiStore.getState().selection;
+      return sel.kind === "thread" ? sel.id : sel.kind;
+    };
+
+    it("next from the dashboard selects the first row, then walks down and wraps", () => {
+      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(1))).toEqual(["f", "d", "b", "e", "c", "a", "f"]);
+      expect(runCommandForResult).not.toHaveBeenCalled();
+    });
+
+    it("previous from the dashboard selects the last row, then walks up and wraps", () => {
+      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(-1))).toEqual(["a", "c", "e", "b", "d", "f", "a"]);
+    });
+
+    it("rows of a collapsed section do not count; a thread in one starts like a page", () => {
+      useUiStore.setState({ workingCollapsed: true, selection: { kind: "thread", id: "c" } });
+      expect(step(1)).toBe("f");
+      expect(step(-1)).toBe("c");
+      useUiStore.setState({ selection: { kind: "thread", id: "a" } });
+      expect(step(-1)).toBe("c");
+    });
+
+    it("a hidden thread selected starts from its creator's row, and is never a stop", () => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, g: thread("g", { createdBy: "d", inSidebar: false }) }, order: [...s.order, "g"] }));
+      useUiStore.setState({ selection: { kind: "thread", id: "g" } });
+      expect(step(1)).toBe("b");
+      expect(step(-1)).toBe("d");
+      expect(step(1)).toBe("b");
+    });
+
+    it("does nothing with no rows", () => {
+      useThreadsStore.setState({ byId: {}, order: [] });
+      expect(step(1)).toBe("view");
+      expect(step(-1)).toBe("view");
+    });
+
+    it("works from a focused shell, and lands in the window's history", () => {
+      useUiStore.setState({ history: [{ kind: "view", name: "dashboard" }], historyIndex: 0 });
+      expect(step(1, terminal)).toBe("f");
+      expect(step(1, terminal)).toBe("d");
+      useUiStore.getState().back();
+      expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "f" });
+    });
+
+    it("a plain text field keeps them (only back and forward leave one)", () => {
+      expect(press(input, { key: "}", code: "BracketRight", metaKey: true, shiftKey: true }).defaultPrevented).toBe(false);
+      expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    });
+  });
+
   it("text fields consume command chords", () => {
     press(input, { key: "t", code: "KeyT", metaKey: true });
     expect(runCommandForResult).not.toHaveBeenCalled();

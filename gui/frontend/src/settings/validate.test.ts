@@ -38,6 +38,8 @@ describe("validateKeybinding", () => {
     ["view.panel.split's chord is bindable", "cmd+\\", { ok: true, value: "cmd+\\" }],
     ["view.back's chord is bindable", "cmd+[", { ok: true, value: "cmd+[" }],
     ["view.forward's chord is bindable", "cmd+]", { ok: true, value: "cmd+]" }],
+    ["thread.previous's chord is bindable", "Shift+Cmd+[", { ok: true, value: "cmd+shift+[" }],
+    ["thread.next's chord is bindable", "cmd+shift+]", { ok: true, value: "cmd+shift+]" }],
     ["minimize is reserved", "cmd+m", { ok: false, error: "cmd+m is reserved by the app" }],
     ["bare letter", "x", { ok: false, error: "x needs cmd, ctrl, or alt (a bare key would steal typing)" }],
     ["shift letter", "shift+x", { ok: false, error: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)" }],

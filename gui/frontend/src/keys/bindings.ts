@@ -11,6 +11,7 @@ import { openPublishDialog } from "@/stores/publish";
 import { allSurfaces } from "@/stores/plugins";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
+import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadSidebar } from "@/stores/threadActions";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
@@ -307,6 +308,15 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   "view.forward": () => {
     historyCommand(1);
+    return true;
+  },
+  // Window-local too: this window's sidebar order (the CLI's reach every window).
+  "thread.previous": () => {
+    jumpToNeighbour(-1);
+    return true;
+  },
+  "thread.next": () => {
+    jumpToNeighbour(1);
     return true;
   },
   // Window-local like view.panel.toggle: this window leaves its subagent view (Escape, the
