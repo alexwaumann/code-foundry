@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 )
@@ -61,8 +62,20 @@ func keychainAccount(plugin, key string) (string, error) {
 	return plugin + "/" + key, nil
 }
 
-// MaxSecretBytes bounds one secret value.
-const MaxSecretBytes = 16 << 10
+// MaxSecretBytes bounds one secret value. It is what one `security -i` line holds: the
+// interactive reader takes at most securityLineMax bytes a line (measured on macOS 26:
+// a 4096-byte line, newline included, is read whole and a longer one is cut there, the
+// rest parsed as another command, after the cut value was stored), Set hex-encodes the
+// value (two characters a byte), and the rest of the line is the command with the
+// longest service and account the patterns allow (maxAddPrefix).
+const MaxSecretBytes = 1800
+
+// securityLineMax is the longest line `security -i` reads whole, newline included.
+const securityLineMax = 4096
+
+// maxAddPrefix is the longest add command before the value, and its newline:
+// "add-generic-password -U -s <service ≤128> -a <plugin ≤64>/<key ≤128> -X " + "\n".
+const maxAddPrefix = len("add-generic-password -U -s  -a / -X \n") + 128 + 64 + 128
 
 // Keychain is the SecretStore backed by the user's login Keychain through the security
 // CLI. A value is never in argv (it would show in ps): Set feeds the add command to
@@ -170,12 +183,21 @@ func (k Keychain) Set(ctx context.Context, plugin, key, value string) error {
 	// No -A and no -T: the item trusts only its creator, /usr/bin/security (the note
 	// plugins-8-secrets-hardening.md says what that does and does not protect).
 	cmdline := fmt.Sprintf("add-generic-password -U -s %s -a %s -X %s\n", k.service(), acct, hex.EncodeToString([]byte(value)))
-	_, stderr, code, err := k.run(ctx, cmdline, "-i")
-	switch {
-	case err != nil:
+	if len(value) > MaxSecretBytes || len(cmdline) > securityLineMax {
+		return fmt.Errorf("keychain: store %s/%s: a secret is at most %d bytes, this one is %d", plugin, key, MaxSecretBytes, len(value))
+	}
+	stdout, stderr, code, err := k.run(ctx, cmdline, "-i")
+	if err != nil {
 		return fmt.Errorf("keychain: %w", err)
-	case code != 0 || strings.Contains(stderr, "SecKeychain"):
-		return fmt.Errorf("keychain: store %s/%s: %s", plugin, key, firstLine(stderr, code))
+	}
+	// A stored value prints nothing. Anything else is a refusal or a line security cut
+	// and parsed in part (the item may be written, cut short): remove what it may have
+	// written, and never quote its output, which can echo the value's hex.
+	if code != 0 || stdout != "" || stderr != "" {
+		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		_ = k.Delete(dctx, plugin, key)
+		return fmt.Errorf("keychain: store %s/%s: the Keychain refused the value (%d bytes)", plugin, key, len(value))
 	}
 	return nil
 }

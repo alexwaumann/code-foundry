@@ -299,7 +299,7 @@ list, err := h.Secrets().List(ctx) // names and set times, never values
   `code-foundry-plugin-<hash>` for a `CODE_FOUNDRY_HOME` other than `~/.code-foundry`;
   account `<plugin>/<key>`), namespaced to the plugin by the host. Keys
   `[A-Za-z0-9._-]{1,128}` (anything else, `/` included, is invalid params); values
-  non-empty UTF-8 up to 16 KiB. Only keys this plugin set through the host are read.
+  non-empty UTF-8 up to 1800 bytes. Only keys this plugin set through the host are read.
 - They belong to the plugin's source (its registry, release repository or dev folder):
   a package of the same name from elsewhere starts without them (`plugin install` /
   `plugin dev --force` deletes them, data dir and consent included). Linking the plugin
