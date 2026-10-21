@@ -1,12 +1,49 @@
 package daemon
 
 import (
+	"context"
 	"strings"
 
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
+
+// abandonedBy is project.CleanupOptions.Abandoned over the thread store's threads,
+// archived ones included, and its tombstones (cleanupAbandoned).
+func abandonedBy(threads *thread.Manager) func(project.Worktree) bool {
+	return func(w project.Worktree) bool {
+		removed, _ := threads.ListRemoved(context.Background(), thread.ListOptions{})
+		return cleanupAbandoned(w.Path, threads.Snapshot(), removed)
+	}
+}
+
+// cleanupAbandoned reports whether the worktree at path is abandoned: no thread that is
+// not archived is on it (its cwd is the worktree or inside it), and an archived one or
+// a removed one (its tombstone, kept for thread.RemovedTTL) was. Cleanup then removes it
+// although it was made less than project.FreshFor ago. Pure.
+func cleanupAbandoned(path string, snap *thread.Snapshot, removed []thread.RemovedThread) bool {
+	was := false
+	if snap != nil {
+		for _, t := range snap.Threads {
+			if !inside(t.WorktreePath, path) {
+				continue
+			}
+			if t.ArchivedAt.IsZero() {
+				return false
+			}
+			was = true
+		}
+	}
+	for _, r := range removed {
+		if inside(r.WorktreePath, path) {
+			was = true
+		}
+	}
+	return was
+}
 
 // cleanupHold is the non-git half of the worktree cleanup rule (project.CleanupVerdict
 // is the git half): why something keeps the worktree at path, or "". A thread is on it

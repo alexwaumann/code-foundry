@@ -11,7 +11,8 @@ import (
 
 // FreshFor is how long cleanup keeps a worktree the app made while its HEAD is still the
 // commit it was made at: a thread or an orchestrator that just made it has not
-// committed yet, and an empty branch is otherwise "in the base".
+// committed yet, and an empty branch is otherwise "in the base". It does not apply to
+// an abandoned worktree (CleanupOptions.Abandoned): no one is about to commit there.
 const FreshFor = 10 * time.Minute
 
 // CleanupVerdict is the git half of the worktree cleanup rule for w at now: whether it
@@ -28,6 +29,16 @@ const FreshFor = 10 * time.Minute
 // Live threads, running terminals and workspace membership are the other half; the
 // project store does not know them (CleanupOptions.Hold).
 func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
+	return cleanupVerdict(w, now, false)
+}
+
+// AbandonedReason is the reason an abandoned worktree (CleanupOptions.Abandoned) with
+// no commits since it was made goes.
+const AbandonedReason = "no commits since it was made; its threads are archived or removed"
+
+// cleanupVerdict is CleanupVerdict; abandoned lifts the FreshFor rule (a worktree whose
+// threads are all archived or removed: none of them will commit).
+func cleanupVerdict(w Worktree, now time.Time, abandoned bool) (removable bool, reason string) {
 	st := w.Status
 	switch {
 	case w.IsMain:
@@ -46,8 +57,10 @@ func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
 		return false, UncommittedReason
 	case st.BaseRef == "":
 		return false, "no remote default branch to compare with"
-	case justMade(w, now):
+	case justMade(w, now) && !abandoned:
 		return false, "no commits yet, made less than " + strconv.Itoa(int(FreshFor/time.Minute)) + " minutes ago"
+	case justMade(w, now) && st.BaseAhead == 0:
+		return true, AbandonedReason
 	case st.BaseAhead > 0 && st.BaseMerged:
 		return true, "a rebased or squash-merged copy is in " + st.BaseRef
 	case st.BaseAhead > 0:
@@ -131,6 +144,9 @@ type CleanupOptions struct {
 	// terminal is open there, a workspace has it), or "". It is asked right before each
 	// removal. Nil: nothing holds a worktree.
 	Hold func(w Worktree) string
+	// Abandoned reports whether every thread that worked in w is archived or removed
+	// (and there was one): the FreshFor rule then does not keep it. Nil: none is.
+	Abandoned func(w Worktree) bool
 	// Now is the time CleanupVerdict judges at. Nil: time.Now.
 	Now func() time.Time
 }
@@ -192,12 +208,13 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 		if opts.Path == "" && w.IsMain {
 			continue
 		}
-		removable, reason := CleanupVerdict(w, now())
+		abandoned := opts.Abandoned != nil && opts.Abandoned(w)
+		removable, reason := cleanupVerdict(w, now(), abandoned)
 		// Kept for its uncommitted changes alone: with them set aside every other
 		// condition passes.
 		uncommitted := false
 		if !removable && w.Status.HasUncommitted() {
-			if ok, why := CleanupVerdict(withoutUncommitted(w), now()); ok {
+			if ok, why := cleanupVerdict(withoutUncommitted(w), now(), abandoned); ok {
 				uncommitted = true
 				if opts.Force {
 					removable, reason = true, why
