@@ -247,12 +247,14 @@ code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/b
 ```
 
 `thread remove` stops a working child itself: no `thread interrupt` first. The path
-names the project (`--project` only for a path no project has). Add `--delete-branch` to
-the second command when the user said yes; it deletes the local branch. A pushed branch
-stays on origin until `code-foundry project branch delete <project> <branch> --remote
---yes` (`--force` for unmerged work), again only on the user's say-so; the same command
-deletes a branch whose worktree is already gone. Never `git worktree remove` or raw git
-branch deletion. A removed child leaves a tombstone: `thread reports --all` lists it as
+names the project (`--project` only for a path no project has). Add `--delete-branch
+--force` to the second command when the user said yes: without `--force` a branch with
+commits not in the default branch is kept (the command says so), and a worktree a thread,
+terminal or workspace still uses is refused. A pushed branch stays on origin until
+`code-foundry project branch delete <project> <branch> --remote --yes` (`--force` for
+unmerged work: without it nothing is deleted), again only on the user's say-so; the same
+command deletes a branch whose worktree is already gone. Never `git worktree remove` or
+raw git branch deletion. A removed child leaves a tombstone: `thread reports --all` lists it as
 removed.
 
 ## 8. Checking a batch before the roll-up

@@ -476,11 +476,18 @@ export type RemoveWorktreeRequest = Message<"codefoundry.v1.RemoveWorktreeReques
   path: string;
 
   /**
+   * Also delete the worktree's branch: only when it is merged into the default branch
+   * (as DeleteBranch decides) unless force. A branch kept is a FailedPrecondition
+   * returned after the worktree is removed.
+   *
    * @generated from field: bool delete_branch = 3;
    */
   deleteBranch: boolean;
 
   /**
+   * Remove it even with uncommitted changes (deleting them), while a thread, a running
+   * terminal or a workspace holds it, and delete its branch even when unmerged.
+   *
    * @generated from field: bool force = 4;
    */
   force: boolean;
@@ -521,16 +528,19 @@ export type DeleteBranchRequest = Message<"codefoundry.v1.DeleteBranchRequest"> 
   branch: string;
 
   /**
-   * `git branch -D` (unmerged work is lost); without it `git branch -d`, which refuses
-   * a branch not merged into its upstream or HEAD.
+   * Delete it whatever it holds (unmerged work is lost). Without it the local branch,
+   * and with remote origin's copy (fetched first), must be merged into origin/<default>
+   * (else the local default branch): reachable from it, or its changes landed there as
+   * a rebased or squash-merged copy. Otherwise nothing is deleted (FailedPrecondition
+   * naming the unmerged commits).
    *
    * @generated from field: bool force = 3;
    */
   force: boolean;
 
   /**
-   * Also `git push origin --delete <branch>`. A branch origin does not have is not an
-   * error.
+   * Also `git push origin --delete <branch>`, leased on the tip that was checked. A
+   * branch origin does not have is not an error.
    *
    * @generated from field: bool remote = 4;
    */
@@ -2064,7 +2074,9 @@ export const ProjectService: GenService<{
     output: typeof CreateWorktreeResponseSchema;
   },
   /**
-   * RemoveWorktree removes a worktree (and optionally its branch).
+   * RemoveWorktree removes a worktree (and optionally its branch). Without force it is
+   * refused while a live thread, a running terminal or a workspace holds it (the
+   * cleanup rule's non-git half).
    *
    * @generated from rpc codefoundry.v1.ProjectService.RemoveWorktree
    */

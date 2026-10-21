@@ -42,6 +42,9 @@ var (
 	ErrExists = errors.New("already exists")
 	// ErrBusy: a clone into the same destination is running.
 	ErrBusy = errors.New("clone already running")
+	// ErrNested: the owner directory is itself a repository (a project made with the
+	// owner's name), which the clone would land inside.
+	ErrNested = errors.New("inside another repository")
 	// ErrOutsideRoot: the projects directory resolves outside the allowed root.
 	ErrOutsideRoot = errors.New("outside your home directory")
 	// ErrNotFound: GitHub has no such repository, or the viewer cannot see it.
@@ -141,6 +144,12 @@ func (c *Cloner) Clone(ctx context.Context, owner, name string, progress func(Pr
 		return project.Project{}, fmt.Errorf("check %s: %w", dest, err)
 	}
 	parent := filepath.Dir(dest)
+	if _, err := os.Lstat(filepath.Join(parent, ".git")); err == nil {
+		// projects/<owner> is a repository (fuzz finding git 7): a clone inside it would
+		// be nested in that project, and deleting it would delete the clone.
+		return project.Project{}, fmt.Errorf("%w: %s is a git repository (a project named %s?); cloning %s/%s there would put it inside that one",
+			ErrNested, parent, owner, owner, name)
+	}
 	if err := os.MkdirAll(c.opts.Root, 0o700); err != nil {
 		return project.Project{}, fmt.Errorf("create %s: %w", c.opts.Root, err)
 	}

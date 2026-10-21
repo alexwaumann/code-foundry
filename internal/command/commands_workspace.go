@@ -153,7 +153,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or path (the member worktree path works too)"},
 				wsArg, cwdArg,
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
-				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
+				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch when it is merged into the default branch (with --force: always)"},
 			},
 			Confirm: "Remove project {project} from its workspace? This deletes its worktree from disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -163,7 +163,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				}))
 				if err != nil {
 					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
-						return Result{}, deleteWorkConfirm("workspace.remove-project", wts, "the worktree")
+						return Result{}, deleteWorkConfirm("workspace.remove-project", wts, withBranch(a, "the worktree"))
 					}
 					return Result{}, err
 				}
@@ -180,7 +180,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Args: []ArgSpec{
 				{Name: "workspace", Type: String, Required: true, Positional: true, Description: "Workspace id or name"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
-				{Name: "delete-branch", Type: Bool, Description: "Also delete each member's branch"},
+				{Name: "delete-branch", Type: Bool, Description: "Also delete each member's branch that is merged into its default branch (with --force: every one)"},
 			},
 			Confirm: "Remove workspace {workspace}? This deletes every member worktree from disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -189,7 +189,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 					Workspace: ws, Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
 				})); err != nil {
 					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
-						return Result{}, deleteWorkConfirm("workspace.remove", wts, "the workspace's worktrees")
+						return Result{}, deleteWorkConfirm("workspace.remove", wts, withBranch(a, "the workspace's worktrees"))
 					}
 					return Result{}, err
 				}

@@ -137,21 +137,30 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		Command{
-			Name:        "project.worktree.remove",
-			Title:       "Remove Worktree",
-			Description: "Remove a worktree from disk, optionally deleting its branch." + forceNote,
-			Category:    "Project",
+			Name:  "project.worktree.remove",
+			Title: "Remove Worktree",
+			Description: "Remove a worktree from disk, optionally deleting its branch (only when merged into the default branch; " +
+				"an unmerged one is kept and the command says so). Refused while a thread is on it, a terminal is open in it or a " +
+				"workspace has it; --force removes it anyway and deletes an unmerged branch." + forceNote,
+			Category: "Project",
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: the project the worktree is registered in)"},
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
-				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
+				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch when it is merged into the default branch (with --force: always)"},
+				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked), or while a thread, terminal or workspace uses it; with --delete-branch, delete an unmerged branch too"},
 			},
 			// The project may be left out: the path names it (W4 finding 2: inside a
 			// thread, --path alone was "not available in this context").
 			When:           func(c Context) bool { return hasActiveWorktree(c) && !notGit(c) },
 			WhyUnavailable: whyNoWorktree(notGit),
 			Confirm:        "Remove worktree {path}? This deletes files on disk.",
+			DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
+				if !a.Bool("delete-branch") || a.Bool("force") {
+					return ""
+				}
+				return "Remove worktree " + a.Path("path") + " and delete its branch? This deletes files on disk. " +
+					"A branch with commits not in the default branch is kept."
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
 				project, err := worktreeProject(ctx, b, a.String("project"), path)
@@ -165,7 +174,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 					Force:        a.Bool("force"),
 				})); err != nil {
 					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
-						return Result{}, deleteWorkConfirm("project.worktree.remove", wts, "the worktree")
+						return Result{}, deleteWorkConfirm("project.worktree.remove", wts, withBranch(a, "the worktree"))
 					}
 					return Result{}, err
 				}

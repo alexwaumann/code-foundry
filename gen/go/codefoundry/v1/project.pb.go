@@ -1110,11 +1110,16 @@ func (x *CreateWorktreeResponse) GetWorktree() *Worktree {
 }
 
 type RemoveWorktreeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	DeleteBranch  bool                   `protobuf:"varint,3,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
-	Force         bool                   `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Path      string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// Also delete the worktree's branch: only when it is merged into the default branch
+	// (as DeleteBranch decides) unless force. A branch kept is a FailedPrecondition
+	// returned after the worktree is removed.
+	DeleteBranch bool `protobuf:"varint,3,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
+	// Remove it even with uncommitted changes (deleting them), while a thread, a running
+	// terminal or a workspace holds it, and delete its branch even when unmerged.
+	Force         bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1217,11 +1222,14 @@ type DeleteBranchRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	Branch    string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	// `git branch -D` (unmerged work is lost); without it `git branch -d`, which refuses
-	// a branch not merged into its upstream or HEAD.
+	// Delete it whatever it holds (unmerged work is lost). Without it the local branch,
+	// and with remote origin's copy (fetched first), must be merged into origin/<default>
+	// (else the local default branch): reachable from it, or its changes landed there as
+	// a rebased or squash-merged copy. Otherwise nothing is deleted (FailedPrecondition
+	// naming the unmerged commits).
 	Force bool `protobuf:"varint,3,opt,name=force,proto3" json:"force,omitempty"`
-	// Also `git push origin --delete <branch>`. A branch origin does not have is not an
-	// error.
+	// Also `git push origin --delete <branch>`, leased on the tip that was checked. A
+	// branch origin does not have is not an error.
 	Remote        bool `protobuf:"varint,4,opt,name=remote,proto3" json:"remote,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

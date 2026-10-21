@@ -112,6 +112,7 @@ var cloneErrorCodes = []struct {
 	{clone.ErrExists, connect.CodeAlreadyExists},
 	{clone.ErrBusy, connect.CodeFailedPrecondition},
 	{clone.ErrOutsideRoot, connect.CodeFailedPrecondition},
+	{clone.ErrNested, connect.CodeFailedPrecondition},
 	{clone.ErrNotFound, connect.CodeNotFound},
 	{clone.ErrFailed, connect.CodeUnknown},
 	{context.Canceled, connect.CodeCanceled},

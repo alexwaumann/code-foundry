@@ -19,12 +19,13 @@ func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 		Name:  "project.branch.delete",
 		Title: "Delete Branch",
 		Description: "Delete a branch no worktree has checked out (its worktree removed); remote: origin's too. " +
-			"Only a merged branch unless force.",
+			"Without force the branch, and origin's copy, must be merged into the default branch (or landed there " +
+			"squash- or rebase-merged); otherwise nothing is deleted and the error counts the unmerged commits.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project id or name"},
 			{Name: "branch", Type: String, Required: true, Positional: true, Description: "Branch name"},
-			{Name: "force", Type: Bool, Description: "Delete it even when not merged (its commits are lost)"},
+			{Name: "force", Type: Bool, Description: "Delete it even when not merged (its commits are lost, on origin too with --remote)"},
 			{Name: "remote", Type: Bool, Description: "Also delete the branch on origin"},
 		},
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },

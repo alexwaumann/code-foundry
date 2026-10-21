@@ -255,6 +255,12 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 		f.mu.Unlock()
 		return fmt.Errorf("%w: cannot remove the main worktree", project.ErrInvalidArgument)
 	}
+	if !o.Force && o.Hold != nil {
+		if held := o.Hold(r.Worktrees[i]); held != "" {
+			f.mu.Unlock()
+			return fmt.Errorf("%w: worktree %s is in use: %s", project.ErrFailedPrecondition, o.Path, held)
+		}
+	}
 	if !o.Force && r.Worktrees[i].Status.HasUncommitted() {
 		// As git refuses a worktree with modified or untracked files without --force.
 		defer f.mu.Unlock()

@@ -34,8 +34,8 @@ type Project struct {
 	// (project_create.go); nil answers Unimplemented.
 	newProjects newproject.Service
 	owners      gh.Owners
-	// cleanupHold backs CleanupWorktrees' non-git check (project_cleanup.go); nil holds
-	// nothing.
+	// cleanupHold backs CleanupWorktrees' and RemoveWorktree's non-git check
+	// (project_cleanup.go); nil holds nothing.
 	cleanupHold func(project.Worktree) string
 	// baseFromOrigin reads projects.base_from_origin for CreateWorktree and ListRefs'
 	// default ref; nil is on (WithBaseFromOrigin).
@@ -131,11 +131,13 @@ func (h *Project) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefs
 	return connect.NewResponse(&v1.ListRefsResponse{Refs: all, DefaultRef: refs.Default(h.fromOrigin())}), nil
 }
 
-// RemoveWorktree removes a worktree.
+// RemoveWorktree removes a worktree; without force one the cleanup hold names (a
+// thread on it, a running terminal, a workspace) is refused.
 func (h *Project) RemoveWorktree(ctx context.Context, req *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	m := req.Msg
 	if err := h.store.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
 		ProjectID: m.GetProjectId(), Path: m.GetPath(), DeleteBranch: m.GetDeleteBranch(), Force: m.GetForce(),
+		Hold: h.cleanupHold,
 	}); err != nil {
 		return nil, projectError(err)
 	}
