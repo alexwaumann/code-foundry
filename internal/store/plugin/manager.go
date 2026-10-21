@@ -282,7 +282,7 @@ func (m *Manager) publicLocked(e *entry) Plugin {
 		DisabledReason: e.disabledReason, ConsentedAt: e.row.ConsentedAt,
 		State: e.state, PID: e.pid, StartedAt: e.startedAt, NextRestartAt: e.nextRestartAt,
 		Restarts: e.restarts, LastError: e.lastError, Protocol: e.protocol, Capabilities: slices.Clone(e.caps),
-		LogPath: e.logs.path,
+		LogPath: e.logs.file.Path(),
 	}
 	if e.dev {
 		p.DevPath = e.dir

@@ -1,21 +1,37 @@
 package daemon
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"syscall"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/logfile"
 )
+
+// logMaxBytes caps daemon.log; past it the file rotates to daemon.log.1 (one rotation,
+// like the plugins' logs).
+const logMaxBytes = 10 << 20
 
 // newLogger returns a logger that writes JSON to logPath and, in dev mode, text to
 // stderr. The returned closer closes the log file. The file handler's level is the
 // returned LevelVar (settings: advanced.log_level); dev mode logs at debug.
 func newLogger(logPath string, dev bool, stderr io.Writer) (*slog.Logger, *slog.LevelVar, io.Closer, error) {
-	f, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	var opts []logfile.Option
+	if stdioIsLog(logPath) {
+		// An auto-started daemon's stdout and stderr are this file (client.spawnDaemon).
+		// Keep them on the live file across rotations, so a panic lands with the rest.
+		opts = append(opts, logfile.OnRotate(func(f *os.File) {
+			fd := int(f.Fd())
+			_ = syscall.Dup2(fd, 1)
+			_ = syscall.Dup2(fd, 2)
+		}))
+	}
+	f, err := logfile.Open(logPath, logMaxBytes, opts...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("open log %s: %w", logPath, err)
+		return nil, nil, nil, err
 	}
 	level := new(slog.LevelVar)
 	if dev {
@@ -26,6 +42,19 @@ func newLogger(logPath string, dev bool, stderr io.Writer) (*slog.Logger, *slog.
 		h = slog.NewMultiHandler(h, slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: level}))
 	}
 	return slog.New(h), level, f, nil
+}
+
+// stdioIsLog reports whether this process's stderr is the file at logPath.
+func stdioIsLog(logPath string) bool {
+	a, err := os.Stderr.Stat()
+	if err != nil {
+		return false
+	}
+	b, err := os.Stat(logPath)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(a, b)
 }
 
 // logRequests logs each request at debug level. The wrapper keeps http.Flusher and

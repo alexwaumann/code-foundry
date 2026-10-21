@@ -2,11 +2,11 @@ package plugin
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/logfile"
 )
 
 // Defaults for a plugin's log.
@@ -23,21 +23,18 @@ const (
 // sequence numbers that followers subscribe to. It lives as long as the plugin is
 // known, across restarts.
 type logBuffer struct {
-	path     string
-	maxBytes int64
-	tailCap  int
-	now      func() time.Time
+	tailCap int
+	now     func() time.Time
 
 	mu    sync.Mutex
-	file  *os.File
-	size  int64
+	file  *logfile.File
 	lines []LogLine
 	seq   uint64
 	subs  map[chan LogLine]struct{}
 }
 
 func newLogBuffer(path string, maxBytes int64, tailCap int, now func() time.Time) *logBuffer {
-	return &logBuffer{path: path, maxBytes: maxBytes, tailCap: tailCap, now: now, subs: map[chan LogLine]struct{}{}}
+	return &logBuffer{file: logfile.New(path, maxBytes), tailCap: tailCap, now: now, subs: map[chan LogLine]struct{}{}}
 }
 
 // add records one line. Errors writing the file are dropped (the tail still has it).
@@ -75,34 +72,9 @@ func formatLine(l LogLine) string {
 	return fmt.Sprintf("%s %s %s\n", l.Time.UTC().Format("2006-01-02T15:04:05.000Z"), tag, l.Text)
 }
 
-// write appends l to the file, rotating first when it would pass maxBytes. b.mu held.
+// write appends l to the file, rotating first when it would pass the cap. b.mu held.
 func (b *logBuffer) write(l LogLine) {
-	s := formatLine(l)
-	if b.file == nil {
-		if err := os.MkdirAll(filepath.Dir(b.path), 0o700); err != nil {
-			return
-		}
-		f, err := os.OpenFile(b.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-		if err != nil {
-			return
-		}
-		b.file = f
-		if fi, err := f.Stat(); err == nil {
-			b.size = fi.Size()
-		}
-	}
-	if b.size > 0 && b.size+int64(len(s)) > b.maxBytes {
-		_ = b.file.Close()
-		b.file = nil
-		_ = os.Rename(b.path, b.path+".1")
-		f, err := os.OpenFile(b.path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-		if err != nil {
-			return
-		}
-		b.file, b.size = f, 0
-	}
-	n, _ := b.file.WriteString(s)
-	b.size += int64(n)
+	_, _ = b.file.Write([]byte(formatLine(l)))
 }
 
 // tail returns the last n lines (all kept when n <= 0).
@@ -141,8 +113,5 @@ func (b *logBuffer) subscribe(n int) ([]LogLine, <-chan LogLine, func()) {
 func (b *logBuffer) close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.file != nil {
-		_ = b.file.Close()
-		b.file = nil
-	}
+	_ = b.file.Close()
 }
