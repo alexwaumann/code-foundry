@@ -15,10 +15,10 @@ func TestEmberDefaults(t *testing.T) {
 	if d != want {
 		t.Errorf("Defaults().Ember = %+v, want %+v", d, want)
 	}
-	if f := field(t, KeyEmberEnabled); f.Page != PageEmber || !strings.HasPrefix(f.Description, "Experimental: ") {
+	if f := field(t, KeyEmberEnabled); f.Page != PageEmber || !strings.HasPrefix(f.Description, "Experimental.") {
 		t.Errorf("enabled field = %+v", f)
 	}
-	if f := field(t, KeyEmberEpochTokens); f.Min != 50000 || !strings.Contains(f.Description, "fresh session already starts") {
+	if f := field(t, KeyEmberEpochTokens); f.Min != 50000 || !strings.Contains(f.Description, "fresh session starts") {
 		t.Errorf("epoch tokens min = %d", f.Min)
 	}
 }

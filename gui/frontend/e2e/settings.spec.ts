@@ -145,8 +145,8 @@ test("model and effort share a row with the model's description under them", asy
   await expect(pair.locator("[data-setting]")).toHaveCount(2);
   await expect(pair.locator("[data-setting]").first()).toHaveAttribute("data-setting", "threads.default_model");
   await expect(pair.locator("[data-setting]").nth(1)).toHaveAttribute("data-setting", "threads.default_effort");
-  await expect(pair).toContainText("Used by new threads unless you pick otherwise.");
-  await expect(pair).not.toContainText("Effort level new threads use");
+  await expect(pair).toContainText("The default for new threads.");
+  await expect(pair).not.toContainText("The default effort for new threads");
 });
 
 test("a dependent row is indented under its toggle and dims while it is off; across sections it says why", async ({ page }) => {
