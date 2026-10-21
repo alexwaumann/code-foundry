@@ -47,6 +47,8 @@ const (
 	ActionServiceGetRunProcedure = "/codefoundry.v1.ActionService/GetRun"
 	// ActionServiceWaitRunProcedure is the fully-qualified name of the ActionService's WaitRun RPC.
 	ActionServiceWaitRunProcedure = "/codefoundry.v1.ActionService/WaitRun"
+	// ActionServiceStopRunProcedure is the fully-qualified name of the ActionService's StopRun RPC.
+	ActionServiceStopRunProcedure = "/codefoundry.v1.ActionService/StopRun"
 	// ActionServiceWatchProcedure is the fully-qualified name of the ActionService's Watch RPC.
 	ActionServiceWatchProcedure = "/codefoundry.v1.ActionService/Watch"
 )
@@ -72,6 +74,11 @@ type ActionServiceClient interface {
 	// WaitRun returns a run with its output once it has finished (a terminal run: once
 	// its terminal has exited, or is gone). Cancelling the call does not stop the run.
 	WaitRun(context.Context, *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error)
+	// StopRun ends a running run: a background run's process group gets SIGTERM, then
+	// SIGKILL after a grace period; a terminal run's terminal is killed (SIGHUP, then
+	// SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
+	// end. Stopping a finished run does nothing.
+	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error)
@@ -130,6 +137,12 @@ func NewActionServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(actionServiceMethods.ByName("WaitRun")),
 			connect.WithClientOptions(opts...),
 		),
+		stopRun: connect.NewClient[v1.StopActionRunRequest, v1.StopActionRunResponse](
+			httpClient,
+			baseURL+ActionServiceStopRunProcedure,
+			connect.WithSchema(actionServiceMethods.ByName("StopRun")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchActionsRequest, v1.ActionEvent](
 			httpClient,
 			baseURL+ActionServiceWatchProcedure,
@@ -148,6 +161,7 @@ type actionServiceClient struct {
 	run     *connect.Client[v1.RunActionRequest, v1.RunActionResponse]
 	getRun  *connect.Client[v1.GetActionRunRequest, v1.GetActionRunResponse]
 	waitRun *connect.Client[v1.WaitActionRunRequest, v1.WaitActionRunResponse]
+	stopRun *connect.Client[v1.StopActionRunRequest, v1.StopActionRunResponse]
 	watch   *connect.Client[v1.WatchActionsRequest, v1.ActionEvent]
 }
 
@@ -186,6 +200,11 @@ func (c *actionServiceClient) WaitRun(ctx context.Context, req *connect.Request[
 	return c.waitRun.CallUnary(ctx, req)
 }
 
+// StopRun calls codefoundry.v1.ActionService.StopRun.
+func (c *actionServiceClient) StopRun(ctx context.Context, req *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error) {
+	return c.stopRun.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.ActionService.Watch.
 func (c *actionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -212,6 +231,11 @@ type ActionServiceHandler interface {
 	// WaitRun returns a run with its output once it has finished (a terminal run: once
 	// its terminal has exited, or is gone). Cancelling the call does not stop the run.
 	WaitRun(context.Context, *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error)
+	// StopRun ends a running run: a background run's process group gets SIGTERM, then
+	// SIGKILL after a grace period; a terminal run's terminal is killed (SIGHUP, then
+	// SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
+	// end. Stopping a finished run does nothing.
+	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error
@@ -266,6 +290,12 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(actionServiceMethods.ByName("WaitRun")),
 		connect.WithHandlerOptions(opts...),
 	)
+	actionServiceStopRunHandler := connect.NewUnaryHandler(
+		ActionServiceStopRunProcedure,
+		svc.StopRun,
+		connect.WithSchema(actionServiceMethods.ByName("StopRun")),
+		connect.WithHandlerOptions(opts...),
+	)
 	actionServiceWatchHandler := connect.NewServerStreamHandler(
 		ActionServiceWatchProcedure,
 		svc.Watch,
@@ -288,6 +318,8 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 			actionServiceGetRunHandler.ServeHTTP(w, r)
 		case ActionServiceWaitRunProcedure:
 			actionServiceWaitRunHandler.ServeHTTP(w, r)
+		case ActionServiceStopRunProcedure:
+			actionServiceStopRunHandler.ServeHTTP(w, r)
 		case ActionServiceWatchProcedure:
 			actionServiceWatchHandler.ServeHTTP(w, r)
 		default:
@@ -325,6 +357,10 @@ func (UnimplementedActionServiceHandler) GetRun(context.Context, *connect.Reques
 
 func (UnimplementedActionServiceHandler) WaitRun(context.Context, *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.WaitRun is not implemented"))
+}
+
+func (UnimplementedActionServiceHandler) StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.StopRun is not implemented"))
 }
 
 func (UnimplementedActionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error {

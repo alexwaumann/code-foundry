@@ -31,6 +31,11 @@ service ActionService {
   // WaitRun returns a run with its output once it has finished (a terminal run: once
   // its terminal has exited, or is gone). Cancelling the call does not stop the run.
   rpc WaitRun(WaitActionRunRequest) returns (WaitActionRunResponse) {}
+  // StopRun ends a running run: a background run's process group gets SIGTERM, then
+  // SIGKILL after a grace period; a terminal run's terminal is killed (SIGHUP, then
+  // SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
+  // end. Stopping a finished run does nothing.
+  rpc StopRun(StopActionRunRequest) returns (StopActionRunResponse) {}
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
   // snapshot.
   rpc Watch(WatchActionsRequest) returns (stream ActionEvent) {}
@@ -199,6 +204,14 @@ message WaitActionRunRequest {
 }
 
 message WaitActionRunResponse {
+  ActionRun run = 1;
+}
+
+message StopActionRunRequest {
+  string run_id = 1;
+}
+
+message StopActionRunResponse {
   ActionRun run = 1;
 }
 

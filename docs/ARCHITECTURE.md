@@ -220,7 +220,8 @@ Services (v1):
   take a timer target (`target_at` once, `target_every` repeating; wall clock, persisted,
   one catch-up wake after a stop; `thread subscribe --at/--every`).
 * `EmberService` — GetStatus, ListTasks, WatchBoard (server stream: the whole board, then
-  again on every change of a task, of Ember's state or of a task's worker thread): Ember,
+  again on every change of a task, of Ember's state or of a task's worker thread, and a
+  heartbeat when quiet): Ember,
   the resident agent, and its task board, each task with its worker's derived status and
   report (`docs/notes/ember-2-store.md`). Read only: Ember and the CLI change the board
   with the `ember.*` commands; `ember.*` settings turn it on and pick its models. Its
@@ -323,14 +324,16 @@ Services (v1):
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
   `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
-* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, Watch. Per-project
+* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, Watch. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and
   their runs (in memory, 50 per project). A run belongs to a thread or a worktree like a
   shell, runs `$SHELL -lc <command>` there with `CODE_FOUNDRY_PROJECT_ROOT` and
   `CODE_FOUNDRY_WORKTREE`, in a `kind=action` terminal or as a background process whose
-  last 64 KiB of output WaitRun returns. A new thread's worktree runs the project's
-  on-worktree-create actions in the background; `run_finished` events carry every end
+  last 64 KiB of output WaitRun returns; StopRun ends one (`action.stop`, and an
+  interrupted `action run --wait` of a background run). A new thread's worktree runs the
+  project's on-worktree-create actions in the background, one after another, each stopped
+  after 10 minutes; `run_finished` events carry every end
   (`docs/notes/actions-1-daemon.md`). The action.* commands are the CLI's surface.
 * `PluginService` — List, Enable (with consent, else the text to consent to), Disable,
   Restart, Dev (link a folder and enable it), Reload, Logs, FollowLogs, ListSecrets,

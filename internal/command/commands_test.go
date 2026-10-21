@@ -75,7 +75,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.threads", "view.panel.worktree",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-project", "workspace.remove-project", "workspace.remove",
-		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.runs",
+		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.stop", "action.runs",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
 		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
 		"plugin.threads", "plugin.terminals", "plugin.wakes",

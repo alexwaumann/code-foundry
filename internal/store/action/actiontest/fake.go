@@ -30,6 +30,8 @@ type Fake struct {
 	done    map[string]chan struct{}
 	// Ran records Run's options in order.
 	ran []action.RunOptions
+	// stopped records StopRun's run ids in order.
+	stopped []string
 }
 
 var _ action.Store = (*Fake)(nil)
@@ -191,6 +193,33 @@ func (f *Fake) Finish(id string, code int, output string) error {
 		TerminalID: r.TerminalID, Mode: r.Mode, Trigger: r.Trigger, ExitCode: code,
 	})
 	return nil
+}
+
+// StopRun implements action.Store: a running run finishes at once with code 143 (128 +
+// SIGTERM). The ids are recorded (Stopped).
+func (f *Fake) StopRun(_ context.Context, id string) (action.Run, error) {
+	f.mu.Lock()
+	i := slices.IndexFunc(f.runs, func(r action.Run) bool { return r.ID == id })
+	if i < 0 {
+		f.mu.Unlock()
+		return action.Run{}, fmt.Errorf("%w: run %q", action.ErrNotFound, id)
+	}
+	f.stopped = append(f.stopped, id)
+	running := f.runs[i].State == action.RunRunning
+	f.mu.Unlock()
+	if running {
+		if err := f.Finish(id, 128+15, ""); err != nil {
+			return action.Run{}, err
+		}
+	}
+	return f.GetRun(context.Background(), id)
+}
+
+// Stopped returns the run ids StopRun was called with.
+func (f *Fake) Stopped() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.stopped)
 }
 
 // GetRun implements action.Store.

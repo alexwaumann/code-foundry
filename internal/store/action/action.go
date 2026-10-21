@@ -307,4 +307,8 @@ type Store interface {
 	GetRun(ctx context.Context, id string) (Run, error)
 	// Wait returns a run with its output once it has finished, or ctx's error.
 	Wait(ctx context.Context, id string) (Run, error)
+	// StopRun ends a running run (a background run's process group: SIGTERM, then
+	// SIGKILL; a terminal run's terminal: killed) and returns it, usually still running:
+	// Wait waits for the end. A finished run is returned as it is.
+	StopRun(ctx context.Context, id string) (Run, error)
 }

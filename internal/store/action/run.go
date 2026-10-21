@@ -323,6 +323,42 @@ func (m *Manager) GetRun(_ context.Context, id string) (Run, error) {
 	return rec.public(true), nil
 }
 
+// StopRun implements Store. A terminal run whose terminal is gone already finishes
+// with ExitUnknown.
+func (m *Manager) StopRun(ctx context.Context, id string) (Run, error) {
+	m.mu.Lock()
+	rec, ok := m.runs[id]
+	if !ok {
+		m.mu.Unlock()
+		return Run{}, fmt.Errorf("%w: run %q", ErrNotFound, id)
+	}
+	out := rec.public(false)
+	if out.State != RunRunning {
+		m.mu.Unlock()
+		return out, nil
+	}
+	if out.Mode == ModeBackground {
+		rec.kill(m.opts.KillGrace, &m.wg)
+		m.mu.Unlock()
+		m.log.Info("action run stopped", "run", id, "action", out.ActionID, "name", out.ActionName)
+		return out, nil
+	}
+	m.mu.Unlock()
+	if m.opts.Terminals == nil || out.TerminalID == "" {
+		return out, nil
+	}
+	err := m.opts.Terminals.Kill(ctx, out.TerminalID)
+	switch {
+	case errors.Is(err, terminal.ErrNotFound):
+		m.finish(rec, ExitUnknown)
+		return m.GetRun(ctx, id)
+	case err != nil:
+		return Run{}, fmt.Errorf("stop run %s: kill terminal %s: %w", id, out.TerminalID, err)
+	}
+	m.log.Info("action run stopped", "run", id, "action", out.ActionID, "name", out.ActionName, "terminal", out.TerminalID)
+	return out, nil
+}
+
 // Wait implements Store. A terminal run whose terminal is gone without a seen exit
 // finishes with ExitUnknown.
 func (m *Manager) Wait(ctx context.Context, id string) (Run, error) {
@@ -386,7 +422,7 @@ func (m *Manager) WorktreeCreated(threadID, projectID, worktree string) {
 				m.log.Warn("worktree-create action did not start", "action", a.ID, "name", a.Name, "thread", threadID, "err", err)
 				continue
 			}
-			r, err = m.Wait(m.ctx, r.ID)
+			r, err = m.waitHook(r.ID)
 			if err != nil {
 				return // closing
 			}
@@ -396,6 +432,25 @@ func (m *Manager) WorktreeCreated(threadID, projectID, worktree string) {
 			}
 		}
 	}()
+}
+
+// waitHook waits for an on-worktree-create run, stopping it after HookTimeout so that a
+// hook that never exits does not hold back the ones after it. It fails only when the
+// store closes.
+func (m *Manager) waitHook(id string) (Run, error) {
+	ctx, cancel := context.WithTimeout(m.ctx, m.opts.HookTimeout)
+	r, err := m.Wait(ctx, id)
+	cancel()
+	if err == nil || m.ctx.Err() != nil {
+		return r, err
+	}
+	r, _ = m.GetRun(m.ctx, id)
+	m.log.Warn("worktree-create action timed out; stopping it", "run", id, "action", r.ActionID, "name", r.ActionName,
+		"after", m.opts.HookTimeout.String())
+	if _, err := m.StopRun(m.ctx, id); err != nil {
+		m.log.Warn("worktree-create action: stop", "run", id, "err", err)
+	}
+	return m.Wait(m.ctx, id)
 }
 
 // lastLines returns the last n lines of s, for a log line.
