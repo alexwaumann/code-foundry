@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/procscan"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 func TestPickStrays(t *testing.T) {
@@ -77,31 +79,39 @@ func TestStrayDir(t *testing.T) {
 	const home = "/Users/u"
 	archived := time.Date(2026, 10, 21, 1, 0, 0, 0, time.UTC)
 	th := func(id, cwd string) Thread { return Thread{ID: id, WorktreePath: cwd} }
+	const root = "/wt" // the daemon's worktree directory
 	tests := []struct {
-		name    string
-		threads []Thread
-		want    string
+		name     string
+		threads  []Thread
+		want     string
+		wantStop bool
 	}{
-		{"its worktree", []Thread{th("s1", "/wt/cf-a")}, "/wt/cf-a"},
-		{"a project checkout under home", []Thread{th("s1", home+"/src/app")}, home + "/src/app"},
-		{"no project: the home directory", []Thread{th("s1", home)}, ""},
-		{"above home", []Thread{th("s1", "/Users")}, ""},
-		{"no cwd", []Thread{th("s1", "")}, ""},
-		{"relative cwd", []Thread{th("s1", "wt")}, ""},
-		{"unknown thread", []Thread{th("s2", "/wt/cf-a")}, ""},
-		{"another live thread there", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a")}, ""},
-		{"another live thread below", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a/web")}, ""},
-		{"another live thread above", []Thread{th("s1", "/wt/cf-a/web"), th("s2", "/wt/cf-a")}, ""},
-		{"another archived thread there", []Thread{th("s1", "/wt/cf-a"), {ID: "s2", WorktreePath: "/wt/cf-a", ArchivedAt: archived}}, "/wt/cf-a"},
-		{"another thread being removed there", []Thread{th("s1", "/wt/cf-a"), {ID: "s2", WorktreePath: "/wt/cf-a", Removing: true}}, "/wt/cf-a"},
-		{"a sibling with a common prefix", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a-2")}, "/wt/cf-a"},
+		{"its worktree", []Thread{th("s1", "/wt/cf-a")}, "/wt/cf-a", true},
+		{"a subdirectory of its worktree", []Thread{th("s1", "/wt/cf-a/web")}, "/wt/cf-a/web", true},
+		{"a project checkout under home: only logged", []Thread{th("s1", home+"/src/app")}, home + "/src/app", false},
+		{"a checkout beside the worktree directory: only logged", []Thread{th("s1", "/wt-other/app")}, "/wt-other/app", false},
+		{"the worktree directory itself: only logged", []Thread{th("s1", "/wt")}, "/wt", false},
+		{"no project: the home directory", []Thread{th("s1", home)}, "", false},
+		{"above home", []Thread{th("s1", "/Users")}, "", false},
+		{"no cwd", []Thread{th("s1", "")}, "", false},
+		{"relative cwd", []Thread{th("s1", "wt")}, "", false},
+		{"unknown thread", []Thread{th("s2", "/wt/cf-a")}, "", false},
+		{"another live thread there", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a")}, "", false},
+		{"another live thread below", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a/web")}, "", false},
+		{"another live thread above", []Thread{th("s1", "/wt/cf-a/web"), th("s2", "/wt/cf-a")}, "", false},
+		{"another archived thread there", []Thread{th("s1", "/wt/cf-a"), {ID: "s2", WorktreePath: "/wt/cf-a", ArchivedAt: archived}}, "/wt/cf-a", true},
+		{"another thread being removed there", []Thread{th("s1", "/wt/cf-a"), {ID: "s2", WorktreePath: "/wt/cf-a", Removing: true}}, "/wt/cf-a", true},
+		{"a sibling with a common prefix", []Thread{th("s1", "/wt/cf-a"), th("s2", "/wt/cf-a-2")}, "/wt/cf-a", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := strayDir(tt.threads, "s1", home); got != tt.want {
-				t.Errorf("strayDir = %q, want %q", got, tt.want)
+			if got, stop := strayDir(tt.threads, "s1", home, root); got != tt.want || stop != tt.wantStop {
+				t.Errorf("strayDir = %q, %v; want %q, %v", got, stop, tt.want, tt.wantStop)
 			}
 		})
+	}
+	if _, stop := strayDir([]Thread{th("s1", "/wt/cf-a")}, "s1", home, ""); stop {
+		t.Error("stops with no worktree directory configured")
 	}
 }
 
@@ -166,37 +176,51 @@ func waitGone(t *testing.T, pid int, what string) {
 }
 
 // TestArchiveAndRemoveStopStrays: a server a thread's Bash call left in the background
-// in its worktree dies with the thread's archive or removal; one elsewhere, a child
-// of a live process there, and the strays of a worktree another live thread shares,
-// stay.
+// in a worktree Code Foundry made dies with the thread's archive or removal. One in a
+// project's own checkout stays (only logged), and so do one elsewhere, a child of a
+// live process in the worktree, and the strays of a worktree another live thread
+// shares.
 func TestArchiveAndRemoveStopStrays(t *testing.T) {
+	archive := func(e *env, id string) error { _, err := e.m.Archive(e.ctx(), id, true); return err }
 	tests := []struct {
 		name string
 		// end archives or removes the thread.
 		end func(e *env, id string) error
+		// checkout: the thread works in the project's own checkout, not a new worktree.
+		checkout bool
 		// shared: a second, live thread works in the same worktree.
-		shared bool
+		shared   bool
+		wantGone bool
 	}{
-		{name: "archive", end: func(e *env, id string) error { _, err := e.m.Archive(e.ctx(), id, true); return err }},
-		{name: "remove", end: func(e *env, id string) error { return e.m.Remove(e.ctx(), id) }},
-		{name: "archive, worktree shared with a live thread", shared: true,
-			end: func(e *env, id string) error { _, err := e.m.Archive(e.ctx(), id, true); return err }},
+		{name: "archive", end: archive, wantGone: true},
+		{name: "remove", end: func(e *env, id string) error { return e.m.Remove(e.ctx(), id) }, wantGone: true},
+		{name: "archive in the project's checkout", end: archive, checkout: true},
+		{name: "remove in the project's checkout", end: func(e *env, id string) error { return e.m.Remove(e.ctx(), id) }, checkout: true},
+		{name: "archive, worktree shared with a live thread", end: archive, shared: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := newEnv(t)
-			s := e.connected(CreateOptions{Name: "worker"})
+			e := newEnv(t, func(o *Options) { o.WorktreeRoot = o.Projects.(*projecttest.Fake).WorktreeRoot })
+			e.namer = func(string) (string, error) { return "worker", nil }
+			o := CreateOptions{Name: "worker", ProjectID: "r1", NewWorktree: &NewWorktree{}}
+			if tt.checkout {
+				o = CreateOptions{Name: "worker"}
+			}
+			s := e.connected(o)
 			if tt.shared {
-				e.connected(CreateOptions{Name: "neighbour"})
+				e.connected(CreateOptions{Name: "neighbour", ProjectID: "r1", WorktreePath: s.WorktreePath})
+			}
+			if !tt.checkout && !project.InsideRoot(s.WorktreePath, e.projects.WorktreeRoot) {
+				t.Fatalf("the thread's worktree %s is not under %s", s.WorktreePath, e.projects.WorktreeRoot)
 			}
 			elsewhere := filepath.Join(t.TempDir(), "elsewhere")
 			if err := os.MkdirAll(elsewhere, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			stray := startOrphan(t, e.wt)
+			stray := startOrphan(t, s.WorktreePath)
 			other := startOrphan(t, elsewhere)
 			child := exec.Command("sleep", "60") // the test's own child: not an orphan
-			child.Dir = e.wt
+			child.Dir = s.WorktreePath
 			if err := child.Start(); err != nil {
 				t.Fatal(err)
 			}
@@ -205,13 +229,13 @@ func TestArchiveAndRemoveStopStrays(t *testing.T) {
 			if err := tt.end(e, s.ID); err != nil {
 				t.Fatal(err)
 			}
-			if tt.shared {
-				time.Sleep(StrayGrace / 2)
-				if !running(stray) {
-					t.Error("a stray in a worktree a live thread shares was stopped")
-				}
-			} else {
+			if tt.wantGone {
 				waitGone(t, stray, "the stray in the worktree")
+			} else {
+				time.Sleep(StrayGrace + 500*time.Millisecond) // past a SIGKILL that should not come
+				if !running(stray) {
+					t.Error("the stray was stopped")
+				}
 			}
 			if !running(other) {
 				t.Error("a process in another directory was stopped")

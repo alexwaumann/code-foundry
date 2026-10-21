@@ -531,10 +531,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
 * **Processes** a thread leaves behind: Claude runs in its own process group, which the
   runner signals as the last step of every end of the process (after the graceful close
   or a crash). Claude Code puts each Bash call in a group of its own, so Archive and
-  Remove also stop the process groups of the orphans (parent launchd) whose working
-  directory is in the thread's cwd and that started after the thread was made: not for
-  a cwd that is home or above it or that another live thread shares, never an app
-  bundle (`strays.go`, `internal/procscan`, `docs/notes/ember-fixes-2-small.md`).
+  Remove also look for the orphans (parent launchd) whose working directory is in the
+  thread's cwd and that started after the thread was made. They stop those orphans'
+  process groups only when the cwd is a worktree Code Foundry made (under
+  `Options.WorktreeRoot`); in a project's own checkout they only log them. Never for a
+  cwd that is home or above it or that another live thread shares, never an app bundle
+  (`strays.go`, `internal/procscan`, `docs/notes/ember-fixes-2-small.md`).
 * Persists thread metadata in SQLite so the sidebar can show resumable threads after a
   daemon restart. v1 does not keep Claude processes alive across daemon restarts.
 

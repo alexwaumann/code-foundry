@@ -38,13 +38,20 @@ spawn with `CODE_FOUNDRY_THREAD` and matching on it does not work either.
    store lists the user's processes (`sysctl kern.proc.uid`). It keeps the orphans
    (parent 1) that started after the thread was created. It reads their working
    directories with one `lsof -d cwd -p …` call and keeps those inside the thread's cwd.
-   - Each such process's **group** gets SIGTERM, then SIGKILL after `StrayGrace` (2 s)
-     in the background, so the vite + esbuild pair goes together.
-   - The log line is `stopping processes the thread left running … processes="[sleep
-     (42803)]" groups=[42801]`.
+   - **Only in a worktree Code Foundry made** (the cwd is strictly inside the daemon's
+     worktree directory, `Options.WorktreeRoot`), each such process's **group** gets
+     SIGTERM, then SIGKILL after `StrayGrace` (2 s) in the background, so the vite +
+     esbuild pair goes together. The log line is `stopping processes the thread left
+     running … processes="[sleep (42803)]" groups=[42801]`.
+   - **In any other cwd, a project's own checkout above all, they are only logged** at
+     Warn: "left running in the thread's checkout (not a worktree Code Foundry made, so
+     not stopped)". Alex runs his own dev servers in his checkouts, and a lead started
+     with `--new-worktree=false` lives there. Killing a user's server on archive is
+     worse than leaving a stray one (coordinator's review of #297).
 
 **Safety rules** (`strayDir`, `pickStrays`):
 
+- Nothing is stopped outside the daemon's worktree directory, as above.
 - Nothing is stopped when the cwd is the home directory or above it. This covers threads
   without a project.
 - Nothing is stopped when another thread that is not archived works in the same
@@ -53,9 +60,8 @@ spawn with `CODE_FOUNDRY_THREAD` and matching on it does not work either.
   editor opened with `code .`, or a browser. These are logged at Warn as "left running".
 - A live process's child is never stopped (its parent is not launchd). Neither is a
   process that started before the thread was created.
-- A project checkout is included, so a lead started with `--new-worktree=false` is
-  covered (e3-10). The only risk is a user's own `nohup` server in that checkout, started
-  during the thread's life from a terminal that has since closed.
+- So a lead started with `--new-worktree=false` (e3-10) gets its leftovers logged, not
+  stopped. Its workers run in new worktrees, and theirs are stopped.
 
 **Interrupt is not included.** The brief listed "interrupt/archive/remove". Interrupting a
 turn keeps the process, and signalling Claude's group then would kill Claude itself.
