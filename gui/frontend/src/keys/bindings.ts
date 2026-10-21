@@ -17,7 +17,7 @@ import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -283,6 +283,16 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // And for the Worktree surface: this window's thread's own worktree in its panel.
   "view.panel.worktree": () => {
     worktreePanelCommand();
+    return true;
+  },
+  // Window-local like view.panel.toggle: this window's own selection history (the CLI's
+  // view.back and view.forward reach every window through ShowView).
+  "view.back": () => {
+    historyCommand(-1);
+    return true;
+  },
+  "view.forward": () => {
+    historyCommand(1);
     return true;
   },
   // Window-local like view.panel.toggle: this window leaves its subagent view (Escape, the

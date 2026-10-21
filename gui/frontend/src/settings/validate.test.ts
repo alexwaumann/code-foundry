@@ -36,6 +36,8 @@ describe("validateKeybinding", () => {
     ["the pull request copy chord is reserved", "shift+cmd+c", { ok: false, error: "cmd+shift+c is reserved by the app" }],
     ["the split panel's other-group chord is reserved", "alt+cmd+\\", { ok: false, error: "cmd+alt+\\ is reserved by the app" }],
     ["view.panel.split's chord is bindable", "cmd+\\", { ok: true, value: "cmd+\\" }],
+    ["view.back's chord is bindable", "cmd+[", { ok: true, value: "cmd+[" }],
+    ["view.forward's chord is bindable", "cmd+]", { ok: true, value: "cmd+]" }],
     ["minimize is reserved", "cmd+m", { ok: false, error: "cmd+m is reserved by the app" }],
     ["bare letter", "x", { ok: false, error: "x needs cmd, ctrl, or alt (a bare key would steal typing)" }],
     ["shift letter", "shift+x", { ok: false, error: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)" }],

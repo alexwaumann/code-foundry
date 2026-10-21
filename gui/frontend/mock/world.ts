@@ -3342,6 +3342,16 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.split" } } }))}`,
       },
       {
+        cmd: { name: "view.back", title: "Back", category: "View", description: "Return to the previously selected thread or page.", keybindings: ["cmd+["], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "back" } } }))}`,
+      },
+      {
+        cmd: { name: "view.forward", title: "Forward", category: "View", description: "Go to the thread or page selected before going back.", keybindings: ["cmd+]"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "forward" } } }))}`,
+      },
+      {
         cmd: {
           name: "view.panel.workspace",
           title: "Show Workspace in Side Panel",

@@ -51,6 +51,17 @@ const ViewPanelNewTab = "panel.new-tab"
 // without tabs has nothing to split.
 const ViewPanelSplit = "panel.split"
 
+// ViewBack is the ShowView name that selects the thread or page selected before the
+// current one, in the window's selection history (docs/notes/selection-history.md). Like
+// ViewPanelToggle it is an action on per-window GUI state, not a page: a window at the
+// start of its history ignores it.
+const ViewBack = "back"
+
+// ViewForward is the ShowView name that selects the thread or page after the current one
+// in the window's selection history, after ViewBack went back. An action like ViewBack; a
+// window at the end of its history ignores it.
+const ViewForward = "forward"
+
 // ViewPanelWorkspace is the ShowView name that opens (or reveals) the workspace surface
 // in the side panel of the selected workspace thread: the workspace's members with their
 // git and pull request state. Like ViewPanelToggle it is an action on per-selection GUI
@@ -106,7 +117,8 @@ func hasWorktreeThreadContext(c Context) bool {
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.bottom.toggle, which shows or hides the bottom panel, view.panel.expand, which switches it between split and full width,
 // view.panel.new-tab, which shows its surface list to open another tab,
-// view.panel.split, which splits it into two tab groups or joins them, and
+// view.panel.split, which splits it into two tab groups or joins them,
+// view.back and view.forward, which step through the window's selection history, and
 // view.panel.workspace, which opens the workspace surface in it,
 // view.panel.linked-prs, which opens the thread's linked pull requests in it,
 // view.panel.usage, which opens the thread's usage in it,
@@ -210,6 +222,26 @@ func RegisterView(r *Registry, e Emitter) error {
 			Keybindings: []string{`cmd+\`},
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelSplit), nil
+			},
+		},
+		Command{
+			Name:        "view.back",
+			Title:       "Back",
+			Description: "Return to the previously selected thread or page.",
+			Category:    "View",
+			Keybindings: []string{"cmd+["},
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewBack), nil
+			},
+		},
+		Command{
+			Name:        "view.forward",
+			Title:       "Forward",
+			Description: "Go to the thread or page selected before going back.",
+			Category:    "View",
+			Keybindings: []string{"cmd+]"},
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewForward), nil
 			},
 		},
 		Command{

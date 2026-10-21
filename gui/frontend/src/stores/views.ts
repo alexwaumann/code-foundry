@@ -159,6 +159,14 @@ export function showView(name: string): boolean {
       // thread.agent.up from the CLI: out of the subagent view, back to its thread.
       leaveSubagent();
       return true;
+    case "back":
+      // view.back: the selection before this one in the window's history.
+      historyCommand(-1);
+      return true;
+    case "forward":
+      // view.forward: the selection after this one, after going back.
+      historyCommand(1);
+      return true;
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a page would hide the panel.
       if (parsePluginView(name)) {
@@ -172,6 +180,27 @@ export function showView(name: string): boolean {
       useUiStore.getState().select({ kind: "view", name });
       return true;
   }
+}
+
+/**
+ * view.back (-1) and view.forward (1): steps through the window's selection history
+ * (stores/ui.ts back/forward). The settings, usage and themes pages are not selections, so
+ * not history entries: back with one of them up closes it like its Esc or × (the Themes
+ * page opened from Settings goes back to Settings), revealing what was on screen before
+ * it, and does not step. Stepping to another selection closes such a page anyway
+ * (startViewSync). Returns whether anything changed.
+ */
+export function historyCommand(by: 1 | -1): boolean {
+  if (by === -1) {
+    const v = useViewsStore.getState();
+    const close = v.themesOpen ? closeThemes : v.settingsOpen ? closeSettings : v.usageOpen ? closeUsage : null;
+    if (close) {
+      close();
+      return true;
+    }
+  }
+  const ui = useUiStore.getState();
+  return by === -1 ? ui.back() : ui.forward();
 }
 
 /**
