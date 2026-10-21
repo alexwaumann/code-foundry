@@ -23,6 +23,8 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.panel.split", view: command.ViewPanelSplit},
 		{command: "view.back", view: command.ViewBack},
 		{command: "view.forward", view: command.ViewForward},
+		{command: "thread.previous", view: command.ViewThreadPrevious},
+		{command: "thread.next", view: command.ViewThreadNext},
 		{command: "view.panel.workspace", view: command.ViewPanelWorkspace},
 		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
 		{command: "view.panel.usage", view: command.ViewPanelUsage},
