@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
@@ -64,6 +65,9 @@ type projector struct {
 	// model is the model of the running turn's own replies (its assistant frames).
 	model string
 	costs turnCosts
+	// partial is the running turn's usage so far, by top-level response (message id):
+	// each response's latest usage, which a cut turn's end sums (cutTurn).
+	partial map[string]claudestream.APIUsage
 	// ctx is the running turn's context size so far: the last top-level response's
 	// usage (usageTokens), or a compaction's post-compaction size; 0 when none yet.
 	ctx int64
@@ -107,7 +111,7 @@ func newProjector(w itemWriter, base runningTotals) *projector {
 // starts from base.
 func (p *projector) restart(base runningTotals) {
 	p.costs.start(base)
-	p.model = ""
+	p.model, p.partial = "", nil
 }
 
 func (p *projector) nextID(prefix string) string {
@@ -150,7 +154,7 @@ func (p *projector) event(ev claudestream.Event) {
 		t.TurnCostUSD = p.costs.turn(e.TotalCostUSD, e.OutputTokens(), turnOut)
 		t.Model, t.ProcessOutputTokens = p.model, e.OutputTokens()
 		p.last.tokens, p.last.model = turnContext(p.ctx, e.Usage), p.model
-		p.model, p.ctx = "", 0
+		p.model, p.ctx, p.partial = "", 0, nil
 		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
 	}
 }
@@ -161,11 +165,11 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 	case "message_start":
 		if se.Message != nil {
 			p.msg = se.Message.ID
-			p.noteUsage(se.Message.Usage)
+			p.noteUsage(se.Message.ID, se.Message.Usage)
 		}
 	case "message_delta":
 		// The response's final usage (message_start's has the output so far).
-		p.noteUsage(se.Usage)
+		p.noteUsage(nonEmpty(e.APIMessageID, p.msg), se.Usage)
 	case "content_block_start":
 		msg := nonEmpty(e.APIMessageID, p.msg)
 		cb := se.ContentBlock
@@ -213,11 +217,56 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 	}
 }
 
-// noteUsage records a top-level response's usage as the running turn's context size.
-func (p *projector) noteUsage(u *claudestream.APIUsage) {
+// noteUsage records a top-level response's usage (of message msg) as the running
+// turn's context size and in its partial usage.
+func (p *projector) noteUsage(msg string, u *claudestream.APIUsage) {
 	if n := usageTokens(u); n > 0 {
 		p.ctx = n
 	}
+	if u == nil {
+		return
+	}
+	if p.partial == nil {
+		p.partial = map[string]claudestream.APIUsage{}
+	}
+	// message_start, the assistant frame and message_delta report the same response,
+	// each field only growing; a message_delta may leave the input fields out.
+	cur := p.partial[msg]
+	cur.InputTokens = max(cur.InputTokens, u.InputTokens)
+	cur.OutputTokens = max(cur.OutputTokens, u.OutputTokens)
+	cur.CacheReadInputTokens = max(cur.CacheReadInputTokens, u.CacheReadInputTokens)
+	cur.CacheCreationInputTokens = max(cur.CacheCreationInputTokens, u.CacheCreationInputTokens)
+	p.partial[msg] = cur
+}
+
+// partialUsage sums the running turn's responses (partial): what a result's usage
+// would have said for the part of the turn the stream saw. ok is false when it saw no
+// usage.
+func (p *projector) partialUsage() (u claudestream.APIUsage, ok bool) {
+	for _, m := range p.partial {
+		u.InputTokens += m.InputTokens
+		u.OutputTokens += m.OutputTokens
+		u.CacheReadInputTokens += m.CacheReadInputTokens
+		u.CacheCreationInputTokens += m.CacheCreationInputTokens
+	}
+	return u, len(p.partial) > 0
+}
+
+// cutTurn ends the open turn of a process that ended before its result
+// (closeOpenTurn), with the usage the stream saw of it and its model, and starts the
+// next turn's count afresh.
+func (p *projector) cutTurn(end time.Time) (Item, bool) {
+	u, ok := p.partialUsage()
+	model := p.model
+	p.partial = nil
+	if !ok {
+		return closeOpenTurn(p.w, end)
+	}
+	return closeOpenTurnWith(p.w, end, func(t *TurnEnd) {
+		t.InputTokens, t.OutputTokens = u.InputTokens, u.OutputTokens
+		t.CacheReadTokens, t.CacheWriteTokens = u.CacheReadInputTokens, u.CacheCreationInputTokens
+		t.Model = model
+	})
 }
 
 func (p *projector) drop(msg string, i int) {
@@ -278,7 +327,7 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 		p.model = e.Message.Model
 		// Without partial messages this frame is the only usage of the response; with
 		// them its message_delta follows with the final output count.
-		p.noteUsage(e.Message.Usage)
+		p.noteUsage(e.Message.ID, e.Message.Usage)
 	}
 	for _, b := range e.Message.Content {
 		kind := blockKind(b.Type)

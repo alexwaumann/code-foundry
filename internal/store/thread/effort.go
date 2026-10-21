@@ -157,7 +157,7 @@ func (r *runner) respawn() {
 	st.sd.pending = nil
 	if st.sd.busy || st.sd.compacting {
 		// A user's restart that went ahead mid-turn (restart.go): that turn is over.
-		closeOpenTurn(st.proj.w, r.m.opts.Now())
+		st.proj.cutTurn(r.m.opts.Now())
 		st.sd.busy, st.sd.compacting = false, false
 	}
 	closeUnfinished(st.proj.w, "Claude restarted")

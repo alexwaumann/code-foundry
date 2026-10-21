@@ -13,8 +13,10 @@ import "time"
 
 // SubtypeProcessEnded is the TurnEnd.Subtype of a turn end the daemon wrote because
 // the thread's process ended before Claude's result (closeOpenTurn): Interrupted, no
-// usage, no cost (CostUSD 0, TurnCostUSD nil), DurationMS from the turn's first item to
-// the process's end.
+// cost (CostUSD 0, TurnCostUSD nil), DurationMS from the turn's first item to the
+// process's end. Its usage and model are what the stream reported of the turn's
+// responses before the end (projector.cutTurn), zero when it saw none or the daemon
+// was not there (closeLostRun).
 const SubtypeProcessEnded = "process_ended"
 
 // synthTurnPrefix starts the id of a turn end the daemon wrote: the prefix and the id of
@@ -68,6 +70,12 @@ func latest(ts ...time.Time) time.Time {
 // SubtypeProcessEnded whose duration runs from the turn's first item to end (0 when end
 // is not after it). It returns the item written.
 func closeOpenTurn(w itemWriter, end time.Time) (Item, bool) {
+	return closeOpenTurnWith(w, end, nil)
+}
+
+// closeOpenTurnWith is closeOpenTurn with fill, when set, adding to the turn end
+// (projector.cutTurn's usage).
+func closeOpenTurnWith(w itemWriter, end time.Time, fill func(*TurnEnd)) (Item, bool) {
 	start, _, ok := w.log.openTurn()
 	if !ok {
 		return Item{}, false
@@ -76,9 +84,11 @@ func closeOpenTurn(w itemWriter, end time.Time) (Item, bool) {
 	if !start.CreatedAt.IsZero() && end.After(start.CreatedAt) {
 		ms = end.Sub(start.CreatedAt).Milliseconds()
 	}
-	return w.add(Item{ID: synthTurnPrefix + start.ID, Kind: KindTurnEnd, Turn: &TurnEnd{
-		Subtype: SubtypeProcessEnded, Interrupted: true, DurationMS: ms,
-	}}), true
+	t := &TurnEnd{Subtype: SubtypeProcessEnded, Interrupted: true, DurationMS: ms}
+	if fill != nil {
+		fill(t)
+	}
+	return w.add(Item{ID: synthTurnPrefix + start.ID, Kind: KindTurnEnd, Turn: t}), true
 }
 
 // closeLostRun completes what a run the daemon lost (it died with the process running)
