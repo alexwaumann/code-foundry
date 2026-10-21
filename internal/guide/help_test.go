@@ -40,6 +40,18 @@ func TestWriteHelp(t *testing.T) {
 			not:  []string{"Common flags:", "--context-thread"},
 		},
 		{
+			// A bool shows how to turn it off; a long enum lists its values after the
+			// description instead of widening the flag column.
+			name: "bool and long enum", cmd: &v1.Command{Name: "thread.new", Title: "New Thread", Args: []*v1.ArgSpec{
+				{Name: "sidebar", Type: v1.ArgType_ARG_TYPE_BOOL, Description: "Show it"},
+				{Name: "model", Type: v1.ArgType_ARG_TYPE_ENUM, Description: "Model",
+					EnumValues: []string{"claude-opus-4-8[1m]", "claude-sonnet-5[1m]", "claude-haiku-5-5[1m]"}},
+				{Name: "until", Type: v1.ArgType_ARG_TYPE_ENUM, Description: "When", EnumValues: []string{"idle", "error"}},
+			}},
+			want: []string{"  --sidebar[=false]   Show it", "  --model value       Model (one of: claude-opus-4-8[1m], claude-sonnet-5[1m], claude-haiku-5-5[1m])\n",
+				"  --until idle|error  "},
+		},
+		{
 			name: "no args, no confirmation", cmd: &v1.Command{Name: "plugin.list", Title: "List Plugins"},
 			want: []string{"  code-foundry plugin list [flags]\n"},
 			not:  []string{"Flags:", "Asks for confirmation", "\n\n\n"},

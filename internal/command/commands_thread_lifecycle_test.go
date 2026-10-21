@@ -135,7 +135,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			current: &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED, WorkspaceId: "w-1", Name: "drv"},
 			wantMsg: "thread drv (s5) runs in /wt/api", wantReqs: []proto.Message{&v1.RunInThreadRequest{Id: "s5", WorktreePath: "/wt/api"}}},
 		{name: "run in needs a member", cmd: "thread.run-in", args: map[string]string{"id": "s5"}, wantErr: command.ErrInvalidArgs},
-		{name: "run in unavailable without a thread", cmd: "thread.run-in", args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},
+		{name: "run in unavailable without a thread", cmd: "thread.run-in", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},
 		{name: "run in unavailable in the GUI for a project thread", cmd: "thread.run-in",
 			ctx: command.Context{ActiveThreadID: "s5", ActiveView: "thread"}, args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},
 		{name: "run in from the GUI for a workspace thread", cmd: "thread.run-in",
@@ -152,7 +152,8 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantMsg: "pinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5", Pinned: true}}},
 		{name: "unpin explicit", cmd: "thread.pin", args: map[string]string{"id": "s5", "pinned": "false"},
 			wantMsg: "unpinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5"}}},
-		{name: "pin unavailable without a thread", cmd: "thread.pin", wantErr: command.ErrUnavailable},
+		{name: "pin unavailable without a thread", cmd: "thread.pin", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "pin from the CLI without a thread", cmd: "thread.pin", wantErr: command.ErrInvalidArgs},
 		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
 		{name: "backend error passes through", cmd: "thread.remove", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
@@ -219,6 +220,24 @@ func TestThreadNewKeybindingAndEnums(t *testing.T) {
 			if !slices.Equal(a.Enum, []string{"supervised", "accept-edits", "auto"}) || a.Default != "auto" {
 				t.Errorf("permission = %v default %q", a.Enum, a.Default)
 			}
+		}
+	}
+}
+
+// thread.focus only emits an intent, so it looks the id up first: a short or mistyped
+// one (which resolution passes through) is not found, not "delivered".
+func TestThreadFocusUnknown(t *testing.T) {
+	reg, _ := newBulkRegistry(t, idle("s-aaaa11112222", "one"))
+	for _, tt := range []struct {
+		id       string
+		wantCode connect.Code
+	}{{"x", connect.CodeNotFound}, {"s-ffff00000000", connect.CodeNotFound}, {"1111", connect.CodeNotFound}, {"2222", 0}} {
+		res, err := reg.Invoke(context.Background(), command.Context{}, "thread.focus", map[string]string{"id": tt.id})
+		if connect.CodeOf(err) != tt.wantCode && !(tt.wantCode == 0 && err == nil) {
+			t.Errorf("focus %s: err %v, want code %v", tt.id, err, tt.wantCode)
+		}
+		if tt.wantCode == 0 && res.Message != "delivered=1" {
+			t.Errorf("focus %s: %q", tt.id, res.Message)
 		}
 	}
 }

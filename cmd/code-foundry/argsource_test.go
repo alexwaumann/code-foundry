@@ -68,6 +68,7 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	inThread := map[string]string{paths.EnvThread: "s-parent"}
+	t.Setenv("HOME", dir)
 	tests := []struct {
 		name    string
 		env     map[string]string
@@ -87,6 +88,8 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		{name: "data as given", args: []string{"thread", "report", "done", "--data", `{"n":2}`},
 			want: map[string]string{"status": "done", "data": `{"n":2}`}},
 		{name: "data from a file relative to the cwd", args: []string{"thread", "report", "done", "--data", "@r.json"},
+			want: map[string]string{"status": "done", "data": `{"n": 1}` + "\n"}},
+		{name: "data from a file under ~", args: []string{"thread", "report", "done", "--data", "@~/r.json"},
 			want: map[string]string{"status": "done", "data": `{"n": 1}` + "\n"}},
 		{name: "data from stdin", stdin: `{"s":true}`, args: []string{"thread", "report", "done", "--data", "-"},
 			want: map[string]string{"status": "done", "data": `{"s":true}`}},

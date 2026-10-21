@@ -28,7 +28,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			"Without archived, toggles. Pinning or sending a message unarchives it too.",
 		Category: "Thread",
 		Args: []ArgSpec{
-			optionalID(idArg),
+			positional(optionalID(idArg)),
 			threadIDsArg,
 			{Name: "archived", Type: Bool, Description: "Archive (true) or unarchive (false); default: the opposite of now (with ids: archive)"},
 			descendantsArg("archive the threads below it (not it, unless include-root)"),
@@ -36,13 +36,16 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 		},
 		When:    hasThreadOrCLI,
 		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
-		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
-			return archiveConfirm(ctx, b, a) != ""
+		ConfirmIf: func(ctx context.Context, c Context, a Args) bool {
+			return notSelf(c, a, "archiving") == nil && archiveConfirm(ctx, b, a) != ""
 		},
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 			return archiveConfirm(ctx, b, a)
 		},
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+			if err := notSelf(c, a, "archiving"); err != nil {
+				return Result{}, err
+			}
 			if a.String("descendants-of") != "" {
 				if a.Has("ids") {
 					return Result{}, InvalidArg("ids", "give ids or descendants-of, not both")

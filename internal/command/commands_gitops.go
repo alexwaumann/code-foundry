@@ -139,6 +139,11 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		return ""
 	}
 	wt := ArgSpec{Name: "worktree", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"}
+	// git.* and worktree.* run from a worktree on the CLI act on it (pr.* match the
+	// worktree exactly, so a subdirectory would read as not on GitHub).
+	cwdWT := wt
+	cwdWT.DefaultToCwd = true
+	cwdWT.Description = "Worktree path (CLI default: the working directory)"
 	fileArg := ArgSpec{Name: "file", Type: Path, Description: "A file to open instead of the worktree"}
 	return r.RegisterAll(
 		Command{
@@ -147,7 +152,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Description:    "Fetch from the remote and prune deleted branches (git fetch --prune).",
 			Category:       "Git",
 			Keybindings:    []string{"cmd+shift+f"},
-			Args:           []ArgSpec{wt},
+			Args:           []ArgSpec{cwdWT},
 			When:           hasRemote,
 			WhyUnavailable: whyNoRemote,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -161,7 +166,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Description: "Pull the upstream branch, fast-forward only unless --rebase. A conflicting rebase is aborted.",
 			Category:    "Git",
 			Keybindings: []string{"cmd+shift+u"},
-			Args: []ArgSpec{wt,
+			Args: []ArgSpec{cwdWT,
 				{Name: "rebase", Type: Bool, Description: "Rebase local commits onto the upstream instead of requiring a fast-forward"},
 			},
 			When:           hasRemote,
@@ -177,7 +182,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Description: "Push the current branch; a branch without upstream is pushed to origin and tracks it.",
 			Category:    "Git",
 			Keybindings: []string{"cmd+shift+k"},
-			Args: []ArgSpec{wt,
+			Args: []ArgSpec{cwdWT,
 				{Name: "force-with-lease", Type: Bool, Description: "Overwrite the remote branch if it is where we last saw it"},
 			},
 			When:           hasRemote,
@@ -226,7 +231,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Description: "Open the worktree, or one file of it, in the configured editor (default: $VISUAL/$EDITOR if it is a GUI editor, else Cursor, VS Code, Zed, or Sublime Text).",
 			Category:    "Worktree",
 			Keybindings: []string{"cmd+shift+o"},
-			Args:        []ArgSpec{wt, fileArg, {Name: "line", Type: Int, Description: "Line to open the file at (VS Code, Cursor, Windsurf, Zed, Sublime Text)"}},
+			Args:        []ArgSpec{cwdWT, fileArg, {Name: "line", Type: Int, Description: "Line to open the file at (VS Code, Cursor, Windsurf, Zed, Sublime Text)"}},
 			When:        hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if a.Int("line") < 0 {
@@ -243,7 +248,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Title:       "Reveal Worktree in Finder",
 			Description: "Show the worktree folder, or one file of it, in Finder.",
 			Category:    "Worktree",
-			Args:        []ArgSpec{wt, fileArg},
+			Args:        []ArgSpec{cwdWT, fileArg},
 			When:        hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Reveal(ctx, connect.NewRequest(&v1.RevealRequest{WorktreePath: a.Path("worktree"), File: a.Path("file")}))

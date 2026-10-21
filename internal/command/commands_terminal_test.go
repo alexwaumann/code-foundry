@@ -169,7 +169,7 @@ func TestTerminalClose(t *testing.T) {
 	}{
 		{name: "from context", ctx: command.Context{ActiveTerminalID: "t4"}, wantID: "t4"},
 		{name: "explicit id", args: map[string]string{"id": "t5"}, wantID: "t5"},
-		{name: "no terminal", wantErr: command.ErrUnavailable},
+		{name: "no terminal", wantErr: command.ErrInvalidArgs},
 		{name: "backend error passes through", args: map[string]string{"id": "t6"},
 			backend: connect.NewError(connect.CodeNotFound, errors.New("no such terminal")), wantID: "t6"},
 	}
@@ -203,9 +203,10 @@ func TestTerminalClose(t *testing.T) {
 		})
 	}
 	reg := command.NewRegistry()
-	shells := map[string]bool{"t-shell": true}
+	shells := map[string]bool{"t-shell1234567": true}
+	listed := &commandtest.Terminal{Terminals: []*v1.Terminal{{Id: "t-shell1234567"}, {Id: "t-other"}}}
 	if err := command.RegisterTerminal(reg, command.TerminalDeps{
-		Terminal: &commandtest.Terminal{}, IsShell: func(id string) bool { return shells[id] },
+		Terminal: listed, IsShell: func(id string) bool { return shells[id] },
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -217,12 +218,24 @@ func TestTerminalClose(t *testing.T) {
 	if c.Available(command.Context{ActiveTerminalID: "t-other", ActiveThreadID: "s1"}) {
 		t.Error("terminal.close offered on a terminal that is not a shell")
 	}
-	if !c.Available(command.Context{ActiveTerminalID: "t-shell", ActiveThreadID: "s1"}) {
+	if !c.Available(command.Context{ActiveTerminalID: "t-shell1234567", ActiveThreadID: "s1"}) {
 		t.Error("terminal.close not offered on a shell")
 	}
 	_, err := reg.Invoke(context.Background(), command.Context{ActiveTerminalID: "t-other"}, "terminal.close", nil)
 	if !errors.Is(err, command.ErrUnavailable) || !strings.Contains(err.Error(), "use terminal.kill") {
 		t.Errorf("terminal.close on a terminal that is not a shell = %v, want unavailable, use terminal.kill", err)
+	}
+	// A suffix resolves before availability looks the terminal up.
+	if res, err := reg.Invoke(context.Background(), command.Context{}, "terminal.close", map[string]string{"id": "4567"}); err != nil || res.Message != "closed terminal t-shell1234567" {
+		t.Errorf("terminal.close by suffix = %v, %q", err, res.Message)
+	}
+	_, err = reg.Invoke(context.Background(), command.Context{}, "terminal.close", map[string]string{"id": "t-gone"})
+	if !errors.Is(err, command.ErrUnavailable) || !strings.HasSuffix(err.Error(), "no terminal t-gone") {
+		t.Errorf("terminal.close on an unknown terminal = %v, want no terminal t-gone", err)
+	}
+	_, err = reg.Invoke(context.Background(), command.Context{}, "terminal.close", map[string]string{"id": "zzzz"})
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("terminal.close on an unknown suffix = %v, want not found", err)
 	}
 }
 

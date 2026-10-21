@@ -84,29 +84,31 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"json result", []string{"daemon.version", "--json"}, nil, `"version":"test"`, ""},
 		{"notify with no GUI", []string{"ui", "notify", "--title", "hi", "--body", "there"}, nil, "delivered=0", ""},
 		{"help for a command", []string{"help", "ui", "notify"}, nil, "--level info|warning|error", ""},
-		{"-h on a command", []string{"ui.notify", "-h"}, nil, "", "--title string"},
+		{"-h on a command", []string{"ui.notify", "-h"}, nil, "--title string", ""},
 		{"unknown command", []string{"bogus", "thing"}, errUsage, "", `unknown command "bogus thing"`},
 		{"missing required arg", []string{"workspace", "new"}, errUsage, "", `code-foundry workspace.new: missing required argument "name"`},
 		{"bad enum", []string{"ui.notify", "--title", "x", "--level", "loud"}, errUsage, "", "want one of info, warning, error"},
-		{"unavailable", []string{"terminal", "kill"}, errUsage, "", "terminal.kill: not available in this context"},
+		{"missing the active id", []string{"terminal", "kill"}, errUsage, "", "terminal.kill: missing --id (default: the active terminal; there is none)"},
 		{"unknown flag", []string{"ui.notify", "--nope"}, errUsage, "", "flag provided but not defined: -nope"},
 		{"stray positional", []string{"ui.notify", "--title", "x", "extra"}, errUsage, "", "unexpected arguments [extra]"},
+		{"no thread outside one", []string{"thread", "get"}, errUsage, "", "thread.get: missing --id (default: the active thread; there is none)"},
+		{"git fetch defaults to the working directory", []string{"git", "fetch"}, errUsage, "", "/work"},
 		{"workspace list", []string{"workspace", "list"}, nil, "no workspaces", ""},
 		{"workspace members defaults to the working directory", []string{"workspace", "members"}, errUsage, "", "/work is not inside a workspace worktree"},
-		{"kebab-case verb with a positional", []string{"workspace", "add-project", "api", "--fetch=false"}, errUsage, "", "workspace.add-project: not found: /work is not inside"},
+		{"kebab-case verb with a positional", []string{"workspace", "add-project", "api", "--fetch=false"}, errUsage, "", "code-foundry workspace.add-project: /work is not inside"},
 		{"explicit --cwd wins", []string{"workspace", "members", "--cwd", "/elsewhere"}, errUsage, "", "/elsewhere is not inside"},
 		{"project add prints the CLI hint", []string{"project", "add"}, nil, "code-foundry project add <folder>", ""},
 		{"project add resolves a relative folder against the working directory", []string{"project", "add", "rel"}, errUsage, "",
-			"code-foundry project.add: invalid argument: /work/rel: lstat /work: no such file or directory"},
+			"code-foundry project.add: /work/rel: lstat /work: no such file or directory"},
 		{"project clone refuses ssh before the daemon runs gh", []string{"project", "clone", "git@github.com:o/r.git"}, errUsage, "",
 			"code-foundry project.clone: invalid argument: SSH URLs are not supported"},
 		{"project clone needs a project", []string{"project", "clone"}, errUsage, "", "no repository given"},
 		{"project create refuses a dot name", []string{"project", "create", ".hidden"}, errUsage, "",
-			`code-foundry project.create: invalid argument: a project name cannot start with "."`},
+			`code-foundry project.create: a project name cannot start with "."`},
 		// The test daemon's config home is under /tmp, outside the home directory.
 		{"project create keeps projects under home", []string{"project", "create", "demo"}, errUsage, "", "outside your home directory"},
 		{"project github publish needs a project", []string{"project", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
-			"project.github.publish: not available in this context"},
+			"project.github.publish: missing --project (default: the active project; there is none)"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}
@@ -144,6 +146,8 @@ func TestCLIAgainstDaemon(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("empty ids", func(t *testing.T) { testCLIRefusesEmptyIDs(t, c) })
 
 	t.Run("unknown terminal is a clean not-found error", func(t *testing.T) {
 		r := runCLI(c, "terminal.kill", "--id", "t1", "--yes")

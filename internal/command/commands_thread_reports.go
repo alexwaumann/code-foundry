@@ -163,7 +163,7 @@ func reportWord(s *v1.Thread) string {
 // threadReport is s for thread.reports' --json.
 func threadReport(s *v1.Thread) ThreadReport {
 	r := ThreadReport{
-		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s.GetStatus()), ReportStatus: reportWord(s),
+		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s), ReportStatus: reportWord(s),
 		ReportSummary: s.GetReportSummary(), CreatedBy: s.GetCreatedBy(), Labels: slices.Clone(s.GetLabels()),
 		CostUSD: s.GetCostUsd(), Depth: s.Depth,
 	}
@@ -179,14 +179,14 @@ func threadReport(s *v1.Thread) ThreadReport {
 }
 
 // threadStatusName is a thread status as thread.list's --status names it, without the
-// reason threadStatusWord adds.
-func threadStatusName(st v1.ThreadStatus) string {
+// reason threadStatusWord adds (noStatusWord before it has one).
+func threadStatusName(s *v1.Thread) string {
 	for name, v := range threadListStatuses {
-		if v == st {
+		if v == s.GetStatus() {
 			return name
 		}
 	}
-	return "unknown"
+	return noStatusWord(s)
 }
 
 // formatThreadReports is thread.reports' text: one aligned line per thread, each with

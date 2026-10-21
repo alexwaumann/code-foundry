@@ -56,16 +56,17 @@ func TestRegistryBadFlagIsOneLine(t *testing.T) {
 		args       []string
 		wantErr    bool
 		wantStderr string
+		wantStdout string // -h: the help, on stdout
 	}{
 		{name: "unknown flag", args: []string{"thread", "report", "done", "--jsonl"}, wantErr: true,
 			wantStderr: "flag provided but not defined: -jsonl\n" +
 				"Run `code-foundry help thread.report` for usage; a value that starts with - goes after --.\n"},
-		{name: "help", args: []string{"thread", "report", "-h"}, wantStderr: "thread.report"},
+		{name: "help", args: []string{"thread", "report", "-h"}, wantStdout: "thread.report"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeArgCommands{}
-			cl, _, stderr := fakeCommandCLI(t, f)
+			cl, stdout, stderr := fakeCommandCLI(t, f)
 			err := cl.dispatch(context.Background(), tt.args)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v", err)
@@ -73,8 +74,8 @@ func TestRegistryBadFlagIsOneLine(t *testing.T) {
 			if tt.wantErr && stderr.String() != tt.wantStderr {
 				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
-			if !tt.wantErr && !strings.Contains(stderr.String(), tt.wantStderr) {
-				t.Errorf("stderr = %q, want it to contain %q", stderr.String(), tt.wantStderr)
+			if !tt.wantErr && (!strings.Contains(stdout.String(), tt.wantStdout) || stderr.Len() > 0) {
+				t.Errorf("stdout = %q, stderr = %q; want stdout containing %q", stdout.String(), stderr.String(), tt.wantStdout)
 			}
 			if len(f.args) != 0 {
 				t.Errorf("invoked with %v", f.args)

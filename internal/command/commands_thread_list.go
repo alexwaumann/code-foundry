@@ -263,12 +263,21 @@ func threadStatusWord(s *v1.Thread) string {
 	case v1.ThreadStatus_THREAD_STATUS_ERROR:
 		w = "error"
 	default:
-		return "unknown"
+		return noStatusWord(s)
 	}
 	if r := s.GetStatusReason(); r != "" {
 		w += " (" + r + ")"
 	}
 	return w
+}
+
+// noStatusWord names a thread without a status yet (UNSPECIFIED): Claude has not
+// reported one since it started, so "starting", or "not started" when no process runs.
+func noStatusWord(s *v1.Thread) string {
+	if s.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED {
+		return "not started"
+	}
+	return "starting"
 }
 
 // threadDisplayName is the name, or "(unnamed)".

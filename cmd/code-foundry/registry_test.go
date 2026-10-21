@@ -40,8 +40,10 @@ func TestInvokeFailed(t *testing.T) {
 			"code-foundry project.create: unknown run 12\n"},
 		{"a plugin down: exit 1", failed(connect.CodeFailedPrecondition, "not available in this context: plugin x is failed (boom); run `code-foundry plugin restart x`"),
 			errReported, "", "code-foundry project.create: not available in this context: plugin x is failed (boom); run `code-foundry plugin restart x`\n"},
-		{"other codes", connect.NewError(connect.CodeDeadlineExceeded, errors.New("took too long\nreally")), nil,
-			"project.create: took too long\nreally (deadline_exceeded)", ""},
+		{"a timeout: its words", connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out after 1m")), nil,
+			"project.create: timed out after 1m", ""},
+		{"other codes", connect.NewError(connect.CodeInternal, errors.New("took too long\nreally")), nil,
+			"project.create: took too long\nreally (internal)", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

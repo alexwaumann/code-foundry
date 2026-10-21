@@ -30,7 +30,7 @@ func newFixture(t *testing.T) fixture {
 	f := fixture{
 		reg:     command.NewRegistry(),
 		emit:    &commandtest.Emitter{Delivered: 2},
-		term:    &commandtest.Terminal{},
+		term:    &commandtest.Terminal{Terminals: []*v1.Terminal{{Id: "t9"}}},
 		project: &commandtest.Project{},
 	}
 	start := time.Unix(1000, 0)
@@ -170,6 +170,7 @@ func TestBuiltinCommands(t *testing.T) {
 		args      map[string]string
 		backendEr error
 		wantErr   error
+		wantCode  connect.Code
 		wantMsg   string
 		wantJSON  string        // substring of EncodeJSON
 		wantReq   proto.Message // last backend request or emitted intent
@@ -192,6 +193,8 @@ func TestBuiltinCommands(t *testing.T) {
 		{name: "ui.focus.terminal from context", cmd: "ui.focus.terminal", ctx: command.Context{ActiveTerminalID: "t9"},
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{FocusTerminal: &v1.UiIntent_FocusTerminal{TerminalId: "t9"}}}},
 		{name: "ui.focus.terminal needs an id", cmd: "ui.focus.terminal", wantErr: command.ErrInvalidArgs},
+		// A short id passes resolution through; it is not delivered as if it named one.
+		{name: "ui.focus.terminal of no terminal", cmd: "ui.focus.terminal", args: map[string]string{"id": "x"}, wantCode: connect.CodeNotFound},
 		{name: "ui.focus.project", cmd: "ui.focus.project", args: map[string]string{"project": "r1", "worktree": "~/wt"},
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusProject_{FocusProject: &v1.UiIntent_FocusProject{ProjectId: "r1", WorktreePath: "/Users/me/wt"}}}},
 		// terminal.new's owners and defaults: commands_terminal_test.go.
@@ -207,7 +210,7 @@ func TestBuiltinCommands(t *testing.T) {
 			wantReq: &v1.RegisterProjectRequest{Path: "/Users/me/src/app"}},
 		{name: "project.add without a folder prints the hint", cmd: "project.add", wantMsg: command.AddProjectHint},
 		{name: "project.list without projects", cmd: "project.list", wantMsg: "no projects", wantReq: &v1.ListProjectsRequest{}},
-		{name: "project.unregister unavailable", cmd: "project.unregister", wantErr: command.ErrUnavailable},
+		{name: "project.unregister without a project", cmd: "project.unregister", wantErr: command.ErrInvalidArgs},
 		{name: "project.worktree.new with explicit project", cmd: "project.worktree.new", args: map[string]string{"project": "r2", "branch": "feat", "base": "main"},
 			wantMsg: "created worktree /wt/feat on feat",
 			wantReq: &v1.CreateWorktreeRequest{ProjectId: "r2", Branch: "feat", BaseRef: "main", Fetch: true}},
@@ -217,7 +220,7 @@ func TestBuiltinCommands(t *testing.T) {
 			args:    map[string]string{"branch": "x", "base": "origin/dev", "fetch": "false"},
 			wantReq: &v1.CreateWorktreeRequest{ProjectId: "r1", Branch: "x", BaseRef: "origin/dev"}},
 		{name: "project.worktree.new needs a branch", cmd: "project.worktree.new", ctx: command.Context{ActiveProjectID: "r1"}, wantErr: command.ErrInvalidArgs},
-		{name: "project.worktree.new unavailable", cmd: "project.worktree.new", args: map[string]string{"branch": "x"}, wantErr: command.ErrUnavailable},
+		{name: "project.worktree.new without a project", cmd: "project.worktree.new", args: map[string]string{"branch": "x"}, wantErr: command.ErrInvalidArgs},
 		{name: "project.worktree.remove", cmd: "project.worktree.remove", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt/x"},
 			args: map[string]string{"force": "true"}, wantMsg: "removed worktree /wt/x",
 			wantReq: &v1.RemoveWorktreeRequest{ProjectId: "r1", Path: "/wt/x", Force: true}},
@@ -237,6 +240,12 @@ func TestBuiltinCommands(t *testing.T) {
 			f := newFixture(t)
 			f.term.Err, f.project.Err = tt.backendEr, tt.backendEr
 			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
+			if tt.wantCode != 0 {
+				if connect.CodeOf(err) != tt.wantCode {
+					t.Fatalf("err = %v, want code %v", err, tt.wantCode)
+				}
+				return
+			}
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}

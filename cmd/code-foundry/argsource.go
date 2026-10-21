@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"unicode"
+
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // maxArgSource bounds what readArgSource reads; the daemon refuses large values anyway
@@ -15,7 +17,7 @@ import (
 const maxArgSource = 1 << 20
 
 // readArgSource is a FileOrStdin arg's value (ArgSpec.file_or_stdin): the contents of
-// <path> for @<path> (relative to the CLI's cwd), stdin for -, else the value as given.
+// <path> for @<path> (relative to the CLI's cwd; ~/ is the home directory), stdin for -, else the value as given.
 // A value with whitespace that names no file is also taken as given: a prompt may
 // start with a Claude Code file mention ("@main.go explain this").
 func (cl *cli) readArgSource(name, v string) (string, error) {
@@ -27,7 +29,15 @@ func (cl *cli) readArgSource(name, v string) (string, error) {
 		}
 		r = cl.stdin
 	case strings.HasPrefix(v, "@"):
-		p, err := cl.absPath(strings.TrimPrefix(v, "@"))
+		p := strings.TrimPrefix(v, "@")
+		if strings.HasPrefix(p, "~/") {
+			// The shell expands no ~ after @; absPath leaves it for the daemon, but the
+			// CLI opens this file itself.
+			if e, err := command.ExpandPath(p); err == nil {
+				p = e
+			}
+		}
+		p, err := cl.absPath(p)
 		if err != nil {
 			return "", err
 		}

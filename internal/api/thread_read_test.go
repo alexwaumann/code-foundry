@@ -38,6 +38,7 @@ func TestPageItems(t *testing.T) {
 		{name: "the last few", q: &v1.ThreadItemsQuery{Last: 3}, want: []string{"w1", "perm-1", "m2/0"}, wantNext: "perm-1"},
 		{name: "since an id", q: &v1.ThreadItemsQuery{Since: "m1/0"}, want: []string{"turn-1", "w1", "perm-1", "m2/0"}, wantNext: "perm-1"},
 		{name: "since an ordinal", q: &v1.ThreadItemsQuery{Since: "5"}, want: []string{"w1", "perm-1", "m2/0"}, wantNext: "perm-1"},
+		{name: "since an ordinal as thread read prints it", q: &v1.ThreadItemsQuery{Since: "#5"}, want: []string{"w1", "perm-1", "m2/0"}, wantNext: "perm-1"},
 		{name: "since, the first few, more", q: &v1.ThreadItemsQuery{Since: "1", Last: 2}, want: []string{"u1", "toolu_1"}, wantNext: "toolu_1", wantMore: true},
 		{name: "since, exactly the rest", q: &v1.ThreadItemsQuery{Since: "u1", Last: 6}, want: []string{"toolu_1", "m1/0", "turn-1", "w1", "perm-1", "m2/0"}, wantNext: "perm-1"},
 		{name: "since the end", q: &v1.ThreadItemsQuery{Since: "8"}, want: nil, wantNext: "8"},

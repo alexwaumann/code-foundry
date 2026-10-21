@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -33,6 +34,10 @@ const (
 	TerminalID
 	// EmberTaskID: a task on Ember's board, "t-" + 8 hex digits.
 	EmberTaskID
+	// ProjectID: a registered project, given by its id, its name (when unique) or a path
+	// inside it (resolveProjectRef), never by a suffix. It resolves through the
+	// registry's RefResolver (RegisterProject sets it).
+	ProjectID
 )
 
 // MinIDSuffix is the shortest suffix an id arg resolves.
@@ -45,6 +50,7 @@ var idKinds = map[IDKind]struct{ prefix, noun string }{
 	SubscriptionID: {"sub-", "subscription"},
 	TerminalID:     {"t-", "terminal"},
 	EmberTaskID:    {"t-", "task"},
+	ProjectID:      {"", "project"},
 }
 
 // IDLister returns every id of a kind the daemon knows now.
@@ -59,6 +65,27 @@ func (r *Registry) SetIDLister(kind IDKind, list IDLister) {
 		r.idListers = make(map[IDKind]IDLister)
 	}
 	r.idListers[kind] = list
+}
+
+// RefResolver turns a reference to an id of its kind into the id: a project's name or
+// path into its id. arg names the argument for errors.
+type RefResolver func(ctx context.Context, arg, ref string) (string, error)
+
+// SetRefResolver makes Invoke resolve every given arg of kind with resolve, instead of
+// as a suffix. A kind without one passes its values through.
+func (r *Registry) SetRefResolver(kind IDKind, resolve RefResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.refResolvers == nil {
+		r.refResolvers = make(map[IDKind]RefResolver)
+	}
+	r.refResolvers[kind] = resolve
+}
+
+func (r *Registry) refResolver(kind IDKind) RefResolver {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.refResolvers[kind]
 }
 
 func (r *Registry) idLister(kind IDKind) IDLister {
@@ -77,6 +104,24 @@ func (r *Registry) SetIDFallback(kind IDKind, list IDLister) {
 		r.idFallbacks = make(map[IDKind]IDLister)
 	}
 	r.idFallbacks[kind] = list
+}
+
+// known returns a NotFound error unless id is one of kind's listed ids: for a command
+// that only emits an intent (thread.focus), so a short or mistyped id, which resolution
+// passes through, is not reported as delivered. A kind without a lister knows any id.
+func (r *Registry) known(ctx context.Context, kind IDKind, id string) error {
+	list := r.idLister(kind)
+	if list == nil {
+		return nil
+	}
+	ids, err := list(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(ids, id) {
+		return connect.NewError(connect.CodeNotFound, fmt.Errorf("no %s %s", idKinds[kind].noun, id))
+	}
+	return nil
 }
 
 // resolveRef resolves one suffix ref of kind against ids, then, when none ends in it,
@@ -115,6 +160,21 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 			args.vals[s.Name] = full
 			continue
 		}
+		if res := r.refResolver(s.ID); res != nil {
+			// Only a value the caller gave: a context one is an id already.
+			if v == "" || !args.Given(s.Name) {
+				continue
+			}
+			full, err := res(ctx, s.Name, v)
+			if err != nil {
+				return eff, err
+			}
+			args.vals[s.Name] = full
+			if s.Context != NoContext {
+				eff = eff.With(s.Context, full)
+			}
+			continue
+		}
 		if s.ID == NoID || !needsResolve(s.ID, v) {
 			continue
 		}
@@ -140,7 +200,8 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 
 // resolveIDList resolves each entry of v, an IDList arg, listing the ids once (only
 // when an entry is a suffix): the full ids joined by commas, blanks and repeats dropped.
-// One entry that does not resolve fails them all, so a typo acts on none.
+// One entry that does not resolve fails them all, so a typo acts on none, and a list of
+// only blanks is an *ArgError.
 func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (string, error) {
 	list := r.idLister(s.ID)
 	var (
@@ -167,6 +228,11 @@ func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (stri
 			out = append(out, full)
 		}
 	}
+	if len(out) == 0 {
+		// "," or " , ": a list built from nothing. Run would fall back to id, which in a
+		// thread is the caller's own.
+		return "", InvalidArg(s.Name, "%s holds no %s ids", s.Name, idKinds[s.ID].noun)
+	}
 	return strings.Join(out, ","), nil
 }
 
@@ -174,7 +240,7 @@ func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (stri
 // enough). Shorter values and prefixed ones pass through for the daemon to judge.
 func needsResolve(kind IDKind, v string) bool {
 	k, ok := idKinds[kind]
-	return ok && len(v) >= MinIDSuffix && !strings.HasPrefix(v, k.prefix)
+	return ok && k.prefix != "" && len(v) >= MinIDSuffix && !strings.HasPrefix(v, k.prefix)
 }
 
 // ResolveID resolves ref, an id or a suffix of one, against ids: the id itself when
@@ -202,6 +268,43 @@ func ResolveID(kind IDKind, arg, ref string, ids []string) (string, error) {
 	return "", InvalidArg(arg, "%q is ambiguous: %d %s ids end in it (%s); give more characters",
 		ref, len(matches), noun, strings.Join(matches, ", "))
 }
+
+// ProjectRefHelp describes a ProjectID arg.
+const ProjectRefHelp = "Project id, name, or a path inside it"
+
+// shortIDHint adds to a NotFound err that an id suffix needs MinIDSuffix characters,
+// when an id arg was given a shorter value without its kind's prefix ("5b6"), which
+// resolution passed through as if it were a whole id.
+func shortIDHint(specs []ArgSpec, a Args, err error) error {
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		return err
+	}
+	for _, s := range specs {
+		k, ok := idKinds[s.ID]
+		v := a.String(s.Name)
+		if !ok || k.prefix == "" || !a.Given(s.Name) || v == "" || len(v) >= MinIDSuffix || strings.HasPrefix(v, k.prefix) {
+			continue
+		}
+		return connect.NewError(connect.CodeNotFound, hinted{err, fmt.Sprintf(" (an id suffix needs at least %d characters)", MinIDSuffix)})
+	}
+	return err
+}
+
+// hinted is err with a hint after its message; it unwraps to err.
+type hinted struct {
+	err  error
+	hint string
+}
+
+func (h hinted) Error() string {
+	var ce *connect.Error
+	if errors.As(h.err, &ce) {
+		return ce.Message() + h.hint
+	}
+	return h.err.Error() + h.hint
+}
+
+func (h hinted) Unwrap() error { return h.err }
 
 // IDHelp is the description suffix of an id arg: "id or unique suffix".
 const IDHelp = " (or a unique suffix of 4+ characters)"

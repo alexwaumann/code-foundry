@@ -72,6 +72,9 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 		if err == nil {
 			return res.Msg, nil
 		}
+		if connLost(ctx, err) {
+			return nil, fmt.Errorf("%s: %w", name, errConnLost)
+		}
 		cr := confirmationOf(err)
 		if cr == nil || stage >= maxConfirmStages {
 			return nil, cl.invokeFailed(name, err)
@@ -236,8 +239,10 @@ func takesValue(fs *flag.FlagSet, tok string) bool {
 }
 
 // assignPositionals gives each word to the next positional arg not already set by its
-// flag, in declaration order.
+// flag, in declaration order. Words left over are an error, which names the id flag
+// they were probably meant for (idFlagHint).
 func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []string) error {
+	var took []*argFlag // the positionals given a word
 	for _, f := range flags {
 		if len(words) == 0 {
 			return nil
@@ -245,11 +250,37 @@ func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []str
 		if f.spec.GetPositional() && !f.set {
 			_ = f.Set(words[0])
 			words = words[1:]
+			took = append(took, f)
 		}
 	}
 	if len(words) > 0 {
-		fmt.Fprintf(cl.stderr, "%s: unexpected arguments %v\n", fs.Name(), words)
+		fmt.Fprintf(cl.stderr, "%s: unexpected arguments %v%s\n", fs.Name(), words, idFlagHint(flags, took, words))
 		return errUsage
 	}
 	return nil
+}
+
+// idFlagHint guesses which flag stray words were meant for when exactly one id flag is
+// unset (not counting one the CLI fills from the environment): " (did you mean --id
+// 8f3a?)". When a positional took the first word (`thread send 8f3a "hello"`: the id
+// became the text), that word is the likely id.
+func idFlagHint(flags, took []*argFlag, rest []string) string {
+	var id *argFlag
+	for _, f := range flags {
+		if !f.spec.GetId() || f.spec.GetPositional() || f.set || f.spec.GetDefaultToThreadEnv() {
+			continue
+		}
+		if id != nil {
+			return ""
+		}
+		id = f
+	}
+	if id == nil {
+		return ""
+	}
+	name := id.spec.GetName()
+	if len(took) > 0 {
+		return fmt.Sprintf(" (the first word is the %s; did you mean --%s %s?)", took[0].spec.GetName(), name, took[0].value)
+	}
+	return fmt.Sprintf(" (did you mean --%s %s?)", name, rest[0])
 }

@@ -101,7 +101,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 				"some visibilities; gh's error is shown as is.",
 			Category: "Project",
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"},
+				{Name: "project", Type: String, Required: true, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp},
 				{Name: "owner", Type: String, Required: true, Description: "GitHub user or organization"},
 				{Name: "name", Type: String, Description: "Repository name on GitHub (default: the project's name)"},
 				{Name: "visibility", Type: Enum, Required: true, Enum: []string{"public", "internal", "private"},
@@ -140,7 +140,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 			Description: "Stop tracking a project made by New Project and delete its folder in ~/.code-foundry/projects. " +
 				"Only projects there can be deleted; a repository on GitHub is not touched.",
 			Category: "Project",
-			Args:     []ArgSpec{{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}},
+			Args:     []ArgSpec{{Name: "project", Type: String, Required: true, Positional: true, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp}},
 			When:     func(c Context) bool { return hasProject(c) && deletable(c) },
 			WhyUnavailable: func(c Context) string {
 				if hasProject(c) && !deletable(c) {

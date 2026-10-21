@@ -20,6 +20,8 @@ type Registry struct {
 	// idListers resolve id suffixes, idFallbacks those none of their ids end in
 	// (resolve.go).
 	idListers, idFallbacks map[IDKind]IDLister
+	// refResolvers resolve references that are not suffixes (a project's name).
+	refResolvers map[IDKind]RefResolver
 }
 
 // Overrides adjust registered commands without re-registering them. The daemon sets
@@ -136,9 +138,9 @@ func (r *Registry) Get(name string) (Command, bool) {
 
 // Invoke validates raw args against the command's specs, checks availability, and runs
 // it. Errors wrap ErrUnknownCommand, ErrInvalidArgs (*ArgError), or ErrUnavailable;
-// anything else comes from Run. Checks run in this order: name, arg syntax,
-// availability (with explicit context-bound args overlaid), required args, id
-// suffixes (resolve.go), confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
+// anything else comes from Run. Checks run in this order: name, arg syntax, id
+// suffixes (resolve.go), availability (with explicit context-bound args overlaid,
+// resolved), required args, confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
 // ConfirmIf, if any, says this call needs it). Run
 // sees the overlaid context.
 func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw map[string]string, opts ...InvokeOption) (Result, error) {
@@ -154,7 +156,17 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if err != nil {
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
+	// Id suffixes resolve first, so When sees the full id an explicit arg names
+	// (terminal.close --id 3ec0 looks the terminal up). A missing one is skipped.
+	if eff, err = r.resolveIDs(ctx, c.Args, args, eff); err != nil {
+		return Result{}, fmt.Errorf("%s: %w", name, err)
+	}
 	if !c.Available(eff) {
+		if err := missingContextArg(c.Args, args); err != nil && uctx.ActiveView == "" {
+			// From the CLI the usual reason is no --id and no active thread: say so, not
+			// "unavailable" (the GUI only offers what is available).
+			return Result{}, fmt.Errorf("%s: %w", name, err)
+		}
 		if c.WhyUnavailable != nil {
 			if why := c.WhyUnavailable(eff); why != "" {
 				return Result{}, fmt.Errorf("%s: %w: %s", name, ErrUnavailable, why)
@@ -163,9 +175,6 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		return Result{}, fmt.Errorf("%s: %w", name, ErrUnavailable)
 	}
 	if err := checkRequired(c.Args, args); err != nil {
-		return Result{}, fmt.Errorf("%s: %w", name, err)
-	}
-	if eff, err = r.resolveIDs(ctx, c.Args, args, eff); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
 	if c.Confirm != "" && !o.confirmed && (c.ConfirmIf == nil || c.ConfirmIf(ctx, eff, args)) {
@@ -185,7 +194,8 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
 	}
 	eff.CallerThreadID = uctx.ActiveThreadID
-	return c.Run(ctx, eff, args)
+	res, err := c.Run(ctx, eff, args)
+	return res, shortIDHint(c.Args, args, err)
 }
 
 // ReplacePrefix atomically replaces every command whose name starts with prefix with

@@ -17,7 +17,7 @@ func threadPin(b ThreadBackend, idArg ArgSpec) Command {
 		Description: "Pin a thread to the top of the thread list, or unpin it. Without pinned, toggles the current pin.",
 		Category:    "Thread",
 		Args: []ArgSpec{
-			idArg,
+			positional(idArg),
 			{Name: "pinned", Type: Bool, Description: "Pin (true) or unpin (false); default: the opposite of now"},
 		},
 		When: hasThread,

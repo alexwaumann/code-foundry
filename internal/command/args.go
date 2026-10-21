@@ -89,6 +89,12 @@ type ArgSpec struct {
 	Repeatable bool
 }
 
+// positional is s taking a bare word on the CLI too: `thread archive 8f3a`.
+func positional(s ArgSpec) ArgSpec {
+	s.Positional = true
+	return s
+}
+
 // validate checks the spec's static shape at Register time.
 func (s ArgSpec) validate() error {
 	switch {
@@ -114,7 +120,7 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg without a context or default can default to $CODE_FOUNDRY_THREAD")
 	case s.FileOrStdin && s.Type != String:
 		return errors.New("only a string arg can be read from a file or stdin")
-	case s.ID != NoID && (s.Type != String || idKinds[s.ID].prefix == ""):
+	case s.ID != NoID && (s.Type != String || !knownIDKind(s.ID)):
 		return errors.New("only a string arg can be an id, of a known kind")
 	case s.IDList && (s.ID == NoID || s.Context != NoContext):
 		return errors.New("an id list needs an id kind and no context")
@@ -127,6 +133,12 @@ func (s ArgSpec) validate() error {
 		}
 	}
 	return nil
+}
+
+// knownIDKind: kind is one idKinds lists.
+func knownIDKind(kind IDKind) bool {
+	_, ok := idKinds[kind]
+	return ok
 }
 
 // ArgError is an argument validation failure. It wraps ErrInvalidArgs.
@@ -248,6 +260,17 @@ func checkRequired(specs []ArgSpec, a Args) error {
 	for _, s := range specs {
 		if s.Required && !a.Has(s.Name) {
 			return &ArgError{Arg: s.Name, Msg: fmt.Sprintf("missing required argument %q", s.Name)}
+		}
+	}
+	return nil
+}
+
+// missingContextArg returns an *ArgError for the first required context-bound spec
+// without a value: "missing --id (default: the active thread; there is none)".
+func missingContextArg(specs []ArgSpec, a Args) error {
+	for _, s := range specs {
+		if s.Required && s.Context != NoContext && !a.Has(s.Name) {
+			return &ArgError{Arg: s.Name, Msg: fmt.Sprintf("missing --%s (default: %s; there is none)", s.Name, s.Context.Describe())}
 		}
 	}
 	return nil

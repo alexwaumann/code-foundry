@@ -101,7 +101,7 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "a thread until finished", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "until": "finished"}, wantErr: command.ErrInvalidArgs},
 		{name: "no target", cmd: "thread.subscribe", ctx: inThread, wantErr: command.ErrInvalidArgs},
 		{name: "two targets", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "run": "r-1"}, wantErr: command.ErrInvalidArgs},
-		{name: "no subscriber", cmd: "thread.subscribe", args: map[string]string{"thread": "s-c"}, wantErr: command.ErrUnavailable},
+		{name: "no subscriber", cmd: "thread.subscribe", args: map[string]string{"thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 		{name: "subscribe to a plugin's wake source", cmd: "thread.subscribe", ctx: inThread,
 			args:     map[string]string{"plugin": "hello/tick", "arg": "every=2s\n\n pr = a/b#1 ", "repeat": "true"},
 			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (every=2s pr=a/b#1) (repeat)",

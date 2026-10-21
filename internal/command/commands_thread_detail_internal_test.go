@@ -4,6 +4,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
@@ -74,6 +77,31 @@ func TestThreadDetailPendingLine(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("line 3 = %q, want %q\n%s", lines[2], tt.want, strings.Join(lines, "\n"))
+			}
+		})
+	}
+}
+
+// thread.get says when a thread is archived, snoozed or pinned (--json has the times).
+func TestThreadDetailListing(t *testing.T) {
+	at := time.Date(2026, 10, 21, 9, 30, 0, 0, time.Local)
+	tests := []struct {
+		name string
+		s    *v1.Thread
+		want []string
+	}{
+		{name: "archived", s: &v1.Thread{ArchivedAt: timestamppb.New(at)}, want: []string{"archived: 2026-10-21 09:30:00"}},
+		{name: "snoozed", s: &v1.Thread{SnoozedUntil: timestamppb.New(at)}, want: []string{"snoozed until: 2026-10-21 09:30:00"}},
+		{name: "pinned", s: &v1.Thread{Pinned: true}, want: []string{"pinned"}},
+		{name: "none of them", s: &v1.Thread{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.s.Id, tt.s.WorktreePath = "s-1", "/wt"
+			lines := strings.Split(threadDetail(tt.s, nil), "\n")
+			// thread, status, then these, then worktree.
+			if got := lines[2 : len(lines)-2]; !slices.Equal(got, tt.want) {
+				t.Errorf("lines %q, want %q\n%s", got, tt.want, strings.Join(lines, "\n"))
 			}
 		})
 	}

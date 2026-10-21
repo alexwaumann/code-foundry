@@ -84,7 +84,7 @@ func TestThreadSnooze(t *testing.T) {
 			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
 		{name: "a past until fails without asking", args: map[string]string{"id": "s5", "until": "2001-01-01"}, current: busy,
 			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
-		{name: "unavailable without a thread", args: map[string]string{"until": "1h"}, wantErr: command.ErrUnavailable},
+		{name: "missing a thread", args: map[string]string{"until": "1h"}, wantErr: command.ErrInvalidArgs},
 		{name: "an unknown thread fails in Run, not with a confirmation", args: map[string]string{"id": "s5", "until": "1h"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -222,7 +224,8 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	cf := cl.addContextFlags(fs)
 	words, err := cl.parseWithPositionals(fs, rest)
 	if errors.Is(err, errHelp) {
-		guide.WriteHelp(cl.stderr, cmd, true)
+		// Asked for (-h), so stdout: `thread new -h | less` reads it.
+		guide.WriteHelp(cl.stdout, cmd, true)
 		return nil
 	}
 	if err != nil {
@@ -232,6 +235,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if err := cl.assignPositionals(fs, flags, words); err != nil {
 		return err
 	}
+	if err := cl.refuseEmptyIDs(cmd.GetName(), flags); err != nil {
+		return err
+	}
 
 	uctx, err := cl.uiContext(cf)
 	if err != nil {
@@ -239,7 +245,8 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	vals := make(map[string]string, len(flags))
 	for _, f := range flags {
-		if !f.set && f.spec.GetDefaultToCwd() {
+		// A worktree arg defaulting to the cwd gives way to an explicit --context-worktree.
+		if !f.set && f.spec.GetDefaultToCwd() && !(f.spec.GetContextBound() && cf.worktree != "") {
 			wd, err := cl.getwd()
 			if err != nil {
 				return fmt.Errorf("--%s defaults to the working directory: %w", f.spec.GetName(), err)
@@ -280,7 +287,14 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 		return present(ctx, cl, c, vals, *asJSON)
 	}
+	start := time.Now()
 	res, err := cl.invoke(ctx, cmd, uctx, vals, *yes)
+	if errors.Is(err, errConnLost) {
+		res, err = cl.rewait(ctx, cmd, uctx, vals, start, err)
+	}
+	if te := (*timeoutError)(nil); errors.As(err, &te) && *asJSON {
+		fmt.Fprintln(cl.stdout, timeoutJSON(te))
+	}
 	if err != nil {
 		return err
 	}
@@ -296,6 +310,11 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		fmt.Fprintln(cl.stdout, res.GetMessage())
 	}
 	if code := res.GetExitCode(); code != 0 {
+		if code >= 2 {
+			// action run --wait exits with the action's code: 2 from make is not a usage
+			// mistake, and stderr says so where the two would read the same.
+			fmt.Fprintf(cl.stderr, "code-foundry %s: exited with code %d from what it ran, not a usage mistake\n", cmd.GetName(), code)
+		}
 		return exitCodeError(code)
 	}
 	if f, ok := cliFollowers[cmd.GetName()]; ok && !*asJSON && cl.wantsFollow(f, flags) {
@@ -311,6 +330,37 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 	}
 	return nil
+}
+
+// refuseEmptyIDs refuses an id or context-bound flag given an empty value (`--id ""`,
+// `--id "$CHILD"` with CHILD unset): the daemon takes an empty value as absent and
+// falls back to the context, the thread this runs in, so an agent would act on itself.
+// A DefaultToThreadEnv flag's empty value is its documented opt-out (--created-by=).
+func (cl *cli) refuseEmptyIDs(name string, flags []*argFlag) error {
+	for _, f := range flags {
+		s := f.spec
+		if !f.set || strings.TrimSpace(f.value) != "" || s.GetDefaultToThreadEnv() || (!s.GetId() && !s.GetContextBound()) {
+			continue
+		}
+		hint := "give an id"
+		if def := contextDefault(s.GetDescription()); def != "" {
+			hint = "leave it out to mean " + def
+		}
+		fmt.Fprintf(cl.stderr, "code-foundry %s: --%s is empty; %s\n", name, s.GetName(), hint)
+		return errUsage
+	}
+	return nil
+}
+
+// contextDefault is what a context-bound arg defaults to, from the "(default: the
+// active thread)" its description ends in; "" without one.
+func contextDefault(desc string) string {
+	i := strings.LastIndex(desc, "(default: ")
+	if i < 0 {
+		return ""
+	}
+	def, _, _ := strings.Cut(desc[i+len("(default: "):], ")")
+	return def
 }
 
 // badFlag follows the flag package's one-line error ("flag provided but not defined:
@@ -330,6 +380,9 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		return err
 	}
 	msg := strings.TrimPrefix(ce.Message(), name+": ")
+	// A store's sentinel ("invalid argument: ...", "failed precondition: ...") repeats
+	// the code in words; the exit status already says it.
+	msg = strings.TrimPrefix(msg, strings.ReplaceAll(ce.Code().String(), "_", " ")+": ")
 	if commandFailed(ce) {
 		// The command's own failure (a plugin's error, its plugin down): its words, exit 1.
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
@@ -340,6 +393,9 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
 		fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage.\n", name)
 		return errUsage
+	case connect.CodeDeadlineExceeded:
+		// thread.wait's timeout: --json still prints an object (timedOut).
+		return &timeoutError{name: name, msg: msg}
 	case connect.CodeUnknown:
 		// The tool's own words (several lines from gh repo clone or create): as is.
 		if strings.Contains(msg, "\n") {
@@ -348,6 +404,21 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %s (%s)", name, msg, ce.Code())
+}
+
+// timeoutError is a command that timed out (thread wait --for): exit 1 with its
+// message, and with --json an object on stdout so a pipeline into jq gets input.
+type timeoutError struct{ name, msg string }
+
+func (e *timeoutError) Error() string { return e.name + ": " + e.msg }
+
+// timeoutJSON is what --json prints for a timeoutError.
+func timeoutJSON(e *timeoutError) string {
+	b, _ := json.Marshal(struct {
+		TimedOut bool   `json:"timedOut"`
+		Error    string `json:"error"`
+	}{true, e.msg})
+	return string(b)
 }
 
 // commandFailed reports whether ce carries a CommandFailed detail: the command could not

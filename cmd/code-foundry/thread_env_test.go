@@ -71,7 +71,8 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 		{name: "a reported exit code ends the CLI with it after the output",
 			args:     []string{"action", "run", "test", "--wait"},
 			res:      &v1.InvokeCommandResponse{Message: "FAIL\nTest exited with code 3 (run r1)", ExitCode: 3},
-			wantExit: 3, wantStdout: "FAIL\nTest exited with code 3 (run r1)\n"},
+			wantExit: 3, wantStdout: "FAIL\nTest exited with code 3 (run r1)\n",
+			wantStderr: "code-foundry action.run: exited with code 3 from what it ran, not a usage mistake\n"},
 		{name: "exit code 0 is success", args: []string{"action", "run", "test", "--wait"},
 			res: &v1.InvokeCommandResponse{Message: "ok"}, wantStdout: "ok\n"},
 		{name: "warnings go to stderr, the result stays on stdout", args: []string{"action", "run", "test"},
@@ -108,6 +109,9 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 				}
 			case err != nil:
 				t.Fatalf("err = %v\nstderr: %s", err, stderr.String())
+			}
+			if stderr.String() != tt.wantStderr {
+				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
 			if tt.wantStdout != "" && stdout.String() != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", stdout.String(), tt.wantStdout)

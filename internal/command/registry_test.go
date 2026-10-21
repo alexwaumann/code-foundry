@@ -183,7 +183,9 @@ func TestInvoke(t *testing.T) {
 		check   func(t *testing.T, s seen)
 	}{
 		{name: "unknown", cmd: "terminal.nope", wantErr: ErrUnknownCommand, wantMsg: `unknown command "terminal.nope"`},
-		{name: "unavailable", cmd: "terminal.kill", wantErr: ErrUnavailable, wantMsg: "terminal.kill: not available in this context"},
+		{name: "unavailable", cmd: "terminal.kill", ctx: Context{ActiveView: "dashboard"}, wantErr: ErrUnavailable, wantMsg: "terminal.kill: not available in this context"},
+		// From the CLI (no view) a missing context-bound arg is the reason given.
+		{name: "missing context arg", cmd: "terminal.kill", wantErr: ErrInvalidArgs, wantMsg: "terminal.kill: missing --id (default: the active terminal; there is none)"},
 		{name: "context supplies id", cmd: "terminal.kill", ctx: Context{ActiveTerminalID: "t1"}, wantMsg: "killed t1",
 			check: func(t *testing.T, s seen) {
 				if s.args.String("signal") != "hup" || s.args.Has("grace") || s.args.Bool("force") {

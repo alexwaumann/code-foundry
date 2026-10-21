@@ -45,7 +45,7 @@ func RegisterSlash(r *Registry, b SlashBackend) error {
 			"plugin skills and built-ins), minus the ones the app replaces or that mean nothing outside Claude's terminal.",
 		Category:     "Thread",
 		NoKeybinding: true,
-		Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}},
+		Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Positional: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}},
 		When:         hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			res, err := b.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{ThreadId: a.String("id")}))

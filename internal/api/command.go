@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -128,7 +129,7 @@ func commandToProto(c command.Listed) *v1.Command {
 	args := make([]*v1.ArgSpec, len(c.Args))
 	for i, a := range c.Args {
 		desc := a.Description
-		if a.Context != command.NoContext {
+		if a.Context != command.NoContext && !strings.Contains(desc, "(default:") {
 			desc += " (default: " + a.Context.Describe() + ")"
 		}
 		args[i] = &v1.ArgSpec{
@@ -143,6 +144,8 @@ func commandToProto(c command.Listed) *v1.Command {
 			DefaultToThreadEnv: a.DefaultToThreadEnv,
 			FileOrStdin:        a.FileOrStdin,
 			Repeatable:         a.Repeatable,
+			Id:                 a.ID != command.NoID,
+			ContextBound:       a.Context != command.NoContext,
 		}
 	}
 	return &v1.Command{

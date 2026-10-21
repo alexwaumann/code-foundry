@@ -66,12 +66,13 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 // (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
-	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}
+	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp}
+	r.SetRefResolver(ProjectID, func(ctx context.Context, _, ref string) (string, error) { return projectRef(ctx, b, ref, false) })
 	return r.RegisterAll(
 		Command{
 			Name:         "project.list",
 			Title:        "List Projects",
-			Description:  "List registered projects: name, id and path, one per line. The id is what --project and the other project commands take.",
+			Description:  "List registered projects: name, id and path, one per line. --project and the other project commands take the id or the name.",
 			Category:     "Project",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -144,7 +145,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 				"workspace has it; --force removes it anyway and deletes an unmerged branch." + forceNote,
 			Category: "Project",
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: the project the worktree is registered in)"},
+				{Name: "project", Type: String, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp + " (default: the project the worktree is registered in)"},
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch when it is merged into the default branch (with --force: always)"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked), or while a thread, terminal or workspace uses it; with --delete-branch, delete an unmerged branch too"},
@@ -187,7 +188,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Description: "Re-read git status now, for one project or all of them.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: all)"},
+				{Name: "project", Type: String, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp + " (default: all)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("project")
