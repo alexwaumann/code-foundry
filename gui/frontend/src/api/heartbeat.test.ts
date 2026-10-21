@@ -1,8 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
+import { EmberBoardSchema } from "@/gen/codefoundry/v1/ember_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
 import { AttachEventSchema } from "@/gen/codefoundry/v1/terminal_pb";
 import { ThreadEventSchema } from "@/gen/codefoundry/v1/thread_pb";
+import { watchEmberBoard } from "./ember";
 import type { DaemonConnection } from "./endpoint";
 import { watchEvents } from "./events";
 import { HEARTBEAT } from "./stream";
@@ -49,5 +51,14 @@ describe("stream openers map a StreamHeartbeat to HEARTBEAT", () => {
   it("EventService.Watch", async () => {
     const conn = fakeConn("watch", [create(EventSchema, { event: { case: "heartbeat", value: {} } })]);
     expect(await collect(watchEvents(signal, conn))).toEqual([HEARTBEAT]);
+  });
+
+  it("EmberService.WatchBoard", async () => {
+    const conn = fakeConn("watchBoard", [
+      create(EmberBoardSchema, { status: { enabled: true, epoch: 2 } }),
+      create(EmberBoardSchema, { heartbeat: {} }),
+    ]);
+    const got = await collect(watchEmberBoard(signal, conn));
+    expect(got.map((v) => (v === HEARTBEAT ? "heartbeat" : `epoch ${String(v.status.epoch)}`))).toEqual(["epoch 2", "heartbeat"]);
   });
 });

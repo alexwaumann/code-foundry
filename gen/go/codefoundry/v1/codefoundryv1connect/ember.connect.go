@@ -49,7 +49,7 @@ type EmberServiceClient interface {
 	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
 	// WatchBoard sends the whole board (status and every task) at once, then again on
 	// every change: a task, Ember's state, or a task's worker thread (its status or
-	// report).
+	// report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
 	WatchBoard(context.Context, *connect.Request[v1.WatchEmberBoardRequest]) (*connect.ServerStreamForClient[v1.EmberBoard], error)
 }
 
@@ -115,7 +115,7 @@ type EmberServiceHandler interface {
 	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
 	// WatchBoard sends the whole board (status and every task) at once, then again on
 	// every change: a task, Ember's state, or a task's worker thread (its status or
-	// report).
+	// report). A quiet board gets a heartbeat (EmberBoard.heartbeat) every 5 s.
 	WatchBoard(context.Context, *connect.Request[v1.WatchEmberBoardRequest], *connect.ServerStream[v1.EmberBoard]) error
 }
 

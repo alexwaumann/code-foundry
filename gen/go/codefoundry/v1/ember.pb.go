@@ -715,9 +715,12 @@ func (x *EmberTaskDescendant) GetDepth() int32 {
 
 // EmberBoard is the status and every task, in board order.
 type EmberBoard struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        *EmberStatus           `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Tasks         []*EmberTask           `protobuf:"bytes,2,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Status *EmberStatus           `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Tasks  []*EmberTask           `protobuf:"bytes,2,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	// WatchBoard only: nothing else was sent for a while (see StreamHeartbeat). A
+	// heartbeat carries no board: status and tasks are unset, and the last board stands.
+	Heartbeat     *StreamHeartbeat `protobuf:"bytes,3,opt,name=heartbeat,proto3" json:"heartbeat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -762,6 +765,13 @@ func (x *EmberBoard) GetStatus() *EmberStatus {
 func (x *EmberBoard) GetTasks() []*EmberTask {
 	if x != nil {
 		return x.Tasks
+	}
+	return nil
+}
+
+func (x *EmberBoard) GetHeartbeat() *StreamHeartbeat {
+	if x != nil {
+		return x.Heartbeat
 	}
 	return nil
 }
@@ -975,7 +985,7 @@ var File_codefoundry_v1_ember_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\n" +
-	"\x1acodefoundry/v1/ember.proto\x12\x0ecodefoundry.v1\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe0\x03\n" +
+	"\x1acodefoundry/v1/ember.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe0\x03\n" +
 	"\vEmberStatus\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x14\n" +
@@ -1038,11 +1048,12 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x0ereport_summary\x18\x06 \x01(\tR\rreportSummary\x121\n" +
 	"\x05state\x18\a \x01(\x0e2\x1b.codefoundry.v1.ThreadStateR\x05state\x12D\n" +
 	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12\x14\n" +
-	"\x05depth\x18\t \x01(\x05R\x05depth\"r\n" +
+	"\x05depth\x18\t \x01(\x05R\x05depth\"\xb1\x01\n" +
 	"\n" +
 	"EmberBoard\x123\n" +
 	"\x06status\x18\x01 \x01(\v2\x1b.codefoundry.v1.EmberStatusR\x06status\x12/\n" +
-	"\x05tasks\x18\x02 \x03(\v2\x19.codefoundry.v1.EmberTaskR\x05tasks\"\x17\n" +
+	"\x05tasks\x18\x02 \x03(\v2\x19.codefoundry.v1.EmberTaskR\x05tasks\x12=\n" +
+	"\theartbeat\x18\x03 \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatR\theartbeat\"\x17\n" +
 	"\x15GetEmberStatusRequest\"M\n" +
 	"\x16GetEmberStatusResponse\x123\n" +
 	"\x06status\x18\x01 \x01(\v2\x1b.codefoundry.v1.EmberStatusR\x06status\"+\n" +
@@ -1097,6 +1108,7 @@ var file_codefoundry_v1_ember_proto_goTypes = []any{
 	(ThreadState)(0),               // 13: codefoundry.v1.ThreadState
 	(ThreadStatus)(0),              // 14: codefoundry.v1.ThreadStatus
 	(ThreadReportStatus)(0),        // 15: codefoundry.v1.ThreadReportStatus
+	(*StreamHeartbeat)(nil),        // 16: codefoundry.v1.StreamHeartbeat
 }
 var file_codefoundry_v1_ember_proto_depIdxs = []int32{
 	12, // 0: codefoundry.v1.EmberStatus.epoch_started_at:type_name -> google.protobuf.Timestamp
@@ -1120,19 +1132,20 @@ var file_codefoundry_v1_ember_proto_depIdxs = []int32{
 	12, // 18: codefoundry.v1.EmberTaskDescendant.last_activity_at:type_name -> google.protobuf.Timestamp
 	1,  // 19: codefoundry.v1.EmberBoard.status:type_name -> codefoundry.v1.EmberStatus
 	3,  // 20: codefoundry.v1.EmberBoard.tasks:type_name -> codefoundry.v1.EmberTask
-	1,  // 21: codefoundry.v1.GetEmberStatusResponse.status:type_name -> codefoundry.v1.EmberStatus
-	3,  // 22: codefoundry.v1.ListEmberTasksResponse.tasks:type_name -> codefoundry.v1.EmberTask
-	7,  // 23: codefoundry.v1.EmberService.GetStatus:input_type -> codefoundry.v1.GetEmberStatusRequest
-	9,  // 24: codefoundry.v1.EmberService.ListTasks:input_type -> codefoundry.v1.ListEmberTasksRequest
-	11, // 25: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
-	8,  // 26: codefoundry.v1.EmberService.GetStatus:output_type -> codefoundry.v1.GetEmberStatusResponse
-	10, // 27: codefoundry.v1.EmberService.ListTasks:output_type -> codefoundry.v1.ListEmberTasksResponse
-	6,  // 28: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
-	26, // [26:29] is the sub-list for method output_type
-	23, // [23:26] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	16, // 21: codefoundry.v1.EmberBoard.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	1,  // 22: codefoundry.v1.GetEmberStatusResponse.status:type_name -> codefoundry.v1.EmberStatus
+	3,  // 23: codefoundry.v1.ListEmberTasksResponse.tasks:type_name -> codefoundry.v1.EmberTask
+	7,  // 24: codefoundry.v1.EmberService.GetStatus:input_type -> codefoundry.v1.GetEmberStatusRequest
+	9,  // 25: codefoundry.v1.EmberService.ListTasks:input_type -> codefoundry.v1.ListEmberTasksRequest
+	11, // 26: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
+	8,  // 27: codefoundry.v1.EmberService.GetStatus:output_type -> codefoundry.v1.GetEmberStatusResponse
+	10, // 28: codefoundry.v1.EmberService.ListTasks:output_type -> codefoundry.v1.ListEmberTasksResponse
+	6,  // 29: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
+	27, // [27:30] is the sub-list for method output_type
+	24, // [24:27] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ember_proto_init() }
@@ -1140,6 +1153,7 @@ func file_codefoundry_v1_ember_proto_init() {
 	if File_codefoundry_v1_ember_proto != nil {
 		return
 	}
+	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_thread_lifecycle_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
