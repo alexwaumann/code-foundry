@@ -9,7 +9,7 @@ Findings e13-2, e13-3, e13-5 and e13-7 of the second Ember battle test
 ### Notes on subscriptions (e13-2)
 
 - `thread subscribe --note "<why>"` (`SubscribeThreadRequest.note`, `SubscribeOptions.Note`)
-  is stored on the subscription: migration 0043 adds `thread_subscriptions.note` (TEXT,
+  is stored on the subscription: migration 0044 adds `thread_subscriptions.note` (TEXT,
   default ''). `thread.CleanNote` puts it on one line (whitespace runs as one space) and
   refuses more than `MaxNote` (200) characters: INVALID_ARGUMENT from the store, an args
   error from the CLI before any request.
@@ -107,8 +107,8 @@ not touched, so `ran_for` and `note` are self-describing in the wake JSON.
 - `gofmt` rewrote `''` in a Go comment to a typographic quote; say "empty" instead.
 - The command package has local variables named `thread`; it imports the store as
   `threadstore` in `commands_thread_subscribe.go`.
-- Migration numbers must be unique (`LoadMigrations` refuses a shared version): PR A
-  (task branch column) may also take 0043; whichever merges second renumbers.
+- Migration numbers must be unique (`LoadMigrations` refuses a shared version): PR #294
+  (task rollup) takes 0043 and merges first, so this one is 0044.
 
 ## Tests
 
@@ -161,4 +161,4 @@ transcripts deleted.
 
 ## Daemon restart
 
-Needed after merging: migration 0043, new proto fields, the ember store's timers.
+Needed after merging: migration 0044, new proto fields, the ember store's timers.

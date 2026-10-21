@@ -8,7 +8,7 @@ import (
 )
 
 // Persistence for thread_subscriptions (migrations 0024, 0034 args, 0037 suppressed_at and
-// 0043 note; subscriptions.go). Times are
+// 0044 note; subscriptions.go). Times are
 // unix milliseconds, 0 for none. Rows of a removed subscriber go with its threads row
 // (ON DELETE CASCADE); the store deletes the rest itself.
 
