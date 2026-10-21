@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UiContextView } from "@/api/command";
 import { SHELL_GAP } from "@/design/tokens";
+import { bool, finite, persistedRecord } from "./persisted";
 
 /**
  * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
@@ -396,22 +397,30 @@ export const useUiStore = create<UiState>()(
         const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
         return rest as Partial<UiState> as UiState;
       },
-      // A saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 180, saved before the minimum
-      // rose to 220) is clamped on load, so it renders and drags from a valid width.
+      // Only the persisted fields, each checked (stores/persisted.ts): a store another build
+      // wrote, or a hand edit, never puts a wrong-typed value in the window's state. Numbers
+      // are clamped: a saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 180, saved before
+      // the minimum rose to 220) renders and drags from a valid width.
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<UiState>;
-        const merged = {
+        const p = persistedRecord(persisted);
+        const num = (v: unknown, lo: number, hi: number, fallback: number): number => {
+          const n = finite(v);
+          return n === undefined ? fallback : clamp(Math.round(n), lo, hi);
+        };
+        return {
           ...current,
-          ...p,
+          sidebarVisible: bool(p.sidebarVisible, current.sidebarVisible),
+          sidebarWidth: num(p.sidebarWidth, SIDEBAR_MIN, SIDEBAR_MAX, current.sidebarWidth),
+          fontSize: num(p.fontSize, FONT_MIN, FONT_MAX, current.fontSize),
+          zoom: num(p.zoom, ZOOM_MIN, ZOOM_MAX, current.zoom),
           usageRange: isUsageRange(p.usageRange) ? p.usageRange : current.usageRange,
-          workingCollapsed: typeof p.workingCollapsed === "boolean" ? p.workingCollapsed : current.workingCollapsed,
-          archivedCollapsed: typeof p.archivedCollapsed === "boolean" ? p.archivedCollapsed : current.archivedCollapsed,
-          snoozedCollapsed: typeof p.snoozedCollapsed === "boolean" ? p.snoozedCollapsed : current.snoozedCollapsed,
+          workingCollapsed: bool(p.workingCollapsed, current.workingCollapsed),
+          archivedCollapsed: bool(p.archivedCollapsed, current.archivedCollapsed),
+          snoozedCollapsed: bool(p.snoozedCollapsed, current.snoozedCollapsed),
           collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
           collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
-          emberShowWork: typeof p.emberShowWork === "boolean" ? p.emberShowWork : current.emberShowWork,
+          emberShowWork: bool(p.emberShowWork, current.emberShowWork),
         };
-        return typeof p.sidebarWidth === "number" ? { ...merged, sidebarWidth: clamp(Math.round(p.sidebarWidth), SIDEBAR_MIN, SIDEBAR_MAX) } : merged;
       },
       partialize: (s) => ({
         sidebarVisible: s.sidebarVisible,

@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { WorkInMode } from "@/lib/compose";
+import { oneOf, persistedRecord, recordOf } from "./persisted";
 
 interface WorkInState {
   /** Project id → the last fresh-copy / in-place pick. */
@@ -23,6 +24,10 @@ export const useWorkInStore = create<WorkInState>()(
       const p = (persisted ?? {}) as { byRepo?: WorkInState["byProject"]; byProject?: WorkInState["byProject"] };
       return { byProject: (version < 2 ? p.byRepo : p.byProject) ?? {} };
     },
+    merge: (persisted, current) => ({
+      ...current,
+      byProject: recordOf(persistedRecord(persisted).byProject, (v) => oneOf<WorkInMode | "">(v, ["new", "current"], "") || undefined),
+    }),
   }),
 );
 

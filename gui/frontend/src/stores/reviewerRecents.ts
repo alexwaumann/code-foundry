@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ReviewerKindView } from "@/api/gh";
+import { isRecord, persistedRecord, recordOf } from "./persisted";
 
 export interface RecentReviewer {
   login: string;
@@ -22,8 +23,24 @@ interface ReviewerRecentsState {
   bySlug: Readonly<Record<string, readonly RecentReviewer[]>>;
 }
 
+function recentReviewer(v: unknown): RecentReviewer | undefined {
+  if (!isRecord(v) || typeof v.login !== "string" || !v.login || (v.kind !== "user" && v.kind !== "team")) return undefined;
+  return { login: v.login, name: typeof v.name === "string" ? v.name : "", avatarUrl: typeof v.avatarUrl === "string" ? v.avatarUrl : "", kind: v.kind };
+}
+
 export const useReviewerRecentsStore = create<ReviewerRecentsState>()(
-  persist((): ReviewerRecentsState => ({ bySlug: {} }), { name: "code-foundry.reviewerRecents", version: 1 }),
+  persist((): ReviewerRecentsState => ({ bySlug: {} }), {
+    name: "code-foundry.reviewerRecents",
+    version: 1,
+    // Only well-formed reviewers in lists (stores/persisted.ts).
+    merge: (persisted, current) => ({
+      ...current,
+      bySlug: recordOf(persistedRecord(persisted).bySlug, (v) => {
+        const list = Array.isArray(v) ? v.map(recentReviewer).filter((r) => r !== undefined) : [];
+        return list.length > 0 ? list.slice(0, RECENT_REVIEWERS_MAX) : undefined;
+      }),
+    }),
+  }),
 );
 
 const slugKey = (slug: string): string => slug.toLowerCase();
