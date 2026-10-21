@@ -130,6 +130,9 @@ type Options struct {
 	StartTimeout  time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
 	CloseTimeout  time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
 	Tick          time.Duration // transcript poll and housekeeping; default 1s
+	// WakeStartBackoff is how long wakes to a thread wait after its Claude failed to
+	// start, doubling with each failure in a row (wakebackoff.go); default 1m.
+	WakeStartBackoff time.Duration
 	// ControlTimeout bounds the answer to a control request a Store call makes for its
 	// caller (Interrupt, SetModel, SetPermissionMode; boundedControl); default 10s.
 	ControlTimeout time.Duration
@@ -237,6 +240,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
 	def(&o.ControlTimeout, 10*time.Second)
+	def(&o.WakeStartBackoff, time.Minute)
 	def(&o.SendTimeout, 30*time.Second)
 	def(&o.Tick, time.Second)
 	def(&o.WakeTimeout, 10*time.Second)
@@ -319,6 +323,9 @@ type record struct {
 	envPrint *extrasPrint
 	// wait is the waiting overlay's state (waiting.go).
 	wait waitState
+	// startFails counts the failed starts since the last one that came up: wakes
+	// back off (wakebackoff.go).
+	startFails failedStarts
 }
 
 var _ Store = (*Manager)(nil)
@@ -1149,6 +1156,9 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
 			rec.run = nil
+			if r.startFailed {
+				rec.noteStartFailed() // wakes back off (wakebackoff.go)
+			}
 			// The process is gone: the next spawn gets the current extras.
 			rec.envPrint = nil
 			rec.s.PluginEnvStale, rec.s.PluginEnvChange = false, ""

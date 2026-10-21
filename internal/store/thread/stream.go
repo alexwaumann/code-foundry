@@ -379,6 +379,7 @@ func (r *runner) onInitialized(res initResult) {
 	}
 	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
+		rec.startFails = failedStarts{} // it starts: wakes go at once again (wakebackoff.go)
 		if rec.s.State == StateStarting {
 			rec.s.State = StateConnected
 		}
