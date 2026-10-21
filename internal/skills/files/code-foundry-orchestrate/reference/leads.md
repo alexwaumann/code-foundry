@@ -8,6 +8,14 @@ the lead follows.
   `code-foundry thread report done` listing each worker" rather than copying these rules
   into the prompt. A lead only coordinates: give it no new worktree. It never runs
   `project worktree cleanup`: its parent owns it.
+- A lead starts its workers within its first few tool calls: it reads only what it needs
+  to write their prompts, plans at the file level (who owns which file, which pieces
+  stack with `--base`), never at the line level, and runs no experiments. Conflicts found
+  later are reported, not prevented: never promise a parent conflict-free branches.
+- Each worker's branch delivers its whole piece on its own. When two pieces must change
+  the same code, stack them (`--base`) or let them conflict and say so in the first
+  progress report; never move part of one piece into another's branch, unless the
+  parent said to.
 - Before a lead ends a turn while its workers still run, it posts `code-foundry thread
   report progress "<n> workers started: <ids>"` (with the ids its `thread new` calls
   printed), so its parent's `thread reports` shows where it stands. No settle of a lead
@@ -21,3 +29,5 @@ the lead follows.
   included (a new report replaces the old); a parent runs `thread reports
   --descendants-of <lead>` (with costs) before presenting it, and quotes cost from
   `thread list --descendants-of $CODE_FOUNDRY_THREAD` (the whole tree, itself included).
+  A follow-up on a piece a lead ran goes to that piece's worker (`thread send`; the
+  lead's report or `thread list --descendants-of <lead>` names it), not to a new thread.

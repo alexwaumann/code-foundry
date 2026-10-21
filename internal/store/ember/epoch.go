@@ -158,7 +158,7 @@ func (s *Store) projectSeeds() []ProjectSeed {
 	showCreated := s.opts.Config().ShowCreatedThreads
 	out := make([]ProjectSeed, 0, len(ps.Projects))
 	for _, p := range ps.Projects {
-		seed := ProjectSeed{ID: p.ID, Name: p.Name, Path: p.Path, DefaultBranch: p.DefaultBranch, Git: p.Git}
+		seed := ProjectSeed{ID: p.ID, Name: p.Name, Path: p.Path, DefaultBranch: p.DefaultBranch, Git: p.Git, GitHubSlug: p.GitHubSlug}
 		var list []thread.Thread
 		if threads != nil {
 			for _, t := range threads.Threads {

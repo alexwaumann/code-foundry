@@ -60,6 +60,10 @@ wrong with the child. Check its worktree (`git status`, `git diff`: an edit may 
 uncommitted), and for a user's interrupt ask the user before resuming; a `thread
 interrupt` of your own you resume with `thread send --id <child>` saying what you checked.
 
+A child whose process crashed (reason `crashed`, or the wake says its process died and
+nobody stopped it) is not the user's interrupt: check its worktree the same way and
+resume it once with `thread send --id <child>` without asking.
+
 ## After the app restarts
 
 When a wake says the app restarted, or the user does: the restart wake lists the

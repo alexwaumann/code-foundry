@@ -114,18 +114,27 @@ func TestRenderSkills(t *testing.T) {
 }
 
 func TestRenderProjects(t *testing.T) {
-	got := RenderProjects([]ProjectSeed{
-		{ID: "p-1", Name: "app", Path: "/u/app", DefaultBranch: "main", Git: true,
-			Threads: []ThreadLine{{ID: "s-1", Name: "Fix it", State: "idle"}, {ID: "s-2", Name: "Docs", State: "busy"}}},
-		{ID: "p-2", Name: "notes", Path: "/u/notes"},
-	})
-	for _, w := range []string{
-		"- **app** (`p-1`) · /u/app · git, default branch main\n  Latest threads: s-1 \"Fix it\" (idle); s-2 \"Docs\" (busy)\n",
-		"- **notes** (`p-2`) · /u/notes · not a git repository\n",
-	} {
-		if !strings.Contains(got, w) {
-			t.Errorf("projects lack %q:\n%s", w, got)
-		}
+	threads := []ThreadLine{{ID: "s-1", Name: "Fix it", State: "idle"}, {ID: "s-2", Name: "Docs", State: "busy"}}
+	tests := []struct {
+		name string
+		p    ProjectSeed
+		want string
+	}{
+		{"github origin", ProjectSeed{ID: "p-1", Name: "app", Path: "/u/app", DefaultBranch: "main", Git: true, GitHubSlug: "acme/app", Threads: threads},
+			"- **app** (`p-1`) · /u/app · git, default branch main, origin: GitHub (acme/app)\n  Latest threads: s-1 \"Fix it\" (idle); s-2 \"Docs\" (busy)\n"},
+		{"local or other origin", ProjectSeed{ID: "p-3", Name: "tally", Path: "/u/tally", DefaultBranch: "main", Git: true},
+			"- **tally** (`p-3`) · /u/tally · git, default branch main, origin: local/other (no pull requests)\n"},
+		{"no default branch yet", ProjectSeed{ID: "p-4", Name: "new", Path: "/u/new", Git: true},
+			"- **new** (`p-4`) · /u/new · git, origin: local/other (no pull requests)\n"},
+		{"not git", ProjectSeed{ID: "p-2", Name: "notes", Path: "/u/notes"},
+			"- **notes** (`p-2`) · /u/notes · not a git repository\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RenderProjects([]ProjectSeed{tt.p}); !strings.Contains(got, tt.want) {
+				t.Errorf("projects lack %q:\n%s", tt.want, got)
+			}
+		})
 	}
 	if got := RenderProjects(nil); !strings.Contains(got, "None yet") {
 		t.Errorf("no projects = %q", got)
