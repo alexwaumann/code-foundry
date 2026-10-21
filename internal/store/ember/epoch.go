@@ -22,8 +22,9 @@ type persisted struct {
 	// Epoch is the resident's epoch the store last saw, EpochStartedAt when it began.
 	Epoch          int       `json:"epoch"`
 	EpochStartedAt time.Time `json:"epoch_started_at"`
-	// LastConsolidatedAt is when the last consolidation finished (its input starts
-	// there next time); LastConsolidationError why it failed, "" when it went well.
+	// LastConsolidatedAt is when the last good consolidation finished (its input starts
+	// there next time; a failed one leaves it); LastConsolidationError why the last one
+	// failed, "" when it went well.
 	LastConsolidatedAt     time.Time `json:"last_consolidated_at"`
 	LastConsolidationError string    `json:"last_consolidation_error,omitempty"`
 	// LastConsolidationUsage is the last consolidation call's usage (nil before one
@@ -214,8 +215,8 @@ func (s *Store) Reseed(ctx context.Context) (Status, error) {
 }
 
 // boundary runs an epoch boundary for resident id (s.consolidating set by the caller,
-// cleared here): consolidation (a failure keeps MEMORY.md and goes on), the seed, the
-// reseed.
+// cleared here): consolidation (a failure keeps MEMORY.md and LastConsolidatedAt, and
+// goes on), the seed, the reseed.
 func (s *Store) boundary(ctx context.Context, id string) error {
 	s.epochMu.Lock()
 	defer s.epochMu.Unlock()
@@ -236,10 +237,14 @@ func (s *Store) boundary(ctx context.Context, id string) error {
 	}
 	now := s.opts.Now()
 	s.mu.Lock()
-	s.st.Epoch, s.st.EpochStartedAt, s.st.LastConsolidatedAt = t.Epoch, now, now
+	s.st.Epoch, s.st.EpochStartedAt = t.Epoch, now
 	s.st.LastConsolidationError = ""
 	if consErr != nil {
+		// The next consolidation starts where the last good one ended, so this epoch's
+		// conversation still reaches MEMORY.md (ConsolidationInput caps the input).
 		s.st.LastConsolidationError = consErr.Error()
+	} else {
+		s.st.LastConsolidatedAt = now
 	}
 	s.saveStateLocked()
 	s.mu.Unlock()
