@@ -4,9 +4,9 @@ PR B of the Ember battle test round 2 (`/tmp/ember-r2/results/SYNTHESIS.md`). Fi
 e4-2 and e5-3 (crashed vs interrupted), e10-1 (restart notice for a cut turn), e10-2
 (first prompt lost), e10-7 (reported, then stopped), e12-2 (archive's own settle wake),
 e2-4 (sibling counts), e2-5 ("said more after its report"), e13-1 (timer turn while
-waiting). Daemon (`internal/store/thread`), migration 0043, the GUI's status words, one
-line of the orchestrate skill. Follows `orch-restart-wakes.md`, `orch-wakes-content.md`,
-`orch-waiting-status.md`, `orch-child-context.md` and `ember-fixes-1-wakes.md`.
+waiting). Daemon (`internal/store/thread`), migration 0043, the GUI's status words. Follows
+`orch-restart-wakes.md`, `orch-wakes-content.md`, `orch-waiting-status.md`,
+`orch-child-context.md` and `ember-fixes-1-wakes.md`.
 
 ## Decisions
 
@@ -27,8 +27,9 @@ line of the orchestrate skill. Follows `orch-restart-wakes.md`, `orch-wakes-cont
 * CLI: `error (crashed)` (the generic `status (reason)`, no code change; a test row).
   GUI: a `crashed` status kind and line ("Crashed while working · 2 min ago", red),
   folded into "error" by the lineage and Ember words like `interrupted`.
-* `reference/wakes.md` (Interrupted): a `crashed` child is resumed without asking the
-  user; check its worktree, `thread send`, ask only if it crashes again.
+* The skill line (a crashed child is resumed without asking) came with the skill PR
+  (`ember-fixes-2-skill.md`, already on main): its `reference/wakes.md` paragraph says
+  it, so this PR adds none.
 * `interruptedByStop` still means `interrupted` with a daemon disconnect reason; a crash
   is not a stop, so the restart engine does not treat it as one.
 

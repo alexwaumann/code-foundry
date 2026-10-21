@@ -59,8 +59,6 @@ error such as "was NOT written": that is the interrupt, not a rejection, and not
 wrong with the child. Check its worktree (`git status`, `git diff`: an edit may sit there
 uncommitted), and for a user's interrupt ask the user before resuming; a `thread
 interrupt` of your own you resume with `thread send --id <child>` saying what you checked.
-A `crashed` child (its process died; no one stopped it) you resume without asking the
-user: check its worktree, then `thread send --id <child>`; ask only if it crashes again.
 
 A child whose process crashed (reason `crashed`, or the wake says its process died and
 nobody stopped it) is not the user's interrupt: check its worktree the same way and
