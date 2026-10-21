@@ -380,6 +380,9 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		return err
 	}
 	msg := strings.TrimPrefix(ce.Message(), name+": ")
+	// A store's sentinel ("invalid argument: ...", "failed precondition: ...") repeats
+	// the code in words; the exit status already says it.
+	msg = strings.TrimPrefix(msg, strings.ReplaceAll(ce.Code().String(), "_", " ")+": ")
 	if commandFailed(ce) {
 		// The command's own failure (a plugin's error, its plugin down): its words, exit 1.
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
