@@ -15,7 +15,9 @@ test("a timeline row that fails to render degrades alone", async ({ page }) => {
   const pane = page.getByTestId("thread-pane");
   await expect(pane.getByTestId("thread-user").first()).toBeVisible();
   await page.evaluate(async () => {
-    const { useThreadStore } = (await import("/src/stores/thread.ts" as string)) as {
+    // The app's own store, from the Vite dev server (the instance the app runs).
+    const storeUrl = "/src/stores/thread.ts";
+    const { useThreadStore } = (await import(/* @vite-ignore */ storeUrl)) as {
       useThreadStore: { setState: (f: (s: { logs: Record<string, { byId: Record<string, { ordinal: number }>; order: string[] }> }) => unknown) => void };
     };
     useThreadStore.setState((s) => {
