@@ -207,6 +207,11 @@ func TestCreateRefusals(t *testing.T) {
 			h := newHarness(t)
 			h.create("taken", "api")
 			before := len(h.projects.Creates)
+			// Refused before the branch is named (a model call when it is derived).
+			h.m.opts.DefaultBranch = func(context.Context, string) string {
+				t.Error("branch named for a refused workspace")
+				return ""
+			}
 			_, err := h.m.Create(context.Background(), tt.opts)
 			if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.errText) {
 				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, tt.errText)
