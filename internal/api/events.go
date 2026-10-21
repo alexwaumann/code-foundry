@@ -367,9 +367,9 @@ func busTopic[T any](b *bus.Bus, n int, conv func(T) *v1.Event) topic {
 
 // transientTopic is busTopic for a transient topic.
 func transientTopic[T any](b *bus.Bus, n int, conv func(T) *v1.Event) topic {
-	t := busTopic(b, n, conv)
-	t.transient = true
-	return t
+	return topic{transient: true, open: func() tap {
+		return &busTap[T]{sub: bus.Subscribe[T](b, n), conv: conv, transient: true}
+	}}
 }
 
 // tap is one bus subscription feeding a source's events to emit.
@@ -384,6 +384,9 @@ type tap interface {
 type busTap[T any] struct {
 	sub  *bus.Subscription[T]
 	conv func(T) *v1.Event
+	// transient: no snapshot restores the topic's events, so a drop keeps the ones
+	// still buffered (see run).
+	transient bool
 }
 
 func (t *busTap[T]) close() { t.sub.Close() }
@@ -401,13 +404,48 @@ func (t *busTap[T]) run(ctx context.Context, emit func(*v1.Event) bool) {
 				return
 			}
 			if d := t.sub.Dropped(); d != dropped {
-				dropped = d // msg stays nil: resync
+				if t.transient {
+					// Nothing to resync from: mark the gap, then go on with every
+					// event still buffered, this one first.
+					dropped = d
+					if !emit(nil) {
+						return
+					}
+					if msg = t.conv(ev); msg == nil {
+						continue
+					}
+					break
+				}
+				// The marker makes the receiver take a snapshot, which is newer than
+				// every event still buffered (all published before the newest ones,
+				// which were dropped). Emitted after the marker, those older events
+				// would be numbered past the snapshot and applied on top of it, and
+				// the client would end on stale state. Drop them here instead.
+				if !t.drain() {
+					return
+				}
+				dropped = t.sub.Dropped() // drops while draining: the same snapshot covers them
+				// msg stays nil: resync
 			} else if msg = t.conv(ev); msg == nil {
 				continue
 			}
 		}
 		if !emit(msg) {
 			return
+		}
+	}
+}
+
+// drain discards the events buffered in the subscription; false when it was closed.
+func (t *busTap[T]) drain() bool {
+	for {
+		select {
+		case _, ok := <-t.sub.C():
+			if !ok {
+				return false
+			}
+		default:
+			return true
 		}
 	}
 }
