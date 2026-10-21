@@ -1,7 +1,7 @@
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileArchive, FileCode, FileImage, FileJson, FileTerminal, FileText, File as FileIcon } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { HTML_PREVIEW_CSP, fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, sandboxedDocument, tooLargeHeading, truncatedNotice } from "./fileKind";
+import { fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
 
 describe("previewKindOf", () => {
   it.each([
@@ -85,19 +85,5 @@ describe("firstChangeLine", () => {
   it("an added file starts at 1; no hunks: null", () => {
     expect(firstChangeLine(parseDiffFromFile(null, { name: "a.ts", contents: "x\n" }))).toBe(1);
     expect(firstChangeLine(parseDiffFromFile({ name: "a.ts", contents: old }, { name: "a.ts", contents: old }))).toBeNull();
-  });
-});
-
-describe("sandboxedDocument", () => {
-  it("puts the CSP first", () => {
-    const doc = sandboxedDocument("<!doctype html><p>x</p>");
-    expect(doc.startsWith(`<meta http-equiv="Content-Security-Policy" content="${HTML_PREVIEW_CSP}">`)).toBe(true);
-    expect(HTML_PREVIEW_CSP).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:");
-  });
-
-  it("the CSP lands in the head of the parsed document", () => {
-    const parsed = new DOMParser().parseFromString(sandboxedDocument("<!doctype html><html><head><title>t</title></head><body><p>x</p></body></html>"), "text/html");
-    expect(parsed.head.querySelector('meta[http-equiv="Content-Security-Policy"]')).not.toBeNull();
-    expect(parsed.body.textContent).toBe("x");
   });
 });

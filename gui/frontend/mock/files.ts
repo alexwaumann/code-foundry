@@ -11,12 +11,13 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import type { ReadFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
+import type { PreviewFileResponseSchema, ReadFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { HOME } from "./filesystem";
 import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
+type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
 type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
 
 /** What the detail fixtures say about a changed file (mock/github.ts FileInit). */
@@ -103,9 +104,14 @@ export const PREVIEW_HTML = `<!doctype html>
 <html><head><title>Preview</title><style>body{font-family:sans-serif;color:#123;margin:24px} h1{color:#0a6}</style></head>
 <body>
 <h1 id="title">Hello from the preview</h1>
-<p>A paragraph with <strong>bold</strong> text.</p>
-<img id="remote" src="https://example.com/x.png" alt="remote">
-<script>document.getElementById("title").textContent = "script ran";</script>
+<p>A paragraph with <strong>bold</strong> text. <a id="anchor" href="#title">Top</a> · <a id="sibling" href="../docs/logo.png">Logo</a></p>
+<img id="local" src="logo.png" alt="local">
+<button id="count" type="button">0 clicks</button>
+<script>
+document.getElementById("title").textContent = "script ran";
+let n = 0;
+document.getElementById("count").addEventListener("click", () => { n++; document.getElementById("count").textContent = n + " clicks"; });
+</script>
 </body></html>
 `;
 
@@ -188,6 +194,39 @@ export class MockFiles {
     if (!c || c.file.status === "D") return undefined;
     if (c.file.binary) return { data: PNG, mime: "image/png", binary: true };
     return text(generated(c.file.path));
+  }
+
+  /** Grants mock/preview-<n> ids per scope: code-foundry's checkout for its files, else the file's directory. */
+  private grants = new Map<string, string>();
+
+  previewFile(baseDir: string, path: string): PreviewInit {
+    const r = this.readFile(baseDir, path, 1n);
+    const abs = r.resolvedPath ?? "";
+    if (r.notFound) throw new ConnectError(`${abs} does not exist`, Code.NotFound);
+    if (r.isDir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
+    const scope = abs.startsWith(`${CF}/`) ? CF : abs.slice(0, abs.lastIndexOf("/"));
+    let grant = this.grants.get(scope);
+    if (!grant) {
+      grant = `mock-preview-${String(this.grants.size + 1)}`;
+      this.grants.set(scope, grant);
+    }
+    const rel = abs.slice(scope.length + 1);
+    this.calls.push(`preview ${abs}`);
+    return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope };
+  }
+
+  /** GET /preview/<grant>/<path>: the file under the grant's scope (a directory serves its index.html), or undefined. */
+  previewEntry(pathname: string): { data: Uint8Array; mime: string } | undefined {
+    const m = /^\/preview\/([^/]+)\/(.*)$/.exec(pathname);
+    if (!m) return undefined;
+    const scope = [...this.grants].find(([, id]) => id === m[1])?.[0];
+    if (scope === undefined) return undefined;
+    const rel = decodeURIComponent(m[2] ?? "");
+    if (rel.split("/").includes("..")) return undefined;
+    const abs = normalize(`${scope}/${rel}`);
+    if (abs !== scope && !abs.startsWith(`${scope}/`)) return undefined;
+    const e = this.onDisk(abs) ?? this.onDisk(`${abs}/index.html`);
+    return e && !e.dir ? { data: e.data, mime: e.mime } : undefined;
   }
 
   readFile(baseDir: string, path: string, maxBytes: bigint): ReadInit {

@@ -79,3 +79,27 @@ export async function readFile(baseDir: string, path: string, conn: DaemonConnec
     throw orOutdatedDaemon(err);
   }
 }
+
+/** Where the HTML preview loads a file from (FilesystemService.PreviewFile). */
+export interface FilePreview {
+  /** Absolute URL on the daemon's loopback listener; no bearer token needed (the grant is in the path). */
+  url: string;
+  /** Absolute directory the page may load files from: its checkout, else its directory. */
+  scope: string;
+}
+
+/**
+ * Grants the HTML preview a URL for `path` (as for readFile) and joins it to the daemon's
+ * base URL. A missing file is NotFound; a directory or a path outside home is
+ * InvalidArgument. A daemon older than the RPC fails with OutdatedDaemonError.
+ */
+export async function previewFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FilePreview> {
+  const c = await conn.client(FilesystemService);
+  try {
+    const r = await c.previewFile({ baseDir, path }, { signal });
+    const { baseUrl } = await conn.resolveEndpoint();
+    return { url: new URL(r.url, baseUrl).toString(), scope: r.scope };
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}

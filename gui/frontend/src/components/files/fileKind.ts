@@ -112,19 +112,3 @@ export function tooLargeHeading(kind: "Image" | "PDF", size: number): string {
 export function truncatedNotice(size: number): string {
   return `Showing the first 1 MiB of ${formatSize(size)}`;
 }
-
-/**
- * What the frame may load: nothing but inline styles and data: images. The sandbox already
- * stops scripts, forms and navigation; this stops the network (remote stylesheets, images,
- * fonts) too, so opening a file cannot call home.
- */
-export const HTML_PREVIEW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
-
-/**
- * The document the frame shows: the file with the CSP as its first element. A <meta> before
- * <html> still lands in the document's head (the parser opens html and head for it), and a
- * CSP meta applies to everything parsed after it.
- */
-export function sandboxedDocument(html: string): string {
-  return `<meta http-equiv="Content-Security-Policy" content="${HTML_PREVIEW_CSP}">${html}`;
-}

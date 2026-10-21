@@ -45,6 +45,9 @@ const (
 	// FilesystemServiceReadFileProcedure is the fully-qualified name of the FilesystemService's
 	// ReadFile RPC.
 	FilesystemServiceReadFileProcedure = "/codefoundry.v1.FilesystemService/ReadFile"
+	// FilesystemServicePreviewFileProcedure is the fully-qualified name of the FilesystemService's
+	// PreviewFile RPC.
+	FilesystemServicePreviewFileProcedure = "/codefoundry.v1.FilesystemService/PreviewFile"
 )
 
 // FilesystemServiceClient is a client for the codefoundry.v1.FilesystemService service.
@@ -80,6 +83,16 @@ type FilesystemServiceClient interface {
 	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
 	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+	// listener that serves the file, and everything else under its scope, without the
+	// bearer token: the scope is the registered checkout holding the file, else its
+	// directory. A sandboxed frame loads the page from there so its scripts run and its
+	// relative links, stylesheets, scripts and images resolve. The grant is an
+	// unguessable id in the URL, scoped to that directory tree and never reaching above
+	// it or outside the home directory (symlinks resolved); it lasts until the daemon
+	// stops. path is as for ReadFile: InvalidArgument when it is outside the home
+	// directory, relative without an absolute base_dir, or not a regular file.
+	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 
 // NewFilesystemServiceClient constructs a client for the codefoundry.v1.FilesystemService service.
@@ -117,6 +130,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
 			connect.WithClientOptions(opts...),
 		),
+		previewFile: connect.NewClient[v1.PreviewFileRequest, v1.PreviewFileResponse](
+			httpClient,
+			baseURL+FilesystemServicePreviewFileProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("PreviewFile")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -126,6 +145,7 @@ type filesystemServiceClient struct {
 	listSkills      *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
 	searchFiles     *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
 	readFile        *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
+	previewFile     *connect.Client[v1.PreviewFileRequest, v1.PreviewFileResponse]
 }
 
 // ListDirectories calls codefoundry.v1.FilesystemService.ListDirectories.
@@ -146,6 +166,11 @@ func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.
 // ReadFile calls codefoundry.v1.FilesystemService.ReadFile.
 func (c *filesystemServiceClient) ReadFile(ctx context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return c.readFile.CallUnary(ctx, req)
+}
+
+// PreviewFile calls codefoundry.v1.FilesystemService.PreviewFile.
+func (c *filesystemServiceClient) PreviewFile(ctx context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
+	return c.previewFile.CallUnary(ctx, req)
 }
 
 // FilesystemServiceHandler is an implementation of the codefoundry.v1.FilesystemService service.
@@ -181,6 +206,16 @@ type FilesystemServiceHandler interface {
 	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
 	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	// PreviewFile grants the File tab's HTML preview a URL on the daemon's loopback
+	// listener that serves the file, and everything else under its scope, without the
+	// bearer token: the scope is the registered checkout holding the file, else its
+	// directory. A sandboxed frame loads the page from there so its scripts run and its
+	// relative links, stylesheets, scripts and images resolve. The grant is an
+	// unguessable id in the URL, scoped to that directory tree and never reaching above
+	// it or outside the home directory (symlinks resolved); it lasts until the daemon
+	// stops. path is as for ReadFile: InvalidArgument when it is outside the home
+	// directory, relative without an absolute base_dir, or not a regular file.
+	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
 }
 
 // NewFilesystemServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -214,6 +249,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServicePreviewFileHandler := connect.NewUnaryHandler(
+		FilesystemServicePreviewFileProcedure,
+		svc.PreviewFile,
+		connect.WithSchema(filesystemServiceMethods.ByName("PreviewFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.FilesystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FilesystemServiceListDirectoriesProcedure:
@@ -224,6 +265,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
 		case FilesystemServiceReadFileProcedure:
 			filesystemServiceReadFileHandler.ServeHTTP(w, r)
+		case FilesystemServicePreviewFileProcedure:
+			filesystemServicePreviewFileHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -247,4 +290,8 @@ func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *conne
 
 func (UnimplementedFilesystemServiceHandler) ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.ReadFile is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.PreviewFile is not implemented"))
 }

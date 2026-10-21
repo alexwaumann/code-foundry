@@ -90,7 +90,8 @@ command only needs an absolute directory). Row two: the mode switches (the Usage
   directory and shown from an object URL. A `max-w-3xl` reading column; `files.css` puts
   the body on `text-body` and h1/h2/h3+ on `text-title`/`text-heading`/`text-subheading`
   through `@apply` (with `@reference "../../index.css"`).
-- **HTML Rendered**: `<iframe sandbox="" srcdoc referrerpolicy="no-referrer">` on a white
+- **HTML Rendered** (as first shipped; superseded by the daemon-served interactive frame,
+  `html-preview-interactive.md`): `<iframe sandbox="" srcdoc referrerpolicy="no-referrer">` on a white
   canvas (allowlisted in the palette guard), the document prefixed with `<meta
   http-equiv="Content-Security-Policy" content="default-src 'none'; style-src
   'unsafe-inline'; img-src data:">`, and the muted shield footer. The frame has an

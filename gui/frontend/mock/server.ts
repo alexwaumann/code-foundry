@@ -94,7 +94,7 @@
  *                                                 none; reset restores DEFAULT_FILES)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
- *   FilesystemService.ReadFile, ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
+ *   FilesystemService.ReadFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
  *   POST /__mock/fs/write?path=…&text=…           (a file's contents on disk; reset restores the fixtures)
  *   GET  /__mock/fs/calls                         ("read <path>", "diff <worktree> <file> <working|branch>")
@@ -358,6 +358,7 @@ function routes(router: ConnectRouter): void {
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFilesSlow(world.projects, req.projectId, req.path, req.query, req.limit),
     readFile: (req) => mockFiles.readFile(req.baseDir, req.path, req.maxBytes),
+    previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
   });
 
   router.service(GhService, {
@@ -1330,6 +1331,24 @@ const server = createServer((req, res) => {
   if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
+    return;
+  }
+  // The HTML preview's route authenticates by the grant in its URL, like the daemon's (internal/preview).
+  if (url.pathname.startsWith("/preview/")) {
+    const e = mockFiles.previewEntry(url.pathname);
+    if (!e) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("not found\n");
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": e.mime,
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads",
+    });
+    res.end(e.data);
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

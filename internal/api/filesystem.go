@@ -16,6 +16,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
@@ -24,6 +25,7 @@ type Filesystem struct {
 	root     string
 	projects project.Store
 	files    *fsx.FileIndex
+	grants   *preview.Grants
 	log      *slog.Logger
 }
 
@@ -32,10 +34,11 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 // NewFilesystem returns a FilesystemService handler that completes paths under root
 // (the user's home directory, symlinks resolved; see fsx.HomeRoot), marks the
 // registered projects, and lists skills (root/.claude for the user's) and
-// files of their checkouts.
-func NewFilesystem(root string, projects project.Store) *Filesystem {
+// files of their checkouts. PreviewFile mints its grants in grants, the table the
+// preview route (preview.Handler) serves from.
+func NewFilesystem(root string, projects project.Store, grants *preview.Grants) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
-	return &Filesystem{root: root, projects: projects, files: fsx.NewFileIndex(log), log: log}
+	return &Filesystem{root: root, projects: projects, files: fsx.NewFileIndex(log), grants: grants, log: log}
 }
 
 // Route mounts the service.
@@ -185,4 +188,53 @@ func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFil
 		out.ModifiedAt = f.ModifiedAt.UnixMilli()
 	}
 	return connect.NewResponse(out), nil
+}
+
+// PreviewFile grants the HTML preview a URL for one file (see package preview): the
+// grant's scope is the registered checkout holding the file, else its directory.
+func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
+	m := req.Msg
+	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), 1)
+	if err != nil {
+		if errors.Is(err, fsx.ErrInvalidArgument) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	switch {
+	case f.NotFound:
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("%s does not exist", f.Path))
+	case f.IsDir:
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is a directory", f.Path))
+	}
+	scope := h.previewScope(f.Path)
+	rel, err := filepath.Rel(scope, f.Path)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
+	}
+	grant, err := h.grants.Grant(scope)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&v1.PreviewFileResponse{Url: preview.URL(grant, filepath.ToSlash(rel)), Scope: scope}), nil
+}
+
+// previewScope is the directory a preview of file may read: the deepest registered
+// project or worktree path holding it (so "../assets/app.css" from docs/ resolves), else
+// the file's own directory.
+func (h *Filesystem) previewScope(file string) string {
+	scope := filepath.Dir(file)
+	best := -1
+	consider := func(p string) {
+		if p != "" && len(p) > best && fsx.Within(p, file) && p != file {
+			scope, best = p, len(p)
+		}
+	}
+	for _, r := range h.projects.Snapshot().Projects {
+		consider(r.Path)
+		for _, w := range r.Worktrees {
+			consider(w.Path)
+		}
+	}
+	return scope
 }
