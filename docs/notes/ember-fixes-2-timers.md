@@ -44,7 +44,7 @@ LAST FIRED stays UTC (the decision covered subscribe and unsubscribe only).
   subscriptions (off its lock), keeps the timers (`timersOf`: soonest first) and
   republishes. `Snapshot.Timers` (`ember.Timer`: ID, NextAt, Every, Note, CreatedAt); the
   store's `Threads` interface gained `Subscriptions`.
-- Proto: `EmberBoard.timers` (3), `EmberTimer{id, next_at, every ("2m", "" for once),
+- Proto: `EmberBoard.timers` (4; 3 is the heartbeat from main), `EmberTimer{id, next_at, every ("2m", "" for once),
   note, created_at}`. WatchBoard sends a new board on every timer change.
 - `ember board` and seed BOARD.md get a `## Scheduled` section between Blocked and Done
   today (only when there are timers), one line per timer:
@@ -85,11 +85,10 @@ was.
 
 ### Skill
 
-Ember's SKILL.md "Later" line only: `--note "<what to tell the user> (t-…)"`, "Always
-pass `--note`, with the task id: the wake carries it, the board lists it." PR D rewrites
-the rest of the skill; the guide (at its cap) and the orchestrate skill's `wakes.md` are
-not touched, so `ran_for` and `note` are self-describing in the wake JSON until PR D
-names them.
+Ember's SKILL.md (v2, PR #290, already had `--note "<why>"`) "Later" line only: the
+placeholder is `--note "<what to tell the user> (t-…)"` and it says the wake and the
+board show the note. The guide (at its cap) and the orchestrate skill's `wakes.md` are
+not touched, so `ran_for` and `note` are self-describing in the wake JSON.
 
 ## Decisions
 
