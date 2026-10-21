@@ -120,7 +120,9 @@ func waitLine(s *v1.Thread) string {
 func waitStatus(s *v1.Thread) string {
 	st := strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "THREAD_STATUS_")), "_", " ")
 	if s.GetStatus() == v1.ThreadStatus_THREAD_STATUS_UNSPECIFIED {
-		st = "unknown"
+		if st = noStatusWord(s); st == "not started" {
+			return st
+		}
 	}
 	if r := s.GetStatusReason(); r != "" {
 		st += " (" + r + ")"

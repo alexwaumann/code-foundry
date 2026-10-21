@@ -26,3 +26,22 @@ func TestThreadStatusWordWaiting(t *testing.T) {
 		}
 	}
 }
+
+// A thread whose Claude has not reported a status yet is starting, not "unknown".
+func TestNoStatusWord(t *testing.T) {
+	starting := &v1.Thread{State: v1.ThreadState_THREAD_STATE_STARTING}
+	stopped := &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED}
+	for _, tt := range []struct {
+		name, got, want string
+	}{
+		{"list", threadStatusWord(starting), "starting"},
+		{"wait", waitStatus(starting), "starting"},
+		{"reports", threadStatusName(starting), "starting"},
+		{"list, no process", threadStatusWord(stopped), "not started"},
+		{"wait, no process", waitStatus(stopped), "not started"},
+	} {
+		if tt.got != tt.want {
+			t.Errorf("%s: %q, want %q", tt.name, tt.got, tt.want)
+		}
+	}
+}
