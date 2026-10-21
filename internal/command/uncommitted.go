@@ -85,3 +85,12 @@ func deleteWorkConfirm(name string, wts []*v1.Worktree, what string) *ConfirmErr
 	}
 	return &ConfirmError{Command: name, Title: deleteWorkTitle, Message: b.String(), Args: forceArgs()}
 }
+
+// withBranch is what, plus the branches when the command deletes them: the re-run with
+// --force deletes them merged or not (git finding 2), so the question says so.
+func withBranch(a Args, what string) string {
+	if a.Bool("delete-branch") {
+		return what + " and its branch (merged or not)"
+	}
+	return what
+}

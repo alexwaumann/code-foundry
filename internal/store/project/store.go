@@ -868,6 +868,15 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	if wt.IsMain {
 		return fmt.Errorf("%w: cannot remove the main worktree", ErrInvalidArgument)
 	}
+	if !opts.Force && opts.Hold != nil {
+		if held := opts.Hold(wt); held != "" {
+			also := ""
+			if wt.Status.HasUncommitted() {
+				also = ", deleting its uncommitted changes"
+			}
+			return fmt.Errorf("%w: worktree %s is in use: %s; --force removes it anyway%s", ErrFailedPrecondition, path, held, also)
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()
 	args := []string{"worktree", "remove"}
@@ -891,14 +900,39 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	g.forgetMade(ctx, g.now(), path)
 	var branchErr error
 	if opts.DeleteBranch && wt.Branch != "" {
-		if _, err := g.runner.Run(ctx, m.Path, "branch", "-D", wt.Branch); err != nil {
-			branchErr = fmt.Errorf("%w: worktree removed, but deleting branch %s failed: %w", ErrFailedPrecondition, wt.Branch, err)
-		}
+		branchErr = g.deleteRemovedBranch(ctx, m, wt.Branch, opts.Force)
 	}
 	if err := g.sched.wait(ctx, jobKey{kind: jobReconcile, projectID: m.ID}); err != nil {
 		return errors.Join(branchErr, err)
 	}
 	return branchErr
+}
+
+// deleteRemovedBranch deletes the branch of a worktree RemoveWorktree just removed:
+// with force whatever it holds, else only when it is merged into the default branch
+// (unmergedTip, the DeleteBranch rule; fuzz finding git 2: it was always `branch -D`).
+// A branch kept is an error that says the worktree is gone and why the branch is not.
+func (g *Git) deleteRemovedBranch(ctx context.Context, m *projectMeta, branch string, force bool) error {
+	if !force {
+		tip := g.revParse(ctx, m.Path, "refs/heads/"+branch)
+		if tip == "" {
+			return nil // already gone
+		}
+		n, base, err := g.unmergedTip(ctx, m, tip)
+		switch {
+		case err != nil:
+			return fmt.Errorf("%w: worktree removed, but kept branch %s: %w (code-foundry project branch delete --force deletes it)", ErrFailedPrecondition, branch, err)
+		case n > 0:
+			g.log.Info("branch kept: not merged", "project", m.ID, "branch", branch, "commits", n, "base", base)
+			return fmt.Errorf("%w: worktree removed, but kept branch %s: it has %s not in %s (code-foundry project branch delete --force deletes it)",
+				ErrFailedPrecondition, branch, commits(n), base)
+		}
+	}
+	if _, err := g.runner.Run(ctx, m.Path, "branch", "-D", branch); err != nil {
+		return fmt.Errorf("%w: worktree removed, but deleting branch %s failed: %w", ErrFailedPrecondition, branch, err)
+	}
+	g.log.Info("branch deleted", "project", m.ID, "branch", branch, "force", force)
+	return nil
 }
 
 // --- jobs ------------------------------------------------------------------------

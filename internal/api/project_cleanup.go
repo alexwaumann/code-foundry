@@ -10,8 +10,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// WithCleanupHold sets what CleanupWorktrees asks, besides git, before removing a
-// worktree: why a thread on it, a running terminal or a workspace keeps it, or "". The
+// WithCleanupHold sets what CleanupWorktrees and RemoveWorktree (without force) ask,
+// besides git, before removing a worktree: why a thread on it, a running terminal or a workspace keeps it, or "". The
 // daemon joins those stores' snapshots there; nil holds nothing.
 func (h *Project) WithCleanupHold(hold func(project.Worktree) string) *Project {
 	h.cleanupHold = hold

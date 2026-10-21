@@ -243,12 +243,19 @@ func (r Refs) Default(fromOrigin bool) string {
 type RemoveWorktreeOptions struct {
 	ProjectID string
 	Path      string
-	// DeleteBranch also runs `git branch -D <branch>` after removing the worktree.
+	// DeleteBranch also deletes the worktree's branch after removing it: only when it
+	// is merged into the default branch (as DeleteBranch decides) unless Force. A
+	// branch kept is an ErrFailedPrecondition returned after the worktree is gone.
 	DeleteBranch bool
-	// Force passes --force to `git worktree remove` (discarding local changes).
-	// Without it, a worktree git refuses for its uncommitted changes fails with
-	// *UncommittedError (its status read again).
+	// Force passes --force to `git worktree remove` (discarding local changes) and
+	// deletes the branch (DeleteBranch) whatever it holds. Without it, a worktree git
+	// refuses for its uncommitted changes fails with *UncommittedError (its status
+	// read again). It also overrides Hold.
 	Force bool
+	// Hold returns why something outside git keeps w (CleanupOptions.Hold), or "";
+	// without Force a held worktree is refused before git runs (fuzz finding git 6).
+	// Nil: nothing holds it.
+	Hold func(w Worktree) string
 }
 
 // Store is the project store. The daemon's implementation is *Git; a fake lives in

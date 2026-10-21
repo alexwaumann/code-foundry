@@ -101,7 +101,9 @@ type ProjectServiceClient interface {
 	Get(context.Context, *connect.Request[v1.GetProjectRequest]) (*connect.Response[v1.GetProjectResponse], error)
 	// CreateWorktree creates a worktree with a new or existing branch.
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
-	// RemoveWorktree removes a worktree (and optionally its branch).
+	// RemoveWorktree removes a worktree (and optionally its branch). Without force it is
+	// refused while a live thread, a running terminal or a workspace holds it (the
+	// cleanup rule's non-git half).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// DeleteBranch deletes a local branch no worktree has checked out (and optionally
 	// origin's), for a branch whose worktree is already gone.
@@ -461,7 +463,9 @@ type ProjectServiceHandler interface {
 	Get(context.Context, *connect.Request[v1.GetProjectRequest]) (*connect.Response[v1.GetProjectResponse], error)
 	// CreateWorktree creates a worktree with a new or existing branch.
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
-	// RemoveWorktree removes a worktree (and optionally its branch).
+	// RemoveWorktree removes a worktree (and optionally its branch). Without force it is
+	// refused while a live thread, a running terminal or a workspace holds it (the
+	// cleanup rule's non-git half).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// DeleteBranch deletes a local branch no worktree has checked out (and optionally
 	// origin's), for a branch whose worktree is already gone.
