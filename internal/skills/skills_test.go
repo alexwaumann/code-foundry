@@ -289,18 +289,25 @@ func TestEmberSkill(t *testing.T) {
 	if fm["name"] != skills.Ember || fm["user-invocable"] != "false" {
 		t.Errorf("frontmatter = %v", fm)
 	}
-	if n := bytes.Count(ember[p], []byte("\n")); n >= 160 {
-		t.Errorf("%s has %d lines; keep it under 160", p, n)
+	// Round 2 of the Ember battle test (ember-fixes-2-skill) added the worker checklist,
+	// the combination check, cancel, merge, restart and budget recipes: each one was a
+	// discovery call or a wrong claim without its line. Pay for new lines by cutting.
+	if n := bytes.Count(ember[p], []byte("\n")); n >= 205 {
+		t.Errorf("%s has %d lines; keep it under 205", p, n)
 	}
 	for _, w := range []string{"ember task add", "ember task start", "--notify", "--labels ember,<task id>", "Never pass `--model`", "cf-task://", "reference/leads.md",
 		"--budget", "ember remember", "ember board", "Skill tool", "never progress", "thread send --id <worker>", "thread respond --id <worker>",
-		"thread subscribe --at", "git -C <worktree> log origin/<branch>", "--branch <branch>"} {
+		"thread subscribe --at", "git -C <worktree> log origin/<branch>", "--branch <branch>",
+		"--prompt - <<'EOF'", "never in double quotes", "merge-tree --write-tree", `"no text`, "ember task cancel", "thread unsubscribe",
+		"project branch delete", "pr merge", "at most 1000 characters", "no new errors against the base", "report `blocked`, not `done`"} {
 		if !bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s lacks %q", p, w)
 		}
 	}
-	// Gone with ember task start: the two-command dance and its $(...) footgun.
-	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread"} {
+	// Gone with ember task start: the two-command dance and its $(...) footgun. Gone in
+	// round 2: a prompt in double quotes (its backticks ran in Ember's shell) and "every
+	// caveat in the summary" (over the report cap).
+	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread", `--prompt "`, "every caveat"} {
 		if bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s still has %q", p, w)
 		}
