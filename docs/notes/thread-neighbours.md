@@ -48,8 +48,9 @@ one below, the macOS tab-switching chords (Safari, Terminal).
   letters, the bottom panel's only cmd+w, the PR keys stop only unmodified keys, and the
   native menu has no accelerator on them.
 * A plain text field (the settings search, a rename field) keeps them: `fieldYielded`
-  stays back and forward only, as the brief asked. The composer and shells are what
-  matter here, and both yield.
+  stays back and forward only. Back from the settings search closes the page, which is
+  what a user there wants; jumping to another thread out from under a rename or a filter
+  is not. The composer and shells, where these matter, both yield.
 * Not added to the native Thread menu (neither was Back / Forward).
 
 ## Verified live (2026-10-21)
