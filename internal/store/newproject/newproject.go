@@ -331,6 +331,9 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 	if !s.Deletable(r.Path) {
 		return fmt.Errorf("%w: %s is not in the projects directory %s", ErrFailedPrecondition, r.Path, s.opts.Root)
 	}
+	if other, where := nestedIn(s.opts.Projects.Snapshot(), r); other != "" {
+		return fmt.Errorf("%w: %s holds %s at %s; deleting its folder would delete that too", ErrFailedPrecondition, r.Name, other, where)
+	}
 	if !s.claim(r.ID) {
 		return fmt.Errorf("%w: %s is being published", ErrFailedPrecondition, r.Name)
 	}
@@ -345,6 +348,27 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 	}
 	log.Info("project deleted")
 	return nil
+}
+
+// nestedIn names another registered project, or a worktree of one, inside r's folder
+// (fuzz finding git 7: a clone of <owner>/x lands in projects/<owner>, which may be a
+// project made with that name), and where it is; "" when there is none.
+func nestedIn(snap *project.Snapshot, r project.Project) (what, path string) {
+	root := filepath.Clean(r.Path)
+	for _, p := range snap.Projects {
+		if p.ID == r.ID {
+			continue
+		}
+		if fsx.Within(root, filepath.Clean(p.Path)) {
+			return "project " + p.Name, p.Path
+		}
+		for _, w := range p.Worktrees {
+			if fsx.Within(root, filepath.Clean(w.Path)) {
+				return "a worktree of project " + p.Name, w.Path
+			}
+		}
+	}
+	return "", ""
 }
 
 // Deletable reports whether path is directly inside the projects directory (compared

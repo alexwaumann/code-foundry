@@ -109,6 +109,15 @@ func TestClone(t *testing.T) {
 			wantErr: ErrExists, wantMsg: "taken already exists", wantDest: true, wantOwner: true,
 		},
 		{
+			name: "owner directory is a repository: refused before gh runs", owner: "acme", project: "widget",
+			setup: func(t *testing.T, root string) {
+				if err := os.MkdirAll(filepath.Join(root, "acme", ".git"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: ErrNested, wantMsg: "is a git repository", wantOwner: true,
+		},
+		{
 			name: "invalid owner/repo: refused before anything", owner: "-bad", project: "x",
 			wantErr: ErrInvalidArgument,
 		},

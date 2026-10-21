@@ -462,6 +462,16 @@ func TestDelete(t *testing.T) {
 				mk(t, "x")
 				return newFakeProjects(project.Project{ID: "r", Name: "projects", Path: root})
 			}},
+		{name: "holds another project", id: "a", err: ErrFailedPrecondition, errText: "acme holds project widget", wantDir: true,
+			projects: func(t *testing.T) *fakeProjects {
+				return newFakeProjects(project.Project{ID: "a", Name: "acme", Path: mk(t, "acme"), Git: true},
+					project.Project{ID: "w", Name: "widget", Path: mk(t, "acme/widget"), Git: true})
+			}},
+		{name: "holds another project's worktree", id: "a", err: ErrFailedPrecondition, errText: "a worktree of project far", wantDir: true,
+			projects: func(t *testing.T) *fakeProjects {
+				return newFakeProjects(project.Project{ID: "a", Name: "acme", Path: mk(t, "acme"), Git: true},
+					project.Project{ID: "f", Name: "far", Path: t.TempDir(), Git: true, Worktrees: []project.Worktree{{Path: filepath.Join(root, "acme", "wt")}}})
+			}},
 		{name: "unregister fails: the folder stays", id: "u", unregErr: errors.New("boom"), errText: "unregister demo: boom", wantDir: true,
 			unregistered: []string{"u"},
 			projects: func(t *testing.T) *fakeProjects {
