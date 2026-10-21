@@ -58,6 +58,8 @@ func (f *dropOnce) Invoke(_ context.Context, req *connect.Request[v1.InvokeComma
 }
 
 func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
+	defer func(p time.Duration) { rewaitPause = p }(rewaitPause)
+	rewaitPause = 0
 	tests := []struct {
 		name       string
 		code       connect.Code
@@ -65,11 +67,15 @@ func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
 		wantErr    bool
 		wantStderr string
 		wantRetry  map[string]string // the second invoke's args; nil: none
+		failFirst  bool              // the first reconnect fails (a daemon still stopping)
 	}{
 		{name: "thread wait waits again for what is left", code: connect.CodeCanceled,
 			args:       []string{"thread", "wait", "s-1", "--until", "error", "--for", "1h"},
-			wantStderr: "code-foundry thread.wait: the daemon stopped or restarted while waiting; waiting again for 59m59s\n",
+			wantStderr: "code-foundry thread.wait: the daemon stopped or restarted while waiting; waiting again\n",
 			wantRetry:  map[string]string{"id": "s-1", "until": "error", "for": "59m59s"}},
+		{name: "a reconnect that fails is tried again", code: connect.CodeCanceled, failFirst: true,
+			args:      []string{"thread", "wait", "s-1"},
+			wantRetry: map[string]string{"id": "s-1", "for": "9m59s"}},
 		{name: "send --wait waits, not sends, again", code: connect.CodeUnavailable,
 			args:      []string{"thread", "send", "--id", "s-1", "hi", "--wait"},
 			wantRetry: map[string]string{"id": "s-1", "for": "9m59s"}},
@@ -88,9 +94,16 @@ func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
 			defer srv.Close()
 			c := &client.Client{Command: codefoundryv1connect.NewCommandServiceClient(srv.Client(), srv.URL)}
 			var stdout, stderr bytes.Buffer
+			connects := 0
 			cl := &cli{stdout: &stdout, stderr: &stderr,
-				connect: func(context.Context) (*client.Client, error) { return c, nil },
-				getwd:   func() (string, error) { return "/work", nil }}
+				connect: func(context.Context) (*client.Client, error) {
+					// lookup, invoke, then rewait's first reconnect.
+					if connects++; tt.failFirst && connects == 3 {
+						return nil, errors.New("another daemon is already running")
+					}
+					return c, nil
+				},
+				getwd: func() (string, error) { return "/work", nil }}
 			err := cl.dispatch(context.Background(), tt.args)
 			if tt.wantErr {
 				if !errors.Is(err, errConnLost) || !strings.Contains(err.Error(), "daemon connection lost (it stopped or restarted)") || len(f.invoked) != 1 {

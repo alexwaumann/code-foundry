@@ -290,7 +290,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	start := time.Now()
 	res, err := cl.invoke(ctx, cmd, uctx, vals, *yes)
 	if errors.Is(err, errConnLost) {
-		res, err = cl.rewait(ctx, cmd, uctx, vals, time.Since(start), err)
+		res, err = cl.rewait(ctx, cmd, uctx, vals, start, err)
 	}
 	if te := (*timeoutError)(nil); errors.As(err, &te) && *asJSON {
 		fmt.Fprintln(cl.stdout, timeoutJSON(te))
