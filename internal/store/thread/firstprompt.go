@@ -6,7 +6,7 @@ import "encoding/json"
 // e10-2 of the 2026-10-21 battle test). Create's prompt goes out only once Claude
 // answers its handshake; a daemon stop in that window (a second or two) used to lose it,
 // and the worker came back after the restart with nothing but its brief. So Create puts
-// it on the row (Thread.PendingFirst, threads.pending_first, migration 0043) before
+// it on the row (Thread.PendingFirst, threads.pending_first, migration 0045) before
 // claude starts, and every spawn delivers a pending first message before anything else:
 // the next start after a stop (a send, a wake, a reconnect) hands it to Claude first,
 // then the message that started it. It is cleared once it went out (sendMessage), and

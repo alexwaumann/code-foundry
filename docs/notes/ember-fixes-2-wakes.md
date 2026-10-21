@@ -4,7 +4,7 @@ PR B of the Ember battle test round 2 (`/tmp/ember-r2/results/SYNTHESIS.md`). Fi
 e4-2 and e5-3 (crashed vs interrupted), e10-1 (restart notice for a cut turn), e10-2
 (first prompt lost), e10-7 (reported, then stopped), e12-2 (archive's own settle wake),
 e2-4 (sibling counts), e2-5 ("said more after its report"), e13-1 (timer turn while
-waiting). Daemon (`internal/store/thread`), migration 0043, the GUI's status words. Follows
+waiting). Daemon (`internal/store/thread`), migration 0045, the GUI's status words. Follows
 `orch-restart-wakes.md`, `orch-wakes-content.md`, `orch-waiting-status.md`,
 `orch-child-context.md` and `ember-fixes-1-wakes.md`.
 
@@ -56,7 +56,7 @@ waiting). Daemon (`internal/store/thread`), migration 0043, the GUI's status wor
 
 ### The first message is persisted (e10-2)
 
-* `threads.pending_first` (migration 0043, JSON: text, composer text, prompt,
+* `threads.pending_first` (migration 0045, JSON: text, composer text, prompt,
   attachments, item id) is set by `Create` on the row before claude starts
   (`Thread.PendingFirst`, not on the API) and cleared once the message went out
   (`sendMessage`).
@@ -185,5 +185,5 @@ counted 3 lines and reported done; `pending_first` was cleared.
   the message in the timeline wait for `StateConnected`.
 * With a batch window the send-time filter alone hid the archive bug in a test; the
   test runs without batching too, where the close's own fire would go at once.
-* Migration 0043 may collide with PR A (ember tasks' branch column); the one that
-  merges second renumbers.
+* Migration 0045: 0043 went to PR #294 (ember tasks' branch column) and 0044 to PR
+  #293.
