@@ -42,6 +42,16 @@ func TestRenderBoard(t *testing.T) {
 			"Earlier: 1 done, 1 cancelled",
 		}, []string{"Old work", "Dropped"}},
 		{"only closed", tasks[5:], []string{"Earlier: 1 done, 1 cancelled"}, []string{"No tasks yet", "## "}},
+		{"a done-today parent keeps its cancelled piece", []Task{
+			{ID: "t-00000010", Title: "Streaks", State: StateDone, DoneAt: today},
+			{ID: "t-00000011", Title: "Counter", State: StateDone, DoneAt: today, ParentID: "t-00000010", Branch: "cf/counter", Outcome: "pushed"},
+			{ID: "t-00000012", Title: "Freeze", State: StateCancelled, UpdatedAt: today.Add(-30 * time.Hour), ParentID: "t-00000010"},
+			{ID: "t-00000013", Title: "Dropped today", State: StateCancelled, UpdatedAt: today},
+			{ID: "t-00000014", Title: "Dropped before", State: StateCancelled, UpdatedAt: today.Add(-24 * time.Hour)},
+		}, []string{
+			"## Done today\n\n- t-00000010 Streaks\n  - t-00000011 Counter · branch cf/counter — pushed\n  - t-00000012 Freeze\n- t-00000013 Dropped today\n",
+			"Earlier: 0 done, 1 cancelled",
+		}, []string{"Dropped before"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
