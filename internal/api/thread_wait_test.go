@@ -10,6 +10,7 @@ import (
 func TestThreadWaitMet(t *testing.T) {
 	const (
 		idle  = v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_IDLE
+		setl  = v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_SETTLED
 		unset = v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED
 		attn  = v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION
 		fail  = v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR
@@ -35,7 +36,16 @@ func TestThreadWaitMet(t *testing.T) {
 		want   bool
 	}{
 		{"idle at prompt", idle, connected, atPrompt, "at prompt", true},
-		{"unset means idle", unset, connected, atPrompt, "at prompt", true},
+		{"unset means settled: a permission prompt", unset, connected, needs, "permission: Bash ls", true},
+		{"settled: idle at prompt", setl, connected, atPrompt, "at prompt", true},
+		{"settled: a permission prompt", setl, connected, needs, "permission: Bash ls", true},
+		{"settled: a question", setl, connected, needs, "question: Which color?", true},
+		{"settled: finished", setl, connected, needs, "finished", true},
+		{"settled: error", setl, stopped, failed, "interrupted", true},
+		{"settled: disconnected at prompt", setl, stopped, atPrompt, "at prompt", true},
+		{"settled: starting", setl, starting, busy, "working", false},
+		{"settled: busy", setl, connected, busy, "working", false},
+		{"unknown condition means settled", v1.ThreadWaitCondition(99), connected, needs, "question: Which color?", true},
 		{"idle while closing", idle, closing, atPrompt, "at prompt", true},
 		{"idle stopped", idle, stopped, atPrompt, "at prompt", true},
 		{"starting is not idle", idle, starting, unknown, "starting", false},

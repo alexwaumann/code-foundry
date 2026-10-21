@@ -429,10 +429,13 @@ func (AgentRunStatus) EnumDescriptor() ([]byte, []int) {
 
 // ThreadWaitCondition is what ThreadService.Wait waits for. Each is a fact about the
 // Thread record (state, status, status_reason), checked at once and on every change.
+// A connected thread's "permission: …" or "question: …" status counts only while a
+// request is still pending in its items: the status is published after a short
+// debounce, so a wait right after an answer would otherwise return on the answered one.
 type ThreadWaitCondition int32
 
 const (
-	// Means IDLE.
+	// Means SETTLED, the CLI's default (GUI, CLI and daemon are always one version).
 	ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED ThreadWaitCondition = 0
 	// Claude is not working and no answer is pending: the thread is not STARTING and its
 	// status is IDLE, ERROR (the process ended mid-turn), or NEEDS_ATTENTION for anything
@@ -445,6 +448,9 @@ const (
 	ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR ThreadWaitCondition = 3
 	// state DISCONNECTED (no Claude process).
 	ThreadWaitCondition_THREAD_WAIT_CONDITION_DISCONNECTED ThreadWaitCondition = 4
+	// IDLE or ATTENTION: Claude stopped working; its turn ended, or it asks for a
+	// permission or an answer (the wake subscriptions' settled).
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_SETTLED ThreadWaitCondition = 5
 )
 
 // Enum value maps for ThreadWaitCondition.
@@ -455,6 +461,7 @@ var (
 		2: "THREAD_WAIT_CONDITION_ATTENTION",
 		3: "THREAD_WAIT_CONDITION_ERROR",
 		4: "THREAD_WAIT_CONDITION_DISCONNECTED",
+		5: "THREAD_WAIT_CONDITION_SETTLED",
 	}
 	ThreadWaitCondition_value = map[string]int32{
 		"THREAD_WAIT_CONDITION_UNSPECIFIED":  0,
@@ -462,6 +469,7 @@ var (
 		"THREAD_WAIT_CONDITION_ATTENTION":    2,
 		"THREAD_WAIT_CONDITION_ERROR":        3,
 		"THREAD_WAIT_CONDITION_DISCONNECTED": 4,
+		"THREAD_WAIT_CONDITION_SETTLED":      5,
 	}
 )
 
@@ -5309,13 +5317,14 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x0eAgentRunStatus\x12 \n" +
 	"\x1cAGENT_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15AGENT_RUN_STATUS_OPEN\x10\x01\x12\x1b\n" +
-	"\x17AGENT_RUN_STATUS_CLOSED\x10\x02*\xca\x01\n" +
+	"\x17AGENT_RUN_STATUS_CLOSED\x10\x02*\xed\x01\n" +
 	"\x13ThreadWaitCondition\x12%\n" +
 	"!THREAD_WAIT_CONDITION_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aTHREAD_WAIT_CONDITION_IDLE\x10\x01\x12#\n" +
 	"\x1fTHREAD_WAIT_CONDITION_ATTENTION\x10\x02\x12\x1f\n" +
 	"\x1bTHREAD_WAIT_CONDITION_ERROR\x10\x03\x12&\n" +
-	"\"THREAD_WAIT_CONDITION_DISCONNECTED\x10\x04B\xcc\x01\n" +
+	"\"THREAD_WAIT_CONDITION_DISCONNECTED\x10\x04\x12!\n" +
+	"\x1dTHREAD_WAIT_CONDITION_SETTLED\x10\x05B\xcc\x01\n" +
 	"\x12com.codefoundry.v1B\x14ThreadLifecycleProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (

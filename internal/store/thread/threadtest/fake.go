@@ -601,8 +601,9 @@ func (f *Fake) Watchers(id string) int {
 	return f.watchers[id]
 }
 
-// appendItem adds it to id's items and publishes ItemAppended. The lock is held; the
-// event is returned for publishing after unlock.
+// appendItem adds it to id's items (a pending request item to the pending requests)
+// and publishes ItemAppended. The lock is held; the event is returned for publishing
+// after unlock.
 func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.ThreadEvent) {
 	snap, ok := f.items[id]
 	if !ok {
@@ -613,6 +614,9 @@ func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.Thread
 	it.CreatedAt, it.UpdatedAt = f.Now(), f.Now()
 	snap.Seq++
 	snap.Items = append(snap.Items, it)
+	if it.Request != nil {
+		snap.Pending = pending(snap.Items)
+	}
 	return it, thread.ItemAppended{ThreadID: id, Seq: snap.Seq, Item: it}
 }
 

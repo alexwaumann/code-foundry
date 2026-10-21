@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -20,8 +21,10 @@ import (
 // holds returns at once. The condition counts only once Claude reacted (isReaction)
 // after req's after item, else after the thread's latest message (lastMessage), so a
 // wait right after a send never returns the status of the turn before it; followed on
-// the thread's item events. See docs/notes/agents-1-wait-events.md,
-// docs/notes/agents-5-cli.md and docs/notes/send-ordinal-wait-after.md.
+// the thread's item events. A status at a request that was already answered does not
+// count (answeredRequest). See docs/notes/agents-1-wait-events.md,
+// docs/notes/agents-5-cli.md, docs/notes/send-ordinal-wait-after.md and
+// docs/notes/thread-wait-settled.md.
 func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error) {
 	id, until := req.Msg.GetId(), req.Msg.GetUntil()
 	if id == "" {
@@ -57,7 +60,14 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	for {
 		p := threadToProto(cur)
 		if reacted && threadWaitMet(until, cur) {
-			return connect.NewResponse(&v1.WaitThreadResponse{Thread: p}), nil
+			answered, err := h.answeredRequest(ctx, cur)
+			if err != nil {
+				return nil, threadError(err)
+			}
+			if !answered {
+				return connect.NewResponse(&v1.WaitThreadResponse{Thread: p}), nil
+			}
+			// Its new status follows within the debounce: wait for the update.
 		}
 		select {
 		case <-ctx.Done():
@@ -105,6 +115,24 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 			}
 		}
 	}
+}
+
+// answeredRequest reports whether t's status is a request that is no longer pending:
+// a connected thread at "permission: …" or "question: …" with no pending request in
+// its items. The runner publishes a status after a debounce (StatusDebounce), so for a
+// moment after an answer the thread still reads as asking; a wait then (thread respond,
+// then thread wait) must not return on the answered request. A stopped thread keeps a
+// request status with nothing pending (it says what it waited on): that one counts.
+func (h *Thread) answeredRequest(ctx context.Context, t thread.Thread) (bool, error) {
+	if t.State != thread.StateConnected || t.Status != thread.StatusNeedsAttention ||
+		!(strings.HasPrefix(t.StatusReason, "permission:") || strings.HasPrefix(t.StatusReason, "question:")) {
+		return false, nil
+	}
+	snap, err := h.store.Items(ctx, t.ID)
+	if err != nil {
+		return false, err
+	}
+	return len(snap.Pending) == 0, nil
 }
 
 // waitGone is Wait's answer for a thread that is not in the store: the removed one
@@ -180,9 +208,10 @@ func eventItem(ev thread.ThreadEvent) *thread.Item {
 	return nil
 }
 
-// threadWaitConditions maps the wait conditions to the store's (UNSPECIFIED is IDLE).
+// threadWaitConditions maps the wait conditions to the store's (UNSPECIFIED is SETTLED).
 var threadWaitConditions = map[v1.ThreadWaitCondition]thread.Condition{
-	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED:  thread.CondIdle,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED:  thread.CondSettled,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_SETTLED:      thread.CondSettled,
 	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_IDLE:         thread.CondIdle,
 	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION:    thread.CondAttention,
 	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR:        thread.CondError,
@@ -194,7 +223,7 @@ var threadWaitConditions = map[v1.ThreadWaitCondition]thread.Condition{
 func threadWaitMet(until v1.ThreadWaitCondition, t thread.Thread) bool {
 	c, ok := threadWaitConditions[until]
 	if !ok {
-		c = thread.CondIdle
+		c = thread.CondSettled
 	}
 	return thread.Meets(c, t)
 }

@@ -22,9 +22,17 @@ func TestThreadWait(t *testing.T) {
 		s.State, s.Status, s.StatusReason = st, status, reason
 		return s
 	}
+	const question = `{"questions":[{"question":"Which color?","options":[{"label":"Red"},{"label":"Blue"}]}]}`
+	permission := thread.Item{ID: "p-r1", Kind: thread.KindPermission, Request: &thread.Request{
+		RequestID: "r1", ToolName: "Bash", Description: "touch x", InputJSON: "{\n  \"command\": \"touch x\"\n}", State: thread.RequestPending}}
+	asks := thread.Item{ID: "q-r2", Kind: thread.KindQuestion, Request: &thread.Request{
+		RequestID: "r2", ToolName: "AskUserQuestion", InputJSON: question, State: thread.RequestPending}}
+	const allowR1 = "pending permission r1: Bash {\"command\":\"touch x\"}; answer with: code-foundry thread respond --id s1 allow (or deny --message \"why\")"
 	tests := []struct {
 		name  string
 		start thread.Thread
+		// items are the thread's items, put before the wait.
+		items []thread.Item
 		args  map[string]string
 		// later are put one by one once the wait is under way.
 		later []thread.Thread
@@ -51,7 +59,44 @@ func TestThreadWait(t *testing.T) {
 			wantMsg: "thread s1 fix: needs attention (finished)",
 		},
 		{
-			name: "a permission prompt is not idle", start: working, args: map[string]string{"id": "s1"},
+			name: "settled at a permission prompt names it", start: working, items: []thread.Item{permission}, args: map[string]string{"id": "s1"},
+			later:   []thread.Thread{with(thread.StateConnected, thread.StatusNeedsAttention, "permission: Bash touch x")},
+			wantMsg: "thread s1 fix: needs attention (permission: Bash touch x)\n" + allowR1,
+		},
+		{
+			name: "settled at a question names it", start: working, items: []thread.Item{asks}, args: map[string]string{"id": "s1", "until": "settled"},
+			later: []thread.Thread{with(thread.StateConnected, thread.StatusNeedsAttention, "question: Which color?")},
+			wantMsg: "thread s1 fix: needs attention (question: Which color?)\n" +
+				`pending question r2: Which color? (options: Red | Blue); answer with: code-foundry thread respond --id s1 --answer "<label>"`,
+		},
+		{
+			name: "two pending requests take --request", start: with(thread.StateConnected, thread.StatusNeedsAttention, "permission: Bash touch x"),
+			items: []thread.Item{permission, asks}, args: map[string]string{"id": "s1"},
+			wantMsg: "thread s1 fix: needs attention (permission: Bash touch x)\n" +
+				"pending permission r1: Bash {\"command\":\"touch x\"}; answer with: code-foundry thread respond --id s1 --request r1 allow (or deny --message \"why\")\n" +
+				`pending question r2: Which color? (options: Red | Blue); answer with: code-foundry thread respond --id s1 --request r2 --answer "<label>"`,
+		},
+		{
+			name: "a stopped thread's request status counts, nothing to answer", start: with(thread.StateDisconnected, thread.StatusNeedsAttention, "permission: Bash touch x"),
+			args: map[string]string{"id": "s1"}, wantMsg: "thread s1 fix: needs attention (permission: Bash touch x), disconnected",
+		},
+		{
+			name: "settled at an idle prompt", start: working, args: map[string]string{"id": "s1"},
+			later:   []thread.Thread{with(thread.StateConnected, thread.StatusIdle, "at prompt")},
+			wantMsg: "thread s1 fix: idle (at prompt)",
+		},
+		{
+			name: "settled at an error", start: working, args: map[string]string{"id": "s1"},
+			later:   []thread.Thread{with(thread.StateDisconnected, thread.StatusError, "interrupted")},
+			wantMsg: "thread s1 fix: error (interrupted), disconnected",
+		},
+		{
+			name: "settled is not starting", start: with(thread.StateStarting, thread.StatusBusy, "starting"), args: map[string]string{"id": "s1"},
+			later:   []thread.Thread{with(thread.StateConnected, thread.StatusBusy, "working"), with(thread.StateConnected, thread.StatusNeedsAttention, "finished")},
+			wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+		{
+			name: "a permission prompt is not idle", start: working, items: []thread.Item{permission}, args: map[string]string{"id": "s1", "until": "idle"},
 			later: []thread.Thread{
 				with(thread.StateConnected, thread.StatusNeedsAttention, "permission: Bash ls"),
 				with(thread.StateConnected, thread.StatusBusy, "working"),
@@ -60,9 +105,10 @@ func TestThreadWait(t *testing.T) {
 			wantMsg: "thread s1 fix: idle (at prompt)",
 		},
 		{
-			name: "attention", start: working, args: map[string]string{"id": "s1", "until": "attention"},
-			later:   []thread.Thread{with(thread.StateConnected, thread.StatusNeedsAttention, "question: Which color?")},
-			wantMsg: "thread s1 fix: needs attention (question: Which color?)",
+			name: "attention", start: working, items: []thread.Item{asks}, args: map[string]string{"id": "s1", "until": "attention"},
+			later: []thread.Thread{with(thread.StateConnected, thread.StatusNeedsAttention, "question: Which color?")},
+			wantMsg: "thread s1 fix: needs attention (question: Which color?)\n" +
+				`pending question r2: Which color? (options: Red | Blue); answer with: code-foundry thread respond --id s1 --answer "<label>"`,
 		},
 		{
 			name: "error", start: working, args: map[string]string{"id": "s1", "until": "error"},
@@ -79,6 +125,10 @@ func TestThreadWait(t *testing.T) {
 		},
 		{
 			name: "timeout names the status", start: working, args: map[string]string{"id": "s1", "for": "50ms"},
+			wantCode: connect.CodeDeadlineExceeded, wantErr: "timed out after 50ms waiting for thread s1 to settle; it is busy (working)",
+		},
+		{
+			name: "timeout until idle", start: working, args: map[string]string{"id": "s1", "for": "50ms", "until": "idle"},
 			wantCode: connect.CodeDeadlineExceeded, wantErr: "timed out after 50ms waiting for thread s1 to be idle; it is busy (working)",
 		},
 		{
@@ -99,6 +149,7 @@ func TestThreadWait(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, fake := newThreadRegistry(t)
 			fake.Put(tt.start)
+			fake.PutItems("s1", tt.items...)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if tt.removed {
@@ -244,7 +295,7 @@ func TestThreadWaitAfterErrors(t *testing.T) {
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "x", "wait": "true", "for": "50ms"})
 	if connect.CodeOf(err) != connect.CodeDeadlineExceeded ||
-		!strings.Contains(err.Error(), "sent to thread s1 (#3); timed out after 50ms waiting for thread s1 to be idle; it is needs attention (finished)") {
+		!strings.Contains(err.Error(), "sent to thread s1 (#3); timed out after 50ms waiting for thread s1 to settle; it is needs attention (finished)") {
 		t.Errorf("timeout: %v", err)
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "x", "wait": "true", "for": "soon"})
@@ -358,5 +409,55 @@ func TestThreadWaitDefaultAfter(t *testing.T) {
 				t.Fatalf("answer %q, %v; want %q", a.res.Message, a.err, tt.wantMsg)
 			}
 		})
+	}
+}
+
+// A wait right after an answer does not return on the request just answered: the
+// thread still reads "permission: …" until the runner publishes its new status (after
+// a debounce; the fake never does), but nothing is pending any more. It returns at the
+// turn's end, with no pending line. See docs/notes/thread-wait-settled.md.
+func TestThreadWaitAfterAnswer(t *testing.T) {
+	asking := thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, Status: thread.StatusNeedsAttention, StatusReason: "permission: Bash touch x"}
+	busy, finished := asking, asking
+	busy.Status, busy.StatusReason = thread.StatusBusy, "working"
+	finished.StatusReason = "finished"
+	reg, fake := newThreadRegistry(t)
+	fake.Put(asking)
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "touch x"},
+		thread.Item{ID: "p-r1", Kind: thread.KindPermission, Request: &thread.Request{
+			RequestID: "r1", ToolName: "Bash", Description: "touch x", InputJSON: `{"command":"touch x"}`, State: thread.RequestPending}})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	res, err := reg.Invoke(ctx, command.Context{}, "thread.wait", map[string]string{"id": "s1"})
+	if err != nil || !strings.Contains(res.Message, "\npending permission r1: Bash") {
+		t.Fatalf("at the prompt: %q, %v", res.Message, err)
+	}
+	if _, err := fake.Respond(ctx, "s1", "r1", thread.Decision{Allow: true}); err != nil {
+		t.Fatal(err)
+	}
+	type answer struct {
+		res command.Result
+		err error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		res, err := reg.Invoke(ctx, command.Context{}, "thread.wait", map[string]string{"id": "s1"})
+		done <- answer{res, err}
+	}()
+	for _, step := range []func(){
+		func() { fake.Put(asking) }, // a republish of the stale status
+		func() { fake.Put(busy) },
+		func() { fake.AppendItem("s1", thread.Item{ID: "t1", Kind: thread.KindTurnEnd}); fake.Put(finished) },
+	} {
+		select {
+		case a := <-done:
+			t.Fatalf("returned (%q, %v) on the answered request", a.res.Message, a.err)
+		case <-time.After(30 * time.Millisecond):
+		}
+		step()
+	}
+	a := <-done
+	if a.err != nil || a.res.Message != "thread s1 fix: needs attention (finished)" {
+		t.Fatalf("answer %q, %v", a.res.Message, a.err)
 	}
 }
