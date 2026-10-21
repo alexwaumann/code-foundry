@@ -74,7 +74,7 @@ func (m *Manager) holdWakes(subscriber string) {
 		if wait <= 0 {
 			return
 		}
-		if !logged {
+		if !logged && wait > startingPoll { // not a start under way: a backoff
 			logged = true
 			m.log.Info("wakes held: Claude did not start last time", "thread", subscriber, "retry_in", wait.Round(time.Second).String())
 		}
