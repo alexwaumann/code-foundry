@@ -2,10 +2,12 @@ package terminal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -41,8 +43,11 @@ type actor struct {
 	opts   Options
 	drops  *atomic.Uint64
 
-	info     atomic.Pointer[Terminal] // latest published metadata, read by Get/List
-	observer Observer                 // Spec.Observer; may be nil. Called on the actor only.
+	info atomic.Pointer[Terminal] // latest published metadata, read by Get/List
+	// killed is the process groups hung up by kill (the shell's and its foreground
+	// job's): what the SIGKILL escalation and Manager.Close finish off.
+	killed   atomic.Pointer[[]int]
+	observer Observer // Spec.Observer; may be nil. Called on the actor only.
 	reqs     chan func()
 	done     chan struct{} // closed when run returns
 
@@ -63,8 +68,7 @@ type actor struct {
 	pubC       <-chan time.Time
 	graceC     <-chan time.Time
 	hardC      <-chan time.Time
-	killTimer  *time.Timer
-	killC      <-chan time.Time
+	killTimer  *time.Timer // the SIGKILL escalation (killLeftovers); never stopped
 	compress   *time.Timer // idle scrollback compression; see onIdle
 }
 
@@ -137,14 +141,6 @@ func (a *actor) run(ready chan<- error) {
 			a.hardC = nil
 			a.log.Warn("pty reader did not stop after close; finishing anyway")
 			a.finish()
-		case <-a.killC:
-			a.killC = nil
-			if !a.exited {
-				a.log.Info("process ignored SIGHUP, sending SIGKILL", "pid", a.cur.Pid)
-				if err := signalGroup(a.cur.Pid, syscall.SIGKILL); err != nil {
-					a.log.Warn("SIGKILL failed", "err", err)
-				}
-			}
 		case now := <-a.pubC:
 			a.pubC = nil
 			a.th.fired(now)
@@ -344,10 +340,6 @@ func (a *actor) finish() {
 	}
 	a.exited = true
 	a.graceC, a.hardC = nil, nil
-	if a.killTimer != nil {
-		a.killTimer.Stop()
-		a.killTimer, a.killC = nil, nil
-	}
 	a.input.close()
 	_ = a.master.Close()
 
@@ -421,18 +413,63 @@ func (a *actor) resize(cols, rows uint16) error {
 	return nil
 }
 
+// kill hangs up the shell's process group and the PTY's foreground job, which a
+// job-control shell runs in a group of its own (and which may ignore SIGHUP), then
+// SIGKILLs whatever of those groups is left after grace, even once the shell is gone.
 func (a *actor) kill(grace time.Duration) error {
 	if a.exited {
 		return nil
+	}
+	groups := []int{a.cur.Pid}
+	if prev := a.killed.Load(); prev != nil {
+		groups = append(groups, *prev...)
+	}
+	groups = append(groups, foregroundGroup(a.master))
+	groups = slices.DeleteFunc(groups, func(pg int) bool { return pg <= 0 })
+	slices.Sort(groups[1:])
+	groups = slices.Compact(groups)
+	if i := slices.Index(groups[1:], a.cur.Pid); i >= 0 {
+		groups = slices.Delete(groups, i+1, i+2)
+	}
+	a.killed.Store(&groups)
+	for _, pg := range groups[1:] {
+		_ = syscall.Kill(-pg, syscall.SIGHUP)
+		_ = syscall.Kill(-pg, syscall.SIGCONT) // a stopped job sees the hangup
 	}
 	if err := signalGroup(a.cur.Pid, syscall.SIGHUP); err != nil {
 		return fmt.Errorf("SIGHUP %d: %w", a.cur.Pid, err)
 	}
 	if a.killTimer == nil {
-		a.killTimer = time.NewTimer(grace)
-		a.killC = a.killTimer.C
+		// Not on the actor: the escalation outlives a terminal removed right after its
+		// exit (KillAndRemove), and only sends signals.
+		a.killTimer = time.AfterFunc(grace, a.killLeftovers)
 	}
 	return nil
+}
+
+// killLeftovers SIGKILLs every process group kill hung up that still has a member.
+// Safe on any goroutine.
+func (a *actor) killLeftovers() {
+	groups := a.killed.Load()
+	if groups == nil {
+		return
+	}
+	for _, pg := range *groups {
+		if !groupAlive(pg) {
+			continue
+		}
+		a.log.Info("process ignored SIGHUP, sending SIGKILL", "pgid", pg)
+		if err := syscall.Kill(-pg, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+			a.log.Warn("SIGKILL failed", "pgid", pg, "err", err)
+		}
+	}
+}
+
+// leftovers reports whether a process group kill hung up still has a member. Safe on
+// any goroutine.
+func (a *actor) leftovers() bool {
+	groups := a.killed.Load()
+	return groups != nil && slices.ContainsFunc(*groups, groupAlive)
 }
 
 // remove stops the actor. Only exited terminals can be removed, unless force is set
@@ -445,9 +482,6 @@ func (a *actor) remove(force bool) error {
 		_ = signalGroup(a.cur.Pid, syscall.SIGHUP)
 		a.input.close()
 		_ = a.master.Close()
-	}
-	if a.killTimer != nil {
-		a.killTimer.Stop()
 	}
 	if a.pubTimer != nil {
 		a.pubTimer.Stop()

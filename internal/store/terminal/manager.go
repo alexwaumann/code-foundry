@@ -452,7 +452,7 @@ wait:
 	for {
 		running := 0
 		for _, a := range actors {
-			if a.info.Load().State == StateRunning {
+			if a.info.Load().State == StateRunning || a.leftovers() {
 				running++
 			}
 		}
@@ -472,6 +472,7 @@ wait:
 		if a.info.Load().State == StateRunning {
 			_ = signalGroup(a.info.Load().Pid, syscall.SIGKILL)
 		}
+		a.killLeftovers() // a foreground job that ignored SIGHUP, the shell gone
 		if err := a.call(context.Background(), func() { _ = a.remove(true) }); err != nil && !errors.Is(err, ErrNotFound) {
 			errs = append(errs, err)
 		}
