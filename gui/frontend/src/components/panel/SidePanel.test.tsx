@@ -507,6 +507,28 @@ describe("reordering tabs", () => {
     expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
   });
 
+  it("the aside carries data-dragging (its iframes ignore the pointer) from the lift to the drop, and to a cancel", () => {
+    render(<SidePanel />);
+    const aside = screen.getByTestId("side-panel");
+    const t = tab("#1");
+    expect(aside.hasAttribute("data-dragging")).toBe(false);
+    // Under the 4px threshold the press is still a click: no drag yet.
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 12, clientY: 10 });
+    expect(aside.hasAttribute("data-dragging")).toBe(false);
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(aside.getAttribute("data-dragging")).toBe("true");
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+    expect(aside.hasAttribute("data-dragging")).toBe(false);
+
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(aside.getAttribute("data-dragging")).toBe("true");
+    fireEvent.keyDown(t, { key: "Escape", code: "Escape" });
+    expect(aside.hasAttribute("data-dragging")).toBe(false);
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+  });
+
   it("mid-drag, Escape cancels the drag even while picking (which keeps picking), and alt+arrows wait for the drop", () => {
     render(<SidePanel />);
     // Not a click on the +: the drag test before this one leaves dnd-kit's click swallower on the document for 50ms.

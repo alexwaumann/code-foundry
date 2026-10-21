@@ -396,6 +396,13 @@
   }
 }
 
+/* While a side panel tab is dragged (SidePanel.tsx), the panel's iframes (an HTML render, a
+   plugin's frame) ignore the pointer. Over a frame the pointer's events go to the frame's
+   document, so dnd-kit's sensor on this one would hear nothing and the ghost would freeze. */
+[data-dragging] iframe {
+  pointer-events: none;
+}
+
 /* Floating surfaces under page zoom (lib/zoom.ts, docs/notes/zoom-popovers.md). Radix
    (floating-ui) measures anchors and the viewport with getBoundingClientRect, in viewport
    px, and writes `transform: translate(x, y)` on this wrapper; under the zoom on <html>

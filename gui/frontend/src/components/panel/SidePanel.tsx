@@ -80,6 +80,10 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   const live = splitOrientation(expanded ? fullWidth : width);
   const [held, setHeld] = useState<SplitOrientation | null>(null);
   const orientation = held ?? live;
+  // While a tab is dragged the aside carries data-dragging, and its iframes ignore the
+  // pointer (index.css): over a frame the pointer's events go to the frame's document,
+  // which dnd-kit's sensor (on the app's) never hears, and the drag would freeze there.
+  const [dragging, setDragging] = useState(false);
 
   // Surfaces keep what their availability reads loaded while this panel shows.
   useEffect(() => {
@@ -146,6 +150,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
         data-testid="side-panel"
         data-panel-key={panelKey}
         data-picking={picking || undefined}
+        data-dragging={dragging || undefined}
         className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs outline-none"
         onKeyDown={onKeyDown}
       >
@@ -157,7 +162,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
           data-orientation={split ? orientation : undefined}
         >
           {/* One drag context around both groups: a tab can move between them, or split the panel (PanelDnd). */}
-          <PanelDnd panelKey={panelKey} orientation={orientation} panel={asideRef}>
+          <PanelDnd panelKey={panelKey} orientation={orientation} panel={asideRef} onDragChange={setDragging}>
             <TabGroup panelKey={panelKey} group={0} split={split} focused={focused === 0} controls={!side} style={split ? groupStyle(orientation, ratio) : undefined} />
             {split && (
               <>

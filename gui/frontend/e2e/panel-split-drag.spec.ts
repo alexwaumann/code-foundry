@@ -3,7 +3,7 @@
 // Every test here fails without the feature: each strip had its own DndContext, so a tab
 // could only reorder within its strip, and there was no band, ghost, marker or tint.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { CF, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -262,6 +262,40 @@ test("a drop on the other group's body appends the tab there, tinting it while o
   await expect(split(page)).not.toHaveAttribute("data-split");
   await expect(panel(page).getByRole("tab")).toHaveText(["Diff", "Files", "#12"]);
   await expect(bodyOf(page, 0)).toHaveAttribute("data-tab-id", "pullrequest?number=12");
+});
+
+test("a drag over the other group's HTML render keeps moving and drops on that body (the frame ignores the pointer while a tab is lifted)", async ({ page }) => {
+  await panelWith(page, 420, THREE);
+  // Split with Diff in group two, then open the mock's HTML page there (group two is focused).
+  await store(page, "movePanelTabToGroup", "current", "diff", 1);
+  await expect(split(page)).toHaveAttribute("data-split", "true");
+  const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/preview.html" });
+  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  const frame = group(page, 1).getByTestId("file-html-frame");
+  await expect(frame).toBeVisible();
+  await expect(page.frameLocator('[data-testid="file-html-frame"]').locator("#title")).toHaveText("script ran");
+  // Not lifted, the page takes the pointer as before.
+  expect(await frame.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("auto");
+
+  const underPointer = async (x: number, y: number) => {
+    const g = await rect(ghost(page).first());
+    expect(g.left <= x && x <= g.right && g.top <= y && y <= g.bottom, `ghost ${JSON.stringify(g)} under (${String(x)}, ${String(y)})`).toBe(true);
+  };
+  const [x1, y1] = await at(frame, 0.3, 0.3);
+  await startDrag(page, tabIn(page, 0, "Files"), x1, y1);
+  await expect(panel(page)).toHaveAttribute("data-dragging", "true");
+  expect(await frame.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
+  await underPointer(x1, y1);
+  // Further across the frame: the ghost follows (it froze at the frame's edge) and the body under the frame is the target.
+  const [x2, y2] = await at(frame, 0.7, 0.7);
+  await page.mouse.move(x2, y2, { steps: 8 });
+  await underPointer(x2, y2);
+  await expect(group(page, 1).getByTestId("panel-drop-tint")).toBeVisible();
+  await page.mouse.up();
+
+  await expect(tabsOf(page, 1)).toHaveText(["Diff", "preview.html", "Files"]);
+  await expect(tabsOf(page, 0)).toHaveText(["#12"]);
+  await expect(panel(page)).not.toHaveAttribute("data-dragging");
 });
 
 /** SHOTS=<dir>: mid-drag mock screenshots for docs/notes/panel-split-3-drag, WebKit, 1440x900, dark and light. */
