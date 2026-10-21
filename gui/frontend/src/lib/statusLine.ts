@@ -15,6 +15,7 @@ import { isWaiting } from "./waiting";
  * - "finished": "Finished <ago>" (emerald)
  * - "error": "Error · <code or reason>" (red): Claude reported an error, or an error status other than interrupted
  * - "interrupted": "Interrupted while working · <ago>" (red): the process ended mid-turn
+ * - "crashed": "Crashed while working · <ago>" (red): the process died mid-turn on its own
  * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
  * - "waiting": "Waiting" (muted, an hourglass before it), then the place: the thread ended
  *   its turn while child threads it subscribed to still work (lib/waiting); idle-like
@@ -31,6 +32,7 @@ export type StatusLineKind =
   | "finished"
   | "error"
   | "interrupted"
+  | "crashed"
   | "snoozeEnded"
   | "waiting"
   | "flagAttention"
@@ -42,7 +44,7 @@ export interface StatusLine {
   kind: StatusLineKind;
   /** The tool, dialog text, error code or reason after "Needs input · " / "Error · "; "" for none. */
   detail: string;
-  /** When the status began (epoch ms), for "finished", "interrupted" and "snoozeEnded"; null otherwise or when unknown. */
+  /** When the status began (epoch ms), for "finished", "interrupted", "crashed" and "snoozeEnded"; null otherwise or when unknown. */
   at: number | null;
 }
 
@@ -55,6 +57,7 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   finished: "emerald",
   error: "red",
   interrupted: "red",
+  crashed: "red",
   snoozeEnded: "amber",
   waiting: "muted",
   flagAttention: "amber",
@@ -90,7 +93,8 @@ function streamLine(s: Pick<ThreadView, "status" | "statusReason" | "statusChang
     case "done":
       return { kind: "finished", detail: "", at: s.statusChangedAtMs };
     case "interrupted":
-      return { kind: "interrupted", detail: "", at: s.statusChangedAtMs };
+    case "crashed":
+      return { kind, detail: "", at: s.statusChangedAtMs };
     case "snoozeEnded":
       return { kind: "snoozeEnded", detail: "", at: s.statusChangedAtMs };
     case "question":
@@ -113,6 +117,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   finished: "Finished",
   error: "Error",
   interrupted: "Interrupted while working",
+  crashed: "Crashed while working",
   snoozeEnded: "Snooze ended",
   waiting: "Waiting",
   flagAttention: "",

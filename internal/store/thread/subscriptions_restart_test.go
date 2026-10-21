@@ -93,7 +93,7 @@ func TestPlanRestartWakes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			plans, clear := planRestartWakes(tt.subs, lookup, now)
+			plans, clear := planRestartWakes(restartInput{subs: tt.subs, thread: lookup}, now)
 			var got []plan
 			for _, p := range plans {
 				g := plan{subscriber: p.subscriber, subs: p.notice.subscriptions, self: p.notice.self}
@@ -229,7 +229,8 @@ func newRestartEnv(t *testing.T, mutate ...func(*Options)) *restartEnv {
 		r.kids = append(r.kids, r.waitFor(k.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy }))
 	}
 	r.loner = r.create(CreateOptions{Name: "Loner", InitialPrompt: "go"})
-	r.waitFor(r.loner.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy })
+	// Connected: its message went out (a first message never sent is not a turn to resume).
+	r.waitFor(r.loner.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy && s.State == StateConnected })
 	subs, err := r.m.Subscriptions(r.ctx(), r.parent.ID)
 	if err != nil || len(subs) != 2 {
 		t.Fatalf("subscriptions = %+v, %v", subs, err)
@@ -276,9 +277,11 @@ func TestRestartWakesDelivered(t *testing.T) {
 			t.Errorf("after delivery, %s = %+v (%v): want fired once, suppression cleared", id, s, ok)
 		}
 	}
-	// No subscriptions, no restart wake, though its turn was cut too.
-	if n := len(wakes(r.items(r.loner.ID).Items)); n != 0 {
-		t.Errorf("the unsubscribed thread got %d wakes", n)
+	// No subscriptions, and its turn on the user's message was cut too: a notice of its
+	// own (e10-1).
+	lonerItems := r.waitItems(r.loner.ID, "the loner's notice", func(items []Item) bool { return len(wakes(items)) == 1 })
+	if w := wakes(lonerItems)[0]; !strings.HasSuffix(w.WakeTitle, `; your own turn was interrupted while handling the user's message: "go".`) {
+		t.Errorf("the unsubscribed thread's notice: %s", w.WakeTitle)
 	}
 	// Once per start.
 	r.m.DeliverRestartWakes()

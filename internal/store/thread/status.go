@@ -15,8 +15,8 @@ const (
 	// dialog).
 	StatusNeedsAttention
 	// StatusError: the process ended while Claude was working (reason
-	// ReasonInterrupted). Never reported by streamStatus; set by the store on a
-	// disconnect (see disconnectedStatus).
+	// ReasonInterrupted, or ReasonCrashed when it died on its own). Never reported by
+	// streamStatus; set by the store on a disconnect (see disconnectedStatus).
 	StatusError
 )
 
@@ -47,13 +47,18 @@ func (s *Thread) setStatus(st Status, reason string, now time.Time) bool {
 
 // disconnectedStatus is the status a thread keeps once its process is gone, whatever
 // the disconnect reason (closed, exited, crashed, daemon stopped or restarted): a turn
-// that was running is interrupted (StatusError ReasonInterrupted); anything else,
-// including needs-attention with its reason, is kept so it survives a daemon restart.
-func disconnectedStatus(st Status, reason string) (Status, string) {
-	if st == StatusBusy {
-		return StatusError, ReasonInterrupted
+// that was running is interrupted (StatusError ReasonInterrupted), or crashed
+// (ReasonCrashed) when its process died on its own (crashed: no close, no daemon stop,
+// no user's interrupt asked for it); anything else, including needs-attention with its
+// reason, is kept so it survives a daemon restart.
+func disconnectedStatus(st Status, reason string, crashed bool) (Status, string) {
+	switch {
+	case st != StatusBusy:
+		return st, reason
+	case crashed:
+		return StatusError, ReasonCrashed
 	}
-	return st, reason
+	return StatusError, ReasonInterrupted
 }
 
 func (st Status) valid() bool { return st >= StatusUnknown && st <= StatusError }

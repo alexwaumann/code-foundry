@@ -22,10 +22,16 @@ import (
 //   - a subscription whose target the stop (or a crash: "daemon restarted") left
 //     interrupted, and that has not fired since, fires then too; a crash records
 //     nothing at its stop;
+//   - a subscription whose target the daemon's death cut after its final report
+//     (restartcut.go: loaded finished, not interrupted) fires then too;
 //   - each subscriber that gets one of those, or whose own turn the stop cut, is told
 //     the app restarted, which of the threads it watches were interrupted, and how many
 //     subscriptions it holds. The notice goes first, the thread wakes after it, as one
-//     message (the batch path; one wake limit slot):
+//     message (the batch path; one wake limit slot);
+//   - a thread whose own turn the stop cut while it worked on the user's message gets
+//     the notice too, subscriptions or not, unless a subscriber hears about it (that
+//     one resumes it): the notice quotes the message it was handling
+//     (restartWakes.selfOnly, checked when sent):
 //
 //	[code-foundry wake] The app restarted at 10:45 CDT; 2 of your child threads were interrupted: "Tests" (s-1), "Docs" (s-2); their sessions resume on your next send. 2 threads interrupted: Thread "Tests" (s-1) was interrupted when the app stopped. Report: progress — halfway. Thread "Docs" (s-2) was interrupted when the app stopped.
 //	```json
@@ -33,8 +39,9 @@ import (
 //	```
 //
 // A subscriber with nothing to hear (its targets at rest, pull request and plugin
-// subscriptions, which go on by themselves) gets no restart wake: every app update
-// would otherwise start a turn in every thread that ever used --notify, on a cold cache.
+// subscriptions, which go on by themselves) and no cut turn of its own gets no restart
+// wake: every app update would otherwise start a turn in every thread that ever used
+// --notify, on a cold cache.
 
 // restartWakes is what a restart sends one subscriber: the notice and the thread wakes
 // that go with it (built when sent, like any thread wake).
@@ -42,6 +49,9 @@ type restartWakes struct {
 	notice restartNotice
 	parts  []func(context.Context) threadWakePart
 	subs   []string // the parts' subscriptions, for the log
+	// selfOnly: the notice is only about the subscriber's own cut turn (it holds no
+	// subscription that fired); it goes only when that turn was the user's message.
+	selfOnly bool
 }
 
 // restartNotice is the restart's own line: when, the watched threads the stop
@@ -51,7 +61,13 @@ type restartNotice struct {
 	interrupted   []Thread
 	subscriptions int
 	self          bool
+	// message is the user's message the cut turn was handling (one line, cut at
+	// maxRestartMessage runes); "" when the turn was a wake's, or unknown. Set when sent.
+	message string
 }
+
+// maxRestartMessage bounds the user's message a restart notice quotes.
+const maxRestartMessage = 200
 
 // wakeRestartPayload is a restart notice's JSON.
 type wakeRestartPayload struct {
@@ -59,8 +75,10 @@ type wakeRestartPayload struct {
 	RestartedAt   string            `json:"restarted_at"`
 	Interrupted   []wakeInterrupted `json:"interrupted"`
 	Subscriptions int               `json:"subscriptions"`
-	// OwnTurnInterrupted: the subscriber was working when the app stopped.
-	OwnTurnInterrupted bool `json:"own_turn_interrupted,omitempty"`
+	// OwnTurnInterrupted: the subscriber was working when the app stopped;
+	// OwnTurnMessage the user's message that turn was handling, when it was one.
+	OwnTurnInterrupted bool   `json:"own_turn_interrupted,omitempty"`
+	OwnTurnMessage     string `json:"own_turn_message,omitempty"`
 }
 
 type wakeInterrupted struct {
@@ -113,17 +131,35 @@ type restartPlan struct {
 	subscriber string
 	notice     restartNotice
 	fires      []restartFire
+	// selfOnly: a notice about its own cut turn alone, for a thread no other plan
+	// covers (restartWakes.selfOnly).
+	selfOnly bool
 }
 
-// planRestartWakes decides the restart's wakes from the subscriptions and the threads
-// as loaded (thread: a live thread, not archived or going; false otherwise), at now. A
-// subscription fires when the stop suppressed its wake and its target still meets the
-// condition or was interrupted, or (none suppressed) when its target was interrupted by
-// a stop after the subscription last fired; one fire per subscriber and target, the
-// oldest subscription's. A subscriber gets a plan when it has a fire or the stop cut
-// its own turn. clear are the suppressed subscriptions, whether they fire or not.
-func planRestartWakes(subs []Subscription, thread func(string) (Thread, bool), now time.Time) (plans []restartPlan, clear []string) {
-	subs = slices.Clone(subs)
+// restartInput is what planRestartWakes plans from.
+type restartInput struct {
+	subs []Subscription
+	// thread is a live thread (not archived or going) as loaded; false otherwise.
+	thread func(string) (Thread, bool)
+	// reported are the threads the daemon's death cut after their final report
+	// (restartcut.go): loaded finished, their settle never fired.
+	reported map[string]bool
+	// cut are the live threads whose own turn the stop cut (interruptedByStop), ids
+	// sorted: those with no plan otherwise get a notice alone (selfOnly).
+	cut []string
+}
+
+// planRestartWakes decides the restart's wakes from in, at now. A subscription fires
+// when the stop suppressed its wake and its target still meets the condition or was
+// interrupted, or (none suppressed) when its target was interrupted by a stop, or cut
+// after its final report (in.reported) and meets the condition, after the subscription
+// last fired; one fire per subscriber and target, the oldest subscription's. A
+// subscriber gets a plan when it has a fire or the stop cut its own turn. A thread in
+// in.cut with no plan of its own, about which no subscription fires, whose first message
+// went out (no PendingFirst), gets a selfOnly plan. clear are the suppressed
+// subscriptions, whether they fire or not.
+func planRestartWakes(in restartInput, now time.Time) (plans []restartPlan, clear []string) {
+	subs, thread := slices.Clone(in.subs), in.thread
 	slices.SortFunc(subs, func(a, b Subscription) int {
 		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
 	})
@@ -151,6 +187,8 @@ func planRestartWakes(subs []Subscription, thread func(string) (Thread, bool), n
 		case !sub.SuppressedAt.IsZero() && (stopped || Meets(sub.Condition, t)):
 			at = sub.SuppressedAt
 		case sub.SuppressedAt.IsZero() && stopped && firesOnInterrupt(sub.Condition) && t.StatusChangedAt.After(sub.LastFiredAt):
+			at = t.StatusChangedAt
+		case sub.SuppressedAt.IsZero() && in.reported[t.ID] && Meets(sub.Condition, t) && t.StatusChangedAt.After(sub.LastFiredAt):
 			at = t.StatusChangedAt
 		default:
 			continue
@@ -180,6 +218,19 @@ func planRestartWakes(subs []Subscription, thread func(string) (Thread, bool), n
 			plans = append(plans, p)
 		}
 	}
+	told := map[string]bool{} // threads a subscriber hears about
+	for key := range fired {
+		told[key[1]] = true
+	}
+	for _, id := range in.cut {
+		s, ok := thread(id)
+		if !ok || told[id] || s.PendingFirst != nil || !interruptedByStop(s) ||
+			slices.ContainsFunc(plans, func(p restartPlan) bool { return p.subscriber == id }) {
+			continue
+		}
+		plans = append(plans, restartPlan{subscriber: id, selfOnly: true,
+			notice: restartNotice{at: now, subscriptions: held[id], self: true}})
+	}
 	return plans, clear
 }
 
@@ -208,13 +259,21 @@ func (m *Manager) DeliverRestartWakes() {
 		}
 		return rec.s, true
 	}
-	plans, clear := planRestartWakes(all, live, now)
+	var cut []string
+	for id, rec := range m.recs {
+		if t, ok := live(id); ok && interruptedByStop(t) {
+			cut = append(cut, rec.s.ID)
+		}
+	}
+	slices.Sort(cut)
+	plans, clear := planRestartWakes(restartInput{subs: all, thread: live, reported: s.reportedAtStop, cut: cut}, now)
+	s.reportedAtStop = nil
 	for _, p := range plans {
 		if !s.allowLocked(p.subscriber, now, m.opts.WakeLimit) {
 			m.log.Warn("restart wake dropped: the subscriber reached the wake limit", "thread", p.subscriber)
 			continue
 		}
-		rw := &restartWakes{notice: p.notice}
+		rw := &restartWakes{notice: p.notice, selfOnly: p.selfOnly}
 		for _, f := range p.fires {
 			r := s.byID[f.sub]
 			r.s.FiredCount++
@@ -233,7 +292,8 @@ func (m *Manager) DeliverRestartWakes() {
 		}
 		m.enqueueLocked(p.subscriber, delivery{restart: rw, queued: time.Now(), slot: now})
 		m.log.Info("restart wake queued", "thread", p.subscriber, "interrupted", len(p.notice.interrupted),
-			"wakes", len(p.fires), "own_turn_interrupted", p.notice.self, "subscriptions", p.notice.subscriptions)
+			"wakes", len(p.fires), "own_turn_interrupted", p.notice.self, "subscriptions", p.notice.subscriptions,
+			"own_turn_only", p.selfOnly)
 	}
 	for _, id := range clear {
 		if r, ok := s.byID[id]; ok && !r.s.SuppressedAt.IsZero() {
@@ -247,7 +307,8 @@ func (m *Manager) DeliverRestartWakes() {
 
 // keepLive drops what a restart's wakes say about threads archived or removed since
 // they were planned: the parts about them and their names in the notice. It reports
-// whether anything is left to say.
+// whether anything is left to say: a selfOnly notice only when its cut turn was the
+// user's message (message, set by ownTurn).
 func (rw *restartWakes) keepLive(snap *Snapshot, parts []threadWakePart) ([]threadWakePart, bool) {
 	live := func(id string) bool {
 		t, ok := snap.Thread(id)
@@ -255,19 +316,42 @@ func (rw *restartWakes) keepLive(snap *Snapshot, parts []threadWakePart) ([]thre
 	}
 	parts = slices.DeleteFunc(parts, func(p threadWakePart) bool { return !live(p.t.ID) })
 	rw.notice.interrupted = slices.DeleteFunc(rw.notice.interrupted, func(t Thread) bool { return !live(t.ID) })
+	if rw.selfOnly {
+		return parts, rw.notice.message != ""
+	}
 	return parts, len(parts) > 0 || len(rw.notice.interrupted) > 0 || rw.notice.self
+}
+
+// ownTurn sets the notice's message from the subscriber's items when its own turn was
+// cut: the user's message that turn was handling (its last top-level user message, when
+// that is not a wake). Read when sent, off the locks.
+func (rw *restartWakes) ownTurn(items []Item) {
+	if !rw.notice.self {
+		return
+	}
+	if last, ok := lastUserMessage(items); ok && last.Origin == OriginUser {
+		rw.notice.message = oneLine(last.Text, maxRestartMessage)
+	}
 }
 
 // restartLine is the notice's header sentence: "The app restarted at 10:45 CDT; 2 of
 // your child threads were interrupted: "A" (s-1), "B" (s-2); their sessions resume on
-// your next send." With "; your own turn was interrupted" when it was.
+// your next send." With "; your own turn was interrupted" when it was, and "while
+// handling the user's message: "…"" when the turn was one; a thread with no
+// subscriptions hears nothing about child threads.
 func restartLine(n restartNotice) string {
 	line := "The app restarted at " + n.at.Format("15:04 MST")
 	if n.self {
 		line += "; your own turn was interrupted"
+		if n.message != "" {
+			line += " while handling the user's message: " + strconv.Quote(n.message)
+		}
 	}
 	switch len(n.interrupted) {
 	case 0:
+		if n.subscriptions == 0 {
+			return line + "."
+		}
 		return line + "; none of your child threads were interrupted."
 	case 1:
 		t := n.interrupted[0]
@@ -284,7 +368,7 @@ func restartLine(n restartNotice) string {
 // restartPayload is the notice's JSON.
 func restartPayload(n restartNotice) wakeRestartPayload {
 	p := wakeRestartPayload{Kind: "restart", RestartedAt: wakeTime(n.at), Interrupted: []wakeInterrupted{},
-		Subscriptions: n.subscriptions, OwnTurnInterrupted: n.self}
+		Subscriptions: n.subscriptions, OwnTurnInterrupted: n.self, OwnTurnMessage: n.message}
 	for _, t := range n.interrupted {
 		p.Interrupted = append(p.Interrupted, wakeInterrupted{ID: t.ID, Name: t.Name, Reason: t.DisconnectReason})
 	}

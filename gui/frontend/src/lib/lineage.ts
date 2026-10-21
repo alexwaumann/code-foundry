@@ -159,6 +159,7 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
       return "finished";
     case "error":
     case "interrupted":
+    case "crashed":
     case "flagError":
       return "error";
     case "place":

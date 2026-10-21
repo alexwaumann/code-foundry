@@ -220,22 +220,34 @@ func TestSiblingsOf(t *testing.T) {
 		w.CreatedBy = lead
 		return w
 	}
+	// e2-4: the current request began at since; old is a child made and last active
+	// before it, recent one active after it.
+	since := time.Date(2026, 10, 21, 1, 0, 0, 0, time.UTC)
+	old := func(th Thread) Thread {
+		th.CreatedAt, th.LastActivityAt = since.Add(-time.Hour), since.Add(-time.Minute)
+		return th
+	}
+	recent := func(th Thread) Thread {
+		th.CreatedAt, th.LastActivityAt = since.Add(-time.Hour), since.Add(time.Minute)
+		return th
+	}
 	tests := []struct {
 		name    string
 		threads []Thread
 		parts   []Thread // the wakes' targets as they fired
 		want    *wakeSiblings
+		since   time.Time
 	}{
-		{"not a child: none", []Thread{other}, []Thread{other}, nil},
+		{"not a child: none", []Thread{other}, []Thread{other}, nil, time.Time{}},
 		{"an only child", []Thread{kid("s-1", busy)}, []Thread{kid("s-1", finished)},
-			&wakeSiblings{Settled: 1, Total: 1, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}},
+			&wakeSiblings{Settled: 1, Total: 1, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}, time.Time{}},
 		{"the target as it fired, others as they are now",
 			[]Thread{kid("s-1", busy), kid("s-2", busy), kid("s-3", askEdit1), kid("s-4", atPrompt), archived, other, removing},
 			[]Thread{kid("s-1", finished)},
 			&wakeSiblings{Settled: 3, Total: 4, Working: []wakeSibling{{"s-2", "ns-2"}},
-				Pending: []wakeSiblingPending{{"s-3", "ns-3", "permission: Edit README.md"}}}},
+				Pending: []wakeSiblingPending{{"s-3", "ns-3", "permission: Edit README.md"}}}, time.Time{}},
 		{"a stopped child's old prompt is not pending", []Thread{kid("s-1", finished), kid("s-2", offAsking)}, []Thread{kid("s-1", finished)},
-			&wakeSiblings{Settled: 2, Total: 2, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}},
+			&wakeSiblings{Settled: 2, Total: 2, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}, time.Time{}},
 		// A lead whose own workers run is still working, whatever its report (its
 		// settled wake was held, or went for a report of its own); with its workers
 		// settled, it is not. A worker's own lead waiting on workers counts too.
@@ -246,15 +258,35 @@ func TestSiblingsOf(t *testing.T) {
 				kid("s-5", finished), worker("w-4", "s-5", finished), worker("w-5", "w-4", busy)},
 			[]Thread{kid("s-1", finished)},
 			&wakeSiblings{Settled: 2, Total: 5, Working: []wakeSibling{{"s-2", "ns-2"}, {"s-3", "ns-3"}, {"s-5", "ns-5"}},
-				Pending: []wakeSiblingPending{}}},
+				Pending: []wakeSiblingPending{}}, time.Time{}},
 		// D2: the lead that fired, its workers running, is working too, and listed.
 		{"a target lead with workers running is working",
 			[]Thread{kid("s-1", busy), kid("s-2", finished), worker("w-1", "s-1", busy), worker("w-2", "s-1", finished)},
 			[]Thread{kid("s-1", finished)},
-			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-1", "ns-1"}}, Pending: []wakeSiblingPending{}}},
+			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-1", "ns-1"}}, Pending: []wakeSiblingPending{}}, time.Time{}},
 		{"two targets in a batch are not listed", []Thread{kid("s-1", busy), kid("s-2", busy), kid("s-3", busy)},
 			[]Thread{kid("s-1", finished), kid("s-2", askBash)},
-			&wakeSiblings{Settled: 2, Total: 3, Working: []wakeSibling{{"s-3", "ns-3"}}, Pending: []wakeSiblingPending{}}},
+			&wakeSiblings{Settled: 2, Total: 3, Working: []wakeSibling{{"s-3", "ns-3"}}, Pending: []wakeSiblingPending{}}, time.Time{}},
+		// e2-4: only the current batch counts.
+		{"children settled before the request are left out",
+			[]Thread{recent(kid("s-1", busy)), old(kid("s-2", finished)), old(kid("s-3", atPrompt)), recent(kid("s-4", busy))},
+			[]Thread{recent(kid("s-1", finished))},
+			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-4", "ns-4"}}, Pending: []wakeSiblingPending{}}, since},
+		{"an only worker of this request after earlier ones: alone",
+			[]Thread{old(kid("s-1", finished)), recent(kid("s-2", busy))}, []Thread{recent(kid("s-2", finished))},
+			&wakeSiblings{Settled: 1, Total: 1, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}, since},
+		{"settled after the request began: counted",
+			[]Thread{recent(kid("s-1", busy)), recent(kid("s-2", finished))}, []Thread{recent(kid("s-1", finished))},
+			&wakeSiblings{Settled: 2, Total: 2, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}, since},
+		{"working from before the request: counted",
+			[]Thread{recent(kid("s-1", busy)), old(kid("s-2", busy))}, []Thread{recent(kid("s-1", finished))},
+			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-2", "ns-2"}}, Pending: []wakeSiblingPending{}}, since},
+		{"a lead from before whose workers run: counted",
+			[]Thread{recent(kid("s-1", busy)), old(kid("s-2", finished)), worker("w-1", "s-2", busy)}, []Thread{recent(kid("s-1", finished))},
+			&wakeSiblings{Settled: 1, Total: 2, Working: []wakeSibling{{"s-2", "ns-2"}}, Pending: []wakeSiblingPending{}}, since},
+		{"a target is counted however old", []Thread{old(kid("s-1", finished)), old(kid("s-2", finished))},
+			[]Thread{old(kid("s-1", finished))},
+			&wakeSiblings{Settled: 1, Total: 1, Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}, since},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -262,7 +294,7 @@ func TestSiblingsOf(t *testing.T) {
 			for _, th := range tt.parts {
 				parts = append(parts, threadWakePart{t: th})
 			}
-			got := siblingsOf(&Snapshot{Threads: tt.threads}, "p", parts)
+			got := siblingsOf(&Snapshot{Threads: tt.threads}, "p", parts, tt.since)
 			gj, _ := json.Marshal(got)
 			wj, _ := json.Marshal(tt.want)
 			if string(gj) != string(wj) {

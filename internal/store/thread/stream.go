@@ -50,6 +50,9 @@ type outgoing struct {
 	// (resumenote.go); empty without one.
 	note   string
 	resume ResumeNote
+	// first: the thread's pending first message (Thread.PendingFirst), cleared on the row
+	// once it went out (firstprompt.go).
+	first bool
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -161,15 +164,22 @@ func (r *runner) viewersChanged() {
 // pid is the claude process id (Claude's sessions/<pid>.json follows /clear).
 func (r *runner) pid() int { return r.st.proc.Pid() }
 
-// spawnStream starts a thread's claude and prepares its runner (spawn starts run).
-func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv, env []string, first *outgoing) error {
+// spawnStream starts a thread's claude and prepares its runner (spawn starts run). msgs
+// go out once Claude answers its handshake, in order; the items of all but the first are
+// in the timeline already.
+func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv, env []string, msgs []*outgoing) error {
 	s := rec.s
 	log, err := m.thread(ctx, s.ID)
 	if err != nil {
 		return err
 	}
+	var first *outgoing
+	var queued []*outgoing
+	if len(msgs) > 0 {
+		first, queued = msgs[0], msgs[1:]
+	}
 	st := &streamState{
-		sd: &streamStatus{waiting: first != nil}, log: log, first: first,
+		sd: &streamStatus{waiting: first != nil}, log: log, first: first, queued: queued,
 		initDone: make(chan initResult, 1),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
@@ -441,6 +451,9 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 		if _, err := recordUser(st.proj.w, f); err != nil {
 			return Item{}, err
 		}
+		if f.first {
+			r.m.setPendingFirstItem(r.id, f.itemID) // the next start must not write it again
+		}
 	}
 	it, err := recordUser(st.proj.w, o)
 	if err != nil {
@@ -583,6 +596,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	}
 	// Claude reads a message sent while it works at its next tool call (queued.go).
 	queued := st.sd.busy || st.sd.compacting
+	r.m.noteTurnMessage(r.id, !queued, o) // a timer's turn needs attention (waiting_reminder.go)
 	var it Item
 	if o.itemID == "" {
 		u := userItem(id, o)
@@ -598,6 +612,9 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	}
 	if o.note != "" {
 		r.m.clearResumeNote(r.id, o.resume)
+	}
+	if o.first {
+		r.m.clearPendingFirst(r.id)
 	}
 	if seed != "" {
 		r.seed = ""
@@ -931,8 +948,15 @@ func (r *runner) abandon() {
 // it over pipes), so it is terminated, and the thread disconnects "daemon stopped".
 func (r *runner) shutdown() {
 	st := r.st
-	// A turn the stop cuts off leaves a resume note for the next message (resumenote.go).
+	// A turn the stop cuts off leaves a resume note for the next message (resumenote.go),
+	// unless it had filed its final report already: it finished, all but its last words.
 	cut := st.sd.busy || st.sd.compacting || len(st.pending) > 0
+	if cut {
+		if s, ok := r.m.Snapshot().Thread(r.id); ok && reportCoversTurn(s.Report, st.log.snapshot().Items) {
+			cut, r.reportedAtStop = false, true
+			r.log().info("the daemon stopped a turn after its final report: finished, not interrupted", "report", s.Report.Status.String())
+		}
+	}
 	_ = st.conn.CloseStdin()
 	_ = st.proc.Signal(syscall.SIGTERM)
 	select {
@@ -941,6 +965,10 @@ func (r *runner) shutdown() {
 		_ = st.proc.Signal(syscall.SIGKILL)
 	}
 	r.killGroup(st.proc)
+	if f := st.first; f != nil && f.first {
+		// Kept on the row for the next start (firstprompt.go).
+		r.log().warn("first message not delivered: the daemon stopped; it goes at the next start")
+	}
 	st.sd.pending = nil
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
@@ -1003,6 +1031,9 @@ func (r *runner) maybeExited() {
 			r.startFailed = true
 			r.addErrorOnce("Claude did not start: " + why)
 		case midTurn:
+			// No one stopped it: crashed, not interrupted (disconnectedStatus), and the
+			// next message says so (resumenote.go).
+			r.crashed = true
 			r.addErrorOnce("Claude stopped unexpectedly (" + why + ")")
 		}
 	}
@@ -1021,6 +1052,12 @@ func (r *runner) maybeExited() {
 		if lastErr != "" && (code != 0 || !st.initialized) {
 			s.LastError = lastErr
 		}
+		if r.crashed {
+			s.ResumeNote = ResumeNote{Cause: ResumeCrash, At: r.m.opts.Now()}
+		}
+		// Only a daemon stop keeps an undelivered first message (firstprompt.go): a start
+		// that failed, or a close while starting, ends it as before.
+		s.PendingFirst = nil
 	})
 }
 

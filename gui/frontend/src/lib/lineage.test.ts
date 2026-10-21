@@ -158,6 +158,7 @@ describe("lineageStatus", () => {
     ["a question", { status: "attention", statusReason: "question: Which?" }, "input"],
     ["a Claude error", { status: "attention", statusReason: "error: overloaded" }, "error"],
     ["interrupted", { status: "error", statusReason: "interrupted" }, "error"],
+    ["crashed", { status: "error", statusReason: "crashed" }, "error"],
     ["archived wins", { status: "attention", statusReason: "finished", archivedAtMs: 1 }, "archived"],
     ["snoozed", { snoozedUntilMs: 9 }, "snoozed"],
   ] as const)("%s", (_n, o, want) => {

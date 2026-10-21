@@ -247,9 +247,12 @@ func (m *Manager) drain(subscriber string) {
 		m.holdWakes(subscriber)
 		d, ok := m.subs.next(subscriber, m.opts.WakeBatch > 0)
 		if !ok {
-			// Quiet now, unless the wake started a turn: a wake held about it may go.
+			// Quiet now, unless the wake started a turn: a wake held about it may go. A
+			// subscriber waiting only on wakes that were dropped (archived targets,
+			// archive_wakes.go) waits no more.
 			m.mu.Lock()
 			m.releaseHeldLocked(subscriber)
+			m.rewaitLocked([]string{subscriber})
 			m.mu.Unlock()
 			return
 		}
@@ -452,7 +455,8 @@ type wakeDetail struct {
 	// filed before its last message (a follow-up, a wake), so it describes an older turn.
 	noReport, staleReport bool
 	// saidMore: the turn ended with assistant text after its (current) report was
-	// filed: what it said may qualify the report.
+	// filed, and did real work after it (a tool call) or said more than a closing
+	// paragraph (over maxClosingWords runes): what it said may qualify the report.
 	saidMore bool
 	// lastMessage is the ended turn's last assistant text, when its report does not
 	// describe it (noReport, or staleReport) or it said more after it (saidMore).
@@ -476,15 +480,22 @@ const (
 	maxPendingInput = 4 << 10
 )
 
+// maxClosingWords bounds a closing paragraph after a report (runes of assistant text):
+// a sign-off up to it, with no tool call after the report, is not "said more".
+const maxClosingWords = 300
+
 // wakeDetailOf reads a thread wake's detail from t's items: whether the report is
 // missing or older than the last user message (any origin: a follow-up or a wake), or
-// was followed by more assistant text in the ended turn, the turn's last assistant text
-// when so, and the request a "permission: …" or "question: …" reason describes.
-// Subagents' items are skipped.
+// was followed in the ended turn by more assistant text and real work (a tool call, or
+// more than a closing paragraph: maxClosingWords), the turn's last assistant text when
+// so, and the request a "permission: …" or "question: …" reason describes. Subagents'
+// items are skipped.
 func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	d := wakeDetail{children: kids}
 	var lastUser, lastAt, turnEnd time.Time
 	var last string
+	// After the report, in the turn: tool calls, and the assistant text's runes.
+	toolAfter, textAfter := false, 0
 	for _, it := range items {
 		if it.ParentToolUseID != "" {
 			continue
@@ -492,12 +503,18 @@ func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 		switch it.Kind {
 		case KindUserMessage:
 			lastUser, last, lastAt, turnEnd = it.CreatedAt, "", time.Time{}, time.Time{}
+			toolAfter, textAfter = false, 0
 		case KindAssistantText:
 			if s := strings.TrimSpace(it.Text); s != "" {
 				last, lastAt = s, it.CreatedAt
+				if it.CreatedAt.After(t.Report.At) {
+					textAfter += utf8.RuneCountInString(s)
+				}
 			}
 		case KindTurnEnd:
 			turnEnd = it.CreatedAt
+		case KindToolCall:
+			toolAfter = toolAfter || it.CreatedAt.After(t.Report.At)
 		}
 	}
 	d.startedAt = lastUser
@@ -508,9 +525,11 @@ func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	d.staleReport = hasReport && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
 	if Meets(CondIdle, t) {
 		// The turn ended: say when the report does not describe it, or when the turn
-		// went on talking after filing it, and what it said last.
+		// went on working after filing it, and what it said last. A short sign-off after
+		// the report is the normal end of a turn, not news.
 		d.noReport = !hasReport
-		d.saidMore = hasReport && !d.staleReport && last != "" && lastAt.After(t.Report.At)
+		d.saidMore = hasReport && !d.staleReport && last != "" && lastAt.After(t.Report.At) &&
+			(toolAfter || textAfter > maxClosingWords)
 		if d.noReport || d.staleReport || d.saidMore {
 			d.lastMessage = oneLine(last, maxLastMessage)
 		}
@@ -628,8 +647,10 @@ func wakeReportOf(rep Report) *wakeReport {
 // `Thread "Ask" (s-2) needs attention: finished without a report.` or
 // `Thread "Lead" (s-3) is idle: at prompt (report is from before its last message); 2 of
 // its 3 child threads still working.` or `Thread "Docs" (s-4) needs attention: finished,
-// said more after its report. Report: done — typos fixed.` The verb is the condition's, or for settled and
-// idle the status's. A report is quoted only while it is current (not staleReport).
+// said more after its report. Report: done — typos fixed.` or `Thread "Tests" (s-5)
+// crashed: its process died (not stopped by anyone).` The verb is the condition's, or for
+// settled and idle the status's. A report is quoted only while it is current (not
+// staleReport).
 func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 	who := "Thread " + t.ID
 	if t.Name != "" {
@@ -658,6 +679,9 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		line += ": " + oneLine(t.StatusReason, maxHeaderReason)
 	}
 	switch {
+	case t.Status == StatusError && t.StatusReason == ReasonCrashed:
+		// Not "interrupted": no one stopped it, so no one needs asking before it resumes.
+		line = who + " crashed: its process died (not stopped by anyone)"
 	case d.appStopped:
 		line = who + " was interrupted when the app stopped"
 	case d.noReport && t.StatusReason == "finished":

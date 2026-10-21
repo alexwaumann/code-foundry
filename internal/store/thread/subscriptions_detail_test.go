@@ -15,6 +15,9 @@ func TestWakeDetailOf(t *testing.T) {
 	user := func(at time.Time) Item { return Item{Kind: KindUserMessage, Text: "do it", CreatedAt: at} }
 	said := func(text string) Item { return Item{Kind: KindAssistantText, Text: text} }
 	saidAt := func(text string, at time.Time) Item { return Item{Kind: KindAssistantText, Text: text, CreatedAt: at} }
+	toolAt := func(at time.Time) Item { return Item{Kind: KindToolCall, CreatedAt: at} }
+	closing := strings.Repeat("Done. ", maxClosingWords/6)
+	longer := strings.Repeat("Note: ", maxClosingWords/6+2)
 	perm := func(id, desc, input string, state RequestState) Item {
 		return Item{ID: "perm-" + id, Kind: KindPermission, Request: &Request{RequestID: id, ToolName: "Bash", Description: desc, InputJSON: input, State: state}}
 	}
@@ -49,10 +52,21 @@ func TestWakeDetailOf(t *testing.T) {
 		{name: "a current report", t: reported(finished, t0.Add(time.Minute)), items: []Item{user(t0), said("Done.")}},
 		{name: "a report from before the last message", t: reported(finished, t0.Add(time.Minute)),
 			items: []Item{user(t0), said("Done."), user(t0.Add(2 * time.Minute)), said("Rebased.")}, stale: true, last: "Rebased."},
-		// Text after a current report: a caveat the parent should see (A3).
-		{name: "said more after its report", t: reported(finished, t0.Add(time.Minute)),
-			items:    []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), saidAt("Note: the benchmark\nmeasures nothing.", t0.Add(2*time.Minute))},
+		// Work after a current report: a caveat the parent should see (A3). A short
+		// closing paragraph with no tool call after the report is the turn's sign-off.
+		{name: "said more after its report: a tool call after it", t: reported(finished, t0.Add(time.Minute)),
+			items: []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), toolAt(t0.Add(90 * time.Second)),
+				saidAt("Note: the benchmark\nmeasures nothing.", t0.Add(2*time.Minute))},
 			saidMore: true, last: "Note: the benchmark measures nothing."},
+		{name: "said more after its report: long text", t: reported(finished, t0.Add(time.Minute)),
+			items:    []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), saidAt(longer, t0.Add(2*time.Minute))},
+			saidMore: true, last: strings.TrimSpace(longer)},
+		{name: "a closing paragraph after its report says nothing", t: reported(finished, t0.Add(time.Minute)),
+			items: []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), saidAt("Note: the benchmark\nmeasures nothing.", t0.Add(2*time.Minute))}},
+		{name: "a closing paragraph at the cap says nothing", t: reported(finished, t0.Add(time.Minute)),
+			items: []Item{user(t0), toolAt(t0.Add(30 * time.Second)), saidAt(closing, t0.Add(2*time.Minute))}},
+		{name: "tool calls before the report are not after it", t: reported(finished, t0.Add(time.Minute)),
+			items: []Item{user(t0), toolAt(t0.Add(10 * time.Second)), toolAt(t0.Add(50 * time.Second)), saidAt("All done.", t0.Add(2*time.Minute))}},
 		{name: "the report came last", t: reported(finished, t0.Add(time.Minute)),
 			items: []Item{user(t0), saidAt("Done, reporting.", t0.Add(30*time.Second))}},
 		{name: "text after the report while still working says nothing", t: reported(Thread{State: StateConnected, Status: StatusBusy}, t0.Add(time.Minute)),
@@ -136,6 +150,10 @@ func TestThreadWakeTitleDetail(t *testing.T) {
 			`Thread "Add LICENSE" (s-1) is idle: at prompt (no report).`},
 		{"an interrupted turn", CondSettled, named(StatusError, ReasonInterrupted), wakeDetail{noReport: true},
 			`Thread "Add LICENSE" (s-1) has an error: interrupted (no report).`},
+		{"a crashed turn", CondSettled, named(StatusError, ReasonCrashed), wakeDetail{noReport: true},
+			`Thread "Add LICENSE" (s-1) crashed: its process died (not stopped by anyone).`},
+		{"a crashed turn, error subscription, current report", CondError, withReport(named(StatusError, ReasonCrashed)), wakeDetail{},
+			`Thread "Add LICENSE" (s-1) crashed: its process died (not stopped by anyone). Report: progress — 2 workers started.`},
 		{"a stale report is not quoted", CondSettled, withReport(named(StatusNeedsAttention, "finished")), wakeDetail{staleReport: true},
 			`Thread "Add LICENSE" (s-1) needs attention: finished (report is from before its last message).`},
 		{"a current report", CondSettled, withReport(named(StatusNeedsAttention, "finished")), wakeDetail{},

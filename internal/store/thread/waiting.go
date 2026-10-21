@@ -19,7 +19,8 @@ import (
 // will wake the thread), or a wake to it is queued. A target is pending while it is not
 // settled (working, starting, being removed), or while it is itself waiting on its own
 // targets (a lead waiting on its workers). A question, a permission prompt, a turn
-// error, the budget stop and the wake limit keep their reasons: they win over waiting.
+// error, the budget stop and the wake limit keep their reasons: they win over waiting;
+// so does the end of a turn a timer started (waiting_reminder.go).
 //
 // It is an overlay applied by every commit (commitLocked): the record keeps the raw
 // status, the snapshot and the database have the one shown. A commit of a target
@@ -87,6 +88,9 @@ type statusVal struct {
 type waitState struct {
 	raw   statusVal
 	shown statusVal
+	// reminder: a timer wake started (or joined) the thread's current or last turn
+	// (waiting_reminder.go); its end needs attention, waiting or not.
+	reminder bool
 }
 
 // rawStatus is the record's own status: the shown one, unless that is the overlay.
@@ -108,7 +112,7 @@ func (rec *record) rawThread() Thread {
 // pending targets. Callers hold m.mu (it takes m.subs.mu).
 func (m *Manager) waitingLocked(rec *record) (int, bool) {
 	raw := rec.rawStatus()
-	if m.subs == nil || !rec.s.ArchivedAt.IsZero() || rec.s.Removing || !canWait(raw.st, raw.reason) {
+	if m.subs == nil || !rec.s.ArchivedAt.IsZero() || rec.s.Removing || !canWait(raw.st, raw.reason) || reminderShows(rec, raw) {
 		return 0, false
 	}
 	n := 0

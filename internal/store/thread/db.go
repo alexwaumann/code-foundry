@@ -46,9 +46,9 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
 			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
-			in_sidebar, kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix)
+			in_sidebar, kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix, pending_first)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			project_id = excluded.project_id,
@@ -96,7 +96,8 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			epoch = excluded.epoch,
 			system_prompt_append = excluded.system_prompt_append,
 			fresh_start = excluded.fresh_start,
-			seed_prefix = excluded.seed_prefix`,
+			seed_prefix = excluded.seed_prefix,
+			pending_first = excluded.pending_first`,
 		s.ID, s.ClaudeSessionID, s.ProjectID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
@@ -104,7 +105,8 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
 		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
 		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional, s.Owner, labelsJSON(s.SpawnEnv), labelsJSON(s.SpawnAddDirs), resumeNoteJSON(s.ResumeNote),
-		nullBool(s.SidebarOverride), int(s.Kind), s.ResidentName, max(s.Epoch, 1), s.SystemPromptAppend, s.FreshStart, s.SeedPrefix)
+		nullBool(s.SidebarOverride), int(s.Kind), s.ResidentName, max(s.Epoch, 1), s.SystemPromptAppend, s.FreshStart, s.SeedPrefix,
+		pendingFirstJSON(s.PendingFirst))
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
@@ -119,7 +121,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
 			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs, resume_note,
-			in_sidebar, kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix
+			in_sidebar, kind, resident_name, epoch, system_prompt_append, fresh_start, seed_prefix, pending_first
 		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
@@ -130,7 +132,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		var s Thread
 		var created, active, statusAt, lastResult, archived, snoozed, reportAt int64
 		var state, perm, status, reportStatus, kind int
-		var labels, spawnEnv, spawnAddDirs, resumeNote string
+		var labels, spawnEnv, spawnAddDirs, resumeNote, pendingFirst string
 		var inSidebar sql.NullBool
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.ProjectID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
@@ -139,7 +141,8 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
 			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
 			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional, &s.Owner, &spawnEnv, &spawnAddDirs, &resumeNote,
-			&inSidebar, &kind, &s.ResidentName, &s.Epoch, &s.SystemPromptAppend, &s.FreshStart, &s.SeedPrefix); err != nil {
+			&inSidebar, &kind, &s.ResidentName, &s.Epoch, &s.SystemPromptAppend, &s.FreshStart, &s.SeedPrefix,
+			&pendingFirst); err != nil {
 			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
@@ -156,6 +159,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		s.Labels = parseLabels(labels)
 		s.SpawnEnv, s.SpawnAddDirs = parseLabels(spawnEnv), parseLabels(spawnAddDirs)
 		s.ResumeNote = parseResumeNote(resumeNote)
+		s.PendingFirst = parsePendingFirst(pendingFirst)
 		if s.Kind = ThreadKind(kind); !s.Kind.valid() {
 			s.Kind = KindNormal
 		}
