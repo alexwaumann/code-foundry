@@ -55,6 +55,10 @@ code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
 # created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/fix-login-redirect
 
 code-foundry thread wait 7d10 --for 1h
+# thread s-3f9a1c2b7d10 Fix the login redirect: needs attention (permission: Bash npm test)
+# pending permission 9c41…: Bash {"command":"npm test"}; answer with: code-foundry thread respond --id s-3f9a1c2b7d10 allow (or deny --message "why")
+code-foundry thread respond --id 7d10 allow
+code-foundry thread wait 7d10 --for 1h
 # thread s-3f9a1c2b7d10 Fix the login redirect: needs attention (finished)
 
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD
@@ -146,9 +150,10 @@ code-foundry thread read 5e6f --last 10
 
 `send --wait` is for a child you are not subscribed to; a `--notify` child gets `send`
 without `--wait`, then you end the turn and its wake brings the answer. `send --wait`
-returns once the child has answered this message, not an earlier turn. While you wait in
-a turn the user cannot reach you: for a follow-up longer than a minute or so, prefer the
-`--notify` shape.
+returns once the child has answered this message, not an earlier turn, or asks you
+something (answer with the `thread respond` line it prints, then `thread wait` again).
+While you wait in a turn the user cannot reach you: for a follow-up longer than a minute
+or so, prefer the `--notify` shape.
 To follow up with several children at once, send to each without `--wait` and end your
 turn (their `--notify` subscriptions wake you), or run the `send --wait` calls in
 parallel (a plain `thread wait` after a `send` waits for the answer to that message).

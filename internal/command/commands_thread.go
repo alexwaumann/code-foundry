@@ -107,8 +107,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "text", Type: String, Required: true, Positional: true, FileOrStdin: true, Description: "The message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
-				{Name: "wait", Type: Bool, Description: "Then wait like thread.wait until Claude has answered it and the thread is idle " +
-					"(--json: the thread, not the message item)"},
+				{Name: "wait", Type: Bool, Description: "Then wait like thread.wait until Claude has answered it and the thread settled: " +
+					"its turn ended, or it asks for a permission or an answer, which it prints with the thread respond line (--json: the thread, not the message item)"},
 				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, as thread.wait's for"},
 					waitForArg.Default),
 			},
@@ -144,7 +144,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				// Past the message's own item: the status of the turn before it (still
 				// "finished" until the new turn's busy is published) does not count.
-				return waitThread(ctx, b, id, "idle", item.GetId(), limit, sent+"; ")
+				return waitThread(ctx, b, id, "settled", item.GetId(), limit, sent+"; ")
 			},
 		},
 		Command{

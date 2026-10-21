@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -50,5 +51,49 @@ func TestThreadSendNextStep(t *testing.T) {
 				t.Errorf("message %q, want %q", res.Message, tt.want)
 			}
 		})
+	}
+}
+
+// thread.send --wait settles at a permission prompt the message led to and names it,
+// instead of waiting out --for (docs/notes/thread-wait-settled.md).
+func TestThreadSendWaitSettlesAtPrompt(t *testing.T) {
+	finished := thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, Status: thread.StatusNeedsAttention, StatusReason: "finished"}
+	busy, asking := finished, finished
+	busy.Status, busy.StatusReason = thread.StatusBusy, "working"
+	asking.StatusReason = "permission: Bash rm x"
+	reg, fake := newThreadRegistry(t)
+	fake.Put(finished)
+	fake.PutItems("s1", thread.Item{ID: "u-old", Kind: thread.KindUserMessage, Text: "hi"}, thread.Item{ID: "t-old", Kind: thread.KindTurnEnd})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	type answer struct {
+		res command.Result
+		err error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		res, err := reg.Invoke(ctx, command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "remove x", "wait": "true", "for": "5s"})
+		done <- answer{res, err}
+	}()
+	for _, step := range []func(){
+		func() { fake.Put(busy) },
+		func() {
+			fake.AppendItem("s1", thread.Item{ID: "p-r1", Kind: thread.KindPermission, Request: &thread.Request{
+				RequestID: "r1", ToolName: "Bash", Description: "rm x", InputJSON: `{"command":"rm x"}`, State: thread.RequestPending}})
+			fake.Put(asking)
+		},
+	} {
+		select {
+		case a := <-done:
+			t.Fatalf("returned (%q, %v) early", a.res.Message, a.err)
+		case <-time.After(30 * time.Millisecond):
+		}
+		step()
+	}
+	a := <-done
+	want := "thread s1 fix: needs attention (permission: Bash rm x)\n" +
+		`pending permission r1: Bash {"command":"rm x"}; answer with: code-foundry thread respond --id s1 allow (or deny --message "why")`
+	if a.err != nil || a.res.Message != want {
+		t.Fatalf("answer %q, %v; want %q", a.res.Message, a.err, want)
 	}
 }

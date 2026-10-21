@@ -760,8 +760,11 @@ message GetThreadResponse {
 
 // ThreadWaitCondition is what ThreadService.Wait waits for. Each is a fact about the
 // Thread record (state, status, status_reason), checked at once and on every change.
+// A connected thread's "permission: …" or "question: …" status counts only while a
+// request is still pending in its items: the status is published after a short
+// debounce, so a wait right after an answer would otherwise return on the answered one.
 enum ThreadWaitCondition {
-  // Means IDLE.
+  // Means SETTLED, the CLI's default (GUI, CLI and daemon are always one version).
   THREAD_WAIT_CONDITION_UNSPECIFIED = 0;
   // Claude is not working and no answer is pending: the thread is not STARTING and its
   // status is IDLE, ERROR (the process ended mid-turn), or NEEDS_ATTENTION for anything
@@ -774,6 +777,9 @@ enum ThreadWaitCondition {
   THREAD_WAIT_CONDITION_ERROR = 3;
   // state DISCONNECTED (no Claude process).
   THREAD_WAIT_CONDITION_DISCONNECTED = 4;
+  // IDLE or ATTENTION: Claude stopped working; its turn ended, or it asks for a
+  // permission or an answer (the wake subscriptions' settled).
+  THREAD_WAIT_CONDITION_SETTLED = 5;
 }
 
 message WaitThreadRequest {
