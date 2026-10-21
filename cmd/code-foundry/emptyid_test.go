@@ -11,10 +11,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
-// An explicitly empty id never falls back to the thread the CLI runs in: `--id
-// "$CHILD"` with CHILD unset archived, removed or interrupted the caller itself.
-func TestCLIRefusesEmptyIDs(t *testing.T) {
-	c := startTestDaemon(t)
+// testCLIRefusesEmptyIDs: an explicitly empty id never falls back to the thread the
+// CLI runs in: `--id "$CHILD"` with CHILD unset archived, removed or interrupted the
+// caller itself. TestCLIAgainstDaemon runs it on its daemon (one daemon start per test
+// binary is slow enough under load).
+func testCLIRefusesEmptyIDs(t *testing.T, c *client.Client) {
 	tests := []struct {
 		name       string
 		args       []string

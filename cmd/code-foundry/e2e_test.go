@@ -147,6 +147,8 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		})
 	}
 
+	t.Run("empty ids", func(t *testing.T) { testCLIRefusesEmptyIDs(t, c) })
+
 	t.Run("unknown terminal is a clean not-found error", func(t *testing.T) {
 		r := runCLI(c, "terminal.kill", "--id", "t1", "--yes")
 		if !errors.Is(r.err, errUsage) || !strings.Contains(r.stderr, "terminal not found: t1") {
