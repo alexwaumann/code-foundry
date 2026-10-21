@@ -1008,7 +1008,7 @@ func (s *Store) checkAuth(ctx context.Context) {
 		return
 	}
 	s.authFailures++
-	s.authNext = now.Add(backoff(s.opts.AuthRetry, s.opts.MaxBackoff, s.authFailures, s.opts.Rand()))
+	s.authNext = now.Add(s.authBackoffLocked())
 	s.mu.Unlock()
 	msg := ErrNotAuthenticated.Error()
 	switch {

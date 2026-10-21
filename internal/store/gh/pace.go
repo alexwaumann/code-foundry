@@ -32,8 +32,13 @@ const (
 	// DefaultNoGUIInterval is the shortest poll interval while no GUI client is
 	// connected: the CLI and threads read the cache, and a GUI connecting brings the
 	// next poll forward (PresenceChanged).
-	DefaultNoGUIInterval  = 15 * time.Minute
-	DefaultAuthRetry      = 60 * time.Second
+	DefaultNoGUIInterval = 15 * time.Minute
+	DefaultAuthRetry     = 60 * time.Second
+	// maxAuthBackoff caps the wait between auth checks while gh is not authenticated:
+	// a check asks the local gh for its token and validates only a token GitHub has not
+	// rejected already (HTTPRunner.AuthStatus), so `gh auth login` is picked up within
+	// a couple of minutes.
+	maxAuthBackoff        = 2 * time.Minute
 	DefaultNetworkBackoff = 15 * time.Second
 	// DefaultSecondaryBackoff follows GitHub's guidance to wait at least a minute after a
 	// secondary rate limit response without a retry-after header. With one, the store

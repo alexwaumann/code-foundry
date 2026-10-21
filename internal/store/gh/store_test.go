@@ -229,6 +229,49 @@ func TestStoreAuthPauseAndRecovery(t *testing.T) {
 	})
 }
 
+// While gh is not authenticated, a refresh or a GUI coming back checks the login at
+// once instead of waiting out the auth backoff.
+func TestStoreAuthCheckNow(t *testing.T) {
+	f := &fakeRunner{}
+	notAuthed := fmt.Errorf("%w: Bad credentials (HTTP 401)", ErrNotAuthenticated)
+	f.set(func(string, map[string]any) (json.RawMessage, error) { return nil, notAuthed })
+	f.auth = func() (AuthStatus, error) { return AuthStatus{Error: "Bad credentials"}, nil }
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.AuthRetry = time.Hour // no check unless one is asked for
+	s := startStore(t, opts)
+	waitFor(t, "unauthenticated", func() bool { return !s.Snapshot().Viewer.Authenticated })
+	time.Sleep(100 * time.Millisecond)
+	if _, n := f.snapshot(); n != 0 {
+		t.Fatalf("auth checks = %d before any was asked for", n)
+	}
+	if err := s.Refresh(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the refresh's auth check", func() bool { _, n := f.snapshot(); return n == 1 })
+	s.PresenceChanged(PresenceBackground, PresenceForeground)
+	waitFor(t, "the presence rise's auth check", func() bool { _, n := f.snapshot(); return n == 2 })
+	s.PresenceChanged(PresenceForeground, PresenceBackground)
+	time.Sleep(100 * time.Millisecond)
+	if _, n := f.snapshot(); n != 2 {
+		t.Errorf("auth checks = %d after a presence fall, want 2", n)
+	}
+}
+
+// The auth check backs off to a couple of minutes at most: it costs GitHub nothing
+// while the token stays the one it rejected.
+func TestAuthBackoffCap(t *testing.T) {
+	s := &Store{opts: Options{AuthRetry: DefaultAuthRetry, MaxBackoff: DefaultMaxBackoff, Rand: func() float64 { return 0.99 }}}
+	for _, tc := range []struct {
+		failures int
+		want     time.Duration
+	}{{1, DefaultAuthRetry}, {2, maxAuthBackoff}, {50, maxAuthBackoff}} {
+		s.authFailures = tc.failures
+		if got := s.authBackoffLocked(); got < tc.want || got > jitter(tc.want, 1) {
+			t.Errorf("failures %d: backoff = %v, want about %v", tc.failures, got, tc.want)
+		}
+	}
+}
+
 func TestStoreRateLimitBudgetPauses(t *testing.T) {
 	g := newFakeGitHub()
 	f := &fakeRunner{}

@@ -346,6 +346,7 @@ func (s *Store) Refresh(ctx context.Context, slug string) error {
 		s.mu.Lock()
 		s.pollAgain = true
 		s.pollNext = s.opts.Now()
+		s.authNext = s.pollNext // while gh is not authenticated: check now
 		s.mu.Unlock()
 		s.nudge()
 		return nil
@@ -611,6 +612,12 @@ func (s *Store) pace(ctx context.Context) error {
 	}
 }
 
+// authBackoffLocked is the wait before the next auth check (s.mu held): AuthRetry
+// doubled per failure, capped at maxAuthBackoff (MaxBackoff when lower).
+func (s *Store) authBackoffLocked() time.Duration {
+	return backoff(s.opts.AuthRetry, max(s.opts.AuthRetry, min(s.opts.MaxBackoff, maxAuthBackoff)), s.authFailures, s.opts.Rand())
+}
+
 // noteResult updates global state after a request.
 func (s *Store) noteResult(ctx context.Context, err error, rl *rateLimitJSON) {
 	if ctx.Err() != nil {
@@ -643,7 +650,7 @@ func (s *Store) noteResult(ctx context.Context, err error, rl *rateLimitJSON) {
 		first := !s.authBad
 		s.authBad = true
 		s.authFailures++
-		s.authNext = now.Add(backoff(s.opts.AuthRetry, s.opts.MaxBackoff, s.authFailures, s.opts.Rand()))
+		s.authNext = now.Add(s.authBackoffLocked())
 		s.mu.Unlock()
 		if first {
 			s.log.Warn("gh is not authenticated; polling paused", "err", err)

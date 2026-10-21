@@ -478,40 +478,59 @@ func TestHTTPRunnerNetworkFailures(t *testing.T) {
 
 func TestHTTPRunnerAuthStatus(t *testing.T) {
 	ctx := context.Background()
+	type check struct {
+		loggedIn bool
+		err      string // a substring of AuthStatus.Error; "" for none
+	}
 	tests := []struct {
-		name      string
-		valid     string
-		tokens    *fakeTokens
-		want      AuthStatus
-		wantError string
+		name   string
+		valid  string
+		tokens *fakeTokens
+		later  time.Duration // the clock moves this much between the checks
+		checks []check
+		users  int // GET /user requests
 	}{
-		{"ok", "tok", &fakeTokens{tokens: []string{"tok"}}, AuthStatus{LoggedIn: true, Login: "octocat"}, ""},
-		{"rejected", "other", &fakeTokens{tokens: []string{"tok"}}, AuthStatus{}, "Bad credentials (HTTP 401)"},
-		{"no token", "tok", &fakeTokens{err: errors.Join(ErrNoToken, errors.New("no oauth token found for github.com"))},
-			AuthStatus{}, "no oauth token found"},
+		{"ok", "tok", &fakeTokens{tokens: []string{"tok"}}, 0, []check{{true, ""}, {true, ""}}, 2},
+		// GitHub already said no to this token: the second check asks gh, not GitHub.
+		{"rejected", "other", &fakeTokens{tokens: []string{"tok"}}, 0,
+			[]check{{false, "Bad credentials (HTTP 401)"}, {false, "rejected the token"}}, 1},
+		{"rejected long ago: asked again", "other", &fakeTokens{tokens: []string{"tok"}}, rejectedRecheck,
+			[]check{{false, "Bad credentials (HTTP 401)"}, {false, "Bad credentials (HTTP 401)"}}, 2},
+		{"a new login after a rejection", "other", &fakeTokens{tokens: []string{"tok", "other"}}, 0,
+			[]check{{false, "Bad credentials (HTTP 401)"}, {true, ""}}, 2},
+		{"no token", "tok", &fakeTokens{err: errors.Join(ErrNoToken, errors.New("no oauth token found for github.com"))}, 0,
+			[]check{{false, "no oauth token found"}, {false, "no oauth token found"}}, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := newAPIServer(t, tt.valid, serveViewer)
-			r := NewHTTPRunner(HTTPOptions{BaseURL: srv.URL, Tokens: tt.tokens})
-			for i := 1; i <= 2; i++ {
+			now := time.Now()
+			r := NewHTTPRunner(HTTPOptions{BaseURL: srv.URL, Tokens: tt.tokens, Now: func() time.Time { return now }})
+			for i, want := range tt.checks {
+				if i > 0 {
+					now = now.Add(tt.later)
+				}
 				st, err := r.AuthStatus(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if st.LoggedIn != tt.want.LoggedIn || st.Login != tt.want.Login || !strings.Contains(st.Error, tt.wantError) ||
-					(tt.wantError == "") != (st.Error == "") {
-					t.Errorf("status = %+v, want %+v with error %q", st, tt.want, tt.wantError)
+				if st.LoggedIn != want.loggedIn || (want.loggedIn && st.Login != "octocat") || !strings.Contains(st.Error, want.err) ||
+					(want.err == "") != (st.Error == "") {
+					t.Errorf("check %d: status = %+v, want %+v", i+1, st, want)
 				}
 				// Every check asks gh again: that is how a new login is noticed.
-				if n := tt.tokens.count(); n != i {
-					t.Errorf("token resolutions = %d, want %d", n, i)
+				if n := tt.tokens.count(); n != i+1 {
+					t.Errorf("token resolutions = %d, want %d", n, i+1)
 				}
 			}
-			for _, req := range srv.requests() {
+			reqs := srv.requests()
+			for _, req := range reqs {
 				if req.method != "GET" || req.path != "/user" {
 					t.Errorf("request = %s %s, want GET /user", req.method, req.path)
 				}
+			}
+			if len(reqs) != tt.users {
+				t.Errorf("GET /user requests = %d, want %d", len(reqs), tt.users)
 			}
 		})
 	}

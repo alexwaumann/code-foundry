@@ -64,6 +64,33 @@ type HTTPRunner struct {
 	mu      sync.Mutex
 	token   string
 	tokenAt time.Time
+	// rejected is the last token GitHub answered 401 to, at rejectedAt: AuthStatus
+	// does not ask GitHub about it again until rejectedRecheck has passed.
+	rejected   string
+	rejectedAt time.Time
+}
+
+// rejectedRecheck is how long AuthStatus trusts GitHub's 401 for a token before asking
+// about the same token again (a different token is asked about at once).
+const rejectedRecheck = 15 * time.Minute
+
+// noteAnswer remembers whether GitHub rejected tok (status 401).
+func (r *HTTPRunner) noteAnswer(tok string, status int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	switch {
+	case status == http.StatusUnauthorized:
+		r.rejected, r.rejectedAt = tok, r.opts.Now()
+	case tok == r.rejected && status >= 200 && status < 300:
+		r.rejected = ""
+	}
+}
+
+// knownRejected reports whether GitHub rejected tok within rejectedRecheck.
+func (r *HTTPRunner) knownRejected(tok string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return tok == r.rejected && r.opts.Now().Sub(r.rejectedAt) < rejectedRecheck
 }
 
 var (
@@ -176,8 +203,10 @@ func (r *HTTPRunner) restURL(path string, params map[string]string) string {
 }
 
 // AuthStatus implements Runner. It resolves the token afresh and validates it with
-// GET /user (one REST core point; GraphQL's budget is untouched). A missing or rejected
-// token is reported in AuthStatus, not as an error; transport failures are errors.
+// GET /user (one REST core point; GraphQL's budget is untouched), except a token GitHub
+// rejected within rejectedRecheck, which is reported rejected without a request. A
+// missing or rejected token is reported in AuthStatus, not as an error; transport
+// failures are errors.
 func (r *HTTPRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 	tok, err := r.resolveToken(ctx, true)
 	if err != nil {
@@ -186,10 +215,14 @@ func (r *HTTPRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 		}
 		return AuthStatus{}, err
 	}
+	if r.knownRejected(tok) {
+		return AuthStatus{Error: "GitHub rejected the token gh has (gh auth login replaces it)"}, nil
+	}
 	res, err := r.send(ctx, http.MethodGet, r.opts.BaseURL+"/user", nil, tok, sendOpts{})
 	if err != nil {
 		return AuthStatus{}, err
 	}
+	r.noteAnswer(tok, res.status)
 	switch {
 	case res.status == http.StatusUnauthorized:
 		return AuthStatus{Error: httpMessage(res)}, nil
@@ -214,6 +247,9 @@ func (r *HTTPRunner) do(ctx context.Context, method, u string, body []byte, o se
 		return httpResult{}, notAuthenticated(err)
 	}
 	res, err := r.send(ctx, method, u, body, tok, o)
+	if err == nil {
+		r.noteAnswer(tok, res.status)
+	}
 	if err != nil || res.status != http.StatusUnauthorized {
 		return res, err
 	}
@@ -226,7 +262,11 @@ func (r *HTTPRunner) do(ctx context.Context, method, u string, body []byte, o se
 		return res, nil
 	}
 	r.opts.Log.Info("github rejected the token; retrying with the one gh has now")
-	return r.send(ctx, method, u, body, fresh, o)
+	res, err = r.send(ctx, method, u, body, fresh, o)
+	if err == nil {
+		r.noteAnswer(fresh, res.status)
+	}
+	return res, err
 }
 
 func notAuthenticated(err error) error {

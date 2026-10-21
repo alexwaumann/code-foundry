@@ -78,6 +78,9 @@ func (s *Store) PresenceChanged(from, to Presence) {
 		if s.pollNext.After(due) {
 			s.pollNext = due
 		}
+		if s.authBad { // the user may have logged in meanwhile
+			s.authNext = now
+		}
 	}
 	next := s.pollNext.Sub(now)
 	s.mu.Unlock()
