@@ -52,6 +52,7 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 		wantThread string
 		wantExit   int
 		wantStdout string
+		wantStderr string
 	}{
 		{name: "a thread's agent acts for its thread", env: map[string]string{paths.EnvThread: "s-agent"},
 			args: []string{"action", "run", "test"}, wantThread: "s-agent"},
@@ -73,6 +74,9 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 			wantExit: 3, wantStdout: "FAIL\nTest exited with code 3 (run r1)\n"},
 		{name: "exit code 0 is success", args: []string{"action", "run", "test", "--wait"},
 			res: &v1.InvokeCommandResponse{Message: "ok"}, wantStdout: "ok\n"},
+		{name: "warnings go to stderr, the result stays on stdout", args: []string{"action", "run", "test"},
+			res:        &v1.InvokeCommandResponse{Message: "13", Warnings: []string{"settings.toml does not parse"}},
+			wantStdout: "13\n", wantStderr: "warning: settings.toml does not parse\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -107,6 +111,9 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 			}
 			if tt.wantStdout != "" && stdout.String() != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", stdout.String(), tt.wantStdout)
+			}
+			if stderr.String() != tt.wantStderr {
+				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
 			}
 			if len(f.invoked) != 1 {
 				t.Fatalf("invoked %d times", len(f.invoked))

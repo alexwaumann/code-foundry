@@ -531,10 +531,11 @@ type SettingsSnapshot struct {
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
 	// Increments with every published change.
 	Revision uint64 `protobuf:"varint,3,opt,name=revision,proto3" json:"revision,omitempty"`
-	// Set when the file could not be parsed; the previous values stay in effect.
+	// Set when the file could not be parsed; the last settings that loaded stay in
+	// effect (at the daemon's start, the last file that parsed; else the defaults).
 	LoadError string `protobuf:"bytes,4,opt,name=load_error,json=loadError,proto3" json:"load_error,omitempty"`
 	// Values in the file that were rejected (and replaced by their defaults), and unknown
-	// keys.
+	// keys. Saving keeps them in the file.
 	Issues []*SettingIssue `protobuf:"bytes,5,rep,name=issues,proto3" json:"issues,omitempty"`
 	// restart_required keys whose value differs from the one the daemon started with.
 	RestartPending []string `protobuf:"bytes,6,rep,name=restart_pending,json=restartPending,proto3" json:"restart_pending,omitempty"`

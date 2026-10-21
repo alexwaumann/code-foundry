@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -21,6 +22,30 @@ func TestActiveThreads(t *testing.T) {
 	for _, tt := range tests {
 		if got := activeThreads(tt.c); got != tt.want {
 			t.Errorf("activeThreads(%+v) = %q, want %q", tt.c, got, tt.want)
+		}
+	}
+}
+
+// Only a first install into the default home's app directory touches the shell setup;
+// an update of an install, or an install into a scratch home, never re-points the link.
+func TestInstallerShellArgs(t *testing.T) {
+	const def = "/Users/u/.code-foundry/app"
+	skip := []string{"--skip-link", "--skip-path"}
+	tests := []struct {
+		name           string
+		appDir, target string
+		want           []string
+	}{
+		{"dev CLI, default home", "", def, nil},
+		{"dev CLI, default home, trailing slash", "", def + "/", nil},
+		{"dev CLI, CODE_FOUNDRY_HOME elsewhere", "", "/tmp/x/app", skip},
+		{"dev CLI, CODE_FOUNDRY_APP_DIR elsewhere", "", "/Users/u/apps/cf", skip},
+		{"installed CLI, default install", def, def, skip},
+		{"installed CLI, side install", "/tmp/x/app", "/tmp/x/app", skip},
+	}
+	for _, tt := range tests {
+		if got := installerShellArgs(tt.appDir, tt.target, def); !slices.Equal(got, tt.want) {
+			t.Errorf("%s: %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }

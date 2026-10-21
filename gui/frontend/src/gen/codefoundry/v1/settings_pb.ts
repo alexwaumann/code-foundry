@@ -287,7 +287,8 @@ export type SettingsSnapshot = Message<"codefoundry.v1.SettingsSnapshot"> & {
   revision: bigint;
 
   /**
-   * Set when the file could not be parsed; the previous values stay in effect.
+   * Set when the file could not be parsed; the last settings that loaded stay in
+   * effect (at the daemon's start, the last file that parsed; else the defaults).
    *
    * @generated from field: string load_error = 4;
    */
@@ -295,7 +296,7 @@ export type SettingsSnapshot = Message<"codefoundry.v1.SettingsSnapshot"> & {
 
   /**
    * Values in the file that were rejected (and replaced by their defaults), and unknown
-   * keys.
+   * keys. Saving keeps them in the file.
    *
    * @generated from field: repeated codefoundry.v1.SettingIssue issues = 5;
    */

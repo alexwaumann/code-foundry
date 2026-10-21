@@ -219,7 +219,9 @@ type Snapshot struct {
 	Values   map[string]string
 	Path     string
 	Revision uint64
-	// LoadError is set when the file could not be parsed; previous values stay.
+	// LoadError is set when the file could not be parsed. The values from before stay
+	// in effect: those of the last successful load, which at the daemon's start are
+	// the last file that parsed (settings.toml.lastgood), else the defaults.
 	LoadError string
 	// Issues lists values in the file that were rejected (their defaults apply) and
 	// unknown keys, sorted by key.
@@ -245,7 +247,8 @@ type resolved struct {
 	settings Settings
 	// values is every field's effective value.
 	values map[string]string
-	// accepted is the raw values that were valid, canonicalized: what the file keeps.
+	// accepted is the raw values that were valid, canonicalized. The file keeps them
+	// and the raw values of keys with issues (fileValues).
 	accepted map[string]string
 	issues   []Issue
 }
@@ -286,6 +289,38 @@ func resolve(raw map[string]string, cmds []CommandInfo) resolved {
 		return cmp.Or(strings.Compare(a.Key, b.Key), strings.Compare(a.Message, b.Message))
 	})
 	return r
+}
+
+// fileValues is what the file keeps after a save from raw (r = resolve(raw, ...)): the
+// accepted values, canonicalized, and the raw text of every key with an issue (a value
+// that failed validation, an unknown key, a keybinding for a command that is not
+// registered now), so a hand edit the app cannot use survives a save from the app until
+// the user fixes or removes it. dropped lists the keys it cannot keep: a top-level key
+// whose name is also a table the file has (threads = 5 next to [threads]).
+func (r resolved) fileValues(raw map[string]string) (keep map[string]string, dropped []string) {
+	keep = maps.Clone(r.accepted)
+	tables := map[string]bool{}
+	for _, g := range Groups {
+		tables[g.ID] = true
+	}
+	for k := range raw {
+		if g, _, ok := strings.Cut(k, "."); ok {
+			tables[g] = true
+		}
+	}
+	for _, is := range r.issues {
+		v, ok := raw[is.Key]
+		if !ok || v == "" {
+			continue
+		}
+		if !strings.Contains(is.Key, ".") && tables[is.Key] {
+			dropped = append(dropped, is.Key)
+			continue
+		}
+		keep[is.Key] = v
+	}
+	slices.Sort(dropped)
+	return keep, slices.Compact(dropped)
 }
 
 // set stores the canonical string v into a *string, *int, or *bool.

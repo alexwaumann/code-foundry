@@ -284,6 +284,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	for _, w := range res.GetWarnings() {
+		fmt.Fprintln(cl.stderr, "warning: "+w)
+	}
 	switch {
 	case *asJSON && res.GetResultJson() != "":
 		fmt.Fprintln(cl.stdout, res.GetResultJson())

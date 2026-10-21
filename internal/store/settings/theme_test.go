@@ -65,7 +65,7 @@ func TestOlderFileGetsThemeDefaults(t *testing.T) {
 	if a.Theme != "light" || a.FontSize != 14 || a.ThemeDark != "github-dark" || a.ThemeLight != "github-light" {
 		t.Errorf("appearance = %+v", a)
 	}
-	text := string(render(r.accepted))
+	text := string(render(r.accepted, nil))
 	for _, want := range []string{"theme = \"light\"\n", "# theme_dark = \"github-dark\"\n", "# theme_light = \"github-light\"\n"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("rendered file lacks %q", want)

@@ -69,6 +69,8 @@ func OpenWith(ctx context.Context, path string, migrations fs.FS) (*sql.DB, erro
 
 // dsn builds a modernc.org/sqlite DSN. _pragma values are applied to every new
 // connection in the pool, which matters for per-connection pragmas like foreign_keys.
+// It is a file: URI, so the path is escaped: a home with "#", "?" or "%" in it would
+// otherwise end the path early or fail to open.
 func dsn(path string) string {
 	q := url.Values{}
 	q.Add("_pragma", "journal_mode(WAL)")
@@ -76,7 +78,8 @@ func dsn(path string) string {
 	q.Add("_pragma", "foreign_keys(1)")
 	q.Add("_pragma", "synchronous(NORMAL)")
 	q.Set("_txlock", "immediate")
-	return "file:" + path + "?" + q.Encode()
+	u := url.URL{Scheme: "file", Path: path, RawQuery: q.Encode()}
+	return u.String()
 }
 
 // Migration is one numbered schema change.

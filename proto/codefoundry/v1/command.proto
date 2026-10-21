@@ -105,6 +105,9 @@ message InvokeCommandResponse {
   // A process exit status the command reports (action.run --wait: the action's exit
   // code). The CLI prints the result, then exits with it when it is not 0.
   int32 exit_code = 3;
+  // Notes about the result the CLI prints to stderr, one "warning: " line each, so
+  // stdout stays the result (settings.get warns when settings.toml does not parse).
+  repeated string warnings = 4;
 }
 
 // ConfirmationRequired is the error detail of an Invoke that needs confirmation.

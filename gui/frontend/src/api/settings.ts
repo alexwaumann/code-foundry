@@ -80,7 +80,7 @@ export interface SettingsSnapshotView {
   values: Readonly<Record<string, string>>;
   path: string;
   revision: number;
-  /** The file does not parse; previous values stay in effect. */
+  /** The file does not parse; the last settings that loaded stay in effect (the defaults if none have). */
   loadError: string;
   issues: SettingIssueView[];
   /** restart_required keys changed since the daemon started. */

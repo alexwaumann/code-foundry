@@ -3,6 +3,8 @@ package command_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -117,5 +119,64 @@ func TestSettingsRevealAndViews(t *testing.T) {
 		if c, _ := reg.Get(tt.cmd); len(c.Keybindings) != 1 || c.Keybindings[0] != tt.chord {
 			t.Errorf("%s keybindings = %v", tt.cmd, c.Keybindings)
 		}
+	}
+}
+
+// settings.get, set and reset warn (on stderr, via Result.Warnings) when the file does
+// not parse or holds values the app ignores, so a hand edit gone wrong is not silent.
+func TestSettingsWarnings(t *testing.T) {
+	tests := []struct {
+		name  string
+		file  string
+		cmd   string
+		args  map[string]string
+		want  []string // substrings, one per warning
+		value string   // the message, when set
+	}{
+		{name: "clean file", file: "[appearance]\nfont_size = 15\n", cmd: "settings.get", args: map[string]string{"key": "appearance.font_size"}, value: "15"},
+		{name: "does not parse", file: "[advanced]\n[advanced]\n", cmd: "settings.get", args: map[string]string{"key": "appearance.font_size"},
+			want: []string{"does not parse", "the last settings that loaded are in effect"}, value: "13"},
+		{name: "ignored value of the key", file: "[appearance]\nfont_size = 30000\n", cmd: "settings.get", args: map[string]string{"key": "appearance.font_size"},
+			want: []string{"appearance.font_size in ", "is ignored: want 9 to 28, got 30000"}, value: "13"},
+		{name: "ignored value of another key", file: "[appearance]\nfont_size = 30000\n", cmd: "settings.get", args: map[string]string{"key": "appearance.zoom"}, value: "100"},
+		{name: "get all lists them", file: "[appearance]\nfont_size = 30000\n[threads]\nnope = 1\n", cmd: "settings.get",
+			want: []string{"2 values are ignored", "appearance.font_size, threads.nope"}},
+		{name: "set keeps them and says so", file: "[appearance]\nfont_size = 30000\n", cmd: "settings.set", args: map[string]string{"key": "appearance.zoom", "value": "110"},
+			want: []string{"1 value is ignored in ", "(kept in the file until fixed", "appearance.font_size"}},
+		{name: "reset another key", file: "[appearance]\nfont_size = 30000\n", cmd: "settings.reset", args: map[string]string{"key": "appearance.zoom"},
+			want: []string{"1 value is ignored"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, settings.FileName), []byte(tt.file), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			store, err := settingstest.New(context.Background(), dir, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = store.Close() })
+			reg := command.NewRegistry()
+			if err := command.RegisterSettings(reg, api.NewSettings(store), &commandtest.Emitter{}, nil); err != nil {
+				t.Fatal(err)
+			}
+			res, err := reg.Invoke(context.Background(), command.Context{}, tt.cmd, tt.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.value != "" && res.Message != tt.value {
+				t.Errorf("message = %q, want %q", res.Message, tt.value)
+			}
+			got := strings.Join(res.Warnings, "\n")
+			if len(res.Warnings) != min(len(tt.want), 1) { // one line, whatever it says
+				t.Errorf("warnings = %q", res.Warnings)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("warnings %q lack %q", got, w)
+				}
+			}
+		})
 	}
 }

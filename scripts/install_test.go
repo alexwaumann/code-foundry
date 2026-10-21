@@ -730,3 +730,91 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 		})
 	}
 }
+
+// The code-foundry link is someone's working command: an install never re-points a link
+// that leads to another existing install unless --force says so (a TTY would ask), and a
+// rerun that installs nothing never re-points it at all.
+func TestInstallLinkGuard(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing string // "other": a link to another install; "dangling"; "file"; "same"; "": none
+		args     []string
+		rerun    bool // install once first (link set up), then point the link away and rerun
+		want     string
+		wantOut  string
+	}{
+		{name: "no link: created", want: "app"},
+		{name: "link to another install: kept", existing: "other", want: "other", wantOut: "warning: left "},
+		{name: "link to another install with --force: replaced", existing: "other", args: []string{"--force"}, want: "app"},
+		{name: "dangling link: replaced", existing: "dangling", want: "app"},
+		{name: "a plain file: kept", existing: "file", want: "file", wantOut: "a file that is not a link"},
+		{name: "link to this install by another path: re-pointed without asking", existing: "same", want: "app"},
+		{name: "already installed: never re-pointed", existing: "other", rerun: true, want: "other", wantOut: "already installed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+			bin := filepath.Join(e.home, ".local", "bin")
+			link := filepath.Join(bin, "code-foundry")
+			other := filepath.Join(e.home, "other", "code-foundry")
+			targets := map[string]string{
+				"app": filepath.Join(e.app(), "code-foundry"), "other": other,
+				"dangling": filepath.Join(e.home, "gone", "code-foundry"),
+				// The same install through a symlinked directory.
+				"same": filepath.Join(e.home, "alias", "app", "code-foundry"),
+			}
+			if err := os.MkdirAll(bin, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Dir(other), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(other, []byte("#!/bin/sh\necho other\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if tt.rerun || tt.existing == "same" {
+				if out, err := e.run(t, "--skip-path"); err != nil {
+					t.Fatalf("first install: %v\n%s", err, out)
+				}
+				_ = os.Remove(link)
+			}
+			if tt.existing == "same" {
+				if err := os.Symlink(filepath.Join(e.home, ".code-foundry"), filepath.Join(e.home, "alias")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch tt.existing {
+			case "":
+			case "file":
+				if err := os.WriteFile(link, []byte("#!/bin/sh\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			default:
+				if err := os.Symlink(targets[tt.existing], link); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out, err := e.run(t, append([]string{"--skip-path"}, tt.args...)...)
+			if err != nil {
+				t.Fatalf("install: %v\n%s", err, out)
+			}
+			if e.installedVersion(t) != "v0.1.0" {
+				t.Fatal("not installed")
+			}
+			if !strings.Contains(out, tt.wantOut) {
+				t.Errorf("output lacks %q:\n%s", tt.wantOut, out)
+			}
+			got, err := os.Readlink(link)
+			if tt.want == "file" {
+				if err == nil {
+					t.Fatalf("the file became a link to %s", got)
+				}
+				return
+			}
+			if err != nil || got != targets[tt.want] {
+				t.Fatalf("link -> %q (%v), want %q\n%s", got, err, targets[tt.want], out)
+			}
+		})
+	}
+}

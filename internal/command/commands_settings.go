@@ -60,6 +60,33 @@ func settingValue(f *v1.SettingField, v string) SettingValue {
 	}
 }
 
+// settingsWarnings are the settings.* commands' warnings about the settings file: it
+// does not parse (so it is not what is in effect), or it holds values the app ignores.
+// With key set, only that key's issue is reported; else one line lists them all.
+func settingsWarnings(snap *v1.SettingsSnapshot, key string) []string {
+	var out []string
+	if e := snap.GetLoadError(); e != "" {
+		out = append(out, fmt.Sprintf("%s does not parse (%s); the last settings that loaded are in effect (the defaults if none have); fix the file by hand", snap.GetPath(), e))
+	}
+	var keys []string
+	for _, is := range snap.GetIssues() {
+		switch {
+		case key == "":
+			keys = append(keys, is.GetKey())
+		case is.GetKey() == key:
+			out = append(out, fmt.Sprintf("%s in %s is ignored: %s", key, snap.GetPath(), is.GetMessage()))
+		}
+	}
+	if keys = slices.Compact(keys); len(keys) > 0 {
+		noun := "values are"
+		if len(keys) == 1 {
+			noun = "value is"
+		}
+		out = append(out, fmt.Sprintf("%d %s ignored in %s (kept in the file until fixed; see the \"# Ignored:\" lines): %s", len(keys), noun, snap.GetPath(), strings.Join(keys, ", ")))
+	}
+	return out
+}
+
 // Views the GUI knows how to show (UiIntent.ShowView.name).
 const (
 	ViewHelp     = "help"
@@ -118,10 +145,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 				if err != nil {
 					return Result{}, err
 				}
-				vals := res.Msg.GetSettings().GetValues()
+				snap := res.Msg.GetSettings()
+				vals := snap.GetValues()
+				warns := settingsWarnings(snap, key)
 				if f != nil {
 					v := vals[key]
-					return Result{Message: v, JSON: settingValue(f, v)}, nil
+					return Result{Message: v, JSON: settingValue(f, v), Warnings: warns}, nil
 				}
 				var sb strings.Builder
 				out := make([]SettingValue, 0, len(fields))
@@ -130,7 +159,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 					out = append(out, settingValue(f, v))
 					fmt.Fprintf(&sb, "%s = %q\n", f.GetKey(), v)
 				}
-				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: out}, nil
+				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: out, Warnings: warns}, nil
 			},
 		},
 		Command{
@@ -152,7 +181,8 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 					return Result{}, err
 				}
 				v := res.Msg.GetSettings().GetValues()[key]
-				return Result{Message: fmt.Sprintf("%s = %q%s", key, v, restartNote(f)), JSON: settingValue(f, v)}, nil
+				return Result{Message: fmt.Sprintf("%s = %q%s", key, v, restartNote(f)), JSON: settingValue(f, v),
+					Warnings: settingsWarnings(res.Msg.GetSettings(), "")}, nil
 			},
 		},
 		Command{
@@ -173,7 +203,8 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 					return Result{}, err
 				}
 				v := res.Msg.GetSettings().GetValues()[key]
-				return Result{Message: fmt.Sprintf("%s = %q (default)%s", key, v, restartNote(f)), JSON: settingValue(f, v)}, nil
+				return Result{Message: fmt.Sprintf("%s = %q (default)%s", key, v, restartNote(f)), JSON: settingValue(f, v),
+					Warnings: settingsWarnings(res.Msg.GetSettings(), "")}, nil
 			},
 		},
 		Command{

@@ -120,11 +120,11 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		Stdin: os.Stdin, Stdout: cl.stdout, Stderr: cl.stderr,
 	}
 	if appDir != "" {
-		// Update this install, wherever it is, and leave the link and ~/.zshrc alone:
-		// the first install set them up, and the link may point at another install.
+		// Update this install, wherever it is.
 		inst.AppDir = appDir
-		inst.Args = append(inst.Args, "--skip-link", "--skip-path")
 	}
+	home, _ := os.UserHomeDir()
+	inst.Args = append(inst.Args, installerShellArgs(appDir, target, filepath.Join(home, paths.DirName, "app"))...)
 	if *yes {
 		inst.Args = append(inst.Args, "--yes")
 	}
@@ -136,6 +136,20 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	}
 	if daemon != nil {
 		cl.afterUpdate(ctx, daemon)
+	}
+	return nil
+}
+
+// installerShellArgs are the installer flags that keep it off the user's shell setup
+// (the ~/.local/bin/code-foundry link and ~/.zshrc): set for an update of an existing
+// install (appDir), whose first install set them up and whose link may point at another
+// install, and for an install anywhere but defaultTarget, the default home's app
+// directory (a dev CLI run with CODE_FOUNDRY_HOME or CODE_FOUNDRY_APP_DIR pointing at a
+// scratch home must not take over the user's code-foundry command). target is where
+// the installer installs.
+func installerShellArgs(appDir, target, defaultTarget string) []string {
+	if appDir != "" || filepath.Clean(target) != filepath.Clean(defaultTarget) {
+		return []string{"--skip-link", "--skip-path"}
 	}
 	return nil
 }

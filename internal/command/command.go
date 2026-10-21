@@ -164,6 +164,9 @@ type Result struct {
 	// action's). The CLI prints the result, then exits with it when it is not 0. The
 	// palette ignores it.
 	ExitCode int
+	// Warnings are notes about the result: the CLI prints each to stderr as a
+	// "warning: " line, keeping stdout the result. The palette ignores them.
+	Warnings []string
 }
 
 // NamePattern is the required shape of command names: lowercase dotted segments, at
