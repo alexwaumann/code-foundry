@@ -122,7 +122,8 @@ export function emberWorkers(): EmberWorkerFixture[] {
     {
       id: "s-ember-lead", name: "Lead: notes API input validation", model: "claude-opus-4-8[1m]", brief: "Validate the notes API's input; split the work across a few threads",
       state: ThreadState.CONNECTED, status: ThreadStatus.IDLE, statusReason: "waiting on 2 child threads", createdAt: ago(20), lastActivityAt: ago(3), archived: false,
-      report: { status: ThreadReportStatus.PROGRESS, summary: "Schema done; handlers in two threads", at: ago(3) },
+      // A lead's report names its workers by id: the board shows their names (docs/notes/ember-fixes-2-gui.md).
+      report: { status: ThreadReportStatus.PROGRESS, summary: "Schema done; handlers in s-ember-team-post and s-ember-team-put", at: ago(3) },
     },
     {
       id: "s-ember-team-schema", createdBy: "s-ember-lead", name: "Notes API: request schema", model: "claude-opus-4-7[1m]", brief: "Define the request schema for POST and PUT /notes",
@@ -149,6 +150,8 @@ function seedTasks(): MockTask[] {
   });
   return [
     t({ id: "t-1a2b3c4d", title: "Add release notes for 0.20", detail: "Write docs/release-notes/0.20.md from the PRs merged since v0.19.1.", state: EmberTaskState.DOING, threadId: "s-ember-notes", position: 1, updatedAt: ago(25) }, 30),
+    // A done piece: its outcome and branch show on the card's row for it.
+    t({ id: "t-2b3c4d5e", title: "List the PRs merged since v0.19.1", state: EmberTaskState.DONE, parentId: "t-1a2b3c4d", outcome: "42 PRs in docs/release-notes/prs.txt", branch: "cf/release-notes-prs", position: 2, updatedAt: ago(20), doneAt: ago(20) }, 29),
     t({ id: "t-5e6f7a8b", title: "Link each note to its PR", state: EmberTaskState.TODO, parentId: "t-1a2b3c4d", position: 2 }, 28),
     t({ id: "t-9c0d1e2f", title: "Bump wails to v3.1", state: EmberTaskState.BLOCKED, threadId: "s-ember-wails", outcome: "wails v3.1 needs Go 1.27; the toolchain here is 1.26", position: 3, updatedAt: ago(40) }, 90),
     t({ id: "t-3a4b5c6d", title: "Fix the flaky TestSendSpawnFailure", state: EmberTaskState.DONE, threadId: "s-ember-flaky", outcome: "Raised the spawn timeout to 5s under -race; PR #251 merged", branch: "cf/spawn-timeout-race", position: 4, updatedAt: today, doneAt: today }, 200),
@@ -370,13 +373,14 @@ export class MockEmber {
     return t;
   }
 
-  /** POST /__mock/ember/task: a task's state, and its outcome and branch when given. */
-  setTask(id: string, state: EmberTaskState, outcome: string | null, branch: string | null = null): EmberTaskInit {
+  /** POST /__mock/ember/task: a task's state, and its outcome, branch and title when given. */
+  setTask(id: string, state: EmberTaskState, outcome: string | null, branch: string | null = null, title: string | null = null): EmberTaskInit {
     const t = this.task(id);
     if (state !== t.state) t.doneAt = state === EmberTaskState.DONE ? new Date() : null;
     t.state = state;
     if (outcome !== null) t.outcome = outcome;
     if (branch !== null) t.branch = branch;
+    if (title !== null && title.trim()) t.title = title.trim();
     t.updatedAt = new Date();
     this.changed();
     return this.taskMsg(t);

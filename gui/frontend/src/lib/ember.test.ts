@@ -2,22 +2,34 @@ import { describe, expect, it } from "vitest";
 import type { EmberTaskThreadView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import type { ThreadItemView } from "@/api/thread";
 import {
+  blockedTasks,
   boardSections,
+  budgetStop,
   buildEmberRows,
   cardMeta,
+  clockTime,
   emberStatusWords,
   firstDoingTitle,
   flameState,
   headerSummary,
   linkMeta,
   modelList,
+  restartCuts,
+  rowTitle,
+  runEndMs,
   runMs,
+  shellSegments,
   shortDuration,
   splitTaskLinks,
   timerRows,
   toggleModel,
   turnEndAfter,
+  updatedAgo,
   waitingThreads,
+  waitingTitle,
+  waitingWords,
+  wakeLabel,
+  withNames,
   workerRows,
   workerWords,
   workingThreads,
@@ -131,6 +143,40 @@ function shape(rows: EmberRow[]): string[] {
   return rows.map((r) => (r.type === "work" ? `work(${r.ids.join(",")})${r.live ? " live" : ""}${r.expanded ? " open" : ""}` : `${r.type}:${"id" in r ? r.id : r.key}`));
 }
 
+describe("restartCuts", () => {
+  const base = { ordinal: 0, parentToolUseId: "", streaming: false, createdAtMs: NOW, updatedAtMs: NOW };
+  const user = (id: string, o: Partial<Extract<ThreadItemView, { kind: "user" }>> = {}): ThreadItemView => ({ ...base, id, kind: "user", text: "", attachments: [], composerText: "", ...o });
+  const tool = (id: string, output: string): ThreadItemView => ({ ...base, id, kind: "tool", name: "Bash", inputJson: "{}", status: "error", output, isError: true, resultJson: "", toolUseId: id });
+  const cutEnd = (id: string, at = NOW): ThreadItemView => ({ ...base, id, kind: "turnEnd", subtype: "process_ended", interrupted: true, durationMs: 1000, createdAtMs: at }) as unknown as ThreadItemView;
+  const okEnd = (id: string): ThreadItemView => ({ ...base, id, kind: "turnEnd", subtype: "success", interrupted: false, durationMs: 1000 }) as unknown as ThreadItemView;
+  const err = (id: string): ThreadItemView => ({ ...base, id, kind: "error", text: "Claude stopped unexpectedly (exit code 139)" });
+  const log = (...its: ThreadItemView[]) => ({ byId: Object.fromEntries(its.map((i) => [i.id, i])), order: its.map((i) => i.id) });
+  const restartWake = (at: string) => ({ title: "The app restarted at 01:26 CDT.", json: JSON.stringify({ kind: "batch", wakes: [{ kind: "restart", restarted_at: at, own_turn_interrupted: true }] }) });
+
+  it("finds a cut by the tool the daemon stopped under", () => {
+    expect([...restartCuts(log(user("u"), tool("b", "Interrupted: the daemon stopped."), cutEnd("e", 5)), false)]).toEqual([["e", 5]]);
+  });
+
+  it("finds a cut by the next message's resume note or a restart wake, the wake's time first", () => {
+    const note = "[code-foundry] Your previous turn was stopped because the Code Foundry app restarted, not rejected by anyone; …";
+    expect([...restartCuts(log(user("u"), cutEnd("e", 5), user("u2", { resumeNote: note })), false)]).toEqual([["e", 5]]);
+    const at = "2026-10-21T06:26:00Z";
+    expect([...restartCuts(log(user("u"), cutEnd("e", 5), user("w", { wake: restartWake(at) })), false)]).toEqual([["e", Date.parse(at)]]);
+  });
+
+  it("finds the last turn's cut by Ember's status only while it holds", () => {
+    expect([...restartCuts(log(user("u"), cutEnd("e", 5)), true)]).toEqual([["e", 5]]);
+    expect([...restartCuts(log(user("u"), cutEnd("e", 5)), false)]).toEqual([]);
+    // An earlier cut with no mark is no restart (a close while busy).
+    expect([...restartCuts(log(user("u"), cutEnd("e", 5), user("u2"), okEnd("e2")), true)]).toEqual([]);
+  });
+
+  it("leaves a crash out: its error says so", () => {
+    expect([...restartCuts(log(user("u"), err("x"), cutEnd("e", 5)), true)]).toEqual([]);
+    expect([...restartCuts(undefined, true)]).toEqual([]);
+  });
+});
+
 describe("buildEmberRows", () => {
   const opts = (wakes: Set<string>, o: Partial<Parameters<typeof buildEmberRows>[1]> = {}) => ({ wake: (id: string) => wakes.has(id), expanded: () => undefined, showWork: false, working: false, ...o });
 
@@ -159,12 +205,22 @@ describe("buildEmberRows", () => {
     expect(rows[1]?.key).toBe("w:live:u1");
   });
 
-  it("draws no row for a wake Ember only thought about; thinking alone still is a run", () => {
-    const { list, wakes } = items("u:u1", "h:h1", "t:t1", "e:e1", "w:w1", "h:h2", "t:t2", "e:e2", "w:w2", "b:b1", "t:t3");
-    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(h1)", "etext:t1", "etext:t2", "work(e2,w2,b1)", "etext:t3"]);
+  it("draws no row for a wake Ember only thought about; one it replied to keeps its row; thinking alone still is a run", () => {
+    const { list, wakes } = items("u:u1", "h:h1", "t:t1", "e:e1", "w:w1", "h:h2", "t:t2", "e:e2", "w:w2", "b:b1", "t:t3", "e:e3", "w:w3", "h:h3", "e:e4", "u:u2");
+    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(h1)", "etext:t1", "work(e1,w1,h2)", "etext:t2", "work(e2,w2,b1)", "etext:t3", "user:u2"]);
     // While it is live, the row stands: Ember may still run a tool.
     const live = items("u:u1", "t:t1", "e:e1", "w:w1", "h:h1");
     expect(shape(buildEmberRows(live.list, opts(live.wakes, { working: true })))).toEqual(["user:u1", "etext:t1", "work(e1,w1,h1) live"]);
+  });
+
+  it("ends a run where the app's restart cut it, with a restart line", () => {
+    const { list, wakes } = items("u:u1", "h:h1", "b:b1", "e:e1", "u:u2", "t:t1");
+    const rows = buildEmberRows(list, opts(wakes, { cuts: new Map([["e1", 1234]]) }));
+    expect(shape(rows)).toEqual(["user:u1", "work(h1,b1,e1)", "restart:r:e1", "user:u2", "etext:t1"]);
+    expect(rows[2]).toEqual({ type: "restart", key: "r:e1", atMs: 1234 });
+    // A cut with nothing run before it still says so.
+    const bare = items("u:u1", "e:e1");
+    expect(shape(buildEmberRows(bare.list, opts(bare.wakes, { cuts: new Map([["e1", null]]) })))).toEqual(["user:u1", "restart:r:e1"]);
   });
 
   it("keys a run by its first item, so it holds as the run grows", () => {
@@ -196,7 +252,87 @@ describe("workSummary and workMs", () => {
     ];
     expect(workSummary(run)).toBe("read 2 files, created 2 threads, updated the board");
     expect(workSummary([wake("w", 0), bash("1", "code-foundry thread read --id s-1", 1), bash("2", "cd /x && git log -3", 2)])).toBe("1 wake, read 1 thread, checked git");
-    expect(workSummary([bash("1", "ls", 0), bash("2", "make check", 1)])).toBe("ran 2 commands");
+    expect(workSummary([bash("1", "make check", 0), bash("2", "pnpm build", 1)])).toBe("ran 2 commands");
+  });
+
+  // Commands Ember ran in the round-2 battle test (/tmp/ember-r2, e1, e4, e11).
+  it.each([
+    [
+      "a request turn: reads chained, then the board",
+      ["cd /Users/alex/m && git log --oneline -5 && git ls-files | head -80 && cat package.json", 'cd /Users/alex/m && git remote -v; cat src/types/index.ts; sed -n 1,200p src/store/useStore.ts; grep -n "" src/routes/habits.tsx | head -60; code-foundry thread list --project 20236aea7a4d'],
+      "read 3 files, searched once, read 1 thread, checked git",
+    ],
+    [
+      "three workers started in one call, prompts in heredocs",
+      [
+        "P=20236aea7a4d; T=t-39cd46bb\nCOMMON='Verify with `pnpm build`; stage only your files && push.'\n\ncode-foundry ember task start \"Habit colour\" --project $P --parent $T --prompt - <<'EOF'\nAdd a colour; then run tests && lint.\ngit log is yours\nEOF\ncode-foundry ember task start \"Sort select\" --project $P --parent $T --prompt - <<'EOF'\nSort; done.\nEOF\ncode-foundry ember task start \"About route\" --project $P --parent $T --prompt - <<EOF\nAbout.\nEOF",
+      ],
+      "started 3 workers",
+    ],
+    [
+      "a wake's branch check with a variable",
+      ["W=/private/tmp/wt/feat-habit-colour-picker; git -C $W log --oneline -2 origin/feat/habit-colour-picker; git -C $W diff origin/main...origin/feat/habit-colour-picker --stat", 'code-foundry ember task done t-628cf6a5 "Pushed feat/habit-colour-picker (597a804), no PR; build passes; lint ok." --branch feat/habit-colour-picker'],
+      "closed 1 task, checked 1 branch",
+    ],
+    [
+      "the merge checks over two checkouts and a loop",
+      [
+        'W=/tmp/wt/sort; git -C $W fetch -q origin; git -C $W log --oneline -2 origin/feat/habits-sort-select; for a in x y; do for b in x y; do [ "$a" \\< "$b" ] && { git -C $W merge-tree --write-tree origin/$a origin/$b >/dev/null && echo ok || echo CONFLICT; }; done; done',
+        "git -C /tmp/wt/about log -1 origin/feat/about-route",
+      ],
+      "checked 2 branches",
+    ],
+    [
+      "a steer: a change sent and the board updated, in one call",
+      ['code-foundry thread send --id s-ember-notes "Use a markdown description, not notes" && code-foundry thread rename --id s-ember-notes "Markdown description"; code-foundry ember task update t-e44e62e6 --title "Add markdown description field"'],
+      "sent a change to Release notes for 0.20, updated the board, ran 1 command",
+    ],
+    [
+      "the post-merge turn",
+      ["code-foundry ember task update t-1 --state done; code-foundry thread archive --id s-1 --yes; code-foundry project worktree cleanup --project m"],
+      "updated the board, archived 1 thread, cleaned up worktrees",
+    ],
+    ["changes to two workers", ['code-foundry thread send s-a "x"', "code-foundry thread send --id s-b - <<'EOF'\ny; z\nEOF"], "sent changes to 2 workers"],
+  ])("%s", (_name, commands, want) => {
+    const names: Record<string, string> = { "s-ember-notes": "Release notes for 0.20" };
+    expect(workSummary(commands.map((c, i) => bash(String(i), c, i)), (id) => names[id] ?? "")).toBe(want);
+  });
+
+  it("splits a command into simple commands outside quotes and heredocs", () => {
+    expect(shellSegments("a && b; c || d\ne | f")).toEqual(["a", "b", "c", "d", "e | f"]);
+    expect(shellSegments(`echo "x; y && z" ; b`)).toEqual([`echo "x; y && z"`, "b"]);
+    expect(shellSegments("cat <<'EOF' | x\nbody; not && this\nEOF\nafter")).toEqual(["cat <<'EOF' | x", "after"]);
+    expect(shellSegments(`echo "a << b"\nc`)).toEqual([`echo "a << b"`, "c"]);
+    expect(shellSegments("a \\\n  --flag; # note\nb")).toEqual(["a    --flag", "b"]);
+  });
+
+  it.each([
+    ["a thread wake", { title: 'Thread "Notes" (s-1) is idle: finished.', json: JSON.stringify({ kind: "thread", thread: { id: "s-1", name: "Notes" } }) }, "wake from Notes"],
+    ["a thread wake without JSON", { title: 'Thread "Lead: notes API" (s-l) reported progress.', json: "{}" }, "wake from Lead: notes API"],
+    ["a timer", { title: "Timer sub-1 fired at 09:30 CDT.", json: JSON.stringify({ kind: "timer", subscription_id: "sub-1" }) }, "timer"],
+    ["a timer with a note", { title: "Timer sub-1 fired.", json: JSON.stringify({ kind: "timer", note: "review reminder" }) }, "timer: review reminder"],
+    ["a batch from one thread", { title: "", json: JSON.stringify({ kind: "batch", wakes: [{ kind: "thread", thread: { name: "A" } }, { kind: "thread", thread: { name: "A" } }] }) }, "wake from A"],
+    ["a batch from two", { title: "", json: JSON.stringify({ kind: "batch", wakes: [{ kind: "thread", thread: { name: "A" } }, { kind: "thread", thread: { name: "B" } }] }) }, "2 wakes"],
+    ["a restart notice", { title: "The app restarted at 10:45 CDT.", json: JSON.stringify({ kind: "batch", wakes: [{ kind: "restart" }, { kind: "thread", thread: { name: "A" } }] }) }, "restart, wake from A"],
+    ["anything else", { title: "", json: "not json" }, "1 wake"],
+  ])("labels %s", (_n, w, want) => {
+    expect(wakeLabel(w)).toBe(want);
+  });
+
+  it("leads a wake run with what woke it", () => {
+    const from = (id: string, name: string, sec: number): ThreadItemView => ({ ...wake(id, sec), wake: { title: "", json: JSON.stringify({ kind: "thread", thread: { name } }) } }) as ThreadItemView;
+    expect(workSummary([from("w", "Habit colour", 0), bash("1", "code-foundry ember task done t-1 x --branch b", 1)])).toBe("wake from Habit colour, closed 1 task");
+    expect(workSummary([from("w1", "A", 0), from("w2", "A", 1)])).toBe("2 wakes from A");
+    expect(workSummary([from("w1", "A", 0), from("w2", "B", 1)])).toBe("2 wakes");
+  });
+
+  it("ends a run at its last item", () => {
+    expect(runEndMs([bash("1", "x", 0, 3), end("e", 10)])).toBe(at(10));
+    expect(runEndMs([])).toBeNull();
+    const time = new Date(at(0)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    expect(clockTime(at(0), at(0))).toBe(time);
+    // Another day's carries its date.
+    expect(clockTime(at(0), at(0) + 2 * 24 * 3600_000)).toMatch(new RegExp(`.+ ${time}$`));
   });
 
   it("sums its segments, a turn end and a wake closing one", () => {
@@ -267,14 +403,55 @@ describe("the board", () => {
   });
 
   it("words the header, the pinned row and a task link", () => {
-    expect(headerSummary(all)).toBe("2 threads working · 2 queued");
+    expect(headerSummary(all)).toEqual({ text: "2 threads working · 1 blocked · 2 queued", dot: "amber" });
+    expect(headerSummary(all, 1).text).toBe("2 threads working · 1 blocked · 2 queued · 1 scheduled");
     expect(firstDoingTitle(all)).toBe("Wait on threads");
-    expect(linkMeta(all, "t-p")).toEqual(["in progress", "3 pieces", "2 working"]);
-    expect(linkMeta(all, "t-n")).toEqual(["up next"]);
-    expect(linkMeta(all, "t-gone")).toEqual([]);
-    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, 1)).toEqual({ text: "Working", tone: "sky" });
-    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, 0)).toEqual({ text: "Idle", tone: "muted" });
-    expect(emberStatusWords({ state: "connected", status: "attention", statusReason: "permission: Bash", statusChangedAtMs: null }, 0)).toEqual({ text: "Needs input", tone: "amber" });
+    expect(rowTitle(all)).toBe("Wait on threads");
+    expect(linkMeta(all, "t-p")).toEqual({ parts: ["in progress", "3 pieces", "2 working"], waiting: false });
+    expect(linkMeta(all, "t-n").parts).toEqual(["up next"]);
+    expect(linkMeta(all, "t-gone").parts).toEqual([]);
+    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { doing: 1 })).toEqual({ text: "Working", tone: "sky" });
+    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { doing: 0 })).toEqual({ text: "Idle", tone: "muted" });
+    expect(emberStatusWords({ state: "connected", status: "attention", statusReason: "permission: Bash", statusChangedAtMs: null }, { doing: 0 })).toEqual({ text: "Needs input", tone: "amber" });
+  });
+
+  it("says needs you on a link while one of its workers waits on the user", () => {
+    const asks = task("t-s2", { title: "CLI", state: "doing", parentId: "t-p", threadId: "s-b", thread: thread({ id: "s-b", status: "attention", statusReason: "question: which flag?" }) });
+    expect(linkMeta([parent, subDone, asks], "t-p")).toEqual({ parts: ["needs you", "2 pieces", "1 working"], waiting: true });
+    expect(linkMeta([parent, subDone, asks], "t-s2")).toEqual({ parts: ["needs you"], waiting: true });
+  });
+
+  it("lists a done subtask's outcome and branch, names the worker row only when it says more than the title", () => {
+    const own = thread({ id: "s-o", name: "Bump wails to v3.1", state: "disconnected", status: "attention", statusReason: "finished" });
+    const doneParent = task("t-dp", { title: "Bump Wails to v3.1!", state: "done", doneAtMs: NOW - MIN, threadId: "s-o", thread: own });
+    const piece = task("t-dp1", { title: "Go side", state: "done", parentId: "t-dp", outcome: "Bumped; tests pass", branch: "cf/wails-go", doneAtMs: NOW - MIN });
+    const dropped = task("t-dp2", { title: "Docs", state: "cancelled", parentId: "t-dp" });
+    const [card] = boardSections([doneParent, piece, dropped], NOW).doneToday;
+    expect((card ? workerRows(card) : []).map((r) => [r.title, r.meta.text, r.branch, r.outcome])).toEqual([
+      ["Worker", "Finished", "", ""],
+      ["Go side", "done", "cf/wails-go", "Bumped; tests pass"],
+      ["Docs", "cancelled", "", ""],
+    ]);
+  });
+
+  it("puts names for the thread ids a lead's report gives", () => {
+    const team = [
+      { id: "s-b9fb31a8c2d1", name: "Habit colour", state: "connected" as const, status: "busy" as const, statusReason: "working", reportStatus: null, reportSummary: "", lastActivityAtMs: NOW, depth: 1 },
+      { id: "s-0a1b2c3d4e5f", name: "", state: "connected" as const, status: "busy" as const, statusReason: "working", reportStatus: null, reportSummary: "", lastActivityAtMs: NOW, depth: 1 },
+    ];
+    const lead = task("t-ld", { title: "Six pieces", state: "doing", threadId: "s-ld", thread: thread({ id: "s-ld", name: "Lead for six pieces", status: "idle", statusReason: "waiting on 2 child threads", reportStatus: "progress", reportSummary: "2 workers started: s-b9fb31a8c2d1, s-0a1b2c3d4e5f", descendants: team, descendantsTotal: 2, descendantsWorking: 2 }) });
+    const [card] = boardSections([lead], NOW).inProgress;
+    expect(card && workerRows(card)[0]?.meta.text).toBe("2 workers started: Habit colour, s-0a1b2c3d4e5f");
+    expect(withNames("see s-zz", new Map())).toBe("see s-zz");
+  });
+
+  it.each([
+    [NOW - 20_000, "updated just now"],
+    [NOW - 4 * MIN, "updated 4m ago"],
+    [NOW - 125 * MIN, "updated 2h ago"],
+    [NOW - 50 * 60 * MIN, "updated 2d ago"],
+  ])("labels a worker's age (%i)", (at, want) => {
+    expect(updatedAgo(at, NOW)).toBe(want);
   });
 });
 
@@ -343,7 +520,7 @@ describe("a lead's team", () => {
   it("counts the team in the threads working, once each, and the unlisted ones by the daemon's count", () => {
     // The lead, s-1, s-3, s-sub listed (s-sub also a subtask's worker), and 2 - 3 listed = none unlisted.
     expect(workingThreads([lead, sub])).toBe(4);
-    expect(headerSummary([lead, sub])).toBe("4 threads working");
+    expect(headerSummary([lead, sub])).toEqual({ text: "1 needs you · 4 threads working", dot: "amber" });
     const big = task("t-big", { state: "doing", threadId: "s-big", thread: thread({ id: "s-big", descendantsWorking: 12, descendantsTotal: 12, descendants: [member("s-a"), member("s-b")] }) });
     expect(workingThreads([big])).toBe(13);
   });
@@ -362,11 +539,75 @@ describe("a lead's team", () => {
 
   it("says Needs input on the pinned row while a worker waits, under Ember's own prompt or error", () => {
     const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
-    expect(emberStatusWords(idle, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, 1, 1)).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, status: "error", statusReason: "crashed" }, 1, 1).tone).toBe("red");
-    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, 1, 0)).toEqual({ text: "Finished", tone: "emerald" });
+    expect(emberStatusWords(idle, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "error", statusReason: "crashed" }, { doing: 1, waiting: 1 }).tone).toBe("red");
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { doing: 1, waiting: 0 })).toEqual({ text: "Finished", tone: "emerald" });
+    // A budget stop says so, with the amount when the reason has one.
+    expect(emberStatusWords(idle, { doing: 1, waiting: 1, waitingWords: { text: "Stopped at budget", tone: "amber" } })).toEqual({ text: "Stopped at budget", tone: "amber" });
+  });
+
+  it("names the waiting worker's task on the row, +N for more", () => {
+    // s-2 (the lead's team) asks: the lead's task.
+    expect(waitingTitle([lead, sub])).toBe("Lead the API work");
+    expect(rowTitle([lead, sub])).toBe("Lead the API work");
+    // A subtask's own worker asking is named before a lead whose team asks.
+    const asks = task("t-q", { title: "Translate /profile", state: "doing", parentId: "t-l", threadId: "s-q", thread: thread({ id: "s-q", status: "attention", statusReason: "question: es or es-MX?" }) });
+    expect(waitingTitle([lead, sub, asks])).toBe("Translate /profile +1");
+    expect(waitingTitle([sub])).toBe("");
+    expect(rowTitle([sub])).toBe("Subtask");
+    expect(waitingWords([lead, sub])).toEqual({ text: "Needs input", tone: "amber" });
+    expect(waitingWords([sub])).toBeNull();
+  });
+});
+
+describe("blocked tasks, timers and budget stops", () => {
+  const blockedLeaf = task("t-b", { title: "Bump wails", state: "blocked", threadId: "s-b", thread: thread({ id: "s-b", state: "disconnected", status: "attention", statusReason: "finished" }) });
+  const parent = task("t-p", { title: "Two pieces", state: "blocked" });
+  const piece = task("t-p1", { title: "Piece one", state: "blocked", parentId: "t-p" });
+  const asking = task("t-a", { title: "Asks", state: "blocked", threadId: "s-a", thread: thread({ id: "s-a", status: "attention", statusReason: "question: which?" }) });
+
+  it("counts blocked pieces, not their rolled-up parent nor one whose worker asks", () => {
+    expect(blockedTasks([blockedLeaf])).toBe(1);
+    expect(blockedTasks([parent, piece])).toBe(1);
+    expect(blockedTasks([asking])).toBe(0);
+    expect(rowTitle([parent, piece])).toBe("Piece one");
+  });
+
+  it("says Nothing in progress only when nothing waits, works, is blocked, queued or scheduled", () => {
+    expect(headerSummary([blockedLeaf])).toEqual({ text: "1 blocked", dot: "amber" });
+    expect(headerSummary([asking])).toEqual({ text: "1 needs you", dot: "amber" });
+    expect(headerSummary([], 2)).toEqual({ text: "2 scheduled", dot: "" });
+    // A doing task whose worker finished (Ember has not closed it yet) is still in progress.
+    const finished = task("t-f", { state: "doing", threadId: "s-f", thread: thread({ id: "s-f", state: "disconnected", status: "attention", statusReason: "finished" }) });
+    expect(headerSummary([finished])).toEqual({ text: "1 in progress", dot: "" });
+    expect(headerSummary([task("t-d", { state: "done" })])).toEqual({ text: "", dot: "" });
+  });
+
+  it("reads Blocked on the row below Ember's own words and a doing task's Working", () => {
+    const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
+    expect(emberStatusWords(idle, { doing: 0, blocked: 1 })).toEqual({ text: "Blocked", tone: "amber" });
+    expect(emberStatusWords(idle, { doing: 2, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
+    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { doing: 0, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
+    // A turn the app's restart cut: amber, not a bare red Error.
+    expect(emberStatusWords({ ...idle, status: "error", statusReason: "interrupted" }, { doing: 0 })).toEqual({ text: "Interrupted", tone: "amber" });
+  });
+
+  it.each([
+    ["budget reached", "Stopped at budget"],
+    ["budget reached: $0.21 of $0.20", "Stopped at budget · $0.21 of $0.20"],
+    ["budget reached ($1.50)", "Stopped at budget · $1.50"],
+  ])("words a budget stop (%s)", (reason, want) => {
+    const th = thread({ status: "attention", statusReason: reason, state: "connected" });
+    expect(budgetStop(th)).not.toBeNull();
+    expect(workerWords(th)).toEqual({ text: want, tone: "amber" });
+    expect(waitingWords([task("t-x", { state: "doing", threadId: th.id, thread: th })])).toEqual({ text: want, tone: "amber" });
+  });
+
+  it("is no budget stop for another reason", () => {
+    expect(budgetStop(thread({ status: "attention", statusReason: "question: budget?" }))).toBeNull();
+    expect(budgetStop(thread({ status: "busy", statusReason: "budget reached" }))).toBeNull();
   });
 });
 

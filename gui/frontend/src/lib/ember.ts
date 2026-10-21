@@ -5,7 +5,7 @@
  * visible messages folds into one "Worked for" row.
  */
 import type { EmberTaskDescendantView, EmberTaskStateView, EmberTaskThreadView, EmberTaskView, EmberTimerView } from "@/api/ember";
-import type { ThreadItemView } from "@/api/thread";
+import type { ThreadItemView, WakeView } from "@/api/thread";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
@@ -60,6 +60,8 @@ export interface Words {
 export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusReason" | "archived" | "removed">): Words {
   if (th.removed === true) return { text: "Removed", tone: "muted" };
   if (th.archived === true) return { text: "Archived", tone: "muted" };
+  const budget = budgetStop(th);
+  if (budget !== null) return { text: budget ? `Stopped at budget · ${budget}` : "Stopped at budget", tone: "amber" };
   switch (statusLine({ ...th, statusChangedAtMs: null }).kind) {
     case "working":
     case "waiting":
@@ -84,6 +86,19 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
 
 /** The words of a worker waiting on the user. */
 const NEEDS_INPUT: Words = { text: "Needs input", tone: "amber" };
+
+/** The budget stop's status reason (internal/store/thread/budget.go); a daemon may put the amount after it. */
+const BUDGET_REASON = /^budget reached\b/;
+const BUDGET_AMOUNT = /\$\d+(?:\.\d+)?(?:\s+of\s+\$\d+(?:\.\d+)?)?/;
+
+/**
+ * A thread the budget stop interrupted (needs attention "budget reached"): the amount its
+ * reason carries ("$0.21 of $0.20"), "" when it carries none; null for any other status.
+ */
+export function budgetStop(th: Pick<WorkerLike, "status" | "statusReason">): string | null {
+  if (th.status !== "attention" || !BUDGET_REASON.test(th.statusReason)) return null;
+  return BUDGET_AMOUNT.exec(th.statusReason)?.[0] ?? "";
+}
 
 /** A task's state in a card's or a worker row's words. */
 const stateWords: Readonly<Record<EmberTaskStateView, string>> = {
@@ -192,6 +207,10 @@ export interface WorkerRow {
   meta: Words;
   /** When the worker last did something (else the subtask's last change), for the age. */
   atMs: number | null;
+  /** A done subtask's branch (ember task done --branch); "" for none. */
+  branch: string;
+  /** A done or cancelled subtask's outcome (what the piece came to); "" for none. Drawn under the row with the branch. */
+  outcome: string;
   subtask: boolean;
   /** 0 for a task's own worker or a subtask; 1+ for a thread of a lead's team, by how far below the lead it is. */
   depth: number;
@@ -209,13 +228,50 @@ function workerDot(th: WorkerLike, state: EmberTaskStateView): TaskDot {
  * error says more than a report; while the task is doing, its latest report's summary
  * (muted) says more than "Working" or "Idle"; else the worker's status words.
  */
-function workerMeta(th: WorkerLike, doing: boolean): Words {
+function workerMeta(th: WorkerLike, doing: boolean, names: ReadonlyMap<string, string>): Words {
   const words = workerWords(th);
   if (words.tone === "amber" || words.tone === "red") return words;
   if (th.reportStatus === "blocked") return { text: "Blocked", tone: "amber" };
   if (th.reportStatus === "failed") return { text: "Failed", tone: "red" };
-  if (doing && th.reportSummary) return { text: th.reportSummary, tone: "muted" };
+  if (doing && th.reportSummary) return { text: withNames(th.reportSummary, names), tone: "muted" };
   return words;
+}
+
+/** A thread id in a report ("6 workers started: s-b9fb31a8c2d1, …"). */
+const THREAD_ID = /\bs-[0-9a-z][0-9a-z-]*[0-9a-z]\b/g;
+
+/** `text` with the thread ids it names replaced by those threads' names, where `names` has them. */
+export function withNames(text: string, names: ReadonlyMap<string, string>): string {
+  if (names.size === 0 || !text.includes("s-")) return text;
+  return text.replace(THREAD_ID, (id) => names.get(id) || id);
+}
+
+/** The names of the card's threads (its workers and their teams), by id: what a lead's report names. */
+function cardNames(c: BoardCard): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const t of [c.task, ...c.subtasks]) {
+    const th = t.thread;
+    if (!th) continue;
+    if (th.name) names.set(th.id, th.name);
+    for (const d of th.descendants) if (d.name) names.set(d.id, d.name);
+  }
+  return names;
+}
+
+/** Two titles say the same thing: the same words, case and punctuation aside. */
+function sameTitle(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return norm(a) === norm(b);
+}
+
+/**
+ * A task's own worker row's title: the thread's name, unless it repeats the task's title
+ * above it (Ember names a worker after its task): then "Worker", or "Lead" with a team.
+ */
+function ownTitle(th: EmberTaskThreadView, task: EmberTaskView): string {
+  if (th.name && !sameTitle(th.name, task.title)) return th.name;
+  if (!th.name && th.removed) return th.id;
+  return th.descendantsTotal > 0 ? "Lead" : "Worker";
 }
 
 /**
@@ -223,7 +279,7 @@ function workerMeta(th: WorkerLike, doing: boolean): Words {
  * threads below it (tree order, indented by depth), then "+N more" for the rest. Threads
  * a subtask row already shows are left out.
  */
-function teamRows(th: EmberTaskThreadView, t: EmberTaskView, shown: ReadonlySet<string>): WorkerRow[] {
+function teamRows(th: EmberTaskThreadView, t: EmberTaskView, shown: ReadonlySet<string>, names: ReadonlyMap<string, string>): WorkerRow[] {
   if (t.state !== "doing" && t.state !== "blocked") return [];
   const rows = th.descendants
     .filter((d) => !shown.has(d.id))
@@ -233,20 +289,31 @@ function teamRows(th: EmberTaskThreadView, t: EmberTaskView, shown: ReadonlySet<
         threadId: d.id,
         title: d.name || d.id,
         dot: workerDot(d, t.state),
-        meta: workerMeta(d, t.state === "doing"),
+        meta: workerMeta(d, t.state === "doing", names),
         atMs: d.lastActivityAtMs,
+        branch: "",
+        outcome: "",
         subtask: false,
         depth: Math.max(1, d.depth),
       }),
     );
   const more = th.descendantsTotal - th.descendants.length;
   if (more > 0)
-    rows.push({ key: `d:${t.id}:more`, threadId: "", title: `+${String(more)} more ${more === 1 ? "thread" : "threads"}`, dot: "open", meta: { text: "", tone: "muted" }, atMs: null, subtask: false, depth: 1 });
+    rows.push({ key: `d:${t.id}:more`, threadId: "", title: `+${String(more)} more ${more === 1 ? "thread" : "threads"}`, dot: "open", meta: { text: "", tone: "muted" }, atMs: null, branch: "", outcome: "", subtask: false, depth: 1 });
   return rows;
+}
+
+/** A subtask row's words: a blocked one's outcome (amber); its worker's while it is open; else its state (a done one's outcome goes under it). */
+function subtaskMeta(s: EmberTaskView, names: ReadonlyMap<string, string>): Words {
+  const th = s.thread;
+  if (s.state === "blocked" && s.outcome) return { text: s.outcome, tone: "amber" };
+  if (th && (s.state === "doing" || s.state === "blocked")) return workerMeta(th, s.state === "doing", names);
+  return { text: stateWords[s.state], tone: "muted" };
 }
 
 export function workerRows(c: BoardCard): WorkerRow[] {
   const rows: WorkerRow[] = [];
+  const names = cardNames(c);
   // Subtasks' workers have rows of their own: a lead's team does not repeat them.
   const shown = new Set(c.subtasks.flatMap((s) => (s.thread ? [s.thread.id] : [])));
   const own = c.task.thread;
@@ -254,14 +321,16 @@ export function workerRows(c: BoardCard): WorkerRow[] {
     rows.push({
       key: `w:${c.task.id}`,
       threadId: own.removed ? "" : own.id,
-      title: own.name || own.id,
+      title: ownTitle(own, c.task),
       dot: workerDot(own, c.task.state),
-      meta: workerMeta(own, c.task.state === "doing"),
+      meta: workerMeta(own, c.task.state === "doing", names),
       atMs: own.lastActivityAtMs,
+      branch: "",
+      outcome: "",
       subtask: false,
       depth: 0,
     });
-    rows.push(...teamRows(own, c.task, shown));
+    rows.push(...teamRows(own, c.task, shown, names));
   }
   for (const s of c.subtasks) {
     const th = s.thread;
@@ -270,14 +339,25 @@ export function workerRows(c: BoardCard): WorkerRow[] {
       threadId: th && !th.removed ? th.id : "",
       title: s.title,
       dot: th && (s.state === "doing" || s.state === "blocked") ? workerDot(th, s.state) : taskDot(s.state),
-      meta: s.state === "blocked" && s.outcome ? { text: s.outcome, tone: "amber" } : th && (s.state === "doing" || s.state === "blocked") ? workerMeta(th, s.state === "doing") : { text: stateWords[s.state], tone: "muted" },
+      meta: subtaskMeta(s, names),
       atMs: th?.lastActivityAtMs ?? s.updatedAtMs,
+      branch: s.state === "done" ? s.branch : "",
+      outcome: s.state === "done" || s.state === "cancelled" ? s.outcome : "",
       subtask: true,
       depth: 0,
     });
-    if (th) rows.push(...teamRows(th, s, shown));
+    if (th) rows.push(...teamRows(th, s, shown, names));
   }
   return rows;
+}
+
+/** A worker row's age, labelled: "updated just now", "updated 4m ago". */
+export function updatedAgo(atMs: number, now: number): string {
+  const m = Math.floor(Math.max(0, now - atMs) / 60_000);
+  if (m < 1) return "updated just now";
+  if (m < 60) return `updated ${String(m)}m ago`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `updated ${String(h)}h ago` : `updated ${String(Math.floor(h / 24))}d ago`;
 }
 
 /**
@@ -316,44 +396,132 @@ export function waitingThreads(tasks: readonly EmberTaskView[]): number {
   return countThreads(tasks, workerAsks, (th) => th.descendantsWaiting, (t) => t.state === "doing" || t.state === "blocked");
 }
 
-/** The chat header's summary: "2 threads working · 1 queued"; "" when nothing is going on. */
-export function headerSummary(tasks: readonly EmberTaskView[]): string {
-  const working = workingThreads(tasks);
-  const queued = tasks.filter((t) => t.state === "todo").length;
-  const parts: string[] = [];
-  if (working > 0) parts.push(`${String(working)} ${working === 1 ? "thread" : "threads"} working`);
-  if (queued > 0) parts.push(`${String(queued)} queued`);
-  return parts.join(" · ");
+/** A task's worker, or one of its team, waits on the user. */
+function taskAsks(t: EmberTaskView): boolean {
+  return t.thread !== null && (workerAsks(t.thread) || t.thread.descendantsWaiting > 0 || t.thread.descendants.some(workerAsks));
 }
 
-/** The first doing task's title (a top-level one first): the pinned row's line 2. */
+/**
+ * Blocked tasks the user may need to look at: blocked ones with no blocked subtask (a parent
+ * blocked because all its pieces are counts as its pieces), leaving out those whose worker
+ * waits on the user (waitingThreads counts them).
+ */
+export function blockedTasks(tasks: readonly EmberTaskView[]): number {
+  const parents = new Set(tasks.filter((t) => t.state === "blocked" && t.parentId !== "").map((t) => t.parentId));
+  return tasks.filter((t) => t.state === "blocked" && !parents.has(t.id) && !taskAsks(t)).length;
+}
+
+/** The chat header's dot: amber while something waits on the user (a question, a blocked task), sky while workers run. */
+export type HeaderDot = "amber" | "sky" | "";
+
+/**
+ * The chat header's summary, "1 needs you · 2 threads working · 1 blocked · 1 queued · 1
+ * scheduled" (workers waiting on the user, working threads, blocked tasks, todo tasks and
+ * Ember's pending timers), and its dot. With none of those, a doing task still says "1 in
+ * progress" (a worker finished, Ember has not closed the task yet), so the header never
+ * says less than the board; "" only when nothing is going on.
+ */
+export function headerSummary(tasks: readonly EmberTaskView[], timers = 0): { text: string; dot: HeaderDot } {
+  const waiting = waitingThreads(tasks);
+  const working = workingThreads(tasks);
+  const blocked = blockedTasks(tasks);
+  const queued = tasks.filter((t) => t.state === "todo").length;
+  const parts: string[] = [];
+  if (waiting > 0) parts.push(`${String(waiting)} ${waiting === 1 ? "needs" : "need"} you`);
+  if (working > 0) parts.push(`${String(working)} ${working === 1 ? "thread" : "threads"} working`);
+  if (blocked > 0) parts.push(`${String(blocked)} blocked`);
+  if (queued > 0) parts.push(`${String(queued)} queued`);
+  if (timers > 0) parts.push(`${String(timers)} scheduled`);
+  const doing = tasks.filter((t) => t.state === "doing").length;
+  if (parts.length === 0 && doing > 0) parts.push(`${String(doing)} in progress`);
+  const dot: HeaderDot = waiting > 0 || blocked > 0 ? "amber" : working > 0 ? "sky" : "";
+  return { text: parts.join(" · "), dot };
+}
+
+/** The first doing task's title (a top-level one first). */
 export function firstDoingTitle(tasks: readonly EmberTaskView[]): string {
   return (tasks.find((t) => t.state === "doing" && t.parentId === "") ?? tasks.find((t) => t.state === "doing"))?.title ?? "";
 }
 
 /**
- * The pinned row's status: Ember's own prompt or error; else Needs input while a worker
- * waits on the user (`waiting`); else what Ember's own thread is doing (Finished, Working);
- * else Working while a task is doing, else Idle.
+ * The task whose worker waits on the user (a subtask's own worker before a lead whose team
+ * member asks), "+N" after it when more threads wait; "" when none does.
  */
-export function emberStatusWords(t: { state: ThreadStateView; status: ThreadStatusView; statusReason: string; statusChangedAtMs: number | null } | undefined, doing: number, waiting = 0): Words {
-  const own = t && (t.status === "attention" || t.status === "error" || threadBadge(t) === "busy") ? workerWords(t) : null;
-  if (own && (own.tone === "amber" || own.tone === "red")) return own;
-  if (waiting > 0) return NEEDS_INPUT;
-  if (own && own.text !== "Idle") return own;
-  return doing > 0 ? { text: "Working", tone: "sky" } : { text: "Idle", tone: "muted" };
+export function waitingTitle(tasks: readonly EmberTaskView[]): string {
+  const open = tasks.filter((t) => t.state === "doing" || t.state === "blocked");
+  const t = open.find((x) => x.thread !== null && workerAsks(x.thread)) ?? open.find(taskAsks);
+  if (!t) return "";
+  const more = waitingThreads(tasks) - 1;
+  return more > 0 ? `${t.title} +${String(more)}` : t.title;
 }
 
-/** A task link's words after its title: "in progress · 3 pieces · 2 working"; [] for a task the board does not have. */
-export function linkMeta(tasks: readonly EmberTaskView[], id: string): string[] {
+/**
+ * The pinned row's line 2: the task a waiting worker belongs to, else the first doing
+ * task, else the first blocked one (a piece, not its rolled-up parent).
+ */
+export function rowTitle(tasks: readonly EmberTaskView[]): string {
+  const waiting = waitingTitle(tasks);
+  if (waiting) return waiting;
+  const doing = firstDoingTitle(tasks);
+  if (doing) return doing;
+  const parents = new Set(tasks.filter((t) => t.state === "blocked" && t.parentId !== "").map((t) => t.parentId));
+  return tasks.find((t) => t.state === "blocked" && !parents.has(t.id))?.title ?? "";
+}
+
+/** Ember's own thread, as the pinned row reads it. */
+type EmberThreadLike = { state: ThreadStateView; status: ThreadStatusView; statusReason: string; statusChangedAtMs: number | null };
+
+/** What else the board holds for the pinned row's words: workers waiting on the user (and their words), blocked tasks. */
+export interface RowCounts {
+  doing: number;
+  waiting?: number;
+  /** The waiting worker's words when one waits ("Stopped at budget"); Needs input otherwise. */
+  waitingWords?: Words | null;
+  blocked?: number;
+}
+
+/**
+ * The pinned row's status: Ember's own prompt or error (a turn the app's restart cut reads
+ * Interrupted, amber: the chat says what happened); else Needs input (or a budget stop's
+ * words) while a worker waits on the user; else what Ember's own thread is doing
+ * (Finished, Working); else Working while a task is doing; else Blocked while a task is
+ * blocked (the row counts blocked tasks after Working), else Idle.
+ */
+export function emberStatusWords(t: EmberThreadLike | undefined, c: RowCounts): Words {
+  if (t && t.status === "error" && t.statusReason === "interrupted") return { text: "Interrupted", tone: "amber" };
+  const own = t && (t.status === "attention" || t.status === "error" || threadBadge(t) === "busy") ? workerWords(t) : null;
+  if (own && (own.tone === "amber" || own.tone === "red")) return own;
+  if ((c.waiting ?? 0) > 0) return c.waitingWords ?? NEEDS_INPUT;
+  if (own && own.text !== "Idle") return own;
+  if (c.doing > 0) return { text: "Working", tone: "sky" };
+  return (c.blocked ?? 0) > 0 ? { text: "Blocked", tone: "amber" } : { text: "Idle", tone: "muted" };
+}
+
+/** The words of the first worker waiting on the user (a budget stop says so), null when none waits. */
+export function waitingWords(tasks: readonly EmberTaskView[]): Words | null {
+  for (const t of tasks) {
+    if ((t.state !== "doing" && t.state !== "blocked") || !t.thread) continue;
+    const th = [t.thread, ...t.thread.descendants].find(workerAsks);
+    if (th) return workerWords(th);
+  }
+  return null;
+}
+
+/**
+ * A task link's words after its title: "in progress · 3 pieces · 2 working" ("needs you"
+ * in place of the state while one of its workers waits on the user: `waiting`); no parts
+ * for a task the board does not have.
+ */
+export function linkMeta(tasks: readonly EmberTaskView[], id: string): { parts: string[]; waiting: boolean } {
   const t = tasks.find((x) => x.id === id);
-  if (!t) return [];
+  if (!t) return { parts: [], waiting: false };
   const subs = tasks.filter((x) => x.parentId === id);
-  const parts = [linkWords[t.state]];
+  const waiting = (t.state === "doing" || t.state === "blocked") && [t, ...subs].some((x) => (x.state === "doing" || x.state === "blocked") && taskAsks(x));
+  const parts = [waiting ? "needs you" : linkWords[t.state]];
   if (subs.length > 0) parts.push(`${String(subs.length)} ${subs.length === 1 ? "piece" : "pieces"}`);
   const working = workingThreads([t, ...subs]);
   if (working > 0) parts.push(`${String(working)} working`);
-  return parts;
+  return { parts, waiting };
 }
 
 // ---------- task links in Ember's text ----------
@@ -411,11 +579,21 @@ export interface EmberTextRow {
   id: string;
 }
 
-export type EmberRow = TimelineRow | WorkRow | EmberTextRow;
+/** "Code Foundry restarted at 01:26 while Ember was working": the line where the app's restart cut Ember's turn. */
+export interface RestartRow {
+  type: "restart";
+  /** `r:<the cut turn's end>`. */
+  key: string;
+  atMs: number | null;
+}
+
+export type EmberRow = TimelineRow | WorkRow | EmberTextRow | RestartRow;
 
 export interface EmberRowOptions {
   /** Whether a user message is a wake (the daemon's, not the user's). */
   wake: (id: string) => boolean;
+  /** The turn ends where the app's restart cut Ember's turn (restartCuts), with the restart's time. */
+  cuts?: ReadonlyMap<string, number | null>;
   /** The user's choice for a work row, by key; undefined: showWork. */
   expanded: (key: string) => boolean | undefined;
   /** "Show work": every work row open by default. */
@@ -471,12 +649,16 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
 
   const rows: EmberRow[] = [];
   let run: TimelineItem[] = [];
-  /** Pushes the run (its work row, then its rows while expanded); false when it had no work. */
-  const flush = (live: boolean): boolean => {
+  /**
+   * Pushes the run (its work row, then its rows while expanded); false when it had no work.
+   * `reply`: Ember's text follows it.
+   */
+  const flush = (live: boolean, reply = false): boolean => {
     const first = run[0];
     // Only turn ends (a reply's own): nothing worked. A wake with only thinking after it
-    // (a progress wake Ember just acknowledged) did nothing worth a row either.
-    if (!first || run.every((it) => it.kind === "turnEnd") || (!live && quiet(run))) {
+    // (a progress wake Ember just acknowledged) did nothing worth a row either, unless
+    // Ember replied to it: then the row says what woke it and when.
+    if (!first || run.every((it) => it.kind === "turnEnd") || (!live && !reply && quiet(run))) {
       run = [];
       return false;
     }
@@ -490,11 +672,19 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
   for (const it of top) {
     // A permission on a tool call shows on that call's row (workNodes): it is in no run.
     if (it.kind === "permission" && permissions.get(it.toolUseId)?.id === it.id) continue;
+    const cut = it.kind === "turnEnd" ? opts.cuts?.get(it.id) : undefined;
+    if (cut !== undefined) {
+      // The app's restart cut this turn: its run ends here, and a line says so.
+      run.push(it);
+      flush(false);
+      rows.push({ type: "restart", key: `r:${it.id}`, atMs: cut });
+      continue;
+    }
     if (!visible(it)) {
       run.push(it);
       continue;
     }
-    flush(false);
+    flush(false, it.kind === "text");
     if (it.kind === "user") rows.push({ type: "user", key: it.id, id: it.id });
     else if (it.kind === "text") rows.push({ type: "etext", key: it.id, id: it.id });
     else rows.push(...workNodes([it], children, permissions));
@@ -524,16 +714,233 @@ function count(n: number, one: string, many: string): string {
   return `${String(n)} ${n === 1 ? one : many}`;
 }
 
+/** A heredoc's start in a command (`<<'EOF'`, `<<-EOF`): its terminator. */
+const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
+/** A quoted string that is not a heredoc's terminator. */
+const QUOTED = /(?<!<<-?\s*)('[^']*'|"(?:[^"\\]|\\.)*")/g;
+
 /**
- * What a run did, in a few words ("read 5 files, created 2 threads, updated the board"),
- * from its top-level items: wakes, reads and searches, then the CLI calls Ember makes
- * (threads created, read and messaged, board updates and reads, notes), then whatever
- * else ran.
+ * A shell command's simple commands, in order: split on newlines, `;`, `&&` and `||`
+ * outside quotes (a pipeline stays one), heredoc bodies and comment lines left out.
  */
-export function workSummary(items: readonly ThreadItemView[]): string {
-  const n = { wakes: 0, files: 0, searches: 0, created: 0, readThreads: 0, sent: 0, boardUpdates: 0, boardReads: 0, notes: 0, git: 0, commands: 0, agents: 0, skills: 0, tools: 0 };
+export function shellSegments(command: string): string[] {
+  const out: string[] = [];
+  const heredocs: string[] = [];
+  let cur = "";
+  let quote: string | null = null;
+  const push = () => {
+    // Quoted text is no heredoc ("a << b"); a heredoc's quoted terminator is.
+    for (const m of cur.replace(QUOTED, "''").matchAll(HEREDOC)) heredocs.push(m[2] ?? "");
+    const s = cur.trim();
+    if (s && !s.startsWith("#")) out.push(s);
+    cur = "";
+  };
+  for (let i = 0; i < command.length; i++) {
+    const c = command.charAt(i);
+    if (quote !== null) {
+      cur += c;
+      if (c === "\\" && quote === '"') cur += command.charAt(++i);
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      cur += c;
+    } else if (c === "\\") {
+      // A line continuation joins the lines; any other escape is kept.
+      const next = command.charAt(++i);
+      cur += next === "\n" ? " " : c + next;
+    } else if (c === ";" || c === "\n" || ((c === "&" || c === "|") && command.charAt(i + 1) === c)) {
+      push();
+      if (c !== ";" && c !== "\n") i++;
+      // A heredoc's body starts on the next line and runs to its terminator.
+      if (c === "\n") {
+        while (heredocs.length > 0) {
+          const end = heredocs.shift() ?? "";
+          let nl = i;
+          for (;;) {
+            const from = nl + 1;
+            nl = command.indexOf("\n", from);
+            const line = command.slice(from, nl < 0 ? undefined : nl);
+            if (nl < 0 || line.trim() === end) break;
+          }
+          i = nl < 0 ? command.length : nl;
+        }
+      }
+    } else cur += c;
+  }
+  push();
+  return out;
+}
+
+/** `NAME=value` alone: a shell variable set for the commands after it. */
+const ASSIGN = /^([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|(\$\([^)]*\)|\S*))$/;
+/** A shell keyword or grouping before a command (`do git …`, `{ git …`), left off. */
+const KEYWORD = /^(?:(?:do|then|else|elif|if|while|until|!)\s+|[{(]\s*)/;
+/** Commands that do nothing worth a word: moving around, printing, loops and tests. */
+const QUIET_COMMAND = /^(?:(?:cd|echo|printf|set|export|local|read|sleep|true|false|for|done|fi|esac|case|test)\b|(?:\[\[?|[:}\])])(?:\s|$))/;
+/** Reading files by hand (`cat`, `sed -n`, `head`). */
+const READ_COMMAND = /^(?:cat|head|tail|sed\s+-n|less|wc|nl)\b/;
+/** Looking for files or text (`grep`, `rg`, `find`, `ls`). */
+const SEARCH_COMMAND = /^(?:grep|rg|find|fd|ls|tree)\b/;
+/** `git -C <dir> <subcommand> <args>` (flags before the subcommand allowed). */
+const GIT_C = /(?:^|[\s(|])git\s+-C\s+("[^"]*"|'[^']*'|\S+)\s+(?:--?[\w-]+(?:=\S+)?\s+)*([\w-]+)(.*)$/;
+/** A plain `git <subcommand> <args>`. */
+const GIT = /(?:^|[\s(|])git\s+(?:--?[\w-]+(?:=\S+)?\s+)*([\w-]+)(.*)$/;
+/** A git command that only reads: a branch check. */
+const GIT_READ = /^(?:log|diff|show|merge-base|merge-tree|rev-list|rev-parse|status|branch|cherry|shortlog|ls-files|ls-tree|fetch)$/;
+/** The base a branch is compared with, not a branch the check is about. */
+const BASE_REF = /^(?:HEAD|main|master|trunk|develop)$/;
+
+/** `$NAME` and `${NAME}` in s replaced by the values set before. */
+function expand(s: string, vars: ReadonlyMap<string, string>): string {
+  return s.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (m, name: string) => vars.get(name) ?? m);
+}
+
+/**
+ * The branches a git command's arguments name: a range's right side ("main..cf/x",
+ * "origin/main...origin/cf/x"), or a ref-looking argument ("origin/cf/x"); the remote's
+ * prefix dropped, bases (main, HEAD) and unknown variables left out.
+ */
+function gitRefs(args: string, vars: ReadonlyMap<string, string>): string[] {
+  const refs: string[] = [];
+  for (const raw of args.split(/\s+/)) {
+    const arg = expand(raw.replace(/^["']|["']$/g, ""), vars);
+    if (!arg || arg.startsWith("-") || arg.includes("$") || /[<>|&;]/.test(arg)) continue;
+    const range = /^[\w./-]+\.{2,3}([\w./-]+)$/.exec(arg);
+    const ref = range ? (range[1] ?? "") : /^[\w-]+(?:\/[\w-]+)+$/.test(arg) ? arg : "";
+    const name = ref.replace(/^origin\//, "");
+    if (name && !BASE_REF.test(name)) refs.push(name);
+  }
+  return refs;
+}
+
+/** How many branches the run's git commands checked: those named, and a checkout with none named as one. */
+function branchCount(branches: ReadonlyMap<string, ReadonlySet<string>>): number {
+  const named = new Set<string>();
+  let bare = 0;
+  for (const refs of branches.values()) {
+    if (refs.size === 0) bare++;
+    for (const r of refs) named.add(r);
+  }
+  return named.size + bare;
+}
+
+/** What a run's Bash commands did, one simple command at a time. */
+interface CommandCounts {
+  files: number;
+  searches: number;
+  created: number;
+  started: number;
+  /** The threads `thread send` went to, in order. */
+  sentTo: string[];
+  answered: number;
+  closed: number;
+  boardUpdates: number;
+  boardReads: number;
+  notes: number;
+  readThreads: number;
+  archived: number;
+  cleanups: number;
+  /** The branches git commands looked at, by the checkout (`-C <dir>`; "" for none) they ran in. */
+  branches: Map<string, Set<string>>;
+  git: number;
+  commands: number;
+}
+
+/** The thread a `thread send` goes to: `--id s-…` or the first positional id. */
+const SEND_TARGET = /\bthread send\b.*?(?:--id[=\s]+|\s)(s-[A-Za-z0-9-]+)/;
+
+function countCommand(c: CommandCounts, segment: string, vars: Map<string, string>): void {
+  const assign = ASSIGN.exec(segment);
+  if (assign) {
+    vars.set(assign[1] ?? "", expand(assign[2] ?? assign[3] ?? assign[4] ?? "", vars));
+    return;
+  }
+  let s = segment;
+  for (let prev = ""; prev !== s; ) {
+    prev = s;
+    // Shell keywords, and NAME=value words before a command (its environment).
+    s = s.replace(KEYWORD, "").replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/, "");
+  }
+  if (s === "" || QUIET_COMMAND.test(s)) return;
+  if (/\bember task start\b/.test(s)) c.started++;
+  else if (/\bthread new\b/.test(s)) c.created++;
+  else if (/\bember task done\b/.test(s)) c.closed++;
+  else if (/\bember task (?:add|update|cancel|move)\b/.test(s)) c.boardUpdates++;
+  else if (/\bember (?:board|status|task (?:list|show))\b/.test(s)) c.boardReads++;
+  else if (/\bember remember\b/.test(s)) c.notes++;
+  else if (/\bthread send\b/.test(s)) c.sentTo.push(SEND_TARGET.exec(s)?.[1] ?? "");
+  else if (/\bthread respond\b/.test(s)) c.answered++;
+  else if (/\bthread archive\b/.test(s)) c.archived++;
+  else if (/\bproject worktree cleanup\b/.test(s)) c.cleanups++;
+  else if (/\bthread (?:read|get|items|events|show|list|wait|reports?|subscriptions)\b/.test(s)) c.readThreads++;
+  else if (/(?:^|[\s(|])git\s/.test(s)) {
+    const withDir = GIT_C.exec(s);
+    const plain = withDir ? null : GIT.exec(s);
+    const sub = withDir?.[2] ?? plain?.[1] ?? "";
+    const reads = GIT_READ.test(sub);
+    const refs = reads ? gitRefs(withDir?.[3] ?? plain?.[2] ?? "", vars) : [];
+    if (refs.length > 0 || (withDir && reads)) {
+      // A check of a worktree's branch: by the branch it names, else by the checkout.
+      const dir = withDir ? expand((withDir[1] ?? "").replace(/^["']|["']$/g, ""), vars) : "";
+      const set = c.branches.get(dir) ?? new Set<string>();
+      for (const r of refs) set.add(r);
+      c.branches.set(dir, set);
+    } else c.git++;
+  } else if (READ_COMMAND.test(s)) c.files++;
+  else if (SEARCH_COMMAND.test(s)) c.searches++;
+  else c.commands++;
+}
+
+/** A thread wake's thread name from its title (`Thread "Fix the login" (s-…) is idle…`). */
+const WAKE_TITLE = /^Thread "(.+?)" \(s-/;
+
+/**
+ * What woke Ember, in a few words: "wake from <thread>", "timer" (with its note, when it
+ * has one), "restart"; a batch of thread wakes from one thread is that thread's, from
+ * several "N wakes"; anything else "1 wake".
+ */
+export function wakeLabel(w: WakeView): string {
+  let v: unknown;
+  try {
+    v = JSON.parse(w.json);
+  } catch {
+    v = null;
+  }
+  const fromTitle = WAKE_TITLE.exec(w.title)?.[1];
+  const one = (p: unknown): string => {
+    if (!p || typeof p !== "object") return "";
+    const o = p as { kind?: unknown; note?: unknown; thread?: { name?: unknown } };
+    if (o.kind === "timer") return typeof o.note === "string" && o.note ? `timer: ${o.note}` : "timer";
+    if (o.kind === "restart") return "restart";
+    if (o.kind === "thread" && typeof o.thread?.name === "string" && o.thread.name) return `wake from ${o.thread.name}`;
+    return "";
+  };
+  const o = v as { kind?: unknown; wakes?: unknown } | null;
+  if (o?.kind === "batch" && Array.isArray(o.wakes)) {
+    const labels = [...new Set((o.wakes as unknown[]).map(one).filter((l) => l !== "" && l !== "restart"))];
+    const restart = (o.wakes as unknown[]).some((p) => one(p) === "restart");
+    const rest = labels.length === 1 ? (labels[0] ?? "") : labels.length > 1 ? `${String(labels.length)} wakes` : "";
+    if (restart) return rest ? `restart, ${rest}` : "restart";
+    if (rest) return rest;
+  }
+  return one(v) || (fromTitle ? `wake from ${fromTitle}` : "1 wake");
+}
+
+/**
+ * What a run did, in a few words ("wake from Notes, read 5 files, started 2 workers,
+ * checked 2 branches, updated the board"), from its top-level items: what woke Ember,
+ * reads and searches, then the CLI calls Ember makes, each simple command of a Bash call
+ * on its own (`a && b; c` counts three), then whatever else ran. `nameOf` names a thread
+ * (`thread send`'s target); "" when unknown.
+ */
+export function workSummary(items: readonly ThreadItemView[], nameOf: (id: string) => string = () => ""): string {
+  const n = { files: 0, searches: 0, agents: 0, skills: 0, tools: 0 };
+  const wakes: string[] = [];
+  const c: CommandCounts = { files: 0, searches: 0, created: 0, started: 0, sentTo: [], answered: 0, closed: 0, boardUpdates: 0, boardReads: 0, notes: 0, readThreads: 0, archived: 0, cleanups: 0, branches: new Map(), git: 0, commands: 0 };
   for (const it of items) {
-    if (it.kind === "user" && it.wake) n.wakes++;
+    if (it.kind === "user" && it.wake) wakes.push(wakeLabel(it.wake));
     if (it.kind !== "tool" || it.parentToolUseId !== "") continue;
     if (it.name === "Read" || it.name === "NotebookRead") n.files++;
     else if (EXPLORE_TOOLS.has(it.name)) n.searches++;
@@ -541,33 +948,123 @@ export function workSummary(items: readonly ThreadItemView[]): string {
     else if (it.name === "Skill") n.skills++;
     else if (it.name === "AskUserQuestion" || it.name === "TodoWrite") continue;
     else if (it.name === "Bash") {
-      const c = bashCommand(it);
-      if (/\bthread new\b/.test(c)) n.created++;
-      else if (/\bember task (?:add|update|done|cancel)\b/.test(c)) n.boardUpdates++;
-      else if (/\bember (?:board|status|task (?:list|show))\b/.test(c)) n.boardReads++;
-      else if (/\bember remember\b/.test(c)) n.notes++;
-      else if (/\bthread (?:read|get|items|events|show|list)\b/.test(c)) n.readThreads++;
-      else if (/\bthread send\b/.test(c)) n.sent++;
-      else if (/^\s*(?:cd [^&;]+(?:&&|;)\s*)?git\b/.test(c)) n.git++;
-      else n.commands++;
+      const vars = new Map<string, string>();
+      for (const s of shellSegments(bashCommand(it))) countCommand(c, s, vars);
     } else n.tools++;
   }
   const parts: string[] = [];
-  if (n.wakes) parts.push(count(n.wakes, "wake", "wakes"));
-  if (n.files) parts.push(`read ${count(n.files, "file", "files")}`);
-  if (n.searches) parts.push(`searched ${n.searches === 1 ? "once" : `${String(n.searches)} times`}`);
-  if (n.readThreads) parts.push(`read ${count(n.readThreads, "thread", "threads")}`);
-  if (n.created) parts.push(`created ${count(n.created, "thread", "threads")}`);
-  if (n.sent) parts.push(`messaged ${count(n.sent, "thread", "threads")}`);
-  if (n.boardUpdates) parts.push("updated the board");
-  else if (n.boardReads) parts.push("checked the board");
-  if (n.notes) parts.push(`noted ${count(n.notes, "fact", "facts")}`);
-  if (n.git) parts.push("checked git");
-  if (n.commands) parts.push(`ran ${count(n.commands, "command", "commands")}`);
+  if (wakes.length === 1) parts.push(wakes[0] ?? "");
+  else if (wakes.length > 1) {
+    // Several: "3 wakes from Notes" when one thread sent them all, else "3 wakes".
+    const one = new Set(wakes).size === 1 ? (wakes[0] ?? "") : "";
+    parts.push(one.startsWith("wake from ") ? `${String(wakes.length)} wakes from ${one.slice("wake from ".length)}` : count(wakes.length, "wake", "wakes"));
+  }
+  const files = n.files + c.files;
+  const searches = n.searches + c.searches;
+  if (files) parts.push(`read ${count(files, "file", "files")}`);
+  if (searches) parts.push(`searched ${searches === 1 ? "once" : `${String(searches)} times`}`);
+  if (c.readThreads) parts.push(`read ${count(c.readThreads, "thread", "threads")}`);
+  if (c.created) parts.push(`created ${count(c.created, "thread", "threads")}`);
+  if (c.started) parts.push(`started ${count(c.started, "worker", "workers")}`);
+  const sent = [...new Set(c.sentTo)];
+  if (sent.length === 1) parts.push(`sent ${c.sentTo.length === 1 ? "a change" : `${String(c.sentTo.length)} changes`} to ${nameOf(sent[0] ?? "") || "a worker"}`);
+  else if (sent.length > 1) parts.push(`sent changes to ${String(sent.length)} workers`);
+  if (c.answered) parts.push(`answered ${count(c.answered, "question", "questions")}`);
+  if (c.closed) parts.push(`closed ${count(c.closed, "task", "tasks")}`);
+  if (c.boardUpdates) parts.push("updated the board");
+  else if (c.boardReads && !c.closed) parts.push("checked the board");
+  if (c.notes) parts.push(`noted ${count(c.notes, "fact", "facts")}`);
+  const branches = branchCount(c.branches);
+  if (branches) parts.push(`checked ${count(branches, "branch", "branches")}`);
+  if (c.git) parts.push("checked git");
+  if (c.archived) parts.push(`archived ${count(c.archived, "thread", "threads")}`);
+  if (c.cleanups) parts.push("cleaned up worktrees");
+  if (c.commands) parts.push(`ran ${count(c.commands, "command", "commands")}`);
   if (n.agents) parts.push(count(n.agents, "subagent", "subagents"));
   if (n.skills) parts.push(`used ${count(n.skills, "skill", "skills")}`);
   if (n.tools) parts.push(`used ${count(n.tools, "tool", "tools")}`);
   return parts.join(", ");
+}
+
+/** When a run ended: its last item's last change (epoch ms); null for none. */
+export function runEndMs(items: readonly ThreadItemView[]): number | null {
+  let end: number | null = null;
+  for (const it of items) {
+    const t = it.updatedAtMs ?? it.createdAtMs;
+    if (t !== null) end = Math.max(end ?? t, t);
+  }
+  return end;
+}
+
+/** "14:02" today, "Oct 20 14:02" before. */
+export function clockTime(ms: number, now: number): string {
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date(now).toDateString() ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
+// ---------- a restart that cut Ember's turn ----------
+
+/** The daemon's turn end for a turn whose process went (internal/store/thread/turnclose.go). */
+const PROCESS_ENDED = "process_ended";
+/** A running tool's output when the daemon stopped under it (stream.go shutdown). */
+const STOPPED_OUTPUT = "Interrupted: the daemon stopped";
+/** The resume note's restart cause (resumenote.go). */
+const RESTART_NOTE = "app restarted";
+
+/** A restart wake (subscriptions_restart.go): its restarted_at, null when it is none. */
+function restartWakeAt(w: WakeView | undefined): number | null {
+  if (!w) return null;
+  try {
+    const v = JSON.parse(w.json) as { kind?: unknown; restarted_at?: unknown; wakes?: unknown };
+    const r = v.kind === "restart" ? v : v.kind === "batch" && Array.isArray(v.wakes) ? (v.wakes as { kind?: unknown; restarted_at?: unknown }[]).find((x) => x.kind === "restart") : undefined;
+    if (!r) return null;
+    const at = typeof r.restarted_at === "string" ? Date.parse(r.restarted_at) : NaN;
+    return Number.isNaN(at) ? 0 : at;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The turn ends where the app's restart cut Ember's turn, with when it restarted. A turn
+ * end the daemon wrote for a process that went (interrupted, `process_ended`) with no
+ * error before it (a crash says so in its own row) is a restart when the daemon's marks
+ * say so: a tool it stopped under ("Interrupted: the daemon stopped."), a restart wake or
+ * a resume note ("…the Code Foundry app restarted…") on the next message; failing those,
+ * when it is the thread's last turn and Ember's status is still the cut ("interrupted",
+ * `cutNow`). The time is the restart wake's, else the turn end's.
+ */
+export function restartCuts(log: { byId: Readonly<Record<string, ThreadItemView>>; order: readonly string[] } | undefined, cutNow: boolean): Map<string, number | null> {
+  const cuts = new Map<string, number | null>();
+  if (!log) return cuts;
+  let stopped = false;
+  let failed = false;
+  let open: { id: string; at: number | null } | null = null;
+  let lastEnd = "";
+  for (const id of log.order) {
+    const it = log.byId[id];
+    if (!it || it.parentToolUseId !== "") continue;
+    if (it.kind === "user" && open) {
+      const wakeAt = restartWakeAt(it.wake);
+      if (wakeAt !== null) cuts.set(open.id, wakeAt || open.at);
+      else if (it.resumeNote?.includes(RESTART_NOTE)) cuts.set(open.id, open.at);
+      open = null;
+    }
+    if (it.kind === "tool" && it.output.startsWith(STOPPED_OUTPUT)) stopped = true;
+    if (it.kind === "error") failed = true;
+    if (it.kind === "turnEnd") {
+      lastEnd = it.id;
+      if (it.subtype === PROCESS_ENDED && it.interrupted && !failed) {
+        // The next message may still say when the app came back (a restart wake).
+        open = { id: it.id, at: it.createdAtMs };
+        if (stopped) cuts.set(it.id, it.createdAtMs);
+      }
+      stopped = failed = false;
+    }
+  }
+  if (open && cutNow && open.id === lastEnd) cuts.set(open.id, open.at);
+  return cuts;
 }
 
 /**

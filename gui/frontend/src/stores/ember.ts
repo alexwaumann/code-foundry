@@ -4,13 +4,27 @@
  * row, the chat, the Board panel), the resident thread's id, ember.enabled, and the Board
  * panel's scroll target.
  */
+import { useMemo } from "react";
 import { create } from "zustand";
 import type { EmberBoardView, EmberTaskView, EmberTimerView } from "@/api/ember";
 import { watchEmberBoard } from "@/api/ember";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream } from "@/api/stream";
 import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
-import { boardSections, firstDoingTitle, flameState, headerSummary, linkMeta, waitingThreads, workingThreads, type FlameState } from "@/lib/ember";
+import {
+  blockedTasks,
+  boardSections,
+  flameState,
+  headerSummary,
+  linkMeta,
+  rowTitle,
+  waitingThreads,
+  waitingWords,
+  workingThreads,
+  type FlameState,
+  type HeaderDot,
+  type Words,
+} from "@/lib/ember";
 import { useSettingsStore } from "./settings";
 import { useThreadStore } from "./thread";
 import { isAttention, useThreadsStore, type ThreadsData } from "./threads";
@@ -120,14 +134,41 @@ export function useDoingCount(): number {
   return useEmberStore((s) => s.board?.tasks.filter((t) => t.state === "doing").length ?? 0);
 }
 
-/** The chat header's "2 threads working · 1 queued". */
-export function useHeaderSummary(): string {
-  return useEmberStore((s) => headerSummary(s.board?.tasks ?? NO_TASKS));
+/** How many timers Ember has pending (the board's Scheduled section). */
+export function pendingTimers(board: EmberBoardView | null): number {
+  return board?.timers.length ?? 0;
 }
 
-/** The pinned row's middle part: the first doing task's title. */
-export function useFirstDoingTitle(): string {
-  return useEmberStore((s) => firstDoingTitle(s.board?.tasks ?? NO_TASKS));
+/** The chat header's "1 needs you · 2 threads working · 1 blocked · 1 queued". */
+export function useHeaderSummary(): string {
+  return useEmberStore((s) => headerSummary(s.board?.tasks ?? NO_TASKS, pendingTimers(s.board)).text);
+}
+
+/** The chat header's dot: amber while something waits on the user, sky while workers run. */
+export function useHeaderDot(): HeaderDot {
+  return useEmberStore((s) => headerSummary(s.board?.tasks ?? NO_TASKS, pendingTimers(s.board)).dot);
+}
+
+/** The pinned row's middle part: the waiting worker's task, else the first doing task, else the first blocked one. */
+export function useRowTitle(): string {
+  return useEmberStore((s) => rowTitle(s.board?.tasks ?? NO_TASKS));
+}
+
+/** Blocked tasks no worker of which waits on the user (the row's Blocked, the header's "N blocked"). */
+export function useBlockedCount(): number {
+  return useEmberStore((s) => blockedTasks(s.board?.tasks ?? NO_TASKS));
+}
+
+/** The pending timers' count (the row's "N scheduled"). */
+export function usePendingTimers(): number {
+  return useEmberStore((s) => pendingTimers(s.board));
+}
+
+/** The first waiting worker's words ("Needs input", "Stopped at budget · $0.21"), as text and tone; null when none waits. */
+export function useWaitingWords(): Words | null {
+  const text = useEmberStore((s) => waitingWords(s.board?.tasks ?? NO_TASKS)?.text ?? "");
+  const tone = useEmberStore((s) => waitingWords(s.board?.tasks ?? NO_TASKS)?.tone ?? "muted");
+  return useMemo(() => (text ? { text, tone } : null), [text, tone]);
 }
 
 /** Worker threads working now (leads' teams included). */
@@ -142,7 +183,25 @@ export function useWaitingThreads(): number {
 
 /** A task link's words after its title, joined ("in progress · 3 pieces · 2 working"); "" for a task not on the board. */
 export function useLinkMeta(taskId: string): string {
-  return useEmberStore((s) => linkMeta(s.board?.tasks ?? NO_TASKS, taskId).join(" · "));
+  return useEmberStore((s) => linkMeta(s.board?.tasks ?? NO_TASKS, taskId).parts.join(" · "));
+}
+
+/** Whether one of a linked task's workers waits on the user (its words read "needs you", amber). */
+export function useLinkWaiting(taskId: string): boolean {
+  return useEmberStore((s) => linkMeta(s.board?.tasks ?? NO_TASKS, taskId).waiting);
+}
+
+/** A linked task's title on the board now (Ember may have renamed it since); "" for a task not on the board. */
+export function useLinkTitle(taskId: string): string {
+  return useEmberStore((s) => s.board?.tasks.find((t) => t.id === taskId)?.title ?? "");
+}
+
+/** A linked done task's branch (ember task done --branch); "" otherwise. */
+export function useLinkBranch(taskId: string): string {
+  return useEmberStore((s) => {
+    const t = s.board?.tasks.find((x) => x.id === taskId);
+    return t?.state === "done" ? t.branch : "";
+  });
 }
 
 /** The Board panel's header counts: cards in progress and up next, and Ember's pending timers. */
