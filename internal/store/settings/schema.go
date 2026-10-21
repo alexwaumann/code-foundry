@@ -140,7 +140,7 @@ const (
 var Pages = []Page{
 	{ID: PageGeneral, Title: "General", Sections: []Section{
 		{ID: "threads", Title: "Threads"},
-		{ID: "textgen", Title: "Text generation", Description: "Models for small side jobs such as naming a thread."},
+		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "lifecycle", Title: "Lifecycle"},
 		{ID: "updates", Title: "Updates"},
 	}},
@@ -150,35 +150,35 @@ var Pages = []Page{
 		{ID: "terminal", Title: "Terminal"},
 	}},
 	{ID: PageNotifications, Title: "Notifications",
-		Description: "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle.",
+		Description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app.",
 		Sections:    []Section{{ID: "alerts"}}},
 	{ID: PageSource, Title: "Source control", Sections: []Section{
-		{ID: "github", Title: "GitHub", Description: "Your pull requests and default-branch checks, polled with gh's login."},
-		{ID: "projects", Title: "Projects", Description: "Fetching, and how worktrees open."},
+		{ID: "github", Title: "GitHub", Description: "Pull requests and checks, read with your gh login."},
+		{ID: "projects", Title: "Projects", Description: "Fetching, branches and worktrees."},
 	}},
-	{ID: PageEmber, Title: "Ember", Description: "Ember is a resident agent that plans work, runs worker threads and reports back in its own chat.", Sections: []Section{
+	{ID: PageEmber, Title: "Ember", Description: "A resident agent that plans work, runs worker threads and reports back in its own chat.", Sections: []Section{
 		{ID: "experiment", Title: "Experiment"},
 		{ID: "models", Title: "Models"},
-		{ID: "epochs", Title: "Epochs", Description: "Advanced. Ember's Claude session is replaced by a fresh one, seeded with its memory, task board and recent messages, when either limit is reached after a turn."},
+		{ID: "epochs", Title: "Epochs", Description: "When Ember starts a fresh session, seeded with its memory, task board and recent messages. Checked after each turn."},
 	}},
 	{ID: PageKeybindings, Title: "Keybindings",
-		Description: `Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound.`},
+		Description: `Change or remove a command's shortcut. App shortcuts like cmd+k, cmd+b and cmd+1..9 are reserved.`},
 	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
 		{ID: "executables", Title: "Executables"},
 		{ID: "logging", Title: "Logging"},
 	}},
-	{ID: PagePlugins, Title: "Plugins", Description: "Separate programs that add commands, panel surfaces, thread flags and environment to Code Foundry.",
+	{ID: PagePlugins, Title: "Plugins", Description: "Programs that add commands, panels and thread options to Code Foundry.",
 		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
 }
 
 // Groups are the file's tables, in file order. The settings page follows Pages.
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
-	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
+	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Git fetching."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window."},
-	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
+	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
 	{GroupPlugins, "Plugins", "Where plugins are installed from."},
@@ -331,13 +331,13 @@ var staticFields = []Field{
 	// General › Threads.
 	{
 		Key: KeyDefaultModel, Group: GroupThreads, Page: PageGeneral, Section: "threads", Row: "model", Type: Enum, Title: "Model",
-		Description: "Used by new threads unless you pick otherwise. Every model runs with the 1M context window.",
+		Description: "The default for new threads. Every model runs with the 1M context window.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.Default,
 		bind: func(s *Settings) any { return &s.Threads.DefaultModel },
 	},
 	{
 		Key: KeyDefaultEffort, Group: GroupThreads, Page: PageGeneral, Section: "threads", Row: "model", Type: Enum, Title: "Effort",
-		Description: "Effort level new threads use unless you pick otherwise.",
+		Description: "The default effort for new threads.",
 		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "medium",
 		bind: func(s *Settings) any { return &s.Threads.DefaultEffort },
 	},
@@ -346,7 +346,7 @@ var staticFields = []Field{
 		// remembered per project wins). thread.new itself stays explicit (--new-worktree
 		// or --worktree).
 		Key: KeyDefaultWorktree, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "New threads work in",
-		Description: "The project folder itself edits your files in place. A fresh copy gives each thread its own folder and branch, so several can run at once.",
+		Description: "A fresh copy gives each thread its own folder and branch, so several can run at once. The project folder itself edits your files in place.",
 		Enum:        []string{WorktreeNew, WorktreeCurrent},
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
 		Default:     WorktreeCurrent,
@@ -357,41 +357,41 @@ var staticFields = []Field{
 		// and the GUI (the sidebar, the Dock badge).
 		Key: KeyShowCreatedThreads, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool,
 		Title: "Show threads created by other threads",
-		Description: "Off: threads an agent creates stay out of the sidebar and the Dock badge, and are archived with their creator. " +
-			"They stay in the creator's Threads tab.",
+		Description: "When off, threads an agent creates stay out of the sidebar and the Dock badge and are archived with their creator. " +
+			"They still appear in the creator's Threads tab.",
 		Default: "false",
 		bind:    func(s *Settings) any { return &s.Threads.ShowCreatedThreads },
 	},
 	{
 		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
-		Description: "Name a new thread from its first message with a short claude -p call to the naming model.",
+		Description: "Give each new thread a name based on its first message.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Threads.AutoName },
 	},
 	// General › Text generation.
 	{
 		Key: KeyNamingModel, Group: GroupThreads, Page: PageGeneral, Section: "textgen", DependsOn: KeyAutoName, Type: Enum, Title: "Naming model",
-		Description: "Names a new thread from its first message. Always runs at low effort.",
+		Description: "Writes thread names. Always runs at low effort.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
 		bind: func(s *Settings) any { return &s.Threads.NamingModel },
 	},
 	// General › Lifecycle.
 	{
 		Key: KeyCacheTTL, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Prompt cache lifetime",
-		Description: "How long the Claude API keeps a conversation's prompt cache after its last request (1 hour on Bedrock and the Anthropic API). Code Foundry uses it to predict when a thread's cache has expired; it does not change the API's behaviour.",
+		Description: "How long the Claude API keeps a conversation's prompt cache (1 hour on Bedrock and the Anthropic API). Code Foundry uses this to tell when a thread's cache has expired. It doesn't change the API.",
 		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
 		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
 	},
 	{
 		Key: KeyCloseGrace, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Close grace",
-		Description: "How long closing a thread waits for Claude to exit before terminating it.",
+		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
 	},
 	// General › Updates.
 	{
 		Key: KeyUpdateChannel, Group: GroupUpdate, Page: PageGeneral, Section: "updates", Type: Enum, Title: "Channel",
-		Description: "Stable is a build promoted on purpose; tip is the newest build of main, published on every push. Switching never installs an older version.",
+		Description: "Stable gets releases chosen by hand. Tip gets every build of main. Switching never installs an older version.",
 		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable,
 		bind: func(s *Settings) any { return &s.Update.Channel },
 	},
@@ -404,26 +404,26 @@ var staticFields = []Field{
 		Enum:        []string{"system", "dark", "light"}, EnumLabels: []string{"System", "Dark", "Light"}, Default: "system",
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
 	},
-	themeField(KeyThemeDark, theme.SchemeDark, "Dark theme", "Colours of the window, threads and terminals when the scheme is dark.",
+	themeField(KeyThemeDark, theme.SchemeDark, "Dark theme", "Colours used when the scheme is dark.",
 		func(s *Settings) any { return &s.Appearance.ThemeDark }),
-	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colours of the window, threads and terminals when the scheme is light.",
+	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colours used when the scheme is light.",
 		func(s *Settings) any { return &s.Appearance.ThemeLight }),
 	// Appearance › Window.
 	{
 		Key: KeyZoom, Group: GroupAppearance, Page: PageAppearance, Section: "window", Unit: "%", Type: Int, Title: "Zoom",
-		Description: "Scale of the whole window, terminal included. ⌘=, ⌘- and ⌘0 change it too.",
+		Description: "Scale of the whole window. ⌘=, ⌘- and ⌘0 change it too.",
 		Default:     "100", Min: 90, Max: 200,
 		bind: func(s *Settings) any { return &s.Appearance.Zoom },
 	},
 	{
 		Key: KeyDensity, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Density",
-		Description: "Row height and spacing in the sidebar and lists.",
+		Description: "Spacing in the sidebar and lists.",
 		Enum:        []string{"compact", "comfortable"}, EnumLabels: []string{"Compact", "Comfortable"}, Default: "comfortable",
 		bind: func(s *Settings) any { return &s.Appearance.Density },
 	},
 	{
 		Key: KeyThreadWidth, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Thread width",
-		Description: "Column width of a rendered thread's conversation and composer.",
+		Description: "Width of the conversation column.",
 		Enum:        []string{"compact", "comfortable", "full"}, EnumLabels: []string{"Compact", "Comfortable", "Full"}, Default: "comfortable",
 		bind: func(s *Settings) any { return &s.Appearance.ThreadWidth },
 	},
@@ -437,13 +437,13 @@ var staticFields = []Field{
 		// Owned by the backdrop row's editor in the GUI (its gallery), which leaves this
 		// row out; the backdrop store sets it on import and clears it on removal.
 		Key: KeyBackdropFile, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: String, Title: "Backdrop image",
-		Description: "The image the Custom backdrop shows: a file name in the backdrops folder of the Code Foundry home. Images are added and removed on the settings page.",
+		Description: "The file the Custom backdrop shows, from the backdrops folder of the Code Foundry home. Add and remove images on the settings page.",
 		check:       checkBackdropFile,
 		bind:        func(s *Settings) any { return &s.Appearance.BackdropFile },
 	},
 	{
 		Key: KeyPanelKeepOpen, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Bool, Title: "Keep side panel open",
-		Description: "When its last tab closes, the side panel stays open on the new tab page instead of hiding.",
+		Description: "Keep the side panel open on its new tab page after its last tab closes.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Appearance.PanelKeepOpen },
 	},
@@ -452,7 +452,7 @@ var staticFields = []Field{
 		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
 		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
 		Key: KeyFontFamily, Group: GroupAppearance, Page: PageAppearance, Section: "terminal", Type: String, Title: "Font family",
-		Description: "Comma-separated font families; the first one installed wins. JetBrainsMono Nerd Font Mono ships with the app, and ui-monospace and Menlo are always appended.",
+		Description: "Fonts to try, separated by commas; the first one installed is used. JetBrainsMono Nerd Font Mono ships with the app, and Menlo is always the last fallback.",
 		Default:     defaultFontFamily, Placeholder: defaultFontFamily,
 		bind: func(s *Settings) any { return &s.Appearance.FontFamily },
 	},
@@ -464,66 +464,65 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyScrollback, Group: GroupThreads, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback lines",
-		Description: "Lines of history each terminal keeps, in the daemon and in the window.",
+		Description: "Lines of history each terminal keeps.",
 		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
 	},
 	// Notifications.
 	{
 		Key: KeyDockBadge, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Dock badge",
-		Description: "Show how many threads need attention (waiting on you or finished) on the Dock icon.",
+		Description: "Count the threads that need you on the Dock icon.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Notifications.DockBadge },
 	},
 	{
 		Key: KeyBounce, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Bounce the Dock icon",
-		Description: "Bounce once when a thread starts needing attention while Code Foundry is not the active app.",
+		Description: "Bounce once when a thread needs you and Code Foundry is in the background.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Notifications.Bounce },
 	},
 	{
 		Key: KeySound, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Alert sound",
-		Description: "Play a short sound when a thread starts needing attention while Code Foundry is not the active app.",
+		Description: "Play a short sound when a thread needs you and Code Foundry is in the background.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Notifications.Sound },
 	},
 	{
 		Key: KeySoundVolume, Group: GroupNotify, Page: PageNotifications, Section: "alerts", DependsOn: KeySound, Unit: "%", Type: Int, Title: "Alert volume",
-		Description: "Loudness of the alert sound, as a share of the Mac's output volume.",
+		Description: "Volume of the alert sound, relative to the Mac's output volume.",
 		Default:     strconv.Itoa(defaultSoundVolume), Min: 0, Max: 100,
 		bind: func(s *Settings) any { return &s.Notifications.SoundVolume },
 	},
 	{
 		Key: KeyAlertCooldown, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Unit: "s", Type: Int, Title: "Alert cooldown",
-		Description: "Minimum gap between alerts (bounce and sound); the badge still updates. 0 alerts every time.",
+		Description: "Shortest gap between bounces and sounds. The badge always updates. 0 alerts every time.",
 		Default:     strconv.Itoa(defaultAlertCooldown), Min: 0, Max: 3600,
 		bind: func(s *Settings) any { return &s.Notifications.CooldownSeconds },
 	},
 	// Source control › GitHub.
 	{
 		Key: KeyDashboards, Group: GroupGitHub, Page: PageSource, Section: "github", Type: Bool, Title: "Pull request dashboards",
-		Description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.",
+		Description: "Keep the Pull Requests page up to date with the pull requests you wrote, reviewed or are asked to review. Off still checks default-branch CI and watched branches.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
 	},
 	{
 		Key: KeyGhPollInterval, Group: GroupGitHub, Page: PageSource, Section: "github", Unit: "s", Type: Int, Title: "Poll interval",
-		Description: "How often one request checks your pull requests, watched branches and tracked default branches for changes while the app's window is visible. Details are fetched only for what changed. With the window hidden it checks every 5 minutes, with the app closed every 15 (or at this interval, if longer).",
+		Description: "How often GitHub is checked for changes while the window is visible. A hidden window checks every 5 minutes and a closed app every 15, or at this interval if longer.",
 		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
 		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
 	},
 	// Source control › Projects.
 	{
 		Key: KeyFetchInterval, Group: GroupProjects, Page: PageSource, Section: "projects", Unit: "s", Type: Int, Title: "Fetch interval",
-		Description: "How often a project with an active thread (or an open worktree panel) runs git fetch --prune. Other projects fetch every 15 minutes, or at this interval if longer. 0 turns background fetching off.",
+		Description: "How often projects with an active thread fetch from origin. Idle projects fetch every 15 minutes, or at this interval if longer. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
 		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
 	},
 	{
 		Key: KeyAutoPull, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Pull the default branch automatically",
-		Description: "After each background fetch of a project with an active thread (or an open worktree panel), fast-forward its checkouts that are on the default branch and only behind their upstream. " +
-			"A checkout is skipped while it has staged, modified or conflicted files, a rebase or merge in progress, a thread working in it or an action running. " +
-			"Untracked files don't block it; if git refuses the pull, it is tried again after the next fetch. Does nothing while background fetching is off.",
+		Description: "After each fetch, fast-forward checkouts that sit on the default branch and are only behind it. " +
+			"A checkout with staged or modified files, a rebase or merge in progress, a working thread or a running action is left alone. Needs background fetching.",
 		Default: "true",
 		bind:    func(s *Settings) any { return &s.Projects.AutoPull },
 	},
@@ -531,9 +530,9 @@ var staticFields = []Field{
 		// Read by the thread store at every new worktree or workspace
 		// (internal/store/thread/branchname.go), live.
 		Key: KeyBranchNaming, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Enum, Title: "Branch names",
-		Description: "How a new worktree's branch is named. Semantic: the naming model picks a type (feat, fix, chore, docs, ci, refactor, test, perf, build) and a slug, as in feat/add-search-filter. " +
-			"Prefix: the branch prefix and a slug. Custom: the naming model follows your branch instructions. " +
-			"With automatic naming off there is no model call: prefix mode uses the thread's name, the others cf/<thread id>.",
+		Description: "How a new worktree's branch is named. Type and slug: the naming model picks a type like feat or fix and a short slug. " +
+			"Prefix and slug: your branch prefix and a slug. Custom: the naming model follows your instructions. " +
+			"With automatic naming off, prefix mode uses the thread's name and the others use cf/<thread id>.",
 		Enum:       []string{BranchNamingSemantic, BranchNamingPrefix, BranchNamingCustom},
 		EnumLabels: []string{"Type and slug (feat/add-filter)", "Prefix and slug (cf/add-filter)", "Custom instructions"},
 		Default:    BranchNamingSemantic,
@@ -541,28 +540,28 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyBranchPrefix, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch prefix",
-		Description: "Prefix mode: what goes before the slash. " + BranchPrefixNone + " gives a bare slug.",
+		Description: "For Prefix and slug: the part before the slash. " + BranchPrefixNone + " gives a bare slug.",
 		Default:     "cf", Placeholder: "cf", check: checkBranchPrefix,
 		bind: func(s *Settings) any { return &s.Projects.BranchPrefix },
 	},
 	{
 		Key: KeyBranchInstructions, Group: GroupProjects, Page: PageSource, Section: "projects", Type: String, Title: "Branch instructions",
-		Description: "Custom mode: how the naming model writes the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
-			"Spaces in its answer become dashes; a name git refuses falls back to cf/<thread id>.",
+		Description: "For Custom: how the naming model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". " +
+			"Spaces become dashes; a name git refuses falls back to cf/<thread id>.",
 		Placeholder: "ab/<slug of 2 to 4 words>",
 		bind:        func(s *Settings) any { return &s.Projects.BranchInstructions },
 	},
 	{
 		// Read at every new worktree (project.CreateWorktreeOptions.BaseFromOrigin), live.
 		Key: KeyBaseFromOrigin, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Branch from origin",
-		Description: "Start a new worktree's branch from origin's copy of its base, fetched first: origin/<default branch> when no base is given, and origin/<name> for a base given as a branch name (main, release/2.3) when origin has that branch. " +
-			"Off: no base means the local default branch, a base is used exactly as given, and nothing is fetched. A remote branch (origin/x), a tag or a commit is always used as given.",
+		Description: "Fetch first and start a new worktree's branch from origin's copy of its base branch (the default branch when none is given). " +
+			"Off starts from the local branch without fetching. A remote branch, tag or commit given as the base is always used as is.",
 		Default: "true",
 		bind:    func(s *Settings) any { return &s.Projects.BaseFromOrigin },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",
-		Description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor ($VISUAL/$EDITOR if graphical, then common editors).",
+		Description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.",
 		Placeholder: "auto-detect",
 		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
 	},
@@ -570,14 +569,14 @@ var staticFields = []Field{
 	// live.
 	{
 		Key: KeyEmberEnabled, Group: GroupEmber, Page: PageEmber, Section: "experiment", Type: Bool, Title: "Enable Ember",
-		Description: "Experimental: a resident agent pinned above your threads. Tell it what you want done; it plans the work, creates worker threads, follows them and reports back in its own chat. " +
-			"It keeps its memory and task board under ~/.code-foundry/residents/ember, and nothing else changes while it is off.",
+		Description: "Experimental. A resident agent pinned above your threads: tell it what you want done and it plans the work, runs worker threads and reports back in its own chat. " +
+			"Its memory and task board live under ~/.code-foundry/residents/ember. Nothing else changes while it is off.",
 		Default: "false",
 		bind:    func(s *Settings) any { return &s.Ember.Enabled },
 	},
 	{
 		Key: KeyEmberModel, Group: GroupEmber, Page: PageEmber, Section: "models", Row: "ember-model", Type: Enum, Title: "Model",
-		Description: "The model Ember itself runs on. A change applies to its running session at once.",
+		Description: "The model Ember runs on. Changes apply at once.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.EmberDefault,
 		bind: func(s *Settings) any { return &s.Ember.Model },
 	},
@@ -589,52 +588,52 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyEmberWorkerModels, Group: GroupEmber, Page: PageEmber, Section: "models", Type: String, Title: "Worker threads",
-		Description: "The models Ember's worker threads run on. With more than one, new workers alternate between them.",
+		Description: "Models for Ember's worker threads. With several, new workers take turns.",
 		Default:     model.EmberWorkersDefault, Placeholder: model.EmberWorkersDefault,
 		check: checkModelList,
 		bind:  func(s *Settings) any { return &s.Ember.WorkerModels },
 	},
 	{
 		Key: KeyEmberWorkerEffort, Group: GroupEmber, Page: PageEmber, Section: "models", Type: Enum, Title: "Worker effort",
-		Description: "The effort level of Ember's worker threads.",
+		Description: "Effort for Ember's worker threads.",
 		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "high",
 		bind: func(s *Settings) any { return &s.Ember.WorkerEffort },
 	},
 	{
 		Key: KeyEmberEpochTokens, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "tokens", Type: Int, Title: "Context limit",
-		Description: "Start a fresh session once Ember's context passes this many tokens. A fresh session already starts near 25K (its instructions, skills and seed).",
+		Description: "Start a fresh session once Ember's context passes this many tokens. A fresh session starts near 25K.",
 		Default:     strconv.Itoa(defaultEmberEpochTokens), Min: 50000, Max: 1000000,
 		bind: func(s *Settings) any { return &s.Ember.EpochContextTokens },
 	},
 	{
 		Key: KeyEmberEpochHours, Group: GroupEmber, Page: PageEmber, Section: "epochs", Unit: "h", Type: Int, Title: "Session age limit",
-		Description: "Start a fresh session once the current one is this many hours old (and has had a turn).",
+		Description: "Start a fresh session once the current one is this many hours old.",
 		Default:     strconv.Itoa(defaultEmberEpochHours), Min: 1, Max: 720,
 		bind: func(s *Settings) any { return &s.Ember.EpochMaxHours },
 	},
 	// Advanced.
 	{
 		Key: KeyClaudePath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "claude executable",
-		Description: "Absolute path to claude. Empty finds it on PATH.",
+		Description: "Path to claude. Empty finds it on PATH.",
 		Placeholder: "claude (from PATH)", Restart: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.ClaudePath },
 	},
 	{
 		Key: KeyGhPath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "gh executable",
-		Description: "Absolute path to gh. Empty finds it on PATH or in Homebrew's locations.",
+		Description: "Path to gh. Empty finds it on PATH or where Homebrew installs it.",
 		Placeholder: "gh (from PATH)", Restart: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.GhPath },
 	},
 	{
 		Key: KeyLogLevel, Group: GroupAdvanced, Page: PageAdvanced, Section: "logging", Type: Enum, Title: "Log level",
-		Description: "Minimum level written to the daemon's log file (logs/daemon.log).",
+		Description: "Lowest level written to logs/daemon.log.",
 		Enum:        []string{"debug", "info", "warn", "error"}, EnumLabels: []string{"Debug", "Info", "Warn", "Error"}, Default: "info",
 		bind: func(s *Settings) any { return &s.Advanced.LogLevel },
 	},
 	// Plugins › Registries.
 	{
 		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
-		Description: "Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas. Empty (the default) configures none: Browse lists nothing and install takes only a release or a folder.",
+		Description: "Where Browse and plugin install look for plugins, in order; the first registry listing a name wins. Each is a GitHub repository URL (private ones work through your gh login) or an https URL of an index.json, separated by commas. Empty means no registry: Browse lists nothing and install needs a release or a folder.",
 		Default:     "", Placeholder: "https://github.com/<owner>/<repo>",
 		check: checkRegistries,
 		bind:  func(s *Settings) any { return &s.Plugins.Registries },

@@ -17,7 +17,7 @@ export interface GuiPage {
 
 export const guiPages: readonly GuiPage[] = [
   {
-    page: { id: "plugins", title: "Plugins", description: "Separate programs that add commands, panel surfaces, thread flags and environment to Code Foundry.", sections: [] },
+    page: { id: "plugins", title: "Plugins", description: "Programs that add commands, panels and thread options to Code Foundry.", sections: [] },
     icon: Puzzle,
     component: PluginsPage,
   },
@@ -27,9 +27,9 @@ export const guiPages: readonly GuiPage[] = [
       title: "Skills",
       description: "Claude Code plugins and skills from your organisation's marketplace.",
       sections: [
-        { id: "installed", title: "Installed", description: "Claude Code plugins and skills on this Mac: enable, disable, update, run setup, uninstall." },
-        { id: "browse", title: "Browse", description: "Search the marketplace's enterprise and community plugins and skills, and install them." },
-        { id: "registries", title: "Registries", description: "The marketplaces Claude Code has (claude plugin marketplace), and refreshing them." },
+        { id: "installed", title: "Installed", description: "What's installed on this Mac. Enable, disable, update, run setup or uninstall." },
+        { id: "browse", title: "Browse", description: "Search the marketplace and install plugins and skills." },
+        { id: "registries", title: "Registries", description: "The marketplaces Claude Code knows about, and refreshing them." },
       ],
     },
     icon: Sparkles,
