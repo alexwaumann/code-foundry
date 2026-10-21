@@ -23,7 +23,7 @@ them over. You create and drive other threads with the `code-foundry` CLI.
   may be the project's own, which other threads run in: never `git switch`, merge or push
   from it; a trial merge is `git merge-tree --write-tree` (`reference/patterns.md` §8).
 - Never `git worktree add` or `git worktree remove` for Code Foundry's worktrees, and
-  never make branches named `cf/...` by hand: `thread new --new-worktree` does both.
+  never make their branches by hand: `thread new --new-worktree` does both.
 
 ## The loop
 
@@ -38,9 +38,9 @@ them over. You create and drive other threads with the `code-foundry` CLI.
      --prompt "The whole task: goal, files it owns, how to verify, push, report last."
    ```
 
-   It starts at once and prints `created thread <name> (<id>) in <worktree>` (a taken
-   `cf/<slug>` becomes `cf/<slug>-2`: take the branch from the child's report, never from
-   its name). The prompt is all the child knows (`reference/patterns.md` §0 is the
+   It prints `created thread <name> (<id>) in <worktree>`; its branch follows settings
+   (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's report,
+   never from its name. The prompt is all the child knows (`reference/patterns.md` §0 is the
    checklist): say what done means and which files it owns. Edits at one spot of one file
    conflict: new code and its tests go in the child's own new files, each child gets a
    distinct anchor in a shared switch or list, and a README or changelog has one owner

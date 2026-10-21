@@ -370,8 +370,8 @@ type CreateOptions struct {
 	// The thread runs in the member WorktreePath or ProjectID names, else the first
 	// member. Exclusive with NewWorktree and NewWorkspace.
 	WorkspaceID string
-	// NewWorkspace, when set, makes Create make a workspace (a worktree on cf/<slug>
-	// in every repository, the slug as for NewWorktree) and run the thread in the
+	// NewWorkspace, when set, makes Create make a workspace (a worktree on one new
+	// branch in every repository, named as for NewWorktree) and run the thread in the
 	// member ProjectID names, else the first. Exclusive with NewWorktree and WorkspaceID.
 	NewWorkspace *NewWorkspace
 	// NoProject, when set, starts a thread without a project: it runs in Options.Home
@@ -399,9 +399,9 @@ type CreateOptions struct {
 	// PermissionMode selects claude --permission-mode.
 	PermissionMode PermissionMode
 	// NewWorktree, when set, makes Create branch a new worktree for the thread before
-	// claude starts; WorktreePath is then ignored. The branch is cf/<slug>, the slug
-	// named from InitialPrompt with a bounded wait (Options.SlugTimeout), else
-	// cf/<thread id>.
+	// claude starts; WorktreePath is then ignored. The branch follows the
+	// projects.branch_naming mode (branchname.go), named from InitialPrompt with a
+	// bounded wait (Options.SlugTimeout), else cf/<thread id>.
 	NewWorktree *NewWorktree
 	// Attachments are paths returned by StageAttachment. Each becomes an
 	// "Attached image: <path>" or "Attached PDF: <path> (<N> pages)" line after the

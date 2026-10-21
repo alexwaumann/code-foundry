@@ -49,7 +49,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Workspace name"},
 				{Name: "projects", Type: String, Required: true, Description: "Comma-separated projects (id, name, or absolute path), each optionally project:base-ref"},
-				{Name: "branch", Type: String, Description: "Branch for every worktree (default: cf/<name as a slug>)"},
+				{Name: "branch", Type: String, Description: "Branch for every worktree (default: the name's slug in the settings' projects.branch_naming mode, e.g. feat/<slug>; an existing branch is checked out)"},
 				{Name: "base", Type: String, Description: "Ref to branch from for projects without their own (default: origin/<default branch>)"},
 				fetchArg,
 			},
