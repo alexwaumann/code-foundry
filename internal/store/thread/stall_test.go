@@ -37,7 +37,9 @@ func TestControlCallsToAStuckClaude(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			start := time.Now()
 			err := tt.call()
-			if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "Claude did not answer the "+tt.what+" within 300ms") {
+			var na *NoAnswerError
+			if !errors.As(err, &na) || !errors.Is(err, context.DeadlineExceeded) ||
+				!strings.Contains(err.Error(), "Claude did not answer the "+tt.what+" within 300ms") {
 				t.Errorf("err = %v", err)
 			}
 			if took := time.Since(start); took > 3*time.Second {

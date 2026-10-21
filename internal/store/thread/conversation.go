@@ -275,8 +275,8 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 
 // boundedControl runs call, a control request named what ("interrupt"), with ctx
 // bounded by Options.ControlTimeout: the caller's ctx often has no deadline, and a
-// Claude that is stuck never answers. When that bound, not ctx, ends it, the error says
-// so (ErrFailedPrecondition).
+// Claude that is stuck never answers. When that bound, not ctx, ends it, the error is a
+// *NoAnswerError.
 func (m *Manager) boundedControl(ctx context.Context, what string, call func(context.Context) error) error {
 	return boundedControl(ctx, what, m.opts.ControlTimeout, call)
 }
@@ -286,10 +286,24 @@ func boundedControl(ctx context.Context, what string, timeout time.Duration, cal
 	defer cancel()
 	err := call(bounded)
 	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
-		return fmt.Errorf("%w: Claude did not answer the %s within %s; close or restart the thread", ErrFailedPrecondition, what, timeout)
+		return &NoAnswerError{What: what, After: timeout}
 	}
 	return err
 }
+
+// NoAnswerError: Claude did not answer a control request in time (boundedControl). It
+// is a context.DeadlineExceeded.
+type NoAnswerError struct {
+	What  string // the request: "interrupt"
+	After time.Duration
+}
+
+func (e *NoAnswerError) Error() string {
+	return fmt.Sprintf("Claude did not answer the %s within %s; close or restart the thread", e.What, e.After)
+}
+
+// Unwrap makes a NoAnswerError a context.DeadlineExceeded.
+func (e *NoAnswerError) Unwrap() error { return context.DeadlineExceeded }
 
 // controlErr maps the CLI's refusal to InvalidArgument and a gone process to
 // FailedPrecondition.
