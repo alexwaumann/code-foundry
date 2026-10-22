@@ -228,9 +228,8 @@ type AskedResult struct {
 	// Receivers is how many event streams got the request: the windows, but also CLI
 	// events streams and plugins. Not a window count.
 	Receivers int `json:"receivers"`
-	// Delivered is Receivers under its old name, kept for plugins that read it.
-	//
-	// Deprecated: use Windows (or Receivers).
+	// Delivered is Receivers under its old name, kept for plugins that read it: read
+	// Windows (or Receivers) instead.
 	Delivered int `json:"delivered"`
 }
 
