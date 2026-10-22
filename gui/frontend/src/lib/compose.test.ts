@@ -27,7 +27,6 @@ import {
   threadArgs,
   threadPlace,
   defaultWorktree,
-  workInMemory,
   workInText,
   type ComposeTarget,
   type DraftArgsInput,
@@ -251,27 +250,16 @@ describe("workspaces", () => {
 });
 
 describe("Work in", () => {
-  it.each<[string, { setting?: string; remembered?: string; mainPath?: string }, WorktreeChoice]>([
+  it.each<[string, { setting?: string; mainPath?: string }, WorktreeChoice]>([
     ["nothing set: the main checkout", { mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
     ["nothing set, main checkout unknown: a fresh copy", {}, { kind: "new" }],
     ["setting new", { setting: "new", mainPath: "/src/cf" }, { kind: "new" }],
     ["setting current: the main checkout", { setting: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
     ["setting current, main checkout unknown: a fresh copy", { setting: "current" }, { kind: "new" }],
     ["an unknown setting value: the main checkout", { setting: "", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
-    ["remembered current over setting new", { setting: "new", remembered: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
-    ["remembered new over setting current", { setting: "current", remembered: "new", mainPath: "/src/cf" }, { kind: "new" }],
-    ["a garbled memory is ignored", { setting: "current", remembered: "elsewhere", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
+    ["a garbled setting value: the main checkout", { setting: "elsewhere", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
   ])("defaultWorktree: %s", (_, input, want) => {
     expect(defaultWorktree(input)).toEqual(want);
-  });
-
-  it.each<[string, WorktreeChoice & { kind: "new" | "existing" }, string | undefined, string | null]>([
-    ["a fresh copy", { kind: "new" }, "/src/cf", "new"],
-    ["the main checkout", { kind: "existing", path: "/src/cf" }, "/src/cf", "current"],
-    ["another worktree: a one-off", { kind: "existing", path: "/wt/cf-x" }, "/src/cf", null],
-    ["main checkout unknown", { kind: "existing", path: "/src/cf" }, undefined, null],
-  ])("workInMemory: %s", (_, choice, mainPath, want) => {
-    expect(workInMemory(choice, mainPath)).toBe(want);
   });
 
   const main = { isMain: true, branch: "main", head: "3c3c4651234" };

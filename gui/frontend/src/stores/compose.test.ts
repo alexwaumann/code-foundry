@@ -14,7 +14,6 @@ import {
   emptyDraft,
   emptyWorkspaceDraft,
   getDraft,
-  pickWorktree,
   projectWorktree,
   removeAlsoIn,
   setPrimary,
@@ -28,7 +27,6 @@ import { answerConfirm, useConfirmStore } from "./confirm";
 import { useProjectsStore } from "./projects";
 import { useSettingsStore } from "./settings";
 import { useUiStore } from "./ui";
-import { useWorkInStore } from "./workIn";
 import { useWorkspacesStore } from "./workspaces";
 
 // pdf.js does not run in jsdom: each test says what a PDF turns out to be.
@@ -109,24 +107,18 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
 
   beforeEach(() => {
     useProjectsStore.setState({ byId: { "repo-cf": project("repo-cf"), "repo-gp": project("repo-gp") }, order: ["repo-cf", "repo-gp"] });
-    useWorkInStore.setState({ byProject: {} });
   });
   afterEach(() => {
     useSettingsStore.setState({ snapshot: null });
-    useWorkInStore.setState({ byProject: {} });
   });
 
-  it.each<[string, string | undefined, Record<string, "new" | "current">, { kind: string; path?: string }]>([
-    ["no settings yet: the main checkout", undefined, {}, { kind: "existing", path: "/src/repo-cf" }],
-    ["setting new", "new", {}, { kind: "new" }],
-    ["setting current: the main checkout", "current", {}, { kind: "existing", path: "/src/repo-cf" }],
-    ["an unknown setting value: the main checkout", "elsewhere", {}, { kind: "existing", path: "/src/repo-cf" }],
-    ["remembered in place beats the setting", "new", { "repo-cf": "current" }, { kind: "existing", path: "/src/repo-cf" }],
-    ["remembered fresh copy beats the setting", "current", { "repo-cf": "new" }, { kind: "new" }],
-    ["another project's memory does not apply", "new", { "repo-gp": "current" }, { kind: "new" }],
-  ])("%s", (_, value, byProject, want) => {
+  it.each<[string, string | undefined, { kind: string; path?: string }]>([
+    ["no settings yet: the main checkout", undefined, { kind: "existing", path: "/src/repo-cf" }],
+    ["setting new", "new", { kind: "new" }],
+    ["setting current: the main checkout", "current", { kind: "existing", path: "/src/repo-cf" }],
+    ["an unknown setting value: the main checkout", "elsewhere", { kind: "existing", path: "/src/repo-cf" }],
+  ])("%s", (_, value, want) => {
     setting(value);
-    useWorkInStore.setState({ byProject });
     expect(projectWorktree("repo-cf")).toEqual(want);
     expect(place("repo-cf")).toEqual(want);
   });
@@ -138,21 +130,15 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
     expect(projectWorktree("repo-unknown")).toEqual({ kind: "new" });
   });
 
-  it("a pick sets the draft and teaches the project (fresh copy or in place only)", () => {
+  it("a pick applies to its draft only: the next draft starts from the setting again", () => {
     setting("new");
-    pickWorktree("repo-cf", { kind: "existing", path: "/src/repo-cf" });
-    expect(getDraft("repo-cf").worktree).toEqual({ kind: "existing", path: "/src/repo-cf" });
-    expect(useWorkInStore.getState().byProject).toEqual({ "repo-cf": "current" });
-    // Another existing worktree is a one-off: the memory stays.
-    pickWorktree("repo-cf", { kind: "existing", path: "/wt/repo-cf-x" });
-    expect(useWorkInStore.getState().byProject).toEqual({ "repo-cf": "current" });
-    // The next draft for the project starts in place; another project does not.
+    updateDraft("repo-cf", { worktree: { kind: "existing", path: "/src/repo-cf" } });
+    expect(place("repo-cf")).toEqual({ kind: "existing", path: "/src/repo-cf" });
+    expect(projectWorktree("repo-cf")).toEqual({ kind: "new" });
+    expect(place("repo-gp")).toEqual({ kind: "new" });
     clearDraft("repo-cf");
     expect(getDraft("repo-cf").worktree).toBeNull();
-    expect(place("repo-cf")).toEqual({ kind: "existing", path: "/src/repo-cf" });
-    expect(place("repo-gp")).toEqual({ kind: "new" });
-    pickWorktree("repo-cf", { kind: "new" });
-    expect(useWorkInStore.getState().byProject).toEqual({ "repo-cf": "new" });
+    expect(place("repo-cf")).toEqual({ kind: "new" });
   });
 
   it("the draft's own choice wins over the default; a vanished worktree still falls back to a fresh copy", () => {

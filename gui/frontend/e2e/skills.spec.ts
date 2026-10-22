@@ -189,7 +189,7 @@ test("the settings search finds the Skills page's sections and opens the page th
   await openApp(page);
   await page.keyboard.press("Meta+Comma");
   await page.getByRole("searchbox", { name: "Search settings" }).fill("skills registries");
-  await expect(page.getByTestId("settings-section-hit")).toHaveText(["Skills › RegistriesThe marketplaces Claude Code has (claude plugin marketplace), and refreshing them."]);
+  await expect(page.getByTestId("settings-section-hit")).toHaveText(["Skills › RegistriesThe marketplaces Claude Code knows about, and refreshing them."]);
   await expect(page.getByTestId("settings-nav-skills").getByTestId("settings-nav-count")).toHaveText("1");
   await page.getByTestId("settings-section-hit").click();
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "skills");

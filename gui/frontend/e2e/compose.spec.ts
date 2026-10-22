@@ -328,7 +328,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
 });
 
-test("Work in: by default a thread starts in place; a pick is remembered per project", async ({ page }) => {
+test("Work in: by default a thread starts in place; a pick applies to its draft only", async ({ page }) => {
   // threads.default_worktree is unset: its default is the project folder itself.
   await openApp(page);
   await compose(page);
@@ -337,8 +337,9 @@ test("Work in: by default a thread starts in place; a pick is remembered per pro
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await expect(page.getByTestId("composer-checkout-branch")).toHaveText("On main");
 
-  // Picking a fresh copy brings the base back and becomes code-foundry's default.
+  // Picking a fresh copy brings the base back for this draft; the footer names the setting.
   await worktree.click();
+  await expect(page.getByText("Default for new threads: Settings › Threads › New threads work in")).toBeVisible();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "A fresh copy of the project" }).click();
   await expect(worktree).toHaveText("Fresh copy");
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
@@ -349,18 +350,15 @@ test("Work in: by default a thread starts in place; a pick is remembered per pro
   expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "origin/main" });
   await expect.poll(() => promptFocused(page)).toBe(true);
 
-  // The next code-foundry draft starts from the memory; another project from the default.
+  // The next code-foundry draft starts from the setting again, not from the pick.
   await compose(page);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
-  await row(page, "s:s-1").click();
-  await compose(page, 2);
   await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
 
-  // The memory outlives a reload (drafts do not).
+  // So does one after a reload.
   await openApp(page);
   await compose(page);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
 });
 
 test("attachments: picked, rejected, removed, staged on send", async ({ page }) => {

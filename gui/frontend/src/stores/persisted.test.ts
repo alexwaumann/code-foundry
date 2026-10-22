@@ -5,7 +5,6 @@ import { usePanelStore } from "./panel";
 import { addRecentReviewer, useReviewerRecentsStore } from "./reviewerRecents";
 import { useSettingsPrefsStore } from "./settingsPrefs";
 import { FONT_MAX, FONT_DEFAULT, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
-import { rememberedWorkIn, rememberWorkIn, useWorkInStore } from "./workIn";
 
 // Every persisted store, with what a well-formed state must look like after loading and a
 // use of its reducers (what used to throw on a bad shape: getBottom on byKey null).
@@ -63,17 +62,6 @@ const stores: Persisted[] = [
       expect(["unified", "split"]).toContain(s.diffStyle);
       expect(["rendered", "source"]).toContain(s.preview.markdown);
       setPreviewMode("html", "source");
-    },
-  },
-  {
-    name: "code-foundry.workIn",
-    version: 2,
-    rehydrate: () => useWorkInStore.persist.rehydrate(),
-    fields: ["byProject"],
-    use: () => {
-      rememberedWorkIn("p");
-      rememberWorkIn("p", "new");
-      expect(rememberedWorkIn("p")).toBe("new");
     },
   },
   {

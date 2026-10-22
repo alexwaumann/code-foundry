@@ -51,9 +51,8 @@ export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string 
 export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
 
 /**
- * Where a project's new thread works by default (threads.default_worktree, and the
- * choice remembered per project): a fresh copy (a new worktree) or the project folder
- * itself (the main checkout).
+ * Where a project's new thread works by default (threads.default_worktree): a fresh copy
+ * (a new worktree) or the project folder itself (the main checkout).
  */
 export type WorkInMode = "new" | "current";
 
@@ -64,23 +63,14 @@ function workInMode(v: string | undefined): WorkInMode | undefined {
 }
 
 /**
- * A project draft's worktree before the user picks one: the choice remembered for the
- * project, else the setting, else the project folder itself (the daemon's default for
- * threads.default_worktree). "current" is the main checkout, or a fresh copy while the
- * main checkout is not known.
+ * A project draft's worktree before the user picks one: the setting, else the project
+ * folder itself (the daemon's default for threads.default_worktree). "current" is the
+ * main checkout, or a fresh copy while the main checkout is not known. A pick in the Work
+ * in picker applies to its draft only (docs/notes/work-in-draft-only.md).
  */
-export function defaultWorktree(p: { setting?: string; remembered?: string; mainPath?: string }): ProjectWorktree {
-  const mode = workInMode(p.remembered) ?? workInMode(p.setting) ?? "current";
+export function defaultWorktree(p: { setting?: string; mainPath?: string }): ProjectWorktree {
+  const mode = workInMode(p.setting) ?? "current";
   return mode === "current" && p.mainPath ? { kind: "existing", path: p.mainPath } : { kind: "new" };
-}
-
-/**
- * What picking a worktree teaches the project's default: a fresh copy or the main
- * checkout; null for another existing worktree (a one-off; the memory stays as it was).
- */
-export function workInMemory(choice: ProjectWorktree, mainPath: string | undefined): WorkInMode | null {
-  if (choice.kind === "new") return "new";
-  return mainPath !== undefined && choice.path === mainPath ? "current" : null;
 }
 
 /**
