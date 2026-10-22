@@ -297,7 +297,8 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
   }, []);
   return createPortal(
     <div
-      className="fixed inset-0 z-40 bg-black/55"
+      // cf-thread: the strip's thread-scoped styles (.mono, tones) hold outside the pane too.
+      className="cf-thread fixed inset-0 z-40 bg-black/55"
       data-testid="thread-html-lightbox"
       role="dialog"
       aria-modal="true"

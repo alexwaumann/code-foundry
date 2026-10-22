@@ -46,12 +46,12 @@ func workspacePrompt(name string) string {
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
 	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
-	"cost and usage: code-foundry usage.show; " +
-	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
-	"a path in your reply is a clickable chip; show .html pages: view.inline <file>; " +
+	"cost: code-foundry usage.show; " +
+	"to show something: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
+	"a path in your reply is a clickable chip; a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown; " +
 	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
-	"never tell the user to type /model or /cost, which the app replaces; " +
+	"never tell the user to type /model or /cost; " +
 	"page verbs (view.*) move every window: prefer panel verbs; " +
 	"say what you will do, not command or skill names. " +
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
