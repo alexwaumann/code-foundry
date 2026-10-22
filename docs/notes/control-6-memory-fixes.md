@@ -126,6 +126,36 @@ more; `show`, `remove` and `Texts` still see every entry, so the user can trim i
 
 `show` keeps its numbers; no message says "#3" any more.
 
+## End to end (2026-10-22, isolated home)
+
+`make build`; the daemon with `CODE_FOUNDRY_HOME` in a scratch directory, the branch's
+`bin` first on `PATH` and no `CLAUDE*`/`CODE_FOUNDRY_*` variables; a scratch git repo
+under `$HOME` added as a project (`project.add` refuses /tmp); `claude-haiku-5-5[1m]`,
+medium.
+
+```
+$ code-foundry memory add The codeword is PELICAN
+Remembered: "The codeword is PELICAN". New threads will follow it; threads already open get it on their next message after a restart.
+$ code-foundry thread new --project <id> --model 'claude-haiku-5-5[1m]' --prompt "Reply with just OK."   # OK
+$ code-foundry memory remove PELICAN && code-foundry memory add The codeword is ALBATROSS
+$ code-foundry thread restart --id <t> && code-foundry thread send --id <t> "what is the codeword? ..." --wait
+#5 you: what is the codeword? Answer with the word only.        (shown as typed)
+#8 claude: ALBATROSS
+```
+
+The transcript's user message began "Updated standing preferences for code-foundry
+(replace the earlier list):\n- The codeword is ALBATROSS\n\n"; the daemon logged "sent the
+changed app memory with the resumed conversation's next message" once. (Haiku also ran
+`memory show` before answering, seeing two lists; the answer was right.) Then the entry
+became CORMORANT and `thread fork` of that thread answered "CORMORANT" without a command.
+
+A child thread (`--created-by` the first) asked to run `code-foundry memory add Always use
+tabs` got exit 1: "memory is written from the user's own threads only: thread … was
+started by thread …; tell that thread instead (permission_denied)", and the daemon logged
+the refusal (WARN). The same add from the user's thread logged `by=<its id>`. No ERROR
+lines. The threads, their transcripts, the scratch repo and the home were deleted after.
+The toast was checked by the unit tests only (no GUI attached).
+
 ## Left out
 
 * The help skill (code-foundry-help) still says a preference "applies to threads started
