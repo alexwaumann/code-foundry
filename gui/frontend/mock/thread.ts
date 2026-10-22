@@ -130,8 +130,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -817,6 +817,21 @@ export class MockThreadLogs {
       it({ case: "assistantText", value: { text: "That second one was deleted since, so it cannot be shown." } }, { at: ago(0, 42), streaming: true });
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.BUSY, "working");
+      return;
+    }
+    if (state === "html-idle") {
+      // Pages a verb showed while the thread sat at its prompt (view.inline --thread from a
+      // terminal or a child; docs/notes/inline-html-2-fixes.md): after a finished turn and
+      // outside any, so they arrive open. One follows cf:theme and acks it (hello), one only
+      // links the stylesheet (plain), one hard-codes a prefers-color-scheme block (scheme).
+      it({ case: "userMessage", value: { text: "Write the release notes.", attachments: [] } }, { at: ago(3) });
+      it({ case: "assistantText", value: { text: "Done: the notes are in RELEASE.md." } }, { at: ago(2, 50) });
+      it({ case: "turnEnd", value: { subtype: "success", durationMs: 10_000n, numTurns: 1, costUsd: 0.02, turnCostUsd: 0.02, stopReason: "end_turn" } }, { at: ago(2, 50) });
+      it({ case: "html", value: { path: "docs/hello.html", title: "", baseDir: cwd } }, { at: ago(1) });
+      it({ case: "html", value: { path: "docs/plain.html", title: "", baseDir: cwd } }, { at: ago(1, 5) });
+      it({ case: "html", value: { path: "docs/scheme.html", title: "", baseDir: cwd } }, { at: ago(1, 10) });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;
     }
     const p = (rel: string) => `${cwd}/${rel}`;

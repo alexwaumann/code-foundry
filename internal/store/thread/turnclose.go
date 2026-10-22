@@ -34,9 +34,10 @@ func (t *threadLog) openTurn() (start Item, last time.Time, ok bool) {
 // openTurn finds the turn items end in while it has no turn end. The turn is the
 // top-level items after the last turn end or note (the GUI's turn grouping, where a
 // note stands alone and closes what came before it; a fork's copied history ends with
-// one). It starts at the first of them that is not an error: errors alone (a failed
-// start) are not a turn, and a message sent while Claude works is part of the running
-// turn. ok is false when there is no such turn. last is the latest time any item after
+// one). It starts at the first of them that starts a turn (startsTurn): errors alone (a
+// failed start) are not a turn, nor are the daemon's own lines appended between turns
+// (a page view.inline showed, "Set effort to high"), and a message sent while Claude
+// works is part of the running turn. ok is false when there is no such turn. last is the latest time any item after
 // the boundary was created or changed.
 func openTurn(items []Item) (start Item, last time.Time, ok bool) {
 	from := len(items)
@@ -49,11 +50,21 @@ func openTurn(items []Item) (start Item, last time.Time, ok bool) {
 		last = latest(last, it.CreatedAt, it.UpdatedAt)
 	}
 	for _, it := range items[from:] {
-		if it.ParentToolUseID == "" && it.Kind != KindError {
+		if it.ParentToolUseID == "" && startsTurn(it.Kind) {
 			return it, last, true
 		}
 	}
 	return Item{}, time.Time{}, false
+}
+
+// startsTurn reports whether an item of kind k can be a turn's first: not an error, an
+// html item or a command output. Those three are what the daemon appends on its own,
+// outside a turn too: an html item a verb put in an idle thread (inline-html-2-fixes.md),
+// an effort restart's "Set effort to …" and "Restarted Claude". Alone they are no turn,
+// so a process ending after them writes no "Interrupted" turn end; inside a turn they
+// follow its first message. A local command's output comes after the message that ran it.
+func startsTurn(k ItemKind) bool {
+	return k != KindError && k != KindHTML && k != KindCommandOutput
 }
 
 func latest(ts ...time.Time) time.Time {

@@ -31,7 +31,8 @@ func NewFloor(home string, p paths.Paths) Floor {
 	f := Floor{
 		home:    home,
 		guarded: []string{cfg},
-		open:    []string{filepath.Join(cfg, filepath.Base(p.Worktrees())), filepath.Join(cfg, filepath.Base(p.Projects()))},
+		// The checkouts, and the pages threads write to show (paths.Pages).
+		open: []string{filepath.Join(cfg, filepath.Base(p.Worktrees())), filepath.Join(cfg, filepath.Base(p.Projects())), filepath.Join(cfg, filepath.Base(p.Pages()))},
 	}
 	for _, c := range credentialPaths {
 		f.guarded = append(f.guarded, filepath.Join(home, c))

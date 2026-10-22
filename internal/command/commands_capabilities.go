@@ -340,7 +340,9 @@ const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, -
 // commands_view_inline.go; docs/notes/inline-html.md).
 const inlinePage = "view.inline <path> (--title, --panel) shows an .html page inline in your own conversation, at your place in the " +
 	"turn: the File tab's sandboxed frame in a card the user can expand, view as source or open in the panel; --panel also opens it " +
-	"in the File tab. The page may post {type: \"cf:resize\", height} to set its height (the card caps it at 60% of the pane)."
+	"in the File tab. Write the page in $CODE_FOUNDRY_PAGES (your thread's own folder, removed with it), never the repository or the " +
+	"home folder's root. The page may post {type: \"cf:resize\", height} to set its height (the card caps it at 60% of the pane); " +
+	"view.inline warns when it does not, or does not link /cf/theme.css."
 
 // surfaceWhat is what a surface verb's description says the surface shows: what follows
 // its lead ("Open the X surface in a thread's side panel (from a thread: …): "), the

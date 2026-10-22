@@ -2,6 +2,8 @@ package command_test
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -17,17 +19,29 @@ func TestViewInline(t *testing.T) {
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
 	named := richThread()
 	named.Name = "Usage week"
+	good := `<link rel="stylesheet" href="/cf/theme.css"><script>parent.postMessage({type: "cf:resize", height: document.body.scrollHeight}, "*")</script>`
 	tests := []struct {
 		name      string
 		uctx      command.Context
 		args      map[string]string
+		contents  string // the page's ("" for good)
 		windows   int
 		wantReq   *v1.ShowThreadHtmlRequest
 		wantMsg   string
 		wantPanel bool
+		wantWarn  []string
 		code      connect.Code
 		argErr    string
 	}{
+		{name: "a page without the stylesheet or the resize message", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: "<h1 style=\"color: #333\">hi</h1>",
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnNoThemeCSS, command.WarnNoResize}},
+		{name: "a page that does not ask for its height", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><p>hi</p>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnNoResize}},
+		{name: "the CLI outside a thread", uctx: command.Context{}, args: map[string]string{"path": "/wt/docs/page.html"}, argErr: "thread"},
 		{name: "the caller's thread", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
 			wantMsg: "shown docs/page.html in thread Usage week"},
@@ -45,7 +59,11 @@ func TestViewInline(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			th := &commandtest.Thread{Current: named}
-			files := &commandtest.Files{Files: []string{"/wt/docs/page.html"}}
+			contents := tt.contents
+			if contents == "" {
+				contents = good
+			}
+			files := &commandtest.Files{Files: []string{"/wt/docs/page.html", "/home/a/x.htm"}, Contents: map[string]string{"/wt/docs/page.html": contents, "/home/a/x.htm": contents}}
 			reg, emit := panelRegistryWith(t, th, panelDeps{windows: tt.windows, files: files})
 			res, err := reg.Invoke(context.Background(), tt.uctx, "view.inline", tt.args)
 			if checkItemErr(t, err, tt.code, tt.argErr) {
@@ -68,6 +86,9 @@ func TestViewInline(t *testing.T) {
 			if !ok || out.Item != "html-1" || out.Thread != "s-aaaaaaaaaaa1" || (out.Panel != nil) != tt.wantPanel {
 				t.Errorf("JSON = %+v", res.JSON)
 			}
+			if !slices.Equal(out.Warnings, tt.wantWarn) || !slices.Equal(res.Warnings, tt.wantWarn) {
+				t.Errorf("warnings = %q (result %q), want %q", out.Warnings, res.Warnings, tt.wantWarn)
+			}
 			var want []*v1.UiIntent
 			if tt.wantPanel {
 				want = append(want, showViewWith(command.ViewPanelFile, "s-aaaaaaaaaaa1", map[string]string{"path": "/wt/docs/page.html", "project": "r1", "base": "/wt"}))
@@ -75,9 +96,9 @@ func TestViewInline(t *testing.T) {
 			sameIntents(t, emit.Intents(), want)
 		})
 	}
-	// Outside a thread it is not available (When: hasThread), like the item verbs.
+	// In the app with no thread selected it is not available (When: hasThreadOrCLI).
 	reg, _ := panelRegistry(t, &commandtest.Thread{})
-	if _, err := reg.Invoke(context.Background(), command.Context{}, "view.inline", map[string]string{"path": "/wt/a.html"}); err == nil {
-		t.Error("outside a thread: no error")
+	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "projects"}, "view.inline", map[string]string{"path": "/wt/a.html"}); !errors.Is(err, command.ErrUnavailable) {
+		t.Errorf("in the app outside a thread: err = %v, want ErrUnavailable", err)
 	}
 }

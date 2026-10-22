@@ -256,6 +256,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		WorktreeRoot: p.Worktrees(),
 		// Each thread's TMPDIR is <home>/tmp/<thread id> (childcontext.go).
 		TmpRoot: p.Tmp(),
+		// And the pages it shows go in <home>/pages/<thread id> (childcontext.go).
+		PagesRoot: p.Pages(),
 		// Wake subscriptions to action runs read them here (wake.go).
 		ActionRun: actionRunForWake(s.action),
 		// Wake subscriptions to pull requests read the GitHub store's cache and keep

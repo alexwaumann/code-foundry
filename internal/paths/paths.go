@@ -48,6 +48,10 @@ const EnvThread = "CODE_FOUNDRY_THREAD"
 // both. Remove it after the next stable release.
 const EnvThreadLegacy = "CODE_FOUNDRY_SESSION"
 
+// EnvPages is the directory a thread's claude writes the pages it shows in (Pages/<id>),
+// set in every Claude process the daemon spawns for a thread.
+const EnvPages = "CODE_FOUNDRY_PAGES"
+
 // Every action run (internal/store/action) gets these: the project's main checkout and
 // the worktree the run belongs to (its cwd).
 const (
@@ -142,6 +146,12 @@ func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 // Tmp holds one directory per thread, named by its id: that thread's claude gets it as
 // TMPDIR (internal/store/thread childcontext.go). Removed with the thread.
 func (p Paths) Tmp() string { return filepath.Join(p.home, "tmp") }
+
+// Pages holds one directory per thread, named by its id: where that thread writes the
+// HTML pages it shows (view.inline), given to its claude as EnvPages and --add-dir
+// (internal/store/thread childcontext.go). Removed with the thread. The preview route
+// may serve it (internal/preview floor.go), unlike the rest of the config home.
+func (p Paths) Pages() string { return filepath.Join(p.home, "pages") }
 
 // Residents holds each resident thread's own directory, its cwd: <Residents>/<name>
 // (internal/store/thread resident.go).

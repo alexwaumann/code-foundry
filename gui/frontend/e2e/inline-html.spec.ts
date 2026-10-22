@@ -74,8 +74,11 @@ test("source swaps the frame for the file's code, and back", async ({ page }) =>
   await expect(card.getByTestId("thread-html-frame")).toBeVisible();
 });
 
-test("expand shows the page over the pane; Esc closes it and its frame goes", async ({ page }) => {
+test("expand shows the page over the whole window; Close has focus; Esc closes it and its frame goes", async ({ page }) => {
   await openHtmlThread(page);
+  // The side panel open too: the lightbox covers it as well (inline-html-2-fixes).
+  await hello(page).getByTestId("thread-html-panel").click();
+  await expect(page.getByTestId("side-panel")).toBeVisible();
   const card = hello(page).getByTestId("thread-html-card");
   await card.getByTestId("thread-html-expand").click();
   const box = page.getByTestId("thread-html-lightbox");
@@ -84,14 +87,94 @@ test("expand shows the page over the pane; Esc closes it and its frame goes", as
   await expect(box.frameLocator('[data-testid="thread-html-lightbox-frame"]').locator("#hello")).toHaveText("Hello");
   const lightboxFrame = await box.getByTestId("thread-html-lightbox-frame").boundingBox();
   expect(lightboxFrame?.height ?? 0).toBeGreaterThan(500);
+  const inner = await box.getByTestId("thread-html-lightbox-box").boundingBox();
+  const panel = await page.getByTestId("side-panel").boundingBox();
+  const pane = await page.getByTestId("thread-pane").boundingBox();
+  expect(inner && panel && pane).toBeTruthy();
+  if (inner && panel && pane) {
+    expect(inner.x).toBeLessThan(pane.x);
+    expect(inner.x + inner.width).toBeGreaterThanOrEqual(panel.x + panel.width - 1);
+  }
+  // Focus is on Close, not in the frame (whose keys the app never sees), so Esc works at once.
+  const close = box.getByTestId("thread-html-close");
+  await expect(close).toBeVisible();
+  await expect(close).toBeFocused();
   await shot(page, "inline-html-expanded");
   await page.keyboard.press("Escape");
   await expect(box).toHaveCount(0);
   await expect(page.getByTestId("thread-html-lightbox-frame")).toHaveCount(0);
-  // The collapse action closes it too.
+  // Focus goes back to Expand.
+  await expect(card.getByTestId("thread-html-expand")).toBeFocused();
+  // Close is reachable by keyboard from the strip's other actions, and closes it too. WebKit
+  // (like Safari and the Wails window) moves between buttons with Option+Tab.
   await card.getByTestId("thread-html-expand").click();
-  await page.getByTestId("thread-html-collapse").click();
+  await box.getByTestId("thread-html-source-toggle").focus();
+  await page.keyboard.press("Alt+Tab");
+  await page.keyboard.press("Alt+Tab");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("thread-html-lightbox")).toHaveCount(0);
+});
+
+/** The html-idle state: three pages shown after a finished turn, outside any (mock/thread.ts). */
+async function openIdlePages(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1300, height: 1000 });
+  await mockPost("thread?state=html-idle");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  await expect(items(page)).toHaveCount(3);
+}
+
+test("pages shown between turns arrive open, outside the turn's fold", async ({ page }) => {
+  await openIdlePages(page);
+  for (const name of ["hello.html", "plain.html", "scheme.html"]) {
+    const r = items(page).filter({ hasText: name }).getByTestId("thread-html-row");
+    await expect(r).toHaveAttribute("aria-expanded", "true");
+    await expect(r).not.toContainText("folded");
+  }
+  await expect(page.getByTestId("thread-html-frame")).toHaveCount(3);
+  // The turn before them is folded (it ended); they are not in it, and no header follows them.
+  await expect(page.locator('[data-testid="thread-turn-header"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="thread-turn-header"][data-folded]')).toHaveCount(1);
+  // The chevron still closes one.
+  await items(page).filter({ hasText: "plain.html" }).getByTestId("thread-html-row").click();
+  await expect(page.getByTestId("thread-html-frame")).toHaveCount(2);
+});
+
+test("a theme switch keeps a page that acks cf:theme and reloads one that only links the stylesheet", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openIdlePages(page);
+  const listen = items(page).filter({ hasText: "hello.html" });
+  const plain = items(page).filter({ hasText: "plain.html" });
+  const listenDoc = listen.frameLocator('[data-testid="thread-html-frame"]');
+  const plainDoc = plain.frameLocator('[data-testid="thread-html-frame"]');
+  await listenDoc.locator("#wave").click();
+  await expect(listenDoc.locator("#hello")).toHaveText("Hello x1");
+  await plainDoc.locator("#tick").click();
+  await expect(plainDoc.locator("#plain")).toHaveText("Ticked 1");
+  const darkBg = await plainDoc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor);
+  await page.emulateMedia({ colorScheme: "light" });
+  // The stylesheet-only page reloads (its count starts again) and repaints in the new theme.
+  await expect(plain.getByTestId("thread-html-frame")).toHaveAttribute("data-load", "1");
+  await expect(plainDoc.locator("#plain")).toHaveText("Stylesheet only");
+  await expect.poll(() => plainDoc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(darkBg);
+  // The listening page acked: same load, state kept, repainted by the message.
+  await expect(listen.getByTestId("thread-html-frame")).toHaveAttribute("data-load", "0");
+  await expect(listenDoc.locator("#hello")).toHaveText("Hello x1");
+  await page.emulateMedia({ colorScheme: null });
+});
+
+test("a page's prefers-color-scheme is the app's scheme, not the system's", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openIdlePages(page);
+  const doc = items(page).filter({ hasText: "scheme.html" }).frameLocator('[data-testid="thread-html-frame"]');
+  await expect(doc.locator("#scheme")).toHaveText("sees dark");
+  // The app pinned to light while the system stays dark.
+  await mockPost("settings/external?appearance.theme=light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /light/);
+  await expect(doc.locator("#scheme")).toHaveText("sees light");
+  await expect.poll(() => doc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+  await page.emulateMedia({ colorScheme: null });
 });
 
 test("a page that cannot be rendered says so, never a blank box", async ({ page }) => {

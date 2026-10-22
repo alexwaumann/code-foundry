@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 func TestAllowedTools(t *testing.T) {
@@ -59,7 +61,8 @@ func TestThreadTmp(t *testing.T) {
 // thread removes it, and New removes those of threads that are gone.
 func TestSpawnChildContext(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "tmp")
-	withRoot := func(o *Options) { o.TmpRoot = root }
+	pagesRoot := filepath.Join(t.TempDir(), "pages")
+	withRoot := func(o *Options) { o.TmpRoot, o.PagesRoot = root, pagesRoot }
 	e := newEnv(t, withRoot)
 	s := e.connected(CreateOptions{PermissionMode: PermissionSupervised})
 	spec := e.spec(s.ID)
@@ -71,30 +74,46 @@ func TestSpawnChildContext(t *testing.T) {
 	if !slices.Contains(spec.Env, "TMPDIR="+dir) {
 		t.Errorf("env = %q, want TMPDIR=%s", spec.Env, dir)
 	}
-	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-		t.Fatalf("TMPDIR not made: %v", err)
+	pages := filepath.Join(pagesRoot, s.ID)
+	if !slices.Contains(spec.Env, paths.EnvPages+"="+pages) || !slices.Contains(addDirs(spec.Argv), pages) {
+		t.Errorf("env = %q, argv = %q; want %s=%s and --add-dir for it", spec.Env, spec.Argv, paths.EnvPages, pages)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "bench.txt"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
+	for _, d := range []string{dir, pages} {
+		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+			t.Fatalf("%s not made: %v", d, err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "bench.html"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	kept := e.connected(CreateOptions{})
 	if err := e.m.Remove(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Errorf("TMPDIR after remove: %v", err)
+	for _, d := range []string{dir, pages} {
+		if _, err := os.Stat(d); !os.IsNotExist(err) {
+			t.Errorf("%s after remove: %v", d, err)
+		}
 	}
 
-	stray := filepath.Join(root, "s-gone")
-	if err := os.MkdirAll(filepath.Join(stray, "prof"), 0o700); err != nil {
-		t.Fatal(err)
+	var strays []string
+	for _, r := range []string{root, pagesRoot} {
+		stray := filepath.Join(r, "s-gone")
+		if err := os.MkdirAll(filepath.Join(stray, "prof"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		strays = append(strays, stray)
 	}
 	e.restart(withRoot)
-	if _, err := os.Stat(stray); !os.IsNotExist(err) {
-		t.Errorf("a gone thread's TMPDIR after New: %v", err)
+	for _, stray := range strays {
+		if _, err := os.Stat(stray); !os.IsNotExist(err) {
+			t.Errorf("a gone thread's %s after New: %v", stray, err)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(root, kept.ID)); err != nil {
-		t.Errorf("a thread's TMPDIR after New: %v", err)
+	for _, r := range []string{root, pagesRoot} {
+		if _, err := os.Stat(filepath.Join(r, kept.ID)); err != nil {
+			t.Errorf("a thread's directory after New: %v", err)
+		}
 	}
 }

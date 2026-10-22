@@ -94,6 +94,11 @@ type Options struct {
 	// (paths.Tmp; childcontext.go): made at every spawn, removed with the thread and,
 	// for threads that are gone, at New. Empty: threads keep the daemon's TMPDIR.
 	TmpRoot string
+	// PagesRoot is the directory each thread's pages directory is made under, one per
+	// thread id (paths.Pages; childcontext.go): made at every spawn and given to claude
+	// as paths.EnvPages and --add-dir, removed with the thread and, for threads that
+	// are gone, at New. Empty: none.
+	PagesRoot string
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a thread reaches it without the Unix socket. Every process also
@@ -942,7 +947,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, --add-dir for the skills dir, the spawn extras' dirs
-// (plugins), the attachments dir, the workspace members and the granted dirs (in that
+// (plugins), the attachments dir, its pages dir, the workspace members and the granted dirs (in that
 // order, every spawn), the system prompt (ThreadPrompt, the workspace's line, the app
 // memory read now, the thread's own append), the
 // workspace env, then the extras' env and PATH entries. The prompt is never in argv (it
@@ -967,6 +972,11 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	// Its own TMPDIR, before the workspace's and the thread's own env, which may set
 	// another (childcontext.go); plugins cannot (a reserved name).
 	env = append(env, m.tmpEnv(s.ID)...)
+	// Where it writes the pages it shows (childcontext.go): an --add-dir below too.
+	pages := m.pagesDir(s.ID)
+	if pages != "" {
+		env = append(env, paths.EnvPages+"="+pages)
+	}
 	var wl wsLaunch
 	var members []string
 	if s.WorkspaceID != "" {
@@ -1000,6 +1010,9 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
 		sa.addDirs = append(sa.addDirs, m.opts.AttachmentsDir)
+	}
+	if pages != "" {
+		sa.addDirs = append(sa.addDirs, pages)
 	}
 	sa.addDirs = append(sa.addDirs, wl.addDirs...)
 	sa.addDirs = append(sa.addDirs, g.dirs...)

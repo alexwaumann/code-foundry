@@ -234,6 +234,16 @@ function foldsAway(n: WorkNode): boolean {
   return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html";
 }
 
+/**
+ * Items the daemon adds between turns, outside any: its own command output ("Set effort to
+ * high") and a page a verb showed (view.inline). Alone (no user message before them) they
+ * are no turn: a message after them starts one, and they have no header and never fold, so
+ * a page shown while the thread is at its prompt arrives open (docs/notes/inline-html-2-fixes.md).
+ */
+function isAside(t: { user: readonly string[]; items: readonly TimelineItem[] }): boolean {
+  return t.user.length === 0 && t.items.every((x) => x.kind === "commandOutput" || x.kind === "html");
+}
+
 /** The thread's items (top level, in order) as turns. */
 export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   // Nest subagent items under their Agent call when the thread has it.
@@ -267,9 +277,10 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
       // body. Unless the turn's process ended (an error item is the turn's last: Claude
       // stopped or did not start), which no turn_end will follow: a new turn then. Nor
       // after the daemon's own notes with no user message before them ("Restarted
-      // Claude", "Set effort to high": a restart between turns): no turn runs there.
+      // Claude", "Set effort to high": a restart between turns) or a page a verb showed
+      // between turns (view.inline from a terminal or a child): no turn runs there.
       const last = cur?.items[cur.items.length - 1];
-      const notesOnly = cur !== null && cur.user.length === 0 && cur.items.every((x) => x.kind === "commandOutput");
+      const notesOnly = cur !== null && isAside(cur);
       if (cur && last && last.kind !== "error" && !notesOnly) {
         cur.items.push(it);
         continue;
@@ -333,9 +344,13 @@ export function defaultFolded(turn: TimelineTurn): boolean {
   return turn.end !== "";
 }
 
-/** A system note's turn of its own (buildTurns): no user message, no turn_end, no header. */
+/**
+ * A system note's turn of its own (buildTurns), or pages shown between turns (isAside): no
+ * user message, no turn_end, no header; no turn runs there, so the live header goes after it.
+ */
 function isNoteTurn(t: TimelineTurn): boolean {
-  return t.user.length === 0 && t.end === "" && t.body.length === 1 && t.body[0]?.type === "system";
+  if (t.user.length > 0 || t.end !== "" || t.body.length === 0) return false;
+  return (t.body.length === 1 && t.body[0]?.type === "system") || t.body.every((n) => n.type === "html");
 }
 
 /** The rows to lay out, top to bottom: per turn its user message(s), its header, its work (minus what the fold hides). */
