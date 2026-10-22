@@ -12,7 +12,11 @@ export type UiIntentView =
   | { kind: "focusThread"; threadId: string; explicit?: boolean }
   | { kind: "focusProject"; projectId: string; worktreePath: string }
   | { kind: "openPalette"; query: string }
-  | { kind: "notify"; level: NotifyLevel; title: string; body: string }
+  /**
+   * A toast. `link` (a target stores/notifyLinks.ts knows, "settings:memory") is a button
+   * on it, worded `linkLabel`; absent when the daemon sent none.
+   */
+  | { kind: "notify"; level: NotifyLevel; title: string; body: string; link?: string; linkLabel?: string }
   /**
    * A named view, or a panel action. `threadId` (a view.panel.* verb run inside a thread)
    * scopes a panel action to that thread's panel, whatever the window has selected
@@ -47,8 +51,11 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "focusProject", projectId: e.value.projectId, worktreePath: e.value.worktreePath };
     case "openPalette":
       return { kind: "openPalette", query: e.value.query };
-    case "notify":
-      return { kind: "notify", level: levelMap[e.value.level], title: e.value.title, body: e.value.body };
+    case "notify": {
+      const { level, title, body, link, linkLabel } = e.value;
+      const view = { kind: "notify" as const, level: levelMap[level], title, body };
+      return link ? { ...view, link, linkLabel: linkLabel || "Open" } : view;
+    }
     case "showView": {
       const { name, threadId, params } = e.value;
       if (!threadId) return { kind: "showView", name };

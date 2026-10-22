@@ -205,3 +205,25 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     expect(selected()).toEqual({ kind: "view", name: "dashboard" });
   });
 });
+
+describe("notify", () => {
+  it("a link it carries is a button that opens its target", async () => {
+    const { useViewsStore } = await import("./views");
+    useViewsStore.setState({ settingsOpen: false, settingsPage: "general", usageOpen: true });
+    applyIntent({ kind: "notify", level: "info", title: "Remembered: Use tabs", body: 'By thread "Fix login".', link: "settings:memory", linkLabel: "Show in Settings" });
+    const [title, opts] = toastInfo.mock.calls[0] as [string, { description: string; action: { label: string; onClick: () => void } }];
+    expect(title).toBe("Remembered: Use tabs");
+    expect(opts.description).toBe('By thread "Fix login".');
+    expect(opts.action.label).toBe("Show in Settings");
+    opts.action.onClick();
+    expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "memory", usageOpen: false });
+  });
+
+  it.each([
+    ["no link", undefined, undefined],
+    ["a link this window does not know", "nowhere:at-all", { description: "b" }],
+  ])("%s: no button", (_name, link, want) => {
+    applyIntent({ kind: "notify", level: "info", title: "t", body: link ? "b" : "", ...(link ? { link, linkLabel: "Go" } : {}) });
+    expect(toastInfo).toHaveBeenCalledWith("t", want);
+  });
+});

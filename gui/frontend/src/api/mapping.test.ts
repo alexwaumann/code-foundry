@@ -168,6 +168,11 @@ describe("ui intent mapping", () => {
       { kind: "notify", level: "error", title: "x", body: "y" },
     ],
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
+    [
+      { case: "notify" as const, value: { title: "x", link: "settings:memory", linkLabel: "Show in Settings" } },
+      { kind: "notify", level: "info", title: "x", body: "", link: "settings:memory", linkLabel: "Show in Settings" },
+    ],
+    [{ case: "notify" as const, value: { title: "x", link: "settings:memory" } }, { kind: "notify", level: "info", title: "x", body: "", link: "settings:memory", linkLabel: "Open" }],
     [{ case: "playAlertSound" as const, value: { volume: 15 } }, { kind: "playAlertSound", volume: 15 }],
     [{ case: "showAgentRun" as const, value: { threadId: "s1", runId: "a1" } }, { kind: "showAgentRun", threadId: "s1", runId: "a1" }],
   ])("maps %#", (intent, want) => {
