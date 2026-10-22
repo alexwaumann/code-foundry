@@ -1,6 +1,7 @@
 # Ember: research is a task too (2026-10-22)
 
-Text only: the Ember skill, `rules.md` and their tests. No daemon change.
+Text only: the Ember skill, `rules.md`, the `ember task start --new-worktree` help text
+and their tests. No change in daemon behaviour.
 
 ## The problem
 
@@ -39,16 +40,18 @@ new bullet says Ember reads only to split and assign, never to answer a question
 code. The "read a file whole" rule stays as its own bullet. `soul.md`'s parenthetical
 ("it never edits files, builds or pushes itself") already fit and is unchanged.
 
-## Why no daemon change
+## Why no change in daemon behaviour
 
 `ember task done`'s description already allows an outcome that is "a finding", and
 `--branch` is optional (`internal/command/commands_ember_task.go`). `ember task start
 --new-worktree=false` already exists for leads, and it keeps the labels, `--notify` and
 request id, so a research worker wakes Ember and links to its task like any other.
 
-One small wrinkle: the `--new-worktree` flag's help text says "for a lead". Ember may
-read it in `code-foundry help ember.task.start`. The skill is explicit, so this was left
-alone; widening the help text to "a lead or a research task" is a one-word follow-up.
+The one code change is help text. Ember reads `code-foundry help ember.task.start`, and
+the `--new-worktree` flag's text said the project's checkout was "for a lead", which
+could make Ember refuse the flag for research. It now says that false runs the worker in
+the project's checkout with no worktree or branch: a lead, or a research task that
+touches nothing. The behaviour is unchanged.
 
 ## Fitting the cap
 
