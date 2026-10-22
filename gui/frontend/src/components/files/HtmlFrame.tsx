@@ -1,5 +1,5 @@
-import { useEffect, useRef, type CSSProperties } from "react";
-import { subscribeThemeSlots, themeFrameMessage } from "@/lib/theme";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { resizeHeight } from "./previewGrant";
 
@@ -22,7 +22,9 @@ function postTheme(frame: HTMLIFrameElement | null): void {
  * html-preview-interactive.md, inline-html.md). A page that links `/cf/theme.css` paints in
  * the user's theme; the frame is also posted `{ type: "cf:theme", id, scheme, vars }` on
  * load and on every theme change (docs/notes/theme-css-route.md). The target is "*": the
- * frame is opaque-origin. `onResize` hears this frame's own `{ type: "cf:resize", height }`
+ * frame is opaque-origin. Once the daemon has a theme other than the one the frame loaded in
+ * (onThemePublished), the frame reloads, so a page that only links the stylesheet (it is
+ * fetched once, no-store) repaints too; the page's own state goes with it. `onResize` hears this frame's own `{ type: "cf:resize", height }`
  * messages (a page asking for its height). A white canvas, as in a browser.
  */
 export function HtmlFrame({
@@ -48,6 +50,16 @@ export function HtmlFrame({
       }),
     [],
   );
+  // The theme the frame loaded in; a newer one published reloads it (a new key).
+  const [load, setLoad] = useState(() => ({ n: 0, slots: activeThemeSlots() }));
+  useEffect(
+    () =>
+      onThemePublished(() => {
+        const slots = activeThemeSlots();
+        setLoad((l) => (l.slots === slots ? l : { n: l.n + 1, slots }));
+      }),
+    [],
+  );
   const resizeRef = useRef(onResize);
   useEffect(() => {
     resizeRef.current = onResize;
@@ -66,6 +78,7 @@ export function HtmlFrame({
   }, []);
   return (
     <iframe
+      key={load.n}
       ref={frameRef}
       onLoad={() => {
         postTheme(frameRef.current);

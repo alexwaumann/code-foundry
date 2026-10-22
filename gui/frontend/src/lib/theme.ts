@@ -264,13 +264,32 @@ function onDaemonConnect(cb: () => void): () => void {
  * theme is one per user. A failure is dropped: the next connect publishes again, and a
  * daemon older than the RPC serves the default theme.
  */
+const publishedListeners = new Set<() => void>();
+
+/**
+ * Calls `cb` each time the daemon has the theme (a PublishTheme answered), so
+ * `/cf/theme.css` serves it from then on. A preview frame reloads on it when the theme
+ * changed since it loaded (HtmlFrame): a page that only links the stylesheet repaints too.
+ */
+export function onThemePublished(cb: () => void): () => void {
+  publishedListeners.add(cb);
+  return () => {
+    publishedListeners.delete(cb);
+  };
+}
+
 export function startThemePublish(publish: (t: PublishedTheme) => Promise<void> = publishTheme, onConnect: (cb: () => void) => () => void = onDaemonConnect, debounceMs = 150): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const send = () => {
     timer = undefined;
-    publish(publishedTheme()).catch(() => {
-      // Retried on the next connect (onConnect); an older daemon has nothing to serve it from.
-    });
+    publish(publishedTheme()).then(
+      () => {
+        for (const cb of [...publishedListeners]) cb();
+      },
+      () => {
+        // Retried on the next connect (onConnect); an older daemon has nothing to serve it from.
+      },
+    );
   };
   const schedule = () => {
     if (timer !== undefined) clearTimeout(timer);
