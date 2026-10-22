@@ -147,6 +147,12 @@ export type ThreadItemView = ItemBase &
      * at the top of an agent-made thread (a fork's copy too), else "".
      */
     | { kind: "note"; text: string; createdBy: string }
+    /**
+     * An HTML page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md):
+     * path relative to baseDir (the thread's cwd when it was shown) or absolute; title as the
+     * caller gave it, "" for none.
+     */
+    | { kind: "html"; path: string; title: string; baseDir: string }
   );
 
 export type ThreadItemKind = ThreadItemView["kind"];
@@ -302,6 +308,8 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
       return { ...base, kind: "commandOutput", text: p.value.text };
     case "note":
       return { ...base, kind: "note", text: p.value.text, createdBy: p.value.createdBy };
+    case "html":
+      return { ...base, kind: "html", path: p.value.path, title: p.value.title, baseDir: p.value.baseDir };
     default:
       return null;
   }

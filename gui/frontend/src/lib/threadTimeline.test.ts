@@ -32,6 +32,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return `note:${r.kind}`;
       case "strip":
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
+      case "html":
+        return `html:${r.id}${r.folded ? "(folded)" : ""}`;
       default:
         return `${r.type}:${r.id}`;
     }
@@ -473,5 +475,24 @@ describe("turnCostLabel", () => {
     [null, ""],
   ])("%s → %s", (usd, want) => {
     expect(turnCostLabel(usd)).toBe(want);
+  });
+});
+
+describe("inline pages (html items)", () => {
+  it("stay in a folded turn as their row, marked folded; open when the turn is open; no step", () => {
+    const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:a"]);
+    expect(shape(buildRows(buildTurns(items), expanded))).toEqual(["user:u1", "header", "tool:Write", "html:h", "final:a"]);
+  });
+
+  it("break a live strip's run and show on their own", () => {
+    const items = [user("u1"), tool("Bash"), tool("Write"), item("html", { id: "h" }), tool("Bash"), tool("Read", { toolStatus: "running" })];
+    const rows = buildRows(buildTurns(items), { fold: () => undefined, working: true, strips: true });
+    expect(shape(rows)).toEqual(["user:u1", "live(u1,4)", "strip(2)[tool:Bash tool:Write]", "html:h", "strip(2)[tool:Bash tool:Read]"]);
+  });
+
+  it("do not end the answer: text after a page is the final text", () => {
+    const items = [user("u1"), text("before"), item("html", { id: "h" }), text("after"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:after"]);
   });
 });
