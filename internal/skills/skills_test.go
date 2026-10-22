@@ -261,6 +261,19 @@ func TestRender(t *testing.T) {
 		}
 	}
 
+	// The help skill sends internals questions to the source at the provenance line's
+	// ref, starting from the architecture doc, and names the line's dev-build caveat.
+	help := string(files[skills.Help+"/SKILL.md"])
+	for _, want := range []string{"\n## Reading the source\n", "never answer that from memory", "https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>",
+		"gh api 'repos/<owner>/<repo>/contents/<path>?ref=<ref>'", "`docs/ARCHITECTURE.md`", "Cite the file paths", "If the line says `dev build`"} {
+		if !strings.Contains(help, want) {
+			t.Errorf("the help SKILL.md lacks %q", want)
+		}
+	}
+	if dev := (skills.Sources{Version: "dev", Commit: "0123456789abcdef0123456789abcdef01234567"}).Provenance(); !strings.Contains(dev, "(dev build") {
+		t.Errorf("a dev build's provenance line %q does not say `dev build`, which the help skill looks for", dev)
+	}
+
 	// The skills reference their files by the paths they are installed at.
 	for _, skill := range []string{skills.Orchestrate, skills.Help, skills.Plugin} {
 		body := string(files[skill+"/SKILL.md"])

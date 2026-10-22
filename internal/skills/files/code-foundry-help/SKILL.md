@@ -1,6 +1,6 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions, workspaces. Use when the user asks how to do something in Code Foundry or wants a setting changed; explain, then offer to run the command."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions, workspaces. Use when the user asks how to do something in Code Foundry, how it works, or wants a setting changed; explain, then offer to run the command."
 ---
 
 # Answering questions about Code Foundry
@@ -32,8 +32,25 @@ memory:
   `code-foundry settings get <key>`; `--json` adds each setting's title, description,
   type and default.
 
-If none of these covers the question, say so rather than guess; the Help menu has a way
-to report a problem.
+If none of these covers the question, read the source (below); if that does not answer
+it either, say so rather than guess; the Help menu has a way to report a problem.
+
+## Reading the source
+
+For how Code Foundry works inside, or behaviour the references do not cover, read its
+source; never answer that from memory. The line under this file's title gives the build
+and its source, `https://github.com/<owner>/<repo>/tree/<ref>` (a public repository; with
+no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
+
+- WebFetch `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`, or, when
+  `gh` is installed, `gh api 'repos/<owner>/<repo>/contents/<path>?ref=<ref>' -H
+  'Accept: application/vnd.github.raw'` (without the header it lists a directory).
+- Start at `docs/ARCHITECTURE.md`, then read the package it names for the topic (for
+  example `internal/store/thread/` for threads) and follow the code from there.
+- Cite the file paths your answer rests on. Only the code says how the build works:
+  design notes and comments can be out of date, so confirm in the code.
+- If the line says `dev build`, say that the answer comes from that source, which may
+  not match the build the user is running.
 
 ## Explain first, then offer
 
