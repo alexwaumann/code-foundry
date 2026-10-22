@@ -1,19 +1,19 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { componentValues, resolveSlots, type ThemeFile } from "../src/themes/slots";
 import { emit, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
 // defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
 
 // The generated catalog, read as a file: Playwright's loader refuses a JSON import without
-// an import attribute, which src/themes (bundled by Vite) does not carry.
-interface CatalogTheme {
-  id: string;
-  name: string;
-  scheme: "dark" | "light";
-  vars: Record<string, string>;
-}
-const catalog = JSON.parse(fs.readFileSync(new URL("../src/themes/catalog.json", import.meta.url), "utf8")) as CatalogTheme[];
+// an import attribute, which src/themes (bundled by Vite) does not carry. Its entries are
+// theme files; the values the page shows are resolved by the same rules (src/themes/slots.ts).
+const files = JSON.parse(fs.readFileSync(new URL("../src/themes/catalog.json", import.meta.url), "utf8")) as ThemeFile[];
+const catalog = files.map((t) => {
+  const slots = resolveSlots(t);
+  return { ...t, vars: { ...slots, ...componentValues(slots) } };
+});
 const themeById = new Map(catalog.map((t) => [t.id, t]));
 const themesFor = (scheme: "dark" | "light") => catalog.filter((t) => t.scheme === scheme);
 
