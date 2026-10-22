@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, Minimize2, PanelRight, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, TriangleAlert, X, type LucideIcon } from "lucide-react";
 import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
@@ -8,6 +8,8 @@ import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGr
 import { useTabRead, useToolEdits } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
+import { TITLE_BAND_HEIGHT } from "@/components/window/titleBand";
+import { SHELL_GAP } from "@/design/tokens";
 import { frameHeight, inlinePage, type InlinePage } from "@/lib/inlinePage";
 import { tildify } from "@/lib/path";
 import type { WorkNode } from "@/lib/threadTimeline";
@@ -176,8 +178,8 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   const grant = usePreviewGrant(page.baseDir, page.path);
   const project = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
   const [source, setSource] = useState(false);
-  /** Where the lightbox shows while expanded (the pane), else null. */
-  const [lightbox, setLightbox] = useState<HTMLElement | null>(null);
+  /** Expanded: the lightbox shows. */
+  const [lightbox, setLightbox] = useState(false);
   const [asked, setAsked] = useState<number | null>(null);
   const [pane, setPane] = useState(() => window.innerHeight);
   const [version, setVersion] = useState(0);
@@ -201,7 +203,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   const height = frameHeight(asked, pane);
   const failed = !grant.loading && !grant.preview;
   const close = () => {
-    setLightbox(null);
+    setLightbox(false);
   };
   const actions = (expanded: boolean) => (
     <>
@@ -218,7 +220,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
           label="Expand"
           icon={Maximize2}
           onClick={() => {
-            setLightbox(timelineOf(ref.current)?.parentElement ?? document.body);
+            setLightbox(true);
           }}
           testId="thread-html-expand"
         />
@@ -241,10 +243,13 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
       <Strip page={page}>{actions(false)}</Strip>
       <CardBody page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} />
       {lightbox && (
-        <Lightbox host={lightbox} onClose={close}>
+        <Lightbox onClose={close} returnFocus={() => ref.current?.querySelector<HTMLElement>('[data-testid="thread-html-expand"]') ?? null}>
           <Strip page={page} big>
             {actions(true)}
-            <Action label="Collapse" icon={Minimize2} onClick={close} testId="thread-html-collapse" />
+            <Button type="button" variant="ghost" size="xs" className="ml-1 text-cf-text-muted" data-lightbox-close data-testid="thread-html-close" onClick={close}>
+              <X aria-hidden />
+              Close
+            </Button>
           </Strip>
           {grant.preview && !source ? (
             <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} className="min-h-0 flex-1" testId="thread-html-lightbox-frame" />
@@ -260,16 +265,23 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
 }
 
 /**
- * The page over the thread's pane (the timeline's parent: the conversation and its
- * composer), dimming it; Esc, Collapse or a click on the dimmed edge closes it, and its
- * frame goes with it.
+ * The page over the whole window (sidebar, thread and side panel), below the title band so
+ * the traffic lights stay clear, dimming the rest; Esc, Close or a click on the dimmed edge
+ * closes it, and its frame goes with it. Opening moves focus to Close, not the frame: keys
+ * inside the frame never reach the app (it is another document), so Esc and ⌘[ work only
+ * while focus is outside it; Close stays one click or Tab away. Closing hands focus back to
+ * the card's Expand button (returnFocus). docs/notes/inline-html-2-fixes.md.
  */
-function Lightbox({ host, onClose, children }: { host: HTMLElement; onClose: () => void; children: ReactNode }) {
+function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; returnFocus: () => HTMLElement | null; children: ReactNode }) {
   const close = useRef(onClose);
+  const back = useRef(returnFocus);
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     close.current = onClose;
+    back.current = returnFocus;
   });
   useEffect(() => {
+    box.current?.querySelector<HTMLElement>("[data-lightbox-close]")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
@@ -279,11 +291,13 @@ function Lightbox({ host, onClose, children }: { host: HTMLElement; onClose: () 
     document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("keydown", onKey, true);
+      // Not "what had focus before": WebKit does not focus a button on click.
+      back.current()?.focus();
     };
   }, []);
   return createPortal(
     <div
-      className="absolute inset-0 z-30 flex items-center justify-center bg-black/55"
+      className="fixed inset-0 z-40 bg-black/55"
       data-testid="thread-html-lightbox"
       role="dialog"
       aria-modal="true"
@@ -292,8 +306,15 @@ function Lightbox({ host, onClose, children }: { host: HTMLElement; onClose: () 
         if (e.target === e.currentTarget) close.current();
       }}
     >
-      <div className="flex h-[calc(100%-48px)] w-[min(1100px,calc(100%-48px))] flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface-raised shadow-2xl">{children}</div>
+      <div
+        ref={box}
+        className="absolute flex flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface-raised shadow-2xl"
+        style={{ top: TITLE_BAND_HEIGHT, left: SHELL_GAP, right: SHELL_GAP, bottom: SHELL_GAP }}
+        data-testid="thread-html-lightbox-box"
+      >
+        {children}
+      </div>
     </div>,
-    host,
+    document.body,
   );
 }

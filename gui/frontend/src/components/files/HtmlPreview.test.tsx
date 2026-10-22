@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setThemePreference, setThemeSlots } from "@/lib/theme";
+import { setThemePreference, setThemeSlots, startThemePublish } from "@/lib/theme";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
+import { THEME_ACK_MS } from "./HtmlFrame";
 import { HTML_PREVIEW_SANDBOX, HtmlPreview } from "./HtmlPreview";
 
 const previewFile = vi.fn();
@@ -65,6 +66,56 @@ describe("HtmlPreview", () => {
     });
     expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: "cf:theme", id: "github-light", scheme: "light" }), "*");
     expect(post).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives the frame the app's color-scheme, which WebKit hands the page as prefers-color-scheme", async () => {
+    setThemePreference("light");
+    previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
+    render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+    const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+    expect(frame.style.colorScheme).toBe("light");
+    act(() => {
+      setThemePreference("dark");
+    });
+    expect(screen.getByTestId<HTMLIFrameElement>("file-html-frame").style.colorScheme).toBe("dark");
+  });
+
+  it("reloads on a new published theme unless the page acked cf:theme", async () => {
+    setThemePreference("dark");
+    const stop = startThemePublish(() => Promise.resolve(), () => () => undefined, 0);
+    try {
+      previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
+      render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+      const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+      fireEvent.load(frame);
+      expect(frame.dataset.load).toBe("0");
+      // A page that does not answer: the frame reloads THEME_ACK_MS after the publish.
+      act(() => {
+        setThemeSlots({ dark: "nord" });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("file-html-frame").dataset.load).toBe("1");
+      });
+      // A page that acks the message it was posted keeps its load.
+      const next = screen.getByTestId<HTMLIFrameElement>("file-html-frame");
+      fireEvent.load(next);
+      act(() => {
+        setThemeSlots({ dark: "dracula" });
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: next.contentWindow }));
+      });
+      await new Promise((r) => setTimeout(r, THEME_ACK_MS + 100));
+      expect(screen.getByTestId("file-html-frame").dataset.load).toBe("1");
+      // An ack from another window does not count.
+      act(() => {
+        setThemeSlots({ dark: "nord" });
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: window }));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("file-html-frame").dataset.load).toBe("2");
+      });
+    } finally {
+      stop();
+    }
   });
 
   it("shows the error with a Retry that asks again", async () => {

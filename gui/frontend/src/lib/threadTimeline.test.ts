@@ -500,4 +500,23 @@ describe("inline pages (html items)", () => {
     const items = [user("u1"), text("before"), item("html", { id: "h" }), text("after"), end("e1")];
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:after"]);
   });
+
+  it("shown between turns: no turn, no header, never folded (inline-html-2-fixes)", () => {
+    const items = [user("u1"), text("a"), end("e1"), item("html", { id: "h" }), item("html", { id: "h2" })];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "final:a", "html:h", "html:h2"]);
+    // Folding every turn leaves them open: they are in none.
+    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(["user:u1", "header(folded 0)", "final:a", "html:h", "html:h2"]);
+    // Before the thread's first message too.
+    expect(shape(buildRows(buildTurns([item("html", { id: "h" })]), open))).toEqual(["html:h"]);
+  });
+
+  it("shown between turns: the next message starts a turn of its own, not a steer", () => {
+    const items = [user("u1"), end("e1"), item("html", { id: "h" }), user("u2"), tool("Bash"), text("b"), end("e2")];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "html:h", "user:u2", "header(folded 1)", "final:b"]);
+  });
+
+  it("shown between turns while a new one starts: the live header follows the page", () => {
+    const items = [user("u1"), end("e1"), item("html", { id: "h" })];
+    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 0)", "html:h", "live(,0)"]);
+  });
 });

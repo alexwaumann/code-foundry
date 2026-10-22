@@ -11,6 +11,11 @@ export function resizeHeight(data: unknown): number | null {
   return m.height;
 }
 
+/** A page's answer to `cf:theme`, `{ type: "cf:theme:ack" }`: it applied the theme itself, so its frame need not reload. */
+export function isThemeAck(data: unknown): boolean {
+  return typeof data === "object" && data !== null && (data as { type?: unknown }).type === "cf:theme:ack";
+}
+
 /** A grant for one file: loading (no preview, no error yet), the grant, or why there is none. */
 export interface PreviewGrant {
   preview: FilePreview | null;

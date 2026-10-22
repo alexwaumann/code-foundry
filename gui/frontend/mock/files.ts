@@ -138,12 +138,52 @@ document.getElementById("wave").addEventListener("click", () => { n++; document.
 const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
 addEventListener("load", ask);
 new ResizeObserver(ask).observe(document.body);
-// Follows the app's theme live (cf:theme), not only the slots /cf/theme.css had at load.
+// Follows the app's theme live (cf:theme), not only the slots /cf/theme.css had at load,
+// and acks it so the frame keeps the page (and its count) instead of reloading it.
 addEventListener("message", (e) => {
   if (e.data?.type !== "cf:theme") return;
   document.documentElement.style.colorScheme = e.data.scheme;
   for (const [k, v] of Object.entries(e.data.vars)) document.documentElement.style.setProperty(k, v);
+  parent.postMessage({ type: "cf:theme:ack" }, "*");
 });
+</script>
+</body></html>
+`;
+
+/**
+ * A page that only links /cf/theme.css (no cf:theme listener): a theme switch reloads its
+ * frame so it repaints, and its count starts again (docs/notes/inline-html-2-fixes.md).
+ */
+export const PLAIN_PAGE_HTML = `<!doctype html>
+<html><head><title>Plain</title><link rel="stylesheet" href="/cf/theme.css">
+<style>body{margin:0;padding:16px 24px;background:var(--cf-surface-raised);color:var(--cf-text);font-family:system-ui,sans-serif}</style></head>
+<body><p id="plain">Stylesheet only</p><button id="tick" type="button">Tick</button>
+<script>
+let n = 0;
+document.getElementById("tick").addEventListener("click", () => { n++; document.getElementById("plain").textContent = "Ticked " + n; });
+addEventListener("load", () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*"));
+</script>
+</body></html>
+`;
+
+/**
+ * A page that hard-codes its colours in a prefers-color-scheme block, as a page written for
+ * a browser does: the frame's color-scheme makes it follow the app's scheme, not the
+ * system's (docs/notes/inline-html-2-fixes.md). #scheme says which one the page sees.
+ */
+export const SCHEME_PAGE_HTML = `<!doctype html>
+<html><head><title>Scheme</title>
+<style>
+body{margin:0;padding:16px 24px;background:#ffffff;color:#111111;font-family:system-ui,sans-serif}
+@media (prefers-color-scheme: dark){body{background:#101010;color:#eeeeee}}
+</style></head>
+<body><p id="scheme">?</p>
+<script>
+const m = matchMedia("(prefers-color-scheme: dark)");
+const show = () => { document.getElementById("scheme").textContent = m.matches ? "sees dark" : "sees light"; };
+show();
+m.addEventListener("change", show);
+addEventListener("load", () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*"));
 </script>
 </body></html>
 `;
@@ -167,6 +207,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/src/app.ts`, text(APP_TS, "text/typescript")],
     [`${CF}/docs/preview.html`, text(PREVIEW_HTML, "text/html")],
     [`${CF}/docs/hello.html`, text(INLINE_PAGE_HTML, "text/html")],
+    [`${CF}/docs/plain.html`, text(PLAIN_PAGE_HTML, "text/html")],
+    [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],
