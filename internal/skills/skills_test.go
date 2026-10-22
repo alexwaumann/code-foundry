@@ -210,7 +210,10 @@ func TestRender(t *testing.T) {
 	// (docs/notes/control-3-app-memory.md); its description names them so it fires.
 	helpSkill := string(files[skills.Help+"/SKILL.md"])
 	for _, want := range []string{"standing preference about the app or how you work in it", "\n## Remembering preferences\n",
-		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "never your own memory files",
+		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "not your own memory files",
+		// The scope rule (control-8-memory-scope): facts about the user, a project or its code
+		// are Claude's own memory; "what do you remember" answers from both.
+		"nor a fact about the user, a project or its\ncode", "facts go in your own memory files", "plus your own memory files, each\nlabelled",
 		// The memory verbs' own wording (control-6-memory-fixes).
 		"\"Remembered: …\". New threads follow it;\n   threads already open get it on their next message after a restart",
 		"remove the old entry first", "`code-foundry memory show`"} {

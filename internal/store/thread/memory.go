@@ -21,8 +21,9 @@ import (
 
 // MemoryHeading is the line before the app memory's entries in the system prompt.
 const MemoryHeading = "What you remember about the user's standing preferences for code-foundry " +
-	"(kept with `code-foundry memory show|add|remove`; the user asking what you remember, to remember something, " +
-	"or to forget something means this list, not your own memory files):"
+	"(kept with `code-foundry memory show|add|remove`; they hold in every project, so a new one goes here at once; " +
+	"a fact about the user, a project or a codebase belongs in your own memory files, not here; " +
+	"asked what you remember, give both lists and say which is which):"
 
 // MemoryRefreshHeading is the line before the entries a resumed conversation gets when
 // the memory changed since it started; MemoryRefreshNone replaces the block when the

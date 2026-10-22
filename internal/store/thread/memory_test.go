@@ -34,7 +34,8 @@ func TestSystemPromptMemory(t *testing.T) {
 			}
 		})
 	}
-	if !strings.Contains(MemoryHeading, "`code-foundry memory show|add|remove`") || !strings.Contains(MemoryHeading, "not your own memory files") ||
+	if !strings.Contains(MemoryHeading, "`code-foundry memory show|add|remove`") || !strings.Contains(MemoryHeading, "belongs in your own memory files") || !strings.Contains(MemoryHeading, "give both lists") ||
+		strings.Contains(MemoryHeading, "means this list") ||
 		strings.Contains(MemoryHeading, "before any other instruction") {
 		t.Errorf("MemoryHeading = %q", MemoryHeading)
 	}
