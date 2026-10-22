@@ -2,27 +2,36 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// Thread-scoped panel verbs (docs/notes/control-1-thread-scoped-views.md). The
-// view.panel.* verbs act on a side panel. From the GUI (palette, keybinding, header
-// button) they act on what each window has selected, as before. From the CLI inside a
-// thread (--context-thread defaults to $CODE_FOUNDRY_THREAD, and --thread to that) or
-// with --thread, the ShowView carries the thread's id, and windows apply it to that
-// thread's panel without changing their selection: the model in a thread can show the
-// user something in its own thread without taking over what the user looks at. --focus
-// selects the thread in every window first.
+// Thread-scoped panel verbs (docs/notes/control-1-thread-scoped-views.md,
+// control-5-fixes.md). The view.panel.* verbs act on a side panel. From the GUI
+// (palette, keybinding, header button) they act on what each window has selected, as
+// before. From the CLI inside a thread (--context-thread defaults to
+// $CODE_FOUNDRY_THREAD, and --thread to that) or with --thread, the ShowView carries the
+// thread's id, and windows apply it to that thread's panel without changing their
+// selection: the model in a thread can show the user something in its own thread
+// without taking over what the user looks at. --focus selects the thread in every
+// window first.
 
 // ThreadGetter reads one thread (ThreadService.Get). The thread-scoped panel verbs check
-// that the thread exists, and the workspace and worktree surfaces that it is placed
-// where they can show.
+// that the thread exists, and the surfaces that it has something to show.
 type ThreadGetter interface {
 	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+}
+
+// PanelThreads reads threads for the panel verbs: one (Get), and the threads one
+// created (List), which view.panel.threads needs to know the thread has lineage.
+type PanelThreads interface {
+	ThreadGetter
+	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
 }
 
 // panelThreadArgs are the --thread and --focus args of every verb that acts on a side
@@ -52,76 +61,141 @@ func panelThread(uctx Context, a Args) string {
 
 // cliThread is a CLI call that names a thread (--thread, --context-thread or
 // $CODE_FOUNDRY_THREAD). It cannot name the thread's workspace or worktree, which When
-// would need; Run reads them from the thread instead (panelPlace).
+// would need; Run reads them from the thread instead (panelCheck).
 func cliThread(c Context) bool { return c.ActiveView == "" && hasThread(c) }
 
-// panelPlace says why a thread cannot show a surface ("is in no workspace"), or "" when
-// it can. nil: any thread can.
-type panelPlace func(*v1.Thread) string
+// panelCheck checks that a thread can show a surface, and returns the ShowView's params
+// (what the surface shows; nil for a surface that follows the thread). A refusal is an
+// error: refuse for "the thread has nothing to show there". nil: any thread can.
+type panelCheck func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error)
 
-// inWorkspace is view.panel.workspace's panelPlace.
-func inWorkspace(t *v1.Thread) string {
-	if t.GetWorkspaceId() == "" {
-		return "is in no workspace"
-	}
-	return ""
+// refuse is a panel check's FailedPrecondition: "thread s-… <why>".
+func refuse(t *v1.Thread, why string) error {
+	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("thread %s %s", t.GetId(), why))
 }
 
-// inWorktree is view.panel.worktree's panelPlace.
-func inWorktree(t *v1.Thread) string {
-	if t.GetProjectId() == "" || t.GetWorktreePath() == "" {
-		return "runs in no project worktree"
+// placed is a panelCheck that refuses with why when ok says no.
+func placed(ok func(*v1.Thread) bool, why string) panelCheck {
+	return func(_ context.Context, t *v1.Thread, _ Args) (map[string]string, error) {
+		if !ok(t) {
+			return nil, refuse(t, why)
+		}
+		return nil, nil
 	}
-	return ""
+}
+
+// inWorkspace is view.panel.workspace's check.
+var inWorkspace = placed(func(t *v1.Thread) bool { return t.GetWorkspaceId() != "" }, "is in no workspace")
+
+// inWorktree is view.panel.worktree's check (view.panel.diff's starts with it).
+var inWorktree = placed(func(t *v1.Thread) bool { return t.GetProjectId() != "" && t.GetWorktreePath() != "" }, "runs in no project worktree")
+
+// withLinkedPRs is view.panel.linked-prs's check: the GUI lists the surface only for a
+// thread with links, and opening it for one without is a no-op there.
+var withLinkedPRs = placed(func(t *v1.Thread) bool { return len(t.GetLinkedPullRequests()) > 0 }, "has no linked pull requests yet")
+
+// withAgentRuns is view.panel.agents's check, like withLinkedPRs.
+var withAgentRuns = placed(func(t *v1.Thread) bool { return len(t.GetAgentRuns()) > 0 }, "has no subagent runs yet")
+
+// withLineage is view.panel.threads's check, like withLinkedPRs: a thread has lineage
+// when another thread created it (its siblings come with that) or it created one
+// (gui/frontend/src/lib/lineage.ts hasLineage).
+func withLineage(threads PanelThreads) panelCheck {
+	return func(ctx context.Context, t *v1.Thread, _ Args) (map[string]string, error) {
+		if t.GetCreatedBy() != "" {
+			return nil, nil
+		}
+		res, err := threads.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true, CreatedBy: t.GetId()}}))
+		if err != nil {
+			return nil, err
+		}
+		if slices.ContainsFunc(res.Msg.GetThreads(), func(c *v1.Thread) bool { return c.GetCreatedBy() == t.GetId() && c.GetId() != t.GetId() }) {
+			return nil, nil
+		}
+		return nil, refuse(t, "has no related threads: no thread created it and it created none")
+	}
 }
 
 // PanelResult is the JSON result of a thread-scoped panel verb; an unscoped one answers
 // EmitResult like every ui.* command.
 type PanelResult struct {
-	Delivered int    `json:"delivered"`
+	// Windows and Receivers are EmitResult's: the app windows connected (0: nothing was
+	// shown) and every stream that received the intent.
+	Windows   int    `json:"windows"`
+	Receivers int    `json:"receivers"`
 	Thread    string `json:"thread"`
-	// Focused: --focus selected the thread in every window first.
+	// Focused: --focus selected the thread in the windows (only with a window open).
 	Focused bool `json:"focused,omitempty"`
 }
 
-// showViewIntent is a ShowView of name, scoped to thread when it is not "".
-func showViewIntent(name, thread string) *v1.UiIntent {
-	return &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name, ThreadId: thread}}}
+// showViewIntent is a ShowView of name, scoped to thread when it is not "", with params.
+func showViewIntent(name, thread string, params map[string]string) *v1.UiIntent {
+	return &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name, ThreadId: thread, Params: params}}}
 }
 
-// showPanel runs a panel verb: ShowView name, scoped to panelThread. A scoped call reads
-// the thread through t first (an unknown thread fails; place, when set, may refuse it)
-// and, with --focus, emits FocusThread for it before the ShowView. --focus on the CLI
-// without a thread is an error. An unscoped call answers like before: no message (the GUI toasts
-// non-empty ones; the view change is feedback enough), delivery in the JSON. A scoped
-// one from the CLI also says which thread's panel it went to.
-func showPanel(ctx context.Context, t ThreadGetter, e Emitter, uctx Context, a Args, name string, place panelPlace) (Result, error) {
+// showPanel runs a panel verb: ShowView name, scoped to panelThread. An unscoped call
+// answers EmitResult, with its message only from the CLI (the GUI toasts non-empty
+// ones; the view change is feedback enough). --focus on the CLI without a thread is an
+// error; in the app the selection is the target already, so it is ignored there.
+func showPanel(ctx context.Context, t ThreadGetter, e Emitter, uctx Context, a Args, name string, check panelCheck) (Result, error) {
 	id := panelThread(uctx, a)
 	if id == "" {
-		// In the app the selection is the target already: --focus has nothing to add.
 		if a.Bool("focus") && uctx.ActiveView == "" {
 			return Result{}, InvalidArg("focus", "needs a thread to select (--thread, or run it inside a thread)")
 		}
-		return Result{JSON: EmitResult{Delivered: e.Emit(showViewIntent(name, ""))}}, nil
+		return EmitTo(e, showViewIntent(name, "", nil)).CLIResult(uctx), nil
 	}
+	return showScoped(ctx, t, e, uctx, a, id, name, check)
+}
+
+// showScoped runs a panel verb scoped to thread id: it reads the thread through t (an
+// unknown thread fails; check, when set, may refuse it and gives the params) and, with
+// --focus, emits an explicit FocusThread for it before the ShowView. From the CLI it
+// says which thread's panel it went to, or that no window is open.
+func showScoped(ctx context.Context, t ThreadGetter, e Emitter, uctx Context, a Args, id, name string, check panelCheck) (Result, error) {
+	var params map[string]string
 	if t != nil {
 		res, err := t.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
 		if err != nil {
 			return Result{}, err
 		}
-		if place != nil {
-			if why := place(res.Msg.GetThread()); why != "" {
-				return Result{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("thread %s %s", id, why))
+		th := res.Msg.GetThread()
+		if th == nil {
+			th = &v1.Thread{Id: id}
+		}
+		if check != nil {
+			if params, err = check(ctx, th, a); err != nil {
+				return Result{}, err
 			}
 		}
 	}
-	if a.Bool("focus") {
-		e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}})
+	focus := a.Bool("focus")
+	if focus {
+		// Explicit: the user asked, so the window selects even a hidden thread just
+		// created (which a FocusThread from thread.new leaves alone).
+		e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id, Explicit: true}}})
 	}
-	n := e.Emit(showViewIntent(name, id))
-	res := Result{JSON: PanelResult{Delivered: n, Thread: id, Focused: a.Bool("focus")}}
+	sent := EmitTo(e, showViewIntent(name, id, params))
+	out := PanelResult{Windows: sent.Windows, Receivers: sent.Receivers, Thread: id, Focused: focus && sent.Windows > 0}
+	res := Result{JSON: out}
 	if uctx.ActiveView == "" {
-		res.Message = fmt.Sprintf("delivered=%d thread=%s", n, id)
+		res.Message = out.message()
 	}
 	return res, nil
 }
+
+// message is a scoped panel verb's text: "windows=1 thread=s-…" (plus "focused"), or
+// NoWindowMessage.
+func (r PanelResult) message() string {
+	if r.Windows == 0 {
+		return NoWindowMessage
+	}
+	msg := fmt.Sprintf("windows=%d thread=%s", r.Windows, r.Thread)
+	if r.Focused {
+		msg += " focused"
+	}
+	return msg
+}
+
+// errNotViewed is a page verb's refusal from a thread no window shows.
+var errNotViewed = errors.New("the user is looking at something else; pass --focus to take them there anyway")

@@ -3,9 +3,13 @@ package command_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
+	"connectrpc.com/connect"
+
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/presence"
 )
 
@@ -46,7 +50,13 @@ func TestUIPresence(t *testing.T) {
 		{
 			name: "minimized", deps: deps(presence.State{Kind: presence.Background}, 1), ctx: command.Context{ActiveThreadID: other},
 			wantJSON: `{"state":"background","attended":false,"windows":1,"thread":"s-bbbbbbbbbbb2","viewed":false}`,
-			wantText: "presence: background (the app's windows are hidden or minimized)\nwindows: 1\nthread s-bbbbbbbbbbb2: not viewed (no window shows it)",
+			wantText: "presence: background (the app's windows are hidden, minimized or covered)\nwindows: 1\nthread s-bbbbbbbbbbb2: not viewed (no window shows it)",
+		},
+		{
+			name: "viewed in a covered window", deps: deps(presence.State{Kind: presence.Background}, 1), ctx: command.Context{ActiveThreadID: self},
+			wantJSON: `{"state":"background","attended":false,"windows":1,"thread":"s-aaaaaaaaaaa1","viewed":true}`,
+			wantText: "presence: background (the app's windows are hidden, minimized or covered)\nwindows: 1\n" +
+				"thread s-aaaaaaaaaaa1: viewed (a window has it open; the window is hidden or covered)",
 		},
 		{
 			name: "no GUI, outside a thread", deps: deps(presence.State{}, 0),
@@ -78,6 +88,29 @@ func TestUIPresence(t *testing.T) {
 			}
 			if res.Message != tt.wantText {
 				t.Errorf("text\n got %q\nwant %q", res.Message, tt.wantText)
+			}
+		})
+	}
+}
+
+// ui.presence checks the thread it reports on, like the panel verbs: an unknown one
+// fails instead of reading as "not viewed".
+func TestUIPresenceUnknownThread(t *testing.T) {
+	for name, tt := range map[string]struct {
+		thread *commandtest.Thread
+		code   connect.Code
+	}{
+		"unknown": {thread: &commandtest.Thread{Err: connect.NewError(connect.CodeNotFound, errors.New("thread not found"))}, code: connect.CodeNotFound},
+		"known":   {thread: &commandtest.Thread{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reg := command.NewRegistry()
+			if err := command.RegisterPresence(reg, command.PresenceDeps{Thread: tt.thread}); err != nil {
+				t.Fatal(err)
+			}
+			_, err := reg.Invoke(context.Background(), command.Context{}, "ui.presence", map[string]string{"thread": "s-000000000000"})
+			if connect.CodeOf(err) != tt.code && !(tt.code == 0 && err == nil) {
+				t.Errorf("err = %v, want code %v", err, tt.code)
 			}
 		})
 	}

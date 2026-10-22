@@ -25,7 +25,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"thread.agent.open", "thread.agents", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
-		"usage.show", "view.open.url",
+		"usage.show", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",
 		"workspace.list", "workspace.members",
 	}
 	var got []string

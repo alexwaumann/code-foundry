@@ -85,7 +85,7 @@ func TestThreadAgentOpen(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res.Message != "" || res.JSON != (command.EmitResult{Delivered: 1}) {
+			if res.Message != "windows=1" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
 				t.Errorf("result = %+v", res)
 			}
 			got := emit.Intents()
@@ -111,7 +111,7 @@ func TestThreadAgentUpEmits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Message != "" || res.JSON != (command.EmitResult{Delivered: 1}) {
+	if res.Message != "" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
 		t.Errorf("result = %+v", res)
 	}
 	if got := emit.Intents(); len(got) != 1 || got[0].GetShowView().GetName() != command.ViewAgentUp {

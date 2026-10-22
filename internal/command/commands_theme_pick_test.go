@@ -25,7 +25,7 @@ func TestThemePickShowsThemesPage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := command.NewRegistry()
-			emit := &commandtest.Emitter{Delivered: 2}
+			emit := &commandtest.Emitter{Delivered: 2, OpenWindows: 2}
 			if err := command.RegisterThemePick(reg, emit); err != nil {
 				t.Fatal(err)
 			}
@@ -42,11 +42,11 @@ func TestThemePickShowsThemesPage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res.Message != "" {
-				t.Errorf("message = %q, want none (the page is the feedback)", res.Message)
+			if res.Message != "windows=2" {
+				t.Errorf("message = %q, want windows=2 (from the CLI)", res.Message)
 			}
-			if got, ok := res.JSON.(command.EmitResult); !ok || got.Delivered != 2 {
-				t.Errorf("json = %#v, want EmitResult{Delivered: 2}", res.JSON)
+			if got, ok := res.JSON.(command.EmitResult); !ok || got != (command.EmitResult{Windows: 2, Receivers: 2}) {
+				t.Errorf("json = %#v, want 2 windows and receivers", res.JSON)
 			}
 			intents := emit.Intents()
 			if len(intents) != 1 || intents[0].GetShowView().GetName() != tt.view {

@@ -90,7 +90,7 @@ func count(n int) *int { return &n }
 // capGroups are daemon.capabilities' groups, in index order. A group is an entry here.
 var capGroups = []capGroup{
 	{"build", "this build's version, commit and source", capBuild},
-	{"commands", "commands: every button, menu item and CLI verb is one", capCommands},
+	{"commands", "commands: the CLI verbs, which most buttons and menu items run too", capCommands},
 	{"pages", "main-pane pages and the verb that shows each", capPages},
 	{"panel", "side panel surfaces and the verb that opens each in a thread", capPanel},
 	{"rendering", "what the thread view renders: markdown, code, paths, images, PDFs, HTML", capRendering},
@@ -244,6 +244,7 @@ func capCommands(_ context.Context, env capEnv) (capDetail, error) {
 	how := "`code-foundry commands` lists them with whether each is available here; `code-foundry help <command>` prints one's flags."
 	var b strings.Builder
 	fmt.Fprintf(&b, "commands: %d in %d categories. %s\n", js.Count, len(js.Categories), how)
+	b.WriteString("Most buttons and menu items run one of these; some have none (Copy, Cite, clicking a path chip, the controls inside the Diff and Pull request tabs).\n")
 	// One wrapped paragraph per category, so 180 commands fit in about a screen.
 	for _, cat := range js.Categories {
 		items := make([]string, len(cat.Commands))
@@ -252,7 +253,7 @@ func capCommands(_ context.Context, env capEnv) (capDetail, error) {
 		}
 		writeWrapped(&b, fmt.Sprintf("%s (%d): ", cat.Name, cat.Count), items, capWidth)
 	}
-	sum := fmt.Sprintf("commands in %d categories; every button, menu item and CLI verb is one", len(js.Categories))
+	sum := fmt.Sprintf("commands in %d categories: the CLI verbs, which most buttons and menu items run too", len(js.Categories))
 	return capDetail{Count: count(js.Count), Summary: sum, Text: strings.TrimSuffix(b.String(), "\n"), JSON: js}, nil
 }
 
@@ -312,10 +313,13 @@ type CapabilityViews struct {
 func capPages(_ context.Context, env capEnv) (capDetail, error) {
 	pages := pageCommands(env.r)
 	var b strings.Builder
-	fmt.Fprintf(&b, "pages: %d. Each verb shows its page in every app window, moving what the user sees: run one only when asked.\n", len(pages))
+	fmt.Fprintf(&b, "pages: %d. Each verb shows its page in every app window, moving every window away from what the user sees: "+
+		"run one only when asked. From a thread no window shows, a page verb refuses unless --focus (the user asked to be taken there).\n", len(pages))
 	for _, p := range pages {
 		fmt.Fprintf(&b, "  %-20s %s\n", p.Command, p.Description)
 	}
+	b.WriteString("Pages with no view verb, which the user reaches from the sidebar: Ember (the flame above New thread) " +
+		"and Themes (theme.pick opens it; also Settings, Appearance).\n")
 	b.WriteString("Back and forward through what a window showed: view.back, view.forward.")
 	return capDetail{Count: count(len(pages)), Text: b.String(), JSON: CapabilityViews{Pages: pages}}, nil
 }
@@ -323,6 +327,32 @@ func capPages(_ context.Context, env capEnv) (capDetail, error) {
 // panelActions are the view.panel.* verbs that change the panel rather than open a
 // surface in it.
 var panelActions = []string{ViewPanelToggle, ViewPanelExpand, ViewPanelNewTab, ViewPanelSplit}
+
+// panelItems is how the item verbs (commands_view_items.go) and replies open one file or
+// pull request.
+const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, --scope) and view.panel.pr (--number) open one item " +
+	"and refuse one that does not exist or has nothing to show. A file path written in a reply (prose or inline code) also renders as " +
+	"a chip the user clicks to open it in the File tab; .html files render there interactively (scripts on)."
+
+// surfaceWhat is what a surface verb's description says the surface shows: what follows
+// its lead ("Open the X surface in a thread's side panel (from a thread: …): "), the
+// first ": " outside parentheses; the whole description without one.
+func surfaceWhat(desc string) string {
+	depth := 0
+	for i := 0; i+1 < len(desc); i++ {
+		switch desc[i] {
+		case '(':
+			depth++
+		case ')':
+			depth = max(depth-1, 0)
+		case ':':
+			if depth == 0 && desc[i+1] == ' ' {
+				return desc[i+2:]
+			}
+		}
+	}
+	return desc
+}
 
 // presenceRule is what a thread checks before it opens something in its own side panel
 // (the help skill's "Showing things in the app").
@@ -334,11 +364,13 @@ type CapabilityPanel struct {
 	Surfaces       []CapabilityView `json:"surfaces"`
 	PluginSurfaces []CapabilityView `json:"plugin_surfaces"`
 	Actions        []string         `json:"actions"`
-	Rule           string           `json:"rule"`
+	// Items is how one file, diff or pull request opens (panelItems).
+	Items string `json:"items"`
+	Rule  string `json:"rule"`
 }
 
 func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
-	js := CapabilityPanel{Surfaces: []CapabilityView{}, PluginSurfaces: []CapabilityView{}, Rule: presenceRule}
+	js := CapabilityPanel{Surfaces: []CapabilityView{}, PluginSurfaces: []CapabilityView{}, Items: panelItems, Rule: presenceRule}
 	for _, c := range env.r.List(Context{}, true) {
 		name, ok := strings.CutPrefix(c.Name, "view.panel.")
 		switch {
@@ -346,12 +378,7 @@ func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 		case slices.Contains(panelActions, "panel."+name):
 			js.Actions = append(js.Actions, c.Name)
 		default:
-			// "Open the X surface in the selected thread's side panel: what it shows."
-			_, what, found := strings.Cut(c.Description, ": ")
-			if !found {
-				what = c.Description
-			}
-			js.Surfaces = append(js.Surfaces, CapabilityView{Name: name, Command: c.Name, Description: what})
+			js.Surfaces = append(js.Surfaces, CapabilityView{Name: name, Command: c.Name, Description: surfaceWhat(c.Description)})
 		}
 	}
 	plugins, err := listPlugins(ctx, env.d.Plugins)
@@ -370,6 +397,7 @@ func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 	for _, s := range js.Surfaces {
 		fmt.Fprintf(&b, "  %-24s %s\n", s.Command, s.Description)
 	}
+	b.WriteString(panelItems + "\n")
 	if len(js.PluginSurfaces) > 0 {
 		b.WriteString("Plugin surfaces (their show verb acts on each window's selection, not a thread):\n")
 		for _, s := range js.PluginSurfaces {
@@ -463,9 +491,15 @@ func capSkills(_ context.Context, env capEnv) (capDetail, error) {
 	if js.InstalledError != "" {
 		fmt.Fprintf(&b, "Installed plugins could not be listed: %s\n", js.InstalledError)
 	}
+	b.WriteString(skillsNotAll + "\n")
 	sum := fmt.Sprintf("skills every thread gets, %d more installed for Claude Code", len(js.Installed))
 	return capDetail{Count: count(len(js.Shipped)), Summary: sum, Text: strings.TrimSuffix(b.String(), "\n"), JSON: js}, nil
 }
+
+// skillsNotAll says what --group skills leaves out: it lists what Code Foundry ships and
+// what the skill store knows, not what Claude Code loads for the thread.
+const skillsNotAll = "This is not the thread's full skill list: the project's own skills (.claude/skills in its checkout) " +
+	"and Claude Code's built-in ones are not here; the Skill tool lists what this thread has."
 
 // firstClause is s up to its first ": " or ". ", for a one-line purpose.
 func firstClause(s string) string {

@@ -28,7 +28,7 @@ export const PATH = "/Users/dev/.code-foundry/settings.toml";
 export const groups: GroupInit[] = [
   { id: "threads", title: "Threads", description: "Defaults for new threads." },
   { id: "github", title: "GitHub", description: "Pull requests and checks, read with your gh login." },
-  { id: "projects", title: "Projects", description: "Git fetching." },
+  { id: "projects", title: "Projects", description: "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app." },

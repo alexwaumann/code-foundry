@@ -29,7 +29,7 @@ func newFixture(t *testing.T) fixture {
 	t.Helper()
 	f := fixture{
 		reg:     command.NewRegistry(),
-		emit:    &commandtest.Emitter{Delivered: 2},
+		emit:    &commandtest.Emitter{Delivered: 3, OpenWindows: 2},
 		term:    &commandtest.Terminal{Terminals: []*v1.Terminal{{Id: "t9"}}},
 		project: &commandtest.Project{},
 	}
@@ -74,6 +74,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"view.settings", "view.help", "notifications.test", "theme.list", "theme.set-dark", "theme.set-light", "theme.pick",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.back", "view.forward", "thread.previous", "thread.next", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.threads", "view.panel.worktree",
+		"view.panel.file", "view.panel.diff", "view.panel.pr",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-project", "workspace.remove-project", "workspace.remove",
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.stop", "action.runs",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
@@ -183,14 +184,14 @@ func TestBuiltinCommands(t *testing.T) {
 		{name: "daemon.version", cmd: "daemon.version",
 			wantMsg: "code-foundry 1.2.3 (abc) go1.26", wantJSON: `"go_version":"go1.26","source_url":"https://github.com/alexwaumann/code-foundry"}`},
 		{name: "ui.notify", cmd: "ui.notify", args: map[string]string{"title": "hi", "body": "there", "level": "warning"},
-			wantMsg: "delivered=2", wantJSON: `{"delivered":2}`,
+			wantMsg: "windows=2", wantJSON: `{"windows":2,"receivers":3}`,
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 				Level: v1.UiIntent_Notify_LEVEL_WARNING, Title: "hi", Body: "there"}}}},
-		{name: "ui.notify default level", cmd: "ui.notify", args: map[string]string{"title": "hi"}, wantMsg: "delivered=2",
+		{name: "ui.notify default level", cmd: "ui.notify", args: map[string]string{"title": "hi"}, wantMsg: "windows=2",
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 				Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "hi"}}}},
 		{name: "ui.notify missing title", cmd: "ui.notify", wantErr: command.ErrInvalidArgs},
-		{name: "ui.palette.open", cmd: "ui.palette.open", args: map[string]string{"query": "term"}, wantMsg: "delivered=2",
+		{name: "ui.palette.open", cmd: "ui.palette.open", args: map[string]string{"query": "term"}, wantMsg: "windows=2",
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "term"}}}},
 		{name: "ui.focus.terminal from context", cmd: "ui.focus.terminal", ctx: command.Context{ActiveTerminalID: "t9"},
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{FocusTerminal: &v1.UiIntent_FocusTerminal{TerminalId: "t9"}}}},
@@ -296,6 +297,13 @@ func TestBusEmitter(t *testing.T) {
 	if got := <-sub.C(); got.Intent != intent {
 		t.Fatal("watcher got a different intent")
 	}
+	// A bus subscription is no window: windows come from CountWindows (none without it).
+	if n := e.Windows(); n != 0 {
+		t.Errorf("windows = %d without CountWindows, want 0", n)
+	}
+	if n := (command.BusEmitter{Bus: b, CountWindows: func() int { return 3 }}).Windows(); n != 3 {
+		t.Errorf("windows = %d, want 3", n)
+	}
 }
 
 func TestEncodeJSON(t *testing.T) {
@@ -305,7 +313,7 @@ func TestEncodeJSON(t *testing.T) {
 		want string
 	}{
 		{"nil", nil, ""},
-		{"struct", command.EmitResult{Delivered: 1}, `{"delivered":1}`},
+		{"struct", command.EmitResult{Windows: 1, Receivers: 2}, `{"windows":1,"receivers":2}`},
 		{"proto uses protojson names", &v1.Terminal{Id: "t1", ExitCode: 3}, `{"id":"t1","exitCode":3}`},
 	}
 	for _, tt := range tests {

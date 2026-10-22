@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -24,6 +25,7 @@ func TestUsageShow(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
+		ctx      command.Context
 		args     map[string]string
 		heading  string
 		requests int64
@@ -35,10 +37,14 @@ func TestUsageShow(t *testing.T) {
 			requests: 2, cost: 3, threads: 1},
 		{name: "every thread plus removed ones", heading: "All threads (2 + removed): 5 requests",
 			requests: 5, cost: 7, threads: 2, retired: true},
+		{name: "inside a thread: that thread", ctx: command.Context{ActiveThreadID: "s-1"}, heading: "Thread s-1 (demo): 2 requests",
+			requests: 2, cost: 3, threads: 1},
+		{name: "inside a thread with --all", ctx: command.Context{ActiveThreadID: "s-1"}, args: map[string]string{"all": "true"},
+			heading: "All threads (2 + removed): 5 requests", requests: 5, cost: 7, threads: 2, retired: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := reg.Invoke(context.Background(), command.Context{}, "usage.show", tt.args)
+			res, err := reg.Invoke(context.Background(), tt.ctx, "usage.show", tt.args)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -53,5 +59,10 @@ func TestUsageShow(t *testing.T) {
 	}
 	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "thread"}, "usage.show", nil); err == nil {
 		t.Error("usage.show ran from the GUI; it is the CLI's (the palette has view.usage)")
+	}
+	_, err := reg.Invoke(context.Background(), command.Context{}, "usage.show", map[string]string{"all": "true", "thread": "s-1"})
+	var argErr *command.ArgError
+	if !errors.As(err, &argErr) || argErr.Arg != "all" {
+		t.Errorf("--all with --thread: err = %v, want an ArgError for all", err)
 	}
 }

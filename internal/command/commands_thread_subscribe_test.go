@@ -193,7 +193,7 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			if err := command.RegisterThread(reg, b); err != nil {
 				t.Fatal(err)
 			}
-			if err := command.RegisterThreadLifecycle(reg, b, &commandtest.Emitter{Delivered: 1}); err != nil {
+			if err := command.RegisterThreadLifecycle(reg, b, &commandtest.Emitter{Delivered: 1, OpenWindows: 1}); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)

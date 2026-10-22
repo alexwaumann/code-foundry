@@ -28,8 +28,11 @@ func newSettingsRegistry(t *testing.T) (*command.Registry, *commandtest.Emitter,
 	t.Cleanup(func() { _ = store.Close() })
 	var revealed []string
 	reg := command.NewRegistry()
-	e := &commandtest.Emitter{Delivered: 1}
-	if err := command.RegisterSettings(reg, api.NewSettings(store), e, func(_ context.Context, p string) error {
+	e := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
+	if err := command.RegisterView(reg, command.ViewDeps{Emitter: e}); err != nil {
+		t.Fatal(err)
+	}
+	if err := command.RegisterSettings(reg, api.NewSettings(store), func(_ context.Context, p string) error {
 		revealed = append(revealed, p)
 		return nil
 	}); err != nil {
@@ -158,7 +161,7 @@ func TestSettingsWarnings(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = store.Close() })
 			reg := command.NewRegistry()
-			if err := command.RegisterSettings(reg, api.NewSettings(store), &commandtest.Emitter{}, nil); err != nil {
+			if err := command.RegisterSettings(reg, api.NewSettings(store), nil); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), command.Context{}, tt.cmd, tt.args)

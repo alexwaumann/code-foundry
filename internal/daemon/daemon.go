@@ -177,6 +177,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
+	grants := preview.NewGrants(preview.NewFloor(st.home, p))
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's
@@ -186,7 +188,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
 		DB: st.db, Commands: settingsCommandHost{Registry: commands, settings: st.settings}, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
-		Facts: facts, Emitter: command.BusEmitter{Bus: events},
+		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows},
 		Flags: pluginFlags{threads: st.thread},
 		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
 		Wakes:   pluginWakeSink{threads: st.thread},
@@ -213,7 +215,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
 		},
-		Emitter: command.BusEmitter{Bus: events},
+		Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows},
 		// The same presence the thread store's Options.Attended reads (openStores).
 		Presence: command.PresenceDeps{Presence: pres.Current, Windows: clients.Windows, Viewed: st.thread.Viewed},
 		Terminal: terminalAPI,
@@ -249,6 +251,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveProjectID, c.ActiveWorktreePath) },
 		},
 		Gh:                ghAPI,
+		Files:             filesystemAPI,
+		FileDiffs:         projectAPI,
 		Settings:          settingsAPI,
 		Update:            updateAPI,
 		Workspace:         workspaceAPI,
@@ -282,7 +286,6 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
-	grants := preview.NewGrants(preview.NewFloor(st.home, p))
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),
@@ -299,7 +302,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		pluginAPI.Route(),
 		api.NewSkill(st.skills, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
-		api.NewFilesystem(st.home, st.project, grants).Route(),
+		filesystemAPI.Route(),
 		eventsAPI.Route(),
 	}
 	mux := http.NewServeMux()

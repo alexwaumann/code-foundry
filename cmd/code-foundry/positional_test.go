@@ -96,6 +96,8 @@ func TestAssignPositionalsHint(t *testing.T) {
 	by := &v1.ArgSpec{Name: "by", Type: str, Id: true, DefaultToThreadEnv: true}
 	text := &v1.ArgSpec{Name: "text", Type: str, Positional: true}
 	run := &v1.ArgSpec{Name: "run", Type: str, Id: true}
+	group := &v1.ArgSpec{Name: "group", Type: v1.ArgType_ARG_TYPE_ENUM, EnumValues: []string{"build", "pages"}}
+	kind := &v1.ArgSpec{Name: "kind", Type: v1.ArgType_ARG_TYPE_ENUM, EnumValues: []string{"pages", "panel"}}
 	tests := []struct {
 		name       string
 		specs      []*v1.ArgSpec
@@ -110,6 +112,12 @@ func TestAssignPositionalsHint(t *testing.T) {
 			wantStderr: "code-foundry x: unexpected arguments [8f3a]\n"},
 		{name: "no id flag", specs: []*v1.ArgSpec{text}, words: []string{"a", "b"},
 			wantStderr: "code-foundry x: unexpected arguments [b]\n"},
+		{name: "a value of one enum flag", specs: []*v1.ArgSpec{group, id}, words: []string{"pages"},
+			wantStderr: "code-foundry x: unexpected arguments [pages] (did you mean --group pages?)\n"},
+		{name: "a value of two enum flags: no guess", specs: []*v1.ArgSpec{group, kind}, words: []string{"pages"},
+			wantStderr: "code-foundry x: unexpected arguments [pages]\n"},
+		{name: "no enum value: the id hint", specs: []*v1.ArgSpec{group, id}, words: []string{"8f3a"},
+			wantStderr: "code-foundry x: unexpected arguments [8f3a] (did you mean --id 8f3a?)\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

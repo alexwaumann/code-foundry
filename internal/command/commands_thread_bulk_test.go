@@ -20,7 +20,7 @@ func newBulkRegistry(t *testing.T, threads ...*v1.Thread) (*command.Registry, *c
 	t.Helper()
 	reg := command.NewRegistry()
 	b := &commandtest.Thread{Others: threads}
-	if err := command.RegisterThreadLifecycle(reg, b, &commandtest.Emitter{Delivered: 1}); err != nil {
+	if err := command.RegisterThreadLifecycle(reg, b, &commandtest.Emitter{Delivered: 1, OpenWindows: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := command.RegisterThread(reg, b); err != nil {

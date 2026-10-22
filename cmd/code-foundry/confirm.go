@@ -258,10 +258,33 @@ func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []str
 		}
 	}
 	if len(words) > 0 {
-		fmt.Fprintf(cl.stderr, "%s: unexpected arguments %v%s\n", fs.Name(), words, idFlagHint(flags, took, words))
+		hint := enumFlagHint(flags, words)
+		if hint == "" {
+			hint = idFlagHint(flags, took, words)
+		}
+		fmt.Fprintf(cl.stderr, "%s: unexpected arguments %v%s\n", fs.Name(), words, hint)
 		return errUsage
 	}
 	return nil
+}
+
+// enumFlagHint names the flag a stray word was meant for when it is a value of exactly
+// one unset enum flag: `daemon.capabilities pages` says " (did you mean --group pages?)".
+func enumFlagHint(flags []*argFlag, rest []string) string {
+	var hit *argFlag
+	for _, f := range flags {
+		if f.set || f.spec.GetType() != v1.ArgType_ARG_TYPE_ENUM || !slices.Contains(f.spec.GetEnumValues(), rest[0]) {
+			continue
+		}
+		if hit != nil {
+			return ""
+		}
+		hit = f
+	}
+	if hit == nil {
+		return ""
+	}
+	return fmt.Sprintf(" (did you mean --%s %s?)", hit.spec.GetName(), rest[0])
 }
 
 // idFlagHint guesses which flag stray words were meant for when exactly one id flag is

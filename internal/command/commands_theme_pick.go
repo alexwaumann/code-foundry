@@ -25,14 +25,14 @@ func RegisterThemePick(r *Registry, e Emitter) error {
 			Description: "The slot to edit first (default: the one in use)"}},
 		// No default chord; bindable in settings. The GUI presents it locally
 		// (gui/frontend/src/keys/bindings.ts), so only that window opens the page.
-		Run: func(_ context.Context, _ Context, a Args) (Result, error) {
+		Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
 			name := ViewThemes
 			if s := a.String("slot"); s != "" {
 				name += "." + s
 			}
-			n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
-			// No Message, like the view commands: the page opening is the feedback.
-			return Result{JSON: EmitResult{Delivered: n}}, nil
+			// Like the view commands: in the app the page opening is the feedback; the
+			// CLI says how many windows it went to.
+			return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}}).CLIResult(uctx), nil
 		},
 	})
 }

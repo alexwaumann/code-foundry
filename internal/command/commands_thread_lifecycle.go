@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -220,8 +219,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
 					return Result{}, err
 				}
-				n := focus(a.String("id"))
-				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
+				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id")}}}).Result(), nil
 			},
 		},
 		Command{
