@@ -37,6 +37,7 @@ var placeholder = regexp.MustCompile(`\{\{cf\.([A-Za-z]+)\}\}`)
 func placeholders(src Sources) map[string]string {
 	return map[string]string{
 		"version":       src.Version,
+		"provenance":    src.Provenance(),
 		"sdkPin":        SDKPin(src.Commit, src.SDKTag),
 		"example":       exampleDir(src.SkillsDir),
 		"facts":         codeList(src.Facts),
@@ -218,7 +219,7 @@ func isPluginVerb(name string) bool {
 
 // pluginCLIReference renders the plugin verbs' and helpers' help texts.
 func pluginCLIReference(w io.Writer, src Sources) {
-	header(w, "The code-foundry CLI for plugin development", "commands", src.Version)
+	header(w, "The code-foundry CLI for plugin development", "commands", src)
 	fmt.Fprint(w, `
 Every command below is the text `+"`code-foundry help <command>`"+` prints. Run one by its dotted name or
 with spaces (`+"`code-foundry plugin.dev ...` = `code-foundry plugin dev ...`"+`); `+"`<arg>`"+` is positional and
@@ -286,7 +287,7 @@ string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 
 // hostCommandsReference renders every command a plugin may ask the host to run.
 func hostCommandsReference(w io.Writer, src Sources) {
-	header(w, "Commands a plugin may run (host/invoke, command buttons)", "commands", src.Version)
+	header(w, "Commands a plugin may run (host/invoke, command buttons)", "commands", src)
 	fmt.Fprint(w, `
 A plugin runs these with `+"`Host.Invoke`"+` (or a view's command button) when its manifest's
 `+"`permissions.commands`"+` globs match the name: `+"`*`"+` matches within one dotted segment, `+"`**`"+` across

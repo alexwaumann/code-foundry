@@ -5,6 +5,8 @@ description: "Build, debug and publish a Code Foundry plugin: a Go executable us
 
 # Building a Code Foundry plugin
 
+{{cf.provenance}}
+
 A plugin is an executable the Code Foundry daemon starts and talks to over its stdin and
 stdout (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything up front:
 **commands** (`code-foundry plugin <name> <command>`, also in the app's command palette),

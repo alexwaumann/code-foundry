@@ -32,7 +32,9 @@ var pluginSkillFiles = []string{
 }
 
 // maxPluginFile bounds every file of the plugin skill: an agent reads a reference whole
-// (the Read tool's default window is 2,000 lines, and long files cost context).
+// (the Read tool's default window is 2,000 lines, and long files cost context). The
+// provenance line under each title (control-2-skill-provenance) is not counted: it is
+// the same in every file and its length depends on the build.
 const maxPluginFile = 32 << 10
 
 func TestRenderPluginSkill(t *testing.T) {
@@ -45,11 +47,12 @@ func TestRenderPluginSkill(t *testing.T) {
 	}
 	for _, p := range pluginSkillFiles {
 		b := files[p]
+		size := len(b) - bytes.Count(b, []byte(src.Provenance()+"\n\n"))*len(src.Provenance()+"\n\n")
 		switch {
 		case len(b) == 0:
 			t.Errorf("%s is missing or empty", p)
-		case len(b) > maxPluginFile:
-			t.Errorf("%s has %d bytes; keep it under %d", p, len(b), maxPluginFile)
+		case size > maxPluginFile:
+			t.Errorf("%s has %d bytes without the provenance line; keep it under %d", p, size, maxPluginFile)
 		case bytes.Contains(b, []byte("{{cf.")):
 			t.Errorf("%s has an unfilled placeholder", p)
 		}
@@ -115,7 +118,7 @@ func TestRenderPluginSkill(t *testing.T) {
 	for _, want := range []string{
 		"### plugin.dev\n\n```\nplugin.dev - Develop Plugin\n", "code-foundry plugin dev <path> [flags]",
 		"### plugin.act\n", "  --values string", "### plugin.secrets.delete\n", "### thread.flags\n", "### pr.checks\n",
-		"(v9.9.9)", "code-foundry events --json --source",
+		"Rendered by Code Foundry v9.9.9 (commit ", "code-foundry events --json --source",
 	} {
 		if !strings.Contains(cli, want) {
 			t.Errorf("cli.md lacks %q", want)

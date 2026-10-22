@@ -35,11 +35,12 @@ func emberConfig(s settings.Settings) ember.Config {
 // installEmberSkill writes Ember's skill under dir (dir/.claude/skills), like the
 // skills every thread gets.
 func installEmberSkill(dir string) error {
-	files, err := skills.EmberFiles()
+	v := version.Get()
+	files, err := skills.EmberFiles(skills.Sources{Version: v.Version, Commit: v.Commit})
 	if err != nil {
 		return err
 	}
-	return skills.Install(dir, version.Version, files)
+	return skills.Install(dir, v.Version, files)
 }
 
 // openEmber opens the Ember store and keeps it on the settings.

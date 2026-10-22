@@ -9,9 +9,10 @@ import (
 // Version is set at build time with -ldflags "-X github.com/alexwaumann/code-foundry/internal/version.Version=...".
 var Version = "dev"
 
-// Commit is the commit to report when the binary has no VCS stamp: Go stamps one only
-// when the module's .git is a directory, so a build in a git worktree (where .git is a
-// file) has none. `make build` sets it with -ldflags "-X ...version.Commit=<sha>[-dirty]".
+// Commit is the commit the binary was built from, set by `make build` with -ldflags
+// "-X ...version.Commit=<sha>[-dirty]" from the checkout's own HEAD. It wins over Go's
+// VCS stamp, which is missing in a git worktree (its .git is a file) and wrong in a
+// worktree nested inside another checkout (Go stamps the enclosing repository's HEAD).
 var Commit = ""
 
 // PluginSDKTag is the pluginsdk/vX.Y.Z tag on the commit the binary was built from
@@ -30,10 +31,13 @@ type Info struct {
 	PluginSDKTag string
 }
 
-// Get returns build information, filling the commit from the embedded VCS info, else
-// from Commit.
+// Get returns build information, the commit from Commit, else from the embedded VCS
+// info (a plain `go build`).
 func Get() Info {
 	info := Info{Version: Version, Commit: Commit, GoVersion: runtime.Version(), PluginSDKTag: PluginSDKTag}
+	if info.Commit != "" {
+		return info
+	}
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		dirty := false
 		for _, s := range bi.Settings {

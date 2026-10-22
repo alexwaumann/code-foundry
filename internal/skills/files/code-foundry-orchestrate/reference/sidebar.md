@@ -1,5 +1,7 @@
 # Which threads the user sees
 
+{{cf.provenance}}
+
 For the code-foundry-orchestrate skill: the sidebar, handing a thread over, and what
 archiving takes along.
 

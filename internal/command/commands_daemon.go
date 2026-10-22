@@ -34,6 +34,10 @@ type DaemonVersion struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit,omitempty"`
 	GoVersion string `json:"go_version"`
+	// SourceURL is this build's source tree (version.Info.Source: the release tag's, else
+	// the commit's, else the repository's); SourceRef is that tag or commit.
+	SourceURL string `json:"source_url"`
+	SourceRef string `json:"source_ref,omitempty"`
 }
 
 // RegisterDaemon registers daemon.status and daemon.version.
@@ -67,18 +71,20 @@ func RegisterDaemon(r *Registry, info DaemonInfo) error {
 		Command{
 			Name:         "daemon.version",
 			Title:        "Daemon Version",
-			Description:  "Show the daemon's build version.",
+			Description:  "Show the daemon's build version and commit; --json adds the URL of its source at that build.",
 			Category:     "Daemon",
 			NoKeybinding: true,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				v := info.Version
+				src := v.Source()
 				msg := "code-foundry " + v.Version
 				if v.Commit != "" {
 					msg += " (" + v.Commit + ")"
 				}
 				return Result{
 					Message: msg + " " + v.GoVersion,
-					JSON:    DaemonVersion{Version: v.Version, Commit: v.Commit, GoVersion: v.GoVersion},
+					JSON: DaemonVersion{Version: v.Version, Commit: v.Commit, GoVersion: v.GoVersion,
+						SourceURL: src.URL, SourceRef: src.Ref},
 				}, nil
 			},
 		},

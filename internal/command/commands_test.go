@@ -179,7 +179,7 @@ func TestBuiltinCommands(t *testing.T) {
 			wantMsg:  "daemon pid 42, version 1.2.3, up 1m30s, home /h",
 			wantJSON: `"uptime_seconds":90`},
 		{name: "daemon.version", cmd: "daemon.version",
-			wantMsg: "code-foundry 1.2.3 (abc) go1.26", wantJSON: `"go_version":"go1.26"`},
+			wantMsg: "code-foundry 1.2.3 (abc) go1.26", wantJSON: `"go_version":"go1.26","source_url":"https://github.com/alexwaumann/code-foundry"}`},
 		{name: "ui.notify", cmd: "ui.notify", args: map[string]string{"title": "hi", "body": "there", "level": "warning"},
 			wantMsg: "delivered=2", wantJSON: `{"delivered":2}`,
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{

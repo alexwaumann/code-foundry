@@ -1,5 +1,7 @@
 # Layout: columns, panes, grids, inline nodes, containers, master-detail, node tabs, toolbar and footer
 
+{{cf.provenance}}
+
 Container nodes arrange other nodes: **columns** (side by side), **pane** (a box with its
 own height and scroll), **grid** (cards in as many columns as fit), **container** (a
 capped, centred width), **masterDetail** (a list beside its chosen row's detail) and

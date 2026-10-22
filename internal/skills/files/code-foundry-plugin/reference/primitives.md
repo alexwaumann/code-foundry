@@ -1,5 +1,7 @@
 # Views: the surface view model
 
+{{cf.provenance}}
+
 A surface shows a **view** the plugin sends with `h.UpdateView(instance, view)`: a header,
 optional tabs, and a list of nodes. The host validates it, keeps it, and draws it with its
 own components; there is no HTML, CSS or script. Types and builders are in

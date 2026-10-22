@@ -1,5 +1,7 @@
 # plugin.json
 
+{{cf.provenance}}
+
 The manifest sits at the root of the plugin's folder (the package directory). The host
 reads it before running anything: for the consent text, the command list, and the
 commands and surfaces that stay listed while the plugin is down. `pluginsdk.Manifest` is
