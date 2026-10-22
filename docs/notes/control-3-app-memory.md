@@ -45,12 +45,12 @@ skill; no GUI.
 
   No entries: the prompt is byte-for-byte what it was. A read error is logged (WARN) and
   the thread starts without the block.
-* **Help skill**: a "Remembering preferences" section (15 lines; SKILL.md 90 of its 120
+* **Help skill**: a "Remembering preferences" section (15 lines; SKILL.md 109 of its 120
   lines): check `reference/settings.md` first and offer a setting when one covers it;
   otherwise `memory add` in the user's words without asking, confirm in one line, say it
   applies to threads started from now on (and follow it in this thread); remove a
   contradicted entry first; `memory show` for "what do you remember". The description
-  (354 of 400 characters) now names standing preferences, so the skill fires on one: a
+  (387 of 400 characters) now names standing preferences, so the skill fires on one: a
   preference is not a how-to question.
 
 ## Decisions
