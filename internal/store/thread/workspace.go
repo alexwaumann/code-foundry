@@ -34,12 +34,13 @@ func workspacePrompt(name string) string {
 }
 
 // ThreadPrompt is the one line every thread's system prompt gets: it points at the
-// skills the daemon ships to every thread (Options.SkillsDir, internal/skills), which
-// say how to drive other threads, answer questions about the app and build plugins
-// (docs/notes/agent-skills.md). Its last sentence holds the orchestration rule even
-// when the skill does not fire (docs/notes/orch-skill-v2.md). Static for the same reason
-// as workspacePrompt: it never varies per spawn.
-const ThreadPrompt = "This thread runs inside code-foundry. Its skills (code-foundry-orchestrate, code-foundry-help, code-foundry-plugin) say how to delegate work to other threads, how to answer questions about the app and how to build plugins for it. " +
+// skills the daemon ships to every thread (Options.SkillsDir, internal/skills), the
+// entry skill first, which says what the app can do and routes to the others: driving
+// other threads, answering questions about the app, building plugins
+// (docs/notes/agent-skills.md, control-4-capabilities.md). Its last sentence holds the
+// orchestration rule even when the skill does not fire (docs/notes/orch-skill-v2.md).
+// Static for the same reason as workspacePrompt: it never varies per spawn.
+const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line

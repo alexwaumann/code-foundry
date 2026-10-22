@@ -13,6 +13,10 @@ func TestSystemPrompt(t *testing.T) {
 	if got := systemPrompt("", nil, ""); got != ThreadPrompt {
 		t.Errorf("project thread: %q", got)
 	}
+	// The entry skill comes first (control-4-capabilities).
+	if !strings.HasPrefix(ThreadPrompt, "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (") {
+		t.Errorf("ThreadPrompt does not name the entry skill first: %q", ThreadPrompt)
+	}
 	for _, want := range []string{"code-foundry-orchestrate", "code-foundry-help", "code-foundry-plugin", "delegate work to other threads", "build plugins",
 		"split up, run in parallel or landed on several branches", "never the Agent tool", "hand-made worktrees", "read-only research"} {
 		if !strings.Contains(ThreadPrompt, want) {
