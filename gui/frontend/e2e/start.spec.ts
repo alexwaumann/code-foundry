@@ -38,7 +38,7 @@ test("with projects: greeting, counts, actions, and no New terminal", async ({ p
   await openApp(page);
   await expect(start(page)).toHaveAttribute("data-state", "fleet");
   await expect(page.getByTestId("start-heading")).toHaveText(/^Good (morning|afternoon|evening)$/);
-  await expect(page.getByTestId("start-waiting")).toHaveClass(/text-cf-warning/);
+  await expect(page.getByTestId("start-waiting")).toHaveClass(/text-cf-warning-text/);
   await expect(page.getByTestId("start-counts")).toHaveText("2 running · 1 waiting on you");
   const actions = page.getByTestId("welcome-actions");
   await expect(actions.getByRole("button")).toHaveText(["New thread", "Command palette"]);

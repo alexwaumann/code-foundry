@@ -31,7 +31,7 @@ test("a flag puts the thread in the attention group with the plugin's reason on 
   const s3 = row(page, "s:s-3");
   await expect(s3).toHaveAttribute("data-section", "attention");
   await expect(s3.getByTestId("row-status")).toHaveText("GitHub Actions: deploy needs approval");
-  await expect(s3.getByTestId("row-status")).toHaveClass(/text-cf-warning/);
+  await expect(s3.getByTestId("row-status")).toHaveClass(/text-cf-warning-text/);
   await expect(bell).toHaveText("2");
 
   // A busy thread with an error flag leaves Working, in red.
@@ -39,7 +39,7 @@ test("a flag puts the thread in the attention group with the plugin's reason on 
   const s1 = row(page, "s:s-1");
   await expect(s1).toHaveAttribute("data-section", "attention");
   await expect(s1.getByTestId("row-status")).toHaveText("Test Watcher: tests failed");
-  await expect(s1.getByTestId("row-status")).toHaveClass(/text-cf-error/);
+  await expect(s1.getByTestId("row-status")).toHaveClass(/text-cf-error-text/);
   await expect(bell).toHaveText("3");
   await expect.poll(() => mainKeys(page)).toContain("s:s-1");
 

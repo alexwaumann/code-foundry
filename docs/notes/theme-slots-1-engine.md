@@ -5,6 +5,10 @@ names onto the slots; later: publish the resolved map to frames, user overrides)
 only. Goal: no visible change. Themes get small, a slot can be overridden on its own, and
 a theme is one file the model can write.
 
+The rules and slot list below are this PR's. theme-slots-3-hardening.md changed several (status
+fills and `-text`, distinct control steps, guarded focus and sidebar rows, 72 `--cf-*` slots);
+the current file format and slot list are in docs/THEMES.md.
+
 ## The three tiers
 
 1. **Base**: what a theme file must give (`ThemeBase` in `src/themes/slots.ts`):
