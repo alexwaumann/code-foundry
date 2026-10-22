@@ -48,7 +48,7 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
 	"cost and usage: code-foundry usage.show; " +
 	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
-	"a path in your reply is a clickable chip, an .html file renders interactively; " +
+	"a path in your reply is a clickable chip; show .html pages: view.inline <file>; " +
 	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
 	"never tell the user to type /model or /cost, which the app replaces; " +

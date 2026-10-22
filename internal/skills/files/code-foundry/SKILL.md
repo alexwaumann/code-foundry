@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in: what it can do and which of its other skills to read. Use when the user asks what you can do here, about its version, model, effort, usage or cost, worktrees, settings, skills or plugins; asks to see a file, diff, page, HTML or chart; states a preference or asks you to remember one; wants a PR; or before you act in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in: what it can do and which skill to read. Use when the user asks what you can do here, about its version, model, effort, usage or cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML or chart; states a preference or asks you to remember one; wants a PR; or before you act in the app."
 user-invocable: false
 ---
 
