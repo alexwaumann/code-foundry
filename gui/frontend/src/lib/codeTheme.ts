@@ -1,8 +1,8 @@
 /**
  * The bridge from the app's themes to @pierre/diffs (docs/notes/file-viewer-2-code-foundation.md).
  * The library highlights with Shiki, so each app theme becomes a Shiki theme built from the
- * catalog's values: the pane as the editor background, the seven syntax colours thread.css
- * declares (`--syn-*`) on TextMate scopes, and the status colours as the diff's added,
+ * theme's resolved values (`theme.vars`): the pane as the editor background, the seven syntax
+ * slots thread.css paints with (`--syn-*`) on TextMate scopes, and the status colours as the diff's added,
  * deleted and modified. Code in a diff or a file then reads like the thread's own fenced
  * blocks (lib/highlight.ts) in every theme. A theme is registered on first use, under
  * `cf-<id>`; nothing is shipped as theme JSON.

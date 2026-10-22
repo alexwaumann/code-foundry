@@ -14,7 +14,9 @@ import { describe, expect, it } from "vitest";
  * - a colour literal in a component stylesheet (`#cf222e`, `oklch(1 0 0 / 5%)`, `white`),
  *   except the deliberate ones in CSS_ALLOW: those alias a token (`var(--terminal-ansi-1)`)
  *   or mix one (`color-mix(in oklab, var(--foreground) 5%, transparent)`).
- * index.css is the palette itself and is not scanned.
+ * index.css only aliases component names to theme slots and is not scanned; the colours
+ * themselves are theme files (src/themes/catalog.json) resolved by src/themes/slots.ts,
+ * and src/design/slots.test.ts keeps them out of every other file.
  */
 
 const sources = import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/gen/**", "!/src/lib/palette.test.ts"], { query: "?raw", import: "default", eager: true });
@@ -95,7 +97,7 @@ describe("palette guard", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(100);
     expect(sources["/src/components/sidebar/SidebarRow.tsx"]).toContain("text-warning");
     expect(Object.keys(stylesheets).length).toBeGreaterThan(3);
-    expect(stylesheets["/src/components/thread/thread.css"]).toContain("--syn-kw: var(--terminal-ansi-1)");
+    expect(stylesheets["/src/components/thread/thread.css"]).toContain("--t-bubble: color-mix(in oklab, var(--primary) 8%, transparent)");
   });
 
   it("no Tailwind palette classes: use the theme tokens (text-warning, bg-success/15, border-info/30, ...)", () => {

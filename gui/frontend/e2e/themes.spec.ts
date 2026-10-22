@@ -1,19 +1,19 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { componentValues, resolveSlots, type ThemeFile } from "../src/themes/slots";
 import { emit, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
 // defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
 
 // The generated catalog, read as a file: Playwright's loader refuses a JSON import without
-// an import attribute, which src/themes (bundled by Vite) does not carry.
-interface CatalogTheme {
-  id: string;
-  name: string;
-  scheme: "dark" | "light";
-  vars: Record<string, string>;
-}
-const catalog = JSON.parse(fs.readFileSync(new URL("../src/themes/catalog.json", import.meta.url), "utf8")) as CatalogTheme[];
+// an import attribute, which src/themes (bundled by Vite) does not carry. Its entries are
+// theme files; the values the page shows are resolved by the same rules (src/themes/slots.ts).
+const files = JSON.parse(fs.readFileSync(new URL("../src/themes/catalog.json", import.meta.url), "utf8")) as ThemeFile[];
+const catalog = files.map((t) => {
+  const slots = resolveSlots(t);
+  return { ...t, vars: { ...slots, ...componentValues(slots) } };
+});
 const themeById = new Map(catalog.map((t) => [t.id, t]));
 const themesFor = (scheme: "dark" | "light") => catalog.filter((t) => t.scheme === scheme);
 
@@ -173,6 +173,10 @@ test("a light preview inside the dark window renders with the light rules", asyn
   // Every syntax colour is the scope's, not the window's dark aliases or its theme's patch.
   for (const k of ["--syn-kw", "--syn-com", "--syn-fn"])
     expect(await thread.evaluate((el, key) => getComputedStyle(el).getPropertyValue(key).trim(), k)).toBe(t?.vars[k]);
+  // Text set by a type role is the preview's foreground, not the window's (the roles once
+  // read Tailwind's --color-foreground, which resolves on :root).
+  const rgb = (hex = "") => `rgb(${[1, 3, 5].map((i) => String(parseInt(hex.slice(i, i + 2), 16))).join(", ")})`;
+  expect(await thread.locator(".cf-markdown p").first().evaluate((el) => getComputedStyle(el).color)).toBe(rgb(t?.vars["--foreground"]));
   // dark: utilities stay off: a shadcn Input is transparent in light (dark:bg-input/30 in dark).
   const input = scope(page).getByRole("textbox", { name: "Branch" });
   expect(await input.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");

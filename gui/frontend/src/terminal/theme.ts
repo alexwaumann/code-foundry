@@ -1,8 +1,9 @@
 import type { ITheme } from "@xterm/xterm";
 
 /**
- * xterm ITheme keys and the CSS variables on <html> they come from (src/index.css,
- * `:root` and `.dark`). The background is --pane: the terminal is part of its pane.
+ * xterm ITheme keys and the CSS variables on <html> they come from (the active theme's
+ * slots, set by lib/theme.ts; src/themes/slots.ts). The background is --pane: the terminal
+ * is part of its pane.
  */
 const VARS: readonly (readonly [keyof ITheme, string])[] = [
   ["background", "--pane"],

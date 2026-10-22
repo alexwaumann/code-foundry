@@ -109,16 +109,24 @@ func TestDefaultWindowBackground(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Theme files (docs/notes/theme-slots-1-engine.md): the sheet is the --cf-canvas slot,
+	// base.canvas unless the theme overrides it.
 	var catalog []struct {
-		ID   string            `json:"id"`
-		Vars map[string]string `json:"vars"`
+		ID   string `json:"id"`
+		Base struct {
+			Canvas string `json:"canvas"`
+		} `json:"base"`
+		Overrides map[string]string `json:"overrides"`
 	}
 	if err := json.Unmarshal(data, &catalog); err != nil {
 		t.Fatal(err)
 	}
 	sheet := map[string]string{}
 	for _, th := range catalog {
-		sheet[th.ID] = th.Vars["--sheet"]
+		sheet[th.ID] = th.Base.Canvas
+		if c, ok := th.Overrides["--cf-canvas"]; ok {
+			sheet[th.ID] = c
+		}
 	}
 	if d := defaultWindowBackground; d.Dark != sheet["github-dark"] || d.Light != sheet["github-light"] || d.Scheme != "system" {
 		t.Errorf("default = %+v, want GitHub Dark %s / Light %s", d, sheet["github-dark"], sheet["github-light"])

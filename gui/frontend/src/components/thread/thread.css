@@ -23,20 +23,9 @@
   --t-bubble: color-mix(in oklab, var(--primary) 8%, transparent);
   --t-bubble-border: color-mix(in oklab, var(--primary) 11%, transparent);
   --t-hover: color-mix(in oklab, var(--foreground) 4%, transparent);
-  /* Syntax and shell colours are the terminal palette (index.css --terminal-*, read by
-     src/terminal/theme.ts), so a theme recolours both at once. Light reads the GitHub
-     slots; dark (below) swaps keyword, function, type and comment onto the One Dark
-     slots it was drawn from. */
-  --syn-fg: var(--terminal-fg);
-  --syn-kw: var(--terminal-ansi-1);
-  --syn-fn: var(--terminal-ansi-5);
-  --syn-type: var(--terminal-ansi-4);
-  --syn-str: var(--terminal-ansi-2);
-  --syn-com: var(--terminal-ansi-7);
-  --syn-num: var(--terminal-ansi-6);
-  --sh-cmd: var(--terminal-ansi-4);
-  --sh-flag: var(--terminal-ansi-6);
-  --sh-str: var(--terminal-ansi-2);
+  /* Syntax and shell colours (--syn-*, --sh-*) are theme slots, set on <html> with the
+     rest (src/themes/slots.ts: from the terminal palette, ANSI slots per scheme, guarded
+     for contrast on the pane and code blocks), so a theme recolours both at once. */
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .dark .cf-thread:not(:where(.light *)) {
@@ -46,10 +35,6 @@
   --t-bubble: color-mix(in oklab, var(--primary) 14.5%, transparent);
   --t-bubble-border: color-mix(in oklab, var(--primary) 15.5%, transparent);
   --t-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
-  --syn-kw: var(--terminal-ansi-5);
-  --syn-fn: var(--terminal-ansi-4);
-  --syn-type: var(--terminal-ansi-3);
-  --syn-com: var(--terminal-ansi-8);
 }
 
 .cf-thread .mono {
