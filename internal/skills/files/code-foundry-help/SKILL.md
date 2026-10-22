@@ -44,7 +44,7 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
 
 - WebFetch `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`, or, when
   `gh` is installed, `gh api 'repos/<owner>/<repo>/contents/<path>?ref=<ref>' -H
-  'Accept: application/vnd.github.raw'` (without the header it lists a directory).
+  'Accept: application/vnd.github.raw'` (for a directory, drop the header: it lists it).
 - Start at `docs/ARCHITECTURE.md`, then read the package it names for the topic (for
   example `internal/store/thread/` for threads) and follow the code from there.
 - Cite the file paths your answer rests on. Only the code says how the build works:
