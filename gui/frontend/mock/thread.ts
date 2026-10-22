@@ -7,7 +7,8 @@
  *
  *   POST /__mock/thread?state=permission|question|streaming|idle|parallel|multi[&id=s-r1]
  *        (re)creates the scripted thread in that state; returns { id }. parallel: an Edit
- *        and a Bash permission pending at once (oldest first); multi: a multi-select question
+ *        and a Bash permission pending at once (oldest first); multi: a multi-select question;
+ *        html: a working turn with two inline pages, one rendering and one whose file is gone
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
@@ -129,8 +130,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -803,6 +804,21 @@ export class MockThreadLogs {
       this.world.agentsChanged(id);
       return;
     }
+    if (state === "html") {
+      // Inline pages (docs/notes/inline-html.md), the turn still working so the cards show
+      // open: one that renders (mock/files.ts INLINE_PAGE_HTML, themed, asks for its height)
+      // and one whose file is gone (the failed state). /__mock/thread/finish ends the turn.
+      it({ case: "userMessage", value: { text: "Show me a small page that says hello with a button, inline.", attachments: [] } }, { at: ago(1) });
+      tool("Write", { file_path: `${cwd}/docs/hello.html`, content: "<!doctype html>…" }, { output: `File created successfully at: ${cwd}/docs/hello.html` }, { at: ago(0, 50) });
+      tool("Bash", { command: "code-foundry view.inline docs/hello.html" }, { output: `shown docs/hello.html in thread Fix stale PR badge` }, { at: ago(0, 48) });
+      it({ case: "html", value: { path: "docs/hello.html", title: "", baseDir: cwd } }, { at: ago(0, 48) });
+      it({ case: "assistantText", value: { text: "Here it is: a heading and a Wave button." } }, { at: ago(0, 46) });
+      it({ case: "html", value: { path: "docs/gone.html", title: "An older page", baseDir: cwd } }, { at: ago(0, 44) });
+      it({ case: "assistantText", value: { text: "That second one was deleted since, so it cannot be shown." } }, { at: ago(0, 42), streaming: true });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.BUSY, "working");
+      return;
+    }
     const p = (rel: string) => `${cwd}/${rel}`;
     const text = (t: string, over: Partial<ItemInit> & { at?: Date } = {}) => it({ case: "assistantText", value: { text: t } }, over);
     const read = (rel: string, lines: number, at: Date, parent = "") =>
@@ -1176,6 +1192,18 @@ export class MockThreadLogs {
    * turn (the text streaming at the moment completes first), Claude replies to it in the
    * same turn, and one turn_end ends it.
    */
+  /**
+   * ThreadService.ShowHtml (code-foundry view.inline; docs/notes/inline-html.md): an html
+   * item at the end of the log, its path relative to the thread's cwd when inside it. Only
+   * the extension is checked here (the daemon also wants a file under home).
+   */
+  showHtml(id: string, path: string, title: string): ItemInit {
+    if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file`);
+    const cwd = this.world.worktreeOf(id);
+    const rel = cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
+    return this.append(id, this.item(id, { case: "html", value: { path: rel, title, baseDir: cwd } }));
+  }
+
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     if (this.world.statusOf(id) === ThreadStatus.BUSY) {
       for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
