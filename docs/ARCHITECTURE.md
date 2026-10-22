@@ -431,7 +431,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
   `--add-dir`, before the attachments dir, workspace members and grants
-  (`docs/notes/agent-skills.md`).
+  (`docs/notes/agent-skills.md`). Every skill file carries a provenance line under its
+  title (`version.Info.Provenance`: the build, and its source on GitHub at the release
+  tag or commit), and the help skill sends internals questions to that source
+  (`docs/notes/control-2-skill-provenance.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
   same `claudeCommand` path, read from the plugin store by a function the daemon sets
   (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,
