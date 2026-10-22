@@ -287,7 +287,8 @@ Services (v1):
   CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
-  thread (`docs/notes/control-1-thread-scoped-views.md`).
+  thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
+  ("settings:<page>"), a button on the toast (`docs/notes/memory-page.md`).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
   update, action, plugin, skill, memory, ui; the thread source carries threads' pending requests only, a
@@ -369,6 +370,8 @@ Services (v1):
   `docs/notes/skills-3-api.md`).
 * `MemoryService` — Get, Watch (the whole memory with provenance and caps): the app
   memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
+  The GUI shows it on Settings › Memory, fed by the EventService memory source
+  (`docs/notes/memory-page.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
