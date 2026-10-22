@@ -3,6 +3,7 @@ package command_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -20,9 +22,18 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
 )
 
+// memoryT0 is the memory stores' clock in these tests: every add is at it, so entries
+// are a millisecond apart (the store keeps them in order).
+var memoryT0 = time.Date(2026, 10, 22, 14, 3, 11, 0, time.UTC)
+
+func newMemoryStore(t *testing.T, log *slog.Logger) *memory.Store {
+	t.Helper()
+	return memory.New(memory.Options{Dir: filepath.Join(t.TempDir(), "memory"), Log: log, Now: func() time.Time { return memoryT0 }})
+}
+
 func newMemoryRegistry(t *testing.T) (*command.Registry, *memory.Store) {
 	t.Helper()
-	s := memory.New(filepath.Join(t.TempDir(), "memory.md"), slog.New(slog.DiscardHandler))
+	s := newMemoryStore(t, slog.New(slog.DiscardHandler))
 	r := command.NewRegistry()
 	if err := command.RegisterMemory(r, command.MemoryDeps{Memory: s}); err != nil {
 		t.Fatal(err)
@@ -45,17 +56,17 @@ func TestMemoryCommands(t *testing.T) {
 		wantJSON any
 	}{
 		{name: "show empty", cmd: "memory.show", wantMsg: "No preferences remembered",
-			wantJSON: command.MemoryView{Entries: []memory.Entry{}}},
+			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{}}},
 		{name: "add", cmd: "memory.add", args: map[string]string{"text": "  Always open PRs as drafts "},
 			wantMsg:  `Remembered: "Always open PRs as drafts". New threads will follow it; threads already open get it on their next message after a restart.`,
-			wantJSON: command.MemoryAddView{Entry: memory.Entry{Index: 1, Text: "Always open PRs as drafts"}, Added: true}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}, Added: true}},
 		{name: "add another", cmd: "memory.add", args: map[string]string{"text": "Draft commit messages before committing"},
 			wantMsg: `Remembered: "Draft commit messages before committing". New threads`},
 		{name: "add a third", cmd: "memory.add", args: map[string]string{"text": "Never open the side panel on your own"},
 			wantMsg: `Remembered: "Never open the side panel on your own"`},
 		{name: "duplicate is a no-op", cmd: "memory.add", args: map[string]string{"text": "always open PRs as drafts"},
 			wantMsg:  `Already remembered: "Always open PRs as drafts" (nothing changed).`,
-			wantJSON: command.MemoryAddView{Entry: memory.Entry{Index: 1, Text: "Always open PRs as drafts"}}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}}},
 		{name: "empty", cmd: "memory.add", args: map[string]string{"text": "   "},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "an empty entry"},
 		{name: "multi-line", cmd: "memory.add", args: map[string]string{"text": "one\ntwo"},
@@ -64,9 +75,10 @@ func TestMemoryCommands(t *testing.T) {
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }},
 		{name: "show", cmd: "memory.show",
 			wantMsg: "1. Always open PRs as drafts\n2. Draft commit messages before committing\n3. Never open the side panel on your own",
-			wantJSON: command.MemoryView{Entries: []memory.Entry{
-				{Index: 1, Text: "Always open PRs as drafts"}, {Index: 2, Text: "Draft commit messages before committing"},
-				{Index: 3, Text: "Never open the side panel on your own"}}}},
+			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{
+				{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"},
+				{Index: 2, Text: "Draft commit messages before committing", Created: "2026-10-22T14:03:11.001Z"},
+				{Index: 3, Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z"}}}},
 		{name: "ambiguous substring", cmd: "memory.remove", args: map[string]string{"entry": "draft"},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) },
 			errHas:  "\"draft\" is in 2 entries; give the number of one:\n  1. Always open PRs as drafts\n  2. Draft commit messages"},
@@ -76,7 +88,7 @@ func TestMemoryCommands(t *testing.T) {
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "there is no entry 9: the entries are 1 to 3"},
 		{name: "remove by unique substring", cmd: "memory.remove", args: map[string]string{"entry": "side panel"},
 			wantMsg:  `Forgot: "Never open the side panel on your own".`,
-			wantJSON: command.MemoryRemoveView{Removed: memory.Entry{Index: 3, Text: "Never open the side panel on your own"}}},
+			wantJSON: command.MemoryRemoveView{Removed: command.MemoryEntryView{Index: 3, Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z"}}},
 		{name: "remove by index", cmd: "memory.remove", args: map[string]string{"entry": "1"},
 			wantMsg: `Forgot: "Always open PRs as drafts".`},
 		{name: "clear needs confirmation", cmd: "memory.clear",
@@ -107,8 +119,27 @@ func TestMemoryCommands(t *testing.T) {
 			}
 		})
 	}
-	if _, err := os.Stat(s.Path()); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("memory file after clear: %v", err)
+	if des, err := os.ReadDir(s.Dir()); err != nil || len(des) != 1 || des[0].Name() != memory.IndexFile {
+		t.Errorf("memory directory after clear: %v, %v", des, err)
+	}
+}
+
+// The JSON names every field, also the empty ones, so a script can rely on them.
+func TestMemoryShowJSON(t *testing.T) {
+	r, s := newMemoryRegistry(t)
+	if _, err := s.Add("Use tabs", memory.Origin{ThreadID: "s-1", ThreadName: "Fix login"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := r.Invoke(context.Background(), command.Context{}, "memory.show", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(res.JSON)
+	if want := `{"entries":[{"index":1,"text":"Use tabs","created":"2026-10-22T14:03:11.000Z","thread_id":"s-1","thread_name":"Fix login"}]}`; err != nil || string(b) != want {
+		t.Errorf("JSON = %s, %v; want %s", b, err, want)
+	}
+	if res.Message != "1. Use tabs" {
+		t.Errorf("message = %q", res.Message)
 	}
 }
 
@@ -174,9 +205,15 @@ func TestMemoryCaller(t *testing.T) {
 		wantTitle string // the notification's; "" for none
 		wantBody  string
 		wantLeft  []string
+		// The last entry's provenance after an add.
+		wantOrigin memory.Origin
 	}{
 		{name: "the user's thread adds", uctx: cli("s-user"), cmd: "memory.add", args: map[string]string{"text": "Use tabs"},
-			wantLog: "by=s-user", wantTitle: "Remembered: Use tabs", wantBody: `By thread "Fix login".`, wantLeft: []string{"Keep it short", "Use tabs"}},
+			wantLog: "by=s-user", wantTitle: "Remembered: Use tabs", wantBody: `By thread "Fix login".`, wantLeft: []string{"Keep it short", "Use tabs"},
+			wantOrigin: memory.Origin{ThreadID: "s-user", ThreadName: "Fix login"}},
+		{name: "an unnamed thread records no name", uctx: cli("s-plain"), cmd: "memory.add", args: map[string]string{"text": "Use tabs"},
+			wantLog: "by=s-plain", wantTitle: "Remembered: Use tabs", wantBody: `By thread "s-plain".`, wantLeft: []string{"Keep it short", "Use tabs"},
+			wantOrigin: memory.Origin{ThreadID: "s-plain"}},
 		{name: "an unnamed thread is named by id", uctx: cli("s-plain"), cmd: "memory.remove", args: map[string]string{"entry": "1"},
 			wantLog: "by=s-plain", wantTitle: "Forgot: Keep it short", wantBody: `By thread "s-plain".`, wantLeft: nil},
 		{name: "a duplicate shows nothing", uctx: cli("s-user"), cmd: "memory.add", args: map[string]string{"text": "keep it short."},
@@ -190,7 +227,8 @@ func TestMemoryCaller(t *testing.T) {
 			wantCode: connect.CodePermissionDenied, errHas: "the user's own threads only", wantLeft: []string{"Keep it short"}},
 		{name: "a child thread can read", uctx: cli("s-child"), cmd: "memory.show", wantLeft: []string{"Keep it short"}},
 		{name: "a thread gone from the store counts as the user's", uctx: cli("s-gone"), cmd: "memory.add", args: map[string]string{"text": "Use tabs"},
-			wantLog: "by=s-gone", wantTitle: "Remembered: Use tabs", wantBody: `By thread "s-gone".`, wantLeft: []string{"Keep it short", "Use tabs"}},
+			wantLog: "by=s-gone", wantTitle: "Remembered: Use tabs", wantBody: `By thread "s-gone".`, wantLeft: []string{"Keep it short", "Use tabs"},
+			wantOrigin: memory.Origin{ThreadID: "s-gone"}},
 		{name: "a failed lookup changes nothing", lookupErr: errors.New("database is locked"), uctx: cli("s-other"), cmd: "memory.add",
 			args: map[string]string{"text": "Use tabs"}, wantCode: connect.CodeUnknown, errHas: "look up the calling thread s-other", wantLeft: []string{"Keep it short"}},
 		{name: "the user's terminal", cmd: "memory.add", args: map[string]string{"text": "Use tabs"},
@@ -200,8 +238,8 @@ func TestMemoryCaller(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var logs bytes.Buffer
-			s := memory.New(filepath.Join(t.TempDir(), "memory.md"), slog.New(slog.NewTextHandler(&logs, nil)))
-			if _, err := s.Add("Keep it short", ""); err != nil {
+			s := newMemoryStore(t, slog.New(slog.NewTextHandler(&logs, nil)))
+			if _, err := s.Add("Keep it short", memory.Origin{}); err != nil {
 				t.Fatal(err)
 			}
 			logs.Reset()
@@ -233,6 +271,13 @@ func TestMemoryCaller(t *testing.T) {
 			}
 			if left, err := s.Texts(); err != nil || !slices.Equal(left, tt.wantLeft) {
 				t.Errorf("memory = %q, %v; want %q", left, err, tt.wantLeft)
+			}
+			if tt.cmd == "memory.add" && err == nil && len(tt.wantLeft) > 1 {
+				entries, _ := s.Entries()
+				last := entries[len(entries)-1]
+				if got := (memory.Origin{ThreadID: last.ThreadID, ThreadName: last.ThreadName}); got != tt.wantOrigin {
+					t.Errorf("recorded %+v, want %+v", got, tt.wantOrigin)
+				}
 			}
 		})
 	}

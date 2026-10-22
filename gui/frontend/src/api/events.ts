@@ -4,6 +4,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, isPageFocused, isPageVisible, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
+import { toMemoryEventView, type MemoryEventView } from "./memory";
 import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
 import { toSkillEventView, type SkillEventView } from "./skill";
@@ -34,7 +35,8 @@ export type EventView =
   | { source: "update"; event: UpdateEventView }
   | { source: "action"; event: ActionEventView }
   | { source: "plugin"; event: PluginEventView }
-  | { source: "skill"; event: SkillEventView };
+  | { source: "skill"; event: SkillEventView }
+  | { source: "memory"; event: MemoryEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -89,6 +91,8 @@ export function toEventView(ev: Event): EventView | null {
     }
     case "skill":
       return { source: "skill", event: toSkillEventView(e.value) };
+    case "memory":
+      return { source: "memory", event: toMemoryEventView(e.value) };
     default:
       return null;
   }

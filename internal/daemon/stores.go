@@ -66,9 +66,9 @@ type stores struct {
 	thread *thread.Manager
 	// ember is the resident agent's store (ember.go); closed before thread.
 	ember *ember.Store
-	// memory is the app memory (<home>/memory.md), the user's standing preferences:
-	// thread reads it at every spawn, the memory.* commands write it. It holds no
-	// resources.
+	// memory is the app memory (<home>/memory/), the user's standing preferences:
+	// thread reads it at every spawn, the memory.* commands write it, MemoryService and
+	// EventService watch its snapshots. It holds no resources.
 	memory *memory.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
@@ -223,7 +223,13 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
-	s.memory = memory.New(p.Memory(), log.With("store", "memory"))
+	s.memory = memory.New(memory.Options{Dir: p.Memory(), Legacy: p.LegacyMemory(), Bus: s.bus, Log: log.With("store", "memory")})
+	// The single memory.md before the directory goes into it once (docs/notes/memory-dir.md);
+	// a failure leaves the file for the next start and the daemon runs on.
+	if _, err := s.memory.Import(); err != nil {
+		log.Warn("memory: the single memory file was not imported; it stays for the next start", "err", err)
+	}
+	s.memory.Load()
 	threadLog := log.With("store", "thread")
 	if s.thread, err = thread.New(ctx, thread.Options{
 		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,

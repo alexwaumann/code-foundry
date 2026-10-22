@@ -108,8 +108,9 @@ internal/
     ember/                 Ember, the resident agent: its home (SOUL.md, MEMORY.md, seed/),
                            epochs (consolidation by a one-shot claude -p, then a reseed), the
                            task board, its workers' models (docs/notes/ember-2-store.md)
-    memory/                the app memory: the user's standing preferences (<home>/memory.md),
-                           appended to every thread's system prompt at spawn
+    memory/                the app memory: the user's standing preferences (<home>/memory/,
+                           one file per entry with provenance, and MEMORY.md), appended to
+                           every thread's system prompt at spawn
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   procscan/                the user's processes by working directory (sysctl + lsof), and
                            stopping process groups: what a thread left running in its worktree
@@ -289,7 +290,7 @@ Services (v1):
   thread (`docs/notes/control-1-thread-scoped-views.md`).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
-  update, action, plugin, skill, ui; the thread source carries threads' pending requests only, a
+  update, action, plugin, skill, memory, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
@@ -366,6 +367,8 @@ Services (v1):
 * `SkillService` — Search, Installed, Registries, Watch (the epoch): the Skills
   marketplace, read only; its actions are the `skill.*` commands (§10;
   `docs/notes/skills-3-api.md`).
+* `MemoryService` — Get, Watch (the whole memory with provenance and caps): the app
+  memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -443,11 +446,13 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   tag or commit), and the help skill sends internals questions to that source
   (`docs/notes/control-2-skill-provenance.md`).
 * **App memory** (`internal/store/memory`): the user's standing preferences about the app
-  and the model inside it, one `- <text>` line each in `<config home>/memory.md` (at most
-  40 entries, 4 KiB), written only by the daemon through `memory.*`. Every spawn reads the
-  file (`Options.Memory`) and, when it has entries, appends them under one heading after
-  the `ThreadPrompt` (and workspace) line, before a thread's own append
-  (`docs/notes/control-3-app-memory.md`).
+  and the model inside it, in `<config home>/memory/`: one markdown file per entry (its
+  provenance in frontmatter: created, the thread that added it and its name then) and an
+  index, `MEMORY.md`, written and never read (at most 40 entries, 4 KiB injected), written
+  only by the daemon through `memory.*`. The old single `memory.md` is imported once at
+  start. Every spawn reads the entries (`Options.Memory`) and, when there are any, appends
+  them under one heading after the `ThreadPrompt` (and workspace) line, before a thread's
+  own append (`docs/notes/control-3-app-memory.md`, `docs/notes/memory-dir.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
   same `claudeCommand` path, read from the plugin store by a function the daemon sets
   (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,

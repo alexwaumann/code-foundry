@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// MemoryService reads the app memory (docs/notes/memory-dir.md): the user's standing
+// preferences about Code Foundry and how the model behaves in it, which every thread's
+// system prompt carries. It only reads; adding, removing and clearing are the memory.*
+// commands (CommandService.Invoke), so palette, CLI and the Settings page run the same
+// thing with the same confirms.
+service MemoryService {
+  // Get reads the memory now (a hand edit since the last read shows up here).
+  rpc Get(GetMemoryRequest) returns (GetMemoryResponse) {}
+  // Watch sends the memory as read now, then the whole memory again on every change a
+  // read or write sees. The GUI gets the same events from EventService
+  // (EVENT_SOURCE_MEMORY).
+  rpc Watch(WatchMemoryRequest) returns (stream MemoryEvent) {}
+}
+
+// MemoryEntry is one remembered preference.
+message MemoryEntry {
+  // Its 1-based position, the number `memory show` prints and `memory remove` takes.
+  int32 index = 1;
+  // The preference, one line: what threads get.
+  string text = 2;
+  // Its file name in the memory directory: stable while the text is (a new text is a
+  // new file), so a list can key on it.
+  string file = 3;
+  // When it was added; unset when unknown (a file added by hand without frontmatter).
+  google.protobuf.Timestamp created = 4;
+  // The thread that added it and that thread's name then; empty when the user added it
+  // (their terminal, the GUI) or it is unknown. The thread may be gone.
+  string thread_id = 5;
+  string thread_name = 6;
+  // Whether threads get it: false past the caps, in a directory edited by hand.
+  bool injected = 7;
+}
+
+// MemorySnapshot is the whole memory.
+message MemorySnapshot {
+  // In order; also past the caps (a directory edited by hand), with injected false.
+  repeated MemoryEntry entries = 1;
+  // How many entries threads get (the first ones) and their size rendered as the
+  // prompt lists them, which max_bytes caps.
+  int32 injected = 2;
+  int32 injected_bytes = 3;
+  // The caps: an add past max_entries or max_bytes fails; an entry is at most
+  // max_entry_chars characters.
+  int32 max_entries = 4;
+  int32 max_bytes = 5;
+  int32 max_entry_chars = 6;
+  // The memory directory.
+  string dir = 7;
+  // Why the last read failed; the entries are the last good read's.
+  string error = 8;
+  // Grows by one per change in this daemon's lifetime.
+  uint64 version = 9;
+}
+
+message GetMemoryRequest {}
+
+message GetMemoryResponse {
+  MemorySnapshot memory = 1;
+}
+
+message WatchMemoryRequest {}
+
+// MemoryEvent carries the whole memory, on connect and per change.
+message MemoryEvent {
+  MemorySnapshot snapshot = 1;
+}

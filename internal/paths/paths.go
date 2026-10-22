@@ -165,9 +165,15 @@ func (p Paths) PluginLogs() string { return filepath.Join(p.Logs(), "plugins") }
 func (p Paths) DisabledSkills() string { return filepath.Join(p.home, "skills", "disabled") }
 
 // Memory is the app memory: the user's standing preferences about the app and the model
-// inside it, one "- <text>" line each (internal/store/memory). The daemon reads it at
-// every thread spawn and appends it to the system prompt; only the daemon writes it.
-func (p Paths) Memory() string { return filepath.Join(p.home, "memory.md") }
+// inside it, a directory of one markdown file per entry and an index, MEMORY.md
+// (internal/store/memory). The daemon reads it at every thread spawn and appends it to
+// the system prompt; only the daemon writes it.
+func (p Paths) Memory() string { return filepath.Join(p.home, "memory") }
+
+// LegacyMemory is the single memory file before the directory, one "- <text>" line per
+// entry. The daemon imports it into Memory at start and renames it to
+// memory.md.imported.
+func (p Paths) LegacyMemory() string { return filepath.Join(p.home, "memory.md") }
 
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)

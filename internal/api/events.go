@@ -49,6 +49,8 @@ type EventsDeps struct {
 	Plugin plugin.Store
 	// Skill is the skill store (the Skills marketplace).
 	Skill SkillStore
+	// Memory is the app memory.
+	Memory MemoryStore
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -135,7 +137,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, settings, update,
-// action, plugin, skill),
+// action, plugin, skill, memory),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -172,6 +174,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Skill != nil {
 		out = append(out, skillSource{store: d.Skill, bus: d.Bus}) // api/skill.go
+	}
+	if d.Memory != nil {
+		out = append(out, memorySource{store: d.Memory, bus: d.Bus}) // api/memory.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out
