@@ -12,8 +12,9 @@ the lead follows.
   `project worktree cleanup`: its parent owns it.
 - A lead starts its workers within its first few tool calls: it reads only what it needs
   to write their prompts, plans at the file level (who owns which file, which pieces
-  stack with `--base`), never at the line level, and runs no experiments. Conflicts found
-  later are reported, not prevented: never promise a parent conflict-free branches.
+  stack with `--base`, plus `--base-from-origin no` while that branch is not pushed),
+  never at the line level, and runs no experiments. Conflicts found later are
+  reported, not prevented: never promise a parent conflict-free branches.
 - Each worker's branch delivers its whole piece on its own. When two pieces must change
   the same code, stack them (`--base`) or let them conflict and say so in the first
   progress report; never move part of one piece into another's branch, unless the

@@ -254,7 +254,10 @@ func TestRender(t *testing.T) {
 		"Never tell the user skill or command names: say what you will do, not which command",
 		"`code-foundry memory add <text>`", "`code-foundry usage.show`", "`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`",
 		"`.html` file", "`code-foundry pr.create`, `code-foundry project.github.publish`", "Add `--focus` only when the user asks",
-		"the default, setting `threads.default_worktree`", "The app replaces /model, /effort"} {
+		"default `threads.default_worktree`", "The app replaces /model, /effort",
+		// The setting is the composer's; where thread new puts a thread is the model's call
+		// (thread-new-base-origin).
+		"Threads you create with `thread new` are yours to place: in place or `--new-worktree`"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}

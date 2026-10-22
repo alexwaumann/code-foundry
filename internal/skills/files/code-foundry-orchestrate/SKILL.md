@@ -53,8 +53,8 @@ them over. You create and drive other threads with the `code-foundry` CLI.
    --stat` against what it claims, and to finish, as its LAST step, with `code-foundry
    thread report done "<summary>" --data '{"branch": "...", "files": [...]}'` (or
    `blocked`/`failed`), the summary at most 1000 characters with its caveats first, and
-   again after any later message. Work that builds on a sibling's branch: once that
-   branch is pushed, `thread new --new-worktree --base origin/<its branch>` (§2b).
+   again after any later message. Work built on a sibling's branch: `--base origin/<its
+   branch>` once pushed, else `--base <its branch> --base-from-origin no` (§2b).
 2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
    - `code-foundry thread wait <id> --for 30m` returns when the child finishes, fails, or
      asks you something: answer with the `thread respond` line it prints, then wait again.
