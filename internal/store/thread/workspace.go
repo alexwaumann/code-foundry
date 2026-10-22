@@ -44,7 +44,7 @@ func workspacePrompt(name string) string {
 // rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
-	"In this app: when the user says how you should act from now on (always, never, keep answers short), save it at once with code-foundry memory add <their words>, not your own memory files; " +
+	"In this app: when the user says how you should act from now on (always, never, keep answers short), run code-foundry memory add <their words> at once, without asking (every thread then follows it), never your own memory files; " +
 	"cost and usage: code-foundry usage.show; " +
 	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
 	"a file path in your reply is a clickable chip, an .html file renders interactively; " +
