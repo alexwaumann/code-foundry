@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 import { openUpdateDialog, useUpdateStore } from "@/stores/update";
 
 const tone: Record<UpdateBadgeKind, { className: string; icon: LucideIcon }> = {
-  available: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
-  downloading: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
-  downloaded: { className: "bg-success/10 text-success hover:bg-success/15", icon: RefreshCw },
-  failed: { className: "bg-destructive/10 text-destructive hover:bg-destructive/15", icon: TriangleAlert },
-  installed: { className: "bg-success/10 text-success hover:bg-success/15", icon: RefreshCw },
+  available: { className: "bg-cf-info-surface text-cf-info hover:bg-cf-info/15", icon: Download },
+  downloading: { className: "bg-cf-info-surface text-cf-info hover:bg-cf-info/15", icon: Download },
+  downloaded: { className: "bg-cf-success-surface text-cf-success hover:bg-cf-success/15", icon: RefreshCw },
+  failed: { className: "bg-cf-error-surface text-cf-error hover:bg-cf-error/15", icon: TriangleAlert },
+  installed: { className: "bg-cf-success-surface text-cf-success hover:bg-cf-success/15", icon: RefreshCw },
 };
 
 /**

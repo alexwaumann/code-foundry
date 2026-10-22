@@ -34,7 +34,7 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
   const when = f.fetchedAtMs === null ? "Not fetched yet" : `U${updatedAgo(f.fetchedAtMs, now).slice(1)}`;
   return (
     <Tip label={f.lastError} side="left">
-      <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-warning" : undefined}>
+      <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-cf-warning" : undefined}>
         {when}
         {f.lastError && " · last fetch failed"}
       </span>
@@ -100,7 +100,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             type="button"
             aria-label="Pull request actions"
             data-testid="pr-menu-button"
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-accent"
+            className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover"
           >
             <Ellipsis className="size-4" aria-hidden />
           </button>

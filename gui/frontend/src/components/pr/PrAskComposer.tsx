@@ -59,7 +59,7 @@ export function PrAskComposer({ prRef, focusRequest, onClose }: { prRef: PrRef; 
       submit={{
         label: "Ask",
         icon: CornerDownLeft,
-        className: "bg-primary text-primary-foreground enabled:hover:bg-primary/90",
+        className: "bg-cf-accent text-cf-accent-foreground enabled:hover:bg-cf-accent/90",
         disabled: busy || !text.trim(),
         busy,
       }}

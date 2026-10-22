@@ -5,7 +5,7 @@ export function Highlight({ text, words }: { text: string; words?: readonly stri
   if (!words || words.length === 0) return text;
   return highlightParts(text, words).map((p, i) =>
     p.hit ? (
-      <mark key={i} className="rounded-sm bg-warning/25 text-inherit">
+      <mark key={i} className="rounded-sm bg-cf-warning/25 text-inherit">
         {p.text}
       </mark>
     ) : (

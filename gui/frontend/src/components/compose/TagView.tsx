@@ -52,7 +52,7 @@ function TextTag({
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
         <p>{tip}</p>
-        {detail && <p className="mt-0.5 text-muted-foreground">{detail}</p>}
+        {detail && <p className="mt-0.5 text-cf-text-muted">{detail}</p>}
       </TooltipContent>
     </Tooltip>
   );
@@ -136,7 +136,7 @@ function PrTag({ slug, number, selected }: { slug: string; number: number; selec
 
 /** The ring of the chip whose comment is being edited. */
 const EDITING =
-  "data-[editing]:border-[color-mix(in_oklab,var(--chip-accent)_70%,var(--color-border))] data-[editing]:bg-[color-mix(in_oklab,var(--chip-accent)_20%,transparent)] data-[editing]:ring-2 data-[editing]:ring-[color-mix(in_oklab,var(--chip-accent)_22%,transparent)]";
+  "data-[editing]:border-[color-mix(in_oklab,var(--chip-accent)_70%,var(--cf-border))] data-[editing]:bg-[color-mix(in_oklab,var(--chip-accent)_20%,transparent)] data-[editing]:ring-2 data-[editing]:ring-[color-mix(in_oklab,var(--chip-accent)_22%,transparent)]";
 
 /**
  * Text quoted from one of Claude's answers (docs/notes/citations.md): the quote glyph and
@@ -174,7 +174,7 @@ function CiteTag({ id, selected }: { id: string; selected: boolean }) {
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
         <p className="line-clamp-4 whitespace-pre-wrap">{c ? c.text : "This quote is not in the draft any more"}</p>
-        {c?.comment && <p className="mt-0.5 line-clamp-4 whitespace-pre-wrap text-muted-foreground">{c.comment}</p>}
+        {c?.comment && <p className="mt-0.5 line-clamp-4 whitespace-pre-wrap text-cf-text-muted">{c.comment}</p>}
       </TooltipContent>
     </Tooltip>
   );

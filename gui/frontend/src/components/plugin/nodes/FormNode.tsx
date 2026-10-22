@@ -31,7 +31,7 @@ interface FieldApi {
 
 function Description({ f, error }: { f: Field; error: string | undefined }) {
   const strip = useInStrip() !== null;
-  if (error) return <p className="text-caption-sm text-destructive" data-testid="plugin-field-error">{error}</p>;
+  if (error) return <p className="text-caption-sm text-cf-error" data-testid="plugin-field-error">{error}</p>;
   // A strip is one row: descriptions are left out (errors still show, under the control).
   if (f.description === undefined || strip) return null;
   return (
@@ -212,8 +212,8 @@ function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; a
           aria-invalid={invalid || undefined}
           aria-required={f.required || undefined}
           className={cn(
-            "flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2.5 py-1 text-body-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40",
-            labels.length === 0 && "text-muted-foreground",
+            "flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-cf-input bg-transparent px-2.5 py-1 text-body-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-cf-focus focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-cf-error aria-invalid:ring-cf-error/20 dark:bg-cf-input/30 dark:hover:bg-cf-input/50 dark:aria-invalid:ring-cf-error/40",
+            labels.length === 0 && "text-cf-text-muted",
           )}
           data-testid="plugin-select"
           data-name={f.name}
@@ -222,14 +222,14 @@ function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; a
           <span className="min-w-0 truncate">{labels.length === 0 ? f.select?.placeholder || "Choose…" : summary}</span>
           <span className="flex shrink-0 items-center gap-1.5">
             {labels.length > 1 && <span className="text-caption-sm tabular-nums">{labels.length}</span>}
-            <ChevronDown className="size-4 text-muted-foreground opacity-50" aria-hidden />
+            <ChevronDown className="size-4 text-cf-text-muted opacity-50" aria-hidden />
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[calc(var(--radix-popover-trigger-width)/var(--cf-zoom))] p-1" data-testid="plugin-select-options">
         <div role="group" aria-label={f.label || f.name} className="flex max-h-64 flex-col overflow-y-auto">
           {options.map((o) => (
-            <label key={o.key} className={cn("flex min-w-0 cursor-default items-center rounded-sm px-2 py-1.5 hover:bg-accent dark:hover:bg-accent/50", o.disabled && "pointer-events-none")}>
+            <label key={o.key} className={cn("flex min-w-0 cursor-default items-center rounded-sm px-2 py-1.5 hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50", o.disabled && "pointer-events-none")}>
               {optionLabel(
                 o,
                 false,
@@ -254,7 +254,7 @@ function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; a
 /** The label's mark for a required field, from the first paint (the host checks it on blur and submit). */
 function RequiredMark() {
   return (
-    <span className="text-muted-foreground" aria-hidden data-testid="plugin-required">
+    <span className="text-cf-text-muted" aria-hidden data-testid="plugin-required">
       *
     </span>
   );
@@ -280,7 +280,7 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
         {fs.fields.map((c) => (
           <FieldView key={c.key} f={c} api={api} />
         ))}
-        {fs.error && <p className="text-caption-sm text-destructive">{fs.error}</p>}
+        {fs.error && <p className="text-caption-sm text-cf-error">{fs.error}</p>}
       </fieldset>
     );
   }
@@ -416,7 +416,7 @@ export function FormNode({ node, data }: NodeProps<"form">) {
           <FieldView key={f.key} f={f} api={api} />
         ))}
         {data.error && (
-          <p className={cn("text-caption-sm text-destructive", strip && "order-last basis-full")} role="alert" data-testid="plugin-form-error">
+          <p className={cn("text-caption-sm text-cf-error", strip && "order-last basis-full")} role="alert" data-testid="plugin-form-error">
             {data.error}
           </p>
         )}

@@ -171,7 +171,7 @@ describe("Agents surface", () => {
     expect(within(rowOf("a1"), "agent-activity")?.textContent).toBe("Running go testBash");
     expect(within(rowOf("a1"), "agent-summary")).toBeNull();
     expect(within(rowOf("a3"), "agent-error")?.textContent).toBe("Stopped: process exited with code 1");
-    expect(within(rowOf("a3"), "agent-error")?.className).toContain("text-destructive");
+    expect(within(rowOf("a3"), "agent-error")?.className).toContain("text-cf-error");
     expect(within(rowOf("a0"), "agent-elapsed")?.textContent).toBe("12s");
     expect(within(rowOf("a0"), "agent-tools")?.textContent).toBe("6");
     expect(within(rowOf("a0"), "agent-tokens")?.textContent).toBe("9.4K");
@@ -179,8 +179,8 @@ describe("Agents surface", () => {
     expect(within(rowOf("a1"), "agent-tokens")?.textContent).toBe("48.2K");
     // Running rows spin; ended ones get a dot. Rows are not clickable.
     expect(rowOf("a1").querySelector('[aria-label="Running"]')).not.toBeNull();
-    expect(rowOf("a3").querySelector(".bg-destructive")).not.toBeNull();
-    expect(rowOf("a0").querySelector(".bg-success")).not.toBeNull();
+    expect(rowOf("a3").querySelector(".bg-cf-error")).not.toBeNull();
+    expect(rowOf("a0").querySelector(".bg-cf-success")).not.toBeNull();
     expect(screen.getByTestId("agents-surface").querySelectorAll("button")).toHaveLength(0);
   });
 

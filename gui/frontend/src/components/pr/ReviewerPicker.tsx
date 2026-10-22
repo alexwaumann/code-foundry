@@ -26,7 +26,7 @@ const matches = (c: ReviewerCandidateView, term: string): boolean => {
 
 function Message({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <p className="px-2 py-3 text-body text-muted-foreground" data-testid={testId}>
+    <p className="px-2 py-3 text-body text-cf-text-muted" data-testid={testId}>
       {children}
     </p>
   );
@@ -60,14 +60,14 @@ function CandidateRow({ prRef, c, onRemove }: { prRef: PrRef; c: ReviewerCandida
         {busy ? (
           <Loader2 className="size-3.5 animate-spin" aria-label="Updating" />
         ) : c.isRequested ? (
-          <Check className="size-3.5 text-foreground" aria-label="Requested" />
+          <Check className="size-3.5 text-cf-text" aria-label="Requested" />
         ) : onRemove ? (
           <button
             type="button"
             tabIndex={-1}
             aria-label="Remove from recent"
             data-testid="pr-reviewer-recent-remove"
-            className="flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+            className="flex size-4 items-center justify-center rounded-sm text-cf-text-muted hover:bg-cf-text/10 hover:text-cf-text"
             // Keep the press to the button: cmdk selects the row on click.
             onPointerDown={(e) => {
               e.preventDefault();
@@ -159,7 +159,7 @@ function Candidates({ prRef }: { prRef: PrRef }) {
         onValueChange={setInput}
         trailing={
           searching && (pending || loading) ? (
-            <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-label="Searching" data-testid="pr-reviewer-searching" />
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-cf-text-muted" aria-label="Searching" data-testid="pr-reviewer-searching" />
           ) : null
         }
       />
@@ -192,7 +192,7 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
             type="button"
             aria-label="Request a review"
             data-testid="pr-add-reviewer"
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-accent"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover"
           >
             <UserPlus className="size-3.5" aria-hidden />
           </button>
@@ -211,11 +211,11 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
           <Candidates prRef={prRef} />
         ) : (
           <div>
-            <div className="flex h-9 items-center gap-2 border-b px-3 text-body text-muted-foreground">
+            <div className="flex h-9 items-center gap-2 border-b px-3 text-body text-cf-text-muted">
               <Search className="size-4 shrink-0 opacity-50" aria-hidden />
               <span className="opacity-60">Search people with access</span>
             </div>
-            <p className="px-3 py-3 text-body text-muted-foreground" data-testid="pr-reviewer-readonly">
+            <p className="px-3 py-3 text-body text-cf-text-muted" data-testid="pr-reviewer-readonly">
               {WRITE_ACCESS_HINT}
             </p>
           </div>

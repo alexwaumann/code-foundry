@@ -20,24 +20,24 @@ function useThreadId(): string {
 }
 
 const STATUS_TONE: Readonly<Record<AgentStatusView, string>> = {
-  running: "text-info",
-  done: "text-success",
-  failed: "text-destructive",
-  unknown: "text-muted-foreground",
+  running: "text-cf-info",
+  done: "text-cf-success",
+  failed: "text-cf-error",
+  unknown: "text-cf-text-muted",
 };
 
 const DOT: Readonly<Record<Exclude<AgentStatusView, "running">, string>> = {
-  done: "bg-success",
-  failed: "bg-destructive",
-  unknown: "bg-muted-foreground/40",
+  done: "bg-cf-success",
+  failed: "bg-cf-error",
+  unknown: "bg-cf-text-muted/40",
 };
 
 function Header({ threadId }: { threadId: string }) {
   const c = useAgentCounts(threadId);
   return (
-    <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="agents-header">
+    <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="agents-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Bot className="size-4 shrink-0 text-info" aria-hidden />
+        <Bot className="size-4 shrink-0 text-cf-info" aria-hidden />
         <span className="min-w-0 truncate">Agents</span>
         {c && c.total > 0 && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="agents-count">
@@ -103,14 +103,14 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
   const openable = can && run.spawnDepth <= 1;
   // Nested runs are indented 20px per level, with a connector from their parent's column.
   const style = level > 0 ? ({ paddingLeft: 16 + 20 * level, "--nest-x": `${String(1 + 20 * level)}px` } as CSSProperties) : undefined;
-  const common = cn("relative flex w-full min-w-0 flex-col gap-[3px] border-b border-pane-border px-4 pt-[9px] pb-2.5 text-left @max-[340px]:px-3", level > 0 && "cf-agents-nest");
+  const common = cn("relative flex w-full min-w-0 flex-col gap-[3px] border-b border-cf-divider px-4 pt-[9px] pb-2.5 text-left @max-[340px]:px-3", level > 0 && "cf-agents-nest");
   const data = { "data-testid": "agent-row", "data-agent": run.id, "data-status": run.status, "data-level": level, "data-background": run.background || undefined, "data-viewing": viewing || undefined };
   const body = (
     <>
-      {viewing && <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-info" aria-hidden />}
+      {viewing && <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-cf-info" aria-hidden />}
       <div className="flex min-w-0 items-center gap-2 text-body-sm">
         {running ? (
-          <LoaderCircle className="size-3 shrink-0 animate-spin text-info" aria-label="Running" />
+          <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-info" aria-label="Running" />
         ) : (
           <span className={cn("size-2 shrink-0 rounded-full", DOT[run.status as Exclude<AgentStatusView, "running">])} aria-hidden />
         )}
@@ -120,14 +120,14 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
           </span>
         </Tip>
         {viewing && (
-          <span className="shrink-0 rounded-sm border border-info/50 px-1 text-caption-sm text-info" data-testid="agent-viewing">
+          <span className="shrink-0 rounded-sm border border-cf-info/50 px-1 text-caption-sm text-cf-info" data-testid="agent-viewing">
             viewing
           </span>
         )}
         <span className={cn("shrink-0 text-caption-sm tabular-nums", STATUS_TONE[run.status])} data-testid="agent-status">
           {running || run.endedAtMs === null ? agentStatusText(run, 0) : <EndedStatus run={run} />}
         </span>
-        {openable && <ChevronRight className="-mr-1 size-3.5 shrink-0 text-muted-foreground" aria-hidden data-testid="agent-open-chevron" />}
+        {openable && <ChevronRight className="-mr-1 size-3.5 shrink-0 text-cf-text-muted" aria-hidden data-testid="agent-open-chevron" />}
       </div>
       <div className="min-w-0 truncate pl-5 text-caption" data-testid="agent-meta">
         {meta.map((p, i) => (
@@ -143,14 +143,14 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       </div>
       {running ? (
         <div className="ml-5 flex min-w-0 items-center gap-1.5 text-body-sm" data-testid="agent-activity">
-          <LoaderCircle className="size-[13px] shrink-0 animate-spin text-muted-foreground" aria-hidden />
+          <LoaderCircle className="size-[13px] shrink-0 animate-spin text-cf-text-muted" aria-hidden />
           <span className="cf-agents-shimmer min-w-0 truncate">{run.activity || "Starting…"}</span>
-          {run.lastTool && <span className="shrink-0 text-code text-muted-foreground">{run.lastTool}</span>}
+          {run.lastTool && <span className="shrink-0 text-code text-cf-text-muted">{run.lastTool}</span>}
         </div>
       ) : run.status === "failed" ? (
         run.error && (
           <Tip label={run.error} whenTruncated maxLines={5}>
-            <div className="ml-5 line-clamp-2 text-body-sm break-words text-destructive" data-testid="agent-error">
+            <div className="ml-5 line-clamp-2 text-body-sm break-words text-cf-error" data-testid="agent-error">
               {run.error}
             </div>
           </Tip>
@@ -177,7 +177,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       </div>
     </>
   );
-  const tint = viewing && "bg-info/7 dark:bg-info/10";
+  const tint = viewing && "bg-cf-info/7 dark:bg-cf-info-surface";
   if (!openable)
     return (
       <li className={cn(common, tint)} style={style} {...data}>
@@ -188,7 +188,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
     <li className="flex min-w-0">
       <button
         type="button"
-        className={cn(common, "cursor-default outline-none hover:bg-accent/50 focus-visible:bg-accent/50", tint)}
+        className={cn(common, "cursor-default outline-none hover:bg-cf-control-hover/50 focus-visible:bg-cf-control-hover/50", tint)}
         style={style}
         aria-current={viewing || undefined}
         onClick={() => {
@@ -204,7 +204,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
 
 function Message({ testId, children }: { testId: string; children: string }) {
   return (
-    <p className="px-4 py-3 text-body text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
+    <p className="px-4 py-3 text-body text-cf-text-muted @max-[340px]:px-3" data-testid={testId}>
       {children}
     </p>
   );

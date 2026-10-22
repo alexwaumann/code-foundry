@@ -44,6 +44,8 @@
     --radius-2xl: 16px;
     --radius-pane: var(--radius);
     --spacing-shell: var(--gap-shell);
+    /* The shadcn colour names, for components/ui (vendored shadcn) only: everything else uses
+     * the --color-cf-* utilities below (src/design/guards.test.ts, colour guard). */
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-card: var(--card);
@@ -88,6 +90,78 @@
     --color-sheet: var(--sheet);
     --color-pane: var(--pane);
     --color-pane-border: var(--pane-border);
+    /* The semantic slots as utilities (docs/notes/theme-slots-2-components.md): bg-cf-surface-raised,
+     * text-cf-text-muted, bg-cf-sidebar-row-selected, bg-cf-warning-surface, border-cf-divider, ...
+     * Components use these; the shadcn names above are for components/ui only
+     * (src/design/slots.test.ts). `inline`, so each utility reads var(--cf-X) where it is
+     * used and a preview scope's slots apply. */
+    --color-cf-canvas: var(--cf-canvas);
+    --color-cf-surface: var(--cf-surface);
+    --color-cf-chrome: var(--cf-chrome);
+    --color-cf-surface-raised: var(--cf-surface-raised);
+    --color-cf-surface-overlay: var(--cf-surface-overlay);
+    --color-cf-surface-sunken: var(--cf-surface-sunken);
+    --color-cf-border: var(--cf-border);
+    --color-cf-border-strong: var(--cf-border-strong);
+    --color-cf-divider: var(--cf-divider);
+    --color-cf-text: var(--cf-text);
+    --color-cf-text-muted: var(--cf-text-muted);
+    --color-cf-text-secondary: var(--cf-text-secondary);
+    --color-cf-placeholder: var(--cf-placeholder);
+    --color-cf-icon: var(--cf-icon);
+    --color-cf-icon-muted: var(--cf-icon-muted);
+    --color-cf-link: var(--cf-link);
+    --color-cf-accent: var(--cf-accent);
+    --color-cf-accent-foreground: var(--cf-accent-foreground);
+    --color-cf-accent-surface: var(--cf-accent-surface);
+    --color-cf-accent-surface-foreground: var(--cf-accent-surface-foreground);
+    --color-cf-focus: var(--cf-focus);
+    --color-cf-input: var(--cf-input);
+    --color-cf-control: var(--cf-control);
+    --color-cf-control-hover: var(--cf-control-hover);
+    --color-cf-control-active: var(--cf-control-active);
+    --color-cf-selection: var(--cf-selection);
+    --color-cf-sidebar: var(--cf-sidebar);
+    --color-cf-sidebar-foreground: var(--cf-sidebar-foreground);
+    --color-cf-sidebar-muted-foreground: var(--cf-sidebar-muted-foreground);
+    --color-cf-sidebar-row-hover: var(--cf-sidebar-row-hover);
+    --color-cf-sidebar-row-selected: var(--cf-sidebar-row-selected);
+    --color-cf-sidebar-row-active: var(--cf-sidebar-row-active);
+    --color-cf-sidebar-border: var(--cf-sidebar-border);
+    --color-cf-message-surface: var(--cf-message-surface);
+    --color-cf-message-foreground: var(--cf-message-foreground);
+    --color-cf-code-background: var(--cf-code-background);
+    --color-cf-code-foreground: var(--cf-code-foreground);
+    --color-cf-quote-border: var(--cf-quote-border);
+    --color-cf-success: var(--cf-success);
+    --color-cf-success-foreground: var(--cf-success-foreground);
+    --color-cf-success-surface: var(--cf-success-surface);
+    --color-cf-warning: var(--cf-warning);
+    --color-cf-warning-foreground: var(--cf-warning-foreground);
+    --color-cf-warning-surface: var(--cf-warning-surface);
+    --color-cf-error: var(--cf-error);
+    --color-cf-error-foreground: var(--cf-error-foreground);
+    --color-cf-error-surface: var(--cf-error-surface);
+    --color-cf-info: var(--cf-info);
+    --color-cf-info-foreground: var(--cf-info-foreground);
+    --color-cf-info-surface: var(--cf-info-surface);
+    --color-cf-highlight: var(--cf-highlight);
+    --color-cf-highlight-foreground: var(--cf-highlight-foreground);
+    --color-cf-highlight-surface: var(--cf-highlight-surface);
+    --color-cf-update: var(--cf-update);
+    --color-cf-update-foreground: var(--cf-update-foreground);
+    --color-cf-update-surface: var(--cf-update-surface);
+    --color-cf-diff-addition: var(--cf-diff-addition);
+    --color-cf-diff-addition-surface: var(--cf-diff-addition-surface);
+    --color-cf-diff-deletion: var(--cf-diff-deletion);
+    --color-cf-diff-deletion-surface: var(--cf-diff-deletion-surface);
+    --color-cf-diff-modified: var(--cf-diff-modified);
+    --color-cf-chart-1: var(--cf-chart-1);
+    --color-cf-chart-2: var(--cf-chart-2);
+    --color-cf-chart-3: var(--cf-chart-3);
+    --color-cf-chart-4: var(--cf-chart-4);
+    --color-cf-chart-5: var(--cf-chart-5);
+    --color-cf-chart-6: var(--cf-chart-6);
 }
 
 :root {
@@ -100,7 +174,8 @@
 }
 
 /* The component tier (docs/notes/theme-slots-1-engine.md): every shadcn and shell colour
- * name is an alias of a semantic slot. The slots themselves (--cf-*, --terminal-*, --syn-*,
+ * name is an alias of a semantic slot, kept for components/ui (vendored shadcn); the app's
+ * own components use the slots (docs/notes/theme-slots-2-components.md). The slots themselves (--cf-*, --terminal-*, --syn-*,
  * --sh-*) are set inline by lib/theme.ts on <html> from the active theme, and by
  * components/themes/ThemeScope.tsx on a preview. A var() alias resolves where it is
  * declared and inherits as a value, so the block is declared on every scope too, or a
@@ -158,7 +233,7 @@
 
 /* Type roles (docs/notes/design-system-1-tokens.md). One class bundles size, line-height,
  * weight, tracking and default colour; a colour or weight utility still wins over it
- * (`text-caption text-foreground`, `text-body font-medium`): Tailwind orders utilities by
+ * (`text-caption text-cf-text`, `text-body font-medium`): Tailwind orders utilities by
  * their first property, and font-family/font-size come before font-weight and color, so a
  * role always lands ahead of the single-property utilities (src/design/roles.test.ts).
  * src/design/tokens.ts lists the names too, for cn()'s merge table. */
@@ -167,7 +242,7 @@
   line-height: 28px;
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 /* Display figures: a page's or panel's one big number (Usage totals). */
 @utility text-display {
@@ -176,7 +251,7 @@
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-display-sm {
   font-size: 32px;
@@ -184,7 +259,7 @@
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 /* The sidebar's app name: the one title-band brand mark, between heading and title. */
 @utility text-brand {
@@ -192,19 +267,19 @@
   line-height: 20px;
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-heading {
   font-size: 15px;
   line-height: 20px;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-subheading {
   font-size: 14px;
   line-height: 20px;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-overline {
   font-size: 11px;
@@ -212,42 +287,42 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 @utility text-body {
   font-size: 15px;
   line-height: 22px;
   font-weight: 400;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-body-sm {
   font-size: 13px;
   line-height: 18px;
   font-weight: 400;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-label {
   font-size: 14px;
   line-height: 20px;
   font-weight: 500;
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 @utility text-caption {
   font-size: 13px;
   line-height: 18px;
   font-weight: 400;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 @utility text-caption-sm {
   font-size: 12px;
   line-height: 16px;
   font-weight: 400;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 /* Inline roles: they keep the surrounding size and line-height. */
 @utility text-link {
   font-weight: 500;
-  color: var(--link);
+  color: var(--cf-link);
   &:hover {
     text-decoration-line: underline;
   }
@@ -260,7 +335,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-cf-border outline-cf-focus/50;
   }
   html,
   body,
@@ -269,7 +344,7 @@
     overflow: hidden;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-cf-canvas text-cf-text antialiased;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     -webkit-user-select: none;
     user-select: none;
@@ -395,19 +470,19 @@
    (docs/notes/theme-4-forms.md). */
 .cf-markdown input[type="checkbox"] {
   opacity: 1;
-  accent-color: var(--info);
+  accent-color: var(--cf-info);
 }
 .cf-markdown a {
-  color: var(--link);
+  color: var(--cf-link);
   cursor: pointer;
 }
 .cf-markdown a:hover {
   text-decoration: underline;
 }
 .cf-markdown :not(pre) > code {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 4px;
-  background: var(--muted);
+  background: var(--cf-code-background);
   padding: 0.05em 0.35em;
   font-size: 0.88em;
 }
@@ -416,9 +491,9 @@
 }
 /* Keys (<kbd>⌘N</kbd>, the help overlay's guide), drawn like the shortcut list's. */
 .cf-markdown kbd {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  background: color-mix(in oklab, var(--cf-surface-sunken) 60%, transparent);
   padding: 0.05em 0.4em;
   font-family: inherit;
   font-size: 0.85em;
@@ -426,20 +501,20 @@
 }
 .cf-markdown pre {
   overflow-x: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 6px;
-  background: var(--muted);
+  background: var(--cf-code-background);
   padding: 0.6em 0.8em;
   font-size: 12px;
 }
 .cf-markdown blockquote {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--cf-quote-border);
   padding-left: 0.8em;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 .cf-markdown hr {
   margin: 1em 0;
-  border-color: var(--border);
+  border-color: var(--cf-border);
 }
 .cf-markdown table {
   display: block;
@@ -447,7 +522,7 @@
   border-collapse: collapse;
 }
 .cf-markdown :where(th, td) {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   padding: 0.25em 0.6em;
 }
 .cf-markdown img {
@@ -459,13 +534,13 @@
 }
 .cf-markdown summary {
   cursor: pointer;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 .cf-markdown details[open] > summary {
   margin-bottom: 0.4em;
 }
 .cf-markdown kbd {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0 0.3em;
@@ -480,7 +555,7 @@
 }
 .cf-markdown mark {
   border-radius: 4px;
-  background: color-mix(in oklab, var(--highlight) 22%, transparent);
+  background: color-mix(in oklab, var(--cf-highlight) 22%, transparent);
   padding: 0 0.15em;
   color: inherit;
 }
@@ -489,7 +564,4 @@
 }
 .cf-markdown s {
   text-decoration-line: line-through;
-}
-.dark .cf-markdown:not(:where(.light *)) :where(pre, :not(pre) > code) {
-  background: oklch(1 0 0 / 5%);
 }

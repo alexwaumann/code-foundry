@@ -24,8 +24,8 @@ const PLACEHOLDER = "Tell Ember what you want done…";
 const BUSY_PLACEHOLDER = "Tell Ember more; it reads it mid-turn…";
 
 /** A header toggle: muted text, the accent background while on. */
-const TOGGLE = "gap-1.5 px-2 text-label font-medium text-muted-foreground [--wails-draggable:no-drag] [&_svg]:size-3.5";
-const TOGGLE_ON = "bg-accent text-foreground hover:bg-accent dark:bg-accent/50";
+const TOGGLE = "gap-1.5 px-2 text-label font-medium text-cf-text-muted [--wails-draggable:no-drag] [&_svg]:size-3.5";
+const TOGGLE_ON = "bg-cf-control-hover text-cf-text hover:bg-cf-control-hover dark:bg-cf-control-hover/50";
 
 /**
  * "1 needs you · 2 threads working · 1 blocked · 1 queued" from the board, with an amber
@@ -35,9 +35,9 @@ function HeaderStatus() {
   const summary = useHeaderSummary();
   const dot = useHeaderDot();
   return (
-    <span className="flex min-w-0 shrink items-center gap-1.5 px-1 text-caption whitespace-nowrap text-muted-foreground" data-testid="ember-header-status">
-      {dot === "sky" && <span className="size-1.5 shrink-0 rounded-full bg-info shadow-[0_0_0_2px_color-mix(in_oklab,var(--info)_25%,transparent)]" data-dot="sky" aria-hidden />}
-      {dot === "amber" && <span className="size-1.5 shrink-0 rounded-full bg-warning" data-dot="amber" aria-hidden />}
+    <span className="flex min-w-0 shrink items-center gap-1.5 px-1 text-caption whitespace-nowrap text-cf-text-muted" data-testid="ember-header-status">
+      {dot === "sky" && <span className="size-1.5 shrink-0 rounded-full bg-cf-info shadow-[0_0_0_2px_color-mix(in_oklab,var(--cf-info)_25%,transparent)]" data-dot="sky" aria-hidden />}
+      {dot === "amber" && <span className="size-1.5 shrink-0 rounded-full bg-cf-warning" data-dot="amber" aria-hidden />}
       <span className="truncate">{summary || "Nothing in progress"}</span>
     </span>
   );
@@ -131,28 +131,28 @@ export function EmberBody({ threadId }: { threadId: string }) {
         <PaneHeader className="gap-2 px-3" data-testid="thread-header">
           <span className="flex min-w-0 shrink-0 items-center gap-1.5 px-0.5" data-testid="ember-title">
             <Flame state={flame} size="header" />
-            <span className="text-label text-foreground">Ember</span>
+            <span className="text-label text-cf-text">Ember</span>
           </span>
           <HeaderStatus />
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
+          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col">
           {loaded && catchingUp && (
             <div
-              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-popover/90 px-2 py-0.5 text-caption-sm"
+              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
               data-testid="thread-catching-up"
             >
               <Loader2 className="size-3 animate-spin" />
               catching up…
             </div>
           )}
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
           {loaded && empty && !working && (
             <div className="absolute inset-x-0 top-1/3 flex flex-col items-center gap-3 px-10 text-center" data-testid="ember-empty">
               <Flame state="idle" size="hero" />
-              <p className="text-body text-muted-foreground">Tell Ember what you want done. It plans the work, starts worker threads and reports back here.</p>
+              <p className="text-body text-cf-text-muted">Tell Ember what you want done. It plans the work, starts worker threads and reports back here.</p>
             </div>
           )}
           <EmberPathPlace>

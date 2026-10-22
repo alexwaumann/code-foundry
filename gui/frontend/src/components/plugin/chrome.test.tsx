@@ -138,8 +138,8 @@ describe("the frame", () => {
     inPanel({ toolbar: [text("t1")], footer: [text("f1")] });
     const tb = screen.getByTestId("plugin-toolbar").className;
     const ft = screen.getByTestId("plugin-footer").className;
-    for (const c of ["border-b", "border-pane-border", "px-4", "py-2", "@max-[340px]:px-3", "bg-pane"]) expect(tb).toContain(c);
-    for (const c of ["border-t", "border-pane-border", "px-4", "py-2", "@max-[340px]:px-3", "bg-pane"]) expect(ft).toContain(c);
+    for (const c of ["border-b", "border-cf-divider", "px-4", "py-2", "@max-[340px]:px-3", "bg-cf-surface"]) expect(tb).toContain(c);
+    for (const c of ["border-t", "border-cf-divider", "px-4", "py-2", "@max-[340px]:px-3", "bg-cf-surface"]) expect(ft).toContain(c);
     expect(tb).not.toContain("border-t");
     expect(ft).not.toContain("border-b");
     cleanup();

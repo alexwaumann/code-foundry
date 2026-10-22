@@ -31,7 +31,7 @@ export function WorkerModelsEditor({ field, value, pending, invalid, commit }: E
             aria-disabled={last || undefined}
             disabled={pending}
             data-model={m.value}
-            className={cn("rounded-full px-2.5 font-medium", on ? "border-info bg-info/12 text-foreground hover:bg-info/18 dark:border-info dark:bg-info/12 dark:hover:bg-info/18" : "text-muted-foreground")}
+            className={cn("rounded-full px-2.5 font-medium", on ? "border-cf-info bg-cf-info-surface text-cf-text hover:bg-cf-info/18 dark:border-cf-info dark:bg-cf-info-surface dark:hover:bg-cf-info/18" : "text-cf-text-muted")}
             onClick={() => {
               if (last) return;
               commit(toggleModel(list, m.value).join(","));

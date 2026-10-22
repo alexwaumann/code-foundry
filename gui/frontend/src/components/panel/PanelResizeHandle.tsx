@@ -43,7 +43,7 @@ export function PanelResizeHandle({ panelKey, width, max, onDragChange }: { pane
       aria-valuemin={PANEL_MIN}
       aria-valuemax={Math.max(PANEL_MIN, max)}
       data-testid="panel-resize-handle"
-      className="absolute top-0 -left-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
+      className="absolute top-0 -left-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-cf-focus focus-visible:after:bg-cf-focus active:after:bg-cf-focus"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

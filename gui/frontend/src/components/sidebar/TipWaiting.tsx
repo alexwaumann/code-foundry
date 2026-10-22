@@ -20,15 +20,15 @@ export function TipWaiting({ id }: { id: string }) {
   if (n === null) return null;
   return (
     <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-waiting">
-      <Hourglass className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <Hourglass className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
       <div className="min-w-0">
         <div className="break-words">{waitingText(n)}</div>
         {names.map((name, i) => (
-          <div key={i} className="truncate text-muted-foreground" data-testid="tip-waiting-name">
+          <div key={i} className="truncate text-cf-text-muted" data-testid="tip-waiting-name">
             {name}
           </div>
         ))}
-        {more > 0 && <div className="text-muted-foreground" data-testid="tip-waiting-more">{`+${String(more)} more`}</div>}
+        {more > 0 && <div className="text-cf-text-muted" data-testid="tip-waiting-more">{`+${String(more)} more`}</div>}
       </div>
     </div>
   );

@@ -134,7 +134,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
       }}
     >
       <DialogDescription className="mt-1 pr-7 text-caption">
-        Saved for every thread in <span className="font-medium text-foreground">{project}</span>. Runs in {where} and opens as a tab in the bottom panel.
+        Saved for every thread in <span className="font-medium text-cf-text">{project}</span>. Runs in {where} and opens as a tab in the bottom panel.
       </DialogDescription>
       <div className="mt-4 flex flex-col gap-3.5">
         <div className="flex flex-col gap-1.5">
@@ -193,7 +193,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             }}
           />
         </div>
-        <div className="flex items-center gap-3 rounded-md border border-border/70 px-3 py-2 text-body dark:border-transparent dark:bg-foreground/[0.035]">
+        <div className="flex items-center gap-3 rounded-md border border-cf-border/70 px-3 py-2 text-body dark:border-transparent dark:bg-cf-text/[0.035]">
           <span className="min-w-0 flex-1">
             Run automatically when a worktree is created
             <small className="mt-px block text-caption">In the background, for a new thread's worktree; failures notify you</small>
@@ -210,7 +210,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
         </div>
       </div>
       {(error !== null || gone) && (
-        <p className="mt-3 text-caption text-destructive" role="alert" data-testid="action-error">
+        <p className="mt-3 text-caption text-cf-error" role="alert" data-testid="action-error">
           {gone ? "This action was deleted." : error}
         </p>
       )}
@@ -251,7 +251,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
               size="sm"
               variant="ghost"
               disabled={busy}
-              className="-ml-1.5 text-destructive hover:text-destructive"
+              className="-ml-1.5 text-cf-error hover:text-cf-error"
               data-testid="action-delete"
               ref={deleteRef}
               onClick={() => {
@@ -310,7 +310,7 @@ export function ActionDialog() {
         {target !== null && <ActionForm key={seq} target={target} keysRef={keys} />}
         {/* After the form, so the dialog's first focus lands on Name. */}
         <DialogClose
-          className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50"
           aria-label="Close"
           data-testid="action-dialog-close"
         >

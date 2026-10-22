@@ -32,7 +32,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
     >
       <DialogContent className="max-w-md p-5" data-testid="uninstall-dialog">
         <div className="flex gap-3">
-          <Trash2 className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <Trash2 className="mt-0.5 size-5 shrink-0 text-cf-text-muted" aria-hidden />
           <div className="min-w-0 flex-1 space-y-3">
             <DialogTitle>Uninstall {displayName}?</DialogTitle>
             <DialogDescription className="break-words">
@@ -61,7 +61,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
             variant="outline"
             size="sm"
             autoFocus
-            className="border-destructive/40 bg-transparent text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40 dark:bg-transparent"
+            className="border-cf-error/40 bg-transparent text-cf-error hover:bg-cf-error-surface hover:text-cf-error dark:border-cf-error/40 dark:bg-transparent"
             onClick={() => {
               onClose();
               void uninstallPlugin(name, purge);

@@ -51,9 +51,9 @@ function EnvSummary({ env }: { env: PluginEnvironmentView }) {
   const empty = env.env.length === 0 && env.pathPrepend.length === 0 && env.addDirs.length === 0;
   if (empty && env.issues.length === 0) return null;
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-md border border-border px-3 py-2" data-testid="plugin-env">
+    <div className="flex min-w-0 flex-col gap-1 rounded-md border border-cf-border px-3 py-2" data-testid="plugin-env">
       <p className="text-caption-sm">New threads in {scopeWords(env.projects, env.noProject, projectName)} get:</p>
-      <ul className="flex min-w-0 flex-col gap-0.5 font-mono text-caption-sm text-foreground">
+      <ul className="flex min-w-0 flex-col gap-0.5 font-mono text-caption-sm text-cf-text">
         {env.env.map((k) => (
           <li key={k} className="truncate">
             {k}
@@ -71,7 +71,7 @@ function EnvSummary({ env }: { env: PluginEnvironmentView }) {
         ))}
       </ul>
       {env.issues.map((i) => (
-        <p key={i} className="text-caption-sm text-warning">
+        <p key={i} className="text-caption-sm text-cf-warning">
           {i}
         </p>
       ))}
@@ -93,7 +93,7 @@ function SurfaceButtons({ p }: { p: PluginView }) {
           <Button
             variant="ghost"
             size="xs"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-cf-text-muted hover:text-cf-text"
             disabled={!ok}
             onClick={() => {
               startCommandNamed(s.showCommand);
@@ -143,12 +143,12 @@ function PluginRow({
   return (
     <div className={cn("flex min-w-0 flex-col gap-2 px-4 py-3", className)} data-testid="plugin-row-settings" data-plugin={p.name} data-state={p.state}>
       <div className="flex min-w-0 items-start gap-3">
-        <PluginIcon name={p.surfaces[0]?.icon} fallback="puzzle" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <PluginIcon name={p.surfaces[0]?.icon} fallback="puzzle" className="mt-0.5 size-4 shrink-0 text-cf-text-muted" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="min-w-0 truncate text-label">{p.displayName}</span>
             <span className="shrink-0 font-mono text-caption-sm">{p.version}</span>
-            {p.dev && <span className="shrink-0 rounded-sm border border-border px-1 text-caption-sm">dev</span>}
+            {p.dev && <span className="shrink-0 rounded-sm border border-cf-border px-1 text-caption-sm">dev</span>}
             <PillView pill={pill} className="ml-auto" />
           </div>
           {p.description && <p className="line-clamp-2 text-caption">{p.description}</p>}
@@ -157,14 +157,14 @@ function PluginRow({
               {proc}
             </p>
           )}
-          {p.disabledReason && <p className="text-caption-sm text-warning">{p.disabledReason}</p>}
+          {p.disabledReason && <p className="text-caption-sm text-cf-warning">{p.disabledReason}</p>}
           {p.lastError && p.state !== "running" && (
-            <p className="font-mono text-caption-sm break-words text-destructive" data-testid="plugin-last-error">
+            <p className="font-mono text-caption-sm break-words text-cf-error" data-testid="plugin-last-error">
               {p.lastError}
             </p>
           )}
           {p.issues.map((i) => (
-            <p key={i} className="text-caption-sm text-warning">
+            <p key={i} className="text-caption-sm text-cf-warning">
               {i}
             </p>
           ))}
@@ -175,7 +175,7 @@ function PluginRow({
             </p>
           )}
           {update && (
-            <p className="text-caption-sm text-warning" data-testid="plugin-update-available">
+            <p className="text-caption-sm text-cf-warning" data-testid="plugin-update-available">
               {p.updateVersion} is available.
             </p>
           )}
@@ -193,7 +193,7 @@ function PluginRow({
             </Button>
           )}
           {p.enabled ? (
-            <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={() => void runCommand("plugin.disable", { name: p.name })} data-testid="plugin-disable">
+            <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.disable", { name: p.name })} data-testid="plugin-disable">
               <PowerOff aria-hidden />
               Disable
             </Button>
@@ -201,7 +201,7 @@ function PluginRow({
             <Button
               variant="outline"
               size="xs"
-              className={cn("bg-transparent dark:bg-transparent", main && "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/40")}
+              className={cn("bg-transparent dark:bg-transparent", main && "border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40")}
               onClick={() => void runCommand("plugin.enable", { name: p.name })}
               data-testid="plugin-enable"
             >
@@ -210,7 +210,7 @@ function PluginRow({
             </Button>
           )}
           {p.enabled && (
-            <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={() => void runCommand("plugin.restart", { name: p.name })} data-testid="plugin-restart-settings">
+            <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.restart", { name: p.name })} data-testid="plugin-restart-settings">
               <RotateCcw aria-hidden />
               Restart
             </Button>
@@ -218,7 +218,7 @@ function PluginRow({
           <Button
             variant="ghost"
             size="xs"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-cf-text-muted hover:text-cf-text"
             onClick={() => {
               onLogs(p.name);
             }}
@@ -238,7 +238,7 @@ function PluginRow({
           <Button
             variant="ghost"
             size="xs"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-cf-text-muted hover:text-cf-text"
             disabled={busy !== undefined}
             onClick={() => {
               onUninstall(p.name);
@@ -294,7 +294,7 @@ export function PluginsPage({ schema, page }: { schema: SettingsSchemaView; page
             No plugins yet. Add a dev plugin from a folder, or put one in {dir}.
           </p>
         ) : (
-          names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-border" : undefined} onLogs={setLogsOf} onUninstall={setUninstallOf} />)
+          names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-cf-border" : undefined} onLogs={setLogsOf} onUninstall={setUninstallOf} />)
         )}
       </SectionCard>
       <BrowseSection />

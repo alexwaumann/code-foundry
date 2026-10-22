@@ -105,10 +105,10 @@ describe("MCP surface", () => {
     expect(within(card("linear"), "mcp-login-hint")?.textContent).toBe("Needs login · run claude in a shell and use /mcp, then reconnect");
     // Reconnect everywhere but connecting and disabled; amber on the ones that need you.
     expect(cards().map((c) => within(c, "mcp-reconnect") !== null)).toEqual([true, true, true, false, false]);
-    expect(within(card("playwright"), "mcp-reconnect")?.className).toContain("border-warning/40");
+    expect(within(card("playwright"), "mcp-reconnect")?.className).toContain("border-cf-warning/40");
     expect(within(card("github"), "mcp-reconnect")?.className).toContain("border-transparent");
-    expect(card("playwright").className).toContain("border-destructive/35");
-    expect(card("linear").className).toContain("border-warning/35");
+    expect(card("playwright").className).toContain("border-cf-error/35");
+    expect(card("linear").className).toContain("border-cf-warning/35");
   });
 
   it("expands a server's tools with their hint icons", () => {
@@ -227,7 +227,7 @@ describe("MCP surface staleness", () => {
   }
   function expectStale(on: boolean): void {
     expect(header().getAttribute("data-stale")).toBe(on ? "true" : null);
-    expect(screen.getByTestId("mcp-checked-line").className.includes("text-warning")).toBe(on);
+    expect(screen.getByTestId("mcp-checked-line").className.includes("text-cf-warning")).toBe(on);
     for (const p of pills()) {
       expect(p.getAttribute("data-stale")).toBe(on ? "true" : null);
       expect(p.className.includes("border-dashed")).toBe(on);

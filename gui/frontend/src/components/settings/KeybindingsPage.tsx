@@ -51,7 +51,7 @@ function ExpanderRow({ open, onToggle, className, testId, children }: { open: bo
     <button
       type="button"
       aria-expanded={open}
-      className={cn("flex h-9 w-full items-center gap-2 px-4 text-left text-body-sm text-muted-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50", className)}
+      className={cn("flex h-9 w-full items-center gap-2 px-4 text-left text-body-sm text-cf-text-muted outline-none hover:bg-cf-control-hover/50 focus-visible:bg-cf-control-hover/50", className)}
       onClick={onToggle}
       data-testid={testId}
     >
@@ -127,13 +127,13 @@ export function KeybindingsPage({ schema, page }: { schema: SettingsSchemaView; 
               return (
                 <div key={section.id} className={rowBorder(i)} data-section={section.id}>
                   <ExpanderRow open={expanded} onToggle={() => { toggle(section.id); }} testId={`keybindings-category-${section.id}`}>
-                    <span className="flex-1 text-foreground">{section.title}</span>
+                    <span className="flex-1 text-cf-text">{section.title}</span>
                     <span className="text-caption-sm tabular-nums">{cmds.length} unbound</span>
                   </ExpanderRow>
                   {expanded && (
-                    <div className="ml-5 border-l border-border">
+                    <div className="ml-5 border-l border-cf-border">
                       {cmds.map((f) => (
-                        <KeybindingRow key={f.key} field={f} className="border-t border-border" />
+                        <KeybindingRow key={f.key} field={f} className="border-t border-cf-border" />
                       ))}
                     </div>
                   )}

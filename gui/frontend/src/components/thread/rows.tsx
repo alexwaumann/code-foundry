@@ -153,7 +153,7 @@ function ToolLabel({ t, tense, cwd }: { t: ToolCallView; tense: Tense; cwd: stri
   const file = s.target ? toolFileTarget(t) : null;
   const target =
     s.target && (s.targetStyle === "mono" ? <span className="mono cmd">{s.target}</span> : s.targetStyle === "bold" ? <b>{s.target}</b> : <span>{s.target}</span>);
-  const detail = s.detail && <span className={s.detailMono ? "mono text-muted-foreground" : "text-muted-foreground"}>{s.detail}</span>;
+  const detail = s.detail && <span className={s.detailMono ? "mono text-cf-text-muted" : "text-cf-text-muted"}>{s.detail}</span>;
   return (
     <>
       {s.verb}{" "}
@@ -209,7 +209,7 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
         </span>
       )}
       {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{fmtElapsed(ended)}</span>}
-      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-info" aria-label="Running" />}
+      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-cf-info" aria-label="Running" />}
     </>
   );
 }
@@ -256,7 +256,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         </span>
       )}
       {s.meta && <span>{s.meta}</span>}
-      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-info" aria-label="Running" />}
+      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-cf-info" aria-label="Running" />}
     </>
   );
   // A thread's own run opens in the read-only subagent view; a nested one (spawned by
@@ -448,7 +448,7 @@ const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
           answered ? (
             <>
               Asked {first?.header && <span className="q-hdr">{first.header}</span>} <b>{answer}</b>
-              {questions.length > 1 && <span className="text-muted-foreground"> +{questions.length - 1}</span>}
+              {questions.length > 1 && <span className="text-cf-text-muted"> +{questions.length - 1}</span>}
             </>
           ) : (
             <>Question {r.state === "denied" ? "skipped" : "withdrawn"}</>
@@ -463,7 +463,7 @@ const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
         <dl className="detail grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-sm selectable">
           {questions.map((q) => (
             <div key={q.question} className="contents">
-              <dt className="text-muted-foreground">{q.question}</dt>
+              <dt className="text-cf-text-muted">{q.question}</dt>
               <dd>{r.answers[q.question] ?? "—"}</dd>
             </div>
           ))}
@@ -486,7 +486,7 @@ const PermissionRow = memo(function PermissionRow({ id }: { id: string }) {
       label={
         <>
           {waiting ? "Asks to use" : r.decision === "auto_denied" ? "Not allowed:" : "Permission for"} <b>{r.displayName || r.toolName}</b>
-          {r.description && <span className="text-muted-foreground"> {r.description}</span>}
+          {r.description && <span className="text-cf-text-muted"> {r.description}</span>}
         </>
       }
       meta={waiting ? <span className="t-amber">waiting for you</span> : <span className={r.state === "allowed" ? "chip ok" : "chip fail"}>{r.state}</span>}
@@ -503,7 +503,7 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
   if (!it) return null;
   if (it.kind === "error") {
     return (
-      <div className="my-1.5 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-body-sm selectable" data-testid="thread-error">
+      <div className="my-1.5 flex items-start gap-2 rounded-md border border-cf-error/30 bg-cf-error/5 px-2.5 py-1.5 text-body-sm selectable" data-testid="thread-error">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0 t-red" aria-hidden />
         <span className="t-red whitespace-pre-wrap">{it.text}</span>
       </div>

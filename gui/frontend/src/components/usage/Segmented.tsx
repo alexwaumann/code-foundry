@@ -13,7 +13,7 @@ interface SegmentedProps<T extends string | number> {
 /** A small segmented control (the Usage page's range and Tokens / Cost): pressed buttons in a bordered strip. */
 export function Segmented<T extends string | number>({ options, value, onChange, className, "aria-label": label, "data-testid": testId }: SegmentedProps<T>) {
   return (
-    <div role="group" aria-label={label} className={cn("inline-flex gap-0.5 rounded-md border border-border p-0.5 text-caption-sm font-medium [--wails-draggable:no-drag]", className)} data-testid={testId}>
+    <div role="group" aria-label={label} className={cn("inline-flex gap-0.5 rounded-md border border-cf-border p-0.5 text-caption-sm font-medium [--wails-draggable:no-drag]", className)} data-testid={testId}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -21,7 +21,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             key={String(o.value)}
             type="button"
             aria-pressed={on}
-            className={cn("rounded-sm px-2 py-0.5 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring/50", on ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            className={cn("rounded-sm px-2 py-0.5 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50", on ? "bg-cf-surface-sunken text-cf-text" : "text-cf-text-muted hover:text-cf-text")}
             onClick={() => {
               onChange(o.value);
             }}

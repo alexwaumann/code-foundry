@@ -46,7 +46,7 @@ export function LogNode({ data }: NodeProps<"log">) {
         <div
           ref={box}
           className={cn(
-            "min-h-0 overflow-auto rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-caption-sm text-foreground select-text [font-variant-ligatures:none]",
+            "min-h-0 overflow-auto rounded-md border border-cf-border bg-cf-surface-sunken/40 px-2 py-1.5 font-mono text-caption-sm text-cf-text select-text [font-variant-ligatures:none]",
             !data.wrap && "whitespace-pre",
           )}
           style={{ height: rows * LINE_PX + BOX_PAD, minHeight: Math.min(rows, MIN_ROWS) * LINE_PX + BOX_PAD }}
@@ -57,7 +57,7 @@ export function LogNode({ data }: NodeProps<"log">) {
             setAtEnd(el.scrollHeight - el.scrollTop - el.clientHeight < LINE_PX);
           }}
         >
-          {data.truncated && <div className="text-muted-foreground italic">earlier output not shown</div>}
+          {data.truncated && <div className="text-cf-text-muted italic">earlier output not shown</div>}
           {lines.map((l, i) => (
             <div key={i} className={cn(data.wrap && "pl-[2ch] -indent-[2ch] break-words whitespace-pre-wrap", toneText[l.tone ?? ""])} data-tone={l.tone || undefined}>
               {l.text || " "}
@@ -68,7 +68,7 @@ export function LogNode({ data }: NodeProps<"log">) {
           <Button
             variant="outline"
             size="xs"
-            className="absolute right-2 bottom-2 bg-pane text-muted-foreground shadow-xs dark:bg-pane"
+            className="absolute right-2 bottom-2 bg-cf-surface text-cf-text-muted shadow-xs dark:bg-cf-surface"
             onClick={() => {
               const el = box.current;
               if (el) el.scrollTop = el.scrollHeight;

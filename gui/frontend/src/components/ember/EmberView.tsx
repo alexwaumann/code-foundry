@@ -33,13 +33,13 @@ export function EmberView() {
     return (
       <EmberNote testId="ember-waking">
         <Flame state="thinking" size="hero" />
-        <p className="text-body text-muted-foreground">Ember is waking up…</p>
+        <p className="text-body text-cf-text-muted">Ember is waking up…</p>
       </EmberNote>
     );
   return (
     <EmberNote testId="ember-off">
       <Flame state="idle" size="hero" />
-      <p className="text-body text-muted-foreground">Ember is off.</p>
+      <p className="text-body text-cf-text-muted">Ember is off.</p>
       <Button type="button" variant="outline" size="sm" onClick={openEmberSettings}>
         Open Ember settings
       </Button>

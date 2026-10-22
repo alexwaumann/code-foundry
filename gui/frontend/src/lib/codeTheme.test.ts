@@ -9,7 +9,7 @@ describe("codeThemeOf", () => {
     const t = codeThemeOf(theme);
     expect(t.name).toBe(codeThemeName(theme.id));
     expect(t.type).toBe(theme.scheme);
-    expect(t.colors?.["editor.background"]).toBe(theme.vars["--pane"]);
+    expect(t.colors?.["editor.background"]).toBe(theme.slots["--cf-surface"]);
     expect(t.colors?.["editor.foreground"]).toBe(theme.vars["--syn-fg"]);
     for (const v of Object.values(t.colors ?? {})) expect(v).toMatch(HEX);
     expect(t.tokenColors?.length).toBeGreaterThan(0);

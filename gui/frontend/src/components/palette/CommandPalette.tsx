@@ -28,7 +28,7 @@ function CommandRow({ c, onPick }: { c: CommandView; onPick: (c: CommandView) =>
       data-command={c.name}
     >
       <span className="truncate">{c.title}</span>
-      {promptedArgs(c).length > 0 && <ChevronRight className="size-3.5 text-muted-foreground" aria-label="asks for input" />}
+      {promptedArgs(c).length > 0 && <ChevronRight className="size-3.5 text-cf-text-muted" aria-label="asks for input" />}
       <span className="truncate text-caption">{c.name}</span>
       {c.keybindings[0] && <CommandShortcut>{formatChord(c.keybindings[0])}</CommandShortcut>}
     </CommandItem>
@@ -237,10 +237,10 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
         leading={
           prompt && spec ? (
             <span className="flex shrink-0 items-center gap-1 text-body-sm whitespace-nowrap">
-              <span className="rounded-sm bg-accent px-1.5 py-0.5 text-accent-foreground">{prompt.command.title}</span>
-              <ChevronRight className="size-3 text-muted-foreground" />
-              <span className="font-mono text-muted-foreground">{spec.name}</span>
-              <span className="text-muted-foreground tabular-nums">
+              <span className="rounded-sm bg-cf-control-hover px-1.5 py-0.5 text-cf-text">{prompt.command.title}</span>
+              <ChevronRight className="size-3 text-cf-text-muted" />
+              <span className="font-mono text-cf-text-muted">{spec.name}</span>
+              <span className="text-cf-text-muted tabular-nums">
                 {prompt.index + 1}/{prompt.specs.length}
               </span>
             </span>
@@ -281,7 +281,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
                     submit(v);
                   }}
                 >
-                  {spec.type === "bool" ? (v === "true" ? "Yes" : "No") : v === UNSET_CHOICE ? <span className="text-muted-foreground">Default (not set)</span> : v}
+                  {spec.type === "bool" ? (v === "true" ? "Yes" : "No") : v === UNSET_CHOICE ? <span className="text-cf-text-muted">Default (not set)</span> : v}
                   {v === spec.defaultValue && <span className="text-caption">default</span>}
                 </CommandItem>
               ))}
@@ -302,7 +302,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
                   Use <span className="font-mono">{query}</span>
                 </span>
               ) : (
-                <span className="text-muted-foreground">{spec.defaultValue ? `Use default (${spec.defaultValue})` : `Enter ${spec.name}`}</span>
+                <span className="text-cf-text-muted">{spec.defaultValue ? `Use default (${spec.defaultValue})` : `Enter ${spec.name}`}</span>
               )}
             </CommandItem>
           </CommandGroup>
@@ -318,7 +318,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
       </CommandList>
       {(argError ?? prompt) && (
         <div className="flex items-center justify-between border-t px-3 py-1.5 text-caption">
-          <span className={argError ? "text-destructive" : "text-muted-foreground"} role={argError ? "alert" : undefined}>
+          <span className={argError ? "text-cf-error" : "text-cf-text-muted"} role={argError ? "alert" : undefined}>
             {argError ?? (isPath ? "Tab completes · / opens the highlighted folder · ⌫ on empty input goes back · Esc cancels" : "⌫ on empty input goes back · Esc cancels")}
           </span>
         </div>

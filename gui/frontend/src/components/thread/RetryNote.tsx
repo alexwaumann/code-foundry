@@ -31,7 +31,7 @@ export function RetryNote({ threadId }: { threadId: string }) {
   const note = retryNote({ retry, nowMs: seconds * 1000 });
   if (!note) return null;
   return (
-    <p className="col-span-2 px-4 pt-2.5 text-caption text-warning" role="status" data-testid="thread-retry">
+    <p className="col-span-2 px-4 pt-2.5 text-caption text-cf-warning" role="status" data-testid="thread-retry">
       {note}
     </p>
   );

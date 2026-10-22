@@ -326,7 +326,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
           data-mode={open.mode}
           data-editing={open.editId ? "" : undefined}
           data-hidden={visible ? undefined : ""}
-          className={open.mode === "button" ? "w-auto rounded-md border-[color-mix(in_oklab,var(--foreground)_12%,var(--border))] p-0 data-[hidden]:invisible" : "w-80 p-2 data-[hidden]:invisible"}
+          className={open.mode === "button" ? "w-auto rounded-md border-[color-mix(in_oklab,var(--cf-text)_12%,var(--cf-border))] p-0 data-[hidden]:invisible" : "w-80 p-2 data-[hidden]:invisible"}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             if (open.mode === "comment") fieldRef.current?.focus();
@@ -339,13 +339,13 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
             <button
               type="button"
               data-testid="cite-button"
-              className="flex h-7 items-center gap-1.5 pr-2.5 pl-2 text-body-sm font-medium outline-none hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--popover))] focus-visible:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--popover))]"
+              className="flex h-7 items-center gap-1.5 pr-2.5 pl-2 text-body-sm font-medium outline-none hover:bg-[color-mix(in_oklab,var(--cf-text)_6%,var(--cf-surface-overlay))] focus-visible:bg-[color-mix(in_oklab,var(--cf-text)_6%,var(--cf-surface-overlay))]"
               onMouseDown={(e) => {
                 e.preventDefault();
               }}
               onClick={toComment}
             >
-              <Quote aria-hidden className="size-3 fill-current stroke-0 text-warning" />
+              <Quote aria-hidden className="size-3 fill-current stroke-0 text-cf-warning" />
               Cite
             </button>
           ) : (

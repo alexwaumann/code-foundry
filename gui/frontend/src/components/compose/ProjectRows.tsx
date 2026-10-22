@@ -32,7 +32,7 @@ export function ProjectBadge({ name, className }: { name: string; className?: st
 /** The House badge that stands for "No project" where a project shows its two letters. */
 export function NoProjectBadge({ className }: { className?: string }) {
   return (
-    <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground ${className ?? ""}`}>
+    <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-md bg-cf-surface-sunken text-cf-text-muted ${className ?? ""}`}>
       <House className="size-3.5" />
     </span>
   );
@@ -43,7 +43,7 @@ const workspaceValue = (workspaceId: string) => draftKey({ kind: "workspace", wo
 
 /** The check on the row of the picker's current target. */
 function CurrentMark() {
-  return <Check aria-label="Current" className="ml-auto size-3.5 shrink-0 text-muted-foreground" data-testid="picker-current" />;
+  return <Check aria-label="Current" className="ml-auto size-3.5 shrink-0 text-cf-text-muted" data-testid="picker-current" />;
 }
 
 function ProjectRow({ id, index, current, onPick }: { id: string; index?: number; current: boolean; onPick: (id: string) => void }) {
@@ -95,7 +95,7 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
       data-current={current || undefined}
       className="gap-3 py-2"
     >
-      <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-cf-surface-sunken text-cf-text-muted">
         <Layers className="size-3.5" />
       </span>
       <span className="flex min-w-0 flex-col">

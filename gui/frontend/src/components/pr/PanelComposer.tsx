@@ -142,8 +142,8 @@ export function PanelComposer({
 
   const SubmitIcon = submit.icon;
   return (
-    <section className={cn("flex flex-col gap-2 border-b border-pane-border px-4 py-3 @max-[340px]:px-3", className)} aria-label={ariaLabel} data-testid={testIds.root} {...dataAttrs}>
-      <Label htmlFor={inputId} className={cn("gap-1.5 text-body-sm", labelClassName ?? "text-muted-foreground")} data-testid={testIds.label}>
+    <section className={cn("flex flex-col gap-2 border-b border-cf-divider px-4 py-3 @max-[340px]:px-3", className)} aria-label={ariaLabel} data-testid={testIds.root} {...dataAttrs}>
+      <Label htmlFor={inputId} className={cn("gap-1.5 text-body-sm", labelClassName ?? "text-cf-text-muted")} data-testid={testIds.label}>
         {label}
       </Label>
       <Textarea
@@ -170,7 +170,7 @@ export function PanelComposer({
         <button
           type="button"
           disabled={locked}
-          className="ml-auto shrink-0 rounded-md px-2 py-1 text-body-sm text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-transparent"
+          className="ml-auto shrink-0 rounded-md px-2 py-1 text-body-sm text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:opacity-50 disabled:hover:bg-transparent"
           data-testid={testIds.cancel}
           onClick={close}
         >
@@ -182,7 +182,7 @@ export function PanelComposer({
           aria-busy={submit.busy || undefined}
           aria-label={submit.ariaLabel}
           className={cn(
-            "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-body-sm font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50",
+            "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-body-sm font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-cf-focus disabled:opacity-50",
             submit.className,
           )}
           data-testid={testIds.submit}

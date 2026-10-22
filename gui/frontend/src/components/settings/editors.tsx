@@ -143,7 +143,7 @@ export function KeybindingEditor({ field, value, pending, invalid, commit, setEr
       aria-label={`${field.title} shortcut`}
       aria-invalid={invalid || undefined}
       disabled={pending}
-      className={cn("w-full justify-between px-2.5 font-normal", recording && "border-ring ring-[3px] ring-ring/50")}
+      className={cn("w-full justify-between px-2.5 font-normal", recording && "border-cf-focus ring-[3px] ring-cf-focus/50")}
       onClick={(e) => {
         // WebKit does not focus a button on click; the recorder needs the keydowns.
         e.currentTarget.focus();
@@ -158,7 +158,7 @@ export function KeybindingEditor({ field, value, pending, invalid, commit, setEr
       {recording ? (
         <span className="text-caption">Press a shortcut… (Esc cancels, ⌫ unbinds)</span>
       ) : (
-        <span className={bound ? "" : "text-muted-foreground"}>{bound ? formatChord(value) : "Add shortcut"}</span>
+        <span className={bound ? "" : "text-cf-text-muted"}>{bound ? formatChord(value) : "Add shortcut"}</span>
       )}
     </Button>
   );

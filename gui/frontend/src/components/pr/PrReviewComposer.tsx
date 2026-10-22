@@ -9,9 +9,9 @@ import { toneText } from "./tones";
 
 /** The submit button per verdict: the verdict's tone (Approve green, Request changes red, Comment the primary button). */
 const submitClass: Record<Verdict, string> = {
-  approve: "border border-success/40 bg-success/10 text-success enabled:hover:bg-success/15",
-  "request-changes": "border border-destructive/40 bg-destructive/10 text-destructive enabled:hover:bg-destructive/15",
-  comment: "bg-primary text-primary-foreground enabled:hover:bg-primary/90",
+  approve: "border border-cf-success/40 bg-cf-success-surface text-cf-success enabled:hover:bg-cf-success/15",
+  "request-changes": "border border-cf-error/40 bg-cf-error-surface text-cf-error enabled:hover:bg-cf-error/15",
+  comment: "bg-cf-accent text-cf-accent-foreground enabled:hover:bg-cf-accent/90",
 };
 
 /**
@@ -53,7 +53,7 @@ export function PrReviewComposer({ prRef, verdict, focusRequest, onClose }: { pr
   return (
     <PanelComposer
       ariaLabel={spec.label(prRef.number)}
-      className={verdict === "approve" ? "bg-success/5" : undefined}
+      className={verdict === "approve" ? "bg-cf-success/5" : undefined}
       label={
         <>
           <Icon className="size-3.5" aria-hidden />

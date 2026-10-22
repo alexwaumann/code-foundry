@@ -33,7 +33,7 @@ export function SidebarStatus() {
             icon={ChartColumn}
             tooltip="Usage"
             pressed={usageOpen}
-            className={usageOpen ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
+            className={usageOpen ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground hover:bg-cf-sidebar-row-selected dark:hover:bg-cf-sidebar-row-selected" : undefined}
             data-testid="status-usage"
           />
           <CommandButton command="view.help" icon={CircleHelp} tooltip="Keyboard Shortcuts and Help" data-testid="status-help" />
@@ -43,7 +43,7 @@ export function SidebarStatus() {
             icon={Settings}
             tooltip="Settings"
             pressed={settingsOpen}
-            className={cn("-mr-1.25", settingsOpen && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent")}
+            className={cn("-mr-1.25", settingsOpen && "bg-cf-sidebar-row-selected text-cf-sidebar-foreground hover:bg-cf-sidebar-row-selected dark:hover:bg-cf-sidebar-row-selected")}
             data-testid="status-settings"
           />
         </span>

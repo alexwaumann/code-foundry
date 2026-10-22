@@ -40,7 +40,7 @@ export function BottomResizeHandle({ panelKey, height, max }: { panelKey: string
       aria-valuemin={BOTTOM_MIN}
       aria-valuemax={max}
       data-testid="bottom-resize-handle"
-      className="absolute inset-x-0 -top-shell z-10 h-shell cursor-row-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
+      className="absolute inset-x-0 -top-shell z-10 h-shell cursor-row-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-transparent after:transition-colors hover:after:bg-cf-focus focus-visible:after:bg-cf-focus active:after:bg-cf-focus"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

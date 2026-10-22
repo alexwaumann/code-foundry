@@ -12,9 +12,9 @@ import { InlineView, PillView, PluginButton, PluginIcon } from "./parts";
 export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: ViewHeader | undefined; fallbackTitle: string; icon: string; note?: string }) {
   const hasSubline = inlineSpans(header?.subline).length > 0 || (header?.actions?.length ?? 0) > 0 || Boolean(note);
   return (
-    <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="plugin-header">
+    <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="plugin-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <PluginIcon name={header?.icon || icon} fallback="puzzle" className="size-4 shrink-0 text-muted-foreground" />
+        <PluginIcon name={header?.icon || icon} fallback="puzzle" className="size-4 shrink-0 text-cf-text-muted" />
         <span className="min-w-0 truncate" data-testid="plugin-title">
           {header?.title || fallbackTitle}
         </span>

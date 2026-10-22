@@ -3,7 +3,7 @@ import { DEFAULT_DARK, DEFAULT_LIGHT, themeById } from "@/themes";
 import { setThemePreference, setThemeSlots } from "./theme";
 import { syncWindowBackground, windowBackground } from "./windowBackground";
 
-const sheet = (id: string) => themeById.get(id)?.vars["--sheet"];
+const sheet = (id: string) => themeById.get(id)?.slots["--cf-canvas"];
 
 afterEach(() => {
   setThemePreference("system");

@@ -8,33 +8,29 @@
   /* Status tones from the theme tokens (index.css). Light darkens them a step (15% black
      turns the default 600s into about the 700s), so 11-12px status text clears 4.5:1 on
      the pane (the 600s are about 3:1 for amber and 3.8:1 for emerald). */
-  --t-sky: color-mix(in oklab, var(--info) 85%, black);
-  --t-amber: color-mix(in oklab, var(--warning) 85%, black);
-  --t-emerald: color-mix(in oklab, var(--success) 85%, black);
-  --t-red: var(--destructive);
-  /* Tints (diff lines, chips) mix the plain token into transparent. */
-  --t-emerald-500: var(--success);
-  --t-red-500: var(--destructive);
-  --t-amber-500: var(--warning);
-  /* User messages (variant B): the accent as a tint and a hairline a step stronger than
-     it. The alphas put the default's neutral --primary on today's greys over the pane
-     (237 and 230 of 255 light, 40 and 43 dark); a theme with a coloured --primary gets a
-     tinted bubble. Hovers stay a --foreground tint. */
-  --t-bubble: color-mix(in oklab, var(--primary) 8%, transparent);
-  --t-bubble-border: color-mix(in oklab, var(--primary) 11%, transparent);
-  --t-hover: color-mix(in oklab, var(--foreground) 4%, transparent);
+  --t-sky: color-mix(in oklab, var(--cf-info) 85%, black);
+  --t-amber: color-mix(in oklab, var(--cf-warning) 85%, black);
+  --t-emerald: color-mix(in oklab, var(--cf-success) 85%, black);
+  --t-red: var(--cf-error);
+  /* A diff's +N / -N and added / deleted text: the diff slots, darkened in light like the tones. */
+  --t-add: color-mix(in oklab, var(--cf-diff-addition) 85%, black);
+  --t-del: var(--cf-diff-deletion);
+  /* User messages (variant B): the bubble is its slot (--cf-message-surface, the accent at
+     8% light / 14.5% dark) with a hairline a step stronger than it. Hovers stay a text tint. */
+  --t-bubble-border: color-mix(in oklab, var(--cf-accent) 11%, transparent);
+  --t-hover: color-mix(in oklab, var(--cf-text) 4%, transparent);
   /* Syntax and shell colours (--syn-*, --sh-*) are theme slots, set on <html> with the
      rest (src/themes/slots.ts: from the terminal palette, ANSI slots per scheme, guarded
      for contrast on the pane and code blocks), so a theme recolours both at once. */
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .dark .cf-thread:not(:where(.light *)) {
-  --t-sky: var(--info);
-  --t-amber: var(--warning);
-  --t-emerald: var(--success);
-  --t-bubble: color-mix(in oklab, var(--primary) 14.5%, transparent);
-  --t-bubble-border: color-mix(in oklab, var(--primary) 15.5%, transparent);
-  --t-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --t-sky: var(--cf-info);
+  --t-amber: var(--cf-warning);
+  --t-emerald: var(--cf-success);
+  --t-add: var(--cf-diff-addition);
+  --t-bubble-border: color-mix(in oklab, var(--cf-accent) 15.5%, transparent);
+  --t-hover: color-mix(in oklab, var(--cf-text) 5%, transparent);
 }
 
 .cf-thread .mono {
@@ -90,19 +86,16 @@ html[data-thread-width="full"] .cf-thread {
   tab-size: 4;
   color: var(--syn-fg);
 }
-.dark .cf-thread:not(:where(.light *)) .cf-markdown :where(pre, :not(pre) > code) {
-  background: color-mix(in oklab, var(--foreground) 5%, transparent);
-}
 .cf-thread .cf-markdown th {
   font-weight: 600;
   text-align: left;
 }
 /* Tables (Code.tsx wraps each in .cf-table): a rounded frame that scrolls sideways when
    the table is wider than the column, inner rules and a muted header. Stronger than the
-   PR surface's 1px var(--border) grid, which reads as floating text in dark mode. */
+   PR surface's 1px var(--cf-border) grid, which reads as floating text in dark mode. */
 .cf-thread {
-  --t-table-line: color-mix(in oklab, var(--foreground) 14%, transparent);
-  --t-table-head: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --t-table-line: color-mix(in oklab, var(--cf-text) 14%, transparent);
+  --t-table-head: color-mix(in oklab, var(--cf-text) 5%, transparent);
 }
 .cf-thread .cf-markdown .cf-table {
   margin: 0.75em 0;
@@ -160,7 +153,7 @@ html[data-thread-width="full"] .cf-thread {
   height: 1.05em;
   vertical-align: -2px;
   margin-left: 1px;
-  background: var(--foreground);
+  background: var(--cf-text);
   opacity: 0.7;
   border-radius: 1px;
   animation: cf-caret-blink 1s steps(1) infinite;
@@ -222,7 +215,7 @@ html[data-thread-width="full"] .cf-thread {
   min-height: 24px;
   font-size: 13px;
   line-height: 20px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   border-radius: 6px;
   padding: 1px 2px;
   position: relative;
@@ -233,7 +226,7 @@ html[data-thread-width="full"] .cf-thread {
   background: var(--t-hover);
 }
 .cf-thread button.row:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
   outline-offset: -2px;
 }
 .cf-thread .row .ico {
@@ -257,19 +250,19 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .row .lbl b {
   font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+  color: color-mix(in oklab, var(--cf-text) 82%, transparent);
 }
 .cf-thread .row .lbl .mono {
   font-size: 12px;
 }
 .cf-thread .row .lbl .cmd {
-  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+  color: color-mix(in oklab, var(--cf-text) 82%, transparent);
 }
 .cf-thread .row .meta {
   flex: none;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   display: flex;
   gap: 8px;
   align-items: center;
@@ -289,10 +282,10 @@ html[data-thread-width="full"] .cf-thread {
   flex: none;
 }
 .cf-thread .add {
-  color: var(--t-emerald);
+  color: var(--t-add);
 }
 .cf-thread .del {
-  color: var(--t-red);
+  color: var(--t-del);
 }
 .cf-thread .chip {
   display: inline-flex;
@@ -306,31 +299,31 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .chip.fail {
   border-color: color-mix(in oklab, var(--t-red) 30%, transparent);
-  background: color-mix(in oklab, var(--t-red-500) 10%, transparent);
+  background: var(--cf-error-surface);
   color: var(--t-red);
 }
 .cf-thread .chip.ok {
   border-color: color-mix(in oklab, var(--t-emerald) 30%, transparent);
-  background: color-mix(in oklab, var(--t-emerald-500) 10%, transparent);
+  background: var(--cf-success-surface);
   color: var(--t-emerald);
 }
 .cf-thread .chip.muted,
 .cf-thread .chip.tool {
-  border-color: var(--border);
-  background: var(--muted);
-  color: var(--muted-foreground);
+  border-color: var(--cf-border);
+  background: var(--cf-surface-sunken);
+  color: var(--cf-text-muted);
 }
 .cf-thread .chip.tool {
   font-family: var(--t-mono);
   font-weight: 400;
 }
 .dark .cf-thread:not(:where(.light *)) :is(.chip.tool, .chip.muted) {
-  background: color-mix(in oklab, var(--foreground) 5%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 5%, transparent);
 }
 /* A background subagent's chip: a muted outline (docs/sketches/agents-panel). */
 .cf-thread .chip.bg {
-  border-color: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
-  color: var(--muted-foreground);
+  border-color: color-mix(in oklab, var(--cf-text-muted) 40%, transparent);
+  color: var(--cf-text-muted);
   font-weight: 400;
 }
 /* A running subagent's row is one line: the label at its own width, then the activity
@@ -368,12 +361,12 @@ html[data-thread-width="full"] .cf-thread {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--muted);
-  color: var(--muted-foreground);
+  background: var(--cf-surface-sunken);
+  color: var(--cf-text-muted);
   margin-right: 2px;
 }
 .dark .cf-thread:not(:where(.light *)) .q-hdr {
-  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 7%, transparent);
 }
 .cf-thread .detail {
   margin: 2px 0 6px 30px;
@@ -385,7 +378,7 @@ html[data-thread-width="full"] .cf-thread {
   font-family: var(--t-mono);
   font-size: 12px;
   line-height: 19px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   padding: 2px 0 4px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -393,7 +386,7 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .subresult {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   padding: 4px 2px 6px 30px;
 }
 .cf-thread .subresult code {
@@ -403,16 +396,16 @@ html[data-thread-width="full"] .cf-thread {
 
 /* bash block */
 .cf-thread .term {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 8px;
   overflow: hidden;
   font-family: var(--t-mono);
   font-size: 12px;
   line-height: 18px;
-  background: color-mix(in oklab, var(--foreground) 1.5%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 1.5%, transparent);
 }
 .dark .cf-thread:not(:where(.light *)) .term {
-  background: color-mix(in oklab, var(--foreground) 2.5%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 2.5%, transparent);
 }
 .cf-thread .term .cmd {
   padding: 8px 12px;
@@ -421,13 +414,13 @@ html[data-thread-width="full"] .cf-thread {
   word-break: break-word;
 }
 .cf-thread .term .pr {
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   user-select: none;
 }
 .cf-thread .term .out {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--cf-border);
   padding: 8px 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   white-space: pre;
   overflow: auto;
   max-height: 220px;
@@ -438,7 +431,7 @@ html[data-thread-width="full"] .cf-thread {
 
 /* diff */
 .cf-thread .diff {
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 8px;
   overflow: hidden;
   font-family: var(--t-mono);
@@ -451,21 +444,21 @@ html[data-thread-width="full"] .cf-thread {
   gap: 8px;
   padding: 6px 10px;
   font-size: 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--muted);
+  border-bottom: 1px solid var(--cf-border);
+  background: var(--cf-surface-sunken);
 }
 .dark .cf-thread:not(:where(.light *)) .diff .dh {
-  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 4%, transparent);
 }
 .cf-thread .diff .dh .path {
-  color: color-mix(in oklab, var(--foreground) 85%, transparent);
+  color: color-mix(in oklab, var(--cf-text) 85%, transparent);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .cf-thread .diff .dh .dir {
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 /* A Read row's lines (ToolDetail ReadDetail, lowlight): line number, then the text. */
 .cf-thread .diff .l {
@@ -478,14 +471,14 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .diff .l .o {
   text-align: right;
   padding-right: 8px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   opacity: 0.6;
   user-select: none;
 }
 /* An edit's diff (ToolDiffView on components/code): a MultiEdit's edits one under another;
    a long diff scrolls in a bounded box (the library lays out only the visible lines). */
 .cf-thread .diff .cf-code-view + .cf-code-view {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--cf-border);
 }
 .cf-thread .diff .diff-scroll {
   max-height: 480px;
@@ -501,7 +494,7 @@ html[data-thread-width="full"] .cf-thread {
   margin: 6px 0 12px;
 }
 .cf-thread .u .bubble {
-  background: var(--t-bubble);
+  background: var(--cf-message-surface);
   border: 1px solid var(--t-bubble-border);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -520,7 +513,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .when {
   font-size: 11px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   font-variant-numeric: tabular-nums;
 }
 .cf-thread .a-md {
@@ -535,7 +528,7 @@ html[data-thread-width="full"] .cf-thread {
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   margin: 6px 0 22px;
 }
 .cf-thread .sysnote::before,
@@ -543,7 +536,7 @@ html[data-thread-width="full"] .cf-thread {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--border);
+  background: var(--cf-border);
 }
 .cf-thread .sysnote > span {
   max-width: 70%;
@@ -557,7 +550,7 @@ html[data-thread-width="full"] .cf-thread {
   gap: 8px;
   min-height: 24px;
   font-size: 12.5px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   margin: 0 0 14px;
   padding: 2px 2px;
 }
@@ -567,7 +560,7 @@ html[data-thread-width="full"] .cf-thread {
   flex: none;
 }
 .cf-thread .agentnote .nm {
-  color: var(--foreground);
+  color: var(--cf-text);
   white-space: nowrap;
   flex: none;
   max-width: 40%;
@@ -597,11 +590,11 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .lnote {
   margin: 0 0 16px;
   border-radius: 10px;
-  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
-  border: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 3.5%, transparent);
+  border: 1px solid color-mix(in oklab, var(--cf-text) 6%, transparent);
 }
 .dark .cf-thread:not(:where(.light *)) .lnote {
-  background: color-mix(in oklab, var(--foreground) 3%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 3%, transparent);
 }
 .cf-thread .lnote .ln {
   display: flex;
@@ -611,7 +604,7 @@ html[data-thread-width="full"] .cf-thread {
   padding: 4px 10px;
   font-size: 12.5px;
   line-height: 18px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   border-radius: 9px;
 }
 .cf-thread .lnote .ln[role="button"]:hover {
@@ -627,7 +620,7 @@ html[data-thread-width="full"] .cf-thread {
   flex: none;
 }
 .cf-thread .lnote .nm {
-  color: var(--foreground);
+  color: var(--cf-text);
   font-weight: 500;
   white-space: nowrap;
   flex: none;
@@ -635,7 +628,7 @@ html[data-thread-width="full"] .cf-thread {
   overflow: hidden;
   text-overflow: ellipsis;
   text-decoration: underline;
-  text-decoration-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--cf-text-muted) 45%, transparent);
   text-underline-offset: 2px;
 }
 .cf-thread .lnote button.nm {
@@ -659,7 +652,7 @@ html[data-thread-width="full"] .cf-thread {
   text-decoration-color: currentColor;
 }
 .cf-thread .lnote .nm.gone {
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   font-weight: 400;
   text-decoration: none;
 }
@@ -688,7 +681,7 @@ html[data-thread-width="full"] .cf-thread {
   opacity: 0.6;
 }
 .cf-thread .lnote[data-open] .ln {
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--cf-text) 6%, transparent);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -702,7 +695,7 @@ html[data-thread-width="full"] .cf-thread {
   margin-bottom: 4px;
   font-size: 11px;
   line-height: 16px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 .cf-thread .lnote .lbody pre {
   margin: 0;
@@ -737,10 +730,10 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .thead .fold:hover {
   background: var(--t-hover);
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 .cf-thread .thead .fold:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
   outline-offset: -2px;
 }
 .cf-thread .thead .ico {
@@ -772,7 +765,7 @@ html[data-thread-width="full"] .cf-thread {
   }
 }
 .cf-thread .thead .shimmer {
-  background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 50%, var(--muted-foreground) 100%);
+  background: linear-gradient(90deg, var(--cf-text-muted) 0%, var(--cf-text) 50%, var(--cf-text-muted) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -801,7 +794,7 @@ html[data-thread-width="full"] .cf-thread {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   opacity: 0;
   transition: opacity 0.12s;
 }
@@ -812,7 +805,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .copy-answer:hover {
   background: var(--t-hover);
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 .cf-thread .copy-answer svg {
   width: 13px;
@@ -829,13 +822,13 @@ html[data-thread-width="full"] .cf-thread {
   gap: 6px;
   height: 28px;
   padding: 0 12px 0 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--card) 85%, transparent);
+  background: color-mix(in oklab, var(--cf-surface-raised) 85%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 1px 3px oklch(0 0 0 / 8%);
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -863,10 +856,10 @@ html[data-thread-width="full"] .cf-thread {
     color 100ms ease;
 }
 .cf-thread .jump-bottom:hover {
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 .cf-thread .jump-bottom:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cf-focus) 50%, transparent);
 }
 .cf-thread .jump-bottom svg {
   width: 14px;
@@ -880,7 +873,7 @@ html[data-thread-width="full"] .cf-thread {
   right: 0;
   bottom: 0;
   padding: 32px 40px 16px;
-  background: linear-gradient(to top, var(--pane) 55%, transparent);
+  background: linear-gradient(to top, var(--cf-surface) 55%, transparent);
   pointer-events: none;
 }
 .cf-thread .dock > * {
@@ -897,10 +890,10 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .ccard {
   position: relative;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   /* The composer card: rounded-lg, one step inside the content pane (rounded-pane, 12). */
   border-radius: 10px;
-  background: color-mix(in oklab, var(--card) 85%, transparent);
+  background: color-mix(in oklab, var(--cf-surface-raised) 85%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 1px 2px oklch(0 0 0 / 5%);
@@ -911,11 +904,11 @@ html[data-thread-width="full"] .cf-thread {
   box-shadow: 0 1px 2px oklch(0 0 0 / 40%);
 }
 .cf-thread .ccard.docked {
-  background: var(--card);
+  background: var(--cf-surface-raised);
 }
 .cf-thread .ccard[data-dragging],
 .cf-thread .ccard.file-drop-target-active {
-  border-color: color-mix(in oklab, var(--info) 70%, transparent);
+  border-color: color-mix(in oklab, var(--cf-info) 70%, transparent);
 }
 .cf-thread .pend-stack {
   grid-column: 1 / 3;
@@ -926,7 +919,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .pend {
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--cf-border);
   outline: none;
 }
 .cf-thread .pend:focus-visible,
@@ -959,11 +952,11 @@ html[data-thread-width="full"] .cf-thread {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   border-radius: 4px;
 }
 .cf-thread .pdiff-t:hover {
-  color: var(--foreground);
+  color: var(--cf-text);
 }
 .cf-thread .pdiff-t svg {
   width: 13px;
@@ -975,10 +968,10 @@ html[data-thread-width="full"] .cf-thread {
   margin-left: 2px;
 }
 .cf-thread .pdiff-t .n.add {
-  color: var(--t-emerald);
+  color: var(--t-add);
 }
 .cf-thread .pdiff-t .n.del {
-  color: var(--t-red);
+  color: var(--t-del);
 }
 .cf-thread .pdiff-body {
   margin-top: 6px;
@@ -990,7 +983,7 @@ html[data-thread-width="full"] .cf-thread {
   flex: 1 1 220px;
   min-width: 0;
   height: 28px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 6px;
   background: transparent;
   padding: 0 8px;
@@ -998,8 +991,8 @@ html[data-thread-width="full"] .cf-thread {
   outline: none;
 }
 .cf-thread .acts.deny .reason-in:focus-visible {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  border-color: var(--cf-focus);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cf-focus) 50%, transparent);
 }
 .cf-thread .btn:disabled {
   opacity: 0.45;
@@ -1008,10 +1001,10 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .btn:focus-visible,
 .cf-thread .opt:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cf-focus) 50%, transparent);
 }
 .cf-thread .q-multi {
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   font-size: 12px;
 }
 .cf-thread .opts.multi .opt .on {
@@ -1025,7 +1018,7 @@ html[data-thread-width="full"] .cf-thread {
   height: 5px;
   border-radius: 0;
   background: none;
-  border: solid var(--card);
+  border: solid var(--cf-surface-raised);
   border-width: 0 0 2px 2px;
   transform: translateY(-1px) rotate(-45deg);
 }
@@ -1049,7 +1042,7 @@ html[data-thread-width="full"] .cf-thread {
   margin-left: auto;
   font-weight: 400;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1059,29 +1052,29 @@ html[data-thread-width="full"] .cf-thread {
   font-family: var(--t-mono);
   font-size: 12px;
   line-height: 18px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--syn-fg);
   white-space: pre-wrap;
   word-break: break-word;
-  background: color-mix(in oklab, var(--foreground) 2%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 2%, transparent);
   max-height: 160px;
   overflow: auto;
 }
 .dark .cf-thread:not(:where(.light *)) .pend .cmdbox {
-  background: color-mix(in oklab, var(--foreground) 3%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 3%, transparent);
 }
 .cf-thread .pend .desc {
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   margin-bottom: 10px;
   line-height: 1.45;
 }
 .cf-thread .pend .desc code {
   font-family: var(--t-mono);
   font-size: 11px;
-  color: color-mix(in oklab, var(--foreground) 80%, transparent);
+  color: color-mix(in oklab, var(--cf-text) 80%, transparent);
 }
 .cf-thread .acts {
   display: flex;
@@ -1106,23 +1099,23 @@ html[data-thread-width="full"] .cf-thread {
   height: 13px;
 }
 .cf-thread .btn.primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--cf-accent);
+  color: var(--cf-accent-foreground);
 }
 .cf-thread .btn.primary:hover {
-  background: color-mix(in oklab, var(--primary) 90%, transparent);
+  background: color-mix(in oklab, var(--cf-accent) 90%, transparent);
 }
 .cf-thread .btn.outline {
-  border: 1px solid var(--border);
-  background: var(--sheet);
+  border: 1px solid var(--cf-border);
+  background: var(--cf-canvas);
   box-shadow: 0 1px 2px oklch(0 0 0 / 5%);
 }
 .dark .cf-thread:not(:where(.light *)) .btn.outline {
-  border-color: var(--input);
-  background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
+  border-color: var(--cf-input);
+  background: color-mix(in oklab, var(--cf-text) 4.5%, transparent);
 }
 .cf-thread .btn.outline:hover {
-  background: var(--accent);
+  background: var(--cf-control-hover);
 }
 .cf-thread .q-text {
   font-size: 13px;
@@ -1140,7 +1133,7 @@ html[data-thread-width="full"] .cf-thread {
   align-items: flex-start;
   gap: 10px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 8px;
   font-size: 13px;
   text-align: left;
@@ -1149,7 +1142,7 @@ html[data-thread-width="full"] .cf-thread {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1.5px solid color-mix(in oklab, var(--foreground) 30%, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--cf-text) 30%, transparent);
   flex: none;
   margin-top: 2px;
   display: flex;
@@ -1157,7 +1150,7 @@ html[data-thread-width="full"] .cf-thread {
   justify-content: center;
 }
 .cf-thread .opt.sel {
-  border-color: color-mix(in oklab, var(--t-sky) 55%, var(--border));
+  border-color: color-mix(in oklab, var(--t-sky) 55%, var(--cf-border));
   background: color-mix(in oklab, var(--t-sky) 7%, transparent);
 }
 .cf-thread .opt.sel .on {
@@ -1176,13 +1169,13 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .opt small {
   display: block;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   margin-top: 1px;
 }
 .cf-thread .opt .kn {
   margin-left: auto;
   font-size: 11px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
 }
@@ -1193,36 +1186,36 @@ html[data-thread-width="full"] .cf-thread {
   margin-left: auto;
   font-weight: 400;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: var(--cf-text-muted);
 }
 .cf-thread .pager i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: color-mix(in oklab, var(--foreground) 20%, transparent);
+  background: color-mix(in oklab, var(--cf-text) 20%, transparent);
   display: block;
 }
 .cf-thread .pager i.on {
-  background: var(--foreground);
+  background: var(--cf-text);
 }
 .cf-thread .intr {
   height: 32px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   padding: 0 12px 0 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  background: var(--sheet);
+  background: var(--cf-canvas);
 }
 .dark .cf-thread:not(:where(.light *)) .intr {
-  border-color: var(--input);
-  background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
+  border-color: var(--cf-input);
+  background: color-mix(in oklab, var(--cf-text) 4.5%, transparent);
 }
 .cf-thread .intr:hover {
-  background: var(--accent);
+  background: var(--cf-control-hover);
 }
 .cf-thread .intr i {
   width: 9px;
@@ -1245,12 +1238,12 @@ html[data-thread-width="full"] .cf-thread {
   gap: 2px;
   height: 20px;
   padding: 0 4px 0 7px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cf-border);
   border-radius: 6px;
-  background: var(--pane);
+  background: var(--cf-surface);
   font-size: 12px;
   font-weight: 500;
-  color: var(--foreground);
+  color: var(--cf-text);
   white-space: nowrap;
   flex: none;
   visibility: hidden;
@@ -1266,10 +1259,10 @@ html[data-thread-width="full"] .cf-thread {
   opacity: 0.7;
 }
 .cf-thread .agent-open:hover {
-  background: var(--accent);
+  background: var(--cf-control-hover);
 }
 .cf-thread .agent-open:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--cf-focus) 60%, transparent);
   outline-offset: -2px;
 }
 .cf-thread .agent-host:has(> .row:hover) > .agent-open,
@@ -1293,7 +1286,7 @@ html[data-thread-width="full"] .cf-thread {
   flex: none;
   max-width: 40%;
   min-width: 0;
-  color: var(--foreground);
+  color: var(--cf-text);
   font-weight: 500;
   white-space: nowrap;
   border-radius: 4px;
@@ -1313,7 +1306,7 @@ html[data-thread-width="full"] .cf-thread {
   min-height: 26px;
   margin: 10px 0 2px;
   padding-top: 8px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--cf-border);
 }
 /* A finished run's report as it handed it back: a left-bordered block under an overline. */
 .cf-thread .subreport {

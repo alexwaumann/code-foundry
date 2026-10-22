@@ -34,15 +34,15 @@ export function SearchResults({
         <span className="text-caption">for “{query}” in every page</span>
       </div>
       {n === 0 ? (
-        <p className="py-8 text-center text-body text-muted-foreground">No settings match “{query}”.</p>
+        <p className="py-8 text-center text-body text-cf-text-muted">No settings match “{query}”.</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
+        <div className="overflow-hidden rounded-lg border border-cf-border">
           {result.hits.map(({ field, page, section }, i) => (
             <SettingRow
               key={field.key}
               field={field}
               words={words}
-              className={i > 0 ? "border-t border-border" : undefined}
+              className={i > 0 ? "border-t border-cf-border" : undefined}
               crumb={
                 <div className="mb-0.5 flex items-center gap-1 text-caption-sm" data-testid="setting-crumb">
                   {page.title}
@@ -62,7 +62,7 @@ export function SearchResults({
               key={`${page.id}/${section.id}`}
               label={`${page.title} › ${section.title}`}
               description={section.description}
-              className={result.hits.length + i > 0 ? "border-t border-border" : undefined}
+              className={result.hits.length + i > 0 ? "border-t border-cf-border" : undefined}
               testId="settings-section-hit"
               onClick={() => {
                 onOpenSection?.(page.id, section.id);

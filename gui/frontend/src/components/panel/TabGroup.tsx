@@ -33,7 +33,7 @@ function GroupHeader({ panelKey, group, split, focused, controls }: { panelKey: 
   return (
     <div
       ref={setNodeRef}
-      className="flex shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5 [--wails-draggable:drag]"
+      className="flex shrink-0 items-center gap-2 border-b border-cf-divider pr-2 pl-1.5 [--wails-draggable:drag]"
       style={{ height: PANE_HEADER_HEIGHT }}
       data-testid="panel-header"
     >
@@ -67,7 +67,7 @@ function DropBand({ side, over }: { side: SplitOrientation; over: boolean }) {
       className={cn(
         "pointer-events-none absolute z-10 rounded-lg ring-1 ring-inset transition-colors duration-150",
         side === "side" ? "inset-y-2 right-2 left-[55%]" : "inset-x-2 top-[55%] bottom-2",
-        over ? "bg-accent/55 ring-ring" : "bg-accent/20 ring-ring/40",
+        over ? "bg-cf-control-hover/55 ring-cf-focus" : "bg-cf-control-hover/20 ring-cf-focus/40",
       )}
     />
   );
@@ -90,7 +90,7 @@ function GroupDropArea({ panelKey, group, split, children }: { panelKey: string;
   return (
     <div ref={setNodeRef} className="relative flex min-h-0 flex-1 flex-col">
       {children}
-      {split && target?.kind === "body" && target.group === group && <div aria-hidden data-testid="panel-drop-tint" className="pointer-events-none absolute inset-0 z-10 bg-accent/30" />}
+      {split && target?.kind === "body" && target.group === group && <div aria-hidden data-testid="panel-drop-tint" className="pointer-events-none absolute inset-0 z-10 bg-cf-control-hover/30" />}
       {!split && drag !== null && many && <DropBand side={band} over={target?.kind === "band"} />}
     </div>
   );

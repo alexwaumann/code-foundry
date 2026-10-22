@@ -167,10 +167,10 @@ export const SLOTS: readonly Slot[] = [
       return muted;
     },
   },
-  { name: "--cf-text-secondary", group: "text", rule: "halfway between text and text-muted (so never fainter than muted)", derive: (c) => mix(c.get("--cf-text"), c.get("--cf-text-muted"), 0.5) },
-  { name: "--cf-placeholder", group: "text", rule: "text-muted", derive: (c) => c.get("--cf-text-muted") },
+  { name: "--cf-text-secondary", group: "text", rule: "halfway between the text and the muted text (so never fainter than muted)", derive: (c) => mix(c.get("--cf-text"), c.get("--cf-text-muted"), 0.5) },
+  { name: "--cf-placeholder", group: "text", rule: "the muted text", derive: (c) => c.get("--cf-text-muted") },
   { name: "--cf-icon", group: "text", rule: "text (icons take their label's colour)", derive: (c) => c.get("--cf-text") },
-  { name: "--cf-icon-muted", group: "text", rule: "text-muted", derive: (c) => c.get("--cf-text-muted") },
+  { name: "--cf-icon-muted", group: "text", rule: "the muted text", derive: (c) => c.get("--cf-text-muted") },
 
   // Status solids first: link and the charts read them.
   ...statusSlots("success"),
@@ -225,9 +225,16 @@ export const SLOTS: readonly Slot[] = [
   // Sidebar.
   { name: "--cf-sidebar", group: "sidebar", rule: "chrome", derive: (c) => c.get("--cf-chrome") },
   { name: "--cf-sidebar-foreground", group: "sidebar", rule: "text", derive: (c) => c.get("--cf-text") },
-  { name: "--cf-sidebar-muted-foreground", group: "sidebar", rule: "text-muted (already 4.5:1 on the canvas)", derive: (c) => c.get("--cf-text-muted") },
-  { name: "--cf-sidebar-row-hover", group: "sidebar", rule: "sidebar mixed 5% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.05) },
+  { name: "--cf-sidebar-muted-foreground", group: "sidebar", rule: "the muted text (already 4.5:1 on the canvas)", derive: (c) => c.get("--cf-text-muted") },
   { name: "--cf-sidebar-row-selected", group: "sidebar", rule: "sidebar mixed 10% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.1) },
+  // The selected row at 50% rather than its own mix, so a theme that overrides the selected
+  // row (Graphite) gets a hover that matches it, as `hover:bg-sidebar-accent/50` did.
+  {
+    name: "--cf-sidebar-row-hover",
+    group: "sidebar",
+    rule: "sidebar-row-selected at 50% over the sidebar (about the sidebar 5% toward the text, unless a theme overrides the selected row)",
+    derive: (c) => over(c.get("--cf-sidebar-row-selected"), 0.5, c.get("--cf-sidebar")),
+  },
   { name: "--cf-sidebar-row-active", group: "sidebar", rule: "sidebar mixed 15% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.15) },
   { name: "--cf-sidebar-border", group: "sidebar", rule: "sidebar (no visible edge)", derive: (c) => c.get("--cf-sidebar") },
 
@@ -269,7 +276,7 @@ export const SLOTS: readonly Slot[] = [
   {
     name: "--syn-com",
     group: "syntax",
-    rule: "ANSI 7 light / 8 dark; text-muted when under 3:1 on the surface or above 85% of the text's contrast",
+    rule: "ANSI 7 light / 8 dark; the muted text when under 3:1 on the surface or above 85% of the text's contrast",
     derive: (c) => {
       const com = ansi(c, c.dark ? 8 : 7);
       const surface = c.get("--cf-surface");

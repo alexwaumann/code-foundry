@@ -101,21 +101,21 @@ function ActivityCard({
       <div className="mb-1.5 flex items-center">
         <LineKey series={series} className="mr-2 w-3.5" />
         <h2 className="text-label font-medium">{s.label}</h2>
-        <span className="ml-2 text-label font-normal text-muted-foreground">last six months</span>
+        <span className="ml-2 text-label font-normal text-cf-text-muted">last six months</span>
       </div>
       <div className="relative" ref={ref}>
         <svg width={width} height={H} className="block overflow-visible" role="img" aria-label={`${s.label} per month`} style={s.style}>
           <g>
             {ticks.map((v) => (
               <g key={v}>
-                <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-foreground/8" strokeWidth={1} />
-                <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-caption-sm tabular-nums">
+                <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-cf-text/8" strokeWidth={1} />
+                <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-cf-text-muted text-caption-sm tabular-nums">
                   {tickLabel(v)}
                 </text>
               </g>
             ))}
           </g>
-          {hi !== null && <rect x={LEFT + slot * hi} y={TOP} width={slot} height={PLOT_H} className="fill-foreground/4" data-testid="activity-band" />}
+          {hi !== null && <rect x={LEFT + slot * hi} y={TOP} width={slot} height={PLOT_H} className="fill-cf-text/4" data-testid="activity-band" />}
           {first && last && (
             <path d={`${polyline(pts)} L${at([last[0], y(0)])} L${at([first[0], y(0)])} Z`} className={FILL} fillOpacity={0.1} stroke="none" />
           )}
@@ -133,7 +133,7 @@ function ActivityCard({
                 cy={p[1]}
                 r={hi === i ? 5 : 4}
                 strokeWidth={2}
-                className={m.partial ? cn("fill-pane", STROKE) : cn(FILL, "stroke-pane")}
+                className={m.partial ? cn("fill-cf-surface", STROKE) : cn(FILL, "stroke-cf-surface")}
                 data-testid="activity-marker"
                 data-month={m.month}
                 data-value={m[series]}
@@ -142,15 +142,15 @@ function ActivityCard({
             );
           })}
           {labelPt && (
-            <text x={labelPt[0] + 10} y={labelPt[1] + 4} className="fill-foreground text-caption-sm font-semibold tabular-nums" data-testid="activity-value">
+            <text x={labelPt[0] + 10} y={labelPt[1] + 4} className="fill-cf-text text-caption-sm font-semibold tabular-nums" data-testid="activity-value">
               {tickLabel(values[labelled] ?? 0)}
             </text>
           )}
           {hi !== null && (
-            <line x1={x(hi)} x2={x(hi)} y1={TOP} y2={H - BOTTOM} className="stroke-muted-foreground" strokeWidth={1} strokeDasharray="2 3" data-testid="activity-crosshair" />
+            <line x1={x(hi)} x2={x(hi)} y1={TOP} y2={H - BOTTOM} className="stroke-cf-text-muted" strokeWidth={1} strokeDasharray="2 3" data-testid="activity-crosshair" />
           )}
           {months.map((m, i) => (
-            <text key={m.month} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-caption-sm">
+            <text key={m.month} x={x(i)} y={H - 6} textAnchor="middle" className="fill-cf-text-muted text-caption-sm">
               {axisLabel(m)}
             </text>
           ))}
@@ -183,13 +183,13 @@ function ActivityCard({
         )}
         {showTip && (
           <div
-            className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-border bg-popover px-2.5 py-2 text-caption-sm text-popover-foreground shadow-lg"
+            className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-cf-border bg-cf-surface-overlay px-2.5 py-2 text-caption-sm text-cf-text shadow-lg"
             style={tooltipSide(hi, n) === "left" ? { right: width - x(hi) + 14, top: TOP + 10 } : { left: x(hi) + 14, top: TOP + 10 }}
             data-testid="activity-tooltip"
             data-month={hovered.month}
             data-side={tooltipSide(hi, n)}
           >
-            <div className="mb-1 text-muted-foreground">
+            <div className="mb-1 text-cf-text-muted">
               {monthName(hovered.month, now)}
               {hovered.partial ? " (so far)" : ""}
             </div>
@@ -197,7 +197,7 @@ function ActivityCard({
               <div key={k} className="flex items-center gap-2 leading-relaxed" data-series={k}>
                 <LineKey series={k} className="w-3" />
                 <span className="min-w-7 font-semibold tabular-nums">{tickLabel(hovered[k])}</span>
-                <span className="text-muted-foreground">{SERIES[k].unit}</span>
+                <span className="text-cf-text-muted">{SERIES[k].unit}</span>
               </div>
             ))}
           </div>

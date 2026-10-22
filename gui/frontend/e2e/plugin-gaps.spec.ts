@@ -40,7 +40,7 @@ test("the thread header shows the top flag in its colour; a click opens the surf
   const chip = page.getByTestId("thread-flag");
   await expect(chip).toHaveText("Hello: build failed");
   await expect(chip).toHaveAttribute("data-level", "error");
-  await expect(chip).toHaveClass(/text-destructive/);
+  await expect(chip).toHaveClass(/text-cf-error/);
   await chip.getByTestId("thread-flag-open").click();
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");
   await chip.getByTestId("thread-flag-clear").click();

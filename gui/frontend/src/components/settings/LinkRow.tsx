@@ -7,7 +7,7 @@ export function LinkRow({ label, description, onClick, className, testId }: { la
   return (
     <button
       type="button"
-      className={cn("flex w-full items-center gap-6 px-4 py-3 text-left outline-none hover:bg-accent/50 focus-visible:bg-accent/50", className)}
+      className={cn("flex w-full items-center gap-6 px-4 py-3 text-left outline-none hover:bg-cf-control-hover/50 focus-visible:bg-cf-control-hover/50", className)}
       onClick={onClick}
       data-testid={testId}
     >
@@ -15,7 +15,7 @@ export function LinkRow({ label, description, onClick, className, testId }: { la
         <span className="block text-label">{label}</span>
         <span className="mt-0.5 block text-caption">{description}</span>
       </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <ChevronRight className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
     </button>
   );
 }

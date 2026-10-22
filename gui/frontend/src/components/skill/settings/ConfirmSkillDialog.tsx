@@ -23,7 +23,7 @@ export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAc
     >
       <DialogContent className="max-w-md p-5" data-testid="skill-confirm" data-action={action}>
         <div className="flex gap-3">
-          <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <Icon className="mt-0.5 size-5 shrink-0 text-cf-text-muted" aria-hidden />
           <div className="min-w-0 flex-1 space-y-3">
             <DialogTitle>{copy.title}</DialogTitle>
             <DialogDescription className="break-words">{copy.body}</DialogDescription>
@@ -39,7 +39,7 @@ export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAc
             autoFocus
             className={cn(
               "bg-transparent dark:bg-transparent",
-              destructive && "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40",
+              destructive && "border-cf-error/40 text-cf-error hover:bg-cf-error-surface hover:text-cf-error dark:border-cf-error/40",
             )}
             onClick={() => {
               onClose();

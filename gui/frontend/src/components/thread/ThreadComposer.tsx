@@ -92,7 +92,7 @@ function SnoozedUntil({ until }: { until: number }) {
 function SnoozeEnded({ at }: { at: number | null }) {
   const now = useNow(30_000);
   return (
-    <span className="text-warning" data-testid="thread-snooze-ended">
+    <span className="text-cf-warning" data-testid="thread-snooze-ended">
       {statusText({ kind: "snoozeEnded", detail: "", at }, now)}
     </span>
   );
@@ -419,7 +419,7 @@ export function ThreadComposer({
                 disabled={sending}
                 aria-label={attachLabel(hostFiles.hosted)}
                 data-testid="thread-attach"
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
                 onClick={() => {
                   if (hostFiles.hosted) hostFiles.pick();
                   else fileRef.current?.click();
@@ -465,7 +465,7 @@ export function ThreadComposer({
                 aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}
-                className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40"
+                className="flex size-8 items-center justify-center rounded-full bg-cf-accent text-cf-accent-foreground outline-none transition-all hover:bg-cf-accent/90 focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-40"
                 // A click leaves the caret in the prompt, so it is focused again after the send.
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -485,12 +485,12 @@ export function ThreadComposer({
         {(error ?? notice) && (
           <div className="col-span-2 flex flex-col gap-1 px-4 pb-2 text-body">
             {error && (
-              <p role="alert" className="text-destructive" data-testid="thread-composer-error">
+              <p role="alert" className="text-cf-error" data-testid="thread-composer-error">
                 {error}
               </p>
             )}
             {notice && (
-              <p role="status" className="text-warning">
+              <p role="status" className="text-cf-warning">
                 {notice}
               </p>
             )}

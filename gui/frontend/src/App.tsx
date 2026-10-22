@@ -123,7 +123,7 @@ function ContentPane({ children }: { children: ReactNode }) {
   return (
     <main
       ref={ref}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs"
       data-testid="content-pane"
     >
       {children}
@@ -204,7 +204,7 @@ export function App() {
     // delay, and the skip delay when moving from one tooltip trigger to the next, apply
     // across the sidebar, panes, panels and dialogs.
     <TooltipProvider>
-      <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
+      <div className="relative flex h-full flex-col overflow-hidden bg-cf-canvas text-cf-text">
         {/* The sheet above the panes drags the window too (as the sidebar band and the pane
             headers do), so a page without a header (dashboard, composer) still has a drag
             surface when the sidebar is hidden. It is the shell gap tall: the sheet above the panes. */}

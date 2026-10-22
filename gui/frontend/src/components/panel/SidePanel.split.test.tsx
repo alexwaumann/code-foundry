@@ -131,11 +131,11 @@ describe("a split side panel", () => {
     setEntry({});
     render(<SidePanel />);
     expect(group(1)?.getAttribute("data-focused")).toBe("true");
-    expect(tabWrapper(1, diff.id)?.className).toContain("dark:bg-accent/50");
-    expect(tabWrapper(0, files.id)?.className).toContain("bg-accent/40");
-    expect(tabWrapper(0, files.id)?.className).toContain("dark:bg-accent/25");
+    expect(tabWrapper(1, diff.id)?.className).toContain("dark:bg-cf-control-hover/50");
+    expect(tabWrapper(0, files.id)?.className).toContain("bg-cf-control-hover/40");
+    expect(tabWrapper(0, files.id)?.className).toContain("dark:bg-cf-control-hover/25");
     // An inactive tab has neither.
-    expect(tabWrapper(0, usage.id)?.className).not.toContain("dark:bg-accent/25");
+    expect(tabWrapper(0, usage.id)?.className).not.toContain("dark:bg-cf-control-hover/25");
   });
 
   it("a press or focus inside a group focuses it", () => {

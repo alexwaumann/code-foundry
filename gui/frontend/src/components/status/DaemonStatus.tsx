@@ -6,9 +6,9 @@ import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
 
 const dot = {
-  connecting: "bg-warning",
-  ok: "bg-success",
-  error: "bg-destructive",
+  connecting: "bg-cf-warning",
+  ok: "bg-cf-success",
+  error: "bg-cf-error",
 } as const;
 
 /** "events" while the shared events stream is not open (connecting or reconnecting). */
@@ -39,7 +39,7 @@ export function DaemonStatus() {
       <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap" data-testid="daemon-status" aria-label={details}>
         <span className={cn("size-2 shrink-0 rounded-full", dot[status])} data-testid="status" data-status={status} aria-hidden />
         {version && <span data-testid="version">{version}</span>}
-        {status === "ok" && degraded && <span className="shrink-0 text-warning">syncing {degraded}…</span>}
+        {status === "ok" && degraded && <span className="shrink-0 text-cf-warning">syncing {degraded}…</span>}
       </div>
     </Tip>
   );

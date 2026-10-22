@@ -17,19 +17,19 @@ import { Flame } from "./Flame";
 const DONE_CAP = 10;
 
 const DOT: Readonly<Record<TaskDot, string>> = {
-  doing: "bg-info shadow-[0_0_0_3px_color-mix(in_oklab,var(--info)_25%,transparent)]",
-  blocked: "bg-warning",
-  done: "bg-success",
-  open: "border-[1.5px] border-muted-foreground opacity-70",
+  doing: "bg-cf-info shadow-[0_0_0_3px_color-mix(in_oklab,var(--cf-info)_25%,transparent)]",
+  blocked: "bg-cf-warning",
+  done: "bg-cf-success",
+  open: "border-[1.5px] border-cf-text-muted opacity-70",
 };
 
 /** The sidebar's status colours, muted for "muted". */
 const TONE: Readonly<Record<StatusTone, string>> = {
-  muted: "text-muted-foreground",
-  sky: "text-info",
-  amber: "text-warning",
-  emerald: "text-success",
-  red: "text-destructive",
+  muted: "text-cf-text-muted",
+  sky: "text-cf-info",
+  amber: "text-cf-warning",
+  emerald: "text-cf-success",
+  red: "text-cf-error",
 };
 
 function Dot({ dot, className }: { dot: TaskDot; className?: string }) {
@@ -48,7 +48,7 @@ const INDENT = ["", "pl-4", "pl-7", "pl-10"] as const;
 function BranchLine({ branch, className, testId }: { branch: string; className?: string; testId: string }) {
   return (
     <Tip label={branch} whenTruncated>
-      <p className={cn("flex min-w-0 items-center gap-1 text-caption text-muted-foreground", className)} data-testid={testId}>
+      <p className={cn("flex min-w-0 items-center gap-1 text-caption text-cf-text-muted", className)} data-testid={testId}>
         <GitBranch className="size-3 shrink-0" aria-hidden />
         <span className="truncate font-mono">{branch}</span>
       </p>
@@ -65,7 +65,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
   const body = (
     <>
       <Dot dot={row.dot} />
-      <span className={cn("min-w-0 flex-1 truncate", row.threadId === "" && row.depth > 0 ? "text-muted-foreground" : "text-foreground/90")} data-testid="ember-worker-title">
+      <span className={cn("min-w-0 flex-1 truncate", row.threadId === "" && row.depth > 0 ? "text-cf-text-muted" : "text-cf-text/90")} data-testid="ember-worker-title">
         {row.title}
       </span>
       {row.meta.text && (
@@ -76,7 +76,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
         </Tip>
       )}
       {row.atMs !== null && (
-        <span className="shrink-0 text-muted-foreground tabular-nums" data-testid="ember-worker-age">
+        <span className="shrink-0 text-cf-text-muted tabular-nums" data-testid="ember-worker-age">
           {updatedAgo(row.atMs, now)}
         </span>
       )}
@@ -96,7 +96,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
     ) : (
       <button
         type="button"
-        className={cn(cls, "cursor-pointer outline-none hover:bg-accent/50 focus-visible:bg-accent/50")}
+        className={cn(cls, "cursor-pointer outline-none hover:bg-cf-control-hover/50 focus-visible:bg-cf-control-hover/50")}
         data-testid="ember-worker"
         data-thread={row.threadId}
         data-subtask={row.subtask || undefined}
@@ -113,7 +113,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
   return (
     <>
       {line}
-      <div className="-mt-0.5 mb-0.5 flex min-w-0 items-center gap-1 pl-5 text-caption text-muted-foreground">
+      <div className="-mt-0.5 mb-0.5 flex min-w-0 items-center gap-1 pl-5 text-caption text-cf-text-muted">
         {row.branch && <BranchLine branch={row.branch} className="max-w-[60%] shrink-0" testId="ember-worker-branch" />}
         {row.branch && row.outcome && <span aria-hidden>·</span>}
         {row.outcome && (
@@ -138,7 +138,7 @@ function BlockedOutcome({ text }: { text: string }) {
     <button
       type="button"
       className={cn(
-        "mt-1 w-full cursor-pointer rounded-sm text-left text-caption break-words whitespace-pre-line text-warning outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "mt-1 w-full cursor-pointer rounded-sm text-left text-caption break-words whitespace-pre-line text-cf-warning outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50",
         !open && "line-clamp-3",
       )}
       aria-expanded={open}
@@ -160,7 +160,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
   const rows = workerRows(card);
   return (
     <li
-      className={cn("rounded-lg border border-pane-border px-2.5 py-2 transition-shadow", focused === t.id && "ring-2 ring-ring/60")}
+      className={cn("rounded-lg border border-cf-divider px-2.5 py-2 transition-shadow", focused === t.id && "ring-2 ring-cf-focus/60")}
       data-testid="ember-task"
       data-task={t.id}
       data-state={t.state}
@@ -168,7 +168,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
     >
       <div className="flex min-w-0 items-center gap-2">
         <Dot dot={t.state === "doing" ? "doing" : t.state === "blocked" ? "blocked" : t.state === "done" ? "done" : "open"} />
-        <span className={cn("min-w-0 flex-1 truncate text-label font-semibold", t.state === "cancelled" && "text-muted-foreground line-through")} data-testid="ember-task-title">
+        <span className={cn("min-w-0 flex-1 truncate text-label font-semibold", t.state === "cancelled" && "text-cf-text-muted line-through")} data-testid="ember-task-title">
           {t.title}
         </span>
         <span className={cn("shrink-0 text-caption tabular-nums", TONE[meta.tone])} data-testid="ember-task-meta">
@@ -176,14 +176,14 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
         </span>
       </div>
       {progress && progress.total > 0 && (
-        <div className="mt-2 mb-1.5 h-0.75 overflow-hidden rounded-full bg-foreground/10" data-testid="ember-task-progress">
-          <div className="h-full bg-info" style={{ width: `${String(Math.round((progress.done / progress.total) * 100))}%` }} />
+        <div className="mt-2 mb-1.5 h-0.75 overflow-hidden rounded-full bg-cf-text/10" data-testid="ember-task-progress">
+          <div className="h-full bg-cf-info" style={{ width: `${String(Math.round((progress.done / progress.total) * 100))}%` }} />
         </div>
       )}
       {t.state === "blocked" && t.outcome && <BlockedOutcome text={t.outcome} />}
       {(t.state === "done" || t.state === "cancelled") && t.outcome && (
         <Tip label={t.outcome} whenTruncated>
-          <p className="mt-0.5 truncate text-caption text-muted-foreground" data-testid="ember-task-outcome">
+          <p className="mt-0.5 truncate text-caption text-cf-text-muted" data-testid="ember-task-outcome">
             {t.outcome}
           </p>
         </Tip>
@@ -209,24 +209,24 @@ function TimerLine({ row }: { row: TimerRow }) {
   const [cancelling, setCancelling] = useState(false);
   return (
     <div className="flex h-6 w-full min-w-0 items-center gap-2 rounded-sm pl-1 text-caption" data-testid="ember-timer" data-timer={row.id}>
-      <AlarmClock className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+      <AlarmClock className="size-3 shrink-0 text-cf-text-muted" aria-hidden />
       <Tip label={row.title} whenTruncated>
-        <span className={cn("min-w-0 flex-1 truncate", row.noted ? "text-foreground/90" : "text-muted-foreground")} data-testid="ember-timer-note">
+        <span className={cn("min-w-0 flex-1 truncate", row.noted ? "text-cf-text/90" : "text-cf-text-muted")} data-testid="ember-timer-note">
           {row.title}
         </span>
       </Tip>
       {row.every && (
-        <span className="shrink-0 text-muted-foreground" data-testid="ember-timer-every">
+        <span className="shrink-0 text-cf-text-muted" data-testid="ember-timer-every">
           {row.every}
         </span>
       )}
-      <span className="shrink-0 text-muted-foreground tabular-nums" data-testid="ember-timer-when">
+      <span className="shrink-0 text-cf-text-muted tabular-nums" data-testid="ember-timer-when">
         {row.when}
       </span>
       <Button
         variant="ghost"
         size="icon-xs"
-        className="-my-1 shrink-0 text-muted-foreground hover:text-foreground"
+        className="-my-1 shrink-0 text-cf-text-muted hover:text-cf-text"
         aria-label={`Cancel the timer${row.noted ? `: ${row.title}` : ""}`}
         disabled={cancelling}
         data-testid="ember-timer-cancel"
@@ -246,7 +246,7 @@ function TimerLine({ row }: { row: TimerRow }) {
 /** The Scheduled section's one card: Ember's timers, soonest first. */
 function TimersCard({ rows }: { rows: readonly TimerRow[] }) {
   return (
-    <li className="flex min-w-0 flex-col rounded-lg border border-pane-border py-1.5 pr-1.5 pl-2.5" data-testid="ember-timers">
+    <li className="flex min-w-0 flex-col rounded-lg border border-cf-divider py-1.5 pr-1.5 pl-2.5" data-testid="ember-timers">
       {rows.map((r) => (
         <TimerLine key={r.id} row={r} />
       ))}
@@ -257,7 +257,7 @@ function TimersCard({ rows }: { rows: readonly TimerRow[] }) {
 function Section({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-col gap-1.5" data-testid={`ember-section-${id}`}>
-      <h3 className="text-overline text-muted-foreground">{label}</h3>
+      <h3 className="text-overline text-cf-text-muted">{label}</h3>
       <ul className="flex min-w-0 flex-col gap-2">{children}</ul>
     </section>
   );
@@ -309,20 +309,20 @@ export function BoardSurface() {
   const empty = sections.inProgress.length + sections.upNext.length + sections.doneToday.length + timers.length === 0;
   return (
     <div className="@container flex min-h-0 flex-1 flex-col" data-testid="ember-board">
-      <header className="flex min-w-0 items-baseline gap-2 border-b border-pane-border px-4 pt-2 pb-2.5" data-testid="ember-board-header">
+      <header className="flex min-w-0 items-baseline gap-2 border-b border-cf-divider px-4 pt-2 pb-2.5" data-testid="ember-board-header">
         <h2 className="text-heading">Board</h2>
-        <span className="min-w-0 truncate text-caption text-muted-foreground tabular-nums" data-testid="ember-board-counts">
+        <span className="min-w-0 truncate text-caption text-cf-text-muted tabular-nums" data-testid="ember-board-counts">
           {counts.inProgress} in progress · {counts.upNext} up next
           {counts.scheduled > 0 && ` · ${String(counts.scheduled)} scheduled`}
         </span>
       </header>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {!loaded ? (
-          <p className="text-caption text-muted-foreground">{error ? `Cannot load the board: ${error}. Retrying…` : "Loading the board…"}</p>
+          <p className="text-caption text-cf-text-muted">{error ? `Cannot load the board: ${error}. Retrying…` : "Loading the board…"}</p>
         ) : empty ? (
           <div className="flex flex-col items-center gap-3 pt-10 text-center" data-testid="ember-board-empty">
             <Flame state="idle" size="hero" />
-            <p className="text-body-sm text-muted-foreground">Nothing on the board yet. Ember adds a task before every piece of work.</p>
+            <p className="text-body-sm text-cf-text-muted">Nothing on the board yet. Ember adds a task before every piece of work.</p>
           </div>
         ) : (
           <div className="flex min-w-0 flex-col gap-4">
@@ -354,7 +354,7 @@ export function BoardSurface() {
                   <li>
                     <button
                       type="button"
-                      className="w-full rounded-md px-2 py-1 text-left text-caption text-muted-foreground outline-none hover:bg-accent/50 hover:text-foreground focus-visible:bg-accent/50"
+                      className="w-full rounded-md px-2 py-1 text-left text-caption text-cf-text-muted outline-none hover:bg-cf-control-hover/50 hover:text-cf-text focus-visible:bg-cf-control-hover/50"
                       data-testid="ember-done-more"
                       onClick={() => {
                         setAllDone(true);

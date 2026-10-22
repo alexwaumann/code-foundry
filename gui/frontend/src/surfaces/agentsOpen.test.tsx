@@ -82,8 +82,8 @@ describe("Agents tab rows", () => {
     const row = rowOf("a1");
     expect(row.getAttribute("data-viewing")).toBe("true");
     expect(row.getAttribute("aria-current")).toBe("true");
-    expect(row.className).toContain("bg-info/7");
-    expect(row.querySelector(".bg-info.w-0\\.5")).not.toBeNull();
+    expect(row.className).toContain("bg-cf-info/7");
+    expect(row.querySelector(".bg-cf-info.w-0\\.5")).not.toBeNull();
     const tag = screen.getByTestId("agent-viewing");
     expect(tag.textContent).toBe("viewing");
     expect(tag.nextElementSibling?.getAttribute("data-testid")).toBe("agent-status");

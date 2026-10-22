@@ -53,8 +53,8 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
             aria-describedby={a.reason ? reasonId : undefined}
             data-reason={a.reason ?? undefined}
             className={cn(
-              "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-label text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
-              blocked && "cursor-default hover:bg-primary",
+              "flex h-7 shrink-0 items-center gap-1 rounded-md bg-cf-accent pr-1.5 pl-2 text-label text-cf-accent-foreground shadow-xs outline-none hover:bg-cf-accent/90 focus-visible:ring-2 focus-visible:ring-cf-focus/60 @max-[340px]:pl-1.5",
+              blocked && "cursor-default hover:bg-cf-accent",
               a.reason !== null && "opacity-50",
             )}
           >
@@ -84,7 +84,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           </DropdownMenuLabel>
         </Tip>
         {a.notes.map((n) => (
-          <p key={n} className="px-2 pb-1.5 text-caption text-warning" data-testid="pr-merge-note">
+          <p key={n} className="px-2 pb-1.5 text-caption text-cf-warning" data-testid="pr-merge-note">
             {n}
           </p>
         ))}

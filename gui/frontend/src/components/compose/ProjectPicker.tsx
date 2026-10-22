@@ -134,7 +134,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
               data-testid="picker-add-project"
               className="gap-3 py-2"
             >
-              <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
+              <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-cf-text-muted">
                 <FolderPlus className="size-4" />
               </span>
               <span className="truncate font-medium">Add a project…</span>

@@ -151,7 +151,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
         data-panel-key={panelKey}
         data-picking={picking || undefined}
         data-dragging={dragging || undefined}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs outline-none"
         onKeyDown={onKeyDown}
       >
         {/* One element split or not, so the first group stays mounted (its surface keeps its state) across a split and an unsplit. */}

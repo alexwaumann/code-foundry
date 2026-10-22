@@ -16,7 +16,7 @@ function CopyDiff({ text }: { text: () => string }) {
     <Tip label={label}>
       <button
         type="button"
-        className="flex size-[22px] items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="flex size-[22px] items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text"
         aria-label={label}
         data-copied={copied || undefined}
         data-testid="thread-diff-copy"

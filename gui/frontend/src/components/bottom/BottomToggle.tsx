@@ -17,7 +17,7 @@ export function BottomToggle({ className }: { className?: string }) {
       command="view.bottom.toggle"
       icon={PanelBottom}
       pressed={open}
-      className={cn("[--wails-draggable:no-drag]", open && "bg-accent text-accent-foreground dark:bg-accent/50", className)}
+      className={cn("[--wails-draggable:no-drag]", open && "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50", className)}
       data-testid="bottom-toggle"
     />
   );

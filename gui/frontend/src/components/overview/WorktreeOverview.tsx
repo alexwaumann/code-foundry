@@ -33,10 +33,10 @@ const LOG_ROW_H = 24;
 const MAX_ROWS = 10;
 
 const toneText: Record<FactTone, string> = {
-  success: "text-success",
-  warning: "text-warning",
-  destructive: "text-destructive",
-  muted: "text-muted-foreground",
+  success: "text-cf-success",
+  warning: "text-cf-warning",
+  destructive: "text-cf-error",
+  muted: "text-cf-text-muted",
 };
 
 /**
@@ -73,8 +73,8 @@ function OperationStrip({ st }: { st: GitStatusView }) {
   const op = operationStrip(st);
   if (!op) return null;
   return (
-    <div className="flex h-9 items-center gap-2 rounded-lg border border-destructive/45 bg-destructive/10 px-2.5 text-body-sm" data-testid="worktree-operation" data-operation={st.operation}>
-      <TriangleAlert className="size-3.5 shrink-0 text-destructive" aria-hidden />
+    <div className="flex h-9 items-center gap-2 rounded-lg border border-cf-error/45 bg-cf-error-surface px-2.5 text-body-sm" data-testid="worktree-operation" data-operation={st.operation}>
+      <TriangleAlert className="size-3.5 shrink-0 text-cf-error" aria-hidden />
       <span className="min-w-0 truncate">
         <span className="font-semibold">{op.title}</span>
         {op.conflicts && <span> · {op.conflicts}</span>}
@@ -123,7 +123,7 @@ function PullRequestRow({ pr }: { pr: PullRequestView }) {
     <div data-testid="overview-pr" data-number={pr.number} data-state={draft ? "draft" : pr.state}>
       <NavRow navKey="pr" activateOnClick onCmdClick={() => void openUrl(pr.url)} className="flex h-9 min-w-0 items-center gap-2 rounded-lg border px-2.5 text-body-sm">
         <PrStateIcon state={pr.state} draft={pr.draft} />
-        <span className="shrink-0 text-muted-foreground tabular-nums">#{pr.number}</span>
+        <span className="shrink-0 text-cf-text-muted tabular-nums">#{pr.number}</span>
         <span className="min-w-0 truncate">{pr.title}</span>
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {word && <span className="text-caption">{word}</span>}
@@ -157,20 +157,20 @@ function FileLine({ row }: { row: FileRow }) {
       tipWhenTruncated={!row.oldPath}
       className="grid h-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 px-1.5 text-body-sm font-mono"
     >
-      <span className={cn("text-center", statusColor[row.status] ?? "text-muted-foreground")} data-status={row.status}>
+      <span className={cn("text-center", statusColor[row.status] ?? "text-cf-text-muted")} data-status={row.status}>
         {row.status}
       </span>
       <span className="flex min-w-0 items-center" data-testid="file-path">
-        {row.dir && <span className="min-w-0 truncate text-left text-muted-foreground [direction:rtl]" data-testid="file-dir">{`‎${row.dir}‎`}</span>}
+        {row.dir && <span className="min-w-0 truncate text-left text-cf-text-muted [direction:rtl]" data-testid="file-dir">{`‎${row.dir}‎`}</span>}
         <span className="max-w-full shrink-0 truncate" data-testid="file-name">
           {row.name}
         </span>
-        {row.conflict && <span className="ml-1.5 shrink-0 text-caption-sm text-destructive">conflict</span>}
+        {row.conflict && <span className="ml-1.5 shrink-0 text-caption-sm text-cf-error">conflict</span>}
       </span>
-      <span className="text-right text-success tabular-nums" data-testid="file-added">
-        {row.added > 0 ? `+${String(row.added)}` : row.binary && row.deleted === 0 ? <span className="text-muted-foreground">bin</span> : ""}
+      <span className="text-right text-cf-diff-addition tabular-nums" data-testid="file-added">
+        {row.added > 0 ? `+${String(row.added)}` : row.binary && row.deleted === 0 ? <span className="text-cf-text-muted">bin</span> : ""}
       </span>
-      <span className="text-right text-destructive tabular-nums" data-testid="file-deleted">
+      <span className="text-right text-cf-diff-deletion tabular-nums" data-testid="file-deleted">
         {row.deleted > 0 ? `−${String(row.deleted)}` : ""}
       </span>
     </NavRow>
@@ -184,10 +184,10 @@ function LogLine({ e }: { e: LogEntryView }) {
       tip={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
       className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-1.5 text-body-sm @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
     >
-      <span className="font-mono text-warning/80">{e.shortSha}</span>
+      <span className="font-mono text-cf-warning/80">{e.shortSha}</span>
       <span className="truncate">{e.subject}</span>
       <Age ms={e.authoredAtMs} className="text-right" />
-      <span className="truncate text-muted-foreground @max-[420px]:hidden">{e.authorName}</span>
+      <span className="truncate text-cf-text-muted @max-[420px]:hidden">{e.authorName}</span>
     </NavRow>
   );
 }
@@ -205,20 +205,20 @@ function Changes({ detail, error, rows, base }: { detail: WorktreeDetailView | n
             {totals.added > 0 && (
               <>
                 {" · "}
-                <span className="text-success">+{totals.added}</span>
+                <span className="text-cf-diff-addition">+{totals.added}</span>
               </>
             )}
             {totals.deleted > 0 && (
               <>
                 {totals.added > 0 ? " " : " · "}
-                <span className="text-destructive">−{totals.deleted}</span>
+                <span className="text-cf-diff-deletion">−{totals.deleted}</span>
               </>
             )}
           </span>
         )}
         {detail?.error && (
           <Tip label={detail.error}>
-            <span className="shrink-0 text-caption text-destructive">refresh failed</span>
+            <span className="shrink-0 text-caption text-cf-error">refresh failed</span>
           </Tip>
         )}
         {base && (
@@ -251,7 +251,7 @@ function Commits({ detail, base, open }: { detail: WorktreeDetailView; base: str
   return (
     <section className="flex flex-col gap-1" data-testid="worktree-commits" data-open={open}>
       <NavRow navKey="commits" activateOnClick className="-mx-1.5 flex h-7 min-w-0 items-center gap-1.5 px-1.5">
-        <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} aria-hidden />
+        <ChevronRight className={cn("size-3.5 shrink-0 text-cf-text-muted transition-transform", open && "rotate-90")} aria-hidden />
         <span className="text-subheading">Commits</span>
         <span className="truncate text-caption tabular-nums">
           {detail.logTotal} ahead{base && ` of ${base}`}
@@ -306,7 +306,7 @@ function NoGitBody({ projectId, path }: { projectId: string; path: string }) {
     <div className="flex flex-col gap-6" data-testid="overview-nogit">
       <section className="rounded-lg border border-dashed px-4 py-3" data-testid="section-nogit">
         <h2 className="flex items-center gap-2 text-heading">
-          <Folder className="size-4 text-muted-foreground" aria-hidden />
+          <Folder className="size-4 text-cf-text-muted" aria-hidden />
           Not a git repository
         </h2>
         <p className="mt-1 text-caption">
@@ -393,7 +393,7 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
         <Facts st={st} remotes={project.remotes} />
         {st.error && (
           <Tip label={st.error} align="start">
-            <span className="self-start text-caption text-destructive" data-testid="status-error">
+            <span className="self-start text-caption text-cf-error" data-testid="status-error">
               git status failed
             </span>
           </Tip>
@@ -420,16 +420,16 @@ export function WorktreePanelView({ projectId, path }: { projectId: string; path
   return (
     <div className="@container min-w-0" data-testid="worktree-surface" data-project={projectId} data-path={path} data-git={project ? !noGit : undefined}>
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3">
-        <header className="-mx-4 flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pb-2 @max-[340px]:-mx-3 @max-[340px]:px-3" data-testid="worktree-surface-header">
+        <header className="-mx-4 flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pb-2 @max-[340px]:-mx-3 @max-[340px]:px-3" data-testid="worktree-surface-header">
           <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-            {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-highlight" aria-hidden />}
+            {noGit ? <Folder className="size-4 shrink-0 text-cf-text-muted" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-cf-highlight" aria-hidden />}
             <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
               {project?.name ?? projectId}
               {noGit ? (
                 <NoGitBadge />
               ) : (
                 <>
-                  <span className="text-muted-foreground">@</span>
+                  <span className="text-cf-text-muted">@</span>
                   {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
                 </>
               )}
@@ -441,11 +441,11 @@ export function WorktreePanelView({ projectId, path }: { projectId: string; path
           <WhoElse path={path} />
         </header>
         {!project ? (
-          <p className="text-body text-muted-foreground">Project not found.</p>
+          <p className="text-body text-cf-text-muted">Project not found.</p>
         ) : noGit ? (
           <NoGitBody projectId={projectId} path={path} />
         ) : !wt ? (
-          <p className="text-body text-muted-foreground" data-testid="worktree-surface-missing">
+          <p className="text-body text-cf-text-muted" data-testid="worktree-surface-missing">
             This worktree is gone (removed from the workspace, or deleted).
           </p>
         ) : (

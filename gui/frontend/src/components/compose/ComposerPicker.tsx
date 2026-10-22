@@ -104,7 +104,7 @@ export function ComposerPicker({
           aria-label={`${label}: ${text}`}
           data-compose-stop
           data-testid={testId}
-          className={cn("max-w-64 text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground", className)}
+          className={cn("max-w-64 text-cf-text-muted hover:text-cf-text data-[state=open]:bg-cf-control-hover data-[state=open]:text-cf-text", className)}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
@@ -168,7 +168,7 @@ export function ComposerPicker({
                           <span className="flex min-w-0 flex-col">
                             <span className="flex min-w-0 items-center gap-1.5">
                               <span className="truncate">{o.label}</span>
-                              {o.tag && <span className="shrink-0 rounded-sm border border-border px-1 text-caption-sm">{o.tag}</span>}
+                              {o.tag && <span className="shrink-0 rounded-sm border border-cf-border px-1 text-caption-sm">{o.tag}</span>}
                             </span>
                             {o.detail && <span className={cn("text-caption", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
                           </span>
@@ -180,7 +180,7 @@ export function ComposerPicker({
               )}
           </CommandList>
           {footer && !status && (
-            <div className="mx-2 border-t border-border px-1 py-2 text-caption" data-slot="picker-footer">
+            <div className="mx-2 border-t border-cf-border px-1 py-2 text-caption" data-slot="picker-footer">
               {footer}
             </div>
           )}

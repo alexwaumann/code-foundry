@@ -14,7 +14,7 @@ export function PickFolderButton({ onClick }: { onClick: () => void }) {
     <Tip label="Choose folder…">
       <button
         type="button"
-        className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        className="shrink-0 rounded-sm p-1 text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text"
         aria-label="Choose folder"
         data-testid="pick-directory"
         onClick={onClick}
@@ -76,12 +76,12 @@ export function PathSuggestions({
                 else onPick(e.name);
               }}
             >
-              {e.isGit ? <FolderGit2 className="text-warning" aria-label="git repository" /> : <Folder />}
+              {e.isGit ? <FolderGit2 className="text-cf-warning" aria-label="git repository" /> : <Folder />}
               <span className="truncate font-mono">{e.name}</span>
               {e.registered && <span className="ml-auto shrink-0 text-caption">already added</span>}
               {onOpen && (
                 <ChevronRight
-                  className={`${e.registered ? "" : "ml-auto "}text-muted-foreground opacity-0 group-hover:opacity-100 group-data-[selected=true]:opacity-100`}
+                  className={`${e.registered ? "" : "ml-auto "}text-cf-text-muted opacity-0 group-hover:opacity-100 group-data-[selected=true]:opacity-100`}
                   aria-hidden
                   data-testid="path-entry-open"
                 />

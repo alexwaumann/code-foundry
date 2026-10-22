@@ -230,7 +230,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
       {attachments.map((a) => (
         <li
           key={a.id}
-          className="group relative size-16 overflow-hidden rounded-md border bg-muted/40"
+          className="group relative size-16 overflow-hidden rounded-md border bg-cf-surface-sunken/40"
           data-testid="attachment"
           data-attachment-id={a.id}
           data-kind={a.kind}
@@ -241,7 +241,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
             aria-label={previewLabel(a.file.name, a.kind, a.pages, formatAttachmentSize(a.file.size))}
             aria-haspopup="dialog"
             data-testid="attachment-open"
-            className="block size-full cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+            className="block size-full cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 focus-visible:ring-inset"
             onClick={(e) => {
               openPreview(draftKey, a.id, e.currentTarget);
             }}
@@ -516,7 +516,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           className={cn(
             // Translucent over the backdrop, frosted so the prompt stays readable.
             "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-lg border shadow-sm backdrop-blur-xl transition-colors",
-            dragging ? "border-info/70 bg-info/5" : "border-border bg-card/85 in-[.file-drop-target-active]:border-info/70 in-[.file-drop-target-active]:bg-info/5",
+            dragging ? "border-cf-info/70 bg-cf-info/5" : "border-cf-border bg-cf-surface-raised/85 in-[.file-drop-target-active]:border-cf-info/70 in-[.file-drop-target-active]:bg-cf-info/5",
           )}
         />
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
@@ -599,7 +599,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 aria-label={attachLabel(hostFiles.hosted)}
                 data-compose-stop
                 data-testid="composer-attach"
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
                 onClick={() => {
                   if (hostFiles.hosted) hostFiles.pick();
                   else fileRef.current?.click();
@@ -625,12 +625,12 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         {(error ?? notice) && (
           <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-body">
             {error && (
-              <p role="alert" className="text-destructive" data-testid="composer-error">
+              <p role="alert" className="text-cf-error" data-testid="composer-error">
                 {error}
               </p>
             )}
             {notice && (
-              <p role="status" className="text-warning" data-testid="composer-notice">
+              <p role="status" className="text-cf-warning" data-testid="composer-notice">
                 {notice}
               </p>
             )}
@@ -701,7 +701,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 data-testid="composer-send"
                 data-phase={phase}
                 className={cn(
-                  "flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none",
+                  "flex h-8 items-center justify-center gap-1.5 rounded-full bg-cf-accent text-cf-accent-foreground outline-none transition-all hover:bg-cf-accent/90 focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none",
                   busy ? "px-3 text-body-sm font-medium" : "w-8 disabled:opacity-40",
                 )}
                 onClick={send}
@@ -749,7 +749,7 @@ export function Composer({ projectId, workspaceId, noProject = false }: { projec
       <Backdrop />
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
         {name === null ? (
-          <p className="m-auto text-body text-muted-foreground">{loaded ? gone : "Loading…"}</p>
+          <p className="m-auto text-body text-cf-text-muted">{loaded ? gone : "Loading…"}</p>
         ) : (
           // The heading's name is the first composer Tab stop, then the member chips, the prompt…
           <div className="m-auto w-full max-w-2xl" data-testid="composer-body" onKeyDown={cycleStops}>

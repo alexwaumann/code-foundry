@@ -16,12 +16,12 @@ import { INLINE_LIVE_MAX } from "../live";
  */
 export function LivePaused({ reason, kind, onAttach }: { reason: "budget" | "connections" | "hidden"; kind: "thread" | "terminal"; onAttach?: () => void }) {
   const starved = useStreamSlotsStore((s) => s.waiting.length > 0);
-  if (reason === "hidden") return <div className="absolute inset-0 bg-pane" aria-hidden data-testid="plugin-live-hidden" />;
+  if (reason === "hidden") return <div className="absolute inset-0 bg-cf-surface" aria-hidden data-testid="plugin-live-hidden" />;
   const Icon = reason === "budget" ? Pause : Unplug;
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-pane px-4 text-center" role="status" data-testid="plugin-live-paused" data-reason={reason}>
-      <Icon className="size-4 text-muted-foreground" aria-hidden />
-      <p className="text-body-sm font-medium text-muted-foreground">{reason === "budget" ? "Paused" : "Waiting for a connection"}</p>
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-cf-surface px-4 text-center" role="status" data-testid="plugin-live-paused" data-reason={reason}>
+      <Icon className="size-4 text-cf-text-muted" aria-hidden />
+      <p className="text-body-sm font-medium text-cf-text-muted">{reason === "budget" ? "Paused" : "Waiting for a connection"}</p>
       <p className="max-w-64 text-caption-sm">
         {reason !== "budget"
           ? "The app has as many live streams open as it can; this view attaches when one closes."
@@ -30,7 +30,7 @@ export function LivePaused({ reason, kind, onAttach }: { reason: "budget" | "con
             : `Plugin views keep ${String(INLINE_LIVE_MAX)} threads and terminals live at once. Attach this ${kind} to pause the oldest.`}
       </p>
       {reason === "budget" && !starved && onAttach && (
-        <Button variant="ghost" size="xs" className="mt-1 text-muted-foreground hover:text-foreground" onClick={onAttach} data-testid="plugin-live-attach">
+        <Button variant="ghost" size="xs" className="mt-1 text-cf-text-muted hover:text-cf-text" onClick={onAttach} data-testid="plugin-live-attach">
           Attach
         </Button>
       )}

@@ -9,13 +9,13 @@ import type { Tone } from "./model";
 
 /** Text colour per tone, readable on the pane in both schemes. */
 export const toneText: Record<Tone | "skipped", string> = {
-  success: "text-success",
-  failure: "text-destructive",
-  pending: "text-warning",
-  merged: "text-highlight",
-  draft: "text-muted-foreground",
-  neutral: "text-muted-foreground",
-  skipped: "text-muted-foreground",
+  success: "text-cf-success",
+  failure: "text-cf-error",
+  pending: "text-cf-warning",
+  merged: "text-cf-highlight",
+  draft: "text-cf-text-muted",
+  neutral: "text-cf-text-muted",
+  skipped: "text-cf-text-muted",
 };
 
 /** A pull request's state colour (prState.ts: open, merged, closed; draft and unknown muted). */
@@ -28,10 +28,10 @@ export const prStateText: Record<PrStateTone, string> = {
 
 /** Badge (border + tint) per tone. */
 export const toneBadge: Record<Tone, string> = {
-  success: "border-success/30 bg-success/10 text-success",
-  failure: "border-destructive/30 bg-destructive/10 text-destructive",
-  pending: "border-warning/30 bg-warning/10 text-warning",
-  merged: "border-highlight/30 bg-highlight/10 text-highlight",
-  draft: "border-border bg-muted/60 text-muted-foreground",
-  neutral: "border-border bg-muted/60 text-muted-foreground",
+  success: "border-cf-success/30 bg-cf-success-surface text-cf-success",
+  failure: "border-cf-error/30 bg-cf-error-surface text-cf-error",
+  pending: "border-cf-warning/30 bg-cf-warning-surface text-cf-warning",
+  merged: "border-cf-highlight/30 bg-cf-highlight-surface text-cf-highlight",
+  draft: "border-cf-border bg-cf-surface-sunken/60 text-cf-text-muted",
+  neutral: "border-cf-border bg-cf-surface-sunken/60 text-cf-text-muted",
 };

@@ -136,15 +136,15 @@ export function NewTab({ active }: { active: boolean }) {
           data-testid="add-project-new-name"
         />
         <span className="truncate text-caption">
-          Creates <span className="font-mono text-foreground" data-testid="add-project-new-dest">{destination}</span>
+          Creates <span className="font-mono text-cf-text" data-testid="add-project-new-dest">{destination}</span>
         </span>
         {nameMessage && (
-          <span className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-new-error">
+          <span className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="add-project-new-error">
             {nameMessage}
           </span>
         )}
         {created && (
-          <span className="text-caption text-success" data-testid="add-project-new-created">
+          <span className="text-caption text-cf-success" data-testid="add-project-new-created">
             Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
           </span>
         )}
@@ -162,7 +162,7 @@ export function NewTab({ active }: { active: boolean }) {
             data-testid="add-project-new-publish"
           />
           <Label htmlFor={publishId} className="font-normal">
-            <CloudUpload className="size-4 text-muted-foreground" aria-hidden />
+            <CloudUpload className="size-4 text-cf-text-muted" aria-hidden />
             Publish to GitHub
           </Label>
         </div>

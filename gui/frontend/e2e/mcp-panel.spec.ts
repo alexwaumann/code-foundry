@@ -172,8 +172,8 @@ async function expectStale(page: Page, on: boolean): Promise<void> {
   if (on) await expect(header).toHaveAttribute("data-stale", "true");
   else await expect(header).not.toHaveAttribute("data-stale");
   const line = surface(page).getByTestId("mcp-checked-line");
-  if (on) await expect(line).toHaveClass(/text-warning/);
-  else await expect(line).not.toHaveClass(/text-warning/);
+  if (on) await expect(line).toHaveClass(/text-cf-warning/);
+  else await expect(line).not.toHaveClass(/text-cf-warning/);
   const dashed = await surface(page)
     .getByTestId("mcp-pill")
     .evaluateAll((els) => els.map((e) => getComputedStyle(e).borderStyle === "dashed" && getComputedStyle(e).borderTopWidth !== "0px"));

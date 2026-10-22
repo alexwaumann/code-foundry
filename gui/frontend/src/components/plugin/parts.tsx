@@ -93,7 +93,7 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
   if (!glyph) return null;
   if (glyph.icon) {
     const tone = glyph.tone ?? "";
-    return <PluginIcon name={glyph.icon} className={cn("size-3.5 shrink-0", tone === "ok" ? "text-success" : tone ? toneText[tone] : "text-muted-foreground", className)} />;
+    return <PluginIcon name={glyph.icon} className={cn("size-3.5 shrink-0", tone === "ok" ? "text-cf-success" : tone ? toneText[tone] : "text-cf-text-muted", className)} />;
   }
   const status = glyph.status ?? "";
   if (style === "icon" || status === "running") {
@@ -104,7 +104,7 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
     // A dash, not a ring: pending is the hollow ring.
     return (
       <span className={cn("flex size-2 shrink-0 items-center justify-center", className)} role="img" aria-label="skipped" data-status={status}>
-        <span className="h-0.5 w-2 rounded-full bg-muted-foreground/70" />
+        <span className="h-0.5 w-2 rounded-full bg-cf-text-muted/70" />
       </span>
     );
   }
@@ -113,10 +113,10 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
 
 /** Each style's classes on the shadcn button (no filled style: DECISIONS.md rule 7). */
 const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
-  muted: "text-muted-foreground hover:text-foreground",
-  outline: "border border-border text-foreground",
-  attention: "border border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:hover:bg-warning/10",
-  destructive: "text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive dark:hover:bg-destructive/10",
+  muted: "text-cf-text-muted hover:text-cf-text",
+  outline: "border border-cf-border text-cf-text",
+  attention: "border border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:hover:bg-cf-warning-surface",
+  destructive: "text-cf-text-muted hover:bg-cf-error-surface hover:text-cf-error focus-visible:text-cf-error dark:hover:bg-cf-error-surface",
   link: "h-auto px-0 text-link hover:bg-transparent hover:underline has-[>svg]:px-0 dark:hover:bg-transparent",
 };
 
@@ -199,7 +199,7 @@ export function CopyIconButton({ text, label = "Copy" }: { text: string; label?:
       <Button
         variant="ghost"
         size="icon-xs"
-        className="shrink-0 text-muted-foreground hover:text-foreground"
+        className="shrink-0 text-cf-text-muted hover:text-cf-text"
         aria-label={copied ? "Copied" : label}
         data-copied={copied || undefined}
         data-testid="plugin-copy"

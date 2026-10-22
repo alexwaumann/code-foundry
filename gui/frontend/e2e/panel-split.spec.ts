@@ -123,8 +123,8 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   // Stacked: the buttons in the first (top) group's header.
   expect(await controlsGroup(page)).toBe("0");
   // The unfocused group's active tab is tinted lighter than the focused one's.
-  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="worktree"]')).toHaveClass(/bg-accent\/40/);
-  await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/dark:bg-accent\/50/);
+  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="worktree"]')).toHaveClass(/bg-cf-control-hover\/40/);
+  await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/dark:bg-cf-control-hover\/50/);
 
   // Just under the threshold (two 360px groups and the divider): still stacked. At it: side by side.
   await setPanelWidth(page, 585);

@@ -33,7 +33,7 @@ function NotificationsButton() {
         aria-disabled={count === 0 || undefined}
         data-testid="sidebar-notifications"
         data-count={count}
-        className={cn("relative", count > 0 ? "text-warning hover:text-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
+        className={cn("relative", count > 0 ? "text-cf-warning hover:text-cf-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
         onMouseDown={(e) => {
           e.preventDefault();
         }}
@@ -46,7 +46,7 @@ function NotificationsButton() {
           <span
             aria-hidden
             data-testid="attention-badge"
-            className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-[3px] text-overline leading-none font-semibold tracking-normal text-warning-foreground tabular-nums"
+            className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cf-warning px-[3px] text-overline leading-none font-semibold tracking-normal text-cf-warning-foreground tabular-nums"
           >
             {count}
           </span>
@@ -73,7 +73,7 @@ export function SidebarToolbar() {
     <div
       role="toolbar"
       aria-label="Sidebar"
-      className="flex h-8 shrink-0 items-center gap-1 border-b border-sidebar-border [--wails-draggable:no-drag]"
+      className="flex h-8 shrink-0 items-center gap-1 border-b border-cf-sidebar-border [--wails-draggable:no-drag]"
       data-testid="sidebar-toolbar"
     >
       <CommandButton
@@ -81,7 +81,7 @@ export function SidebarToolbar() {
         icon={LayoutDashboard}
         whenUnavailable="disable"
         current={dashboard}
-        className={cn("-ml-1.25", dashboard && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent")}
+        className={cn("-ml-1.25", dashboard && "bg-cf-sidebar-row-selected text-cf-sidebar-foreground hover:bg-cf-sidebar-row-selected dark:hover:bg-cf-sidebar-row-selected")}
         data-testid="sidebar-dashboard"
       />
       <NotificationsButton />

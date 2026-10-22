@@ -31,7 +31,7 @@ function ThreadMissing() {
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <Backdrop />
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col p-10 outline-none" tabIndex={-1} data-focus-root data-region="content" aria-label="Thread" data-testid="thread-missing">
-        <p className="m-auto text-body text-muted-foreground">{loaded ? "This thread no longer exists." : "Loading thread…"}</p>
+        <p className="m-auto text-body text-cf-text-muted">{loaded ? "This thread no longer exists." : "Loading thread…"}</p>
       </section>
       <DragBand />
     </div>
@@ -86,7 +86,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
           <ThreadTitle id={threadId} />
           <FlagChip id={threadId} />
           <EnvStaleNote id={threadId} />
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
+          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
@@ -94,17 +94,17 @@ function ThreadBody({ threadId }: { threadId: string }) {
           {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
           {loaded && catchingUp && (
             <div
-              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-popover/90 px-2 py-0.5 text-caption-sm"
+              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
               data-testid="thread-catching-up"
             >
               <Loader2 className="size-3 animate-spin" />
               catching up…
             </div>
           )}
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
           {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
           {loaded && empty && !working && (
-            <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-muted-foreground" data-testid="thread-empty">
+            <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
               No messages yet.
             </p>
           )}

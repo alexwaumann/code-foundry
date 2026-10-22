@@ -53,7 +53,7 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
           tabIndex={-1}
           aria-label={`Edit ${action.name}`}
           data-testid="action-edit"
-          className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
+          className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm text-cf-text-muted opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-cf-text/10 hover:text-cf-text [&_svg]:size-3.5"
           onPointerDown={stop}
           onPointerUp={stop}
           onClick={(e) => {
@@ -137,7 +137,7 @@ export function ActionsMenu({ projectId, owner, from, variant, testId }: { proje
               aria-label={label}
               tabIndex={-1}
               data-testid={testId}
-              className="[--wails-draggable:no-drag] aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent/50"
+              className="[--wails-draggable:no-drag] aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text dark:aria-expanded:bg-cf-control-hover/50"
               onMouseDown={(e) => {
                 e.preventDefault();
               }}
@@ -150,7 +150,7 @@ export function ActionsMenu({ projectId, owner, from, variant, testId }: { proje
               tabIndex={-1}
               aria-label={label}
               data-testid={testId}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground [&_svg]:size-3.5"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text [&_svg]:size-3.5"
               onClick={(e) => {
                 e.stopPropagation();
               }}

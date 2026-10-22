@@ -123,7 +123,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
           leading={
             <>
               <SearchIcon className="size-4 shrink-0 opacity-50" aria-hidden />
-              <span className="shrink-0 text-body font-mono text-muted-foreground select-none" aria-hidden data-testid="add-project-local-prefix">
+              <span className="shrink-0 text-body font-mono text-cf-text-muted select-none" aria-hidden data-testid="add-project-local-prefix">
                 {HOME_PREFIX}
               </span>
             </>
@@ -157,7 +157,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
         </CommandList>
       </Command>
       <div className="flex items-center justify-between gap-3">
-        <span className={`text-caption ${error ? "text-destructive" : "text-muted-foreground"}`} role={error ? "alert" : undefined} data-testid="add-project-local-message">
+        <span className={`text-caption ${error ? "text-cf-error" : "text-cf-text-muted"}`} role={error ? "alert" : undefined} data-testid="add-project-local-message">
           {error ?? "Click or Tab opens a folder · Enter adds"}
         </span>
         <Button type="button" size="sm" disabled={busy || typed === ""} onClick={() => void submit(path)} data-testid="add-project-local-submit">

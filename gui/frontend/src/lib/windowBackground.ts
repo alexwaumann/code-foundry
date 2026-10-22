@@ -1,6 +1,6 @@
 /**
  * Keeps the native window's background on the active theme's sheet (gui/windowbg.go).
- * The page paints --sheet over it, so it only shows before the page loads and while a
+ * The page paints the canvas (--cf-canvas) over it, so it only shows before the page loads and while a
  * resize outruns the page; the host saves the colours so the next launch opens in them
  * (docs/notes/theme-engine-3-settings.md).
  */
@@ -11,7 +11,7 @@ import { activeTheme, onThemeChange, themePreference, themeSlots } from "./theme
 /** The colours to report now. */
 export function windowBackground(): WindowBackgroundView {
   const { light, dark } = themeSlots();
-  const sheet = (id: string) => themeById.get(id)?.vars["--sheet"] ?? "";
+  const sheet = (id: string) => themeById.get(id)?.slots["--cf-canvas"] ?? "";
   return { scheme: themePreference(), dark: sheet(dark), light: sheet(light), active: activeTheme().scheme };
 }
 

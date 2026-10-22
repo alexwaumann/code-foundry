@@ -49,12 +49,12 @@ export function fileTotals(files: readonly FileChangeView[]): { count: number; a
 
 /** A git status letter's colour (the Changes rows, the Diff tab's meta). */
 export const statusColor: Readonly<Record<string, string>> = {
-  A: "text-success",
-  M: "text-warning",
-  D: "text-destructive",
-  R: "text-info",
-  C: "text-info",
-  T: "text-info",
-  U: "text-destructive",
-  "?": "text-muted-foreground",
+  A: "text-cf-diff-addition",
+  M: "text-cf-diff-modified",
+  D: "text-cf-diff-deletion",
+  R: "text-cf-info",
+  C: "text-cf-info",
+  T: "text-cf-info",
+  U: "text-cf-error",
+  "?": "text-cf-text-muted",
 };

@@ -27,7 +27,7 @@ const LINE_HEIGHT = 19;
 /** The file header's height (FileHeader h-9), for the same reason. */
 const HEADER_H = 36;
 
-const statusColor: Record<PrDiffFile["status"], string> = { A: "text-success", M: "text-warning", D: "text-destructive", R: "text-info" };
+const statusColor: Record<PrDiffFile["status"], string> = { A: "text-cf-diff-addition", M: "text-cf-diff-modified", D: "text-cf-diff-deletion", R: "text-cf-info" };
 
 const styleOptions: readonly { value: DiffStyle; label: string }[] = [
   { value: "unified", label: "Unified" },
@@ -40,7 +40,7 @@ function Totals({ model }: { model: PrDiffModel }) {
     <span className="min-w-0 truncate tabular-nums" data-testid="pr-code-totals">
       {n} {n === 1 ? "file" : "files"}
       {" · "}
-      <span className="text-success">+{model.added.toLocaleString()}</span> <span className="text-destructive">−{model.deleted.toLocaleString()}</span>
+      <span className="text-cf-diff-addition">+{model.added.toLocaleString()}</span> <span className="text-cf-diff-deletion">−{model.deleted.toLocaleString()}</span>
     </span>
   );
 }
@@ -55,12 +55,12 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
   const busy = usePrDiffStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const Chevron = listOpen ? ChevronDown : ChevronRight;
   return (
-    <div className="flex h-9 min-w-0 shrink-0 items-center gap-2 border-b border-pane-border px-4 text-caption @max-[340px]:px-3" data-testid="pr-code-strip">
+    <div className="flex h-9 min-w-0 shrink-0 items-center gap-2 border-b border-cf-divider px-4 text-caption @max-[340px]:px-3" data-testid="pr-code-strip">
       {model && model.files.length > 0 ? (
         <button
           type="button"
           aria-expanded={listOpen}
-          className="-ml-1 flex min-w-0 items-center gap-1 rounded-sm px-1 outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="-ml-1 flex min-w-0 items-center gap-1 rounded-sm px-1 outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
           onClick={() => {
             toggleSection(tabKey, "files");
           }}
@@ -81,7 +81,7 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
             size="icon-xs"
             aria-label="Wrap long lines"
             aria-pressed={wrap}
-            className={cn(wrap ? "bg-muted text-foreground" : "text-muted-foreground")}
+            className={cn(wrap ? "bg-cf-surface-sunken text-cf-text" : "text-cf-text-muted")}
             onClick={() => {
               setWrap(!wrap);
             }}
@@ -96,7 +96,7 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
             variant="ghost"
             size="icon-xs"
             aria-label="Refresh diff"
-            className="text-muted-foreground"
+            className="text-cf-text-muted"
             disabled={busy}
             onClick={() => void refreshPullRequestDiff(prRef.slug, prRef.number)}
             data-testid="pr-code-refresh"
@@ -112,12 +112,12 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
 /** A warning under the strip, with the way to the whole diff on GitHub. */
 function Notice({ children, url, testId }: { children: ReactNode; url: string; testId: string }) {
   return (
-    <div className="mx-4 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-caption text-warning" role="status" data-testid={testId}>
+    <div className="mx-4 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning" role="status" data-testid={testId}>
       <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 break-words">{children}</span>
       <button
         type="button"
-        className="flex shrink-0 items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex shrink-0 items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-1 focus-visible:ring-cf-focus"
         onClick={() => void openUrl(`${url}/files`)}
         data-testid={`${testId}-open`}
       >
@@ -134,7 +134,7 @@ function FileRowButton({ f, onPick }: { f: PrDiffFile; onPick: (id: string) => v
     <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} whenTruncated={!f.prevPath} align="start">
       <button
         type="button"
-        className="grid h-full w-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 rounded-sm px-1.5 text-left text-body-sm font-mono outline-none hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
+        className="grid h-full w-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 rounded-sm px-1.5 text-left text-body-sm font-mono outline-none hover:bg-cf-control-hover/50 focus-visible:ring-1 focus-visible:ring-cf-focus"
         onClick={() => {
           onPick(f.id);
         }}
@@ -145,11 +145,11 @@ function FileRowButton({ f, onPick }: { f: PrDiffFile; onPick: (id: string) => v
           {f.status}
         </span>
         <span className="flex min-w-0 items-center">
-          {f.dir && <span className="min-w-0 truncate text-left text-muted-foreground [direction:rtl]">{`‎${f.dir}‎`}</span>}
+          {f.dir && <span className="min-w-0 truncate text-left text-cf-text-muted [direction:rtl]">{`‎${f.dir}‎`}</span>}
           <span className="max-w-full shrink-0 truncate">{f.name}</span>
         </span>
-        <span className="text-right text-success tabular-nums">{f.added > 0 ? `+${String(f.added)}` : f.binary ? <span className="text-muted-foreground">bin</span> : ""}</span>
-        <span className="text-right text-destructive tabular-nums">{f.deleted > 0 ? `−${String(f.deleted)}` : ""}</span>
+        <span className="text-right text-cf-diff-addition tabular-nums">{f.added > 0 ? `+${String(f.added)}` : f.binary ? <span className="text-cf-text-muted">bin</span> : ""}</span>
+        <span className="text-right text-cf-diff-deletion tabular-nums">{f.deleted > 0 ? `−${String(f.deleted)}` : ""}</span>
       </button>
     </Tip>
   );
@@ -157,7 +157,7 @@ function FileRowButton({ f, onPick }: { f: PrDiffFile; onPick: (id: string) => v
 
 function FileList({ files, onPick }: { files: readonly PrDiffFile[]; onPick: (id: string) => void }) {
   return (
-    <div className="shrink-0 border-b border-pane-border px-2.5 py-1" data-testid="pr-code-files">
+    <div className="shrink-0 border-b border-cf-divider px-2.5 py-1" data-testid="pr-code-files">
       <RowList rows={files} rowKey={(f) => f.id} rowHeight={FILE_ROW_H} render={(f) => <FileRowButton f={f} onPick={onPick} />} capped maxHeight={FILE_ROWS * FILE_ROW_H} />
     </div>
   );
@@ -177,12 +177,12 @@ function FileHeader({ f, collapsed, onToggle }: { f: PrDiffFile; collapsed: bool
     onToggle(f.id);
   };
   return (
-    <div className="flex h-9 min-w-0 items-center gap-2 border-y border-pane-border bg-muted/40 px-2 text-body-sm dark:bg-muted/30" data-testid="pr-code-header" data-path={f.path} data-collapsed={collapsed}>
+    <div className="flex h-9 min-w-0 items-center gap-2 border-y border-cf-divider bg-cf-surface-sunken/40 px-2 text-body-sm dark:bg-cf-surface-sunken/30" data-testid="pr-code-header" data-path={f.path} data-collapsed={collapsed}>
       <button
         type="button"
         aria-label={collapsed ? "Show file" : "Fold file"}
         aria-expanded={!collapsed}
-        className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex size-5 shrink-0 items-center justify-center rounded-sm text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
         onClick={toggle}
         data-testid="pr-code-fold"
       >
@@ -191,7 +191,7 @@ function FileHeader({ f, collapsed, onToggle }: { f: PrDiffFile; collapsed: bool
       <span className={cn("w-3 shrink-0 text-center font-mono", statusColor[f.status])}>{f.status}</span>
       <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} whenTruncated={!f.prevPath} align="start">
         <span className="flex min-w-0 items-center font-mono">
-          {f.dir && <span className="min-w-0 truncate text-muted-foreground [direction:rtl]">{`‎${f.dir}‎`}</span>}
+          {f.dir && <span className="min-w-0 truncate text-cf-text-muted [direction:rtl]">{`‎${f.dir}‎`}</span>}
           <span className="max-w-full shrink-0 truncate">{f.name}</span>
         </span>
       </Tip>
@@ -199,12 +199,12 @@ function FileHeader({ f, collapsed, onToggle }: { f: PrDiffFile; collapsed: bool
         {f.binary ? (
           <span>binary</span>
         ) : collapsed ? (
-          <button type="button" className="rounded-sm px-1 font-sans outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring" onClick={toggle} data-testid="pr-code-show">
+          <button type="button" className="rounded-sm px-1 font-sans outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus" onClick={toggle} data-testid="pr-code-show">
             {f.collapsed ? `${f.lines.toLocaleString()} lines · Show file` : "Show file"}
           </button>
         ) : null}
-        {!f.binary && f.added > 0 && <span className="text-success">+{f.added}</span>}
-        {!f.binary && f.deleted > 0 && <span className="text-destructive">−{f.deleted}</span>}
+        {!f.binary && f.added > 0 && <span className="text-cf-diff-addition">+{f.added}</span>}
+        {!f.binary && f.deleted > 0 && <span className="text-cf-diff-deletion">−{f.deleted}</span>}
       </span>
     </div>
   );
@@ -344,7 +344,7 @@ export function PrCode({ prRef, tabKey, url }: { prRef: PrRef; tabKey: string; u
       );
     } else if (error) {
       body = (
-        <p className="px-4 py-3 text-caption text-destructive" role="alert" data-testid="pr-code-error">
+        <p className="px-4 py-3 text-caption text-cf-error" role="alert" data-testid="pr-code-error">
           Cannot load the diff: {error}
         </p>
       );
@@ -366,7 +366,7 @@ export function PrCode({ prRef, tabKey, url }: { prRef: PrRef; tabKey: string; u
           </Notice>
         )}
         {error && (
-          <p className="shrink-0 px-4 pt-2 text-caption text-destructive" data-testid="pr-code-refresh-error">
+          <p className="shrink-0 px-4 pt-2 text-caption text-cf-error" data-testid="pr-code-refresh-error">
             Could not refresh: {error}
           </p>
         )}

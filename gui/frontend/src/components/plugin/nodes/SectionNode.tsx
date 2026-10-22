@@ -19,11 +19,11 @@ export function SectionNode({ node, data }: NodeProps<"section">) {
   const toggled = useCollapsed(toggleKey);
   const collapsible = data.collapsible ?? false;
   const collapsed = collapsible && (toggled ?? data.collapsed ?? false);
-  const titleClass = cn("min-w-0 truncate text-overline", data.tone === "attention" && "text-warning", data.tone === "error" && "text-destructive");
+  const titleClass = cn("min-w-0 truncate text-overline", data.tone === "attention" && "text-cf-warning", data.tone === "error" && "text-cf-error");
   const hasHead = Boolean(data.title) || data.meta !== undefined || data.pill !== undefined || (data.actions?.length ?? 0) > 0 || collapsible;
   const label = (
     <>
-      {collapsible && <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", !collapsed && "rotate-90")} aria-hidden />}
+      {collapsible && <ChevronRight className={cn("size-3.5 shrink-0 text-cf-text-muted transition-transform", !collapsed && "rotate-90")} aria-hidden />}
       {data.title && <span className={titleClass}>{data.title}</span>}
       {data.meta !== undefined && <InlineView value={data.meta} className="min-w-0 truncate text-caption-sm" />}
     </>
@@ -43,7 +43,7 @@ export function SectionNode({ node, data }: NodeProps<"section">) {
             <button
               type="button"
               aria-expanded={!collapsed}
-              className="-ml-0.5 flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="-ml-0.5 flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-1 focus-visible:ring-cf-focus"
               onClick={() => {
                 setCollapsed(toggleKey, !collapsed);
               }}

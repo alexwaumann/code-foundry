@@ -20,7 +20,7 @@ type View =
 type Clone = { state: "idle" } | { state: "running"; lines: CloneProgressView[] } | { state: "failed"; lines: CloneProgressView[]; error: string };
 
 function Badge({ children, tone = "muted" }: { children: string; tone?: "muted" | "amber" }) {
-  const cls = tone === "amber" ? "border-warning/40 text-warning" : "border-border text-muted-foreground";
+  const cls = tone === "amber" ? "border-cf-warning/40 text-cf-warning" : "border-cf-border text-cf-text-muted";
   return <span className={`shrink-0 rounded-sm border px-1.5 py-px text-overline ${cls}`}>{children}</span>;
 }
 
@@ -38,7 +38,7 @@ function ResultRow({ repo, onPick }: { repo: GitHubRepoView; onPick: () => void 
   return (
     <button
       type="button"
-      className="flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+      className="flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left hover:bg-cf-control-hover focus-visible:bg-cf-control-hover focus-visible:outline-none"
       onClick={onPick}
       data-testid="add-project-github-result"
       data-slug={repo.slug}
@@ -60,9 +60,9 @@ function ProgressLog({ lines }: { lines: readonly CloneProgressView[] }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines]);
   return (
-    <div ref={ref} className="max-h-40 overflow-y-auto rounded-md border bg-muted/30 px-3 py-2 text-caption-sm font-mono leading-relaxed text-foreground" data-testid="add-project-clone-progress">
+    <div ref={ref} className="max-h-40 overflow-y-auto rounded-md border bg-cf-surface-sunken/30 px-3 py-2 text-caption-sm font-mono leading-relaxed text-cf-text" data-testid="add-project-clone-progress">
       {lines.length === 0 ? (
-        <div className="text-muted-foreground">Starting gh repo clone…</div>
+        <div className="text-cf-text-muted">Starting gh repo clone…</div>
       ) : (
         lines.map((l, i) => (
           <div key={i} className="break-all whitespace-pre-wrap" data-testid="add-project-clone-line" data-transient={l.transient ? "true" : undefined}>
@@ -138,7 +138,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
       {onBack && (
         <button
           type="button"
-          className="flex w-fit items-center gap-1 text-caption hover:text-foreground disabled:opacity-50"
+          className="flex w-fit items-center gap-1 text-caption hover:text-cf-text disabled:opacity-50"
           onClick={onBack}
           disabled={running}
           data-testid="add-project-github-back"
@@ -153,17 +153,17 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
         </span>
         {repo.description && <span className="text-caption">{repo.description}</span>}
         <span className="mt-1 text-caption">
-          Clones into <span className="font-mono text-foreground" data-testid="add-project-clone-dest">{tildify(repo.clonePath)}</span>
+          Clones into <span className="font-mono text-cf-text" data-testid="add-project-clone-dest">{tildify(repo.clonePath)}</span>
         </span>
         {repo.clonePathExists && (
-          <span className="text-caption text-warning" data-testid="add-project-clone-exists">
+          <span className="text-caption text-cf-warning" data-testid="add-project-clone-exists">
             That folder already exists, so it cannot be cloned there. Add the existing folder instead.
           </span>
         )}
       </div>
       {clone.state !== "idle" && <ProgressLog lines={clone.lines} />}
       {clone.state === "failed" && (
-        <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-clone-error">
+        <p className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="add-project-clone-error">
           {clone.error}
         </p>
       )}
@@ -280,7 +280,7 @@ export function GitHubTab({ active }: { active: boolean }) {
         </Button>
       </form>
       {inputError && (
-        <p className="text-caption text-destructive" role="alert" data-testid="add-project-github-error">
+        <p className="text-caption text-cf-error" role="alert" data-testid="add-project-github-error">
           {inputError}
         </p>
       )}

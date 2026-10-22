@@ -22,7 +22,7 @@ export function ViewTabsBar({ tabs }: { tabs: ViewTabs }) {
       inert={inert}
       size="md"
       label="Views"
-      className="flex h-11 min-w-0 items-center gap-0.5 border-b border-pane-border px-4 @max-[340px]:px-3"
+      className="flex h-11 min-w-0 items-center gap-0.5 border-b border-cf-divider px-4 @max-[340px]:px-3"
       testId="plugin-tabs"
       tabTestId="plugin-tab"
     />

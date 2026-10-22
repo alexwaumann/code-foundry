@@ -19,7 +19,7 @@ export function EnvStaleNote({ id }: { id: string }) {
   });
   if (change === null) return null;
   return (
-    <span className="flex min-w-0 shrink-[2] items-center gap-1 text-caption-sm text-muted-foreground" data-testid="thread-env-stale">
+    <span className="flex min-w-0 shrink-[2] items-center gap-1 text-caption-sm text-cf-text-muted" data-testid="thread-env-stale">
       <Tip label={envStaleTip(change)} data-testid="thread-env-stale-tip">
         <span className="flex min-w-0 items-center gap-[5px]" data-testid="thread-env-stale-text">
           <Plug className="size-3 shrink-0" aria-hidden />
@@ -34,7 +34,7 @@ export function EnvStaleNote({ id }: { id: string }) {
         label="Restart"
         variant="link"
         size="xs"
-        className="h-auto shrink-0 px-0 text-caption-sm font-medium text-foreground"
+        className="h-auto shrink-0 px-0 text-caption-sm font-medium text-cf-text"
         data-testid="thread-env-stale-restart"
       />
       <span className="shrink-0">to apply</span>

@@ -236,7 +236,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
       </div>
       {command ? (
         <div className="cmdbox selectable">
-          <span className="text-muted-foreground">$ </span>
+          <span className="text-cf-text-muted">$ </span>
           <TokenSpans tokens={shellTokens(command)} />
         </div>
       ) : path ? (

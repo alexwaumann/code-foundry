@@ -9,7 +9,7 @@ import { deletePluginSecret, loadPluginSecrets, usePluginSecrets } from "@/store
 export function SecretsToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
-    <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" aria-expanded={open} onClick={onToggle} data-testid="plugin-secrets-toggle">
+    <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" aria-expanded={open} onClick={onToggle} data-testid="plugin-secrets-toggle">
       <KeyRound aria-hidden />
       Secrets
       <Chevron aria-hidden />
@@ -31,9 +31,9 @@ export function SecretsList({ name }: { name: string }) {
   }, [name]);
   const list = entry?.list ?? null;
   return (
-    <div className="flex min-w-0 flex-col rounded-md border border-border px-3 py-1.5" data-testid="plugin-secrets">
+    <div className="flex min-w-0 flex-col rounded-md border border-cf-border px-3 py-1.5" data-testid="plugin-secrets">
       {entry?.error ? (
-        <p className="py-0.5 text-caption-sm break-words text-destructive" role="alert" data-testid="plugin-secrets-error">
+        <p className="py-0.5 text-caption-sm break-words text-cf-error" role="alert" data-testid="plugin-secrets-error">
           {entry.error}
         </p>
       ) : list === null ? (
@@ -45,14 +45,14 @@ export function SecretsList({ name }: { name: string }) {
       ) : (
         list.map((s) => (
           <div key={s.key} className="flex min-w-0 items-center gap-2" data-testid="plugin-secret" data-key={s.key}>
-            <span className="min-w-0 truncate font-mono text-caption-sm text-foreground">{s.key}</span>
+            <span className="min-w-0 truncate font-mono text-caption-sm text-cf-text">{s.key}</span>
             <span className="shrink-0 text-caption-sm tabular-nums" data-testid="plugin-secret-set">
               {s.updatedAtMs === null ? "set" : `set ${formatAgo(s.updatedAtMs, now)}`}
             </span>
             <Button
               variant="ghost"
               size="icon-xs"
-              className="ml-auto text-muted-foreground hover:text-destructive"
+              className="ml-auto text-cf-text-muted hover:text-cf-error"
               aria-label={`Delete secret ${s.key}`}
               disabled={deleting !== null}
               onClick={() => {

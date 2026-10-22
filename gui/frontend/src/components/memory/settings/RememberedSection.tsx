@@ -33,7 +33,7 @@ function ByThread({ by }: { by: Extract<MemoryBy, { kind: "thread" }> }) {
       ) : (
         <button
           type="button"
-          className={cn("rounded-sm underline underline-offset-2 outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring", gone && "line-through")}
+          className={cn("rounded-sm underline underline-offset-2 outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus", gone && "line-through")}
           onClick={() => {
             openThread(by.id);
           }}
@@ -57,7 +57,7 @@ function MemoryRow({ file, className }: { file: string; className?: string | und
   if (!entry) return null;
   const when = rememberedWhen(entry.createdMs, now);
   return (
-    <div className={cn("group flex min-w-0 items-start gap-3 px-4 py-3 hover:bg-accent/40", className)} data-testid="memory-row" data-file={file}>
+    <div className={cn("group flex min-w-0 items-start gap-3 px-4 py-3 hover:bg-cf-control-hover/40", className)} data-testid="memory-row" data-file={file}>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="text-label break-words" data-testid="memory-text">
           {entry.text}
@@ -71,7 +71,7 @@ function MemoryRow({ file, className }: { file: string; className?: string | und
         <Button
           variant="ghost"
           size="icon-xs"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-cf-text-muted hover:text-cf-text"
           aria-label="Forget"
           disabled={busy}
           onClick={() => {
@@ -95,7 +95,7 @@ function EmptyMemory() {
     <div className="flex flex-col items-center gap-1 px-4 py-8 text-center" data-testid="memory-empty">
       <p className="text-label font-semibold">Nothing remembered yet</p>
       <p className="text-caption">Tell a thread how you like things done and it will be kept here, for every thread in every project.</p>
-      <span className="mt-2 rounded-full bg-muted px-3 py-1 text-caption text-foreground">“from now on, open PRs as drafts”</span>
+      <span className="mt-2 rounded-full bg-cf-surface-sunken px-3 py-1 text-caption text-cf-text">“from now on, open PRs as drafts”</span>
     </div>
   );
 }
@@ -139,7 +139,7 @@ export function RememberedSection() {
   return (
     <SectionCard id="remembered" heading="Remembered" description="Every thread in every project reads these before its first action." aside={<RememberedAside />}>
       {readError && (
-        <p className="border-b border-border px-4 py-3 text-caption break-words text-warning" role="alert" data-testid="memory-read-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning" role="alert" data-testid="memory-read-error">
           The memory could not be read, so this is the last list read: {readError}
         </p>
       )}
@@ -150,7 +150,7 @@ export function RememberedSection() {
           The daemon is older than this window and cannot show the memory. Restart it to see this page.
         </p>
       ) : status === "error" ? (
-        <p className="px-4 py-3 text-caption break-words text-destructive" role="alert" data-testid="memory-load-error">
+        <p className="px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="memory-load-error">
           Cannot read the memory: {loadError}
         </p>
       ) : files.length === 0 ? (
@@ -158,9 +158,9 @@ export function RememberedSection() {
       ) : (
         <>
           {files.map((f, i) => (
-            <MemoryRow key={f} file={f} className={i > 0 ? "border-t border-border" : undefined} />
+            <MemoryRow key={f} file={f} className={i > 0 ? "border-t border-cf-border" : undefined} />
           ))}
-          <p className="flex items-center gap-2 border-t border-border px-4 py-2.5 text-caption" data-testid="memory-footnote">
+          <p className="flex items-center gap-2 border-t border-cf-border px-4 py-2.5 text-caption" data-testid="memory-footnote">
             <CircleQuestionMark className="size-3.5 shrink-0" aria-hidden />
             Applies to threads started from now on. Facts about a project stay in Claude&apos;s own memory files.
           </p>

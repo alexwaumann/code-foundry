@@ -71,11 +71,11 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
   const now = useNow(30_000);
   const comments = commentCount(d);
   return (
-    <header className="flex min-w-0 flex-col gap-2 border-b border-pane-border px-4 pt-2 pb-3 @max-[340px]:px-3" data-testid="pr-header">
+    <header className="flex min-w-0 flex-col gap-2 border-b border-cf-divider px-4 pt-2 pb-3 @max-[340px]:px-3" data-testid="pr-header">
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
-          className="flex min-w-0 items-center gap-1 rounded-sm text-caption outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex min-w-0 items-center gap-1 rounded-sm text-caption outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
           data-testid="pr-repo-link"
           onClick={() => void openUrl(pr.url)}
         >
@@ -108,9 +108,9 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
         <span className="min-w-0 truncate font-medium" data-testid="pr-author">
           {pr.author || "ghost"}
         </span>
-        <span className="text-muted-foreground">·</span>
+        <span className="text-cf-text-muted">·</span>
         <Tip label={pr.updatedAtMs === null ? null : new Date(pr.updatedAtMs).toLocaleString()}>
-          <span className="shrink-0 text-muted-foreground" data-testid="pr-updated">
+          <span className="shrink-0 text-cf-text-muted" data-testid="pr-updated">
             updated {ago(pr.updatedAtMs, now) || "—"}
           </span>
         </Tip>
@@ -150,8 +150,8 @@ const innerTabs: { id: PrInnerTab; label: string }[] = [
 function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: string; inner: PrInnerTab }) {
   const entries = useMemo(() => (inner === "timeline" ? timeline(d).length : 0), [d, inner]);
   return (
-    <div className="sticky top-0 z-10 flex h-11 min-w-0 items-center gap-2 border-b border-pane-border bg-pane px-4 @max-[340px]:gap-1.5 @max-[340px]:px-3" data-testid="pr-inner-bar">
-      <div role="tablist" aria-label="Pull request views" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 dark:bg-muted/40">
+    <div className="sticky top-0 z-10 flex h-11 min-w-0 items-center gap-2 border-b border-cf-divider bg-cf-surface px-4 @max-[340px]:gap-1.5 @max-[340px]:px-3" data-testid="pr-inner-bar">
+      <div role="tablist" aria-label="Pull request views" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-cf-surface-sunken/60 p-0.5 dark:bg-cf-surface-sunken/40">
         {innerTabs.map((t) => {
           const active = t.id === inner;
           return (
@@ -162,8 +162,8 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
               aria-selected={active}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
-                "h-6 rounded-md px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring @max-[340px]:px-2",
-                active ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground hover:text-foreground",
+                "h-6 rounded-md px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus @max-[340px]:px-2",
+                active ? "bg-cf-surface text-cf-text shadow-xs dark:bg-cf-control-hover" : "text-cf-text-muted hover:text-cf-text",
               )}
               onClick={() => {
                 setInnerTab(tabKey, t.id);
@@ -213,7 +213,7 @@ function StaleBanner({ fetchedAtMs, lastError }: { fetchedAtMs: number | null; l
 
 function Banner({ children, testId }: { children: ReactNode; testId: string }) {
   return (
-    <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-caption text-warning" role="status" data-testid={testId}>
+    <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning" role="status" data-testid={testId}>
       <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">{children}</span>
     </div>
@@ -239,7 +239,7 @@ function Loading() {
 function Centered({ icon: Icon, title, children, testId }: { icon: typeof SearchX; title: string; children?: ReactNode; testId: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-body" data-testid={testId}>
-      <Icon className="size-5 text-muted-foreground" aria-hidden />
+      <Icon className="size-5 text-cf-text-muted" aria-hidden />
       <p className="font-medium">{title}</p>
       {children && <div className="max-w-80 text-caption break-words">{children}</div>}
     </div>

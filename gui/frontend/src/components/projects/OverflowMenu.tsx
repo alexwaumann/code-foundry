@@ -40,7 +40,7 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
             tabIndex={-1}
             aria-label={label}
             data-testid={testId}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground [&_svg]:size-3.5"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text [&_svg]:size-3.5"
             onClick={(e) => {
               e.stopPropagation();
             }}
@@ -90,7 +90,7 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
                 picked.current = it.onSelect;
               }}
             >
-              <it.icon className={it.destructive ? "text-destructive" : undefined} />
+              <it.icon className={it.destructive ? "text-cf-error" : undefined} />
               {it.label}
               {it.badge !== undefined && (
                 <span className="ml-auto pl-4 text-caption tabular-nums" data-testid={`${it.testId}-count`}>

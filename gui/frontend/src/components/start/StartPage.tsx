@@ -26,7 +26,7 @@ function Header({ title, children }: { title: string; children: ReactNode }) {
       <h1 className="text-title" data-testid="start-heading">
         {title}
       </h1>
-      <div className="mt-1 text-body text-muted-foreground">{children}</div>
+      <div className="mt-1 text-body text-cf-text-muted">{children}</div>
     </div>
   );
 }
@@ -65,7 +65,7 @@ function StartThreadRow({ id }: { id: string }) {
     return x !== undefined && isAttention(x);
   });
   const project = useThreadProject(id);
-  const dot = <span aria-hidden className={cn("size-[7px] rounded-full", waiting ? "bg-warning" : "bg-success")} />;
+  const dot = <span aria-hidden className={cn("size-[7px] rounded-full", waiting ? "bg-cf-warning" : "bg-cf-success")} />;
   return <ThreadLink id={id} icon={dot} detail={`${waiting ? "waiting" : "running"}${project ? ` · ${project}` : ""}`} />;
 }
 
@@ -96,7 +96,7 @@ function Counts({ running, waiting }: { running: number; waiting: number }) {
   if (running > 0) parts.push(<span key="running">{running} running</span>);
   if (waiting > 0) {
     parts.push(
-      <span key="waiting" className="text-warning" data-testid="start-waiting">
+      <span key="waiting" className="text-cf-warning" data-testid="start-waiting">
         {waiting} waiting on you
       </span>,
     );
@@ -131,7 +131,7 @@ function Fleet() {
       <ActiveThreads />
       <button
         type="button"
-        className="text-caption underline underline-offset-2 hover:text-foreground"
+        className="text-caption underline underline-offset-2 hover:text-cf-text"
         onClick={() => {
           // Straight to the shortcuts tab (view.help opens the guide).
           openHelp("shortcuts");

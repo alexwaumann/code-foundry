@@ -55,7 +55,7 @@ function NotesLink({ url }: { url: string }) {
 function RepoLink({ repo }: { repo: string }) {
   if (!repo) return null;
   return (
-    <button type="button" className="hover:text-foreground hover:underline" onClick={() => void openExternal(`https://github.com/${repo}`).catch(() => undefined)}>
+    <button type="button" className="hover:text-cf-text hover:underline" onClick={() => void openExternal(`https://github.com/${repo}`).catch(() => undefined)}>
       github.com/{repo}
     </button>
   );
@@ -112,8 +112,8 @@ function BusyThread({ id }: { id: string }) {
   });
   return (
     <div className="flex gap-1.5" data-testid="update-busy-thread">
-      <span className="min-w-0 truncate text-foreground">{name}</span>
-      <span className="ml-auto shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate text-cf-text">{name}</span>
+      <span className="ml-auto shrink-0 text-cf-text-muted">{label}</span>
     </div>
   );
 }
@@ -123,8 +123,8 @@ function BusyThreads() {
   const ids = useCutOffThreadIds();
   if (ids.length === 0) return null;
   return (
-    <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-pane-border px-3 py-2 text-left text-body-sm" data-testid="update-busy-threads">
-      <div className="mb-1 flex items-center gap-[7px] font-medium text-warning" data-testid="update-busy-heading">
+    <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-cf-divider px-3 py-2 text-left text-body-sm" data-testid="update-busy-threads">
+      <div className="mb-1 flex items-center gap-[7px] font-medium text-cf-warning" data-testid="update-busy-heading">
         <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
         {busyHeading(ids.length)}
       </div>
@@ -137,8 +137,8 @@ function BusyThreads() {
 
 function Failure({ reason }: { reason: string }) {
   return (
-    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-destructive/10 px-3 py-2.5 text-left text-body-sm">
-      <TriangleAlert className="mt-px size-3.5 shrink-0 text-destructive" aria-hidden />
+    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-cf-error-surface px-3 py-2.5 text-left text-body-sm">
+      <TriangleAlert className="mt-px size-3.5 shrink-0 text-cf-error" aria-hidden />
       <div className="min-w-0">
         {failureHeadline(reason)}
         <pre className="mt-[3px] max-h-32 overflow-auto text-caption-sm font-mono break-words whitespace-pre-wrap select-text" data-testid="update-failure">
@@ -170,7 +170,7 @@ function PrimaryButton({ p, label }: { p: Primary; label: string }) {
 
 function LaterLink({ label }: { label: string }) {
   return (
-    <button type="button" className="mx-auto text-caption hover:text-foreground" onClick={closeUpdateDialog} data-testid="update-later">
+    <button type="button" className="mx-auto text-caption hover:text-cf-text" onClick={closeUpdateDialog} data-testid="update-later">
       {label}
     </button>
   );
@@ -196,12 +196,12 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       )}
       {v.variant === "restarting" && <Progress className="mt-4 h-1" aria-label="Restarting" data-testid="update-progress-bar" />}
       {checkError && (
-        <p className="mt-3 text-caption-sm text-warning" data-testid="update-check-error">
+        <p className="mt-3 text-caption-sm text-cf-warning" data-testid="update-check-error">
           Last check failed: {checkError}
         </p>
       )}
       {error && (
-        <p className="mt-3 text-caption-sm break-words text-destructive" data-testid="update-error">
+        <p className="mt-3 text-caption-sm break-words text-cf-error" data-testid="update-error">
           {error}
         </p>
       )}
@@ -238,7 +238,7 @@ export function UpdateDialog() {
       }}
     >
       <DialogContent
-        className="max-w-[400px] border-pane-border px-6 pt-[26px] pb-[18px] text-center text-body-sm"
+        className="max-w-[400px] border-cf-divider px-6 pt-[26px] pb-[18px] text-center text-body-sm"
         data-testid="update-dialog"
         data-state-name={st?.state ?? "unknown"}
         data-variant={v?.variant ?? "waiting"}
@@ -246,7 +246,7 @@ export function UpdateDialog() {
         {v?.close && (
           <button
             type="button"
-            className="absolute top-3 right-3 grid size-[22px] place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="absolute top-3 right-3 grid size-[22px] place-items-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text"
             onClick={closeUpdateDialog}
             aria-label="Close"
             data-testid="update-close"

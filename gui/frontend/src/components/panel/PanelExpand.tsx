@@ -16,7 +16,7 @@ export function PanelExpand({ className }: { className?: string }) {
       command="view.panel.expand"
       icon={expanded ? Minimize2 : Maximize2}
       pressed={expanded}
-      className={cn("[--wails-draggable:no-drag]", expanded && "bg-accent text-accent-foreground dark:bg-accent/50", className)}
+      className={cn("[--wails-draggable:no-drag]", expanded && "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50", className)}
       data-testid="panel-expand"
     />
   );

@@ -68,7 +68,7 @@ function RunStatus({ run }: { run: AgentRunView }) {
   const ms = running ? agentElapsedMs(run, now) : null;
   const text = running ? (ms === null ? "Running" : `Running · ${fmtElapsed(ms)}`) : agentStatusText(run, now);
   const Icon = running ? LoaderCircle : run.status === "failed" ? CircleX : run.status === "done" ? CircleCheck : null;
-  const tone = running ? "text-info" : run.status === "failed" ? "text-destructive" : run.status === "done" ? "text-success" : "text-muted-foreground";
+  const tone = running ? "text-cf-info" : run.status === "failed" ? "text-cf-error" : run.status === "done" ? "text-cf-success" : "text-cf-text-muted";
   return (
     <span className={cn("flex shrink-0 items-center gap-1.5 text-caption whitespace-nowrap tabular-nums", tone)} data-testid="subagent-status" data-status={run.status}>
       {Icon && <Icon className={cn("size-3.5 shrink-0", running && "animate-spin")} aria-hidden />}
@@ -108,17 +108,17 @@ function SubagentHeader({ threadId, run }: { threadId: string; run: AgentRunView
         </Button>
       </Tip>
       <span className="flex min-w-0 flex-1 basis-0 items-center gap-1.5 text-label" data-testid="subagent-crumb">
-        <UpLink className="min-w-0 shrink-[4] truncate rounded-sm px-1 text-muted-foreground hover:bg-accent hover:text-foreground" testId="subagent-crumb-parent">
+        <UpLink className="min-w-0 shrink-[4] truncate rounded-sm px-1 text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text" testId="subagent-crumb-parent">
           {parent}
         </UpLink>
-        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <Bot className="size-3.5 shrink-0 text-info" aria-hidden />
+        <ChevronRight className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
+        <Bot className="size-3.5 shrink-0 text-cf-info" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="subagent-name">
           {agentName(run)}
         </span>
       </span>
       <Tip label="A subagent takes its instructions from its parent thread">
-        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded-md border border-warning/50 px-1.5 text-caption-sm font-medium text-warning" data-testid="subagent-readonly">
+        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded-md border border-cf-warning/50 px-1.5 text-caption-sm font-medium text-cf-warning" data-testid="subagent-readonly">
           <Lock className="size-3" aria-hidden />
           Read-only
         </span>
@@ -227,7 +227,7 @@ function ReportRow({ threadId, run }: { threadId: string; run: AgentRunView }) {
 
 /** The dashed plate where the composer would be: why it is read-only, and the way back. */
 function ReadOnlyPlate({ threadId, status }: { threadId: string; status: AgentRunView["status"] }) {
-  const parent = <b className="font-medium text-foreground">{useParentName(threadId)}</b>;
+  const parent = <b className="font-medium text-cf-text">{useParentName(threadId)}</b>;
   const chord = useCommandsStore((s) => s.commands.find((c) => c.name === SUBAGENT_COMMANDS.up)?.keybindings[0] ?? "");
   const why =
     status === "done" ? (
@@ -238,10 +238,10 @@ function ReadOnlyPlate({ threadId, status }: { threadId: string; status: AgentRu
       <>A subagent takes its instructions from its parent thread. To steer it, send a follow-up to {parent}.</>
     );
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-pane px-4 py-3 text-body-sm text-muted-foreground" data-testid="subagent-plate">
+    <div className="flex items-center gap-3 rounded-lg border border-dashed border-cf-border bg-cf-surface px-4 py-3 text-body-sm text-cf-text-muted" data-testid="subagent-plate">
       <Lock className="size-4 shrink-0" aria-hidden />
       <p className="min-w-0 flex-1" data-testid="subagent-plate-text">
-        <b className="font-medium text-foreground">Read-only.</b> {why}
+        <b className="font-medium text-cf-text">Read-only.</b> {why}
       </p>
       <Button type="button" variant="outline" size="sm" className="max-w-[45%] shrink-0" data-testid="subagent-plate-back" onClick={() => goUpFromSubagent()}>
         <ArrowLeft aria-hidden />
@@ -330,7 +330,7 @@ function RunHeader({ threadId, runId }: { threadId: string; runId: string }) {
   if (!run)
     return (
       <PaneHeader className="gap-2 px-3" data-testid="subagent-header">
-        <span className="text-label text-muted-foreground">Subagent</span>
+        <span className="text-label text-cf-text-muted">Subagent</span>
       </PaneHeader>
     );
   return <SubagentHeader threadId={threadId} run={run} />;
@@ -374,7 +374,7 @@ export function SubagentPane({ threadId, runId }: { threadId: string; runId: str
       >
         <RunHeader threadId={threadId} runId={runId} />
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-muted-foreground">Loading the conversation…</p>}
+          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">Loading the conversation…</p>}
           {toolUseId !== null && <SubagentList threadId={threadId} runId={runId} toolUseId={toolUseId} bottomInset={dockHeight} />}
           <div className="dock" ref={dockRef}>
             <ReadOnlyPlate threadId={threadId} status={status} />

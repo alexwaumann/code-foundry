@@ -54,7 +54,7 @@ export function AttachmentLightbox({
         overlayClassName="bg-black/80"
         data-kind={kind}
         className={cn(
-          "top-1/2 flex min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0",
+          "top-1/2 flex min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-cf-surface-overlay/95 p-0",
           kind === "pdf" ? "w-[calc(90vw/var(--cf-zoom))] max-w-4xl" : "w-auto max-w-[calc(90vw/var(--cf-zoom))]",
         )}
         onCloseAutoFocus={onCloseAutoFocus}
@@ -72,7 +72,7 @@ export function AttachmentLightbox({
               type="button"
               aria-label="Close preview"
               data-testid={`${testId}-close`}
-              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50"
               onClick={onClose}
             >
               <X className="size-4" />

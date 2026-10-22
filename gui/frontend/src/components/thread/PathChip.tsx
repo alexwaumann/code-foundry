@@ -58,7 +58,7 @@ export function PathChip({ match }: { match: PathMatch }) {
       <span
         role="button"
         tabIndex={0}
-        className={tagClass(false, cn(TAG_ACCENT.file, "cursor-pointer font-mono font-normal select-text focus-visible:outline-2 focus-visible:outline-ring/60"))}
+        className={tagClass(false, cn(TAG_ACCENT.file, "cursor-pointer font-mono font-normal select-text focus-visible:outline-2 focus-visible:outline-cf-focus/60"))}
         data-testid="path-chip"
         data-path={match.path}
         {...handlers}
@@ -72,7 +72,7 @@ export function PathChip({ match }: { match: PathMatch }) {
             </span>
           )}
           <span className="max-w-full shrink-0 truncate">{name}</span>
-          {suffix && <span className="shrink-0 text-muted-foreground">{suffix}</span>}
+          {suffix && <span className="shrink-0 text-cf-text-muted">{suffix}</span>}
         </span>
       </span>
     </Tip>
@@ -94,7 +94,7 @@ export function ToolPathChip({ path, line, children }: { path: string; line?: nu
       aria-label={`Open ${fileName(path)}`}
       className={cn(
         TAG_ACCENT.file,
-        "-mx-0.5 cursor-pointer rounded-sm border border-transparent px-1 hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)] focus-visible:outline-2 focus-visible:outline-ring/60",
+        "-mx-0.5 cursor-pointer rounded-sm border border-transparent px-1 hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--cf-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)] focus-visible:outline-2 focus-visible:outline-cf-focus/60",
       )}
       data-testid="tool-path-chip"
       data-path={path}

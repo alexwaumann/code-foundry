@@ -9,12 +9,12 @@ import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
 /** The chip's tint per tone; the text colour is the PR surfaces' (pr/tones `toneText`). */
 const toneTint: Readonly<Record<Tone, string>> = {
-  success: "bg-success/15 hover:bg-success/30",
-  merged: "bg-highlight/15 hover:bg-highlight/30",
-  draft: "bg-muted-foreground/15 hover:bg-muted-foreground/25",
-  neutral: "bg-muted-foreground/15 hover:bg-muted-foreground/25",
-  failure: "bg-destructive/15 hover:bg-destructive/30",
-  pending: "bg-warning/15 hover:bg-warning/30",
+  success: "bg-cf-success-surface hover:bg-cf-success/30",
+  merged: "bg-cf-highlight-surface hover:bg-cf-highlight/30",
+  draft: "bg-cf-text-muted/15 hover:bg-cf-text-muted/25",
+  neutral: "bg-cf-text-muted/15 hover:bg-cf-text-muted/25",
+  failure: "bg-cf-error-surface hover:bg-cf-error/30",
+  pending: "bg-cf-warning-surface hover:bg-cf-warning/30",
 };
 
 /**

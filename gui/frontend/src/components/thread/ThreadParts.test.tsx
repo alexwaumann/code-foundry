@@ -58,14 +58,14 @@ describe("ThreadTitle", () => {
     render(<ThreadTitle id="s-1" />);
     expect(title().textContent).toBe("fix the stale pr badge");
     expect(title().className).toContain("italic");
-    expect(title().className).toContain("text-muted-foreground");
-    expect(title().className).not.toContain("text-foreground ");
+    expect(title().className).toContain("text-cf-text-muted");
+    expect(title().className).not.toContain("text-cf-text ");
     act(() => {
       useThreadsStore.setState({ byId: { "s-1": thread({ name: "Fix the stale PR badge", nameProvisional: false }) } });
     });
     expect(title().textContent).toBe("Fix the stale PR badge");
     expect(title().className).not.toContain("italic");
-    expect(title().className).toContain("text-foreground");
+    expect(title().className).toContain("text-cf-text");
   });
 
   it("shows no status, badge text, model or path", () => {

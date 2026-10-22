@@ -26,10 +26,10 @@ import { Flame } from "./Flame";
 /** The sidebar's status colours (SidebarRow toneClasses). */
 const TONE: Readonly<Record<StatusTone, string>> = {
   muted: "",
-  sky: "text-info",
-  amber: "text-warning",
-  emerald: "text-success",
-  red: "text-destructive",
+  sky: "text-cf-info",
+  amber: "text-cf-warning",
+  emerald: "text-cf-success",
+  red: "text-cf-error",
 };
 
 /** Whether the selection shows Ember's chat (its thread, or the Ember view). */
@@ -126,9 +126,9 @@ function EmberRowShown({ threadId }: { threadId: string }) {
           data-flame={flame}
           className={cn(
             "mt-1.5 flex h-12.5 shrink-0 cursor-default items-center gap-2.5 rounded-md px-2 select-none [--wails-draggable:no-drag]",
-            selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
+            selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
             // The keyboard cursor while the thread list has focus (its arrows reach this row).
-            cursor && "[[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-1 [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-sidebar-ring [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-inset",
+            cursor && "[[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-1 [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-cf-focus [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-inset",
           )}
           onClick={() => {
             useUiStore.getState().setCursor(null);

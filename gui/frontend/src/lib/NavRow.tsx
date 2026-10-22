@@ -44,7 +44,7 @@ export function NavRow({
       role="option"
       aria-selected={selected}
       data-nav-key={navKey}
-      className={cn("cursor-default rounded-sm", selected ? "bg-accent text-accent-foreground ring-1 ring-ring/40" : "hover:bg-accent/50", className)}
+      className={cn("cursor-default rounded-sm", selected ? "bg-cf-control-hover text-cf-text ring-1 ring-cf-focus/40" : "hover:bg-cf-control-hover/50", className)}
       onClick={(e) => {
         if (e.metaKey && onCmdClick) {
           setCursor(navKey);

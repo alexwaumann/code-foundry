@@ -15,19 +15,19 @@ export function ThreadStatusIcon({ id, className }: { id: string; className?: st
   const common = { "aria-label": badgeLabels[badge], "data-thread-badge": badge, role: "img" } as const;
   switch (badge) {
     case "busy":
-      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-info", className)} {...common} />;
+      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-cf-info", className)} {...common} />;
     case "attention":
       return (
         <span className={cn("relative flex size-2.5 shrink-0", className)} {...common}>
-          <span className="absolute inline-flex size-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-warning opacity-50" />
-          <span className="relative inline-flex size-2.5 rounded-full bg-warning" />
+          <span className="absolute inline-flex size-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-cf-warning opacity-50" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-cf-warning" />
         </span>
       );
     case "error":
-      return <CircleX className={cn("size-3.5 shrink-0 text-destructive", className)} {...common} />;
+      return <CircleX className={cn("size-3.5 shrink-0 text-cf-error", className)} {...common} />;
     case "idle":
-      return <Circle className={cn("size-2.5 shrink-0 fill-success text-success", className)} {...common} />;
+      return <Circle className={cn("size-2.5 shrink-0 fill-cf-success text-cf-success", className)} {...common} />;
     default:
-      return <Bot className={cn("size-3.5 shrink-0 text-muted-foreground", className)} {...common} />;
+      return <Bot className={cn("size-3.5 shrink-0 text-cf-text-muted", className)} {...common} />;
   }
 }

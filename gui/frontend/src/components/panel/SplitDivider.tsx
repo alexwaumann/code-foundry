@@ -49,7 +49,7 @@ export function SplitDivider({ panelKey, orientation, ratio }: { panelKey: strin
       data-orientation={orientation}
       data-dragging={dragging || undefined}
       className={cn(
-        "relative z-10 shrink-0 touch-none bg-pane-border transition-colors outline-none [--wails-draggable:no-drag] after:absolute hover:bg-ring focus-visible:bg-ring data-dragging:bg-ring",
+        "relative z-10 shrink-0 touch-none bg-cf-divider transition-colors outline-none [--wails-draggable:no-drag] after:absolute hover:bg-cf-focus focus-visible:bg-cf-focus data-dragging:bg-cf-focus",
         side ? "w-px cursor-col-resize after:inset-y-0 after:-inset-x-1" : "h-px cursor-row-resize after:inset-x-0 after:-inset-y-1",
       )}
       onPointerDown={(e) => {

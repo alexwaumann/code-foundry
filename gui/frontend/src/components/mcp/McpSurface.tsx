@@ -29,25 +29,25 @@ function useThreadId(): string {
 }
 
 const DOT: Record<McpServerStatusView, string> = {
-  connected: "bg-success",
-  failed: "bg-destructive",
-  "needs-auth": "bg-warning",
-  pending: "bg-muted-foreground/60",
-  disabled: "border-[1.5px] border-muted-foreground/50",
-  unknown: "bg-muted-foreground/40",
+  connected: "bg-cf-success",
+  failed: "bg-cf-error",
+  "needs-auth": "bg-cf-warning",
+  pending: "bg-cf-text-muted/60",
+  disabled: "border-[1.5px] border-cf-text-muted/50",
+  unknown: "bg-cf-text-muted/40",
 };
 
 const PILL: Record<McpServerStatusView, string> = {
-  connected: "bg-success/15 text-success",
-  failed: "bg-destructive/15 text-destructive",
-  "needs-auth": "bg-warning/15 text-warning",
-  pending: "bg-muted text-muted-foreground",
-  disabled: "bg-muted text-muted-foreground",
-  unknown: "bg-muted text-muted-foreground",
+  connected: "bg-cf-success-surface text-cf-success",
+  failed: "bg-cf-error-surface text-cf-error",
+  "needs-auth": "bg-cf-warning-surface text-cf-warning",
+  pending: "bg-cf-surface-sunken text-cf-text-muted",
+  disabled: "bg-cf-surface-sunken text-cf-text-muted",
+  unknown: "bg-cf-surface-sunken text-cf-text-muted",
 };
 
 /** A stale card's pill: muted with a dashed outline, so no status reads as current. */
-const STALE_PILL = "border border-dashed border-muted-foreground/50 text-muted-foreground";
+const STALE_PILL = "border border-dashed border-cf-text-muted/50 text-cf-text-muted";
 
 const HINT_ICON: Record<ToolHint, LucideIcon> = { "read-only": Eye, writes: Pencil, destructive: TriangleAlert, "open-world": Globe };
 
@@ -75,9 +75,9 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
   const h = useMcpHeader(threadId);
   const refreshing = useMcpRefreshing(threadId);
   return (
-    <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header" data-stale={stale || undefined}>
+    <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header" data-stale={stale || undefined}>
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Plug className="size-4 shrink-0 text-warning" aria-hidden />
+        <Plug className="size-4 shrink-0 text-cf-warning" aria-hidden />
         <span className="min-w-0 truncate">MCP servers</span>
         {h && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="mcp-count">
@@ -85,7 +85,7 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
           </span>
         )}
       </h2>
-      <span className={cn("flex min-h-6 min-w-0 items-center gap-1.5 text-caption", stale && "text-warning")} data-testid="mcp-checked-line">
+      <span className={cn("flex min-h-6 min-w-0 items-center gap-1.5 text-caption", stale && "text-cf-warning")} data-testid="mcp-checked-line">
         <Clock className="size-3.5 shrink-0" aria-hidden />
         {h ? <CheckedText checkedAtMs={h.checkedAtMs} trigger={h.trigger} server={h.server} stale={stale} /> : <span className="min-w-0 truncate">Not checked yet</span>}
         {stale ? (
@@ -100,7 +100,7 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
             <span className="ml-auto inline-flex shrink-0">
               <button
                 type="button"
-                className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-accent/50"
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-cf-control-hover/50"
                 aria-label={REFRESH_LABEL}
                 disabled={refreshing}
                 onClick={() => void refreshMcp(threadId)}
@@ -122,7 +122,7 @@ function HintIcon({ hint }: { hint: ToolHint }) {
   const label = TOOL_HINT_LABEL[hint];
   return (
     <Tip label={label} data-testid="mcp-hint-tooltip">
-      <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-destructive")} data-testid="mcp-hint" data-hint={hint}>
+      <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-cf-error")} data-testid="mcp-hint" data-hint={hint}>
         <Icon className="size-3" aria-hidden />
       </span>
     </Tip>
@@ -141,11 +141,11 @@ function ToolRow({ tool }: { tool: McpToolView }) {
         </Tip>
         {tool.description && (
           <Tip label={tool.description} whenTruncated>
-            <span className="min-w-0 truncate text-muted-foreground">{tool.description}</span>
+            <span className="min-w-0 truncate text-cf-text-muted">{tool.description}</span>
           </Tip>
         )}
       </span>
-      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+      <span className="flex shrink-0 items-center gap-1 text-cf-text-muted">
         {toolHints(tool).map((h) => (
           <HintIcon key={h} hint={h} />
         ))}
@@ -167,9 +167,9 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-lg border border-border px-3 pt-2.5 pb-2",
-        shown === "failed" && "border-destructive/35",
-        shown === "needs-auth" && "border-warning/35",
+        "flex min-w-0 flex-col gap-1.5 rounded-lg border border-cf-border px-3 pt-2.5 pb-2",
+        shown === "failed" && "border-cf-error/35",
+        shown === "needs-auth" && "border-cf-warning/35",
         shown === "disabled" && "opacity-65",
       )}
       data-testid="mcp-card"
@@ -177,7 +177,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
       data-status={shown}
     >
       <div className="flex min-w-0 items-center gap-2 text-body-sm">
-        {shown === "pending" ? <LoaderCircle className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : <span className={cn("size-2 shrink-0 rounded-full", DOT[shown])} aria-hidden />}
+        {shown === "pending" ? <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-text-muted" aria-hidden /> : <span className={cn("size-2 shrink-0 rounded-full", DOT[shown])} aria-hidden />}
         {/* The pill always shows: the version gives way first, then the name truncates. */}
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <Tip label={server.name} whenTruncated>
@@ -187,7 +187,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
           </Tip>
           {server.version && (
             <Tip label={`v${server.version}`} whenTruncated>
-              <span className="min-w-0 truncate text-code text-muted-foreground" data-testid="mcp-version">
+              <span className="min-w-0 truncate text-code text-cf-text-muted" data-testid="mcp-version">
                 v{server.version}
               </span>
             </Tip>
@@ -208,11 +208,11 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
         </div>
       )}
       {server.error ? (
-        <div className="text-caption-sm font-mono break-words text-destructive" data-testid="mcp-error">
+        <div className="text-caption-sm font-mono break-words text-cf-error" data-testid="mcp-error">
           {server.error}
         </div>
       ) : server.status === "needs-auth" ? (
-        <div className="text-caption text-warning" data-testid="mcp-login-hint">
+        <div className="text-caption text-cf-warning" data-testid="mcp-login-hint">
           {MCP_LOGIN_HINT}
         </div>
       ) : null}
@@ -222,10 +222,10 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
             <button
               type="button"
               className={cn(
-                "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-body-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
+                "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-body-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-60",
                 attention
-                  ? "border-warning/40 text-warning hover:bg-warning/10"
-                  : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent/50",
+                  ? "border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface"
+                  : "border-transparent text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text dark:hover:bg-cf-control-hover/50",
               )}
               disabled={reconnecting}
               onClick={() => void reconnectMcp(threadId, server.name)}
@@ -238,7 +238,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
           {server.tools.length > 0 && (
             <button
               type="button"
-              className="ml-auto inline-flex h-6 items-center gap-1 rounded-md px-2 text-body-sm font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-accent/50"
+              className="ml-auto inline-flex h-6 items-center gap-1 rounded-md px-2 text-body-sm font-medium text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 dark:hover:bg-cf-control-hover/50"
               aria-expanded={open}
               onClick={() => {
                 setOpen((o) => !o);
@@ -252,7 +252,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
         </div>
       )}
       {open && server.tools.length > 0 && (
-        <ul className="mt-1 flex min-w-0 flex-col border-t border-border pt-1.5" data-testid="mcp-tools">
+        <ul className="mt-1 flex min-w-0 flex-col border-t border-cf-border pt-1.5" data-testid="mcp-tools">
           {server.tools.map((t) => (
             <ToolRow key={t.name} tool={t} />
           ))}
@@ -264,7 +264,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
 
 function Message({ testId, children }: { testId: string; children: string }) {
   return (
-    <p className="px-4 py-3 text-body text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
+    <p className="px-4 py-3 text-body text-cf-text-muted @max-[340px]:px-3" data-testid={testId}>
       {children}
     </p>
   );

@@ -136,7 +136,7 @@ function TodoDetail({ t }: { t: ToolCallView }) {
         const status = str(td, "status");
         const Icon = status === "completed" ? Check : status === "in_progress" ? CircleDot : Circle;
         return (
-          <li key={i} className={status === "completed" ? "flex items-center gap-2 text-muted-foreground line-through" : "flex items-center gap-2"}>
+          <li key={i} className={status === "completed" ? "flex items-center gap-2 text-cf-text-muted line-through" : "flex items-center gap-2"}>
             <Icon className="size-3.5 shrink-0" aria-hidden />
             {str(td, "content")}
           </li>
@@ -151,7 +151,7 @@ function Output({ text, label }: { text: string; label?: string }) {
   if (!text.trim()) return null;
   return (
     <div className="term selectable">
-      {label && <div className="cmd text-muted-foreground">{label}</div>}
+      {label && <div className="cmd text-cf-text-muted">{label}</div>}
       <div className="out" style={label ? undefined : { borderTop: 0 }}>
         {clip(text.replace(/\n+$/, ""))}
       </div>
