@@ -197,7 +197,10 @@ type ArgSpec struct {
 	// The arg defaults to a field of the caller's context (the active thread, terminal,
 	// project, worktree). The CLI refuses an explicitly empty value, which would
 	// otherwise mean the active one.
-	ContextBound  bool `protobuf:"varint,13,opt,name=context_bound,json=contextBound,proto3" json:"context_bound,omitempty"`
+	ContextBound bool `protobuf:"varint,13,opt,name=context_bound,json=contextBound,proto3" json:"context_bound,omitempty"`
+	// The last positional arg takes every bare word left on the CLI, joined by spaces
+	// (`code-foundry memory add always open PRs as drafts`).
+	Rest          bool `protobuf:"varint,14,opt,name=rest,proto3" json:"rest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -319,6 +322,13 @@ func (x *ArgSpec) GetId() bool {
 func (x *ArgSpec) GetContextBound() bool {
 	if x != nil {
 		return x.ContextBound
+	}
+	return false
+}
+
+func (x *ArgSpec) GetRest() bool {
+	if x != nil {
+		return x.Rest
 	}
 	return false
 }
@@ -834,7 +844,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
-	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\xc0\x03\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\xd4\x03\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -854,7 +864,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"repeatable\x18\v \x01(\bR\n" +
 	"repeatable\x12\x0e\n" +
 	"\x02id\x18\f \x01(\bR\x02id\x12#\n" +
-	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\"\x93\x02\n" +
+	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\x12\x12\n" +
+	"\x04rest\x18\x0e \x01(\bR\x04rest\"\x93\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

@@ -619,8 +619,8 @@ func capMemory(_ context.Context, env capEnv) (capDetail, error) {
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "memory: %d standing preferences remembered. Every thread started from now on gets them in its "+
-		"system prompt; when to save one is the code-foundry-help skill's \"Remembering preferences\".\n", js.Count)
+	fmt.Fprintf(&b, "memory: %d standing preferences remembered. New threads get them in their system prompt, threads "+
+		"already open with their next message after a restart; when to save one is the code-foundry-help skill's \"Remembering preferences\".\n", js.Count)
 	for _, c := range js.Commands {
 		fmt.Fprintf(&b, "  %-14s %s\n", c.Name, c.Title)
 	}

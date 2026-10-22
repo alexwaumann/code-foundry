@@ -82,7 +82,8 @@ type Deps struct {
 	// Ember backs ember.* (ember.enable and ember.disable also use Settings). Nil
 	// registers them failing with Unimplemented.
 	Ember command.EmberBackend
-	// Memory backs memory.* (the app memory). Nil registers them failing with
+	// Memory backs memory.* (the app memory; add, remove and clear also use Thread and
+	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
 	Memory command.MemoryBackend
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
@@ -169,7 +170,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
-		command.RegisterMemory(r, d.Memory),
+		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,
 			Skills: d.Skills, Shipped: d.ShippedSkills, Presence: d.Presence,

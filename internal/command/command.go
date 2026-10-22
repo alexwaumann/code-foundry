@@ -222,9 +222,12 @@ func (c *Command) validate() error {
 		return invalid("Run is required")
 	}
 	seen := make(map[string]bool, len(c.Args))
-	for _, a := range c.Args {
+	for i, a := range c.Args {
 		if err := a.validate(); err != nil {
 			return invalid("arg %q: %v", a.Name, err)
+		}
+		if a.Rest && slices.ContainsFunc(c.Args[i+1:], func(b ArgSpec) bool { return b.Positional }) {
+			return invalid("arg %q takes the rest of the words but is not the last positional arg", a.Name)
 		}
 		if seen[a.Name] {
 			return invalid("arg %q declared twice", a.Name)

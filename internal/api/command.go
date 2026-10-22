@@ -144,6 +144,7 @@ func commandToProto(c command.Listed) *v1.Command {
 			DefaultToThreadEnv: a.DefaultToThreadEnv,
 			FileOrStdin:        a.FileOrStdin,
 			Repeatable:         a.Repeatable,
+			Rest:               a.Rest,
 			Id:                 a.ID != command.NoID,
 			ContextBound:       a.Context != command.NoContext,
 		}

@@ -75,7 +75,7 @@ func newCapFixture(t *testing.T) capFixture {
 		command.RegisterMcp(f.reg, thread, emit),
 		command.RegisterAgents(f.reg, thread, emit),
 		command.RegisterSettings(f.reg, set, emit, nil),
-		command.RegisterMemory(f.reg, nil),
+		command.RegisterMemory(f.reg, command.MemoryDeps{}),
 		command.RegisterPresence(f.reg, pres),
 		command.RegisterCapabilities(f.reg, command.CapabilitiesDeps{
 			Version: v, Settings: set, Memory: f.memory, Plugins: f.plugins, Skills: f.skills, Presence: pres,

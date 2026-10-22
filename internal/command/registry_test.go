@@ -57,6 +57,11 @@ func TestRegisterValidation(t *testing.T) {
 		{"arg reserved context", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "context-project", Type: String}} }), "reserved"},
 		{"arg no type", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x"}} }), "unknown type"},
 		{"arg duplicate", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String}, {Name: "x", Type: Int}} }), "declared twice"},
+		{"rest not positional", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Rest: true}} }), "rest of the words"},
+		{"rest not a string", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Int, Positional: true, Rest: true}} }), "rest of the words"},
+		{"rest before a positional", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: String, Positional: true, Rest: true}, {Name: "y", Type: String, Positional: true}}
+		}), "not the last positional"},
 		{"enum without values", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum}} }), "needs values"},
 		{"values on non-enum", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Enum: []string{"a"}}} }), "non-enum"},
 		{"required with default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Required: true, Default: "a"}} }), "cannot have a default"},
