@@ -36,21 +36,19 @@ type InlineResult struct {
 // inlineCommand is view.inline.
 func (d ViewDeps) inlineCommand() Command {
 	return Command{
-		Name:  "view.inline",
-		Title: "Show HTML Page Inline",
-		Description: "Show an HTML page inline in a thread's conversation (from a thread: its own): a sandboxed frame at the " +
-			"thread's current place, scripts and network on, rendered from the file each time it shows. A page that links " +
-			"/cf/theme.css follows the app's theme; it may post {type: \"cf:resize\", height} to set its height.",
+		Name:         "view.inline",
+		Title:        "Show HTML Page Inline",
+		Description:  "Show an HTML page inline in a thread's conversation.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		When:         hasThread,
 		Args: []ArgSpec{
 			{Name: "path", Type: Path, Required: true, Positional: true,
-				Description: "The .html or .htm file: absolute, ~/…, or relative to the current directory; under the home directory"},
-			{Name: "title", Type: String, Description: "What the page is, shown on its row (default: the file name)"},
-			{Name: "panel", Type: Bool, Description: "Also open the file in the thread's side panel (view.panel.file)"},
+				Description: "The .html or .htm file, under the home directory"},
+			{Name: "title", Type: String, Description: "Shown on its row"},
+			{Name: "panel", Type: Bool, Description: "Also open it in the thread's side panel"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
-				Description: "Thread whose conversation it shows in (default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread)" + IDHelp},
+				Description: "Thread to show it in (default: yours)"},
 		},
 		Run: d.runInline,
 	}
