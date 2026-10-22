@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -53,9 +52,10 @@ const memoryApplies = "New threads will follow it; threads already open get it o
 var errMemoryChildThread = errors.New("memory is written from the user's own threads only")
 
 // MemoryEntryView is an entry in the memory.* commands' JSON: its number and text, and
-// where it came from (docs/notes/memory-dir.md). Created is RFC 3339 in UTC, "" when
-// unknown (a file added by hand); ThreadID and ThreadName are the thread that added it
-// and its name then, "" when the user did (their terminal, the GUI).
+// where it came from (docs/notes/memory-dir.md). Created is RFC 3339 in UTC to the
+// millisecond (memory.CreatedLayout), "" when unknown (a file added by hand); ThreadID
+// and ThreadName are the thread that added it and its name then, "" when the user did
+// (their terminal, the GUI).
 type MemoryEntryView struct {
 	Index      int    `json:"index"`
 	Text       string `json:"text"`
@@ -67,7 +67,7 @@ type MemoryEntryView struct {
 func memoryEntryView(e memory.Entry) MemoryEntryView {
 	v := MemoryEntryView{Index: e.Index, Text: e.Text, ThreadID: e.ThreadID, ThreadName: e.ThreadName}
 	if !e.Created.IsZero() {
-		v.Created = e.Created.UTC().Format(time.RFC3339Nano)
+		v.Created = e.Created.UTC().Format(memory.CreatedLayout)
 	}
 	return v
 }

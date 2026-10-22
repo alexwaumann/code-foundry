@@ -59,14 +59,14 @@ func TestMemoryCommands(t *testing.T) {
 			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{}}},
 		{name: "add", cmd: "memory.add", args: map[string]string{"text": "  Always open PRs as drafts "},
 			wantMsg:  `Remembered: "Always open PRs as drafts". New threads will follow it; threads already open get it on their next message after a restart.`,
-			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11Z"}, Added: true}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}, Added: true}},
 		{name: "add another", cmd: "memory.add", args: map[string]string{"text": "Draft commit messages before committing"},
 			wantMsg: `Remembered: "Draft commit messages before committing". New threads`},
 		{name: "add a third", cmd: "memory.add", args: map[string]string{"text": "Never open the side panel on your own"},
 			wantMsg: `Remembered: "Never open the side panel on your own"`},
 		{name: "duplicate is a no-op", cmd: "memory.add", args: map[string]string{"text": "always open PRs as drafts"},
 			wantMsg:  `Already remembered: "Always open PRs as drafts" (nothing changed).`,
-			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11Z"}}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}}},
 		{name: "empty", cmd: "memory.add", args: map[string]string{"text": "   "},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "an empty entry"},
 		{name: "multi-line", cmd: "memory.add", args: map[string]string{"text": "one\ntwo"},
@@ -76,7 +76,7 @@ func TestMemoryCommands(t *testing.T) {
 		{name: "show", cmd: "memory.show",
 			wantMsg: "1. Always open PRs as drafts\n2. Draft commit messages before committing\n3. Never open the side panel on your own",
 			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{
-				{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11Z"},
+				{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"},
 				{Index: 2, Text: "Draft commit messages before committing", Created: "2026-10-22T14:03:11.001Z"},
 				{Index: 3, Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z"}}}},
 		{name: "ambiguous substring", cmd: "memory.remove", args: map[string]string{"entry": "draft"},
@@ -135,7 +135,7 @@ func TestMemoryShowJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, err := json.Marshal(res.JSON)
-	if want := `{"entries":[{"index":1,"text":"Use tabs","created":"2026-10-22T14:03:11Z","thread_id":"s-1","thread_name":"Fix login"}]}`; err != nil || string(b) != want {
+	if want := `{"entries":[{"index":1,"text":"Use tabs","created":"2026-10-22T14:03:11.000Z","thread_id":"s-1","thread_name":"Fix login"}]}`; err != nil || string(b) != want {
 		t.Errorf("JSON = %s, %v; want %s", b, err, want)
 	}
 	if res.Message != "1. Use tabs" {

@@ -10,10 +10,11 @@ import (
 // order, rewritten after every write. It is never read: the entry files are the memory.
 const IndexFile = "MEMORY.md"
 
-// createdLayout is the frontmatter's created: RFC 3339 in UTC to the millisecond. The
-// entries are ordered by it, and seconds would put two adds in one second (a model
-// saving two preferences in one command, every line of an import) in file-name order.
-const createdLayout = "2006-01-02T15:04:05.000Z07:00"
+// CreatedLayout is created as written (frontmatter, the memory.* commands' JSON): RFC
+// 3339 in UTC to the millisecond. The entries are ordered by it, and seconds would put
+// two adds in one second (a model saving two preferences in one command, every line of
+// an import) in file-name order.
+const CreatedLayout = "2006-01-02T15:04:05.000Z07:00"
 
 // maxSlug caps an entry file's name before ".md" and a de-duplicating suffix.
 const maxSlug = 48
@@ -69,7 +70,7 @@ func fileName(text string, taken map[string]bool) string {
 func renderEntry(text string, created time.Time, by Origin) string {
 	var b strings.Builder
 	b.WriteString("---\ncreated: ")
-	b.WriteString(created.UTC().Format(createdLayout))
+	b.WriteString(created.UTC().Format(CreatedLayout))
 	b.WriteByte('\n')
 	if by.ThreadID != "" {
 		b.WriteString("thread: " + yamlValue(by.ThreadID) + "\n")
