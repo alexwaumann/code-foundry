@@ -43,11 +43,15 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skills (code-fou
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
-// (workspacePrompt) for a workspace thread.
-func systemPrompt(workspaceLine, threadAppend string) string {
+// (workspacePrompt) for a workspace thread, then the app memory's entries (memoryPrompt)
+// when there are any, then the thread's own append.
+func systemPrompt(workspaceLine string, memory []string, threadAppend string) string {
 	p := ThreadPrompt
 	if workspaceLine != "" {
 		p += " " + workspaceLine
+	}
+	if mp := memoryPrompt(memory); mp != "" {
+		p += "\n\n" + mp
 	}
 	if threadAppend != "" {
 		// The thread's own (Thread.SystemPromptAppend: a reseed's or a resident's).

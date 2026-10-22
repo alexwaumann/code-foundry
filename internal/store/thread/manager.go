@@ -68,6 +68,11 @@ type Options struct {
 	// --add-dir, which loads them. Empty: none. New creates it, so claude never refuses
 	// a missing --add-dir.
 	SkillsDir string
+	// Memory reads the app memory (internal/store/memory: the user's standing
+	// preferences) at every spawn, never cached across spawns; non-empty, its entries
+	// follow ThreadPrompt in --append-system-prompt (memoryPrompt). An error is logged
+	// and the thread starts without them. Nil: no memory.
+	Memory func() ([]string, error)
 	// AttachmentMaxAge is how long a staged attachment is kept. Default
 	// AttachmentMaxAge (the package constant).
 	AttachmentMaxAge time.Duration
@@ -932,7 +937,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, --add-dir for the skills dir, the spawn extras' dirs
 // (plugins), the attachments dir, the workspace members and the granted dirs (in that
-// order, every spawn), the system prompt line (ThreadPrompt, and the workspace's), the
+// order, every spawn), the system prompt (ThreadPrompt, the workspace's line, the app
+// memory read now, the thread's own append), the
 // workspace env, then the extras' env and PATH entries. The prompt is never in argv (it
 // is the first user message). g is what the conversation's allow-for-thread answers
 // granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
@@ -941,9 +947,10 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
 	// A resident's own rules (residenthooks.go) come before the conversation's grants.
 	residentAllow, residentDeny := m.residentRules(s)
+	mem := m.memory(s.ID)
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: allowedTools(append(residentAllow, g.allow...)), disallowedTools: append(residentDeny, g.deny...),
-		appendSystemPrompt: systemPrompt("", s.SystemPromptAppend)}
+		appendSystemPrompt: systemPrompt("", mem, s.SystemPromptAppend)}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
@@ -963,7 +970,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		}
 		var ok bool
 		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.appendSystemPrompt = systemPrompt(wl.prompt, s.SystemPromptAppend)
+			sa.appendSystemPrompt = systemPrompt(wl.prompt, mem, s.SystemPromptAppend)
 			env = append(slices.Clip(env), wl.env...)
 			members = wl.projects
 			if len(wl.missing) > 0 {
