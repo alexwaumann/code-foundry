@@ -67,6 +67,8 @@ type ThreadBackend interface {
 	SidebarBackend
 	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
 	ReseedBackend
+	// HTMLShower backs view.inline (commands_view_inline.go).
+	HTMLShower
 }
 
 var (
@@ -587,6 +589,12 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			body = "output: " + line(it.GetCommandOutput().GetText())
 		case it.GetNote() != nil:
 			body = "note: " + line(it.GetNote().GetText())
+		case it.GetHtml() != nil:
+			h := it.GetHtml()
+			body = "page: " + h.GetPath()
+			if h.GetTitle() != "" {
+				body += " (" + line(h.GetTitle()) + ")"
+			}
 		default:
 			body = "(unknown item " + it.GetId() + ")"
 		}

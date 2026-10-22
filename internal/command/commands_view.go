@@ -142,6 +142,8 @@ type ViewDeps struct {
 	Projects ProjectLister
 	// PullRequests backs view.panel.pr's check (GhService.GetPullRequest).
 	PullRequests PullRequestChecksBackend
+	// Inline backs view.inline (ThreadService.ShowHtml; commands_view_inline.go).
+	Inline HTMLShower
 }
 
 // pageFocusArg is the page verbs' --focus.
@@ -173,7 +175,9 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 //     view.panel.workspace, linked-prs, usage, threads and worktree (view.panel.mcp and
 //     view.panel.agents live with their domains);
 //   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
-//     view.panel.pr.
+//     view.panel.pr;
+//   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
+//     conversation (category Thread).
 //
 // Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, d ViewDeps) error {
@@ -188,6 +192,9 @@ func RegisterView(r *Registry, d ViewDeps) error {
 	}
 	if d.PullRequests == nil {
 		d.PullRequests = codefoundryv1connect.UnimplementedGhServiceHandler{}
+	}
+	if d.Inline == nil {
+		d.Inline = codefoundryv1connect.UnimplementedThreadServiceHandler{}
 	}
 	page := func(name string) func(context.Context, Context, Args) (Result, error) {
 		return func(_ context.Context, uctx Context, a Args) (Result, error) { return d.showPage(uctx, a, name) }
@@ -400,5 +407,5 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:  panel(ViewPanelWorktree, inWorktree),
 		},
 	}
-	return r.RegisterAll(append(cmds, d.itemCommands()...)...)
+	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand())...)
 }

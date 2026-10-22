@@ -171,7 +171,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, command.ViewDeps{
 			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, Diffs: d.FileDiffs,
-			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh,
+			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread,
 		}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
