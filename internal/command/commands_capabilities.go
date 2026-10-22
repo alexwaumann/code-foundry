@@ -94,7 +94,7 @@ var capGroups = []capGroup{
 	{"pages", "main-pane pages and the verb that shows each", capPages},
 	{"panel", "side panel surfaces and the verb that opens each in a thread", capPanel},
 	{"rendering", "what the thread view renders: markdown, code, paths, images, PDFs, HTML", capRendering},
-	{"skills", "skills every thread gets, and ones installed from the marketplace", capSkills},
+	{"skills", "skills every thread gets, and ones installed for Claude Code", capSkills},
 	{"plugins", "installed plugins with their commands and surfaces", capPlugins},
 	{"settings", "settings; values with code-foundry settings get --json", capSettings},
 	{"memory", "remembered standing preferences (memory.* verbs)", capMemory},
@@ -244,14 +244,40 @@ func capCommands(_ context.Context, env capEnv) (capDetail, error) {
 	how := "`code-foundry commands` lists them with whether each is available here; `code-foundry help <command>` prints one's flags."
 	var b strings.Builder
 	fmt.Fprintf(&b, "commands: %d in %d categories. %s\n", js.Count, len(js.Categories), how)
+	// One wrapped paragraph per category, so 180 commands fit in about a screen.
 	for _, cat := range js.Categories {
-		fmt.Fprintf(&b, "\n%s (%d)\n", cat.Name, cat.Count)
-		for _, c := range cat.Commands {
-			fmt.Fprintf(&b, "  %-34s %s\n", c.Name, c.Title)
+		items := make([]string, len(cat.Commands))
+		for i, c := range cat.Commands {
+			items[i] = c.Name + " (" + c.Title + ")"
 		}
+		writeWrapped(&b, fmt.Sprintf("%s (%d): ", cat.Name, cat.Count), items, capWidth)
 	}
 	sum := fmt.Sprintf("commands in %d categories; every button, menu item and CLI verb is one", len(js.Categories))
 	return capDetail{Count: count(js.Count), Summary: sum, Text: strings.TrimSuffix(b.String(), "\n"), JSON: js}, nil
+}
+
+// capWidth is where --group commands wraps.
+const capWidth = 110
+
+// writeWrapped writes head and then items joined by ", ", wrapping at width with
+// continuation lines indented two spaces, and a newline.
+func writeWrapped(b *strings.Builder, head string, items []string, width int) {
+	line, onLine := head, 0
+	for i, it := range items {
+		if i < len(items)-1 {
+			it += ","
+		}
+		if onLine > 0 && len(line)+1+len(it) > width {
+			b.WriteString(line + "\n")
+			line, onLine = " ", 0
+		}
+		if onLine > 0 || line == " " {
+			line += " "
+		}
+		line += it
+		onLine++
+	}
+	b.WriteString(line + "\n")
 }
 
 // CapabilityView is a page or panel surface and the verb that shows it.
@@ -419,7 +445,7 @@ func capSkills(_ context.Context, env capEnv) (capDetail, error) {
 	}
 	switch {
 	case len(js.Installed) > 0:
-		fmt.Fprintf(&b, "Installed from the marketplace (code-foundry skill.* verbs; Settings, Skills):\n")
+		b.WriteString("Installed for Claude Code, from the marketplace or local in ~/.claude/skills (code-foundry skill.* verbs; Settings, Skills):\n")
 		for _, in := range js.Installed {
 			state := "enabled"
 			if !in.Enabled {
@@ -432,12 +458,12 @@ func capSkills(_ context.Context, env capEnv) (capDetail, error) {
 			fmt.Fprintf(&b, "  %s %s (%s, %s): %s\n", in.Kind, in.Name, from, state, in.Purpose)
 		}
 	default:
-		b.WriteString("Installed from the marketplace: none (code-foundry skill browse lists them; Settings, Skills).\n")
+		b.WriteString("Installed for Claude Code: none (code-foundry skill browse lists them; Settings, Skills).\n")
 	}
 	if js.InstalledError != "" {
 		fmt.Fprintf(&b, "Installed plugins could not be listed: %s\n", js.InstalledError)
 	}
-	sum := fmt.Sprintf("skills every thread gets, %d installed from the marketplace", len(js.Installed))
+	sum := fmt.Sprintf("skills every thread gets, %d more installed for Claude Code", len(js.Installed))
 	return capDetail{Count: count(len(js.Shipped)), Summary: sum, Text: strings.TrimSuffix(b.String(), "\n"), JSON: js}, nil
 }
 

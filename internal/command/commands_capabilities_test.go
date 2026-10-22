@@ -143,7 +143,7 @@ func TestCapabilitiesIndex(t *testing.T) {
 		{"pages", 6, "main-pane pages"},
 		{"panel", 8, "(1 from plugins)"},
 		{"rendering", len(command.Renderings), "markdown, code, paths, images, PDFs, HTML"},
-		{"skills", 2, "1 installed from the marketplace"},
+		{"skills", 2, "1 more installed for Claude Code"},
 		{"plugins", 1, "installed plugins"},
 		{"settings", fields, "settings in"},
 		{"memory", 2, "standing preferences"},
@@ -209,8 +209,8 @@ func TestCapabilitiesGroups(t *testing.T) {
 			hasNot: []string{"dev build"},
 			json:   map[string]any{"version": "v0.21.3", "source_ref": "v0.21.3", "source_url": "https://github.com/alexwaumann/code-foundry/tree/v0.21.3"}},
 		{group: "commands",
-			has: []string{"`code-foundry commands`", "`code-foundry help <command>`", "\nDaemon (3)\n",
-				"\n  daemon.capabilities                Show Capabilities\n", "\nView (", "  memory.show "},
+			has: []string{"`code-foundry commands`", "`code-foundry help <command>`", "\nDaemon (3): daemon.status (Daemon Status), daemon.version (Daemon Version),\n  daemon.capabilities (Show Capabilities)\n",
+				"\nView (", " memory.show (Memory: Show Preferences)"},
 			jsonLen: map[string]int{"categories": 4}},
 		{group: "pages",
 			has: []string{"pages: 6.", "run one only when asked", "  view.dashboard       Show the dashboard.\n", "  view.pullrequests    ",
@@ -277,7 +277,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 					t.Errorf("JSON %s has %d entries, want %d: %v", k, len(got), n, js[k])
 				}
 			}
-			if tt.group != "commands" {
+			{
 				if n := strings.Count(res.Message, "\n"); n > 40 {
 					t.Errorf("--group %s has %d lines; keep it to a screen", tt.group, n)
 				}
