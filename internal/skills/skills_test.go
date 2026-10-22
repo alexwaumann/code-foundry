@@ -170,7 +170,7 @@ func TestRender(t *testing.T) {
 			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action"},
 			notCats: []string{"Workspace", "View", "Terminal"},
 			// Settings in full, Thread one line each.
-			detailed:  "  - `<value>`",
+			detailed: "  - `<value>`",
 			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`",
 				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`"},
 		},
