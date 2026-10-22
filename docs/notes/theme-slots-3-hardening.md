@@ -46,7 +46,7 @@ found 22 `--cf-*` slots nothing read. Now:
 | `text-secondary` | `.cf-markdown` blockquotes (were the muted text) |
 | `icon`, `icon-muted` | the New thread icon; a sidebar row's pin, created-by, waiting and tooltip icons |
 | `chrome` | the sidebar's title band (the sidebar itself already derived from it) |
-| `diff-addition-surface`, `-deletion-surface` | @pierre/diffs' added and deleted lines (`--diffs-bg-*-override` in code.css). Now opaque: the surface mixed 20% dark / 12% light toward the diff colour, the library's own default. The first try kept them as 12% alpha tints and the lines went nearly flat: the library uses the override as a `color-mix` target for the line, number and hover backgrounds, which needs an opaque colour |
+| `diff-addition-surface`, `-deletion-surface` | @pierre/diffs' added and deleted lines (`--diffs-bg-*-override` in code.css). The library uses the override as the colour it mixes into the line (20% dark / 12% light), so the slots are now that target: opaque, equal to `diff-addition` / `diff-deletion` by default (main's look), overridable apart from the +N/−N text. The first tries (a 12% alpha tint, then an opaque 20% mix) were mixed a second time and the lines went nearly flat; the pixel pass caught it |
 | `control-active` | shadcn Button's ghost and outline variants when pressed |
 | `accent-surface-foreground` | the composer's primary-member chip |
 | `update`, `update-surface`, `update-text` | the update chip's available and downloading states |

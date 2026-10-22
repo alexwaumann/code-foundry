@@ -59,7 +59,9 @@ Values are `#rrggbb`, or `#rrggbbaa` for the slots that are tints and composite 
 they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`,
 `--cf-code-background` (dark themes; light ones use an opaque well),
 and `--cf-<tone>-surface` for success, warning, error, info, highlight and update. Give
-every other slot an opaque colour (the diff line backgrounds too: the diff view mixes them): the component names, the terminal (xterm needs opaque hex) and the syntax
+every other slot an opaque colour. `--cf-diff-addition-surface` and
+`--cf-diff-deletion-surface` are the colours a diff's lines are tinted toward (the diff
+view mixes 20% dark / 12% light of them into the pane), not the line colour itself: the component names, the terminal (xterm needs opaque hex) and the syntax
 colours are checked opaque.
 
 ## Slots

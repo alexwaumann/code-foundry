@@ -357,9 +357,9 @@ export const SLOTS: readonly Slot[] = [
 
   // Diff: text colours from the status text, line tints as @pierre/diffs mixed them.
   { name: "--cf-diff-addition", group: "diff", rule: "success-text (+N, the A of a file's status, added bars)", derive: (c) => c.get("--cf-success-text") },
-  { name: "--cf-diff-addition-surface", group: "diff", rule: "the surface mixed 20% dark / 12% light toward diff-addition, opaque (an added line; @pierre/diffs mixes with it, so no alpha)", derive: (c) => mix(c.get("--cf-surface"), c.get("--cf-diff-addition"), by(c, 0.2, 0.12)) },
+  { name: "--cf-diff-addition-surface", group: "diff", rule: "diff-addition: the colour an added line is tinted toward (@pierre/diffs mixes 20% dark / 12% light of it into the pane), opaque", derive: (c) => c.get("--cf-diff-addition") },
   { name: "--cf-diff-deletion", group: "diff", rule: "error-text (−N, the D of a file's status, deleted bars)", derive: (c) => c.get("--cf-error-text") },
-  { name: "--cf-diff-deletion-surface", group: "diff", rule: "the surface mixed 20% dark / 12% light toward diff-deletion, opaque (a deleted line)", derive: (c) => mix(c.get("--cf-surface"), c.get("--cf-diff-deletion"), by(c, 0.2, 0.12)) },
+  { name: "--cf-diff-deletion-surface", group: "diff", rule: "diff-deletion: the colour a deleted line is tinted toward, opaque", derive: (c) => c.get("--cf-diff-deletion") },
   { name: "--cf-diff-modified", group: "diff", rule: "warning-text (the M of a file's status)", derive: (c) => c.get("--cf-warning-text") },
 
   // Charts: six categorical colours from the status fills, then cyan.
