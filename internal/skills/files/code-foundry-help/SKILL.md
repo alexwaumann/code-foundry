@@ -94,7 +94,7 @@ make is an `.html` file (no server, no browser): show it inline in the conversat
 (surfaces, text, accent, status triples, sidebar, diff, charts) or the type-role classes
 (`text-title`, `text-body`…), not fixed colours. To follow a theme switch live, set each
 var of the message `{type: "cf:theme", id, scheme, vars}` on `<html>`. Inline, post
-`{type: "cf:resize", height}` to its parent with `document.body`'s height to fit the card.
+`{type: "cf:resize", height}` to its parent on load with `document.body`'s height to fit the card.
 
 After you do something worth seeing on your own (a page you wrote, a pull request you
 opened), open it in your own panel too unless a saved preference says not to, and say so

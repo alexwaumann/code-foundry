@@ -49,7 +49,7 @@ Add `--focus` only when the user asks to be taken there. Page verbs move every w
 only when asked. A path in your reply is a chip that opens the file. A page links
 `<link rel="stylesheet" href="/cf/theme.css">` and paints with its `--cf-*` variables
 (status triples, charts…) or type-role classes so it follows the theme; it posts
-`{type: "cf:resize", height}` (body height) to size its inline card. More: code-foundry-help.
+`{type: "cf:resize", height}` (body height, on load) to fit its inline card. More: code-foundry-help.
 
 ## Discovering what exists
 
