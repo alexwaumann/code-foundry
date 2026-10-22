@@ -10,6 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // intentBuffer is each watcher's queue. Intents are rare and small; a watcher that falls
@@ -17,15 +18,17 @@ import (
 const intentBuffer = 32
 
 // UI implements codefoundryv1connect.UiServiceHandler. Intents travel on the bus as
-// command.IntentEvent, so ui.* commands and Emit reach the same watchers.
+// command.IntentEvent, so ui.* commands and Emit reach the same watchers. PublishTheme
+// records the GUI's active theme for the frame stylesheet (theme.Live).
 type UI struct {
-	bus *bus.Bus
+	bus   *bus.Bus
+	theme *theme.Live
 }
 
 var _ codefoundryv1connect.UiServiceHandler = (*UI)(nil)
 
-// NewUI returns a UiService handler on b.
-func NewUI(b *bus.Bus) *UI { return &UI{bus: b} }
+// NewUI returns a UiService handler on b that publishes themes to live.
+func NewUI(b *bus.Bus, live *theme.Live) *UI { return &UI{bus: b, theme: live} }
 
 // Route mounts the service.
 func (h *UI) Route(opts ...connect.HandlerOption) Route {
@@ -65,4 +68,15 @@ func (h *UI) Emit(_ context.Context, req *connect.Request[v1.EmitIntentRequest])
 	}
 	n := command.BusEmitter{Bus: h.bus}.Emit(intent)
 	return connect.NewResponse(&v1.EmitIntentResponse{Delivered: uint32(n)}), nil
+}
+
+// PublishTheme makes the GUI's active theme the one GET /cf/theme.css and /cf/theme.json
+// serve. InvalidArgument when the id, scheme, a name or a value would not be safe in a
+// stylesheet (theme.Frame.Check).
+func (h *UI) PublishTheme(_ context.Context, req *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
+	m := req.Msg
+	if err := h.theme.Publish(theme.Frame{ID: m.GetId(), Scheme: m.GetScheme(), Vars: m.GetVars()}); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&v1.PublishThemeResponse{}), nil
 }

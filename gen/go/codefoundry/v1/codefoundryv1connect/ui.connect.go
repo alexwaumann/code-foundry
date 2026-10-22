@@ -37,6 +37,8 @@ const (
 	UiServiceWatchIntentsProcedure = "/codefoundry.v1.UiService/WatchIntents"
 	// UiServiceEmitProcedure is the fully-qualified name of the UiService's Emit RPC.
 	UiServiceEmitProcedure = "/codefoundry.v1.UiService/Emit"
+	// UiServicePublishThemeProcedure is the fully-qualified name of the UiService's PublishTheme RPC.
+	UiServicePublishThemeProcedure = "/codefoundry.v1.UiService/PublishTheme"
 )
 
 // UiServiceClient is a client for the codefoundry.v1.UiService service.
@@ -45,6 +47,12 @@ type UiServiceClient interface {
 	WatchIntents(context.Context, *connect.Request[v1.WatchIntentsRequest]) (*connect.ServerStreamForClient[v1.UiIntent], error)
 	// Emit publishes an intent to all watchers. Commands use this to drive the GUI.
 	Emit(context.Context, *connect.Request[v1.EmitIntentRequest]) (*connect.Response[v1.EmitIntentResponse], error)
+	// PublishTheme records the GUI's active theme and its resolved slots, so pages the model
+	// writes can paint in it: the loopback listener serves it as GET /cf/theme.css and
+	// /cf/theme.json (docs/notes/theme-css-route.md). The GUI calls it on connect and on
+	// every theme change. One per daemon, in memory: with several windows the last writer
+	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
+	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
 }
 
 // NewUiServiceClient constructs a client for the codefoundry.v1.UiService service. By default, it
@@ -70,6 +78,12 @@ func NewUiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(uiServiceMethods.ByName("Emit")),
 			connect.WithClientOptions(opts...),
 		),
+		publishTheme: connect.NewClient[v1.PublishThemeRequest, v1.PublishThemeResponse](
+			httpClient,
+			baseURL+UiServicePublishThemeProcedure,
+			connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -77,6 +91,7 @@ func NewUiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 type uiServiceClient struct {
 	watchIntents *connect.Client[v1.WatchIntentsRequest, v1.UiIntent]
 	emit         *connect.Client[v1.EmitIntentRequest, v1.EmitIntentResponse]
+	publishTheme *connect.Client[v1.PublishThemeRequest, v1.PublishThemeResponse]
 }
 
 // WatchIntents calls codefoundry.v1.UiService.WatchIntents.
@@ -89,12 +104,23 @@ func (c *uiServiceClient) Emit(ctx context.Context, req *connect.Request[v1.Emit
 	return c.emit.CallUnary(ctx, req)
 }
 
+// PublishTheme calls codefoundry.v1.UiService.PublishTheme.
+func (c *uiServiceClient) PublishTheme(ctx context.Context, req *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
+	return c.publishTheme.CallUnary(ctx, req)
+}
+
 // UiServiceHandler is an implementation of the codefoundry.v1.UiService service.
 type UiServiceHandler interface {
 	// WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
 	WatchIntents(context.Context, *connect.Request[v1.WatchIntentsRequest], *connect.ServerStream[v1.UiIntent]) error
 	// Emit publishes an intent to all watchers. Commands use this to drive the GUI.
 	Emit(context.Context, *connect.Request[v1.EmitIntentRequest]) (*connect.Response[v1.EmitIntentResponse], error)
+	// PublishTheme records the GUI's active theme and its resolved slots, so pages the model
+	// writes can paint in it: the loopback listener serves it as GET /cf/theme.css and
+	// /cf/theme.json (docs/notes/theme-css-route.md). The GUI calls it on connect and on
+	// every theme change. One per daemon, in memory: with several windows the last writer
+	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
+	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
 }
 
 // NewUiServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -116,12 +142,20 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(uiServiceMethods.ByName("Emit")),
 		connect.WithHandlerOptions(opts...),
 	)
+	uiServicePublishThemeHandler := connect.NewUnaryHandler(
+		UiServicePublishThemeProcedure,
+		svc.PublishTheme,
+		connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.UiService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UiServiceWatchIntentsProcedure:
 			uiServiceWatchIntentsHandler.ServeHTTP(w, r)
 		case UiServiceEmitProcedure:
 			uiServiceEmitHandler.ServeHTTP(w, r)
+		case UiServicePublishThemeProcedure:
+			uiServicePublishThemeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -137,4 +171,8 @@ func (UnimplementedUiServiceHandler) WatchIntents(context.Context, *connect.Requ
 
 func (UnimplementedUiServiceHandler) Emit(context.Context, *connect.Request[v1.EmitIntentRequest]) (*connect.Response[v1.EmitIntentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.Emit is not implemented"))
+}
+
+func (UnimplementedUiServiceHandler) PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishTheme is not implemented"))
 }
