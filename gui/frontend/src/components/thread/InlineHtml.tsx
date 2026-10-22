@@ -152,7 +152,7 @@ function Action({ label, icon: Icon, onClick, pressed, disabled, testId }: { lab
 /** The strip over the page: its path (the directory muted), then the actions. */
 function Strip({ page, children, big }: { page: InlinePage; children: ReactNode; big?: boolean }) {
   return (
-    <div className={cn("flex shrink-0 items-center gap-1.5 border-b border-border bg-muted pr-1 text-muted-foreground dark:bg-white/4", big ? "h-10 pl-3.5" : "h-8 pl-2.5")} data-testid="thread-html-strip">
+    <div className={cn("flex shrink-0 items-center gap-1.5 border-b border-border bg-muted pr-1 text-muted-foreground dark:bg-foreground/4", big ? "h-10 pl-3.5" : "h-8 pl-2.5")} data-testid="thread-html-strip">
       <FileCode className="size-3.5 shrink-0" aria-hidden />
       <span className="mono min-w-0 flex-1 truncate text-caption" data-testid="thread-html-path">
         {page.dir && <span>{page.dir}/</span>}
