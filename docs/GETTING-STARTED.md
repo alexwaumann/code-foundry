@@ -58,8 +58,10 @@ them. Hover one there and click **Show in sidebar** to take it over, or turn on
 Settings › Threads › **Show threads created by other threads** to list them all.
 
 Tell any thread how you like things done ("keep your answers short", "always open pull
-requests as drafts") and it remembers that for every thread in every project; a
-**Remembered** notice confirms it. Ask a thread what it remembers, or to forget one.
+requests as drafts") and it keeps that as a standing preference for every thread in
+every project; a **Remembered** notice confirms it. Settings › **Memory** lists them,
+with when and by which thread, and forgets one or all. Ask a thread what it remembers,
+or to forget one.
 
 Closing the window stops nothing. Open the app again and every thread is where you
 left it.

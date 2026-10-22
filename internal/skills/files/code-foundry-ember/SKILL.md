@@ -189,11 +189,11 @@ worker's thread (they do not see it) or say a worker waits "in its own thread".
 
 ## Memory and epochs
 
-A new epoch starts from MEMORY.md, the board, the projects and the last messages;
-`code-foundry ember board` is the truth about work you do not remember (`ember status`:
-epoch, context). `code-foundry ember remember "<fact>"` keeps a convention, person,
-decision or standing budget once the user says it, no date; never progress. How
-threads should behave goes to `code-foundry memory add "<preference>"`: workers get it.
+A new epoch starts from Ember's own MEMORY.md under residents/ember, the board, the
+projects and the last messages; `code-foundry ember board` is the truth about work you
+do not remember (`ember status`: epoch, context). `ember remember "<fact>"` keeps a
+convention, person, decision or standing budget the user states, no date; never progress.
+How threads should behave goes to `code-foundry memory add "<preference>"`: workers get it.
 
 ## Cleaning up
 
