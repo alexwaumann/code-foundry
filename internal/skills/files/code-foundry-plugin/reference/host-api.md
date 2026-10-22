@@ -12,18 +12,17 @@ not be sent (a refusal shows in the plugin's log).
 ## Identity and logging
 
 - `h.Name()`, `h.Dir()` (package folder, also the working directory), `h.DataDir()` (own
-  state folder, 0700, kept across updates: caches, settings that are not secret; always
-  use it rather than building the path, which follows the Code Foundry home),
-  `h.Granted()` (the permissions the user consented to), `h.Dev()` (running under
-  `plugin dev`), `h.HostVersion()`, `h.HasCapability("view.tabs")`.
+  state folder, 0700, kept across updates: caches, non-secret settings; never build the
+  path yourself), `h.Granted()` (the permissions the user consented to), `h.Dev()`
+  (running under `plugin dev`), `h.HostVersion()`, `h.HasCapability("view.tabs")`.
 - `h.Log()` is a `*slog.Logger` writing to the plugin's log (`code-foundry plugin logs
   <name>`) and, at its level, the daemon's. Log keys, ids and counts; never a secret's
   value. Integers print as written (`run=39128319017`). stderr lines land in the same
   log.
-- **Running the user's tools.** The plugin's PATH is the daemon's, which may lack what
-  the user's terminal has (Homebrew, a Go or Node version manager). Run project tools
-  through the login shell, as project actions do: `exec.Command(os.Getenv("SHELL"), "-lc",
-  cmd)` (fall back to `/bin/zsh`), with `Dir` set to the worktree. `gh` and `git` are
+- **Running the user's tools.** The plugin's PATH is the daemon's, which may lack
+  Homebrew's or a version manager's tools. Run project tools through the login shell, as
+  project actions do: `exec.Command(os.Getenv("SHELL"), "-lc", cmd)` (fall back to
+  `/bin/zsh`), with `Dir` set to the worktree. `gh` and `git` are
   usually on PATH; resolve them the same way if not.
 
 ## Invoke: run a Code Foundry command
@@ -45,8 +44,9 @@ res, err := h.Invoke(ctx, "thread.send", map[string]string{"text": "The deploy f
 - A command that asks the user first (destructive ones; shown with `--yes`) fails with
   -32003 `CodeConfirmationRequired`: the plugin never confirms for the user.
   `h.InvokeAsk(...)` instead hands it to the GUI, which shows the command's own confirm
-  dialog; it answers at once with `res.JSON = {"asked": true, "delivered": <windows>}`
-  (and fails like Invoke when no GUI is open). Learn the outcome from events.
+  dialog; it answers at once with `res.JSON = {"asked": true, "windows": N, "receivers":
+  M}` (app windows open; streams that got it, CLI ones too, also in `delivered`) and
+  fails like Invoke when no window is open. Learn the outcome from events.
 - Other failures keep their code: -32004 not found, -32602 invalid args, -32002 not
   available here. `pluginsdk.ErrorCode(err)` reads it.
 

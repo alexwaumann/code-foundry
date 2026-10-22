@@ -220,9 +220,18 @@ const (
 // AskedResult is the JSON of host/invoke's result when a command was handed to the
 // user (Confirm "ask").
 type AskedResult struct {
-	// Asked: the GUI shows the command's confirm dialog; Delivered counts the windows.
-	Asked     bool `json:"asked"`
-	Delivered int  `json:"delivered"`
+	// Asked: the GUI shows the command's confirm dialog.
+	Asked bool `json:"asked"`
+	// Windows is how many app windows were open to show it (at least one: with none the
+	// call fails with CodeConfirmationRequired).
+	Windows int `json:"windows"`
+	// Receivers is how many event streams got the request: the windows, but also CLI
+	// events streams and plugins. Not a window count.
+	Receivers int `json:"receivers"`
+	// Delivered is Receivers under its old name, kept for plugins that read it.
+	//
+	// Deprecated: use Windows (or Receivers).
+	Delivered int `json:"delivered"`
 }
 
 // LogParams is the log notification's params.
