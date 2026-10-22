@@ -1,8 +1,9 @@
 /**
- * Colour maths for the theme converter and its tests: sRGB hex <-> OKLab/OKLCH, mixes,
- * lightness shifts and WCAG contrast. Hand-rolled (no dependency); every function takes
- * and returns `#rrggbb` unless it says otherwise. No DOM or Node APIs, so the contrast
- * test in src/ can import it too.
+ * Colour maths for the theme resolver (src/themes/slots.ts, at runtime), the converter
+ * (themes/convert.ts, at build time) and their tests: sRGB hex <-> OKLab/OKLCH, mixes,
+ * lightness shifts, alpha and WCAG contrast. Hand-rolled (no dependency); every function
+ * takes and returns `#rrggbb` unless it says otherwise. No DOM or Node APIs, so the app
+ * bundles it and the Node converter imports it from here.
  */
 
 export type Rgb = readonly [number, number, number];
@@ -105,12 +106,24 @@ export function shiftL(hex: string, d: number): string {
 
 /**
  * A colour at `alpha` painted over an opaque `under`, as the browser composites it (in
- * gamma-encoded sRGB). Used to turn `oklch(1 0 0 / 11%)` borders into opaque hex.
+ * gamma-encoded sRGB). Borders are the text at 8-18% painted over the surface this way.
  */
 export function over(color: string, alpha: number, under: string): string {
   const c = parseHex(color).rgb;
   const u = parseHex(under).rgb;
   return toHex([c[0] * alpha + u[0] * (1 - alpha), c[1] * alpha + u[1] * (1 - alpha), c[2] * alpha + u[2] * (1 - alpha)]);
+}
+
+/** `hex` at `alpha` (0..1) as `#rrggbbaa`: a tint that composites over whatever it sits on. */
+export function withAlpha(hex: string, alpha: number): string {
+  const a = Math.round(Math.min(1, Math.max(0, alpha)) * 255);
+  return toHex(parseHex(hex).rgb) + a.toString(16).padStart(2, "0");
+}
+
+/** A `#rrggbb` or `#rrggbbaa` colour painted over an opaque `under`, as opaque hex. */
+export function flatten(color: string, under: string): string {
+  const { rgb, alpha } = parseHex(color);
+  return alpha >= 1 ? toHex(rgb) : over(toHex(rgb), alpha, under);
 }
 
 export function luminance(hex: string): number {
@@ -123,25 +136,6 @@ export function contrast(x: string, y: string): number {
   const a = luminance(x);
   const b = luminance(y);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
-
-/**
- * A CSS colour as written in index.css (`#hex`, `oklch(L C H)`, `oklch(L C H / a%)`) to
- * hex and alpha. Only the forms index.css uses; anything else throws.
- */
-export function parseCss(value: string): { hex: string; alpha: number } {
-  const v = value.trim();
-  if (v.startsWith("#")) {
-    const { rgb, alpha } = parseHex(v);
-    return { hex: toHex(rgb), alpha };
-  }
-  const m = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+)(%?)\s*)?\)$/.exec(v);
-  if (!m) throw new Error(`unsupported colour: ${value}`);
-  const L = Number(m[1]) / (m[2] ? 100 : 1);
-  const C = Number(m[3]);
-  const H = (Number(m[4]) * Math.PI) / 180;
-  const alpha = m[5] === undefined ? 1 : Number(m[5]) / (m[6] ? 100 : 1);
-  return { hex: fromLab([L, C * Math.cos(H), C * Math.sin(H)]), alpha };
 }
 
 /**

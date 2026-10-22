@@ -155,18 +155,68 @@ export function useActiveTheme(): Theme {
 }
 
 /**
- * Keeps <html> in sync with the active theme: `data-theme` (its block in
- * src/themes/themes.css), the `dark` class and color-scheme from the theme's own scheme.
- * Everything colour-related reads the CSS variables those select, so this is the one
- * place the document's colours change.
+ * The active theme's resolved slots: every `--cf-*`, `--terminal-*`, `--syn-*` and `--sh-*`
+ * name and its value (`#rrggbb`, or `#rrggbbaa` for tints), as <html> carries them. The
+ * same object until the active theme changes. This is the map to hand to anything outside
+ * the document that should paint in the theme (a frame's tokens stylesheet).
+ */
+export function activeThemeSlots(): Readonly<Record<string, string>> {
+  return activeTheme().slots;
+}
+
+/** activeThemeSlots(); re-renders when the active theme changes. */
+export function useActiveThemeSlots(): Readonly<Record<string, string>> {
+  return useSyncExternalStore(subscribe, activeThemeSlots, activeThemeSlots);
+}
+
+/**
+ * Calls cb with the resolved slots now and after every change of the active theme (not on
+ * a preference or slot change that leaves it the same). Returns an unsubscribe.
+ */
+export function subscribeThemeSlots(cb: (slots: Readonly<Record<string, string>>) => void): () => void {
+  let last = activeThemeSlots();
+  cb(last);
+  return subscribe(() => {
+    const next = activeThemeSlots();
+    if (next === last) return;
+    last = next;
+    cb(next);
+  });
+}
+
+/**
+ * The active theme's id and slots as last applied, for index.html's inline script: it sets
+ * them on <html> before the stylesheet paints, when the stored id is the theme it picks.
+ */
+export const THEME_SLOTS_STORAGE_KEY = "cf.theme.slots";
+
+function persistSlots(id: string, slots: Readonly<Record<string, string>>): void {
+  try {
+    localStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify({ id, vars: slots }));
+  } catch {
+    // No storage: the first frame of the next launch is the window's background colour.
+  }
+}
+
+/**
+ * Keeps <html> in sync with the active theme: its resolved slots as inline CSS variables
+ * (index.css aliases every component name to them), `data-theme` (the id, for tests and
+ * selectors), the `dark` class and color-scheme from the theme's own scheme. This is the
+ * one place the document's colours change.
  */
 export function syncDocumentScheme(): () => void {
+  let applied: readonly string[] = [];
   const apply = () => {
     const theme = activeTheme();
     const root = document.documentElement;
+    const slots = theme.slots;
+    for (const name of applied) if (!(name in slots)) root.style.removeProperty(name);
+    for (const [name, value] of Object.entries(slots)) root.style.setProperty(name, value);
+    applied = Object.keys(slots);
     root.dataset.theme = theme.id;
     root.classList.toggle("dark", theme.scheme === "dark");
     root.style.colorScheme = theme.scheme;
+    persistSlots(theme.id, slots);
   };
   apply();
   return subscribe(apply);

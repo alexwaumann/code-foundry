@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
-import { activeTheme, setThemePreference, setThemeSlots, syncDocumentScheme, themeSlots } from "./theme";
+import { DEFAULT_DARK, DEFAULT_LIGHT, themeById } from "@/themes";
+import { activeTheme, activeThemeSlots, setThemePreference, setThemeSlots, subscribeThemeSlots, syncDocumentScheme, THEME_SLOTS_STORAGE_KEY, themeSlots } from "./theme";
 
 const root = document.documentElement;
 let stop: () => void = () => {};
@@ -62,6 +62,18 @@ describe("syncDocumentScheme", () => {
     expect(root.dataset.theme).toBe("rose-pine-dawn");
   });
 
+  it("sets every resolved slot inline on <html>, follows a theme change and stores them for the first paint", () => {
+    stop = syncDocumentScheme();
+    const dark = themeById.get("github-dark");
+    expect(Object.keys(dark?.slots ?? {}).length).toBeGreaterThan(90);
+    for (const [k, v] of Object.entries(dark?.slots ?? {})) expect(root.style.getPropertyValue(k), k).toBe(v);
+    setThemeSlots({ dark: "dracula" });
+    const dracula = themeById.get("dracula");
+    expect(root.style.getPropertyValue("--cf-surface")).toBe(dracula?.slots["--cf-surface"]);
+    expect(root.style.getPropertyValue("--syn-kw")).toBe(dracula?.slots["--syn-kw"]);
+    expect(JSON.parse(localStorage.getItem(THEME_SLOTS_STORAGE_KEY) ?? "")).toEqual({ id: "dracula", vars: dracula?.slots });
+  });
+
   it("follows the macOS appearance under the system preference", () => {
     const listeners = new Set<() => void>();
     let light = false;
@@ -83,6 +95,25 @@ describe("syncDocumentScheme", () => {
       stop = () => {};
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("the resolved slots", () => {
+  it("are the active theme's, the same object until it changes", () => {
+    expect(activeThemeSlots()).toBe(themeById.get("github-dark")?.slots);
+    expect(activeThemeSlots()).toBe(activeThemeSlots());
+    expect(activeThemeSlots()["--cf-canvas"]).toBe(themeById.get("github-dark")?.vars["--sheet"]);
+  });
+
+  it("subscribers hear the current map, then only changes of the active theme", () => {
+    const seen: string[] = [];
+    const unsub = subscribeThemeSlots((s) => seen.push(s["--cf-surface"] ?? ""));
+    setThemeSlots({ light: "rose-pine-dawn" }); // the light slot: not the active theme
+    setThemePreference("dark"); // already dark: same theme
+    setThemeSlots({ dark: "nord" });
+    unsub();
+    setThemeSlots({ dark: "dracula" });
+    expect(seen).toEqual([themeById.get("github-dark")?.slots["--cf-surface"], themeById.get("nord")?.slots["--cf-surface"]]);
   });
 });
 

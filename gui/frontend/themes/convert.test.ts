@@ -2,18 +2,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { contrast } from "./color.ts";
+import { lightness } from "../src/themes/color.ts";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "../src/themes/defaults.ts";
-import { buildCatalog, catalogJson, goCatalogJson, indexVarNames, parseGhostty, PATHS, readInputs, SYNTAX_VARS, syntaxAliases, themesCss, type Inputs, type Override } from "./convert.ts";
+import { parseThemeFile, resolveSlots, SLOT_NAMES } from "../src/themes/slots.ts";
+import { buildCatalog, catalogJson, ghosttyBase, goCatalogJson, parseGhostty, PATHS, readInputs, type Inputs, type Override } from "./convert.ts";
 
 const inputs = readInputs();
 
 describe("generated files", () => {
-  // `pnpm run themes` regenerates all three; a hand edit or a changed input fails here.
-  it("catalog.json, themes.css and the daemon's catalog match the converter's output", () => {
+  // `pnpm run themes` regenerates both; a hand edit or a changed input fails here.
+  it("catalog.json and the daemon's catalog match the converter's output", () => {
     const catalog = buildCatalog(inputs);
     expect(fs.readFileSync(PATHS.catalog, "utf8")).toBe(catalogJson(catalog));
-    expect(fs.readFileSync(PATHS.css, "utf8")).toBe(themesCss(catalog, syntaxAliases(inputs.threadCss)));
     expect(fs.readFileSync(PATHS.goCatalog, "utf8")).toBe(goCatalogJson(catalog));
   });
 
@@ -26,10 +26,27 @@ describe("generated files", () => {
     for (const [scheme, id] of Object.entries(go.defaults)) expect(go.themes.find((t) => t.id === id)?.scheme).toBe(scheme);
   });
 
-  it("every theme has every index.css colour variable and the syntax colours, nothing else", () => {
-    const names = [...indexVarNames(inputs.indexCss), ...SYNTAX_VARS];
-    expect(names).toContain("--terminal-ansi-15");
-    for (const t of buildCatalog(inputs)) expect(Object.keys(t.vars)).toEqual(names);
+  it("every entry is a theme file as parseThemeFile reads it, and resolves every slot", () => {
+    for (const t of buildCatalog(inputs)) {
+      expect(parseThemeFile(JSON.parse(JSON.stringify(t))), t.id).toEqual(t);
+      expect(Object.keys(resolveSlots(t)), t.id).toEqual(SLOT_NAMES);
+    }
+  });
+
+  // Overrides are for what the rules cannot say; a new one belongs in this list and in
+  // docs/notes/theme-slots-1-engine.md with its reason.
+  it("overrides stay few: only these themes and slots", () => {
+    const got = Object.fromEntries(
+      buildCatalog(inputs)
+        .filter((t) => t.overrides)
+        .map((t) => [t.id, Object.keys(t.overrides ?? {}).sort()]),
+    );
+    expect(got).toEqual({
+      "catppuccin-mocha": ["--syn-kw", "--syn-num"],
+      "catppuccin-latte": ["--syn-kw", "--syn-num"],
+      "graphite-dark": ["--cf-accent-foreground", "--cf-focus", "--cf-sidebar-row-selected", "--terminal-selection-inactive"],
+      "graphite-light": ["--cf-control", "--cf-control-hover", "--cf-focus", "--cf-sidebar-row-selected", "--cf-surface-sunken", "--cf-text-muted"],
+    });
   });
 
   it("vendors every Ghostty file it converts, with the licence", () => {
@@ -47,6 +64,11 @@ describe("generated files", () => {
       expect(other?.scheme, t.id).not.toBe(t.scheme);
     }
   });
+
+  it("refuses an override of a name that is not a slot", () => {
+    const fake: Inputs = { overrides: { t: { name: "T", ghostty: "t", upstream: "test", why: "test", overrides: { "--card": "#ffffff" } } }, ghostty: () => ghosttyFile({ bg: "#ffffff", fg: "#111111" }) };
+    expect(() => buildCatalog(fake)).toThrow(/--card is not a slot/);
+  });
 });
 
 const BASE = ["#222222", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#cccccc"];
@@ -59,20 +81,7 @@ function ghosttyFile(o: { bg: string; fg: string; selection?: string; palette?: 
   return lines.join("\n");
 }
 
-/** One synthetic theme through the real pipeline (index.css names, the guards). */
-function convert(file: string, override: Partial<Override> = {}) {
-  const fake: Inputs = {
-    indexCss: inputs.indexCss,
-    threadCss: inputs.threadCss,
-    overrides: { t: { name: "T", ghostty: "t", upstream: "test", why: "test", ...override } },
-    ghostty: () => file,
-  };
-  const t = buildCatalog(fake)[0];
-  if (!t) throw new Error("no theme");
-  return t;
-}
-
-const v = (t: { vars: Record<string, string> }, k: string) => t.vars[k] ?? "";
+const override = (o: Partial<Override> = {}): Override => ({ name: "T", ghostty: "t", upstream: "test", why: "test", ...o });
 
 describe("parseGhostty", () => {
   it("reads palette, background, foreground, cursor and selection", () => {
@@ -88,77 +97,47 @@ describe("parseGhostty", () => {
   });
 });
 
-describe("derivation and guards", () => {
+describe("ghosttyBase", () => {
   it.each([
     ["#1e1e2e", "dark"],
     ["#282828", "dark"],
     ["#fdf6e3", "light"],
     ["#ffffff", "light"],
   ])("background %s is a %s theme", (bg, scheme) => {
-    expect(convert(ghosttyFile({ bg, fg: scheme === "dark" ? "#eeeeee" : "#111111" })).scheme).toBe(scheme);
+    expect(ghosttyBase(parseGhostty(ghosttyFile({ bg, fg: scheme === "dark" ? "#eeeeee" : "#111111" })), override()).scheme).toBe(scheme);
+  });
+
+  it.each([
+    ["dark", "#1e1e2e", -0.05],
+    ["light", "#fdf6e3", -0.045],
+  ])("the %s canvas is the background a step darker", (_, bg, d) => {
+    const { base } = ghosttyBase(parseGhostty(ghosttyFile({ bg, fg: "#888888" })), override());
+    expect(base.surface).toBe(bg);
+    expect(lightness(base.canvas) - lightness(bg)).toBeCloseTo(d, 2);
   });
 
   it("dark themes take bright slots, falling back to the normal slot when the bright one is grey", () => {
-    const t = convert(ghosttyFile({ bg: "#002b36", fg: "#eeeeee", palette: { 9: "#ff7777", 10: "#586e75" } }));
-    expect(t.vars["--destructive"]).toBe("#ff7777");
-    expect(t.vars["--success"]).toBe("#98c379");
+    const { base } = ghosttyBase(parseGhostty(ghosttyFile({ bg: "#002b36", fg: "#eeeeee", palette: { 9: "#ff7777", 10: "#586e75" } })), override());
+    expect(base.error).toBe("#ff7777");
+    expect(base.success).toBe("#98c379");
   });
 
-  it("a status override takes another slot or a hex, and is still guarded", () => {
-    const t = convert(ghosttyFile({ bg: "#ffffff", fg: "#111111" }), { status: { info: 6, warning: "#ffee00" } });
-    expect(contrast(v(t, "--warning"), "#ffffff")).toBeGreaterThanOrEqual(4.5);
-    expect(t.vars["--link"]).toBe(t.vars["--info"]);
-  });
-
-  it("lifts a low-contrast foreground to 7:1 and keeps the terminal's own", () => {
-    const t = convert(ghosttyFile({ bg: "#002b36", fg: "#657b83" }));
-    expect(contrast(v(t, "--foreground"), "#002b36")).toBeGreaterThanOrEqual(7);
-    expect(t.vars["--terminal-fg"]).toBe("#657b83");
-  });
-
-  it("replaces a selection that is the foreground", () => {
-    const t = convert(ghosttyFile({ bg: "#ffffff", fg: "#1f2328", selection: "#1f2328" }));
-    expect(t.vars["--terminal-selection"]).not.toBe("#1f2328");
-    expect(contrast(v(t, "--terminal-selection"), "#1f2328")).toBeGreaterThanOrEqual(3);
-  });
-
-  // thread.css: comments are ANSI 8 on dark themes and ANSI 7 on light ones.
   it.each([
-    ["under 3:1 (dark, ANSI 8)", "#1e1e1e", "#dddddd", { 8: "#2a2a2a" }],
-    ["as strong as the text (light, ANSI 7)", "#f9f9f9", "#2a2c33", { 7: "#000000" }],
-  ])("a comment colour %s becomes muted-foreground", (_, bg, fg, pal) => {
-    const t = convert(ghosttyFile({ bg, fg, palette: pal }));
-    expect(t.vars["--syn-com"]).toBe(t.vars["--muted-foreground"]);
+    ["light themes take normal slots", {}, "#e06c75"],
+    ["slots: bright on a light theme", { slots: "bright" as const }, "#aa0000"],
+    ["a status override by ANSI slot", { status: { error: 5 } }, "#c678dd"],
+    ["a status override by hex", { status: { error: "#ABCDEF" } }, "#abcdef"],
+  ])("%s", (_, o, error) => {
+    const { base } = ghosttyBase(parseGhostty(ghosttyFile({ bg: "#ffffff", fg: "#111111", palette: { 9: "#aa0000" } })), override(o));
+    expect(base.error).toBe(error);
   });
 
-  it("syntax starts from thread.css's terminal aliases and themes.css patches only what changed", () => {
-    const aliases = syntaxAliases(inputs.threadCss);
-    expect(aliases.dark.get("--syn-kw")).toBe("--terminal-ansi-5");
-    expect(aliases.light.get("--syn-kw")).toBe("--terminal-ansi-1");
-    const t = convert(ghosttyFile({ bg: "#1e1e1e", fg: "#dddddd", palette: { 8: "#2a2a2a" } }));
-    expect(t.vars["--syn-str"]).toBe(t.vars["--terminal-ansi-2"]);
-    const css = themesCss([t], aliases);
-    const block = (sel: string) => css.slice(css.indexOf(`${sel} {`), css.indexOf("}", css.indexOf(`${sel} {`)));
-    const patch = block(`html[data-theme="${t.id}"] .cf-thread`);
-    expect(patch).toContain(`--syn-com: ${v(t, "--muted-foreground")};`);
-    expect(patch).not.toContain("--syn-str:");
-    // A nested scope (the Themes page's preview) carries every syntax colour, so the window
-    // theme's patch cannot leak into it.
-    const scoped = block(`[data-theme-scope][data-theme="${t.id}"] .cf-thread`);
-    for (const k of SYNTAX_VARS) expect(scoped).toContain(`${k}: ${v(t, k)};`);
-    expect(css).toContain(`html[data-theme="${t.id}"],\n[data-theme-scope][data-theme="${t.id}"] {`);
-  });
-
-  it("an accent becomes the primary with readable text, preferring dark text", () => {
-    const t = convert(ghosttyFile({ bg: "#1e1e2e", fg: "#cdd6f4" }), { accent: "#cba6f7" });
-    expect(t.vars["--primary"]).toBe("#cba6f7");
-    expect(t.vars["--primary-foreground"]).toBe("#1e1e2e");
-    expect(t.vars["--sidebar-primary"]).toBe("#cba6f7");
-  });
-
-  it("nudges an accent that neither text colour can sit on", () => {
-    const t = convert(ghosttyFile({ bg: "#002b36", fg: "#93a1a1" }), { accent: "#268bd2" });
-    expect(contrast(v(t, "--primary-foreground"), v(t, "--primary"))).toBeGreaterThanOrEqual(4.5);
-    expect(t.vars["--primary"]).not.toBe("#268bd2");
+  it("the accent is the override's, else the foreground; the terminal keeps what the file has", () => {
+    const g = parseGhostty(ghosttyFile({ bg: "#1e1e2e", fg: "#cdd6f4" }));
+    expect(ghosttyBase(g, override({ accent: "#CBA6F7" })).base.accent).toBe("#cba6f7");
+    const { base } = ghosttyBase(g, override());
+    expect(base.accent).toBe("#cdd6f4");
+    expect(base.text).toBe("#cdd6f4");
+    expect(base.terminal).toEqual({ foreground: "#cdd6f4", ansi: g.palette });
   });
 });

@@ -4,9 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Code Foundry</title>
-    <!-- The last applied theme (lib/theme.ts THEME_STORAGE_KEY), before the stylesheet paints:
-         without it the first frame is index.css's fallback (black) until App mounts. The
-         defaults are lib/theme's (src/themes/defaults.ts; lib/firstPaint.test.ts checks). -->
+    <!-- The last applied theme (lib/theme.ts THEME_STORAGE_KEY) and, when they are that
+         theme's, its resolved slots (THEME_SLOTS_STORAGE_KEY), before the stylesheet paints:
+         without them the first frame has no colours (the window's background shows) until
+         App mounts. The defaults are lib/theme's (src/themes/defaults.ts;
+         lib/firstPaint.test.ts checks). -->
     <script>
       (function () {
         var t = {};
@@ -17,6 +19,10 @@
         r.dataset.theme = id;
         r.classList.toggle("dark", s === "dark");
         r.style.colorScheme = s;
+        var v = {};
+        try { v = JSON.parse(localStorage.getItem("cf.theme.slots")) || {}; } catch (e) {}
+        if (v.id === id && v.vars && typeof v.vars === "object")
+          for (var k in v.vars) if (k.slice(0, 2) === "--" && typeof v.vars[k] === "string") r.style.setProperty(k, v.vars[k]);
       })();
     </script>
   </head>

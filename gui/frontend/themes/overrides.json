@@ -14,18 +14,58 @@
     "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
     "accent": "#cba6f7",
     "slots": "normal",
-    "vars": {
+    "why": "Accent is mauve from the official palette (Ghostty has no accent). Normal slots: Ghostty's bright 9-13 are re-saturated copies, the official red/green/yellow/blue are the normal ones. Keywords mauve and numbers peach, as Catppuccin's own syntax style guide.",
+    "overrides": {
       "--syn-kw": "#cba6f7",
       "--syn-num": "#fab387"
-    },
-    "why": "Accent is mauve from the official palette (Ghostty has no accent). Normal slots: Ghostty's bright 9-13 are re-saturated copies, the official red/green/yellow/blue are the normal ones. Keywords mauve and numbers peach, as Catppuccin's own syntax style guide."
+    }
   },
   "graphite-dark": {
     "name": "Graphite Dark",
-    "graphite": "dark",
+    "scheme": "dark",
+    "base": {
+      "canvas": "#000000",
+      "surface": "#080808",
+      "text": "#fafafa",
+      "accent": "#e5e5e5",
+      "success": "#00d294",
+      "warning": "#fabc00",
+      "error": "#ff6568",
+      "info": "#00bbfd",
+      "highlight": "#a686ff",
+      "terminal": {
+        "foreground": "#d8dadf",
+        "cursor": "#e6e6e6",
+        "selection": "#3a4a6b",
+        "ansi": [
+          "#1d1f23",
+          "#e06c75",
+          "#98c379",
+          "#e5c07b",
+          "#61afef",
+          "#c678dd",
+          "#56b6c2",
+          "#c8ccd4",
+          "#5c6370",
+          "#ef8189",
+          "#a9d38a",
+          "#f0d08f",
+          "#7cc0f7",
+          "#d68ff0",
+          "#6fcbd6",
+          "#f2f3f5"
+        ]
+      }
+    },
     "pair": "graphite-light",
-    "upstream": "Code Foundry's original dark theme (index.css .dark)",
-    "why": "The pre-engine neutral theme, read from index.css .dark so the stylesheet fallback and the catalog cannot drift."
+    "upstream": "Code Foundry's original dark theme (index.css .dark before theme-slots-1)",
+    "why": "The pre-engine neutral theme, hand-picked rather than derived (Tailwind's neutral greys), so its base is literal and the slots where the rules land elsewhere are overrides: the near-black text on its light-grey primary button, the grey focus ring, the selected sidebar row (the rule's 10% toward white is near-black on a black sheet) and the terminal's inactive selection.",
+    "overrides": {
+      "--cf-accent-foreground": "#171717",
+      "--cf-focus": "#737373",
+      "--cf-sidebar-row-selected": "#1e1e1e",
+      "--terminal-selection-inactive": "#2c3446"
+    }
   },
   "dracula": {
     "name": "Dracula",
@@ -149,18 +189,60 @@
     "pair": "catppuccin-mocha",
     "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
     "accent": "#7287fd",
-    "vars": {
-      "--syn-kw": "#8839ef",
-      "--syn-num": "#fe640b"
-    },
-    "why": "Accent is lavender from the official palette (#7287fd), not mauve. Lavender is too light for text on or under it, so the primary guard darkens it at the same hue to #5363d5. Keywords stay mauve and numbers peach, as Catppuccin's syntax style guide. Yellow and green are too light for text on the light base; the guards darken them."
+    "why": "Accent is lavender from the official palette (#7287fd), not mauve. Lavender is too light for text on or under it, so the accent rule darkens it at the same hue to #5363d5. Keywords stay mauve and numbers peach, as Catppuccin's syntax style guide, darkened at the same hue to 4.5:1 on the base and on code blocks (mauve #8839ef -> #8433ea, peach #fe640b -> #b24200): overrides are final values, not guarded. Yellow and green are too light for text on the light base; the rules darken them.",
+    "overrides": {
+      "--syn-kw": "#8433ea",
+      "--syn-num": "#b24200"
+    }
   },
   "graphite-light": {
     "name": "Graphite Light",
-    "graphite": "light",
+    "scheme": "light",
+    "base": {
+      "canvas": "#f0f0f0",
+      "surface": "#ffffff",
+      "text": "#0a0a0a",
+      "accent": "#171717",
+      "success": "#007d57",
+      "warning": "#a55900",
+      "error": "#dc0015",
+      "info": "#0073ae",
+      "highlight": "#7f22fe",
+      "terminal": {
+        "foreground": "#24292f",
+        "cursor": "#24292f",
+        "selection": "#b6d3fb",
+        "ansi": [
+          "#24292f",
+          "#cf222e",
+          "#116329",
+          "#7d4e00",
+          "#0969da",
+          "#8250df",
+          "#1b7c83",
+          "#6e7781",
+          "#57606a",
+          "#a40e26",
+          "#1a7f37",
+          "#633c01",
+          "#218bff",
+          "#a475f9",
+          "#3192aa",
+          "#8c959f"
+        ]
+      }
+    },
     "pair": "graphite-dark",
-    "upstream": "Code Foundry's original light theme (index.css :root)",
-    "why": "The pre-engine neutral theme, read from index.css :root."
+    "upstream": "Code Foundry's original light theme (index.css :root before theme-slots-1)",
+    "why": "The pre-engine neutral theme, hand-picked rather than derived (Tailwind's neutral greys), so its base is literal and the slots where the rules land elsewhere are overrides: muted text (the rule gives #4d4d4d), the paler control and sunken greys, the grey focus ring and the selected sidebar row.",
+    "overrides": {
+      "--cf-text-muted": "#6d6d6d",
+      "--cf-surface-sunken": "#f5f5f5",
+      "--cf-control": "#f5f5f5",
+      "--cf-control-hover": "#f5f5f5",
+      "--cf-focus": "#a1a1a1",
+      "--cf-sidebar-row-selected": "#e1e1e1"
+    }
   },
   "gruvbox-light": {
     "name": "Gruvbox Light",
@@ -178,7 +260,7 @@
     "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
     "accent": "#907aa9",
     "status": {
-      "destructive": "#b0405a",
+      "error": "#b0405a",
       "success": "#6d8f89",
       "info": 4
     },

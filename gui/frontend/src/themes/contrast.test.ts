@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { contrast, lightness } from "../../themes/color.ts";
+import { contrast, flatten, lightness } from "./color";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themeById, themes, themesFor } from "./index";
+import { COMPONENT_ALIASES, SLOT_NAMES } from "./slots";
 
-// The readability floor every curated theme keeps (docs/notes/theme-engine-2-engine.md,
-// "What the tests assert"). A failure means an override in themes/overrides.json (or a
-// guard in themes/convert.ts) needs work, not a looser number here.
+// The readability floor every curated theme keeps, on its resolved values (base -> rules ->
+// overrides; docs/notes/theme-slots-1-engine.md). A failure means a rule in slots.ts or an
+// entry in themes/overrides.json needs work, not a looser number here.
 
 const STATUS = ["--destructive", "--success", "--warning", "--info", "--highlight", "--link"] as const;
-const HEX = /^#[0-9a-f]{6}$/;
+const TONES = ["success", "warning", "error", "info", "highlight", "update"] as const;
+const OPAQUE = /^#[0-9a-f]{6}$/;
+const ANY = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/;
 
 describe.each(themes.map((t) => [t.id, t] as const))("%s", (_, t) => {
   const v = (k: string) => {
@@ -18,8 +21,11 @@ describe.each(themes.map((t) => [t.id, t] as const))("%s", (_, t) => {
   const pane = v("--pane");
   const sheet = v("--sheet");
 
-  it("every value is #rrggbb", () => {
-    for (const [k, value] of Object.entries(t.vars)) expect(value, k).toMatch(HEX);
+  it("resolves every slot, each #rrggbb or a #rrggbbaa tint; component, terminal and syntax colours are opaque", () => {
+    expect(Object.keys(t.slots)).toEqual(SLOT_NAMES);
+    for (const [k, value] of Object.entries(t.slots)) expect(value, k).toMatch(ANY);
+    for (const k of Object.keys(COMPONENT_ALIASES)) expect(v(k), k).toMatch(OPAQUE);
+    for (const k of SLOT_NAMES.filter((n) => !n.startsWith("--cf-"))) expect(v(k), k).toMatch(OPAQUE);
   });
 
   it("foreground is at least 7:1 on the pane", () => {
@@ -31,13 +37,26 @@ describe.each(themes.map((t) => [t.id, t] as const))("%s", (_, t) => {
     expect(contrast(v("--muted-foreground"), sheet)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(["--cf-text-secondary", "--cf-placeholder", "--cf-icon-muted", "--cf-sidebar-muted-foreground"])("%s is at least 4.5:1 on the pane and on the sheet", (k) => {
+    expect(contrast(v(k), pane)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(v(k), sheet)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it.each(STATUS)("%s is at least 4.5:1 on the pane and on the sheet", (k) => {
     expect(contrast(v(k), pane)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(v(k), sheet)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(TONES)("%s-foreground is at least 4.5:1 on a solid %s fill", (tone) => {
+    expect(contrast(v(`--cf-${tone}-foreground`), v(`--cf-${tone}`))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("primary-foreground is at least 4.5:1 on the primary", () => {
     expect(contrast(v("--primary-foreground"), v("--primary"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("accent-surface-foreground is at least 4.5:1 on the accent surface over the pane", () => {
+    expect(contrast(v("--cf-accent-surface-foreground"), flatten(v("--cf-accent-surface"), pane))).toBeGreaterThanOrEqual(4.5);
   });
 
   it("the sheet and the pane are at least 3% apart in OKLab lightness", () => {
@@ -55,6 +74,10 @@ describe.each(themes.map((t) => [t.id, t] as const))("%s", (_, t) => {
 
   it("code comments are at least 3:1 on the pane", () => {
     expect(contrast(v("--syn-com"), pane)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("chart colours are at least 3:1 on the pane", () => {
+    for (let i = 1; i <= 6; i++) expect(contrast(v(`--cf-chart-${String(i)}`), pane), String(i)).toBeGreaterThanOrEqual(3);
   });
 
   it("its scheme matches its background", () => {
