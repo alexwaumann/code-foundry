@@ -482,6 +482,8 @@ function routes(router: ConnectRouter): void {
     watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),
     send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
+    // code-foundry view.inline's RPC (docs/notes/inline-html.md).
+    showHtml: (req) => guard(() => ({ item: world.logs.showHtml(req.threadId, req.path, req.title) })),
     interrupt: (req) => guard(() => (world.logs.finish(req.threadId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {

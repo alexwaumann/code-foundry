@@ -149,6 +149,8 @@ type Item struct {
 	Request     *Request // permission_request and question
 	Turn        *TurnEnd
 	Compaction  *Compaction
+	// HTML: an html item's page (html.go).
+	HTML *HTMLPage
 }
 
 // ToolCall is a tool_call item's payload.
@@ -611,6 +613,10 @@ func cloneItem(it Item) Item {
 	if it.Compaction != nil {
 		c := *it.Compaction
 		it.Compaction = &c
+	}
+	if it.HTML != nil {
+		h := *it.HTML
+		it.HTML = &h
 	}
 	it.Attachments = slices.Clone(it.Attachments)
 	return it

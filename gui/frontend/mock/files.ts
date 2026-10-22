@@ -115,6 +115,39 @@ document.getElementById("count").addEventListener("click", () => { n++; document
 </body></html>
 `;
 
+/**
+ * The page the scripted thread's "html" state shows inline (mock/thread.ts; docs/notes/
+ * inline-html.md): it links /cf/theme.css, paints with the --cf-* slots, and asks for its
+ * height with cf:resize, as the skill tells the model to.
+ */
+export const INLINE_PAGE_HTML = `<!doctype html>
+<html><head><title>Hello</title><link rel="stylesheet" href="/cf/theme.css">
+<style>
+body{margin:0;padding:20px 24px;background:var(--cf-surface-raised);color:var(--cf-text);font-family:system-ui,sans-serif}
+h1{margin:0 0 4px;font-size:20px} p{margin:0 0 14px;color:var(--cf-text-muted)}
+button{background:var(--cf-accent);color:var(--cf-accent-foreground);border:0;border-radius:6px;padding:6px 14px;font:inherit;cursor:pointer}
+</style></head>
+<body>
+<h1 id="hello">Hello</h1>
+<p>A small page shown inline in the conversation.</p>
+<button id="wave" type="button">Wave</button>
+<script>
+let n = 0;
+document.getElementById("wave").addEventListener("click", () => { n++; document.getElementById("hello").textContent = "Hello x" + n; });
+// The body's height, not documentElement.scrollHeight: that is never less than the frame's own height, so a page could only grow.
+const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+addEventListener("load", ask);
+new ResizeObserver(ask).observe(document.body);
+// Follows the app's theme live (cf:theme), not only the slots /cf/theme.css had at load.
+addEventListener("message", (e) => {
+  if (e.data?.type !== "cf:theme") return;
+  document.documentElement.style.colorScheme = e.data.scheme;
+  for (const [k, v] of Object.entries(e.data.vars)) document.documentElement.style.setProperty(k, v);
+});
+</script>
+</body></html>
+`;
+
 interface Entry {
   data: Uint8Array;
   mime: string;
@@ -133,6 +166,7 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/README.md`, text(README, "text/markdown")],
     [`${CF}/src/app.ts`, text(APP_TS, "text/typescript")],
     [`${CF}/docs/preview.html`, text(PREVIEW_HTML, "text/html")],
+    [`${CF}/docs/hello.html`, text(INLINE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],

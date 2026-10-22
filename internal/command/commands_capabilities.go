@@ -288,8 +288,9 @@ type CapabilityView struct {
 	Description string `json:"description"`
 }
 
-// notPages are the view.<name> verbs that act on a window rather than show a page.
-var notPages = []string{ViewBack, ViewForward}
+// notPages are the view.<name> verbs that act on a window rather than show a page, and
+// view.inline, which shows a page in a thread's conversation (the panel group tells it).
+var notPages = []string{ViewBack, ViewForward, "inline"}
 
 // pageCommands are the main-pane pages: the view.<name> verbs (one segment after view.)
 // but those in notPages.
@@ -335,6 +336,12 @@ const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, -
 	"and refuse one that does not exist or has nothing to show. A file path written in a reply (prose or inline code) also renders as " +
 	"a chip the user clicks to open it in the File tab; .html files render there interactively (scripts on)."
 
+// inlinePage is how a thread shows an HTML page in its own conversation (view.inline,
+// commands_view_inline.go; docs/notes/inline-html.md).
+const inlinePage = "view.inline <path> (--title, --panel) shows an .html page inline in your own conversation, at your place in the " +
+	"turn: the File tab's sandboxed frame in a card the user can expand, view as source or open in the panel; --panel also opens it " +
+	"in the File tab. The page may post {type: \"cf:resize\", height} to set its height (the card caps it at 60% of the pane)."
+
 // surfaceWhat is what a surface verb's description says the surface shows: what follows
 // its lead ("Open the X surface in a thread's side panel (from a thread: …): "), the
 // first ": " outside parentheses; the whole description without one.
@@ -370,11 +377,13 @@ type CapabilityPanel struct {
 	Actions        []string         `json:"actions"`
 	// Items is how one file, diff or pull request opens (panelItems).
 	Items string `json:"items"`
-	Rule  string `json:"rule"`
+	// Inline is how a page shows in the conversation instead (inlinePage).
+	Inline string `json:"inline"`
+	Rule   string `json:"rule"`
 }
 
 func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
-	js := CapabilityPanel{Surfaces: []CapabilityView{}, PluginSurfaces: []CapabilityView{}, Items: panelItems, Rule: presenceRule}
+	js := CapabilityPanel{Surfaces: []CapabilityView{}, PluginSurfaces: []CapabilityView{}, Items: panelItems, Inline: inlinePage, Rule: presenceRule}
 	for _, c := range env.r.List(Context{}, true) {
 		name, ok := strings.CutPrefix(c.Name, "view.panel.")
 		switch {
@@ -402,6 +411,7 @@ func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 		fmt.Fprintf(&b, "  %-24s %s\n", s.Command, s.Description)
 	}
 	b.WriteString(panelItems + "\n")
+	b.WriteString(inlinePage + "\n")
 	if len(js.PluginSurfaces) > 0 {
 		b.WriteString("Plugin surfaces (their show verb acts on each window's selection, not a thread):\n")
 		for _, s := range js.PluginSurfaces {

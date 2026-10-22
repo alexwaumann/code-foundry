@@ -117,6 +117,8 @@ const (
 	// ThreadServiceSlashCommandsProcedure is the fully-qualified name of the ThreadService's
 	// SlashCommands RPC.
 	ThreadServiceSlashCommandsProcedure = "/codefoundry.v1.ThreadService/SlashCommands"
+	// ThreadServiceShowHtmlProcedure is the fully-qualified name of the ThreadService's ShowHtml RPC.
+	ThreadServiceShowHtmlProcedure = "/codefoundry.v1.ThreadService/ShowHtml"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -304,6 +306,12 @@ type ThreadServiceClient interface {
 	// daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
+	// ShowHtml shows an HTML page inline in a thread's conversation: an `html` item at the
+	// thread's current position (inside the running turn when one is live, else after the
+	// last item), which the GUI renders as a sandboxed frame (code-foundry view.inline;
+	// docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
+	// home directory (InvalidArgument otherwise, NotFound when missing).
+	ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -539,6 +547,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SlashCommands")),
 			connect.WithClientOptions(opts...),
 		),
+		showHtml: connect.NewClient[v1.ShowThreadHtmlRequest, v1.ShowThreadHtmlResponse](
+			httpClient,
+			baseURL+ThreadServiceShowHtmlProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ShowHtml")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -581,6 +595,7 @@ type threadServiceClient struct {
 	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
+	showHtml          *connect.Client[v1.ShowThreadHtmlRequest, v1.ShowThreadHtmlResponse]
 }
 
 // Create calls codefoundry.v1.ThreadService.Create.
@@ -768,6 +783,11 @@ func (c *threadServiceClient) SlashCommands(ctx context.Context, req *connect.Re
 	return c.slashCommands.CallUnary(ctx, req)
 }
 
+// ShowHtml calls codefoundry.v1.ThreadService.ShowHtml.
+func (c *threadServiceClient) ShowHtml(ctx context.Context, req *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error) {
+	return c.showHtml.CallUnary(ctx, req)
+}
+
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	// Create spawns claude in a worktree and returns the thread in STARTING state.
@@ -953,6 +973,12 @@ type ThreadServiceHandler interface {
 	// daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
+	// ShowHtml shows an HTML page inline in a thread's conversation: an `html` item at the
+	// thread's current position (inside the running turn when one is live, else after the
+	// last item), which the GUI renders as a sandboxed frame (code-foundry view.inline;
+	// docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
+	// home directory (InvalidArgument otherwise, NotFound when missing).
+	ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1184,6 +1210,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SlashCommands")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceShowHtmlHandler := connect.NewUnaryHandler(
+		ThreadServiceShowHtmlProcedure,
+		svc.ShowHtml,
+		connect.WithSchema(threadServiceMethods.ByName("ShowHtml")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceCreateProcedure:
@@ -1260,6 +1292,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceMcpReconnectHandler.ServeHTTP(w, r)
 		case ThreadServiceSlashCommandsProcedure:
 			threadServiceSlashCommandsHandler.ServeHTTP(w, r)
+		case ThreadServiceShowHtmlProcedure:
+			threadServiceShowHtmlHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1415,4 +1449,8 @@ func (UnimplementedThreadServiceHandler) McpReconnect(context.Context, *connect.
 
 func (UnimplementedThreadServiceHandler) SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SlashCommands is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ShowHtml is not implemented"))
 }

@@ -246,6 +246,16 @@ func TestRender(t *testing.T) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}
 	}
+	// A page shows inline in the conversation (inline-html): both skills name the verb,
+	// --panel and cf:resize.
+	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it beside the thread", "`{type: \"cf:resize\", height}`"} {
+		if !strings.Contains(helpSkill, want) {
+			t.Errorf("help SKILL.md lacks %q", want)
+		}
+		if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, want) {
+			t.Errorf("entry SKILL.md lacks %q", want)
+		}
+	}
 	for _, gone := range []string{"`viewed` is true", "check presence", "started from now on"} {
 		if strings.Contains(helpSkill, gone) {
 			t.Errorf("help SKILL.md still has %q", gone)

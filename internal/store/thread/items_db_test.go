@@ -19,6 +19,7 @@ func TestItemsDBRoundTrip(t *testing.T) {
 		{"a fork note has no creator", Item{ID: "rt-note-fork", Kind: KindNote, Text: "Forked from base"}},
 		{"a wake message", Item{ID: "rt-wake", Kind: KindUserMessage, Text: "wake", Origin: OriginWake, WakeTitle: "s-1 is idle", WakeJSON: `{"n":1}`}},
 		{"a queued message", Item{ID: "rt-queued", Kind: KindUserMessage, Text: "status?", Queued: true}},
+		{"an inline html page", Item{ID: "rt-html", Kind: KindHTML, HTML: &HTMLPage{Path: "docs/page.html", Title: "Page", BaseDir: "/home/a/proj"}}},
 		{"a message placed where Claude read it", Item{ID: "rt-placed", Kind: KindUserMessage, Text: "status?", PlacedAfter: 1200}},
 	}
 	for i, tt := range tests {

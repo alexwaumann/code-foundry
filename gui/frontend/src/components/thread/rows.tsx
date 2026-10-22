@@ -53,6 +53,7 @@ import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
 import { QueuedTag } from "./QueuedTag";
 import { AgentOpen } from "./AgentOpen";
+import { HtmlRow } from "./InlineHtml";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
@@ -740,6 +741,8 @@ export function WorkNodeView({ node }: { node: WorkNode }) {
       return <UserRow id={node.id} steer />;
     case "strip":
       return <StripRow node={node} />;
+    case "html":
+      return <HtmlRow node={node} />;
   }
 }
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishedTheme } from "@/api/ui";
 import { useHealthStore } from "@/stores/health";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
-import { setThemePreference, setThemeSlots, startThemePublish, themeFrameMessage } from "./theme";
+import { onThemePublished, setThemePreference, setThemeSlots, startThemePublish, themeFrameMessage } from "./theme";
 
 let stop: () => void = () => {};
 
@@ -41,6 +41,22 @@ function setup() {
 }
 
 describe("startThemePublish", () => {
+  it("tells onThemePublished once the daemon has the theme, not when the publish fails", async () => {
+    const heard = vi.fn();
+    const off = onThemePublished(heard);
+    setup();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(heard).toHaveBeenCalledTimes(1);
+    stop();
+    stop = startThemePublish(
+      () => Promise.reject(new Error("down")),
+      () => () => {},
+    );
+    await vi.advanceTimersByTimeAsync(150);
+    expect(heard).toHaveBeenCalledTimes(1);
+    off();
+  });
+
   it("publishes the active theme on start, debounced", () => {
     const { sent } = setup();
     expect(sent).toHaveLength(0);

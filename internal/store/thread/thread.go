@@ -606,6 +606,11 @@ type Store interface {
 	// the deny table, kept current as Claude pushes changes and kept while it is not
 	// running (slashcommands.go). nil when Claude never answered a handshake.
 	SlashCommands(ctx context.Context, id string) ([]SlashCommand, error)
+	// ShowHTML shows an HTML page inline in the conversation (html.go): an html item at
+	// the thread's current position, inside the running turn when one is live. path must
+	// be an absolute path to a regular .html or .htm file under home
+	// (ErrInvalidArgument; ErrNotFound when missing).
+	ShowHTML(ctx context.Context, id, path, title string) (Item, error)
 
 	// Wake subscriptions (subscriptions.go, docs/notes/agents-4-wake.md).
 

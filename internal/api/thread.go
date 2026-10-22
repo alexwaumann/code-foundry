@@ -353,6 +353,10 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 		p.Payload = &v1.ThreadItem_CommandOutput{CommandOutput: &v1.CommandOutputItem{Text: it.Text}}
 	case thread.KindNote:
 		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text, CreatedBy: it.NoteCreatedBy}}
+	case thread.KindHTML:
+		if h := it.HTML; h != nil {
+			p.Payload = &v1.ThreadItem_Html{Html: &v1.HtmlItem{Path: h.Path, Title: h.Title, BaseDir: h.BaseDir}}
+		}
 	}
 	return p
 }

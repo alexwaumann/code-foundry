@@ -31,7 +31,8 @@ var Renderings = []Rendering{
 		"<link rel=\"stylesheet\" href=\"/cf/theme.css\"> gets the user's theme: --cf-* variables (surfaces, text, accent, " +
 		"status triples, sidebar, diff, charts), the shadcn names (--background, --card…), radii and type-role classes " +
 		"(.text-body…); /cf/theme.json has the same for scripts, and the frame is posted {type: \"cf:theme\", id, scheme, vars} " +
-		"on load and on every theme change."},
+		"on load and on every theme change. view.inline shows a page inline in the conversation instead, in the same frame; " +
+		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink)."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
 	{"file tab", "Opened by a path chip the user clicks, or by view.panel.file (view.panel.diff for a changed file's diff). " +
 		"It renders markdown, images, PDFs and HTML, and highlights other text files."},

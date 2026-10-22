@@ -39,8 +39,7 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
 - Start at `docs/ARCHITECTURE.md`, then read the package it names for the topic (for
   example `internal/store/thread/` for threads) and follow the code from there.
 - Cite the file paths your answer rests on; notes and comments may be stale, the code is not.
-- If the line says `dev build`, say that the answer comes from that source, which may
-  not match the build the user is running.
+- If the line says `dev build`, say the answer comes from that source, not their build.
 
 ## Explain first, then offer
 
@@ -89,12 +88,13 @@ When the user asks to see something, open it in your own thread's side panel:
 `view.panel.worktree`, `view.panel.usage`; `code-foundry daemon.capabilities --group
 panel` lists every surface. A "show me" is asking: just open it. Add `--focus` only when
 they ask to be taken there; it selects this thread in every window. A page or chart you
-make is an `.html` file: open it with `view.panel.file` (no server, no browser). Have it
-link `<link rel="stylesheet" href="/cf/theme.css">` and paint with its `--cf-*` variables
-(surfaces, text, accent, status triples `--cf-error`/`-foreground`/`-surface`, sidebar,
-diff, charts) or the type-role classes (`text-title`, `text-body`, `text-caption`…), not
-fixed colours, so it follows the user's theme. To follow a theme switch live, listen for
-the message `{type: "cf:theme", id, scheme, vars}` and set each var on `<html>`.
+make is an `.html` file (no server, no browser): show it inline in the conversation with
+`code-foundry view.inline <path>` (`--panel` also opens it beside the thread). Have it link
+`<link rel="stylesheet" href="/cf/theme.css">` and paint with its `--cf-*` variables
+(surfaces, text, accent, status triples, sidebar, diff, charts) or the type-role classes
+(`text-title`, `text-body`…), not fixed colours. To follow a theme switch live, set each
+var of the message `{type: "cf:theme", id, scheme, vars}` on `<html>`. Inline, post
+`{type: "cf:resize", height}` to its parent on load with `document.body`'s height to fit the card.
 
 After you do something worth seeing on your own (a page you wrote, a pull request you
 opened), open it in your own panel too unless a saved preference says not to, and say so

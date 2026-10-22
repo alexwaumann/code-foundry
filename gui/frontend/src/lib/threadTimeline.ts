@@ -68,6 +68,14 @@ export type WorkNode =
   /** A system note on its own line between turns (an item of kind "note"). */
   | { type: "system"; key: string; id: string }
   /**
+   * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
+   * and, while open, its card with the page. It stays in a folded turn (its row; the card
+   * closes, `folded`), is no step, and breaks a strip's run (docs/notes/inline-html.md).
+   * `foldChosen`: the turn is folded because the user folded it, not by default (its end
+   * folding it): a card the reader saw open stays open through the default fold only.
+   */
+  | { type: "html"; key: string; id: string; folded: boolean; foldChosen?: boolean }
+  /**
    * A run of work in the live turn collapsed into one row (stripRuns): its nodes in order
    * (thinking included), the latest step (never thinking) and the step count. Its row key
    * is its first node's, so when the turn ends that node's row takes the strip's place
@@ -187,6 +195,9 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
       case "note":
         out.push({ type: "system", key: it.id, id: it.id });
         break;
+      case "html":
+        out.push({ type: "html", key: it.id, id: it.id, folded: false });
+        break;
       case "user":
         // Only a steer reaches here (buildTurns keeps a turn's opening messages apart).
         out.push({ type: "steer", key: it.id, id: it.id });
@@ -218,9 +229,9 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes) and steers stay visible in a folded turn. */
+/** Notes (errors, compactions, command output, system notes), steers and inline pages' rows stay visible in a folded turn. */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer";
+  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html";
 }
 
 /** The thread's items (top level, in order) as turns. */
@@ -344,7 +355,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
     if (t === stripped) rows.push(...stripRuns(t.body));
-    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
+    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n.type === "html" && folded ? { ...n, folded, foldChosen: opts.fold(t.key) !== undefined } : n);
   });
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
   if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
@@ -354,7 +365,8 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
 /**
  * Work a strip collapses: tool rows without a permission request (an Agent included),
  * explore groups, thinking. Everything else (text, steers, notes, questions, permission
- * rows, a tool with a permission request attached) breaks the run and shows on its own.
+ * rows, a tool with a permission request attached, an inline page) breaks the run and
+ * shows on its own.
  */
 function inRun(n: WorkNode): boolean {
   return (n.type === "tool" && n.permissionId === "") || n.type === "group" || n.type === "thinking";

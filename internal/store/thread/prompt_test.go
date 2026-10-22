@@ -30,7 +30,7 @@ func TestSystemPrompt(t *testing.T) {
 	// to the user.
 	for _, want := range []string{"how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both",
 		"code-foundry usage.show", "view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked)",
-		"clickable chip", ".html file renders interactively", "code-foundry pr.create (project.github.publish",
+		"clickable chip", "show .html pages: view.inline <file>", "code-foundry pr.create (project.github.publish",
 		"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call",
 		"/model or /cost", "page verbs (view.*) move every window: prefer panel verbs", "not command or skill names"} {
 		if !strings.Contains(ThreadPrompt, want) {

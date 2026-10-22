@@ -134,11 +134,12 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "w", Kind: thread.KindUserMessage, Text: "[code-foundry wake] Thread s2 is idle: finished.\n```json\n{}\n```",
 					Origin: thread.OriginWake, WakeTitle: "Thread s2 is idle: finished.", WakeJSON: "{}"},
 				{ID: "turn-synth-w", Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: thread.SubtypeProcessEnded, Interrupted: true, DurationMS: 9900}},
+				{ID: "html-1", Kind: thread.KindHTML, HTML: &thread.HTMLPage{Path: "docs/a.html", Title: "Usage", BaseDir: "/wt"}},
 			},
 			wantMsg: "#1 you: write it\n    [image /a.png]\n    [pdf /b.pdf]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
 				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +
 				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5\n#9 note: Forked from fix\n" +
-				"#10 wake: Thread s2 is idle: finished.\n#11 turn end: process_ended, 9.9s, 0 in / 0 out tokens (interrupted)",
+				"#10 wake: Thread s2 is idle: finished.\n#11 turn end: process_ended, 9.9s, 0 in / 0 out tokens (interrupted)\n#12 page: docs/a.html (Usage)",
 		},
 		{
 			// orch-child-context: the resume note Claude got shows under the message.
