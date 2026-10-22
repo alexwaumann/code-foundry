@@ -27,7 +27,11 @@ var Renderings = []Rendering{
 	{"pdfs", "The user's attached PDFs show a first-page thumbnail and page count. A PDF path chip opens it in the " +
 		"File tab, which draws its pages. Replies do not render PDFs inline."},
 	{"html", "An .html or .htm file opens rendered and interactive in the File tab (scripts on, sandboxed, served " +
-		"by the daemon's preview), through its path chip or view.panel.file; a toggle shows the source."},
+		"by the daemon's preview), through its path chip or view.panel.file; a toggle shows the source. A page that links " +
+		"<link rel=\"stylesheet\" href=\"/cf/theme.css\"> gets the user's theme: --cf-* variables (surfaces, text, accent, " +
+		"status triples, sidebar, diff, charts), the shadcn names (--background, --card…), radii and type-role classes " +
+		"(.text-body…); /cf/theme.json has the same for scripts, and the frame is posted {type: \"cf:theme\", id, scheme, vars} " +
+		"on load and on every theme change."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
 	{"file tab", "Opened by a path chip the user clicks, or by view.panel.file (view.panel.diff for a changed file's diff). " +
 		"It renders markdown, images, PDFs and HTML, and highlights other text files."},

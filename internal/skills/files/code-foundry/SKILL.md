@@ -46,14 +46,16 @@ Panel verbs open a surface in your own thread's side panel and move nothing else
 `mcp`, `workspace`. Add `--focus` only when the user asks to be taken there. Page verbs
 (`view.projects`, `view.usage`…) move every window: only when asked. A file path in your
 reply is a chip that opens the file; an `.html` file renders there interactively (no
-server, no browser). Details: code-foundry-help, "Showing things in the app".
+server, no browser). Have the page link `<link rel="stylesheet" href="/cf/theme.css">` and
+paint with its `--cf-*` variables (surfaces, text, accent, status triples, sidebar, diff,
+charts) or the type-role classes (`text-body`, `text-caption`…) so it follows the user's
+theme. Details: code-foundry-help, "Showing things in the app".
 
 ## Discovering what exists
 
 `code-foundry daemon.capabilities` prints one line per group: build, commands, pages,
 panel, rendering, skills, plugins, settings, memory, presence. Read the index, then only
-the group you need (`--group panel`, `rendering`, `commands`; `--json` for both): it reads
-the running app, so it is current where these files may not be.
+the group you need (`--group panel`, `--json`): it reads the running app, so it is current.
 
 ## Good to know
 
@@ -63,8 +65,6 @@ the running app, so it is current where these files may not be.
   Threads you create with `thread new` are yours to place: in place or `--new-worktree`.
 - The app replaces /model, /effort, /fast, /mcp, /rename and /clear: the composer's
   Model, Effort and Permissions pickers, the MCP panel, Rename Thread, a new thread.
-- `$CODE_FOUNDRY_THREAD` is your thread's id. Thread commands without `--id` act on it;
-  pass `--id <thread id>` for another (`code-foundry thread list` prints the ids).
-- Commands that ask for confirmation exit 2 and do nothing without `--yes`; add it only
-  once the user agreed to that exact action.
+- `$CODE_FOUNDRY_THREAD` is your thread's id. Thread commands without `--id` act on it.
+- Commands that ask first exit 2 without `--yes`: add it once the user agreed to that act.
 - The user's standing preferences about the app are in your system prompt; follow them.

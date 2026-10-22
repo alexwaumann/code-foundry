@@ -236,6 +236,16 @@ func TestRender(t *testing.T) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
 	}
+	// Pages the model writes link the frame stylesheet and may follow the theme live
+	// (theme-css-route); the entry skill says the first half.
+	for _, want := range []string{"`<link rel=\"stylesheet\" href=\"/cf/theme.css\">`", "`--cf-*` variables", "status triples", "type-role classes", "`{type: \"cf:theme\", id, scheme, vars}`"} {
+		if !strings.Contains(helpSkill, want) {
+			t.Errorf("help SKILL.md lacks %q", want)
+		}
+		if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, want) && !strings.Contains(want, "cf:theme") {
+			t.Errorf("entry SKILL.md lacks %q", want)
+		}
+	}
 	for _, gone := range []string{"`viewed` is true", "check presence", "started from now on"} {
 		if strings.Contains(helpSkill, gone) {
 			t.Errorf("help SKILL.md still has %q", gone)
