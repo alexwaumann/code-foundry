@@ -173,6 +173,10 @@ test("a light preview inside the dark window renders with the light rules", asyn
   // Every syntax colour is the scope's, not the window's dark aliases or its theme's patch.
   for (const k of ["--syn-kw", "--syn-com", "--syn-fn"])
     expect(await thread.evaluate((el, key) => getComputedStyle(el).getPropertyValue(key).trim(), k)).toBe(t?.vars[k]);
+  // Text set by a type role is the preview's foreground, not the window's (the roles once
+  // read Tailwind's --color-foreground, which resolves on :root).
+  const rgb = (hex = "") => `rgb(${[1, 3, 5].map((i) => String(parseInt(hex.slice(i, i + 2), 16))).join(", ")})`;
+  expect(await thread.locator(".cf-markdown p").first().evaluate((el) => getComputedStyle(el).color)).toBe(rgb(t?.vars["--foreground"]));
   // dark: utilities stay off: a shadcn Input is transparent in light (dark:bg-input/30 in dark).
   const input = scope(page).getByRole("textbox", { name: "Branch" });
   expect(await input.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");

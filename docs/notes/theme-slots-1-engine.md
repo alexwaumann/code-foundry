@@ -266,6 +266,17 @@ Accepted differences (all Graphite, which is hand-made):
   computes at the root and inherits as a value, so a preview scope that only set
   `--cf-*` would still get the window's `--card`. The alias block is declared on
   `:root, [data-theme-scope]`.
+- **Tailwind's `--color-*` resolve on :root too.** The type roles read
+  `var(--color-foreground)`, which Tailwind declares once on `:root`; inside a preview of
+  the other scheme (a dark theme in the light window's Themes page) every role-coloured
+  text took the window's colour, dark on dark. This was already the case on main (the
+  live shots for this PR caught it). The roles now read `--foreground`,
+  `--muted-foreground` and `--link`, which the alias block re-declares on every scope;
+  identical outside previews (the pixel comparison is unchanged), and
+  `src/design/slots.test.ts` refuses `var(--color-` in index.css's rules. Four component
+  class strings still mix `--color-foreground` / `--color-border` into a tag's tint
+  (compose/QuoteGlyph.tsx, compose/TagView.tsx, compose/tagStyle.ts): only visible in a
+  preview, left for the migration PR, which moves components off these names anyway.
 - **Inline slots on `<html>` lose to a declaration on a descendant.** thread.css declared
   the syntax colours on `.cf-thread`; they had to go (the rules own them) or they would
   shadow the theme's. `src/design/slots.test.ts` now refuses any stylesheet declaring a

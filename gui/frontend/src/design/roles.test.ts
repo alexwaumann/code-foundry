@@ -45,19 +45,19 @@ describe("type roles", () => {
   });
 
   it.each([
-    ["text-title", { "font-size": "22px", "line-height": "28px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--color-foreground)" }],
-    ["text-display", { "font-size": "44px", "line-height": "48px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--color-foreground)" }],
-    ["text-display-sm", { "font-size": "32px", "line-height": "36px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--color-foreground)" }],
-    ["text-brand", { "font-size": "17px", "line-height": "20px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--color-foreground)" }],
-    ["text-heading", { "font-size": "15px", "line-height": "20px", "font-weight": "600", color: "var(--color-foreground)" }],
-    ["text-subheading", { "font-size": "14px", "line-height": "20px", "font-weight": "600", color: "var(--color-foreground)" }],
-    ["text-overline", { "font-size": "11px", "line-height": "16px", "font-weight": "500", "letter-spacing": "0.06em", "text-transform": "uppercase", color: "var(--color-muted-foreground)" }],
-    ["text-body", { "font-size": "15px", "line-height": "22px", "font-weight": "400", color: "var(--color-foreground)" }],
-    ["text-body-sm", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--color-foreground)" }],
-    ["text-label", { "font-size": "14px", "line-height": "20px", "font-weight": "500", color: "var(--color-foreground)" }],
-    ["text-caption", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--color-muted-foreground)" }],
-    ["text-caption-sm", { "font-size": "12px", "line-height": "16px", "font-weight": "400", color: "var(--color-muted-foreground)" }],
-    ["text-link", { "font-weight": "500", color: "var(--color-link)" }],
+    ["text-title", { "font-size": "22px", "line-height": "28px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--foreground)" }],
+    ["text-display", { "font-size": "44px", "line-height": "48px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--foreground)" }],
+    ["text-display-sm", { "font-size": "32px", "line-height": "36px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--foreground)" }],
+    ["text-brand", { "font-size": "17px", "line-height": "20px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--foreground)" }],
+    ["text-heading", { "font-size": "15px", "line-height": "20px", "font-weight": "600", color: "var(--foreground)" }],
+    ["text-subheading", { "font-size": "14px", "line-height": "20px", "font-weight": "600", color: "var(--foreground)" }],
+    ["text-overline", { "font-size": "11px", "line-height": "16px", "font-weight": "500", "letter-spacing": "0.06em", "text-transform": "uppercase", color: "var(--muted-foreground)" }],
+    ["text-body", { "font-size": "15px", "line-height": "22px", "font-weight": "400", color: "var(--foreground)" }],
+    ["text-body-sm", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--foreground)" }],
+    ["text-label", { "font-size": "14px", "line-height": "20px", "font-weight": "500", color: "var(--foreground)" }],
+    ["text-caption", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--muted-foreground)" }],
+    ["text-caption-sm", { "font-size": "12px", "line-height": "16px", "font-weight": "400", color: "var(--muted-foreground)" }],
+    ["text-link", { "font-weight": "500", color: "var(--link)" }],
     ["text-code", { "font-family": 'ui-monospace, "SF Mono", Menlo, monospace', "font-size": "0.92em", "font-weight": "400" }],
   ])("%s", async (cls, decls) => {
     expect(rule(await build([cls]), cls)).toEqual(decls);

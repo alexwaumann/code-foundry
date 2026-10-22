@@ -54,6 +54,17 @@ describe("theme tiers", () => {
     expect(exposed.filter((n) => !block.has(n))).toEqual([]);
   });
 
+  // Tailwind declares `--color-foreground: var(--foreground)` once, on :root, so it resolves to
+  // the window's theme there; a rule that reads it paints a preview scope in the window's
+  // colours (the type roles did: a dark preview's thread text was the light window's).
+  it("index.css's own rules read component names, never Tailwind's --color-* (resolved at :root)", () => {
+    const lines = code(indexCss)
+      .split("\n")
+      .map((text, i) => ({ text, line: i + 1 }))
+      .filter(({ text }) => text.includes("var(--color-"));
+    expect(lines.map((l) => `src/index.css:${String(l.line)}: ${l.text.trim()}`)).toEqual([]);
+  });
+
   it("no stylesheet under src declares a slot or a component name (index.css's alias block aside)", () => {
     expect(Object.keys(stylesheets)).toContain("/src/components/thread/thread.css");
     const hits: string[] = [];

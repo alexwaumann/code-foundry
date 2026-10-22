@@ -167,7 +167,7 @@
   line-height: 28px;
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 /* Display figures: a page's or panel's one big number (Usage totals). */
 @utility text-display {
@@ -176,7 +176,7 @@
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-display-sm {
   font-size: 32px;
@@ -184,7 +184,7 @@
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 /* The sidebar's app name: the one title-band brand mark, between heading and title. */
 @utility text-brand {
@@ -192,19 +192,19 @@
   line-height: 20px;
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-heading {
   font-size: 15px;
   line-height: 20px;
   font-weight: 600;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-subheading {
   font-size: 14px;
   line-height: 20px;
   font-weight: 600;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-overline {
   font-size: 11px;
@@ -212,42 +212,42 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-muted-foreground);
+  color: var(--muted-foreground);
 }
 @utility text-body {
   font-size: 15px;
   line-height: 22px;
   font-weight: 400;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-body-sm {
   font-size: 13px;
   line-height: 18px;
   font-weight: 400;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-label {
   font-size: 14px;
   line-height: 20px;
   font-weight: 500;
-  color: var(--color-foreground);
+  color: var(--foreground);
 }
 @utility text-caption {
   font-size: 13px;
   line-height: 18px;
   font-weight: 400;
-  color: var(--color-muted-foreground);
+  color: var(--muted-foreground);
 }
 @utility text-caption-sm {
   font-size: 12px;
   line-height: 16px;
   font-weight: 400;
-  color: var(--color-muted-foreground);
+  color: var(--muted-foreground);
 }
 /* Inline roles: they keep the surrounding size and line-height. */
 @utility text-link {
   font-weight: 500;
-  color: var(--color-link);
+  color: var(--link);
   &:hover {
     text-decoration-line: underline;
   }
