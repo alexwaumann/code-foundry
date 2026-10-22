@@ -226,8 +226,15 @@ export const SLOTS: readonly Slot[] = [
   { name: "--cf-sidebar", group: "sidebar", rule: "chrome", derive: (c) => c.get("--cf-chrome") },
   { name: "--cf-sidebar-foreground", group: "sidebar", rule: "text", derive: (c) => c.get("--cf-text") },
   { name: "--cf-sidebar-muted-foreground", group: "sidebar", rule: "the muted text (already 4.5:1 on the canvas)", derive: (c) => c.get("--cf-text-muted") },
-  { name: "--cf-sidebar-row-hover", group: "sidebar", rule: "sidebar mixed 5% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.05) },
   { name: "--cf-sidebar-row-selected", group: "sidebar", rule: "sidebar mixed 10% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.1) },
+  // The selected row at 50% rather than its own mix, so a theme that overrides the selected
+  // row (Graphite) gets a hover that matches it, as `hover:bg-sidebar-accent/50` did.
+  {
+    name: "--cf-sidebar-row-hover",
+    group: "sidebar",
+    rule: "sidebar-row-selected at 50% over the sidebar (about the sidebar 5% toward the text, unless a theme overrides the selected row)",
+    derive: (c) => over(c.get("--cf-sidebar-row-selected"), 0.5, c.get("--cf-sidebar")),
+  },
   { name: "--cf-sidebar-row-active", group: "sidebar", rule: "sidebar mixed 15% toward the text", derive: (c) => mix(c.get("--cf-sidebar"), c.get("--cf-text"), 0.15) },
   { name: "--cf-sidebar-border", group: "sidebar", rule: "sidebar (no visible edge)", derive: (c) => c.get("--cf-sidebar") },
 
