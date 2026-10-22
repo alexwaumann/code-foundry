@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -31,6 +32,45 @@ type InlineResult struct {
 	Path string `json:"path"`
 	// Panel is the --panel result: the File tab's ShowView (view.panel.file's result).
 	Panel *PanelResult `json:"panel,omitempty"`
+	// Warnings say what the page misses to look and fit right (pageWarnings); the CLI
+	// prints them as warning lines too.
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+// Page warnings (docs/notes/inline-html-2-fixes.md): what a page the model wrote misses,
+// told back to the model at once so it fixes the page in the same turn.
+const (
+	WarnNoThemeCSS = "page does not link /cf/theme.css, so it will not follow the user's theme; add " +
+		`<link rel="stylesheet" href="/cf/theme.css"> and use --cf-* variables (--cf-surface, --cf-text, ` +
+		"--cf-text-muted, --cf-accent, --cf-border, …), not fixed colours or prefers-color-scheme"
+	WarnNoResize = "page does not post cf:resize, so its card keeps the default height; on load, post " +
+		`{type: "cf:resize", height: document.body.scrollHeight} to parent`
+)
+
+// pageReadMax is how much of a page pageWarnings reads.
+const pageReadMax = 256 << 10
+
+// pageWarnings reads the page shown (through Files, as view.panel.file's check does) and
+// says what it misses: the theme stylesheet, the resize message. A plain substring test:
+// a page that names them only in a comment passes, which is fine for a hint. Nothing when
+// the page cannot be read (it was shown; the GUI says what is wrong).
+func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string {
+	if d.Files == nil {
+		return nil
+	}
+	res, err := d.Files.ReadFile(ctx, connect.NewRequest(&v1.ReadFileRequest{BaseDir: base, Path: path, MaxBytes: pageReadMax}))
+	if err != nil || res.Msg.GetNotFound() || res.Msg.GetIsDir() {
+		return nil
+	}
+	text := string(res.Msg.GetContents())
+	var out []string
+	if !strings.Contains(text, "/cf/theme.css") {
+		out = append(out, WarnNoThemeCSS)
+	}
+	if !strings.Contains(text, "cf:resize") {
+		out = append(out, WarnNoResize)
+	}
+	return out
 }
 
 // inlineCommand is view.inline.
@@ -41,7 +81,9 @@ func (d ViewDeps) inlineCommand() Command {
 		Description:  "Show an HTML page inline in a thread's conversation.",
 		Category:     "Thread",
 		NoKeybinding: true,
-		When:         hasThread,
+		// The CLI outside a thread too, so it reaches runInline's "needs a thread" (and
+		// works there with --thread) rather than "not available in this context".
+		When: hasThreadOrCLI,
 		Args: []ArgSpec{
 			{Name: "path", Type: Path, Required: true, Positional: true,
 				Description: "The .html or .htm file, under the home directory"},
@@ -74,6 +116,7 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 	}
 	it := res.Msg.GetItem()
 	out := InlineResult{Thread: id, Item: it.GetId(), Path: nonEmptyStr(it.GetHtml().GetPath(), a.Path("path"))}
+	out.Warnings = d.pageWarnings(ctx, it.GetHtml().GetBaseDir(), a.Path("path"))
 	msg := fmt.Sprintf("shown %s in thread %s", out.Path, name)
 	if a.Bool("panel") {
 		pr, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, d.fileCheck)
@@ -89,7 +132,7 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 			}
 		}
 	}
-	return Result{JSON: out, Message: msg}, nil
+	return Result{JSON: out, Message: msg, Warnings: out.Warnings}, nil
 }
 
 func nonEmptyStr(s, fallback string) string {

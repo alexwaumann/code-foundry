@@ -1,9 +1,11 @@
 package thread
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -87,8 +89,8 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 	if live.Kind != KindHTML || live.HTML == nil || live.HTML.Path != "hello.html" || live.HTML.BaseDir != e.home || live.HTML.Title != "Hello" {
 		t.Fatalf("live item = %+v (html %+v)", live, live.HTML)
 	}
-	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), ""); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("missing file: err = %v, want ErrNotFound", err)
+	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), ""); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
+		t.Fatalf("missing file: err = %v, want ErrNotFound saying no file at the path", err)
 	}
 	e.restart()
 	stopped, err := e.m.ShowHTML(e.ctx(), s.ID, page, "")
@@ -114,5 +116,72 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 	}
 	if _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, ""); err == nil {
 		t.Fatal("unknown thread: no error")
+	}
+}
+
+// TestPageOutsideATurnEndsNoTurn: a page shown in a connected thread at its prompt (from
+// a terminal or a child, view.inline --thread) is no turn of its own: however the
+// process ends afterwards, no "Interrupted" turn end follows it, and the log ends with
+// the page (inline-html-2-fixes.md).
+func TestPageOutsideATurnEndsNoTurn(t *testing.T) {
+	type end func(e *env, s Thread)
+	exit := func(e *env, s Thread) { e.exit(s.ID, 0) }
+	closeIt := func(e *env, s Thread) {
+		if err := e.m.Close(context.Background(), s.ID); err != nil {
+			e.t.Fatal(err)
+		}
+	}
+	archive := func(e *env, s Thread) {
+		if _, err := e.m.Archive(context.Background(), s.ID, true); err != nil {
+			e.t.Fatal(err)
+		}
+	}
+	restart := func(e *env, _ Thread) { e.restart() }
+	tests := []struct {
+		name  string
+		setup statusSetup
+		end   end
+		turns int // turn ends from results
+	}{
+		{"idle, then exit", idleSetup, exit, 0},
+		{"idle, then close", idleSetup, closeIt, 0},
+		{"idle, then archive", idleSetup, archive, 0},
+		{"idle, then daemon restart", idleSetup, restart, 0},
+		{"after a turn, then exit", finishedSetup, exit, 1},
+		{"after a turn, then daemon restart", finishedSetup, restart, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, s := tt.setup.start(t)
+			if err := os.MkdirAll(e.home, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			page := filepath.Join(e.home, "page.html")
+			if err := os.WriteFile(page, []byte("<p>hi</p>"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			it, err := e.m.ShowHTML(e.ctx(), s.ID, page, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.end(e, s)
+			e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
+			items, err := loadItems(context.Background(), e.m.opts.DB, s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			results := 0
+			for _, x := range items {
+				if x.Kind == KindTurnEnd && isSynthTurn(x.Turn) {
+					t.Fatalf("a turn end of the daemon's after the page:\n%s", describeItems(items))
+				}
+				if x.Kind == KindTurnEnd {
+					results++
+				}
+			}
+			if results != tt.turns || len(items) == 0 || items[len(items)-1].ID != it.ID {
+				t.Errorf("want %d result turn ends and the page last:\n%s", tt.turns, describeItems(items))
+			}
+		})
 	}
 }

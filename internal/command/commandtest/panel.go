@@ -19,6 +19,8 @@ type Files struct {
 	Err   error
 	Files []string
 	Dirs  []string
+	// Contents are a file's contents by path (default "x").
+	Contents map[string]string
 }
 
 var _ command.FileReader = (*Files)(nil)
@@ -38,6 +40,9 @@ func (f *Files) ReadFile(_ context.Context, r *connect.Request[v1.ReadFileReques
 	switch {
 	case slices.Contains(f.Files, res.ResolvedPath):
 		res.Contents, res.Size = []byte("x"), 1
+		if c, ok := f.Contents[res.ResolvedPath]; ok {
+			res.Contents, res.Size = []byte(c), int64(len(c))
+		}
 	case slices.Contains(f.Dirs, res.ResolvedPath):
 		res.IsDir = true
 	default:

@@ -18,6 +18,8 @@ func TestOpenTurn(t *testing.T) {
 	end := func(id string) Item { return Item{ID: id, Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}} }
 	errItem := func(id string) Item { return Item{ID: id, Kind: KindError} }
 	note := func(id string) Item { return Item{ID: id, Kind: KindNote} }
+	page := func(id string) Item { return Item{ID: id, Kind: KindHTML, HTML: &HTMLPage{Path: "p.html"}} }
+	cmdOut := func(id string) Item { return Item{ID: id, Kind: KindCommandOutput, Text: "Set effort to high"} }
 	tests := []struct {
 		name  string
 		items []Item
@@ -37,6 +39,12 @@ func TestOpenTurn(t *testing.T) {
 		{"a turn Claude started itself", []Item{user("u"), end("e"), text("w"), tool("t")}, "w"},
 		{"after a fork's note", []Item{user("u"), note("note-fork-p"), user("u2")}, "u2"},
 		{"a message that failed to start", []Item{user("u"), errItem("x")}, "u"},
+		{"a page shown between turns", []Item{user("u"), end("e"), page("p")}, ""},
+		{"a page shown before any turn", []Item{page("p")}, ""},
+		{"an effort restart between turns", []Item{user("u"), end("e"), cmdOut("effort-1")}, ""},
+		{"a page, then a message", []Item{user("u"), end("e"), page("p"), user("u2"), tool("t")}, "u2"},
+		{"a page inside the turn", []Item{user("u"), tool("t"), page("p")}, "u"},
+		{"a page before Claude starts a turn itself", []Item{user("u"), end("e"), page("p"), text("w")}, "w"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

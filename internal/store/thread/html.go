@@ -48,7 +48,7 @@ func htmlPage(home, cwd, path, title string) (*HTMLPage, error) {
 	}
 	real, err := filepath.EvalSymlinks(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("%w: no file at %s", ErrNotFound, path)
+		return nil, pageNotFound("no file at " + path)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
@@ -71,6 +71,15 @@ func htmlPage(home, cwd, path, title string) (*HTMLPage, error) {
 	}
 	return p, nil
 }
+
+// pageNotFound is ErrNotFound with its own message: "thread not found: no file at …"
+// would send the caller looking for the thread (inline-html-2-fixes.md).
+type pageNotFound string
+
+func (e pageNotFound) Error() string { return string(e) }
+
+// Is makes errors.Is(err, ErrNotFound) hold.
+func (e pageNotFound) Is(target error) bool { return target == ErrNotFound }
 
 // ShowHTML implements Store: it appends an html item for path to thread id, on the
 // runner's goroutine while it runs (inside the running turn: the model calls it from a
