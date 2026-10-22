@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FRONTEND, INSTEAD, isColourScanned, isScanned, scanColours, scanSource, scanStylesheet } from "./scan";
+import { isSlot } from "@/themes/slots";
+import { declaredCfProperties, FRONTEND, INSTEAD, isColourScanned, isScanned, scanColours, scanSlotRefs, scanSource, scanStylesheet, stringLiterals } from "./scan";
 
 /**
  * Text uses a type role and radii the scale (index.css; docs/notes/design-system-1-tokens.md).
@@ -139,5 +140,54 @@ describe("scanColours", () => {
     expect(scanStylesheet("src/components/x.css", css).map((h) => `${String(h.line)}:${h.kind}:${h.match}`)).toEqual(["2:variable:var(--muted-foreground)", "3:utility:bg-card", "4:tailwind:var(--color-foreground"]);
     const index = "@theme inline {\n  --color-card: var(--card);\n}\n:root,\n[data-theme-scope] {\n  --card: var(--cf-surface-raised);\n}\n.x { color: var(--card); }\n";
     expect(scanStylesheet("src/index.css", index).map((h) => `${String(h.line)}:${h.match}`)).toEqual(["8:var(--card)"]);
+  });
+});
+
+/**
+ * Every `cf-*` utility and `var(--cf-*)` names something that exists
+ * (docs/notes/theme-slots-3-hardening.md): a utility a slot, a var() a slot or a property
+ * declared somewhere under src (a stylesheet's `--cf-zoom: 1`, a style object's
+ * `"--cf-backdrop-wide"` key, a `setProperty("--cf-zoom", …)`). Scans the same sources and
+ * every stylesheet; components/ui too.
+ */
+const declaredCf = new Set([
+  ...Object.values(stylesheets).flatMap(declaredCfProperties),
+  ...Object.entries(files).flatMap(([file, src]) =>
+    stringLiterals(file, src)
+      .filter((l) => l.key)
+      .map((l) => /^["'`](--cf-[a-z0-9-]+)["'`]$/.exec(l.raw)?.[1] ?? "")
+      .filter(Boolean),
+  ),
+  ...Object.values(files).flatMap((src) => [...src.matchAll(/setProperty\(\s*["'](--cf-[a-z0-9-]+)["']/g)].map((m) => m[1] ?? "")),
+]);
+const knownRef = (name: string, kind: "utility" | "variable") => isSlot(name) || (kind === "variable" && declaredCf.has(name));
+
+describe("slot-name guard", () => {
+  it("knows the declared non-slot properties", () => {
+    expect([...declaredCf].filter((n) => !isSlot(n))).toEqual(expect.arrayContaining(["--cf-zoom", "--cf-flame-ink", "--cf-backdrop-wide"]));
+  });
+
+  it("no utility or var() names a slot that does not exist", () => {
+    const problems = [...Object.entries(files), ...Object.entries(stylesheets)].flatMap(([file, src]) =>
+      scanSlotRefs(file, src, knownRef).map((h) => `${FRONTEND}${file}:${String(h.line)}  ${h.match}  ${h.text}\n    ${h.name} is not a slot (src/themes/slots.ts SLOT_NAMES).`),
+    );
+    expect(problems, `\n${problems.join("\n")}\n`).toEqual([]);
+  });
+
+  it.each([
+    ["a misspelt utility", `const c = "text-cf-sucess";`, ["--cf-sucess"]],
+    ["a retired slot", `const c = "hover:bg-cf-sidebar-row-active/50";`, ["--cf-sidebar-row-active"]],
+    ["a misspelt var()", `const c = "[--chip-accent:var(--cf-infoo)]";`, ["--cf-infoo"]],
+    ["a component name with cf-", `const c = "bg-cf-card";`, ["--cf-card"]],
+    ["a utility on a declared non-slot", `const c = "bg-cf-zoom";`, ["--cf-zoom"]],
+    ["slots, opacity and variants pass", `const c = "bg-cf-surface-raised hover:text-cf-warning-text/80 [&>*]:border-cf-divider var(--cf-error-text) var(--cf-zoom)";`, []],
+    ["class names that are not utilities pass", `const c = "cf-thread cf-markdown cf-code-view";`, []],
+  ])("%s", (_name, source, want) => {
+    expect(scanSlotRefs("x.tsx", source, knownRef).map((h) => h.name)).toEqual(want);
+  });
+
+  it("reads stylesheets outside comments", () => {
+    const css = "/* var(--cf-nope) */\n.a { color: var(--cf-text-mutd); background: var(--cf-surface); }\n.b { @apply text-cf-texxt; }\n";
+    expect(scanSlotRefs("src/x.css", css, knownRef).map((h) => `${String(h.line)}:${h.name}`)).toEqual(["2:--cf-text-mutd", "3:--cf-texxt"]);
   });
 });
