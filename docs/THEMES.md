@@ -58,9 +58,8 @@ say; check the file afterwards.
 Values are `#rrggbb`, or `#rrggbbaa` for the slots that are tints and composite over what
 they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`,
 `--cf-code-background` (dark themes; light ones use an opaque well),
-`--cf-<tone>-surface` for success, warning, error, info, highlight and update, and
-`--cf-diff-addition-surface` / `--cf-diff-deletion-surface`. Give every other slot an
-opaque colour: the component names, the terminal (xterm needs opaque hex) and the syntax
+and `--cf-<tone>-surface` for success, warning, error, info, highlight and update. Give
+every other slot an opaque colour (the diff line backgrounds too: the diff view mixes them): the component names, the terminal (xterm needs opaque hex) and the syntax
 colours are checked opaque.
 
 ## Slots

@@ -237,12 +237,11 @@ describe("rules", () => {
   it.each([
     ["dark", 0.2],
     ["light", 0.12],
-  ] as const)("%s: diff colours are the status text, line tints at %d alpha", (scheme, alpha) => {
+  ] as const)("%s: diff colours are the status text, line backgrounds the surface mixed %d toward them (opaque)", (scheme, t) => {
     const v = resolve(scheme);
     expect([v("--cf-diff-addition"), v("--cf-diff-deletion"), v("--cf-diff-modified")]).toEqual([v("--cf-success-text"), v("--cf-error-text"), v("--cf-warning-text")]);
-    expect(v("--cf-diff-addition-surface").slice(0, 7)).toBe(v("--cf-diff-addition"));
-    expect(alphaOf(v("--cf-diff-addition-surface"))).toBeCloseTo(alpha, 2);
-    expect(alphaOf(v("--cf-diff-deletion-surface"))).toBeCloseTo(alpha, 2);
+    expect(v("--cf-diff-addition-surface")).toBe(mix(v("--cf-surface"), v("--cf-diff-addition"), t));
+    expect(v("--cf-diff-deletion-surface")).toBe(mix(v("--cf-surface"), v("--cf-diff-deletion"), t));
   });
 
   it.each([
