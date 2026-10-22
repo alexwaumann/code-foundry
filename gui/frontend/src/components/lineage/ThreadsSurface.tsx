@@ -21,10 +21,10 @@ const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 /** The sidebar's status colours (SidebarRow toneClasses). */
 const TONE: Readonly<Record<StatusTone, string>> = {
   muted: "text-cf-text-muted",
-  sky: "text-cf-info",
-  amber: "text-cf-warning",
-  emerald: "text-cf-success",
-  red: "text-cf-error",
+  sky: "text-cf-info-text",
+  amber: "text-cf-warning-text",
+  emerald: "text-cf-success-text",
+  red: "text-cf-error-text",
 };
 
 const DOT: Readonly<Record<Exclude<LineageStatus, "working">, string>> = {
@@ -50,7 +50,7 @@ function openThread(id: string): void {
 function StatusMark({ status }: { status: LineageStatus }) {
   return (
     <span className="flex size-3 shrink-0 items-center justify-center" aria-hidden>
-      {status === "working" ? <LoaderCircle className="size-3 animate-spin text-cf-info" /> : <span className={cn("block size-2 rounded-full", DOT[status])} />}
+      {status === "working" ? <LoaderCircle className="size-3 animate-spin text-cf-info-text" /> : <span className={cn("block size-2 rounded-full", DOT[status])} />}
     </span>
   );
 }
@@ -289,7 +289,7 @@ function Header({ threadId }: { threadId: string }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="threads-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Network className="size-4 shrink-0 text-cf-info" aria-hidden />
+        <Network className="size-4 shrink-0 text-cf-info-text" aria-hidden />
         <span className="min-w-0 truncate">Threads</span>
         {related > 0 && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="threads-count">

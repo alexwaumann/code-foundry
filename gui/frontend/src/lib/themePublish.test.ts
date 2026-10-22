@@ -1,14 +1,21 @@
+import { Code, ConnectError } from "@connectrpc/connect";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishedTheme } from "@/api/ui";
 import { useHealthStore } from "@/stores/health";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
-import { onThemePublished, setThemePreference, setThemeSlots, startThemePublish, themeFrameMessage } from "./theme";
+import { onThemePublished, resetPublishFailureForTest, setThemePreference, setThemeSlots, startThemePublish, themeFrameMessage } from "./theme";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 let stop: () => void = () => {};
 
 beforeEach(() => {
   vi.useFakeTimers();
   setThemePreference("dark");
+  resetPublishFailureForTest();
+  vi.mocked(toast.error).mockClear();
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -107,6 +114,28 @@ describe("startThemePublish", () => {
     onConnect();
     vi.advanceTimersByTime(150);
     expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["a refusal", new ConnectError("a theme publishes every slot the GUI resolves, exactly: missing 1 of the 103 slots: --cf-text", Code.InvalidArgument), 1],
+    ["an unreachable daemon", new TypeError("Load failed"), 0],
+    ["a daemon older than the RPC", new ConnectError("HTTP 404", Code.Unimplemented), 0],
+  ] as const)("logs %s every time; a refusal is a toast, once per run", async (_, err, toasts) => {
+    const publish = vi.fn(() => Promise.reject(err));
+    let onConnect: () => void = () => {};
+    stop = startThemePublish(publish, (cb) => {
+      onConnect = cb;
+      return () => {};
+    });
+    await vi.advanceTimersByTimeAsync(150);
+    onConnect();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledWith("theme publish", err);
+    expect(toast.error).toHaveBeenCalledTimes(toasts);
+    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toBe("Theme could not be published to pages");
+    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[1]?.description).toContain("missing 1 of the 103 slots: --cf-text");
   });
 
   it("stops publishing once stopped", () => {

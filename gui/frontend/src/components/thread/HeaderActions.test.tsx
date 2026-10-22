@@ -172,10 +172,10 @@ describe("HeaderActions", () => {
 
   it.each([
     ["unknown until the detail loads", null, "unknown", "text-cf-text-muted"],
-    ["open", { state: "open" as const }, "open", "text-cf-success"],
+    ["open", { state: "open" as const }, "open", "text-cf-success-text"],
     ["draft", { state: "open" as const, draft: true }, "draft", "text-cf-text-muted"],
-    ["merged", { state: "merged" as const }, "merged", "text-cf-highlight"],
-    ["closed", { state: "closed" as const }, "closed", "text-cf-error"],
+    ["merged", { state: "merged" as const }, "merged", "text-cf-highlight-text"],
+    ["closed", { state: "closed" as const }, "closed", "text-cf-error-text"],
   ])("one link: its state icon and number (%s); a click opens it in the panel", (_name, pr, state, tone) => {
     setThread({ linkedPullRequests: [link(78)] });
     render(<HeaderActions threadId="s-1" />);

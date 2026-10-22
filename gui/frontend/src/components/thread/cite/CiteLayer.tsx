@@ -345,7 +345,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
               }}
               onClick={toComment}
             >
-              <Quote aria-hidden className="size-3 fill-current stroke-0 text-cf-warning" />
+              <Quote aria-hidden className="size-3 fill-current stroke-0 text-cf-warning-text" />
               Cite
             </button>
           ) : (

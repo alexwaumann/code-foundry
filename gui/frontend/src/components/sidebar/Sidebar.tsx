@@ -444,7 +444,7 @@ function ThreadsUnavailable() {
 function SidebarBand() {
   const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
-    <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
+    <div className="flex shrink-0 items-center bg-cf-chrome [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-1 pl-3">
         <span

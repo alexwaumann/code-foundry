@@ -73,7 +73,7 @@ function Shortcuts() {
 
   return (
     <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" data-help-scroll tabIndex={-1} className="h-full columns-2 gap-8 overflow-y-auto px-5 py-4 outline-none">
-      {error && <p className="mb-4 text-caption text-cf-error">Cannot list commands: {error}</p>}
+      {error && <p className="mb-4 text-caption text-cf-error-text">Cannot list commands: {error}</p>}
       {sections.map((s) => (
         <div key={s.title} data-help-section={s.title} className="mb-4 break-inside-avoid">
           <h4 className="mb-1 text-overline">{s.title}</h4>

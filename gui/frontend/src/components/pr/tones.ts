@@ -9,10 +9,10 @@ import type { Tone } from "./model";
 
 /** Text colour per tone, readable on the pane in both schemes. */
 export const toneText: Record<Tone | "skipped", string> = {
-  success: "text-cf-success",
-  failure: "text-cf-error",
-  pending: "text-cf-warning",
-  merged: "text-cf-highlight",
+  success: "text-cf-success-text",
+  failure: "text-cf-error-text",
+  pending: "text-cf-warning-text",
+  merged: "text-cf-highlight-text",
   draft: "text-cf-text-muted",
   neutral: "text-cf-text-muted",
   skipped: "text-cf-text-muted",
@@ -28,10 +28,10 @@ export const prStateText: Record<PrStateTone, string> = {
 
 /** Badge (border + tint) per tone. */
 export const toneBadge: Record<Tone, string> = {
-  success: "border-cf-success/30 bg-cf-success-surface text-cf-success",
-  failure: "border-cf-error/30 bg-cf-error-surface text-cf-error",
-  pending: "border-cf-warning/30 bg-cf-warning-surface text-cf-warning",
-  merged: "border-cf-highlight/30 bg-cf-highlight-surface text-cf-highlight",
+  success: "border-cf-success/30 bg-cf-success-surface text-cf-success-text",
+  failure: "border-cf-error/30 bg-cf-error-surface text-cf-error-text",
+  pending: "border-cf-warning/30 bg-cf-warning-surface text-cf-warning-text",
+  merged: "border-cf-highlight/30 bg-cf-highlight-surface text-cf-highlight-text",
   draft: "border-cf-border bg-cf-surface-sunken/60 text-cf-text-muted",
   neutral: "border-cf-border bg-cf-surface-sunken/60 text-cf-text-muted",
 };

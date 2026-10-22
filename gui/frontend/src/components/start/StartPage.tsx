@@ -96,7 +96,7 @@ function Counts({ running, waiting }: { running: number; waiting: number }) {
   if (running > 0) parts.push(<span key="running">{running} running</span>);
   if (waiting > 0) {
     parts.push(
-      <span key="waiting" className="text-cf-warning" data-testid="start-waiting">
+      <span key="waiting" className="text-cf-warning-text" data-testid="start-waiting">
         {waiting} waiting on you
       </span>,
     );

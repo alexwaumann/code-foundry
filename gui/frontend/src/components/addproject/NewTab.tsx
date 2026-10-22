@@ -139,12 +139,12 @@ export function NewTab({ active }: { active: boolean }) {
           Creates <span className="font-mono text-cf-text" data-testid="add-project-new-dest">{destination}</span>
         </span>
         {nameMessage && (
-          <span className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="add-project-new-error">
+          <span className="text-caption whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="add-project-new-error">
             {nameMessage}
           </span>
         )}
         {created && (
-          <span className="text-caption text-cf-success" data-testid="add-project-new-created">
+          <span className="text-caption text-cf-success-text" data-testid="add-project-new-created">
             Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
           </span>
         )}

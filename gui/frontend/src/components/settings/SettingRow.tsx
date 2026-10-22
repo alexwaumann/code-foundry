@@ -15,7 +15,7 @@ type FieldState = ReturnType<typeof useSettingField>;
 export function RestartChip({ field, restartPending }: { field: SettingFieldView; restartPending: boolean }) {
   if (restartPending)
     return (
-      <span className="rounded-sm bg-cf-warning-surface px-1.5 py-px text-caption-sm font-medium text-cf-warning" data-testid="restart-pending">
+      <span className="rounded-sm bg-cf-warning-surface px-1.5 py-px text-caption-sm font-medium text-cf-warning-text" data-testid="restart-pending">
         Restart the daemon to apply
       </span>
     );
@@ -50,7 +50,7 @@ export function ResetButton({ field, state }: { field: SettingFieldView; state: 
 export function FieldError({ message, className }: { message: string | null; className?: string }) {
   if (!message) return null;
   return (
-    <p className={cn("text-caption break-words text-cf-error", className)} role="alert" data-testid="setting-error">
+    <p className={cn("text-caption break-words text-cf-error-text", className)} role="alert" data-testid="setting-error">
       {message}
     </p>
   );

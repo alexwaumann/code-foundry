@@ -26,10 +26,10 @@ const DOT: Readonly<Record<TaskDot, string>> = {
 /** The sidebar's status colours, muted for "muted". */
 const TONE: Readonly<Record<StatusTone, string>> = {
   muted: "text-cf-text-muted",
-  sky: "text-cf-info",
-  amber: "text-cf-warning",
-  emerald: "text-cf-success",
-  red: "text-cf-error",
+  sky: "text-cf-info-text",
+  amber: "text-cf-warning-text",
+  emerald: "text-cf-success-text",
+  red: "text-cf-error-text",
 };
 
 function Dot({ dot, className }: { dot: TaskDot; className?: string }) {
@@ -138,7 +138,7 @@ function BlockedOutcome({ text }: { text: string }) {
     <button
       type="button"
       className={cn(
-        "mt-1 w-full cursor-pointer rounded-sm text-left text-caption break-words whitespace-pre-line text-cf-warning outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50",
+        "mt-1 w-full cursor-pointer rounded-sm text-left text-caption break-words whitespace-pre-line text-cf-warning-text outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50",
         !open && "line-clamp-3",
       )}
       aria-expanded={open}

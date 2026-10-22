@@ -318,7 +318,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
       </CommandList>
       {(argError ?? prompt) && (
         <div className="flex items-center justify-between border-t px-3 py-1.5 text-caption">
-          <span className={argError ? "text-cf-error" : "text-cf-text-muted"} role={argError ? "alert" : undefined}>
+          <span className={argError ? "text-cf-error-text" : "text-cf-text-muted"} role={argError ? "alert" : undefined}>
             {argError ?? (isPath ? "Tab completes · / opens the highlighted folder · ⌫ on empty input goes back · Esc cancels" : "⌫ on empty input goes back · Esc cancels")}
           </span>
         </div>

@@ -84,7 +84,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           </DropdownMenuLabel>
         </Tip>
         {a.notes.map((n) => (
-          <p key={n} className="px-2 pb-1.5 text-caption text-cf-warning" data-testid="pr-merge-note">
+          <p key={n} className="px-2 pb-1.5 text-caption text-cf-warning-text" data-testid="pr-merge-note">
             {n}
           </p>
         ))}

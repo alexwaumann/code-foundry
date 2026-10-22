@@ -32,7 +32,7 @@ function MemberItem({ threadId, projectId, path, current, queued }: { threadId: 
         void runThreadIn(threadId, projectId);
       }}
     >
-      <FolderGit2 className="text-cf-info/90" />
+      <FolderGit2 className="text-cf-info-text/90" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{name}</span>
         <span className="truncate font-mono text-caption">{branch}</span>

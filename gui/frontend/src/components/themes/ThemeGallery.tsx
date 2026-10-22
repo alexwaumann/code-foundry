@@ -146,17 +146,17 @@ function MiniSidebar() {
   return (
     <div className="flex w-[210px] shrink-0 flex-col gap-px overflow-hidden bg-cf-sidebar text-cf-sidebar-foreground" data-testid="gallery-sidebar">
       <Row name="Theme engine tokens" selected pinned line2={<Place project="code-foundry" branch="cf/theme-engine" />} />
-      <Row name="Fix stale PR badge" line2={<span className="text-cf-warning">Asked a question</span>} />
-      <Row name="Release build" line2={<span className="text-cf-error">Error · exit status 2</span>} />
+      <Row name="Fix stale PR badge" line2={<span className="text-cf-warning-text">Asked a question</span>} />
+      <Row name="Release build" line2={<span className="text-cf-error-text">Error · exit status 2</span>} />
       <Row
         name="Usage page polish"
-        chip={<span className="flex shrink-0 items-center rounded-sm bg-cf-success-surface px-1 text-caption-sm font-medium text-cf-success tabular-nums">2 PRs</span>}
-        line2={<span className="text-cf-success">Finished 3m ago</span>}
+        chip={<span className="flex shrink-0 items-center rounded-sm bg-cf-success-surface px-1 text-caption-sm font-medium text-cf-success-text tabular-nums">2 PRs</span>}
+        line2={<span className="text-cf-success-text">Finished 3m ago</span>}
       />
       <Row
         name="Docs typo sweep"
         chip={
-          <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight">
+          <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text">
             <Layers className="size-2.5" aria-hidden />
             <span className="truncate">site</span>
           </span>
@@ -168,11 +168,11 @@ function MiniSidebar() {
         name="Rendered threads daemon"
         line2={
           <>
-            <span className="text-cf-info">
+            <span className="text-cf-info-text">
               <Bot className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden />3 agents
             </span>
             <span aria-hidden> · </span>
-            <span className="text-cf-info">Working</span>
+            <span className="text-cf-info-text">Working</span>
             <span aria-hidden> · </span>code-foundry
           </>
         }
@@ -407,11 +407,11 @@ function Badges() {
       </div>
       {/* The sidebar's status chips and the thread's result chips. */}
       <div className="cf-thread flex flex-wrap items-center gap-1.5">
-        <span className="rounded-sm bg-cf-success-surface px-1 text-caption-sm font-medium text-cf-success">+3 checks</span>
-        <span className="rounded-sm bg-cf-warning-surface px-1 text-caption-sm font-medium text-cf-warning">needs login</span>
-        <span className="rounded-sm bg-cf-info-surface px-1 text-caption-sm font-medium text-cf-info">working</span>
-        <span className="rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight">skill</span>
-        <span className="rounded-sm bg-cf-error-surface px-1 text-caption-sm font-medium text-cf-error">exit 1</span>
+        <span className="rounded-sm bg-cf-success-surface px-1 text-caption-sm font-medium text-cf-success-text">+3 checks</span>
+        <span className="rounded-sm bg-cf-warning-surface px-1 text-caption-sm font-medium text-cf-warning-text">needs login</span>
+        <span className="rounded-sm bg-cf-info-surface px-1 text-caption-sm font-medium text-cf-info-text">working</span>
+        <span className="rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text">skill</span>
+        <span className="rounded-sm bg-cf-error-surface px-1 text-caption-sm font-medium text-cf-error-text">exit 1</span>
         <Chip>worktree</Chip>
       </div>
       <div className="cf-thread flex flex-wrap items-center gap-1.5">
@@ -436,8 +436,8 @@ function TextSamples() {
         <span className="font-mono">mono 00o1lI</span>
       </p>
       <p>
-        <span className="text-cf-info">info</span> · <span className="text-cf-warning">warning</span> · <span className="text-cf-success">success</span> ·{" "}
-        <span className="text-cf-error">destructive</span> · <span className="text-cf-highlight">highlight</span>
+        <span className="text-cf-info-text">info</span> · <span className="text-cf-warning-text">warning</span> · <span className="text-cf-success-text">success</span> ·{" "}
+        <span className="text-cf-error-text">destructive</span> · <span className="text-cf-highlight-text">highlight</span>
       </p>
       <div className="mt-1 flex items-center gap-1.5">
         {/* A tooltip, open (TooltipContent's classes). */}
@@ -471,7 +471,7 @@ function Menu() {
           Haiku 4.5<span className="ml-auto pl-4 text-caption-sm tracking-widest">⌘3</span>
         </div>
         <div className="-mx-1 my-1 h-px bg-cf-border" />
-        <div className={cn(MENU_ITEM, "text-cf-error")}>
+        <div className={cn(MENU_ITEM, "text-cf-error-text")}>
           <Archive aria-hidden /> Archive thread
         </div>
       </div>
@@ -502,9 +502,9 @@ function DialogCard() {
 
 function Alert({ tone, icon: Icon, heading, children }: { tone: "warning" | "destructive" | "info"; icon: typeof Info; heading: string; children: ReactNode }) {
   const tones = {
-    warning: "border-cf-warning/40 bg-cf-warning-surface [&>svg]:text-cf-warning",
-    destructive: "border-cf-error/40 bg-cf-error-surface [&>svg]:text-cf-error",
-    info: "border-cf-info/40 bg-cf-info-surface [&>svg]:text-cf-info",
+    warning: "border-cf-warning/40 bg-cf-warning-surface [&>svg]:text-cf-warning-text",
+    destructive: "border-cf-error/40 bg-cf-error-surface [&>svg]:text-cf-error-text",
+    info: "border-cf-info/40 bg-cf-info-surface [&>svg]:text-cf-info-text",
   } as const;
   return (
     <div className={cn("flex min-w-0 flex-1 items-start gap-2 rounded-md border px-3 py-2 text-body-sm", tones[tone])} role="presentation">

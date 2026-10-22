@@ -51,7 +51,7 @@ function Banners() {
       )}
       {loadError && (
         <div className="mb-4 flex gap-2 rounded-md border border-cf-error/40 bg-cf-error-surface px-3 py-2 text-body-sm" data-testid="settings-load-error">
-          <TriangleAlert className="size-4 shrink-0 text-cf-error" />
+          <TriangleAlert className="size-4 shrink-0 text-cf-error-text" />
           <div>
             <p className="font-medium">The settings file does not parse; the last settings that loaded stay in effect (the defaults if none have) and saving is paused until you fix it.</p>
             <p className="mt-0.5 font-mono break-words text-cf-text-muted">{loadError}</p>
@@ -245,7 +245,7 @@ export function SettingsPage() {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
           <div className="mx-auto max-w-3xl" data-testid="settings-body" data-page={searching ? undefined : page?.id}>
             <Banners />
-            {schemaError && <p className="text-body text-cf-error">Cannot load the settings schema: {schemaError}</p>}
+            {schemaError && <p className="text-body text-cf-error-text">Cannot load the settings schema: {schemaError}</p>}
             {!schema && !schemaError && <p className="text-body text-cf-text-muted">Loading…</p>}
             {schema && result && <SearchResults query={query.trim()} words={words} result={result} sections={guiHits?.hits} onOpenSection={openSection} back={page?.title ?? "the page"} />}
             {schema && !result && page && Page && <Page key={page.id} schema={schema} page={page} />}

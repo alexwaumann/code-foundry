@@ -210,7 +210,7 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
         </span>
       )}
       {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{fmtElapsed(ended)}</span>}
-      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-cf-info" aria-label="Running" />}
+      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-cf-info-text" aria-label="Running" />}
     </>
   );
 }
@@ -257,7 +257,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         </span>
       )}
       {s.meta && <span>{s.meta}</span>}
-      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-cf-info" aria-label="Running" />}
+      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-cf-info-text" aria-label="Running" />}
     </>
   );
   // A thread's own run opens in the read-only subagent view; a nested one (spawned by

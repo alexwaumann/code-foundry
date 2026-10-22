@@ -90,7 +90,7 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
                 picked.current = it.onSelect;
               }}
             >
-              <it.icon className={it.destructive ? "text-cf-error" : undefined} />
+              <it.icon className={it.destructive ? "text-cf-error-text" : undefined} />
               {it.label}
               {it.badge !== undefined && (
                 <span className="ml-auto pl-4 text-caption tabular-nums" data-testid={`${it.testId}-count`}>

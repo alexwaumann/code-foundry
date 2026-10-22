@@ -71,7 +71,7 @@ function EnvSummary({ env }: { env: PluginEnvironmentView }) {
         ))}
       </ul>
       {env.issues.map((i) => (
-        <p key={i} className="text-caption-sm text-cf-warning">
+        <p key={i} className="text-caption-sm text-cf-warning-text">
           {i}
         </p>
       ))}
@@ -157,14 +157,14 @@ function PluginRow({
               {proc}
             </p>
           )}
-          {p.disabledReason && <p className="text-caption-sm text-cf-warning">{p.disabledReason}</p>}
+          {p.disabledReason && <p className="text-caption-sm text-cf-warning-text">{p.disabledReason}</p>}
           {p.lastError && p.state !== "running" && (
-            <p className="font-mono text-caption-sm break-words text-cf-error" data-testid="plugin-last-error">
+            <p className="font-mono text-caption-sm break-words text-cf-error-text" data-testid="plugin-last-error">
               {p.lastError}
             </p>
           )}
           {p.issues.map((i) => (
-            <p key={i} className="text-caption-sm text-cf-warning">
+            <p key={i} className="text-caption-sm text-cf-warning-text">
               {i}
             </p>
           ))}
@@ -175,7 +175,7 @@ function PluginRow({
             </p>
           )}
           {update && (
-            <p className="text-caption-sm text-cf-warning" data-testid="plugin-update-available">
+            <p className="text-caption-sm text-cf-warning-text" data-testid="plugin-update-available">
               {p.updateVersion} is available.
             </p>
           )}
@@ -201,7 +201,7 @@ function PluginRow({
             <Button
               variant="outline"
               size="xs"
-              className={cn("bg-transparent dark:bg-transparent", main && "border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40")}
+              className={cn("bg-transparent dark:bg-transparent", main && "border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface hover:text-cf-warning-text dark:border-cf-warning/40")}
               onClick={() => void runCommand("plugin.enable", { name: p.name })}
               data-testid="plugin-enable"
             >

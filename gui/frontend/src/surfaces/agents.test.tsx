@@ -171,7 +171,7 @@ describe("Agents surface", () => {
     expect(within(rowOf("a1"), "agent-activity")?.textContent).toBe("Running go testBash");
     expect(within(rowOf("a1"), "agent-summary")).toBeNull();
     expect(within(rowOf("a3"), "agent-error")?.textContent).toBe("Stopped: process exited with code 1");
-    expect(within(rowOf("a3"), "agent-error")?.className).toContain("text-cf-error");
+    expect(within(rowOf("a3"), "agent-error")?.className).toContain("text-cf-error-text");
     expect(within(rowOf("a0"), "agent-elapsed")?.textContent).toBe("12s");
     expect(within(rowOf("a0"), "agent-tools")?.textContent).toBe("6");
     expect(within(rowOf("a0"), "agent-tokens")?.textContent).toBe("9.4K");

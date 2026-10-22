@@ -15,7 +15,7 @@ export function ThreadStatusIcon({ id, className }: { id: string; className?: st
   const common = { "aria-label": badgeLabels[badge], "data-thread-badge": badge, role: "img" } as const;
   switch (badge) {
     case "busy":
-      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-cf-info", className)} {...common} />;
+      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-cf-info-text", className)} {...common} />;
     case "attention":
       return (
         <span className={cn("relative flex size-2.5 shrink-0", className)} {...common}>
@@ -24,9 +24,9 @@ export function ThreadStatusIcon({ id, className }: { id: string; className?: st
         </span>
       );
     case "error":
-      return <CircleX className={cn("size-3.5 shrink-0 text-cf-error", className)} {...common} />;
+      return <CircleX className={cn("size-3.5 shrink-0 text-cf-error-text", className)} {...common} />;
     case "idle":
-      return <Circle className={cn("size-2.5 shrink-0 fill-cf-success text-cf-success", className)} {...common} />;
+      return <Circle className={cn("size-2.5 shrink-0 fill-cf-success text-cf-success-text", className)} {...common} />;
     default:
       return <Bot className={cn("size-3.5 shrink-0 text-cf-text-muted", className)} {...common} />;
   }

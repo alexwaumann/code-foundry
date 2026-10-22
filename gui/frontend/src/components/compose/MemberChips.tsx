@@ -81,7 +81,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
           )
         )}
         {primary && (
-          <span className="shrink-0 rounded-sm bg-cf-accent-surface px-1 text-caption-sm font-medium text-cf-accent" data-testid="composer-member-primary">
+          <span className="shrink-0 rounded-sm bg-cf-accent-surface px-1 text-caption-sm font-medium text-cf-accent-surface-foreground" data-testid="composer-member-primary">
             primary
           </span>
         )}

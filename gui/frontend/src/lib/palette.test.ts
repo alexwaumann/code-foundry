@@ -37,6 +37,8 @@ const CSS_COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:oklch|oklab|lch|lab|rgba?|hsla?|hwb)
 /** Colours that are data, not theme: kept on purpose. `match` must appear in the line. */
 const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/icons/ClaudeMark.tsx", match: 'CLAUDE_ORANGE = "#d97757"', why: "Anthropic's brand colour for the Claude mark" },
+  { file: "/src/themes/slots.ts", match: 'const BLACK = "#000000";', why: "the resolver's last-resort text on a fill neither theme colour reads on" },
+  { file: "/src/themes/slots.ts", match: 'const WHITE = "#ffffff";', why: "the resolver's last-resort text on a fill neither theme colour reads on" },
   { file: "/src/lib/usage.ts", match: "light: ", why: "Usage page: one fixed categorical colour per model family (DESIGN.md), light and dark" },
   { file: "/src/components/compose/ProjectRows.tsx", match: "oklch(0.55 0.13 ${String(hue)})", why: "a project's identity dot, its hue hashed from the name" },
   { file: "/src/components/compose/CompletionCard.tsx", match: "oklch(0.55 0.13 ${String(projectHue(name))})", why: "the same project identity dot" },
@@ -54,7 +56,6 @@ const ALLOW: { file: string; match: string; why: string }[] = [
 const CSS_ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 3px oklch(0 0 0 /", why: "a shadow is black in every theme" },
   { file: "/src/components/thread/thread.css", match: "box-shadow: 0 1px 2px oklch(0 0 0 /", why: "a shadow is black in every theme" },
-  { file: "/src/components/thread/thread.css", match: "85%, black);", why: "light status tones darken the theme's token a step so small text clears 4.5:1" },
   { file: "/src/components/ember/ember.css", match: "--cf-flame-", why: "Ember's flame is a mascot drawn in its own fixed colours, the same in every theme (docs/notes/ember-3-gui.md)" },
   { file: "/src/components/backdrop/backdrop.css", match: "radial-gradient(55% 45% at 50% 50%, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%)", why: "a mask: only its alpha is used" },
 ];
@@ -97,13 +98,13 @@ const isTest = (file: string) => /\.test\.tsx?$/.test(file);
 describe("palette guard", () => {
   it("reads the sources", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(100);
-    expect(sources["/src/components/sidebar/SidebarRow.tsx"]).toContain("text-cf-warning");
+    expect(sources["/src/components/sidebar/SidebarRow.tsx"]).toContain("text-cf-warning-text");
     expect(Object.keys(stylesheets).length).toBeGreaterThan(3);
     expect(stylesheets["/src/components/thread/thread.css"]).toContain("background: var(--cf-message-surface);");
     expect(stylesheets["/src/index.css"]).toContain("--color-cf-surface-raised: var(--cf-surface-raised);");
   });
 
-  it("no Tailwind palette classes: use the theme slots (text-cf-warning, bg-cf-success-surface, border-cf-info/30, ...)", () => {
+  it("no Tailwind palette classes: use the theme slots (text-cf-warning-text, bg-cf-success-surface, border-cf-info/30, ...)", () => {
     expect(show(scan(PALETTE_CLASS))).toEqual([]);
   });
 
@@ -134,7 +135,7 @@ describe("palette guard", () => {
 
   it("the patterns catch what they guard against", () => {
     for (const s of ["text-amber-600", "dark:bg-sky-400/10", "hover:border-emerald-500/30", "fill-red-500", "border-t-violet-300"]) expect(PALETTE_CLASS.test(s), s).toBe(true);
-    for (const s of ["text-cf-warning", "bg-cf-success-surface", "text-cf-text-muted", "text-warning", "data-tone=amber", "max-w-24", "border-border"]) expect(PALETTE_CLASS.test(s), s).toBe(false);
+    for (const s of ["text-cf-warning-text", "bg-cf-success-surface", "text-cf-text-muted", "text-warning", "data-tone=amber", "max-w-24", "border-border"]) expect(PALETTE_CLASS.test(s), s).toBe(false);
     for (const s of ["bg-[#0a0a0a]", "text-[oklch(0.7_0.1_200)]", "[--chip-accent:oklch(0.6_0.1_230)]", "border-[rgb(0_0_0)]"]) expect(ARBITRARY_COLOR.test(s), s).toBe(true);
     for (const s of ["[--chip-accent:var(--info)]", "bg-[color-mix(in_oklab,var(--chip-accent)_11%,transparent)]", "bg-[Highlight]/30", "h-[1.41em]"]) expect(ARBITRARY_COLOR.test(s), s).toBe(false);
     for (const s of ['"#d97757"', "oklch(0.5 0 0)", "rgb(1 2 3)"]) expect(COLOR_LITERAL.test(s), s).toBe(true);

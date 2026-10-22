@@ -28,7 +28,7 @@ function RowFallback({ threadId, row, error, reset }: FallbackProps & { threadId
   return (
     <div className="flex flex-col gap-0.5 py-1 text-body-sm text-cf-text-muted" role="alert" data-testid="row-error">
       <div className="flex items-center gap-1.5">
-        <TriangleAlert className="size-3.5 shrink-0 text-cf-error" aria-hidden />
+        <TriangleAlert className="size-3.5 shrink-0 text-cf-error-text" aria-hidden />
         Could not render this item.
       </div>
       <ErrorDetails error={error} raw={raw} />

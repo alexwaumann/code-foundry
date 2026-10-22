@@ -126,7 +126,6 @@
     --color-cf-sidebar-muted-foreground: var(--cf-sidebar-muted-foreground);
     --color-cf-sidebar-row-hover: var(--cf-sidebar-row-hover);
     --color-cf-sidebar-row-selected: var(--cf-sidebar-row-selected);
-    --color-cf-sidebar-row-active: var(--cf-sidebar-row-active);
     --color-cf-sidebar-border: var(--cf-sidebar-border);
     --color-cf-message-surface: var(--cf-message-surface);
     --color-cf-message-foreground: var(--cf-message-foreground);
@@ -136,21 +135,27 @@
     --color-cf-success: var(--cf-success);
     --color-cf-success-foreground: var(--cf-success-foreground);
     --color-cf-success-surface: var(--cf-success-surface);
+    --color-cf-success-text: var(--cf-success-text);
     --color-cf-warning: var(--cf-warning);
     --color-cf-warning-foreground: var(--cf-warning-foreground);
     --color-cf-warning-surface: var(--cf-warning-surface);
+    --color-cf-warning-text: var(--cf-warning-text);
     --color-cf-error: var(--cf-error);
     --color-cf-error-foreground: var(--cf-error-foreground);
     --color-cf-error-surface: var(--cf-error-surface);
+    --color-cf-error-text: var(--cf-error-text);
     --color-cf-info: var(--cf-info);
     --color-cf-info-foreground: var(--cf-info-foreground);
     --color-cf-info-surface: var(--cf-info-surface);
+    --color-cf-info-text: var(--cf-info-text);
     --color-cf-highlight: var(--cf-highlight);
     --color-cf-highlight-foreground: var(--cf-highlight-foreground);
     --color-cf-highlight-surface: var(--cf-highlight-surface);
+    --color-cf-highlight-text: var(--cf-highlight-text);
     --color-cf-update: var(--cf-update);
     --color-cf-update-foreground: var(--cf-update-foreground);
     --color-cf-update-surface: var(--cf-update-surface);
+    --color-cf-update-text: var(--cf-update-text);
     --color-cf-diff-addition: var(--cf-diff-addition);
     --color-cf-diff-addition-surface: var(--cf-diff-addition-surface);
     --color-cf-diff-deletion: var(--cf-diff-deletion);
@@ -343,6 +348,12 @@
     height: 100%;
     overflow: hidden;
   }
+  ::selection {
+    background-color: var(--cf-selection);
+  }
+  ::placeholder {
+    color: var(--cf-placeholder);
+  }
   body {
     @apply bg-cf-canvas text-cf-text antialiased;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
@@ -488,6 +499,7 @@
 }
 .cf-markdown code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--cf-code-foreground);
 }
 /* Keys (<kbd>⌘N</kbd>, the help overlay's guide), drawn like the shortcut list's. */
 .cf-markdown kbd {
@@ -510,7 +522,7 @@
 .cf-markdown blockquote {
   border-left: 3px solid var(--cf-quote-border);
   padding-left: 0.8em;
-  color: var(--cf-text-muted);
+  color: var(--cf-text-secondary);
 }
 .cf-markdown hr {
   margin: 1em 0;

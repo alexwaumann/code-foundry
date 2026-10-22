@@ -98,7 +98,7 @@ function WorkspaceBadge({ id }: { id: string }) {
     // A click opens the workspace surface in the thread's side panel; the click goes on
     // to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight hover:bg-cf-highlight/30"
+      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text hover:bg-cf-highlight/30"
       data-testid="row-workspace"
       onClick={() => {
         openWorkspaceSurface({ kind: "thread", id });
@@ -132,10 +132,10 @@ function useThreadPlace(id: string) {
 /** Status text colours: the theme's status tokens (index.css), sky info, amber warning, emerald success, red destructive. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
   muted: "",
-  sky: "text-cf-info",
-  amber: "text-cf-warning",
-  emerald: "text-cf-success",
-  red: "text-cf-error",
+  sky: "text-cf-info-text",
+  amber: "text-cf-warning-text",
+  emerald: "text-cf-success-text",
+  red: "text-cf-error-text",
 };
 
 /** Status text with a relative time; only these rows subscribe to the shared 30 s clock. */
@@ -176,7 +176,7 @@ function ThreadLine({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
       {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-cf-warning" data-testid="row-moving">
+        <span className="flex min-w-0 items-center gap-1 text-cf-warning-text" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
           <span className="truncate">moving to {movingTo}…</span>
         </span>
@@ -185,7 +185,7 @@ function ThreadLine({ id }: { id: string }) {
           <AgentsRunning id={id} more={status || showsPlace(line.kind)} />
           {status && (
             <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
-              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-cf-sidebar-muted-foreground" aria-hidden data-testid="row-waiting" />}
+              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-cf-icon-muted" aria-hidden data-testid="row-waiting" />}
               {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
             </span>
           )}
@@ -225,7 +225,7 @@ function ThreadLine({ id }: { id: string }) {
 function MadeByThreadGlyph({ id }: { id: string }) {
   const made = useMadeByThread(id);
   if (!made) return null;
-  return <CornerDownRight className="-mr-px size-3 shrink-0 text-cf-sidebar-muted-foreground opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
+  return <CornerDownRight className="-mr-px size-3 shrink-0 text-cf-icon-muted opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
 }
 
 /**
@@ -261,7 +261,7 @@ function ThreadLabel({ id }: { id: string }) {
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
               <LinkedPrsBadge id={id} />
               <WorkspaceBadge id={id} />
-              {pinned && <Pin className="size-3 shrink-0 text-cf-sidebar-muted-foreground" aria-label="pinned" data-testid="row-pinned" />}
+              {pinned && <Pin className="size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
             </span>
           </>
         )}
@@ -287,7 +287,7 @@ function TipRow({ icon, chip, children, testId }: { icon: ReactNode; chip?: stri
 }
 
 function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
-  return <Icon className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />;
+  return <Icon className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />;
 }
 
 const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
@@ -354,7 +354,7 @@ function TipMoving({ id }: { id: string }) {
   const { movingTo } = useThreadPlace(id);
   if (movingTo === null) return null;
   return (
-    <div className="mb-[3px] flex items-start gap-2 leading-5 text-cf-warning" data-testid="tip-moving">
+    <div className="mb-[3px] flex items-start gap-2 leading-5 text-cf-warning-text" data-testid="tip-moving">
       <ArrowRightLeft className="mt-[3px] size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">Runs in {movingTo} once it is idle at its prompt</span>
     </div>

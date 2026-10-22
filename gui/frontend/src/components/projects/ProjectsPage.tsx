@@ -180,7 +180,7 @@ function CollapseToggle({ collapsed, disabled, onToggle, testId, label }: { coll
 }
 
 const KIND_ICON: Record<ProjectKind, { Icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  github: { Icon: GithubMark, className: "text-cf-info/90" },
+  github: { Icon: GithubMark, className: "text-cf-info-text/90" },
   git: { Icon: FolderGit2, className: "text-cf-text-muted" },
   nogit: { Icon: Folder, className: "text-cf-text-muted" },
 };
@@ -217,7 +217,7 @@ function WorktreeRow({ projectId, path, cleanupSlot }: { projectId: string; path
         </RowAction>
         <ActionsMenu projectId={projectId} owner={{ kind: "worktree", projectId, path }} from="projects" variant="row" testId="worktree-actions-menu" />
         {cleanable ? (
-          <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-cf-success hover:text-cf-success" onClick={() => void cleanupWorktree(projectId, path)}>
+          <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-cf-success-text hover:text-cf-success-text" onClick={() => void cleanupWorktree(projectId, path)}>
             <Broom />
           </RowAction>
         ) : (
@@ -383,7 +383,7 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
             useUiStore.getState().setWorkspaceCollapsed(id, !collapsed);
           }}
         />
-        <Layers className="size-4 shrink-0 text-cf-highlight/90" aria-hidden />
+        <Layers className="size-4 shrink-0 text-cf-highlight-text/90" aria-hidden />
         <span className="truncate font-medium" data-testid="workspace-name">
           {name}
         </span>

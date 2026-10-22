@@ -227,7 +227,7 @@ describe("MCP surface staleness", () => {
   }
   function expectStale(on: boolean): void {
     expect(header().getAttribute("data-stale")).toBe(on ? "true" : null);
-    expect(screen.getByTestId("mcp-checked-line").className.includes("text-cf-warning")).toBe(on);
+    expect(screen.getByTestId("mcp-checked-line").className.includes("text-cf-warning-text")).toBe(on);
     for (const p of pills()) {
       expect(p.getAttribute("data-stale")).toBe(on ? "true" : null);
       expect(p.className.includes("border-dashed")).toBe(on);

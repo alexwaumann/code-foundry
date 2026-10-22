@@ -625,12 +625,12 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         {(error ?? notice) && (
           <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-body">
             {error && (
-              <p role="alert" className="text-cf-error" data-testid="composer-error">
+              <p role="alert" className="text-cf-error-text" data-testid="composer-error">
                 {error}
               </p>
             )}
             {notice && (
-              <p role="status" className="text-cf-warning" data-testid="composer-notice">
+              <p role="status" className="text-cf-warning-text" data-testid="composer-notice">
                 {notice}
               </p>
             )}

@@ -34,7 +34,7 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
   const when = f.fetchedAtMs === null ? "Not fetched yet" : `U${updatedAgo(f.fetchedAtMs, now).slice(1)}`;
   return (
     <Tip label={f.lastError} side="left">
-      <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-cf-warning" : undefined}>
+      <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-cf-warning-text" : undefined}>
         {when}
         {f.lastError && " · last fetch failed"}
       </span>

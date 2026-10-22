@@ -11,4 +11,8 @@
   --diffs-font-size: 12px;
   --diffs-line-height: 19px;
   --diffs-tab-size: 4;
+  /* Added and deleted lines take the diff slots (the library's own mix, 12% light / 20%
+     dark of the same colour, is what the slots resolve to by default). */
+  --diffs-bg-addition-override: var(--cf-diff-addition-surface);
+  --diffs-bg-deletion-override: var(--cf-diff-deletion-surface);
 }

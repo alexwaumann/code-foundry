@@ -31,7 +31,7 @@ interface FieldApi {
 
 function Description({ f, error }: { f: Field; error: string | undefined }) {
   const strip = useInStrip() !== null;
-  if (error) return <p className="text-caption-sm text-cf-error" data-testid="plugin-field-error">{error}</p>;
+  if (error) return <p className="text-caption-sm text-cf-error-text" data-testid="plugin-field-error">{error}</p>;
   // A strip is one row: descriptions are left out (errors still show, under the control).
   if (f.description === undefined || strip) return null;
   return (
@@ -280,7 +280,7 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
         {fs.fields.map((c) => (
           <FieldView key={c.key} f={c} api={api} />
         ))}
-        {fs.error && <p className="text-caption-sm text-cf-error">{fs.error}</p>}
+        {fs.error && <p className="text-caption-sm text-cf-error-text">{fs.error}</p>}
       </fieldset>
     );
   }
@@ -416,7 +416,7 @@ export function FormNode({ node, data }: NodeProps<"form">) {
           <FieldView key={f.key} f={f} api={api} />
         ))}
         {data.error && (
-          <p className={cn("text-caption-sm text-cf-error", strip && "order-last basis-full")} role="alert" data-testid="plugin-form-error">
+          <p className={cn("text-caption-sm text-cf-error-text", strip && "order-last basis-full")} role="alert" data-testid="plugin-form-error">
             {data.error}
           </p>
         )}

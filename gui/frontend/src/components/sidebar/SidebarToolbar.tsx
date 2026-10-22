@@ -33,7 +33,7 @@ function NotificationsButton() {
         aria-disabled={count === 0 || undefined}
         data-testid="sidebar-notifications"
         data-count={count}
-        className={cn("relative", count > 0 ? "text-cf-warning hover:text-cf-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
+        className={cn("relative", count > 0 ? "text-cf-warning-text hover:text-cf-warning-text" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
         onMouseDown={(e) => {
           e.preventDefault();
         }}
@@ -104,7 +104,7 @@ export function SidebarNewThread() {
       className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-body-sm font-medium has-[>svg]:px-2 [--wails-draggable:no-drag]"
       data-testid="sidebar-new-thread"
     >
-      <SquarePen aria-hidden className="size-4" />
+      <SquarePen aria-hidden className="size-4 text-cf-icon" />
       <span className="min-w-0 flex-1 truncate text-left">New thread</span>
       {chord && (
         <Kbd variant="inherit" data-testid="sidebar-new-thread-chord">

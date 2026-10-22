@@ -309,7 +309,7 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
     >
       <div
         ref={box}
-        className="absolute flex flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface-raised shadow-2xl"
+        className="absolute flex flex-col overflow-hidden rounded-pane border border-cf-border-strong bg-cf-surface-raised shadow-2xl"
         style={{ top: TITLE_BAND_HEIGHT, left: SHELL_GAP, right: SHELL_GAP, bottom: SHELL_GAP }}
         data-testid="thread-html-lightbox-box"
       >

@@ -66,7 +66,7 @@ describe("type roles", () => {
   // A modifier after a role in the class list must also come after it in the stylesheet.
   it.each([
     ["text-caption", "text-cf-text"],
-    ["text-caption-sm", "text-cf-error"],
+    ["text-caption-sm", "text-cf-error-text"],
     ["text-body", "text-cf-text-muted"],
     // components/ui keeps the shadcn names.
     ["text-caption", "text-foreground"],
@@ -145,7 +145,7 @@ describe("cn knows the tokens", () => {
     [["bg-cf-surface-raised", "bg-cf-sidebar-row-selected"], "bg-cf-sidebar-row-selected"],
     [["bg-accent", "bg-cf-control-hover"], "bg-cf-control-hover"],
     [["text-body", "font-medium"], "text-body font-medium"],
-    [["text-link", "text-cf-error"], "text-link text-cf-error"],
+    [["text-link", "text-cf-error-text"], "text-link text-cf-error-text"],
     [["text-code", "font-mono"], "text-code font-mono"],
     [["text-body", "text-caption"], "text-caption"],
     [["text-display", "text-display-sm"], "text-display-sm"],

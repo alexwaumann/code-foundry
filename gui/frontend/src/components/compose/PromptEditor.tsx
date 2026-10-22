@@ -434,7 +434,7 @@ export function PromptEditor({
       {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
       <div className="relative" data-testid="composer-prompt" data-value={value}>
         {value === "" && (
-          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-body text-cf-text-muted select-none">
+          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-body text-cf-placeholder select-none">
             {placeholder}
           </span>
         )}

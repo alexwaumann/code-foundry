@@ -88,7 +88,7 @@ export function WorktreeState({ projectId, path, showPath = false }: { projectId
           {tildify(path)}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-caption-sm tabular-nums">
-          {missing && <span className="text-cf-warning">missing</span>}
+          {missing && <span className="text-cf-warning-text">missing</span>}
           <WorktreeThreads path={path} />
         </span>
       </span>
@@ -96,7 +96,7 @@ export function WorktreeState({ projectId, path, showPath = false }: { projectId
   }
   return (
     <span className="flex min-w-0 flex-1 items-center gap-2">
-      <GitBranch className={cn("size-3.5 shrink-0", isMain ? "text-cf-text-muted" : "text-cf-highlight/90")} aria-hidden />
+      <GitBranch className={cn("size-3.5 shrink-0", isMain ? "text-cf-text-muted" : "text-cf-highlight-text/90")} aria-hidden />
       <span className="max-w-[45%] shrink-0 truncate text-code" data-testid="worktree-branch">
         {branch}
       </span>
@@ -106,11 +106,11 @@ export function WorktreeState({ projectId, path, showPath = false }: { projectId
         </span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-caption-sm tabular-nums">
-        {missing && <span className="text-cf-warning">missing</span>}
+        {missing && <span className="text-cf-warning-text">missing</span>}
         <WorktreeThreads path={path} />
         {dirty && (
           <Tip label={`${String(changes)} changed`}>
-            <span className="flex items-center gap-0.5 text-cf-warning" data-testid="worktree-dirty">
+            <span className="flex items-center gap-0.5 text-cf-warning-text" data-testid="worktree-dirty">
               <CircleDot className="size-3" aria-label="dirty" />
               {changes > 0 && changes}
             </span>
@@ -166,7 +166,7 @@ export function RowAction({
       data-testid={testId}
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text disabled:hover:bg-transparent [&_svg]:size-3.5",
-        destructive && "hover:text-cf-error",
+        destructive && "hover:text-cf-error-text",
         className,
       )}
       onDoubleClick={(e) => {

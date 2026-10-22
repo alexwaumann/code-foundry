@@ -98,7 +98,7 @@ function MemoryRow({ file, className }: { file: string; className?: string | und
           {by?.kind === "thread" && <ByThread by={by} />}
         </p>
         {leftOut && (
-          <p className="flex items-start gap-1.5 text-caption-sm text-cf-warning" data-testid="memory-left-out" data-reason={entry.leftOut}>
+          <p className="flex items-start gap-1.5 text-caption-sm text-cf-warning-text" data-testid="memory-left-out" data-reason={entry.leftOut}>
             <EyeOff className="mt-px size-3 shrink-0" aria-hidden />
             {leftOut}
           </p>
@@ -176,7 +176,7 @@ export function RememberedSection() {
   return (
     <SectionCard id="remembered" heading="Remembered" description="Every thread in every project reads these before its first action." aside={<RememberedAside />}>
       {readError && (
-        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning" role="alert" data-testid="memory-read-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning-text" role="alert" data-testid="memory-read-error">
           The memory could not be read, so this is the last list read: {readError}
         </p>
       )}
@@ -187,7 +187,7 @@ export function RememberedSection() {
           The daemon is older than this window and cannot show the memory. Restart it to see this page.
         </p>
       ) : status === "error" ? (
-        <p className="px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="memory-load-error">
+        <p className="px-4 py-3 text-caption break-words text-cf-error-text" role="alert" data-testid="memory-load-error">
           Cannot read the memory: {loadError}
         </p>
       ) : files.length === 0 ? (

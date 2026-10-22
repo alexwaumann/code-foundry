@@ -198,8 +198,8 @@ function Badge({ children, tone }: { children: ReactNode; tone: "success" | "pen
     <span
       className={cn(
         "rounded-full border px-1.5 text-caption-sm",
-        tone === "success" && "border-cf-success/30 text-cf-success",
-        tone === "pending" && "border-cf-warning/30 text-cf-warning",
+        tone === "success" && "border-cf-success/30 text-cf-success-text",
+        tone === "pending" && "border-cf-warning/30 text-cf-warning-text",
         tone === "neutral" && "border-cf-border text-cf-text-muted",
       )}
     >

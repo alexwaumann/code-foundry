@@ -9,8 +9,8 @@ import { toneText } from "./tones";
 
 /** The submit button per verdict: the verdict's tone (Approve green, Request changes red, Comment the primary button). */
 const submitClass: Record<Verdict, string> = {
-  approve: "border border-cf-success/40 bg-cf-success-surface text-cf-success enabled:hover:bg-cf-success/15",
-  "request-changes": "border border-cf-error/40 bg-cf-error-surface text-cf-error enabled:hover:bg-cf-error/15",
+  approve: "border border-cf-success/40 bg-cf-success-surface text-cf-success-text enabled:hover:bg-cf-success/15",
+  "request-changes": "border border-cf-error/40 bg-cf-error-surface text-cf-error-text enabled:hover:bg-cf-error/15",
   comment: "bg-cf-accent text-cf-accent-foreground enabled:hover:bg-cf-accent/90",
 };
 

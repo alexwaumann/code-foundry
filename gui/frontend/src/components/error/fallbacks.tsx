@@ -26,7 +26,7 @@ export function PaneError({ error, reset }: FallbackProps) {
   return (
     <div className="flex flex-col gap-2 p-4 text-body-sm" role="alert" data-testid="pane-error">
       <div className="flex items-center gap-2">
-        <TriangleAlert className="size-4 shrink-0 text-cf-error" aria-hidden />
+        <TriangleAlert className="size-4 shrink-0 text-cf-error-text" aria-hidden />
         <span className="font-medium">This part of the window could not render.</span>
         <Button variant="outline" size="xs" className="ml-auto" onClick={reset}>
           <RotateCw aria-hidden />
@@ -44,7 +44,7 @@ export function AppError({ error }: FallbackProps) {
     <div className="flex h-full items-center justify-center bg-cf-canvas p-8 text-cf-text" role="alert" data-testid="app-error">
       <div className="flex max-w-xl flex-col gap-3">
         <div className="flex items-center gap-2">
-          <TriangleAlert className="size-5 shrink-0 text-cf-error" aria-hidden />
+          <TriangleAlert className="size-5 shrink-0 text-cf-error-text" aria-hidden />
           <h1 className="text-heading">Code Foundry hit an error</h1>
         </div>
         <p className="text-body text-cf-text-muted">Your threads keep running in the daemon. Reload the window to pick up where you were.</p>

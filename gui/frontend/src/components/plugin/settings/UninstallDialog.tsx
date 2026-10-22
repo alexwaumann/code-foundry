@@ -61,7 +61,7 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
             variant="outline"
             size="sm"
             autoFocus
-            className="border-cf-error/40 bg-transparent text-cf-error hover:bg-cf-error-surface hover:text-cf-error dark:border-cf-error/40 dark:bg-transparent"
+            className="border-cf-error/40 bg-transparent text-cf-error-text hover:bg-cf-error-surface hover:text-cf-error-text dark:border-cf-error/40 dark:bg-transparent"
             onClick={() => {
               onClose();
               void uninstallPlugin(name, purge);

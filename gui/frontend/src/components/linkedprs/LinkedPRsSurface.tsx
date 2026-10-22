@@ -61,7 +61,7 @@ function Header({ threadId }: { threadId: string }) {
   const count = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   return (
     <header className="flex min-w-0 items-center gap-1.5 border-b border-cf-divider px-4 py-2.5 text-heading @max-[340px]:px-3" data-testid="linkedprs-header">
-      <GitPullRequestArrow className="size-4 shrink-0 text-cf-success" aria-hidden />
+      <GitPullRequestArrow className="size-4 shrink-0 text-cf-success-text" aria-hidden />
       <span className="min-w-0 truncate" data-testid="linkedprs-thread">
         {name}
       </span>
