@@ -69,7 +69,7 @@ export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode,
           {page.dir && (
             <>
               {" "}
-              <span className="mono text-muted-foreground">{page.dir}</span>
+              <span className="mono text-cf-text-muted">{page.dir}</span>
             </>
           )}
         </span>
@@ -99,17 +99,17 @@ function CardBody({
 }) {
   if (grant.loading)
     return (
-      <div className="flex items-center justify-center text-muted-foreground" style={{ height }} data-testid="thread-html-loading">
+      <div className="flex items-center justify-center text-cf-text-muted" style={{ height }} data-testid="thread-html-loading">
         <LoaderCircle className="size-4 animate-spin" aria-label="Loading" />
       </div>
     );
   if (!grant.preview)
     return (
       <>
-        <div className="flex items-start gap-2 border-b border-border bg-warning/8 px-3 py-2 text-caption t-amber" data-testid="thread-html-failed" role="status">
+        <div className="flex items-start gap-2 border-b border-cf-border bg-cf-warning-surface px-3 py-2 text-caption t-amber" data-testid="thread-html-failed" role="status">
           <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
           <span className="shrink-0">Could not render this page.</span>
-          {grant.error && <span className="min-w-0 text-muted-foreground">{grant.error}</span>}
+          {grant.error && <span className="min-w-0 text-cf-text-muted">{grant.error}</span>}
         </div>
         <SourceView page={page} height={Math.min(height, 240)} version={version} />
       </>
@@ -124,10 +124,10 @@ function SourceView({ page, height, version }: { page: InlinePage; height: numbe
   const text = read.data?.text ?? null;
   const lines = useMemo(() => (text === null ? 0 : text.split("\n").length), [text]);
   let body: ReactNode;
-  if (read.data === null && read.error === null) body = <LoaderCircle className="m-3 size-4 animate-spin text-muted-foreground" aria-label="Loading" />;
+  if (read.data === null && read.error === null) body = <LoaderCircle className="m-3 size-4 animate-spin text-cf-text-muted" aria-label="Loading" />;
   else if (text === null) {
     const why = read.error ?? (read.data?.notFound ? `no file at ${tildify(page.abs)}` : "it is not a text file");
-    body = <p className="px-3 py-2 text-caption text-muted-foreground">The source cannot be read either: {why}</p>;
+    body = <p className="px-3 py-2 text-caption text-cf-text-muted">The source cannot be read either: {why}</p>;
   } else body = <CodeBody name={page.name} text={text} lines={lines} />;
   return (
     <div className="flex min-h-0 flex-col" style={text === null ? undefined : { height }} data-testid="thread-html-source">
@@ -144,7 +144,7 @@ function Action({ label, icon: Icon, onClick, pressed, disabled, testId }: { lab
         type="button"
         variant="ghost"
         size="icon-xs"
-        className={cn("text-muted-foreground", pressed && "bg-accent text-foreground", disabled && "cursor-default opacity-50 hover:bg-transparent hover:text-muted-foreground")}
+        className={cn("text-cf-text-muted", pressed && "bg-cf-control-hover text-cf-text", disabled && "cursor-default opacity-50 hover:bg-transparent hover:text-cf-text-muted")}
         aria-label={label}
         aria-pressed={pressed}
         aria-disabled={disabled || undefined}
@@ -160,11 +160,11 @@ function Action({ label, icon: Icon, onClick, pressed, disabled, testId }: { lab
 /** The strip over the page: its path (the directory muted), then the actions. */
 function Strip({ page, children, big }: { page: InlinePage; children: ReactNode; big?: boolean }) {
   return (
-    <div className={cn("flex shrink-0 items-center gap-1.5 border-b border-border bg-muted pr-1 text-muted-foreground dark:bg-foreground/4", big ? "h-10 pl-3.5" : "h-8 pl-2.5")} data-testid="thread-html-strip">
+    <div className={cn("flex shrink-0 items-center gap-1.5 border-b border-cf-border bg-cf-surface-sunken pr-1 text-cf-text-muted dark:bg-cf-text/4", big ? "h-10 pl-3.5" : "h-8 pl-2.5")} data-testid="thread-html-strip">
       <FileCode className="size-3.5 shrink-0" aria-hidden />
       <span className="mono min-w-0 flex-1 truncate text-caption" data-testid="thread-html-path">
         {page.dir && <span>{page.dir}/</span>}
-        <span className="text-foreground/85">{page.name}</span>
+        <span className="text-cf-text/85">{page.name}</span>
       </span>
       {children}
     </div>
@@ -237,7 +237,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
     </>
   );
   return (
-    <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-border bg-card" data-testid="thread-html-card">
+    <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised" data-testid="thread-html-card">
       <Strip page={page}>{actions(false)}</Strip>
       <CardBody page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} />
       {lightbox && (
@@ -292,7 +292,7 @@ function Lightbox({ host, onClose, children }: { host: HTMLElement; onClose: () 
         if (e.target === e.currentTarget) close.current();
       }}
     >
-      <div className="flex h-[calc(100%-48px)] w-[min(1100px,calc(100%-48px))] flex-col overflow-hidden rounded-pane border border-pane-border bg-card shadow-2xl">{children}</div>
+      <div className="flex h-[calc(100%-48px)] w-[min(1100px,calc(100%-48px))] flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface-raised shadow-2xl">{children}</div>
     </div>,
     host,
   );
