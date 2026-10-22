@@ -275,16 +275,21 @@ func RegisterUsage(r *Registry, b ThreadBackend) error {
 		Name:  "usage.show",
 		Title: "Show Token Usage",
 		Description: "Print token usage and its cost at Claude API rates, per model with totals: " +
-			"one thread with --thread, else every thread plus removed ones.",
+			"one thread (default inside a thread: that thread), else every thread plus removed ones.",
 		Category:     "View",
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "thread", Type: String, ID: ThreadID, Description: "Thread id (default: every thread, plus removed threads)" + IDHelp},
+			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
+				Description: "Thread id (default: the thread this runs in, $CODE_FOUNDRY_THREAD; outside a thread: every thread, plus removed threads)" + IDHelp},
+			{Name: "all", Type: Bool, Description: "Every thread plus removed ones, also inside a thread"},
 		},
 		// CLI only: the palette has view.usage, which opens the Usage page.
 		When: func(c Context) bool { return c.ActiveView == "" },
 		Run: func(ctx context.Context, _ Context, args Args) (Result, error) {
-			if id := args.String("thread"); id != "" {
+			if args.Bool("all") && args.Given("thread") {
+				return Result{}, InvalidArg("all", "with --thread: pass one or the other")
+			}
+			if id := args.String("thread"); id != "" && !args.Bool("all") {
 				res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
 				if err != nil {
 					return Result{}, err

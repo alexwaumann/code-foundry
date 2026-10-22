@@ -285,7 +285,7 @@ test("threads end to end against the real daemon", async ({ page }) => {
         "aria-selected",
         "true",
       );
-      expect(cli("thread", "focus", "--id", s1.id)).toMatch(/delivered=[1-9]/);
+      expect(cli("thread", "focus", "--id", s1.id)).toMatch(/windows=[1-9]/);
       await expect(row(page, `s:${s1.id}`)).toHaveAttribute(
         "aria-selected",
         "true",

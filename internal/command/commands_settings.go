@@ -87,24 +87,20 @@ func settingsWarnings(snap *v1.SettingsSnapshot, key string) []string {
 	return out
 }
 
-// Views the GUI knows how to show (UiIntent.ShowView.name).
+// Views the GUI knows how to show (UiIntent.ShowView.name): the settings page and the
+// help overlay (view.settings and view.help, RegisterView).
 const (
 	ViewHelp     = "help"
 	ViewSettings = "settings"
 )
 
-// RegisterSettings registers settings.get, settings.set, settings.reset, settings.path,
-// settings.reveal, and the view.settings and view.help commands that toggle the GUI's
-// settings page and open its help overlay. reveal may be nil (RevealInFinder).
-func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFunc) error {
+// RegisterSettings registers settings.get, settings.set, settings.reset, settings.path
+// and settings.reveal. reveal may be nil (RevealInFinder).
+func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 	if reveal == nil {
 		reveal = RevealInFinder
 	}
 	keyArg := ArgSpec{Name: "key", Type: String, Required: true, Positional: true, Description: `Setting key, e.g. "appearance.font_size"`}
-	show := func(name string) Result {
-		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
-		return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}
-	}
 	// field looks a key up in the schema so typos are reported as such.
 	field := func(ctx context.Context, key string) (*v1.SettingField, []*v1.SettingField, error) {
 		res, err := b.GetSchema(ctx, connect.NewRequest(&v1.GetSettingsSchemaRequest{}))
@@ -238,22 +234,6 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 				}
 				return Result{Message: "revealed " + p}, nil
 			},
-		},
-		Command{
-			Name:        "view.settings",
-			Title:       "Settings",
-			Description: "Show the settings page in every connected window, or close it where it already shows.",
-			Category:    "View",
-			Keybindings: []string{"cmd+,"},
-			Run:         func(context.Context, Context, Args) (Result, error) { return show(ViewSettings), nil },
-		},
-		Command{
-			Name:        "view.help",
-			Title:       "Keyboard Shortcuts and Help",
-			Description: "Show keybindings and how the app works in every connected window.",
-			Category:    "View",
-			Keybindings: []string{"cmd+/"},
-			Run:         func(context.Context, Context, Args) (Result, error) { return show(ViewHelp), nil },
 		},
 	)
 }

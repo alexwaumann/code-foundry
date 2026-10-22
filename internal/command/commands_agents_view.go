@@ -73,7 +73,7 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 				{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp},
 			},
 			When: hasThread,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				id := a.String("id")
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id}))
 				if err != nil {
@@ -83,9 +83,9 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowAgentRun_{ShowAgentRun: &v1.UiIntent_ShowAgentRun{ThreadId: id, RunId: run.GetId()}}})
-				// No Message: the GUI toasts non-empty ones, and the view is feedback enough.
-				return Result{JSON: EmitResult{Delivered: n}}, nil
+				// A Message only from the CLI: the GUI toasts non-empty ones, and the view is
+				// feedback enough there.
+				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_ShowAgentRun_{ShowAgentRun: &v1.UiIntent_ShowAgentRun{ThreadId: id, RunId: run.GetId()}}}).CLIResult(uctx), nil
 			},
 		},
 		{
@@ -98,9 +98,8 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 			// (gui/frontend/src/keys/bindings.ts chordFires), and the view has no composer.
 			Keybindings: []string{"escape"},
 			When:        inSubagentView,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewAgentUp}}})
-				return Result{JSON: EmitResult{Delivered: n}}, nil
+			Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
+				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewAgentUp}}}).CLIResult(uctx), nil
 			},
 		},
 	}

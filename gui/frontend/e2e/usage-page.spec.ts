@@ -69,8 +69,10 @@ test("the status-row button toggles the page; x, Escape and a selection close it
   await expect(page_(page)).toBeVisible();
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
 
-  // The CLI's view.usage (UiIntent.ShowView "usage") toggles too.
+  // The CLI's view.usage (UiIntent.ShowView "usage") only shows: the open page stays.
   expect(await emit({ showView: { name: "usage" } })).toBe(1);
+  await expect(page_(page)).toBeVisible();
+  await button(page).click();
   await expect(page_(page)).toHaveCount(0);
   expect(await emit({ showView: { name: "usage" } })).toBe(1);
   await expect(page_(page)).toBeVisible();

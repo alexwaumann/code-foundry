@@ -18,7 +18,7 @@ import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -251,9 +251,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "project.github.publish": () => openPublishDialog(getUiContext().activeProjectId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
-  "view.settings": () => showView("settings"),
-  // The Usage page, a toggle (stores/views.ts): window-local like view.settings.
-  "view.usage": () => showView("usage"),
+  "view.settings": () => toggleView("settings"),
+  // The Usage page: window-local like view.settings, and like it a toggle here (toggleView).
+  "view.usage": () => toggleView("usage"),
   // The Themes page, window-local like view.settings, on the slot in use (its slot chips
   // switch; the palette's slot prompt is skipped). The CLI's theme pick [slot] reaches
   // every window through ShowView "themes[.slot]".

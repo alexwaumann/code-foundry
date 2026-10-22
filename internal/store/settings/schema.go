@@ -175,7 +175,7 @@ var Pages = []Page{
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
-	{GroupProjects, "Projects", "Git fetching."},
+	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},

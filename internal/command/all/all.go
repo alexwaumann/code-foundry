@@ -86,6 +86,13 @@ type Deps struct {
 	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
 	Memory command.MemoryBackend
+	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
+	// view.panel.file. Nil makes it fail with Unimplemented.
+	Files command.FileReader
+	// FileDiffs reads a worktree file's diff as the Diff tab does
+	// (ProjectService.GetWorktreeFileDiff), for view.panel.diff. Nil makes it fail with
+	// Unimplemented.
+	FileDiffs command.FileDiffer
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
 	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
 	// and Presence. Nil: none listed.
@@ -127,6 +134,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
 	}
+	if d.Presence.Thread == nil {
+		d.Presence.Thread = d.Thread
+	}
 	if d.GitOps.NotGit == nil {
 		d.GitOps.NotGit = d.NotGit
 	}
@@ -154,12 +164,15 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
 			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
 		}),
-		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
+		command.RegisterSettings(r, d.Settings, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
 		command.RegisterTheme(r, d.Settings),
 		command.RegisterThemePick(r, d.Emitter),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
-		command.RegisterView(r, d.Emitter, d.Thread),
+		command.RegisterView(r, command.ViewDeps{
+			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, Diffs: d.FileDiffs,
+			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh,
+		}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),

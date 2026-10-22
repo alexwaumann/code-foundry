@@ -24,7 +24,7 @@ func newMcpRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *command
 	b := bus.New()
 	fake := threadtest.New(b)
 	reg := command.NewRegistry()
-	emit := &commandtest.Emitter{Delivered: 1}
+	emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
 	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestViewPanelMcpEmits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Message != "" || res.JSON != (command.EmitResult{Delivered: 1}) {
+	if res.Message != "" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
 		t.Errorf("result = %+v", res)
 	}
 	if got := emit.Intents(); len(got) != 1 || got[0].GetShowView().GetName() != command.ViewPanelMcp {

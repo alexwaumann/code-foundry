@@ -7,9 +7,46 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// EmitResult is the JSON result of every ui.* command.
+// EmitResult is the JSON result of every command that sends the app windows an intent
+// (the ui.* and view.* commands, thread.focus, theme.pick, ...).
 type EmitResult struct {
-	Delivered int `json:"delivered"`
+	// Windows is the number of app windows connected when the intent went out: the ones
+	// it can show something in. 0: nobody saw anything.
+	Windows int `json:"windows"`
+	// Receivers is how many streams received the intent: windows, but also CLI events
+	// streams (several of them share one subscription) and plugins. Not a window count.
+	Receivers int `json:"receivers"`
+}
+
+// NoWindowMessage is what a command that shows something in the app says when no app
+// window is open (exit 0: there was nothing wrong with the call).
+const NoWindowMessage = "no app window is open: nothing was shown"
+
+// EmitTo sends intent through e and reports the windows and receivers.
+func EmitTo(e Emitter, intent *v1.UiIntent) EmitResult {
+	n := e.Emit(intent)
+	return EmitResult{Windows: e.Windows(), Receivers: n}
+}
+
+// Message is the text result: "windows=N", or NoWindowMessage with none.
+func (r EmitResult) Message() string {
+	if r.Windows == 0 {
+		return NoWindowMessage
+	}
+	return fmt.Sprintf("windows=%d", r.Windows)
+}
+
+// Result is r as a command result with its Message.
+func (r EmitResult) Result() Result { return Result{Message: r.Message(), JSON: r} }
+
+// CLIResult is r as a command result, with its Message only from the CLI (ActiveView
+// empty): the GUI toasts non-empty messages, and there the change on screen is the
+// feedback.
+func (r EmitResult) CLIResult(uctx Context) Result {
+	if uctx.ActiveView != "" {
+		return Result{JSON: r}
+	}
+	return r.Result()
 }
 
 var notifyLevels = map[string]v1.UiIntent_Notify_Level{
@@ -19,12 +56,9 @@ var notifyLevels = map[string]v1.UiIntent_Notify_Level{
 }
 
 // RegisterUI registers the ui.* commands, which steer connected GUIs through e. They
-// need no store and are always available; with no GUI watching they deliver to zero.
+// need no store and are always available; with no app window open they say so.
 func RegisterUI(r *Registry, e Emitter) error {
-	emit := func(intent *v1.UiIntent) Result {
-		n := e.Emit(intent)
-		return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}
-	}
+	emit := func(intent *v1.UiIntent) Result { return EmitTo(e, intent).Result() }
 	return r.RegisterAll(
 		Command{
 			Name:         "ui.palette.open",

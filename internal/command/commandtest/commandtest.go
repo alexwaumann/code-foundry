@@ -13,9 +13,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-// Emitter records intents and reports Delivered for each.
+// Emitter records intents and reports Delivered (receivers) for each, and OpenWindows
+// windows.
 type Emitter struct {
-	Delivered int
+	Delivered   int
+	OpenWindows int
 
 	mu      sync.Mutex
 	intents []*v1.UiIntent
@@ -30,6 +32,9 @@ func (e *Emitter) Emit(intent *v1.UiIntent) int {
 	e.intents = append(e.intents, intent)
 	return e.Delivered
 }
+
+// Windows returns OpenWindows.
+func (e *Emitter) Windows() int { return e.OpenWindows }
 
 // Intents returns the recorded intents.
 func (e *Emitter) Intents() []*v1.UiIntent {

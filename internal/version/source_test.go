@@ -33,8 +33,17 @@ func TestSource(t *testing.T) {
 			line: "Rendered by Code Foundry v0.21.3 (commit 844a109c0123) · source: " + repo + "/tree/v0.21.3",
 		},
 		{
-			name: "tip tag", info: Info{Version: "v0.22.0-tip.4", Commit: sha}, ref: "v0.22.0-tip.4",
-			line: "Rendered by Code Foundry v0.22.0-tip.4 (commit 844a109c0123) · source: " + repo + "/tree/v0.22.0-tip.4",
+			// Tip tags are pruned (release.yml keeps five): the commit outlives them.
+			name: "tip tag", info: Info{Version: "v0.22.0-tip.4", Commit: sha}, ref: sha,
+			line: "Rendered by Code Foundry v0.22.0-tip.4 (commit 844a109c0123) · source: " + repo + "/tree/" + sha,
+		},
+		{
+			name: "tip tag without a commit", info: Info{Version: "v0.22.0-tip.4"}, ref: "v0.22.0-tip.4",
+			line: "Rendered by Code Foundry v0.22.0-tip.4 (commit unknown) · source: " + repo + "/tree/v0.22.0-tip.4",
+		},
+		{
+			name: "tip tag with a dirty commit", info: Info{Version: "v0.22.0-tip.4", Commit: sha + "-dirty"}, ref: sha,
+			line: "Rendered by Code Foundry v0.22.0-tip.4 (commit 844a109c0123-dirty) · source: " + repo + "/tree/" + sha,
 		},
 		{
 			name: "tag without a commit", info: Info{Version: "v1.0.0"}, ref: "v1.0.0",

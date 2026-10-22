@@ -37,10 +37,10 @@ func TestNotificationsTest(t *testing.T) {
 		wantErr  error
 		wantCode connect.Code
 	}{
-		{name: "default volume", want: 50, wantMsg: "alert sound at 50%: delivered=1"},
-		{name: "the setting's volume", stored: "15", want: 15, wantMsg: "alert sound at 15%: delivered=1"},
+		{name: "default volume", want: 50, wantMsg: "alert sound at 50%: windows=1"},
+		{name: "the setting's volume", stored: "15", want: 15, wantMsg: "alert sound at 15%: windows=1"},
 		{name: "explicit volume wins", stored: "15", args: map[string]string{"volume": "80"}, want: 80},
-		{name: "explicit zero", args: map[string]string{"volume": "0"}, want: 0, wantMsg: "alert sound at 0%: delivered=1"},
+		{name: "explicit zero", args: map[string]string{"volume": "0"}, want: 0, wantMsg: "alert sound at 0%: windows=1"},
 		{name: "explicit volume above 100", args: map[string]string{"volume": "101"}, wantErr: command.ErrInvalidArgs},
 		{name: "explicit negative volume", args: map[string]string{"volume": "-1"}, wantErr: command.ErrInvalidArgs},
 		{name: "not a number", args: map[string]string{"volume": "loud"}, wantErr: command.ErrInvalidArgs},
@@ -66,7 +66,7 @@ func TestNotificationsTest(t *testing.T) {
 				b = api.NewSettings(store)
 			}
 			reg := command.NewRegistry()
-			e := &commandtest.Emitter{Delivered: 1}
+			e := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
 			if err := command.RegisterNotifications(reg, b, e); err != nil {
 				t.Fatal(err)
 			}
@@ -96,9 +96,25 @@ func TestNotificationsTest(t *testing.T) {
 			if tt.wantMsg != "" && res.Message != tt.wantMsg {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
-			if js, _ := res.EncodeJSON(); js != `{"delivered":1}` {
+			if js, _ := res.EncodeJSON(); js != `{"windows":1,"receivers":1}` {
 				t.Errorf("json = %s", js)
 			}
 		})
+	}
+}
+
+// With no app window open nothing plays, and the message says so.
+func TestNotificationsTestWithoutAWindow(t *testing.T) {
+	reg := command.NewRegistry()
+	e := &commandtest.Emitter{Delivered: 1}
+	if err := command.RegisterNotifications(reg, valuesSettings{values: map[string]string{}}, e); err != nil {
+		t.Fatal(err)
+	}
+	res, err := reg.Invoke(context.Background(), command.Context{}, "notifications.test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Message != "no app window is open: no sound was played" || res.JSON != (command.EmitResult{Receivers: 1}) {
+		t.Errorf("result = %+v", res)
 	}
 }

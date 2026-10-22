@@ -82,7 +82,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"guide topic", []string{"guide", "terminal"}, nil, "# code-foundry guide: Terminal", ""},
 		{"guide unknown topic", []string{"guide", "bogus"}, errUsage, "", `no guide topic "bogus"; topics: action,`},
 		{"json result", []string{"daemon.version", "--json"}, nil, `"version":"test"`, ""},
-		{"notify with no GUI", []string{"ui", "notify", "--title", "hi", "--body", "there"}, nil, "delivered=0", ""},
+		{"notify with no GUI", []string{"ui", "notify", "--title", "hi", "--body", "there"}, nil, "no app window is open: nothing was shown", ""},
 		{"help for a command", []string{"help", "ui", "notify"}, nil, "--level info|warning|error", ""},
 		{"-h on a command", []string{"ui.notify", "-h"}, nil, "--title string", ""},
 		{"unknown command", []string{"bogus", "thing"}, errUsage, "", `unknown command "bogus thing"`},
@@ -172,9 +172,10 @@ func TestCLINotifyReachesWatcher(t *testing.T) {
 	if r.err != nil {
 		t.Fatalf("notify: %v\n%s", r.err, r.stderr)
 	}
-	var got struct{ Delivered int }
-	if err := json.Unmarshal([]byte(r.stdout), &got); err != nil || got.Delivered != 1 {
-		t.Fatalf("stdout = %q (err %v), want delivered 1", r.stdout, err)
+	// A WatchIntents stream receives the intent but is no app window.
+	var got struct{ Windows, Receivers int }
+	if err := json.Unmarshal([]byte(r.stdout), &got); err != nil || got.Receivers != 1 || got.Windows != 0 {
+		t.Fatalf("stdout = %q (err %v), want 1 receiver and no window", r.stdout, err)
 	}
 	if !stream.Receive() {
 		t.Fatalf("stream ended: %v", stream.Err())

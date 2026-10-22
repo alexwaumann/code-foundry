@@ -154,6 +154,13 @@ describe("ui intent mapping", () => {
   it.each([
     [{ case: "focusTerminal" as const, value: { terminalId: "t" } }, { kind: "focusTerminal", terminalId: "t" }],
     [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusThread", threadId: "s1" }],
+    [{ case: "focusThread" as const, value: { threadId: "s1", explicit: true } }, { kind: "focusThread", threadId: "s1", explicit: true }],
+    [{ case: "showView" as const, value: { name: "projects" } }, { kind: "showView", name: "projects" }],
+    [{ case: "showView" as const, value: { name: "panel.usage", threadId: "s1" } }, { kind: "showView", name: "panel.usage", threadId: "s1" }],
+    [
+      { case: "showView" as const, value: { name: "panel.pr", threadId: "s1", params: { slug: "o/r", number: "7" } } },
+      { kind: "showView", name: "panel.pr", threadId: "s1", params: { slug: "o/r", number: "7" } },
+    ],
     [{ case: "focusProject" as const, value: { projectId: "r", worktreePath: "/w" } }, { kind: "focusProject", projectId: "r", worktreePath: "/w" }],
     [{ case: "openPalette" as const, value: { query: "new" } }, { kind: "openPalette", query: "new" }],
     [

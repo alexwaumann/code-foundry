@@ -34,8 +34,9 @@ type DaemonVersion struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit,omitempty"`
 	GoVersion string `json:"go_version"`
-	// SourceURL is this build's source tree (version.Info.Source: the release tag's, else
-	// the commit's, else the repository's); SourceRef is that tag or commit.
+	// SourceURL is this build's source tree (version.Info.Source: a stable release tag's,
+	// else the commit's, else the repository's; a tip's tag only when its commit is
+	// unknown, since tip tags are pruned); SourceRef is that tag or commit.
 	SourceURL string `json:"source_url"`
 	SourceRef string `json:"source_ref,omitempty"`
 }

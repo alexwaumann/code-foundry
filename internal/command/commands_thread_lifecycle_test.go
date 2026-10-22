@@ -20,7 +20,7 @@ func newLifecycleRegistry(t *testing.T) (*command.Registry, *commandtest.Thread,
 	t.Helper()
 	reg := command.NewRegistry()
 	b := &commandtest.Thread{}
-	e := &commandtest.Emitter{Delivered: 1}
+	e := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
 	if err := command.RegisterThreadLifecycle(reg, b, e); err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantMsg: "unpinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5"}}},
 		{name: "pin unavailable without a thread", cmd: "thread.pin", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		{name: "pin from the CLI without a thread", cmd: "thread.pin", wantErr: command.ErrInvalidArgs},
-		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
+		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "windows=1", wantIntent: focusIntent("s7")},
 		{name: "backend error passes through", cmd: "thread.remove", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}
@@ -236,7 +236,7 @@ func TestThreadFocusUnknown(t *testing.T) {
 		if connect.CodeOf(err) != tt.wantCode && !(tt.wantCode == 0 && err == nil) {
 			t.Errorf("focus %s: err %v, want code %v", tt.id, err, tt.wantCode)
 		}
-		if tt.wantCode == 0 && res.Message != "delivered=1" {
+		if tt.wantCode == 0 && res.Message != "windows=1" {
 			t.Errorf("focus %s: %q", tt.id, res.Message)
 		}
 	}

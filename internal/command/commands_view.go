@@ -3,7 +3,9 @@ package command
 import (
 	"context"
 
-	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"connectrpc.com/connect"
+
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
 // ViewDashboard is the ShowView name of the dashboard: the start page, and what the
@@ -18,8 +20,9 @@ const ViewPullRequests = "pullrequests"
 const ViewProjects = "projects"
 
 // ViewUsage is the ShowView name of the Usage page: token usage and its cost over every
-// thread the daemon tracks (docs/notes/session-usage.md). The GUI toggles it like the
-// settings page.
+// thread the daemon tracks (docs/notes/session-usage.md). A window shows it (a window
+// that shows it already keeps it); only the window's own key and sidebar button toggle
+// it, like the settings page.
 const ViewUsage = "usage"
 
 // ViewPanelToggle is the ShowView name that toggles the side panel of whatever the
@@ -120,168 +123,226 @@ func hasWorktreeThreadContext(c Context) bool {
 	return hasThread(c) && hasWorktree(c)
 }
 
-// RegisterView registers view.dashboard, which shows the dashboard, view.usage, which
-// shows the Usage page,
-// view.pullrequests, which shows the Pull Requests page,
-// view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
-// the side panel, view.bottom.toggle, which shows or hides the bottom panel, view.panel.expand, which switches it between split and full width,
-// view.panel.new-tab, which shows its surface list to open another tab,
-// view.panel.split, which splits it into two tab groups or joins them,
-// view.back and view.forward, which step through the window's selection history,
-// thread.previous and thread.next, which select the thread above or below in the sidebar, and
-// view.panel.workspace, which opens the workspace surface in it,
-// view.panel.linked-prs, which opens the thread's linked pull requests in it,
-// view.panel.usage, which opens the thread's usage in it,
-// view.panel.threads, which opens the thread's lineage in it, and
-// view.panel.worktree, which opens the thread's own worktree in it (all emitted as
-// UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
-//
-// The view.panel.* verbs take --thread and --focus (commands_view_thread.go): from
-// inside a thread they act on that thread's panel only, which t reads to check it.
-func RegisterView(r *Registry, e Emitter, t ThreadGetter) error {
-	show := func(name string) Result {
-		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
-		// No Message: the GUI toasts non-empty messages, and the view change is
-		// feedback enough. The CLI's --json still reports delivery.
-		return Result{JSON: EmitResult{Delivered: n}}
+// ViewDeps are RegisterView's dependencies.
+type ViewDeps struct {
+	Emitter Emitter
+	// Thread reads threads for the thread-scoped panel verbs (commands_view_thread.go).
+	// Nil: they check nothing.
+	Thread PanelThreads
+	// Viewed reports whether a window shows a thread now (PresenceDeps.Viewed): a page
+	// verb from the CLI in a thread no window shows refuses without --focus. Nil: page
+	// verbs never refuse.
+	Viewed func(threadID string) bool
+	// Files backs view.panel.file's check (FilesystemService.ReadFile).
+	Files FileReader
+	// Diffs backs view.panel.diff's check (ProjectService.GetWorktreeFileDiff).
+	Diffs FileDiffer
+	// Projects finds a thread's project's GitHub repository for view.panel.pr
+	// (ProjectService.List).
+	Projects ProjectLister
+	// PullRequests backs view.panel.pr's check (GhService.GetPullRequest).
+	PullRequests PullRequestChecksBackend
+}
+
+// pageFocusArg is the page verbs' --focus.
+var pageFocusArg = ArgSpec{Name: "focus", Type: Bool,
+	Description: "Show it even when no window shows the thread this runs in: every window moves there; only when the user asked to be taken there"}
+
+// showPage runs a page verb: ShowView name in every window. Every window moves to the
+// page, so a call from a thread's CLI (CallerThreadID set) is refused while no window
+// shows that thread, unless --focus says the user asked: a model must not take the
+// user's windows from what they are doing. The app's own palette and keys, and the CLI
+// outside a thread, are unchanged. With no window open there is nothing to take over:
+// it says so.
+func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
+	fromThread := uctx.ActiveView == "" && uctx.CallerThreadID != ""
+	if fromThread && !a.Bool("focus") && d.Viewed != nil && d.Emitter.Windows() > 0 && !d.Viewed(uctx.CallerThreadID) {
+		return Result{}, connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
 	}
-	panel := func(name string, place panelPlace) func(context.Context, Context, Args) (Result, error) {
-		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
-			return showPanel(ctx, t, e, uctx, a, name, place)
+	return EmitTo(d.Emitter, showViewIntent(name, "", nil)).CLIResult(uctx), nil
+}
+
+// RegisterView registers the View category's verbs, all emitted as UiIntent.ShowView:
+//
+//   - the pages, which move every window: view.dashboard, view.usage,
+//     view.pullrequests, view.projects, view.settings and view.help (showPage);
+//   - actions on each window's state: view.bottom.toggle, view.back, view.forward,
+//     thread.previous and thread.next;
+//   - the side panel verbs (commands_view_thread.go), which act on a thread's panel:
+//     view.panel.toggle, expand, new-tab and split, and the surfaces
+//     view.panel.workspace, linked-prs, usage, threads and worktree (view.panel.mcp and
+//     view.panel.agents live with their domains);
+//   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
+//     view.panel.pr.
+//
+// Links open through view.open.url (RegisterGitOps).
+func RegisterView(r *Registry, d ViewDeps) error {
+	if d.Files == nil {
+		d.Files = codefoundryv1connect.UnimplementedFilesystemServiceHandler{}
+	}
+	if d.Diffs == nil {
+		d.Diffs = codefoundryv1connect.UnimplementedProjectServiceHandler{}
+	}
+	if d.Projects == nil {
+		d.Projects = codefoundryv1connect.UnimplementedProjectServiceHandler{}
+	}
+	if d.PullRequests == nil {
+		d.PullRequests = codefoundryv1connect.UnimplementedGhServiceHandler{}
+	}
+	page := func(name string) func(context.Context, Context, Args) (Result, error) {
+		return func(_ context.Context, uctx Context, a Args) (Result, error) { return d.showPage(uctx, a, name) }
+	}
+	show := func(name string) func(context.Context, Context, Args) (Result, error) {
+		return func(_ context.Context, uctx Context, _ Args) (Result, error) {
+			return EmitTo(d.Emitter, showViewIntent(name, "", nil)).CLIResult(uctx), nil
 		}
 	}
-	return r.RegisterAll(
-		Command{
+	panel := func(name string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
+		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			return showPanel(ctx, d.Thread, d.Emitter, uctx, a, name, check)
+		}
+	}
+	// Checks run only with d.Thread set (showScoped), so lineage's lister is never nil.
+	lineage := withLineage(d.Thread)
+	pageArgs := []ArgSpec{pageFocusArg}
+	cmds := []Command{
+		{
 			Name:        "view.dashboard",
 			Title:       "Show Dashboard",
-			Description: "Show the dashboard.",
+			Description: "Show the dashboard in every app window.",
 			Category:    "View",
 			// No default chord; bindable in settings.
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewDashboard), nil
-			},
+			Args: pageArgs,
+			Run:  page(ViewDashboard),
 		},
-		Command{
+		{
 			Name:        "view.usage",
 			Title:       "Usage",
-			Description: "Show the Usage page: token usage and its cost per day and per model over every thread.",
+			Description: "Show the Usage page in every app window: token usage and its cost per day and per model over every thread.",
 			Category:    "View",
 			// No default chord; bindable in settings. The CLI's report is usage.show.
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewUsage), nil
-			},
+			Args: pageArgs,
+			Run:  page(ViewUsage),
 		},
-		Command{
+		{
 			Name:        "view.pullrequests",
 			Title:       "Show Pull Requests",
-			Description: "Show the Pull Requests page: your open pull requests, reviews requested from you, and recent merges across registered projects.",
+			Description: "Show the Pull Requests page in every app window: your open pull requests, reviews requested from you, and recent merges across registered projects.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+d"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPullRequests), nil
-			},
+			Args:        pageArgs,
+			Run:         page(ViewPullRequests),
 		},
-		Command{
+		{
 			Name:        "view.projects",
 			Title:       "Show Projects",
-			Description: "Show the Projects page: each project's worktrees and each workspace's members, with their git state and actions.",
+			Description: "Show the Projects page in every app window: each project's worktrees and each workspace's members, with their git state and actions.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+j"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewProjects), nil
-			},
+			Args:        pageArgs,
+			Run:         page(ViewProjects),
 		},
-		Command{
+		{
+			Name:        "view.settings",
+			Title:       "Settings",
+			Description: "Show the settings page in every app window.",
+			Category:    "View",
+			// The GUI presents cmd+, locally (keys/bindings.ts): there it toggles, in that
+			// window only.
+			Keybindings: []string{"cmd+,"},
+			Args:        pageArgs,
+			Run:         page(ViewSettings),
+		},
+		{
+			Name:        "view.help",
+			Title:       "Keyboard Shortcuts and Help",
+			Description: "Show keybindings and how the app works in every app window.",
+			Category:    "View",
+			Keybindings: []string{"cmd+/"},
+			Args:        pageArgs,
+			Run:         page(ViewHelp),
+		},
+		{
 			Name:        "view.panel.toggle",
 			Title:       "Toggle Side Panel",
-			Description: "Show or hide the side panel next to the selected thread or page.",
+			Description: "Show or hide a side panel (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+e"},
 			Args:        panelThreadArgs(),
 			Run:         panel(ViewPanelToggle, nil),
 		},
-		Command{
+		{
 			Name:        "view.bottom.toggle",
 			Title:       "Toggle Bottom Panel",
 			Description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.",
 			Category:    "View",
 			Keybindings: []string{"cmd+j"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewBottomToggle), nil
-			},
+			Run:         show(ViewBottomToggle),
 		},
-		Command{
+		{
 			Name:        "view.panel.expand",
 			Title:       "Expand Side Panel",
-			Description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.",
+			Description: "Toggle a side panel between its split width and the full width of the content area (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
 			// No default chord (the user's choice); bindable in settings.
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelExpand, nil),
 		},
-		Command{
+		{
 			Name:        "view.panel.new-tab",
 			Title:       "New Side Panel Tab",
-			Description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.",
+			Description: "Show the surface list in a side panel, to open another tab there (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
 			// No default chord, like view.panel.expand: the + after the panel's tabs runs
 			// it, and while the panel has focus each surface's letter opens that surface.
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelNewTab, nil),
 		},
-		Command{
+		{
 			Name:        "view.panel.split",
 			Title:       "Split Side Panel",
-			Description: "Split or unsplit the side panel of the selected thread or page into two tab groups.",
+			Description: "Split or unsplit a side panel into two tab groups (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
 			Keybindings: []string{`cmd+\`},
 			Args:        panelThreadArgs(),
 			Run:         panel(ViewPanelSplit, nil),
 		},
-		Command{
+		{
 			Name:        "view.back",
 			Title:       "Back",
 			Description: "Return to the previously selected thread or page.",
 			Category:    "View",
 			Keybindings: []string{"cmd+["},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewBack), nil
-			},
+			Run:         show(ViewBack),
 		},
-		Command{
+		{
 			Name:        "view.forward",
 			Title:       "Forward",
 			Description: "Go to the thread or page selected before going back.",
 			Category:    "View",
 			Keybindings: []string{"cmd+]"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewForward), nil
-			},
+			Run:         show(ViewForward),
 		},
-		Command{
+		{
 			Name:        "thread.previous",
 			Title:       "Previous Thread",
 			Description: "Select the thread above the current one in the sidebar.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+["},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewThreadPrevious), nil
-			},
+			Run:         show(ViewThreadPrevious),
 		},
-		Command{
+		{
 			Name:        "thread.next",
 			Title:       "Next Thread",
 			Description: "Select the thread below the current one in the sidebar.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+]"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewThreadNext), nil
-			},
+			Run:         show(ViewThreadNext),
 		},
-		Command{
+		{
 			Name:  "view.panel.workspace",
 			Title: "Show Workspace in Side Panel",
-			Description: "Open the workspace surface in the selected workspace thread's side panel: " +
+			Description: "Open the workspace surface in a workspace thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
 			Category: "View",
 			// No default chord, like view.panel.expand (W opens it while the panel has focus).
@@ -289,23 +350,23 @@ func RegisterView(r *Registry, e Emitter, t ThreadGetter) error {
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelWorkspace, inWorkspace),
 		},
-		Command{
+		{
 			Name:  "view.panel.linked-prs",
 			Title: "Show Linked PRs in Side Panel",
-			Description: "Open the Linked PRs surface in the selected thread's side panel: " +
+			Description: "Open the Linked PRs surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the pull requests the thread created or touched, newest first, with state, checks and branch.",
 			Category: "View",
 			// No default chord, like view.panel.workspace (L opens it while the panel has
 			// focus). Available for any thread, even one without links, so the palette
-			// finds it and the GUI can say there are none yet.
+			// finds it and the GUI can say there are none yet; a scoped call refuses one.
 			When: hasThread,
 			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelLinkedPRs, nil),
+			Run:  panel(ViewPanelLinkedPRs, withLinkedPRs),
 		},
-		Command{
+		{
 			Name:  "view.panel.usage",
 			Title: "Show Usage in Side Panel",
-			Description: "Open the Usage surface in the selected thread's side panel: " +
+			Description: "Open the Usage surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"its cost at Claude API rates, tokens and requests, per model and per token kind.",
 			Category: "View",
 			// No default chord, like view.panel.linked-prs (U opens it while the panel has
@@ -314,22 +375,23 @@ func RegisterView(r *Registry, e Emitter, t ThreadGetter) error {
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelUsage, nil),
 		},
-		Command{
+		{
 			Name:  "view.panel.threads",
 			Title: "Show Related Threads in Side Panel",
-			Description: "Open the Threads surface in the selected thread's side panel: " +
+			Description: "Open the Threads surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
 			Category: "View",
 			// No default chord, like view.panel.usage (H opens it while the panel has focus).
-			// Available for any thread, even one no agent created and that created none.
+			// Available for any thread, like view.panel.linked-prs; a scoped call refuses
+			// one no thread created and that created none.
 			When: hasThread,
 			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelThreads, nil),
+			Run:  panel(ViewPanelThreads, lineage),
 		},
-		Command{
+		{
 			Name:  "view.panel.worktree",
 			Title: "Show Worktree in Side Panel",
-			Description: "Open the Worktree surface in the selected thread's side panel: " +
+			Description: "Open the Worktree surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
 			Category: "View",
 			// No default chord, like view.panel.workspace (T opens it while the panel has focus).
@@ -337,5 +399,6 @@ func RegisterView(r *Registry, e Emitter, t ThreadGetter) error {
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelWorktree, inWorktree),
 		},
-	)
+	}
+	return r.RegisterAll(append(cmds, d.itemCommands()...)...)
 }

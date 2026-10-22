@@ -581,7 +581,12 @@ type UiIntent_ShowView struct {
 	// verbs from inside a thread ($CODE_FOUNDRY_THREAD) or with --thread
 	// (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
 	// thread_id whose name is not a panel action.
-	ThreadId      string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// What a panel action that opens one item shows: "panel.file" takes path (absolute)
+	// and line, "panel.diff" project, worktree, path and scope ("working" | "branch"),
+	// "panel.pr" slug and number (view.panel.file, view.panel.diff, view.panel.pr;
+	// docs/notes/control-5-fixes.md). Empty for every other name.
+	Params        map[string]string `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -630,9 +635,20 @@ func (x *UiIntent_ShowView) GetThreadId() string {
 	return ""
 }
 
+func (x *UiIntent_ShowView) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
 type UiIntent_FocusThread struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The user asked for it (a view.panel.* verb's --focus): the window selects the
+	// thread even when it is a hidden child created moments ago, which a FocusThread
+	// otherwise leaves alone so an agent creating threads does not take the user's view.
+	Explicit      bool `protobuf:"varint,2,opt,name=explicit,proto3" json:"explicit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -672,6 +688,13 @@ func (x *UiIntent_FocusThread) GetThreadId() string {
 		return x.ThreadId
 	}
 	return ""
+}
+
+func (x *UiIntent_FocusThread) GetExplicit() bool {
+	if x != nil {
+		return x.Explicit
+	}
+	return false
 }
 
 type UiIntent_FocusTerminal struct {
@@ -880,7 +903,7 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xf5\v\n" +
+	"\x13WatchIntentsRequest\"\x94\r\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -903,12 +926,17 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x1a(\n" +
 	"\x0ePlayAlertSound\x12\x16\n" +
-	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a;\n" +
+	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a\xbd\x01\n" +
 	"\bShowView\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x1a*\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12E\n" +
+	"\x06params\x18\x03 \x03(\v2-.codefoundry.v1.UiIntent.ShowView.ParamsEntryR\x06params\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aF\n" +
 	"\vFocusThread\x12\x1b\n" +
-	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x1a0\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x1a\n" +
+	"\bexplicit\x18\x02 \x01(\bR\bexplicit\x1a0\n" +
 	"\rFocusTerminal\x12\x1f\n" +
 	"\vterminal_id\x18\x01 \x01(\tR\n" +
 	"terminalId\x1aR\n" +
@@ -951,7 +979,7 @@ func file_codefoundry_v1_ui_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_ui_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(UiIntent_Notify_Level)(0),      // 0: codefoundry.v1.UiIntent.Notify.Level
 	(*WatchIntentsRequest)(nil),     // 1: codefoundry.v1.WatchIntentsRequest
@@ -968,7 +996,8 @@ var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(*UiIntent_OpenPalette)(nil),    // 12: codefoundry.v1.UiIntent.OpenPalette
 	(*UiIntent_Notify)(nil),         // 13: codefoundry.v1.UiIntent.Notify
 	nil,                             // 14: codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
-	(*UiContext)(nil),               // 15: codefoundry.v1.UiContext
+	nil,                             // 15: codefoundry.v1.UiIntent.ShowView.ParamsEntry
+	(*UiContext)(nil),               // 16: codefoundry.v1.UiContext
 }
 var file_codefoundry_v1_ui_proto_depIdxs = []int32{
 	10, // 0: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
@@ -982,17 +1011,18 @@ var file_codefoundry_v1_ui_proto_depIdxs = []int32{
 	5,  // 8: codefoundry.v1.UiIntent.invoke_command:type_name -> codefoundry.v1.UiIntent.InvokeCommand
 	2,  // 9: codefoundry.v1.EmitIntentRequest.intent:type_name -> codefoundry.v1.UiIntent
 	14, // 10: codefoundry.v1.UiIntent.InvokeCommand.args:type_name -> codefoundry.v1.UiIntent.InvokeCommand.ArgsEntry
-	15, // 11: codefoundry.v1.UiIntent.InvokeCommand.context:type_name -> codefoundry.v1.UiContext
-	0,  // 12: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
-	1,  // 13: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
-	3,  // 14: codefoundry.v1.UiService.Emit:input_type -> codefoundry.v1.EmitIntentRequest
-	2,  // 15: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
-	4,  // 16: codefoundry.v1.UiService.Emit:output_type -> codefoundry.v1.EmitIntentResponse
-	15, // [15:17] is the sub-list for method output_type
-	13, // [13:15] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	16, // 11: codefoundry.v1.UiIntent.InvokeCommand.context:type_name -> codefoundry.v1.UiContext
+	15, // 12: codefoundry.v1.UiIntent.ShowView.params:type_name -> codefoundry.v1.UiIntent.ShowView.ParamsEntry
+	0,  // 13: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
+	1,  // 14: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
+	3,  // 15: codefoundry.v1.UiService.Emit:input_type -> codefoundry.v1.EmitIntentRequest
+	2,  // 16: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
+	4,  // 17: codefoundry.v1.UiService.Emit:output_type -> codefoundry.v1.EmitIntentResponse
+	16, // [16:18] is the sub-list for method output_type
+	14, // [14:16] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ui_proto_init() }
@@ -1018,7 +1048,7 @@ func file_codefoundry_v1_ui_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_ui_proto_rawDesc), len(file_codefoundry_v1_ui_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

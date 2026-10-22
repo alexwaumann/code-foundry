@@ -143,8 +143,7 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 					return command.Result{}, errors.New("no GUI to show it in")
 				}
 				view := ShowViewName(name, spec.ID, spec.Scope, uctx)
-				n := m.opts.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: view}}})
-				return command.Result{JSON: command.EmitResult{Delivered: n}}, nil
+				return command.EmitTo(m.opts.Emitter, &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: view}}}).CLIResult(uctx), nil
 			},
 		})
 	}

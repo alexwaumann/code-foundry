@@ -140,6 +140,60 @@ describe("a ShowView scoped to a thread", () => {
     });
   });
 
+  describe("the item actions (view.panel.file, diff, pr)", () => {
+    const showItem = (name: string, params: Record<string, string>) => {
+      applyIntent({ kind: "showView", name, threadId: "b", params });
+    };
+    const active = (key: string) => {
+      const g = getPanel(key).groups[0];
+      return g?.tabs.find((t) => t.id === g.activeTabId);
+    };
+    const untouched = () => {
+      expect(useUiStore.getState().selection).toEqual(inA);
+      expect(useUiStore.getState().panelFocusSeq).toBe(0);
+      expect(getPanel("thread:a")).toEqual(getPanel("thread:never"));
+    };
+
+    it("panel.file opens the file's tab at its line in the thread's panel", () => {
+      showItem("panel.file", { path: `${WEB_FEAT}/src/main.go`, line: "12", project: "web", base: WEB_FEAT });
+      expect(getPanel("thread:b").open).toBe(true);
+      expect(active("thread:b")).toMatchObject({ kind: "files", title: "main.go", params: { path: `${WEB_FEAT}/src/main.go`, line: "12", project: "web", base: WEB_FEAT } });
+      untouched();
+    });
+
+    it("panel.file again moves the open tab to the new line", () => {
+      showItem("panel.file", { path: `${WEB_FEAT}/a.html`, project: "web", base: WEB_FEAT });
+      showItem("panel.file", { path: `${WEB_FEAT}/a.html`, line: "3", project: "web", base: WEB_FEAT });
+      expect(tabIds("thread:b")).toHaveLength(1);
+      expect(active("thread:b")?.params.line).toBe("3");
+    });
+
+    it.each([
+      ["working", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "working" }],
+      ["branch", { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope: "branch" }],
+    ])("panel.diff opens the file's Diff tab (%s)", (scope, params) => {
+      showItem("panel.diff", params);
+      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "main.go", params: { project: "web", worktree: WEB_FEAT, path: "src/main.go", scope } });
+      untouched();
+    });
+
+    it("panel.pr opens the pull request's tab", () => {
+      showItem("panel.pr", { slug: "owner/web", number: "42" });
+      expect(active("thread:b")).toMatchObject({ kind: "pullrequest", title: "#42", params: { slug: "owner/web", number: "42" } });
+      untouched();
+    });
+
+    it.each([
+      ["panel.file", {}],
+      ["panel.diff", { project: "web", path: "a.go" }],
+      ["panel.pr", { slug: "nope", number: "42" }],
+      ["panel.pr", { slug: "owner/web", number: "0" }],
+    ])("%s with params that name nothing changes nothing", (name, params) => {
+      expect(showThreadView(name, "b", params)).toBe(false);
+      expect(usePanelStore.getState().byKey).toEqual({});
+    });
+  });
+
   it("without a thread id it acts on the selection as before, and takes focus", () => {
     show("panel.usage");
     expect(tabIds("thread:a")).toEqual(["usage"]);

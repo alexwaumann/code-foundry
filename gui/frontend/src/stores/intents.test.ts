@@ -165,6 +165,17 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     expect(useUiStore.getState().promptFocusSeq).toBe(switches ? 1 : 0);
   });
 
+  it("an explicit one (--focus: the user asked) selects even a new hidden child, when it arrives too", () => {
+    useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", { createdBy: "s1" }) }, order: ["s1", "n"] });
+    applyIntent({ kind: "focusThread", threadId: "n", explicit: true });
+    expect(selected()).toEqual({ kind: "thread", id: "n" });
+
+    applyIntent({ kind: "focusThread", threadId: "late", explicit: true });
+    expect(selected()).toEqual({ kind: "thread", id: "n" });
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, late: made("late", { createdBy: "s1" }) }, order: [...s.order, "late"] }));
+    expect(selected()).toEqual({ kind: "thread", id: "late" });
+  });
+
   it.each<[string, Partial<ThreadView>, boolean]>([
     ["a shown thread", {}, true],
     ["a hidden child", { createdBy: "s1" }, false],

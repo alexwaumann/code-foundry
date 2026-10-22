@@ -101,11 +101,12 @@ export const reviewerCandidatesResource = createResource(
 );
 
 /**
- * Opens a pull request in the current selection's side panel (a row on the Pull
- * Requests page or the worktree overview). Returns false with nothing selected.
+ * Opens a pull request in a side panel: the current selection's (a row on the Pull
+ * Requests page or the worktree overview), or a thread's (view.panel.pr,
+ * stores/threadPanelIntent.ts). Returns false with nothing selected.
  */
-export function openPullRequestInPanel(ref: PrRef): boolean {
-  return openSurface("current", pullRequestTab(ref));
+export function openPullRequestInPanel(ref: PrRef, target: PanelTarget = "current"): boolean {
+  return openSurface(target, pullRequestTab(ref));
 }
 
 export const prArgs = (ref: PrRef): Record<string, string> => ({ "repo-slug": ref.slug, number: String(ref.number) });

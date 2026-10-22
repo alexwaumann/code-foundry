@@ -17,21 +17,38 @@ type IntentEvent struct {
 	Intent *v1.UiIntent
 }
 
-// Emitter sends UI intents to connected GUIs and reports how many received them.
+// Emitter sends UI intents to connected GUIs.
 type Emitter interface {
-	Emit(intent *v1.UiIntent) (delivered int)
+	// Emit sends intent and reports how many bus subscriptions received it. That is not
+	// a window count: the events hub's one subscription serves every EventService.Watch
+	// stream, an app window's and a CLI events stream's alike, and plugins subscribe
+	// too.
+	Emit(intent *v1.UiIntent) (receivers int)
+	// Windows is the number of app windows connected now (api.Clients.Windows): the ones
+	// an intent can show something in.
+	Windows() int
 }
 
 // BusEmitter publishes intents as IntentEvent on a bus. UiService.Emit and the ui.*
 // commands share it, so both count the same watchers.
 type BusEmitter struct {
 	Bus *bus.Bus
+	// CountWindows counts the app windows connected (api.Clients.Windows). Nil: none.
+	CountWindows func() int
 }
 
 // Emit publishes intent without blocking. Watchers with full buffers miss it and are
 // not counted.
 func (e BusEmitter) Emit(intent *v1.UiIntent) int {
 	return bus.Publish(e.Bus, IntentEvent{Intent: intent})
+}
+
+// Windows is CountWindows, 0 without it.
+func (e BusEmitter) Windows() int {
+	if e.CountWindows == nil {
+		return 0
+	}
+	return e.CountWindows()
 }
 
 // EncodeJSON encodes r.JSON for InvokeCommandResponse.result_json: protojson for proto

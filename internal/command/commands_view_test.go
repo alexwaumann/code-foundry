@@ -16,6 +16,8 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.usage", view: command.ViewUsage},
 		{command: "view.pullrequests", view: command.ViewPullRequests},
 		{command: "view.projects", view: command.ViewProjects},
+		{command: "view.settings", view: command.ViewSettings},
+		{command: "view.help", view: command.ViewHelp},
 		{command: "view.panel.toggle", view: command.ViewPanelToggle},
 		{command: "view.bottom.toggle", view: command.ViewBottomToggle},
 		{command: "view.panel.expand", view: command.ViewPanelExpand},
@@ -34,8 +36,8 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
 			reg := command.NewRegistry()
-			emit := &commandtest.Emitter{Delivered: 1}
-			if err := command.RegisterView(reg, emit, &commandtest.Thread{}); err != nil {
+			emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
+			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Thread: &commandtest.Thread{}}); err != nil {
 				t.Fatal(err)
 			}
 			// A workspace thread in a worktree, so view.panel.workspace and view.panel.worktree are available too.
@@ -44,7 +46,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res.Message != "" || res.JSON != (command.EmitResult{Delivered: 1}) {
+			if res.Message != "" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
 				t.Errorf("result = %+v, want no message and delivered 1", res)
 			}
 			got := emit.Intents()
@@ -72,7 +74,7 @@ func TestViewPanelWorkspaceAvailability(t *testing.T) {
 		{name: "CLI in a thread ($CODE_FOUNDRY_THREAD)", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
+	if err := command.RegisterView(reg, command.ViewDeps{Emitter: &commandtest.Emitter{Delivered: 1, OpenWindows: 1}, Thread: &commandtest.Thread{}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range tests {
@@ -107,7 +109,7 @@ func TestViewPanelThreadSurfacesAvailability(t *testing.T) {
 		{name: "CLI with --context-thread", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
+	if err := command.RegisterView(reg, command.ViewDeps{Emitter: &commandtest.Emitter{Delivered: 1, OpenWindows: 1}, Thread: &commandtest.Thread{}}); err != nil {
 		t.Fatal(err)
 	}
 	// All are available for any thread (the GUI says when there is nothing to show).
@@ -149,7 +151,7 @@ func TestViewPanelWorktreeAvailability(t *testing.T) {
 		{name: "CLI in a thread ($CODE_FOUNDRY_THREAD)", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
+	if err := command.RegisterView(reg, command.ViewDeps{Emitter: &commandtest.Emitter{Delivered: 1, OpenWindows: 1}, Thread: &commandtest.Thread{}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range tests {

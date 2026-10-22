@@ -756,8 +756,10 @@ func (s gitopsSource) snapshot(context.Context) []*v1.Event {
 
 // uiSource carries intents. They are fire-and-forget: there is no state to snapshot,
 // and intents dropped for a slow client are lost (as with UiService.WatchIntents). The
-// topic is transient: Emit's delivery count still counts connected windows, and a
-// resumed stream never replays an old intent.
+// topic is transient: a resumed stream never replays an old intent. Every Watch stream
+// that asks for the ui source, an app window's or a CLI events stream's, shares the
+// hub's one bus subscription, so an Emitter's receiver count says nothing about
+// windows; Clients.Windows counts those (command.EmitResult).
 type uiSource struct {
 	bus *bus.Bus
 }

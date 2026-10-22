@@ -57,8 +57,12 @@ func RegisterNotifications(r *Registry, b SettingsBackend, e Emitter) error {
 			if err != nil {
 				return Result{}, err
 			}
-			n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_PlayAlertSound_{PlayAlertSound: &v1.UiIntent_PlayAlertSound{Volume: int32(v)}}})
-			return Result{Message: fmt.Sprintf("alert sound at %d%%: delivered=%d", v, n), JSON: EmitResult{Delivered: n}}, nil
+			res := EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_PlayAlertSound_{PlayAlertSound: &v1.UiIntent_PlayAlertSound{Volume: int32(v)}}})
+			if res.Windows == 0 {
+				// The sound plays in a window: none open, none played.
+				return Result{Message: "no app window is open: no sound was played", JSON: res}, nil
+			}
+			return Result{Message: fmt.Sprintf("alert sound at %d%%: %s", v, res.Message()), JSON: res}, nil
 		},
 	})
 }

@@ -96,7 +96,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		Command{
 			Name:  "view.panel.mcp",
 			Title: "Show MCP Servers",
-			Description: "Open the MCP surface in the selected thread's side panel: " +
+			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"its MCP servers with status, errors and tools, and Reconnect.",
 			Category: "View",
 			// No default chord, like view.panel.usage (M opens it while the panel has

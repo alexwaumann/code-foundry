@@ -17,6 +17,8 @@ var SourceRepo = "https://" + Module
 var (
 	// tagPattern is a release tag: vX.Y.Z (stable) or vX.Y.Z-tip.N (tip).
 	tagPattern = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-tip\.(0|[1-9][0-9]*))?$`)
+	// tipPattern is a tip release tag, vX.Y.Z-tip.N.
+	tipPattern = regexp.MustCompile(`-tip\.(0|[1-9][0-9]*)$`)
 	// shaPattern is a commit as git prints it, abbreviated or whole.
 	shaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 )
@@ -25,8 +27,12 @@ var (
 type Source struct {
 	// Repo is SourceRepo.
 	Repo string
-	// Ref is the release tag when the version is one (vX.Y.Z or vX.Y.Z-tip.N), else the
-	// commit without "-dirty", else "" (a build with neither).
+	// Ref is the release tag when the version is a stable one (vX.Y.Z), else the commit
+	// without "-dirty", else a tip's tag (vX.Y.Z-tip.N) when its commit is unknown, else
+	// "" (a build with neither). A tip's tag is not the ref when the commit is known: the
+	// release workflow keeps only the five newest tip releases and deletes the older
+	// tags, so a link to one stops working within a day or so; the commit stays on main.
+	// The version (the tag) still names the build in Provenance.
 	Ref string
 	// URL is the tree at Ref (Repo/tree/<Ref>), or Repo when Ref is empty.
 	URL string
@@ -36,11 +42,14 @@ type Source struct {
 func (i Info) Source() Source {
 	s := Source{Repo: SourceRepo, URL: SourceRepo}
 	commit, _ := strings.CutSuffix(i.Commit, "-dirty")
+	tip := tipPattern.MatchString(i.Version)
 	switch {
-	case tagPattern.MatchString(i.Version):
+	case tagPattern.MatchString(i.Version) && !tip:
 		s.Ref = i.Version
 	case shaPattern.MatchString(commit):
 		s.Ref = commit
+	case tagPattern.MatchString(i.Version):
+		s.Ref = i.Version
 	}
 	if s.Ref != "" {
 		s.URL = SourceRepo + "/tree/" + s.Ref

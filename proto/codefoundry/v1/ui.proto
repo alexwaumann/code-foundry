@@ -68,10 +68,19 @@ message UiIntent {
     // (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
     // thread_id whose name is not a panel action.
     string thread_id = 2;
+    // What a panel action that opens one item shows: "panel.file" takes path (absolute)
+    // and line, "panel.diff" project, worktree, path and scope ("working" | "branch"),
+    // "panel.pr" slug and number (view.panel.file, view.panel.diff, view.panel.pr;
+    // docs/notes/control-5-fixes.md). Empty for every other name.
+    map<string, string> params = 3;
   }
 
   message FocusThread {
     string thread_id = 1;
+    // The user asked for it (a view.panel.* verb's --focus): the window selects the
+    // thread even when it is a hidden child created moments ago, which a FocusThread
+    // otherwise leaves alone so an agent creating threads does not take the user's view.
+    bool explicit = 2;
   }
 
   message FocusTerminal {

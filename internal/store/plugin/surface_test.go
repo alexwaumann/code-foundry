@@ -239,7 +239,7 @@ func newSurfEnv(t *testing.T, mod func(*plugin.Options)) *surfEnv {
 		"s-1": {ID: "s-1", ProjectID: "p-1", PullRequests: []plugin.PullRequestRef{{Slug: "o/r", Number: 1, URL: "https://github.com/o/r/pull/1"}}},
 		"s-2": {ID: "s-2", ProjectID: "p-1"},
 	}}
-	emit := &commandtest.Emitter{Delivered: 1}
+	emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
 	e := newEnv(t, func(o *plugin.Options) {
 		o.Facts, o.Emitter = facts, emit
 		o.SurfaceGrace, o.FirstViewTimeout, o.CoalesceInterval = 300*time.Millisecond, 500*time.Millisecond, 20*time.Millisecond
