@@ -51,6 +51,8 @@ export interface SettingSectionView {
   /** "" for a page's single unnamed section. */
   title: string;
   description: string;
+  /** More words the settings search finds a GUI-drawn page's section by (guiPages.ts). */
+  keywords?: readonly string[];
 }
 
 /** A page (tab) of the settings page; display only, independent of the file's groups. */

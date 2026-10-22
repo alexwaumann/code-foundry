@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import { confirmationOf, invokeCommand, listCommands, type CommandView, type InvokeResultView, type UiContextView } from "@/api/command";
+import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type CommandView, type InvokeResultView, type UiContextView } from "@/api/command";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
@@ -112,7 +112,8 @@ export async function invokeConfirmed(
       if (confirm.args && confirm.command !== name) throw err;
       const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
       const ask = (confirm.args ? undefined : confirmPresenter(name)) ?? requestConfirm;
-      const yes = await ask({ title, message: confirm.message, confirmLabel: title, command: name, args: callArgs, ...(caller ? { caller } : {}) });
+      const confirmLabel = confirmButtonLabel(title, confirm.confirmLabel);
+      const yes = await ask({ title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) });
       if (!yes) return confirm.declined ?? null;
       confirmed = true;
       if (confirm.args) callArgs = { ...callArgs, ...confirm.args };

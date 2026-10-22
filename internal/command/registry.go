@@ -184,7 +184,7 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 				msg = m
 			}
 		}
-		ce := &ConfirmError{Command: name, Title: c.Title, Message: msg}
+		ce := &ConfirmError{Command: name, Title: c.Title, Message: msg, Label: c.ConfirmLabel}
 		if c.BindConfirm != "" {
 			ce.Bind = map[string]string{c.BindConfirm: ConfirmDigest(msg)}
 		}

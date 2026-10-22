@@ -41,7 +41,14 @@ export const guiPages: readonly GuiPage[] = [
       id: "memory",
       title: "Memory",
       description: "What threads have been told to remember about this app and how they work in it.",
-      sections: [{ id: "remembered", title: "Remembered", description: "Every thread in every project reads these before its first action." }],
+      sections: [
+        {
+          id: "remembered",
+          title: "Remembered",
+          description: "Every thread in every project reads these before its first action.",
+          keywords: ["forget", "preferences", "standing", "remember"],
+        },
+      ],
     },
     icon: BrainCircuit,
     component: MemoryPage,

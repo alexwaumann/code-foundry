@@ -5,7 +5,7 @@ import { ConfirmationRequiredSchema } from "@/gen/codefoundry/v1/command_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
 import { SettingFieldSchema, SettingType } from "@/gen/codefoundry/v1/settings_pb";
 import { UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
-import { confirmationOf } from "./command";
+import { confirmationOf, confirmButtonLabel } from "./command";
 import { toEventView } from "./events";
 import { toSettingFieldView } from "./settings";
 import { toUiIntentView } from "./ui";
@@ -52,5 +52,23 @@ describe("confirmationOf", () => {
     expect(confirmationOf(err)).toEqual({ command: "thread.remove", title: "Remove Thread", message: "Remove thread s1?" });
     expect(confirmationOf(new ConnectError("nope", Code.FailedPrecondition))).toBeNull();
     expect(confirmationOf(new Error("x"))).toBeNull();
+  });
+
+  it("reads the command's button words", () => {
+    const err = new ConnectError("Forget every remembered preference?", Code.FailedPrecondition, undefined, [
+      { desc: ConfirmationRequiredSchema, value: { command: "memory.clear", title: "Memory: Forget All Preferences", message: "Forget?", confirmLabel: "Forget all" } },
+    ]);
+    expect(confirmationOf(err)?.confirmLabel).toBe("Forget all");
+  });
+});
+
+describe("confirmButtonLabel", () => {
+  it.each([
+    ["the command's own words", "Memory: Forget All Preferences", "Forget all", "Forget all"],
+    ["the title without its category", "Ember: Cancel Task", undefined, "Cancel Task"],
+    ["a title without a category", "Remove Worktree", undefined, "Remove Worktree"],
+    ["a title ending in the separator", "Odd: ", undefined, "Odd: "],
+  ])("%s", (_name, title, label, want) => {
+    expect(confirmButtonLabel(title, label)).toBe(want);
   });
 });

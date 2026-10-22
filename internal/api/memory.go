@@ -119,10 +119,10 @@ func memorySnapshotToProto(snap *memory.Snapshot, dir string) *v1.MemorySnapshot
 		MaxEntries: memory.MaxEntries, MaxBytes: memory.MaxBytes, MaxEntryChars: memory.MaxEntryChars,
 		Dir: dir, Error: snap.Err, Version: snap.Version,
 	}
-	for i, e := range snap.Entries {
+	for _, e := range snap.Entries {
 		m := &v1.MemoryEntry{
-			Index: int32(e.Index), Text: e.Text, File: e.File,
-			ThreadId: e.ThreadID, ThreadName: e.ThreadName, Injected: i < snap.Injected,
+			Index: int32(e.Index), Id: e.ID(), Text: e.Text, File: e.File,
+			ThreadId: e.ThreadID, ThreadName: e.ThreadName, Injected: e.Injected, LeftOut: e.LeftOut,
 		}
 		if !e.Created.IsZero() {
 			m.Created = timestamppb.New(e.Created)

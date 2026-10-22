@@ -33,15 +33,22 @@ message MemoryEntry {
   // (their terminal, the GUI) or it is unknown. The thread may be gone.
   string thread_id = 5;
   string thread_name = 6;
-  // Whether threads get it: false past the caps, in a directory edited by hand.
+  // Whether threads get it: false past the caps or longer than max_entry_chars (an
+  // import or a directory edited by hand); left_out says which.
   bool injected = 7;
+  // Its stable id: the file name without ".md". `memory remove --id` takes it, and
+  // refuses (NotFound) once the file is gone, whatever the list looks like then.
+  string id = 8;
+  // Why threads do not get it: "too_long" (past max_entry_chars), "entries" (past
+  // max_entries) or "bytes" (past max_bytes); empty when they do.
+  string left_out = 9;
 }
 
 // MemorySnapshot is the whole memory.
 message MemorySnapshot {
   // In order; also past the caps (a directory edited by hand), with injected false.
   repeated MemoryEntry entries = 1;
-  // How many entries threads get (the first ones) and their size rendered as the
+  // How many entries threads get (those with injected) and their size rendered as the
   // prompt lists them, which max_bytes caps.
   int32 injected = 2;
   int32 injected_bytes = 3;

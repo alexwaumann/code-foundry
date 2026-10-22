@@ -198,4 +198,17 @@ describe("searchGuiPages", () => {
   it("finds nothing without words", () => {
     expect(searchGuiPages([skills], new Set(), [])).toEqual({ hits: [], counts: {} });
   });
+
+  it("finds a section by its keywords", () => {
+    const memory: SettingPageView = {
+      id: "memory",
+      title: "Memory",
+      description: "",
+      sections: [{ id: "remembered", title: "Remembered", description: "Every thread reads these.", keywords: ["forget", "preferences", "standing"] }],
+    };
+    for (const w of ["forget", "preferences", "standing"]) {
+      expect(searchGuiPages([memory], new Set(), [w]).hits.map((h) => h.section.id)).toEqual(["remembered"]);
+    }
+    expect(searchGuiPages([memory, skills], new Set(), ["forget"]).counts).toEqual({ memory: 1, skills: 0 });
+  });
 });

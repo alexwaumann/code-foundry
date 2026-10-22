@@ -26,6 +26,9 @@ type ConfirmError struct {
 	Command string
 	Title   string
 	Message string
+	// Label is the confirm button's words when the command names them
+	// (Command.ConfirmLabel); empty, clients derive them from Title.
+	Label string
 	// Args are merged over the caller's args on the re-invoke (second stage only).
 	Args map[string]string
 	// Declined is what the command already did and answers when the user declines a

@@ -59,7 +59,8 @@ func TestMemoryGet(t *testing.T) {
 	}
 	e := m.GetEntries()[0]
 	if e.GetIndex() != 1 || e.GetText() != "Always open PRs as drafts" || e.GetFile() != "always-open-prs-as-drafts.md" ||
-		!e.GetCreated().AsTime().Equal(memoryT0) || e.GetThreadId() != "s-1" || e.GetThreadName() != "Fix login" || !e.GetInjected() {
+		!e.GetCreated().AsTime().Equal(memoryT0) || e.GetThreadId() != "s-1" || e.GetThreadName() != "Fix login" || !e.GetInjected() ||
+		e.GetId() != "always-open-prs-as-drafts" || e.GetLeftOut() != "" {
 		t.Errorf("entry = %v", e)
 	}
 	// Get reads the directory now: a file added by hand is there, with no provenance.

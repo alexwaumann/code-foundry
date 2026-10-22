@@ -15,7 +15,8 @@
 // (Injected). The single memory.md before the directory is imported once (Import).
 //
 // Every read and write leaves a Snapshot; one that differs from the last is published
-// on the bus as an Event, so a hand edit shows up with the next read (a spawn, a show).
+// on the bus as an Event. Watch reads again on every change to the directory, so a hand
+// edit is published within a moment (watch.go).
 package memory
 
 import (
@@ -70,6 +71,29 @@ type Entry struct {
 	// when the user did (their terminal, the GUI) or it is unknown.
 	ThreadID   string `json:"-"`
 	ThreadName string `json:"-"`
+	// Injected: threads get it. LeftOut says why not when they do not: it is longer
+	// than MaxEntryChars, or past MaxEntries or MaxBytes (LeftOut* constants). Only a
+	// directory edited by hand or an import holds such an entry.
+	Injected bool   `json:"-"`
+	LeftOut  string `json:"-"`
+}
+
+// Why an entry is not injected (Entry.LeftOut).
+const (
+	LeftOutTooLong = "too_long" // longer than MaxEntryChars
+	LeftOutEntries = "entries"  // past MaxEntries
+	LeftOutBytes   = "bytes"    // past MaxBytes
+)
+
+// ID is the entry's stable id: its file name without ".md". It names the entry while
+// the file exists, whatever its position (RemoveID).
+func (e Entry) ID() string { return entryID(e.File) }
+
+func entryID(file string) string {
+	if ext := filepath.Ext(file); strings.EqualFold(ext, ".md") {
+		return file[:len(file)-len(ext)]
+	}
+	return file
 }
 
 // Origin is who adds an entry: a thread's id and its current name, or zero for the user
@@ -85,8 +109,9 @@ type Snapshot struct {
 	// Entries are every entry in order, also past the caps in a directory edited by
 	// hand. Never nil.
 	Entries []Entry
-	// Injected is how many of Entries (the first) a thread's prompt carries, and
-	// InjectedBytes their rendered size (Render), which MaxBytes caps.
+	// Injected is how many of Entries a thread's prompt carries (those with
+	// Entry.Injected), and InjectedBytes their rendered size (Render), which MaxBytes
+	// caps.
 	Injected, InjectedBytes int
 	// Err is why the last read failed; Entries are the last good read's.
 	Err string
@@ -111,6 +136,9 @@ type Options struct {
 	Log *slog.Logger
 	// Now nil is time.Now.
 	Now func() time.Time
+	// WatchRetry is how often Watch looks for a directory that is not there; 0 is two
+	// seconds.
+	WatchRetry time.Duration
 }
 
 // Store reads and writes the memory directory. Writes are serialised by a mutex; each
@@ -144,9 +172,12 @@ func (s *Store) Dir() string { return s.opts.Dir }
 func (s *Store) Snapshot() *Snapshot { return s.snap.Load() }
 
 // Load reads the memory now and returns the snapshot it leaves (Err set when the read
-// failed).
+// failed). It waits for a write in progress, so the snapshot it publishes is never one
+// from the middle of a write that a later one already replaced.
 func (s *Store) Load() *Snapshot {
-	_, _ = s.Entries()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, _ = s.read()
 	return s.Snapshot()
 }
 
@@ -166,35 +197,59 @@ func (s *Store) Texts() ([]string, error) {
 	return textsOf(items), nil
 }
 
-// Injected are the entries a thread's prompt carries, read now: Texts cut to the first
-// MaxEntries that fit MaxBytes rendered. Only a directory edited by hand holds more;
-// what is left out is logged. The thread store calls it at every spawn.
+// Injected are the entries a thread's prompt carries, read now (Entry.Injected): the
+// entries no longer than MaxEntryChars, cut to the first MaxEntries that fit MaxBytes
+// rendered. Only a directory edited by hand or an import holds more; what is left out is
+// logged. The thread store calls it at every spawn.
 func (s *Store) Injected() ([]string, error) {
-	texts, err := s.Texts()
+	items, err := s.read()
 	if err != nil {
 		return nil, err
 	}
-	kept := capped(texts)
-	if len(kept) < len(texts) {
+	kept := injectedTexts(entriesOf(items))
+	if len(kept) < len(items) {
 		s.log.Warn("memory: the directory holds more than threads get; the rest is left out",
-			"dir", s.opts.Dir, "entries", len(texts), "injected", len(kept), "max_entries", MaxEntries, "max_bytes", MaxBytes)
+			"dir", s.opts.Dir, "entries", len(items), "injected", len(kept),
+			"max_entries", MaxEntries, "max_bytes", MaxBytes, "max_entry_chars", MaxEntryChars)
 	}
 	return kept, nil
 }
 
-// capped is the longest prefix of texts within MaxEntries and MaxBytes rendered.
-func capped(texts []string) []string {
-	n := 0
-	for i, t := range texts {
-		if i == MaxEntries {
-			return texts[:i]
-		}
-		n += len("- ") + len(t) + len("\n") // its line (Render)
-		if n > MaxBytes {
-			return texts[:i]
+// markInjected sets Injected and LeftOut on entries in place: one longer than
+// MaxEntryChars is left out on its own; of the others, the longest prefix within
+// MaxEntries and MaxBytes rendered is injected and the rest left out.
+func markInjected(entries []Entry) {
+	n, bytes, full := 0, 0, ""
+	for i := range entries {
+		e := &entries[i]
+		e.Injected, e.LeftOut = false, ""
+		line := len("- ") + len(e.Text) + len("\n") // its line (Render)
+		switch {
+		case TooLong(e.Text):
+			e.LeftOut = LeftOutTooLong
+		case full != "":
+			e.LeftOut = full
+		case n == MaxEntries:
+			full, e.LeftOut = LeftOutEntries, LeftOutEntries
+		case bytes+line > MaxBytes:
+			full, e.LeftOut = LeftOutBytes, LeftOutBytes
+		default:
+			e.Injected = true
+			n++
+			bytes += line
 		}
 	}
-	return texts
+}
+
+// injectedTexts are the texts of the entries marked Injected, in order (nil for none).
+func injectedTexts(entries []Entry) []string {
+	var out []string
+	for _, e := range entries {
+		if e.Injected {
+			out = append(out, e.Text)
+		}
+	}
+	return out
 }
 
 // Added is what Add did.
@@ -257,23 +312,45 @@ func (s *Store) Add(text string, by Origin) (Added, error) {
 	return Added{Entry: e}, nil
 }
 
-// Remove deletes one entry (find): ref is its 1-based index, its text, or text found in
-// exactly one entry. An index out of range or a substring in several entries is
-// ErrInvalidArgument (the message lists the matches); no match is ErrNotFound. Every
-// file holding that text goes (a copy made by hand too). by is the thread that asked,
-// for the log.
+// Remove deletes one entry (find): ref is its 1-based index, its text, its id
+// (Entry.ID), or text found in exactly one entry. An index out of range or a substring
+// in several entries is ErrInvalidArgument (the message lists the matches); no match is
+// ErrNotFound. Every file holding that text goes (a copy made by hand too). by is the
+// thread that asked, for the log.
 func (s *Store) Remove(ref, by string) (Entry, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return Entry{}, fmt.Errorf("%w: give an entry's number or text from it", ErrInvalidArgument)
 	}
+	return s.remove(by, func(items []item) (int, error) { return find(items, ref) })
+}
+
+// RemoveID deletes the entry whose id (Entry.ID, any case) is id, whatever its position
+// now: the Settings page names an entry this way, so a list that changed since it was
+// shown cannot make it remove another. No such entry (its file is gone, or was renamed
+// by hand) is ErrNotFound.
+func (s *Store) RemoveID(id, by string) (Entry, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Entry{}, fmt.Errorf("%w: give an entry's id", ErrInvalidArgument)
+	}
+	return s.remove(by, func(items []item) (int, error) {
+		if i := findID(items, id); i >= 0 {
+			return i, nil
+		}
+		return 0, fmt.Errorf("%w: there is no entry %s now; it was removed or its file renamed", ErrNotFound, id)
+	})
+}
+
+// remove deletes the entry pick chooses from the entries read now.
+func (s *Store) remove(by string, pick func([]item) (int, error)) (Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items, err := s.read()
 	if err != nil {
 		return Entry{}, err
 	}
-	i, err := find(textsOf(items), ref)
+	i, err := pick(items)
 	if err != nil {
 		return Entry{}, err
 	}
@@ -319,11 +396,24 @@ func (s *Store) Clear(by string) (int, error) {
 	return len(items), nil
 }
 
-// find is the index into texts that ref names: digits are a 1-based index when one is
-// in range; otherwise the entry whose text ref is (normalised, any case), else the one
-// entry that contains ref (any case). Digits out of range that no text matches either
-// are an index error.
-func find(texts []string, ref string) (int, error) {
+// findID is the index of the item with a file whose id is id (any case), else -1.
+func findID(items []item, id string) int {
+	for i, it := range items {
+		for _, f := range it.files {
+			if strings.EqualFold(entryID(f), id) {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// find is the index into items that ref names: digits are a 1-based index when one is
+// in range; otherwise the entry whose text ref is (normalised, any case), else the
+// entry whose id it is (Entry.ID), else the one entry that contains ref (any case).
+// Digits out of range that no text matches either are an index error.
+func find(items []item, ref string) (int, error) {
+	texts := textsOf(items)
 	digits := strings.Trim(ref, "0123456789") == ""
 	if n, err := strconv.Atoi(ref); digits && err == nil && n >= 1 && n <= len(texts) {
 		return n - 1, nil
@@ -333,6 +423,9 @@ func find(texts []string, ref string) (int, error) {
 		if strings.EqualFold(t, exact) {
 			return i, nil
 		}
+	}
+	if i := findID(items, ref); i >= 0 {
+		return i, nil
 	}
 	needle := strings.ToLower(ref)
 	var hits []int
@@ -430,8 +523,8 @@ func (s *Store) readDir() ([]item, error) {
 			continue
 		}
 		p := parseEntry(string(b))
-		if p.text == "" {
-			s.log.Warn("memory: entry file holds no text; skipped", "file", path)
+		if !WellFormed(p.text) {
+			s.log.Warn("memory: entry file holds no text; skipped", "file", path, "why", NoLetter)
 			continue
 		}
 		e := Entry{Text: p.text, File: de.Name(), Created: p.created, ThreadID: p.threadID, ThreadName: p.threadNm}
@@ -452,6 +545,11 @@ func (s *Store) readDir() ([]item, error) {
 		f.Index = len(out) + 1
 		f.files = []string{f.File}
 		out = append(out, f.item)
+	}
+	entries := entriesOf(out)
+	markInjected(entries)
+	for i := range out {
+		out[i].Entry = entries[i]
 	}
 	return out, nil
 }
@@ -497,11 +595,7 @@ func (s *Store) observe(items []item, err error) {
 	} else {
 		next.Entries = entriesOf(items)
 	}
-	texts := make([]string, len(next.Entries))
-	for i, e := range next.Entries {
-		texts[i] = e.Text
-	}
-	kept := capped(texts)
+	kept := injectedTexts(next.Entries)
 	next.Injected, next.InjectedBytes = len(kept), len(Render(kept))
 	if next.Err == prev.Err && slices.Equal(next.Entries, prev.Entries) {
 		return

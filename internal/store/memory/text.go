@@ -3,18 +3,26 @@ package memory
 import (
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
+// NoLetter is why a text with no letter or digit is not an entry: Clean refuses it with
+// these words and Import skips such a line with them in its WARN, so the two agree.
+const NoLetter = "an entry needs at least one letter or digit"
+
 // Clean checks that text can be an entry and normalises it (Normalize): one line, not
-// empty, at most MaxEntryChars characters.
+// empty, with a letter or digit (WellFormed), at most MaxEntryChars characters.
 func Clean(text string) (string, error) {
 	if strings.ContainsAny(strings.TrimSpace(text), "\n\r") {
 		return "", fmt.Errorf("%w: an entry is one line; add each preference on its own", ErrInvalidArgument)
 	}
-	text = Normalize(text)
-	if text == "" {
+	if strings.TrimSpace(text) == "" {
 		return "", fmt.Errorf("%w: an empty entry", ErrInvalidArgument)
+	}
+	text = Normalize(text)
+	if !WellFormed(text) {
+		return "", fmt.Errorf("%w: %s", ErrInvalidArgument, NoLetter)
 	}
 	if n := utf8.RuneCountInString(text); n > MaxEntryChars {
 		return "", fmt.Errorf("%w: an entry is at most %d characters and this one has %d; say it shorter or split it in two",
@@ -23,15 +31,31 @@ func Clean(text string) (string, error) {
 	return text, nil
 }
 
+// WellFormed reports a text that can be an entry: one with a letter or a digit ("---",
+// "***", "|---|", an emoji alone are not).
+func WellFormed(text string) bool {
+	return strings.ContainsFunc(text, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) })
+}
+
+// TooLong reports an entry past MaxEntryChars: only an import or a hand edit makes one
+// (Clean refuses it), and threads do not get it (Injected).
+func TooLong(text string) bool { return utf8.RuneCountInString(text) > MaxEntryChars }
+
 // Normalize is an entry as stored: trimmed, each run of white space one space, without
-// a leading "- " (a list item's) and without a sentence's full stop (an ellipsis stays,
-// so normalising twice changes nothing). "" when nothing is left.
+// a leading list bullet ("- ", "* " or "+ ") and without a sentence's full stop (an
+// ellipsis stays, so normalising twice changes nothing). "" when nothing is left (a
+// bullet alone).
 func Normalize(text string) string {
 	text = strings.Join(strings.Fields(text), " ")
-	if text == "-" {
+	if text == "-" || text == "*" || text == "+" {
 		return ""
 	}
-	text = strings.TrimPrefix(text, "- ")
+	for _, bullet := range []string{"- ", "* ", "+ "} {
+		if rest, ok := strings.CutPrefix(text, bullet); ok {
+			text = rest
+			break
+		}
+	}
 	if !strings.HasSuffix(text, "..") {
 		text = strings.TrimSuffix(text, ".")
 	}
@@ -41,18 +65,23 @@ func Normalize(text string) string {
 // Parse reads the entries of a file of "- <text>" lines (the single memory.md before
 // the directory, legacy.go), edited by hand or not: CRLF line ends, blank lines,
 // markdown headings and <!-- --> comments are skipped; every other line is an entry,
-// normalised (Normalize). An entry repeated (any case) counts once.
-func Parse(file string) []string {
-	var out []string
+// normalised (Normalize). An entry repeated (any case) counts once. malformed are the
+// lines (trimmed) that are not one: no letter or digit in them (WellFormed, so a bullet
+// alone too).
+func Parse(file string) (entries, malformed []string) {
 	seen := map[string]bool{}
 	for _, line := range lines(file) {
 		t := Normalize(line)
-		if k := strings.ToLower(t); t != "" && !seen[k] {
+		if !WellFormed(t) {
+			malformed = append(malformed, strings.TrimSpace(line))
+			continue
+		}
+		if k := strings.ToLower(t); !seen[k] {
 			seen[k] = true
-			out = append(out, t)
+			entries = append(entries, t)
 		}
 	}
-	return out
+	return entries, malformed
 }
 
 // lines are file's lines with line ends unified, invalid UTF-8, <!-- --> comments,

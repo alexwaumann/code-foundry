@@ -38,8 +38,15 @@ type MemoryEntry struct {
 	// (their terminal, the GUI) or it is unknown. The thread may be gone.
 	ThreadId   string `protobuf:"bytes,5,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	ThreadName string `protobuf:"bytes,6,opt,name=thread_name,json=threadName,proto3" json:"thread_name,omitempty"`
-	// Whether threads get it: false past the caps, in a directory edited by hand.
-	Injected      bool `protobuf:"varint,7,opt,name=injected,proto3" json:"injected,omitempty"`
+	// Whether threads get it: false past the caps or longer than max_entry_chars (an
+	// import or a directory edited by hand); left_out says which.
+	Injected bool `protobuf:"varint,7,opt,name=injected,proto3" json:"injected,omitempty"`
+	// Its stable id: the file name without ".md". `memory remove --id` takes it, and
+	// refuses (NotFound) once the file is gone, whatever the list looks like then.
+	Id string `protobuf:"bytes,8,opt,name=id,proto3" json:"id,omitempty"`
+	// Why threads do not get it: "too_long" (past max_entry_chars), "entries" (past
+	// max_entries) or "bytes" (past max_bytes); empty when they do.
+	LeftOut       string `protobuf:"bytes,9,opt,name=left_out,json=leftOut,proto3" json:"left_out,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -123,12 +130,26 @@ func (x *MemoryEntry) GetInjected() bool {
 	return false
 }
 
+func (x *MemoryEntry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MemoryEntry) GetLeftOut() string {
+	if x != nil {
+		return x.LeftOut
+	}
+	return ""
+}
+
 // MemorySnapshot is the whole memory.
 type MemorySnapshot struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// In order; also past the caps (a directory edited by hand), with injected false.
 	Entries []*MemoryEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
-	// How many entries threads get (the first ones) and their size rendered as the
+	// How many entries threads get (those with injected) and their size rendered as the
 	// prompt lists them, which max_bytes caps.
 	Injected      int32 `protobuf:"varint,2,opt,name=injected,proto3" json:"injected,omitempty"`
 	InjectedBytes int32 `protobuf:"varint,3,opt,name=injected_bytes,json=injectedBytes,proto3" json:"injected_bytes,omitempty"`
@@ -405,7 +426,7 @@ var File_codefoundry_v1_memory_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_memory_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/memory.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdb\x01\n" +
+	"\x1bcodefoundry/v1/memory.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x86\x02\n" +
 	"\vMemoryEntry\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\x05R\x05index\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
@@ -414,7 +435,9 @@ const file_codefoundry_v1_memory_proto_rawDesc = "" +
 	"\tthread_id\x18\x05 \x01(\tR\bthreadId\x12\x1f\n" +
 	"\vthread_name\x18\x06 \x01(\tR\n" +
 	"threadName\x12\x1a\n" +
-	"\binjected\x18\a \x01(\bR\binjected\"\xb2\x02\n" +
+	"\binjected\x18\a \x01(\bR\binjected\x12\x0e\n" +
+	"\x02id\x18\b \x01(\tR\x02id\x12\x19\n" +
+	"\bleft_out\x18\t \x01(\tR\aleftOut\"\xb2\x02\n" +
 	"\x0eMemorySnapshot\x125\n" +
 	"\aentries\x18\x01 \x03(\v2\x1b.codefoundry.v1.MemoryEntryR\aentries\x12\x1a\n" +
 	"\binjected\x18\x02 \x01(\x05R\binjected\x12%\n" +

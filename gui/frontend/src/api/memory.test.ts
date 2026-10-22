@@ -18,8 +18,11 @@ const snapshot = create(MemorySnapshotSchema, {
       threadId: "s-1",
       threadName: "Fix login",
       injected: true,
+      id: "always-open-prs-as-drafts",
     },
-    { index: 2, text: "Keep it short", file: "hand.md", injected: false },
+    { index: 2, text: "Keep it short", file: "hand.md", injected: false, id: "hand", leftOut: "too_long" },
+    // An older daemon: no id or reason.
+    { index: 3, text: "Old", file: "Old.MD", injected: false },
   ],
   injected: 1,
   injectedBytes: 28,
@@ -41,8 +44,11 @@ describe("memory mapping", () => {
           createdMs: created,
           origin: { kind: "thread", threadId: "s-1", threadName: "Fix login" },
           injected: true,
+          id: "always-open-prs-as-drafts",
+          leftOut: "",
         },
-        { file: "hand.md", index: 2, text: "Keep it short", createdMs: null, origin: { kind: "user" }, injected: false },
+        { file: "hand.md", id: "hand", index: 2, text: "Keep it short", createdMs: null, origin: { kind: "user" }, injected: false, leftOut: "too_long" },
+        { file: "Old.MD", id: "Old", index: 3, text: "Old", createdMs: null, origin: { kind: "user" }, injected: false, leftOut: "entries" },
       ],
       injected: 1,
       injectedBytes: 28,
@@ -66,6 +72,7 @@ describe("memory mapping", () => {
     expect(view?.source === "memory" && view.event.snapshot.entries.map((e) => e.text)).toEqual([
       "Always open PRs as drafts",
       "Keep it short",
+      "Old",
     ]);
   });
 });

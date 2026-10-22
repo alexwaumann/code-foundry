@@ -53,6 +53,18 @@ export interface ConfirmationView {
   bind?: Record<string, string>;
   /** What the command already did, the result when the user declines a second stage. */
   declined?: InvokeResultView;
+  /** The confirm button's words when the command names them ("Forget all"). */
+  confirmLabel?: string;
+}
+
+/**
+ * The confirm button's words: the command's own (ConfirmationView.confirmLabel), else
+ * its title without a "Category: " prefix ("Ember: Cancel Task" → "Cancel Task").
+ */
+export function confirmButtonLabel(title: string, confirmLabel?: string): string {
+  if (confirmLabel) return confirmLabel;
+  const i = title.indexOf(": ");
+  return i > 0 && i + 2 < title.length ? title.slice(i + 2) : title;
 }
 
 /** What the user is looking at. Mirrors codefoundry.v1.UiContext; empty string = none. */
@@ -113,6 +125,7 @@ export function confirmationOf(err: unknown): ConfirmationView | null {
   if (Object.keys(d.args).length > 0) view.args = { ...d.args };
   if (Object.keys(d.bind).length > 0) view.bind = { ...d.bind };
   if (d.declined) view.declined = { message: d.declined.message, resultJson: d.declined.resultJson };
+  if (d.confirmLabel) view.confirmLabel = d.confirmLabel;
   return view;
 }
 

@@ -151,7 +151,9 @@
  *        refresh). GET /__mock/skills: { epoch, calls, failures, installed } (mock/skills.ts)
  *   MemoryService, the memory event source and memory.* (mock/memory.ts): four seeded entries (by s-1,
  *        by s-3, from the user's terminal, by the removed s-gone); reset restores them.
- *   POST /__mock/memory?set=empty|seed           (the entries, as a hand edit; published)
+ *   POST /__mock/memory?set=empty|seed|long      (the entries, as a hand edit; published; long adds a
+ *                                                 700-character entry threads do not get)
+ *   POST /__mock/memory?drop=<file>&quiet=1      (a file removed by hand, no event: a stale page)
  *   POST /__mock/memory/add?text=…&thread=s-1    (a thread's memory add: the entry and the "Remembered: …"
  *                                                 toast with its Settings › Memory link)
  *   GET  /__mock/memory                          ({ entries, calls })
@@ -238,7 +240,7 @@ function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
   if (err instanceof ConfirmNeeded) {
     return new ConnectError(err.message, Code.FailedPrecondition, undefined, [
-      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message } },
+      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message, confirmLabel: err.confirmLabel } },
     ]);
   }
   if (err instanceof SettingsValidation) {

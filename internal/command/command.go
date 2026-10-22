@@ -58,6 +58,9 @@ type Command struct {
 	// rendered Confirm message at invoke time (e.g. "Close 3 threads and restart the
 	// daemon?"). It sees the effective context and validated args.
 	DynamicConfirm func(ctx context.Context, uctx Context, args Args) string
+	// ConfirmLabel, when set with Confirm, is the GUI confirm button's words ("Forget
+	// all"); empty, the GUI uses the title without a "Category: " prefix.
+	ConfirmLabel string
 	// ConfirmIf, when set with Confirm, decides at invoke time whether this call needs
 	// the confirmation at all: false runs the command without one (e.g. thread.archive
 	// asks only while Claude is working or waiting on the user). nil means always.
@@ -248,6 +251,9 @@ func (c *Command) validate() error {
 		if c.Confirm == "" || i < 0 || c.Args[i].Type != String || c.Args[i].Required || c.Args[i].Positional {
 			return invalid("BindConfirm %q must name an optional String flag of a command with Confirm", c.BindConfirm)
 		}
+	}
+	if c.ConfirmLabel != "" && c.Confirm == "" {
+		return invalid("ConfirmLabel without Confirm")
 	}
 	return nil
 }

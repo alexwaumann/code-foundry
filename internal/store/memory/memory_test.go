@@ -111,7 +111,10 @@ func TestLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Entry{Index: 1, Text: "Always open PRs as drafts", File: "always-open-prs-as-drafts.md",
-		Created: t0.Add(time.Second), ThreadID: "s-abc", ThreadName: "fix: the PR flow"}
+		Created: t0.Add(time.Second), ThreadID: "s-abc", ThreadName: "fix: the PR flow", Injected: true}
+	if id := a.Entry.ID(); id != "always-open-prs-as-drafts" {
+		t.Errorf("ID = %q", id)
+	}
 	if a.Entry != want {
 		t.Errorf("Add = %+v, want %+v", a.Entry, want)
 	}
@@ -161,8 +164,11 @@ func TestAdd(t *testing.T) {
 		{"duplicate, any case", "always open prs as DRAFTS", 1, true, nil, ""},
 		{"duplicate after normalising", "-  Always   open PRs\tas drafts.", 1, true, nil, ""},
 		{"empty", "   ", 0, false, ErrInvalidArgument, "an empty entry"},
-		{"only a dash", " - ", 0, false, ErrInvalidArgument, "an empty entry"},
-		{"only a period", " . ", 0, false, ErrInvalidArgument, "an empty entry"},
+		{"only a dash", " - ", 0, false, ErrInvalidArgument, NoLetter},
+		{"only a period", " . ", 0, false, ErrInvalidArgument, NoLetter},
+		{"only stars", "***", 0, false, ErrInvalidArgument, NoLetter},
+		{"a bullet and punctuation", "* ---", 0, false, ErrInvalidArgument, NoLetter},
+		{"an emoji alone", "🚀🎉", 0, false, ErrInvalidArgument, NoLetter},
 		{"multi-line", "one\ntwo", 0, false, ErrInvalidArgument, "one line"},
 		{"carriage return", "one\rtwo", 0, false, ErrInvalidArgument, "one line"},
 		{"a list item", "- drop the dash", 3, false, nil, ""},
@@ -185,8 +191,8 @@ func TestAdd(t *testing.T) {
 	if got := texts(t, s); !slices.Equal(got, want) {
 		t.Errorf("round trip = %q", got)
 	}
-	if got := files(t, s.Dir()); len(got) != len(want)+1 || !slices.Contains(got, "entry.md") {
-		t.Errorf("directory = %q (the all-é entry is entry.md)", got)
+	if got := files(t, s.Dir()); len(got) != len(want)+1 || !slices.Contains(got, strings.Repeat("e", maxSlug)+".md") {
+		t.Errorf("directory = %q (the all-é entry is e…e.md)", got)
 	}
 }
 
@@ -213,7 +219,11 @@ func TestSlug(t *testing.T) {
 	for _, tt := range []struct{ in, want string }{
 		{"Always open PRs as drafts", "always-open-prs-as-drafts"},
 		{"  --Don't   use `git push -f`!  ", "don-t-use-git-push-f"},
-		{"Café crème", "caf-cr-me"},
+		{"Café crème", "cafe-creme"},
+		{"naïve café", "naive-cafe"},
+		{"Mañana, ÉTÉ", "manana-ete"},
+		{"Straße Æsir Œuvre Łódź", "strasse-aesir-oeuvre-lodz"},
+		{"Prefer “smart quotes” and naïve café émoji 🚀 in docs", "prefer-smart-quotes-and-naive-cafe-emoji-in-docs"},
 		{"日本語", "entry"},
 		{"!!!", "entry"},
 		{strings.Repeat("abcdefgh ", 10), "abcdefgh-abcdefgh-abcdefgh-abcdefgh-abcdefgh"},
@@ -286,20 +296,39 @@ func TestInjectedCaps(t *testing.T) {
 	for i := range many {
 		many[i] = fmt.Sprintf("preference %02d", i+1)
 	}
-	big := make([]string, 6)
+	big := make([]string, 10)
 	for i := range big {
-		big[i] = fmt.Sprintf("%d %s", i, strings.Repeat("z", 900)) // 905 bytes a line
+		big[i] = fmt.Sprintf("%d %s", i, strings.Repeat("z", 450)) // 455 bytes a line: 9 fit
+	}
+	long := "a " + strings.Repeat("y", MaxEntryChars) // 502 characters
+	reasons := func(n int, at map[int]string) []string {
+		out := make([]string, n)
+		for i, r := range at {
+			out[i] = r
+		}
+		return out
+	}
+	tail := func(from, n int, r string) map[int]string {
+		m := map[int]string{}
+		for i := from; i < n; i++ {
+			m[i] = r
+		}
+		return m
 	}
 	for _, tt := range []struct {
 		name    string
 		entries []string
-		want    int
+		want    []string // injected
+		leftOut []string // per entry
 		warn    bool
 	}{
-		{"within the caps", many[:3], 3, false},
-		{"exactly 40", many[:40], 40, false},
-		{"past 40 entries", many, 40, true},
-		{"past 4 KiB", big, 4, true},
+		{"within the caps", many[:3], many[:3], reasons(3, nil), false},
+		{"exactly 40", many[:40], many[:40], reasons(40, nil), false},
+		{"past 40 entries", many, many[:40], reasons(45, tail(40, 45, LeftOutEntries)), true},
+		{"past 4 KiB", big, big[:9], reasons(10, tail(9, 10, LeftOutBytes)), true},
+		{"too long is left out alone", []string{"one", long, "two"}, []string{"one", "two"}, reasons(3, map[int]string{1: LeftOutTooLong}), true},
+		{"too long does not count towards 40", append([]string{long}, many[:40]...), many[:40],
+			reasons(41, map[int]string{0: LeftOutTooLong}), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var logs bytes.Buffer
@@ -309,8 +338,8 @@ func TestInjectedCaps(t *testing.T) {
 				write(t, filepath.Join(dir, fmt.Sprintf("e%02d.md", i)), renderEntry(e, t0.Add(time.Duration(i)*time.Second), Origin{}))
 			}
 			got, err := s.Injected()
-			if err != nil || !slices.Equal(got, tt.entries[:tt.want]) {
-				t.Errorf("Injected = %d entries, %v; want %d", len(got), err, tt.want)
+			if err != nil || !slices.Equal(got, tt.want) {
+				t.Errorf("Injected = %d entries, %v; want %d", len(got), err, len(tt.want))
 			}
 			if all := texts(t, s); len(all) != len(tt.entries) {
 				t.Errorf("Texts = %d entries, want all %d", len(all), len(tt.entries))
@@ -318,8 +347,14 @@ func TestInjectedCaps(t *testing.T) {
 			if warned := strings.Contains(logs.String(), "level=WARN"); warned != tt.warn {
 				t.Errorf("warned = %v, want %v: %s", warned, tt.warn, logs.String())
 			}
-			if snap := s.Snapshot(); snap.Injected != tt.want || len(snap.Entries) != len(tt.entries) {
+			snap := s.Snapshot()
+			if snap.Injected != len(tt.want) || len(snap.Entries) != len(tt.entries) {
 				t.Errorf("snapshot = %d injected of %d", snap.Injected, len(snap.Entries))
+			}
+			for i, e := range snap.Entries {
+				if e.LeftOut != tt.leftOut[i] || e.Injected != (tt.leftOut[i] == "") {
+					t.Errorf("entry %d: injected %v, left out %q; want %q", i+1, e.Injected, e.LeftOut, tt.leftOut[i])
+				}
 			}
 		})
 	}
@@ -433,6 +468,9 @@ func TestRemove(t *testing.T) {
 		{"exact text before substring", "use tabs", 5, nil, "", without(4)},
 		{"exact text normalised", "- Use tabs.", 5, nil, "", without(4)},
 		{"digits out of range as text", "2 blank", 7, nil, "", without(6)},
+		{"by id", "never-open-the-side-panel-on-your-own", 3, nil, "", without(2)},
+		{"by id, any case", "USE-TABS-IN-GO-FILES", 6, nil, "", without(5)},
+		{"an id before a substring", "use-tabs", 5, nil, "", without(4)},
 		{"ambiguous substring", "draft", 0, ErrInvalidArgument, "\"draft\" is in 2 entries; give the number of one:\n  1. Always open PRs as drafts\n  4. Draft commit", seed},
 		{"no match", "rebase", 0, ErrNotFound, `no entry contains "rebase"`, seed},
 		{"index zero", "0", 0, ErrInvalidArgument, "the entries are 1 to 7", seed},
@@ -476,6 +514,99 @@ func TestRemove(t *testing.T) {
 			t.Errorf("Remove on empty = %v", err)
 		}
 	})
+}
+
+// The Settings page removes by id: after a hand edit its list is stale, and an id never
+// names another entry (a position would: the bug this replaced).
+func TestRemoveID(t *testing.T) {
+	s := newStore(t)
+	add(t, s, "Always open PRs as drafts", "Explain git terms", "Use tabs")
+	shown, err := s.Entries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The second entry's file goes by hand; the page still shows three rows.
+	if err := os.Remove(filepath.Join(s.Dir(), shown[1].File)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RemoveID(shown[1].ID(), ""); !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "there is no entry explain-git-terms now") {
+		t.Errorf("RemoveID of a gone entry = %v", err)
+	}
+	if got := texts(t, s); !slices.Equal(got, []string{"Always open PRs as drafts", "Use tabs"}) {
+		t.Errorf("a refused remove changed the memory: %q", got)
+	}
+	// The third row, now second by position, goes by its id.
+	got, err := s.RemoveID(shown[2].ID(), "")
+	if err != nil || got.Text != "Use tabs" {
+		t.Errorf("RemoveID = %+v, %v", got, err)
+	}
+	if got := texts(t, s); !slices.Equal(got, []string{"Always open PRs as drafts"}) {
+		t.Errorf("left = %q", got)
+	}
+	if _, err := s.RemoveID(" ", ""); !errors.Is(err, ErrInvalidArgument) {
+		t.Errorf("RemoveID of nothing = %v", err)
+	}
+	// A copy made by hand shares the entry: either file's id names it, and both go.
+	write(t, filepath.Join(s.Dir(), "copy.md"), "always open prs as drafts\n")
+	if got, err := s.RemoveID("COPY", ""); err != nil || got.Text != "Always open PRs as drafts" {
+		t.Errorf("RemoveID of a copy = %+v, %v", got, err)
+	}
+	if got := files(t, s.Dir()); !slices.Equal(got, []string{IndexFile}) {
+		t.Errorf("directory = %q", got)
+	}
+}
+
+// A hand edit is published without a read: the directory is watched, also one made
+// after the watch began, and one removed and made again.
+func TestWatch(t *testing.T) {
+	b := bus.New()
+	dir := filepath.Join(t.TempDir(), "memory")
+	s := New(Options{Dir: dir, Bus: b, Log: slog.New(slog.DiscardHandler), WatchRetry: 20 * time.Millisecond})
+	sub := bus.Subscribe[Event](b, 16)
+	defer sub.Close()
+	s.Watch(t.Context())
+	wait := func(want ...string) {
+		t.Helper()
+		deadline := time.After(10 * time.Second)
+		for {
+			select {
+			case ev := <-sub.C():
+				snap := ev.(*Snapshot)
+				var got []string
+				for _, e := range snap.Entries {
+					got = append(got, e.Text)
+				}
+				if slices.Equal(got, want) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("no snapshot with %q", want)
+			}
+		}
+	}
+	// The directory appears (the retry finds it), with an entry.
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "a.md"), "first\n")
+	wait("first")
+	write(t, filepath.Join(dir, "b.md"), "second\n")
+	wait("first", "second")
+	write(t, filepath.Join(dir, "a.md"), "first, edited\n")
+	wait("second", "first, edited") // no frontmatter: ordered by modification time
+	if err := os.Remove(filepath.Join(dir, "a.md")); err != nil {
+		t.Fatal(err)
+	}
+	wait("second")
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "c.md"), "back\n")
+	wait("back")
 }
 
 func TestClear(t *testing.T) {
@@ -653,7 +784,9 @@ func TestImport(t *testing.T) {
 		{name: "hand edits", legacy: ptr("# Preferences\r\n\r\n<!-- a comment -->\r\nhand written\r\n-   spaced   out  \r\n- Hand Written\r\n"),
 			want: []string{"hand written", "spaced out"}, res: Imported{Entries: 2}},
 		{name: "malformed lines", legacy: ptr("---\n- ok\n***\n- |---|\n-\n- also ok\n"),
-			want: []string{"ok", "also ok"}, res: Imported{Entries: 2, Skipped: 3}},
+			want: []string{"ok", "also ok"}, res: Imported{Entries: 2, Skipped: 4}},
+		{name: "star and plus bullets", legacy: ptr("* Use tabs\n+ Keep answers short\n*\n+\n- 🚀\n"),
+			want: []string{"Use tabs", "Keep answers short"}, res: Imported{Entries: 2, Skipped: 3}},
 		{name: "invalid UTF-8", legacy: ptr("- caf\xff\xfee\n"), want: []string{"cafe"}, res: Imported{Entries: 1}},
 		{name: "past the caps is kept", legacy: ptr("- " + tooLong + "\n- short\n"), want: []string{tooLong, "short"}, res: Imported{Entries: 2}},
 		{name: "cut short and run again", legacy: ptr("- one\n- two\n- three\n"), existing: []string{"one", "TWO"},
@@ -730,25 +863,29 @@ func ptr(s string) *string { return &s }
 
 func TestParse(t *testing.T) {
 	for _, tt := range []struct {
-		name, file string
-		want       []string
+		name, file      string
+		want, malformed []string
 	}{
-		{"empty", "", nil},
-		{"entries", "- a\n- b\n", []string{"a", "b"}},
-		{"blank lines and spaces", "\n  - a  \n\n-   b\n", []string{"a", "b"}},
-		{"a line without a dash", "- a\nhand written\n", []string{"a", "hand written"}},
-		{"a lone dash", "-\n- a\n", []string{"a"}},
-		{"no trailing newline", "- a", []string{"a"}},
-		{"CRLF", "- a\r\n- b\r\n", []string{"a", "b"}},
-		{"headings", "# Preferences\n## Git\n- a\n#hashtag kept\n", []string{"a", "#hashtag kept"}},
-		{"comments", "<!-- one -->\n- a <!-- inline --> b\n<!--\n- hidden\n-->\n- c\n", []string{"a b", "c"}},
-		{"an open comment runs to the end", "- a\n<!-- - b\n- c\n", []string{"a"}},
-		{"normalised", "-   Always   open\tPRs as drafts.\n", []string{"Always open PRs as drafts"}},
-		{"repeats count once", "- Use tabs\n- use tabs.\n- b\n", []string{"Use tabs", "b"}},
+		{"empty", "", nil, nil},
+		{"entries", "- a\n- b\n", []string{"a", "b"}, nil},
+		{"blank lines and spaces", "\n  - a  \n\n-   b\n", []string{"a", "b"}, nil},
+		{"a line without a dash", "- a\nhand written\n", []string{"a", "hand written"}, nil},
+		{"a lone dash is malformed", "-\n- a\n", []string{"a"}, []string{"-"}},
+		{"star and plus bullets", "* a\n+ b\n*emphasis* kept\n", []string{"a", "b", "*emphasis* kept"}, nil},
+		{"bullets and punctuation alone", "*\n +\n---\n- ***\n|---|\n- a\n", []string{"a"}, []string{"*", "+", "---", "- ***", "|---|"}},
+		{"an emoji alone", "- 🚀\n- ship it 🚀\n", []string{"ship it 🚀"}, []string{"- 🚀"}},
+		{"no trailing newline", "- a", []string{"a"}, nil},
+		{"CRLF", "- a\r\n- b\r\n", []string{"a", "b"}, nil},
+		{"headings", "# Preferences\n## Git\n- a\n#hashtag kept\n", []string{"a", "#hashtag kept"}, nil},
+		{"comments", "<!-- one -->\n- a <!-- inline --> b\n<!--\n- hidden\n-->\n- c\n", []string{"a b", "c"}, nil},
+		{"an open comment runs to the end", "- a\n<!-- - b\n- c\n", []string{"a"}, nil},
+		{"normalised", "-   Always   open\tPRs as drafts.\n", []string{"Always open PRs as drafts"}, nil},
+		{"repeats count once", "- Use tabs\n- use tabs.\n* b\n", []string{"Use tabs", "b"}, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Parse(tt.file); !slices.Equal(got, tt.want) {
-				t.Errorf("Parse(%q) = %q, want %q", tt.file, got, tt.want)
+			got, bad := Parse(tt.file)
+			if !slices.Equal(got, tt.want) || !slices.Equal(bad, tt.malformed) {
+				t.Errorf("Parse(%q) = %q, %q; want %q, %q", tt.file, got, bad, tt.want, tt.malformed)
 			}
 		})
 	}
@@ -761,6 +898,11 @@ func TestNormalize(t *testing.T) {
 		{"- a", "a"},
 		{"-a", "-a"},
 		{"- - a", "- a"},
+		{"* a", "a"},
+		{"+ a", "a"},
+		{"*a*", "*a*"},
+		{"*", ""},
+		{"+", ""},
 		{"a.", "a"},
 		{"a...", "a..."},
 		{"a..", "a.."},

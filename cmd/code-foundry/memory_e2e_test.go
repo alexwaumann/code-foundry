@@ -38,9 +38,9 @@ func TestCLIMemory(t *testing.T) {
 		{"several words", []string{"memory", "add", "Never", "open", "the", "side", "panel", "on", "your", "own."}, nil,
 			`Remembered: "Never open the side panel on your own".`, ""},
 		{"add a third", []string{"memory", "add", "Draft commit messages first", "--json"}, nil,
-			`{"entry":{"index":3,"text":"Draft commit messages first","created":"20`, ""},
+			`{"entry":{"index":3,"id":"draft-commit-messages-first","text":"Draft commit messages first","created":"20`, ""},
 		{"add from the user's terminal records no thread", []string{"memory", "add", "Draft commit messages first", "--json"}, nil,
-			`"thread_id":"","thread_name":""},"added":false}`, ""},
+			`"thread_id":"","thread_name":"","injected":true,"left_out":""},"added":false}`, ""},
 		{"duplicate", []string{"memory", "add", "always open prs as drafts"}, nil,
 			`Already remembered: "Always open PRs as drafts" (nothing changed).` + "\n", ""},
 		{"multi-line", []string{"memory", "add", "one\ntwo"}, errUsage, "", "one line"},
@@ -48,12 +48,15 @@ func TestCLIMemory(t *testing.T) {
 		{"show", []string{"memory", "show"}, nil,
 			"1. Always open PRs as drafts\n2. Never open the side panel on your own\n3. Draft commit messages first\n", ""},
 		{"show json", []string{"memory", "show", "--json"}, nil,
-			`{"index":3,"text":"Draft commit messages first","created":"20`, ""},
+			`{"index":3,"id":"draft-commit-messages-first","text":"Draft commit messages first","created":"20`, ""},
 		{"ambiguous", []string{"memory", "remove", "draft"}, errUsage, "", `"draft" is in 2 entries; give the number of one:`},
 		{"no match", []string{"memory", "remove", "rebase"}, errUsage, "", `no entry contains "rebase"`},
 		{"remove by substring", []string{"memory", "remove", "side", "panel"}, nil,
 			`Forgot: "Never open the side panel on your own".` + "\n", ""},
-		{"remove by index", []string{"memory", "remove", "2"}, nil, `Forgot: "Draft commit messages first".`, ""},
+		{"remove by an id that is gone", []string{"memory", "remove", "--id", "never-open-the-side-panel-on-your-own"}, errUsage, "",
+			"there is no entry never-open-the-side-panel-on-your-own now"},
+		{"no letter or digit", []string{"memory", "add", "*", "!!"}, errUsage, "", "an entry needs at least one letter or digit"},
+		{"remove by id", []string{"memory", "remove", "--id", "draft-commit-messages-first"}, nil, `Forgot: "Draft commit messages first".`, ""},
 		{"clear needs --yes", []string{"memory", "clear"}, errUsage, "", "Re-run with --yes to confirm."},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,7 +86,17 @@ func TestCLIMemory(t *testing.T) {
 	if des, err := os.ReadDir(dir); err != nil || len(des) != 1 {
 		t.Errorf("memory directory after clear: %v, %v", des, err)
 	}
-	if r := runCLI(c, "help", "memory", "remove"); !strings.Contains(r.stdout, "code-foundry memory.remove <entry>") {
+	// A full memory is a state, not a usage error: exit 1, its message, no pointer to help.
+	for i := range 40 {
+		if r := runCLI(c, "memory", "add", "preference", string(rune('a'+i%26)), string(rune('a'+i/26))); r.err != nil {
+			t.Fatalf("add %d: %v %s", i, r.err, r.stderr)
+		}
+	}
+	if r := runCLI(c, "memory", "add", "one too many"); r.err == nil || errors.Is(r.err, errUsage) ||
+		!strings.Contains(r.stderr, "at most 40 entries") || strings.Contains(r.stderr, "for usage") {
+		t.Errorf("41st add = %v, stderr %q", r.err, r.stderr)
+	}
+	if r := runCLI(c, "help", "memory", "remove"); !strings.Contains(r.stdout, "code-foundry memory.remove [<entry>] [flags]") {
 		t.Errorf("help memory remove = %q", r.stdout)
 	}
 }

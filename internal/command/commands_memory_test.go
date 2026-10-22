@@ -59,14 +59,14 @@ func TestMemoryCommands(t *testing.T) {
 			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{}}},
 		{name: "add", cmd: "memory.add", args: map[string]string{"text": "  Always open PRs as drafts "},
 			wantMsg:  `Remembered: "Always open PRs as drafts". New threads will follow it; threads already open get it on their next message after a restart.`,
-			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}, Added: true}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, ID: "always-open-prs-as-drafts", Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z", Injected: true}, Added: true}},
 		{name: "add another", cmd: "memory.add", args: map[string]string{"text": "Draft commit messages before committing"},
 			wantMsg: `Remembered: "Draft commit messages before committing". New threads`},
 		{name: "add a third", cmd: "memory.add", args: map[string]string{"text": "Never open the side panel on your own"},
 			wantMsg: `Remembered: "Never open the side panel on your own"`},
 		{name: "duplicate is a no-op", cmd: "memory.add", args: map[string]string{"text": "always open PRs as drafts"},
 			wantMsg:  `Already remembered: "Always open PRs as drafts" (nothing changed).`,
-			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"}}},
+			wantJSON: command.MemoryAddView{Entry: command.MemoryEntryView{Index: 1, ID: "always-open-prs-as-drafts", Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z", Injected: true}}},
 		{name: "empty", cmd: "memory.add", args: map[string]string{"text": "   "},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "an empty entry"},
 		{name: "multi-line", cmd: "memory.add", args: map[string]string{"text": "one\ntwo"},
@@ -76,21 +76,37 @@ func TestMemoryCommands(t *testing.T) {
 		{name: "show", cmd: "memory.show",
 			wantMsg: "1. Always open PRs as drafts\n2. Draft commit messages before committing\n3. Never open the side panel on your own",
 			wantJSON: command.MemoryView{Entries: []command.MemoryEntryView{
-				{Index: 1, Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z"},
-				{Index: 2, Text: "Draft commit messages before committing", Created: "2026-10-22T14:03:11.001Z"},
-				{Index: 3, Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z"}}}},
+				{Index: 1, ID: "always-open-prs-as-drafts", Text: "Always open PRs as drafts", Created: "2026-10-22T14:03:11.000Z", Injected: true},
+				{Index: 2, ID: "draft-commit-messages-before-committing", Text: "Draft commit messages before committing", Created: "2026-10-22T14:03:11.001Z", Injected: true},
+				{Index: 3, ID: "never-open-the-side-panel-on-your-own", Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z", Injected: true}}}},
+		{name: "remove needs entry or id", cmd: "memory.remove",
+			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "give an entry's number, its text, or --id"},
+		{name: "remove takes not both", cmd: "memory.remove", args: map[string]string{"entry": "1", "id": "x"},
+			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "not both"},
+		{name: "remove by an id that is gone", cmd: "memory.remove", args: map[string]string{"id": "use-tabs"},
+			wantErr: func(err error) bool { return connect.CodeOf(err) == connect.CodeNotFound }, errHas: "there is no entry use-tabs now"},
+		{name: "remove by id", cmd: "memory.remove", args: map[string]string{"id": "draft-commit-messages-before-committing"},
+			wantMsg: `Forgot: "Draft commit messages before committing".`},
+		{name: "add it back", cmd: "memory.add", args: map[string]string{"text": "Draft commit messages before committing"},
+			wantMsg: `Remembered: "Draft commit messages before committing"`},
+		{name: "no letter or digit", cmd: "memory.add", args: map[string]string{"text": "* ---"},
+			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: memory.NoLetter},
 		{name: "ambiguous substring", cmd: "memory.remove", args: map[string]string{"entry": "draft"},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) },
-			errHas:  "\"draft\" is in 2 entries; give the number of one:\n  1. Always open PRs as drafts\n  2. Draft commit messages"},
+			errHas:  "\"draft\" is in 2 entries; give the number of one:\n  1. Always open PRs as drafts\n  3. Draft commit messages"},
 		{name: "no match", cmd: "memory.remove", args: map[string]string{"entry": "rebase"},
 			wantErr: func(err error) bool { return connect.CodeOf(err) == connect.CodeNotFound }, errHas: `no entry contains "rebase"`},
 		{name: "index out of range", cmd: "memory.remove", args: map[string]string{"entry": "9"},
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrInvalidArgs) }, errHas: "there is no entry 9: the entries are 1 to 3"},
+		{name: "remove by id as the entry", cmd: "memory.remove", args: map[string]string{"entry": "always-open-prs-as-drafts"},
+			wantMsg: `Forgot: "Always open PRs as drafts".`},
+		{name: "add it again", cmd: "memory.add", args: map[string]string{"text": "Always open PRs as drafts"},
+			wantMsg: `Remembered: "Always open PRs as drafts"`},
 		{name: "remove by unique substring", cmd: "memory.remove", args: map[string]string{"entry": "side panel"},
 			wantMsg:  `Forgot: "Never open the side panel on your own".`,
-			wantJSON: command.MemoryRemoveView{Removed: command.MemoryEntryView{Index: 3, Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z"}}},
+			wantJSON: command.MemoryRemoveView{Removed: command.MemoryEntryView{Index: 1, ID: "never-open-the-side-panel-on-your-own", Text: "Never open the side panel on your own", Created: "2026-10-22T14:03:11.002Z", Injected: true}}},
 		{name: "remove by index", cmd: "memory.remove", args: map[string]string{"entry": "1"},
-			wantMsg: `Forgot: "Always open PRs as drafts".`},
+			wantMsg: `Forgot: "Draft commit messages before committing".`},
 		{name: "clear needs confirmation", cmd: "memory.clear",
 			wantErr: func(err error) bool { return errors.Is(err, command.ErrNeedsConfirmation) }, errHas: "Forget every remembered preference?"},
 		{name: "clear", cmd: "memory.clear", yes: true,
@@ -135,7 +151,7 @@ func TestMemoryShowJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, err := json.Marshal(res.JSON)
-	if want := `{"entries":[{"index":1,"text":"Use tabs","created":"2026-10-22T14:03:11.000Z","thread_id":"s-1","thread_name":"Fix login"}]}`; err != nil || string(b) != want {
+	if want := `{"entries":[{"index":1,"id":"use-tabs","text":"Use tabs","created":"2026-10-22T14:03:11.000Z","thread_id":"s-1","thread_name":"Fix login","injected":true,"left_out":""}]}`; err != nil || string(b) != want {
 		t.Errorf("JSON = %s, %v; want %s", b, err, want)
 	}
 	if res.Message != "1. Use tabs" {
@@ -143,7 +159,8 @@ func TestMemoryShowJSON(t *testing.T) {
 	}
 }
 
-// The caps refuse with FailedPrecondition and name the cap.
+// The caps refuse as the command's own failure (FailedPrecondition with CommandFailed
+// over the wire: exit 1, no usage hint) and name the cap.
 func TestMemoryAddCap(t *testing.T) {
 	r, _ := newMemoryRegistry(t)
 	for i := range memory.MaxEntries {
@@ -152,8 +169,31 @@ func TestMemoryAddCap(t *testing.T) {
 		}
 	}
 	_, err := r.Invoke(context.Background(), command.Context{}, "memory.add", map[string]string{"text": "one too many"})
-	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "at most 40 entries") {
+	if !command.IsFailed(err) || errors.Is(err, command.ErrInvalidArgs) || !strings.Contains(err.Error(), "at most 40 entries") {
 		t.Errorf("41st add = %v", err)
+	}
+}
+
+// memory show marks an entry threads do not get, and its JSON says why.
+func TestMemoryShowMarksLeftOut(t *testing.T) {
+	r, s := newMemoryRegistry(t)
+	if _, err := s.Add("Use tabs", memory.Origin{}); err != nil {
+		t.Fatal(err)
+	}
+	long := strings.Repeat("word ", 140) // 699 characters
+	if err := os.WriteFile(filepath.Join(s.Dir(), "long.md"), []byte(long+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := r.Invoke(context.Background(), command.Context{}, "memory.show", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "\n2. " + strings.TrimSpace(long) + " [not given to threads: longer than 500 characters; remove it and say it shorter]"; !strings.HasSuffix(res.Message, want) {
+		t.Errorf("message = %q", res.Message)
+	}
+	v := res.JSON.(command.MemoryView)
+	if v.Entries[0].LeftOut != "" || !v.Entries[0].Injected || v.Entries[1].LeftOut != memory.LeftOutTooLong || v.Entries[1].Injected || v.Entries[1].ID != "long" {
+		t.Errorf("JSON = %+v", v)
 	}
 }
 
@@ -295,7 +335,7 @@ func TestMemoryArgsTakeTheRest(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s not registered", name)
 		}
-		if a := c.Args[len(c.Args)-1]; !a.Positional || !a.Rest {
+		if a := c.Args[0]; !a.Positional || !a.Rest {
 			t.Errorf("%s's %s: positional %v, rest %v", name, a.Name, a.Positional, a.Rest)
 		}
 	}

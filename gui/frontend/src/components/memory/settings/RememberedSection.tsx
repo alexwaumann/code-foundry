@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { CircleQuestionMark, Trash2 } from "lucide-react";
+import { CircleQuestionMark, EyeOff, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { isMemoryEntryGone } from "@/api/memory";
 import { SectionCard } from "@/components/settings/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { rememberedWhen, type MemoryBy } from "@/lib/memory";
+import { leftOutReason, rememberedWhen, type MemoryBy } from "@/lib/memory";
 import { cn } from "@/lib/utils";
-import { runCommand } from "@/stores/commands";
-import { useMemoryBy, useMemoryCount, useMemoryEntry, useMemoryFiles, useMemoryStatus, useMemoryStore } from "@/stores/memory";
+import { runCommand, runCommandForResult } from "@/stores/commands";
+import { loadMemory, useMemoryBy, useMemoryCaps, useMemoryCount, useMemoryEntry, useMemoryFiles, useMemoryStatus, useMemoryStore } from "@/stores/memory";
 import { useUiStore } from "@/stores/ui";
 import { closeSettings, useViewsStore } from "@/stores/views";
 
@@ -48,24 +50,59 @@ function ByThread({ by }: { by: Extract<MemoryBy, { kind: "thread" }> }) {
   );
 }
 
-/** One entry: its text, when and by whom, and Forget. */
+/**
+ * Forgets an entry by its id, never its position: the list may be stale (a file removed
+ * by hand a moment ago), and a position would then name another entry. An id that is
+ * gone is refused; the page says so and reads the memory again.
+ */
+async function forget(id: string): Promise<void> {
+  const seen = { gone: false };
+  await runCommandForResult(
+    "memory.remove",
+    { id },
+    {
+      expected: (err) => {
+        seen.gone = isMemoryEntryGone(err);
+        return seen.gone;
+      },
+    },
+  );
+  if (!seen.gone) return;
+  toast.info("That entry is gone; the list was refreshed.");
+  await loadMemory();
+}
+
+/** One entry: its text, when and by whom, whether threads get it, and Forget. */
 function MemoryRow({ file, className }: { file: string; className?: string | undefined }) {
   const entry = useMemoryEntry(file);
   const by = useMemoryBy(file);
+  const caps = useMemoryCaps();
   const now = useNow(60_000);
   const [busy, setBusy] = useState(false);
   if (!entry) return null;
   const when = rememberedWhen(entry.createdMs, now);
+  const leftOut = leftOutReason(entry.leftOut, caps);
   return (
-    <div className={cn("group flex min-w-0 items-start gap-3 px-4 py-3 hover:bg-cf-control-hover/40", className)} data-testid="memory-row" data-file={file}>
+    <div
+      className={cn("group flex min-w-0 items-start gap-3 px-4 py-3 hover:bg-cf-control-hover/40", className)}
+      data-testid="memory-row"
+      data-file={file}
+      data-injected={entry.injected}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="text-label break-words" data-testid="memory-text">
+        <p className={cn("text-label break-words", leftOut && "text-cf-text-muted")} data-testid="memory-text">
           {entry.text}
         </p>
         <p className="text-caption-sm" data-testid="memory-meta">
           {when ? `Remembered ${when}` : "Added by hand"}
           {by?.kind === "thread" && <ByThread by={by} />}
         </p>
+        {leftOut && (
+          <p className="flex items-start gap-1.5 text-caption-sm text-cf-warning" data-testid="memory-left-out" data-reason={entry.leftOut}>
+            <EyeOff className="mt-px size-3 shrink-0" aria-hidden />
+            {leftOut}
+          </p>
+        )}
       </div>
       <Tip label="Forget">
         <Button
@@ -76,7 +113,7 @@ function MemoryRow({ file, className }: { file: string; className?: string | und
           disabled={busy}
           onClick={() => {
             setBusy(true);
-            void runCommand("memory.remove", { entry: String(entry.index) }).finally(() => {
+            void forget(entry.id).finally(() => {
               setBusy(false);
             });
           }}
@@ -162,7 +199,7 @@ export function RememberedSection() {
           ))}
           <p className="flex items-center gap-2 border-t border-cf-border px-4 py-2.5 text-caption" data-testid="memory-footnote">
             <CircleQuestionMark className="size-3.5 shrink-0" aria-hidden />
-            Applies to threads started from now on. Facts about a project stay in Claude&apos;s own memory files.
+            Applies to new threads at once, and to open threads with their next message after a restart.
           </p>
         </>
       )}

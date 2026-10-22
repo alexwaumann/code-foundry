@@ -23,6 +23,7 @@ type MemoryBackend interface {
 	Entries() ([]memory.Entry, error)
 	Add(text string, by memory.Origin) (memory.Added, error)
 	Remove(ref, by string) (memory.Entry, error)
+	RemoveID(id, by string) (memory.Entry, error)
 	Clear(by string) (int, error)
 }
 
@@ -51,21 +52,27 @@ const memoryApplies = "New threads will follow it; threads already open get it o
 // would otherwise add a line to every thread's system prompt without the user seeing.
 var errMemoryChildThread = errors.New("memory is written from the user's own threads only")
 
-// MemoryEntryView is an entry in the memory.* commands' JSON: its number and text, and
-// where it came from (docs/notes/memory-dir.md). Created is RFC 3339 in UTC to the
+// MemoryEntryView is an entry in the memory.* commands' JSON: its number, id and text,
+// where it came from (docs/notes/memory-dir.md), and whether threads get it. ID is its
+// file name without ".md" (`memory remove --id`). Created is RFC 3339 in UTC to the
 // millisecond (memory.CreatedLayout), "" when unknown (a file added by hand); ThreadID
 // and ThreadName are the thread that added it and its name then, "" when the user did
-// (their terminal, the GUI).
+// (their terminal, the GUI). LeftOut is why threads do not get it (memory.LeftOut*),
+// "" when they do.
 type MemoryEntryView struct {
 	Index      int    `json:"index"`
+	ID         string `json:"id"`
 	Text       string `json:"text"`
 	Created    string `json:"created"`
 	ThreadID   string `json:"thread_id"`
 	ThreadName string `json:"thread_name"`
+	Injected   bool   `json:"injected"`
+	LeftOut    string `json:"left_out"`
 }
 
 func memoryEntryView(e memory.Entry) MemoryEntryView {
-	v := MemoryEntryView{Index: e.Index, Text: e.Text, ThreadID: e.ThreadID, ThreadName: e.ThreadName}
+	v := MemoryEntryView{Index: e.Index, ID: e.ID(), Text: e.Text, ThreadID: e.ThreadID, ThreadName: e.ThreadName,
+		Injected: e.Injected, LeftOut: e.LeftOut}
 	if !e.Created.IsZero() {
 		v.Created = e.Created.UTC().Format(memory.CreatedLayout)
 	}
@@ -153,20 +160,39 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 		Command{
 			Name:  "memory.remove",
 			Title: "Memory: Forget a Preference",
-			Description: "Forget one remembered preference: by its number in `memory show`, its text, or text found in it alone. " +
+			Description: "Forget one remembered preference: by its number in `memory show`, its text, its id, or text found in it alone; " +
+				"--id names it by id only and fails once it is gone, whatever the list looks like then. " +
 				"New threads no longer get it. Refused in a thread another thread started.",
 			Category:     "Settings",
 			NoKeybinding: true,
-			Args: []ArgSpec{{Name: "entry", Type: String, Required: true, Positional: true, Rest: true,
-				Description: "The entry's number in memory show, its text, or text that only that entry contains"}},
+			Args: []ArgSpec{
+				{Name: "entry", Type: String, Positional: true, Rest: true,
+					Description: "The entry's number in memory show, its text, its id, or text that only that entry contains"},
+				{Name: "id", Type: String,
+					Description: "The entry's id (memory show --json): its file name without .md. Instead of entry"},
+			},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				ref, id := strings.TrimSpace(a.String("entry")), strings.TrimSpace(a.String("id"))
+				switch {
+				case ref != "" && id != "":
+					return Result{}, InvalidArg("id", "give the entry or --id, not both")
+				case ref == "" && id == "":
+					return Result{}, InvalidArg("entry", "give an entry's number, its text, or --id")
+				}
 				c, err := memoryCaller(ctx, d.Threads, uctx)
 				if err != nil {
 					return Result{}, err
 				}
-				e, err := b.Remove(a.String("entry"), c.origin.ThreadID)
+				var e memory.Entry
+				arg := "entry"
+				if id != "" {
+					arg = "id"
+					e, err = b.RemoveID(id, c.origin.ThreadID)
+				} else {
+					e, err = b.Remove(ref, c.origin.ThreadID)
+				}
 				if err != nil {
-					return Result{}, memoryErr("entry", err)
+					return Result{}, memoryErr(arg, err)
 				}
 				memoryNotify(d.Emitter, c, "Forgot: "+e.Text)
 				return Result{Message: fmt.Sprintf("Forgot: %q.", e.Text), JSON: MemoryRemoveView{Removed: memoryEntryView(e)}}, nil
@@ -179,6 +205,7 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			Category:     "Settings",
 			NoKeybinding: true,
 			Confirm:      "Forget every remembered preference? New threads get none.",
+			ConfirmLabel: "Forget all",
 			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
 				c, err := memoryCaller(ctx, d.Threads, uctx)
 				if err != nil {
@@ -251,7 +278,8 @@ func memoryNotify(e Emitter, c memoryCallerInfo, title string) {
 	}}})
 }
 
-// formatMemory is memory.show's text: one numbered line per entry.
+// formatMemory is memory.show's text: one numbered line per entry, an entry threads do
+// not get marked with why.
 func formatMemory(entries []memory.Entry) string {
 	if len(entries) == 0 {
 		return "No preferences remembered. Add one with: code-foundry memory add \"<preference>\""
@@ -262,12 +290,33 @@ func formatMemory(entries []memory.Entry) string {
 			b.WriteByte('\n')
 		}
 		fmt.Fprintf(&b, "%d. %s", e.Index, e.Text)
+		if why := leftOutWords(e.LeftOut); why != "" {
+			fmt.Fprintf(&b, " [not given to threads: %s]", why)
+		}
 	}
 	return b.String()
 }
 
+// leftOutWords says why threads do not get an entry (memory.Entry.LeftOut); "" when
+// they do.
+func leftOutWords(reason string) string {
+	switch reason {
+	case memory.LeftOutTooLong:
+		return fmt.Sprintf("longer than %d characters; remove it and say it shorter", memory.MaxEntryChars)
+	case memory.LeftOutEntries:
+		return fmt.Sprintf("past the %d-entry limit", memory.MaxEntries)
+	case memory.LeftOutBytes:
+		return "past the 4 KiB limit"
+	case "":
+		return ""
+	}
+	return reason
+}
+
 // memoryErr maps the memory store's errors to the command's: a bad entry or reference
-// to an argument error on arg, no match to NotFound, a full memory to FailedPrecondition.
+// to an argument error on arg, no match to NotFound, a full memory to the command's own
+// failure (FailedPrecondition with CommandFailed: the CLI prints it and exits 1, as for
+// any state the caller did not get wrong, not a usage error).
 func memoryErr(arg string, err error) error {
 	switch {
 	case connect.CodeOf(err) != connect.CodeUnknown:
@@ -277,7 +326,7 @@ func memoryErr(arg string, err error) error {
 	case errors.Is(err, memory.ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, memory.ErrFull):
-		return connect.NewError(connect.CodeFailedPrecondition, err)
+		return Failed(err)
 	}
 	return Failed(err)
 }
@@ -289,4 +338,5 @@ var errNoMemory = connect.NewError(connect.CodeUnimplemented, errors.New("this d
 func (noMemory) Entries() ([]memory.Entry, error)                { return nil, errNoMemory }
 func (noMemory) Add(string, memory.Origin) (memory.Added, error) { return memory.Added{}, errNoMemory }
 func (noMemory) Remove(string, string) (memory.Entry, error)     { return memory.Entry{}, errNoMemory }
+func (noMemory) RemoveID(string, string) (memory.Entry, error)   { return memory.Entry{}, errNoMemory }
 func (noMemory) Clear(string) (int, error)                       { return 0, errNoMemory }
