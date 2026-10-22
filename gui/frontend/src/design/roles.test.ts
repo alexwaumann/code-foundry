@@ -45,19 +45,19 @@ describe("type roles", () => {
   });
 
   it.each([
-    ["text-title", { "font-size": "22px", "line-height": "28px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--foreground)" }],
-    ["text-display", { "font-size": "44px", "line-height": "48px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--foreground)" }],
-    ["text-display-sm", { "font-size": "32px", "line-height": "36px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--foreground)" }],
-    ["text-brand", { "font-size": "17px", "line-height": "20px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--foreground)" }],
-    ["text-heading", { "font-size": "15px", "line-height": "20px", "font-weight": "600", color: "var(--foreground)" }],
-    ["text-subheading", { "font-size": "14px", "line-height": "20px", "font-weight": "600", color: "var(--foreground)" }],
-    ["text-overline", { "font-size": "11px", "line-height": "16px", "font-weight": "500", "letter-spacing": "0.06em", "text-transform": "uppercase", color: "var(--muted-foreground)" }],
-    ["text-body", { "font-size": "15px", "line-height": "22px", "font-weight": "400", color: "var(--foreground)" }],
-    ["text-body-sm", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--foreground)" }],
-    ["text-label", { "font-size": "14px", "line-height": "20px", "font-weight": "500", color: "var(--foreground)" }],
-    ["text-caption", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--muted-foreground)" }],
-    ["text-caption-sm", { "font-size": "12px", "line-height": "16px", "font-weight": "400", color: "var(--muted-foreground)" }],
-    ["text-link", { "font-weight": "500", color: "var(--link)" }],
+    ["text-title", { "font-size": "22px", "line-height": "28px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--cf-text)" }],
+    ["text-display", { "font-size": "44px", "line-height": "48px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--cf-text)" }],
+    ["text-display-sm", { "font-size": "32px", "line-height": "36px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--cf-text)" }],
+    ["text-brand", { "font-size": "17px", "line-height": "20px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--cf-text)" }],
+    ["text-heading", { "font-size": "15px", "line-height": "20px", "font-weight": "600", color: "var(--cf-text)" }],
+    ["text-subheading", { "font-size": "14px", "line-height": "20px", "font-weight": "600", color: "var(--cf-text)" }],
+    ["text-overline", { "font-size": "11px", "line-height": "16px", "font-weight": "500", "letter-spacing": "0.06em", "text-transform": "uppercase", color: "var(--cf-text-muted)" }],
+    ["text-body", { "font-size": "15px", "line-height": "22px", "font-weight": "400", color: "var(--cf-text)" }],
+    ["text-body-sm", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--cf-text)" }],
+    ["text-label", { "font-size": "14px", "line-height": "20px", "font-weight": "500", color: "var(--cf-text)" }],
+    ["text-caption", { "font-size": "13px", "line-height": "18px", "font-weight": "400", color: "var(--cf-text-muted)" }],
+    ["text-caption-sm", { "font-size": "12px", "line-height": "16px", "font-weight": "400", color: "var(--cf-text-muted)" }],
+    ["text-link", { "font-weight": "500", color: "var(--cf-link)" }],
     ["text-code", { "font-family": 'ui-monospace, "SF Mono", Menlo, monospace', "font-size": "0.92em", "font-weight": "400" }],
   ])("%s", async (cls, decls) => {
     expect(rule(await build([cls]), cls)).toEqual(decls);
@@ -65,20 +65,22 @@ describe("type roles", () => {
 
   // A modifier after a role in the class list must also come after it in the stylesheet.
   it.each([
+    ["text-caption", "text-cf-text"],
+    ["text-caption-sm", "text-cf-error"],
+    ["text-body", "text-cf-text-muted"],
+    // components/ui keeps the shadcn names.
     ["text-caption", "text-foreground"],
-    ["text-caption-sm", "text-destructive"],
-    ["text-body", "text-muted-foreground"],
     ["text-body", "font-medium"],
     ["text-body-sm", "font-semibold"],
     ["text-label", "font-normal"],
     ["text-title", "font-medium"],
-    ["text-display", "text-muted-foreground"],
+    ["text-display", "text-cf-text-muted"],
     ["text-display-sm", "font-medium"],
     ["text-title", "tracking-normal"],
     ["text-overline", "tracking-normal"],
     ["text-overline", "normal-case"],
     ["text-heading", "leading-none"],
-    ["text-link", "text-foreground"],
+    ["text-link", "text-cf-text"],
     ["text-link", "font-normal"],
     ["text-code", "font-mono"],
     ["text-code", "font-semibold"],
@@ -137,9 +139,13 @@ describe("radius scale and shell gap", () => {
 
 describe("cn knows the tokens", () => {
   it.each([
+    [["text-caption", "text-cf-text"], "text-caption text-cf-text"],
     [["text-caption", "text-foreground"], "text-caption text-foreground"],
+    [["text-cf-text-muted", "text-cf-text"], "text-cf-text"],
+    [["bg-cf-surface-raised", "bg-cf-sidebar-row-selected"], "bg-cf-sidebar-row-selected"],
+    [["bg-accent", "bg-cf-control-hover"], "bg-cf-control-hover"],
     [["text-body", "font-medium"], "text-body font-medium"],
-    [["text-link", "text-destructive"], "text-link text-destructive"],
+    [["text-link", "text-cf-error"], "text-link text-cf-error"],
     [["text-code", "font-mono"], "text-code font-mono"],
     [["text-body", "text-caption"], "text-caption"],
     [["text-display", "text-display-sm"], "text-display-sm"],
@@ -147,7 +153,7 @@ describe("cn knows the tokens", () => {
     [["text-label text-inherit", "text-primary-foreground"], "text-label text-primary-foreground"],
     [["text-label text-inherit", "text-body-sm font-medium"], "text-inherit text-body-sm font-medium"],
     [["text-sm", "text-body"], "text-body"],
-    [["text-xs text-muted-foreground", "text-caption"], "text-muted-foreground text-caption"],
+    [["text-xs text-cf-text-muted", "text-caption"], "text-cf-text-muted text-caption"],
     [["rounded-md", "rounded-pane"], "rounded-pane"],
     [["rounded-pane", "rounded-sm"], "rounded-sm"],
     [["m-2", "m-shell"], "m-shell"],

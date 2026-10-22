@@ -6,7 +6,8 @@ import { COMPONENT_ALIASES, isSlot, SLOT_NAMES } from "@/themes/slots";
  * The theme tiers (docs/notes/theme-slots-1-engine.md), strictly:
  * - index.css's alias block declares exactly COMPONENT_ALIASES, each a bare var() of a slot,
  *   on `:root` and every `[data-theme-scope]`;
- * - every colour Tailwind exposes (`--color-X: var(--X)` in @theme) is an alias there;
+ * - every colour Tailwind exposes (`--color-X: var(--X)` in @theme) is an alias there or a
+ *   `--cf-*` slot (`--color-cf-X: var(--cf-X)`), and every `--cf-*` slot has its utility;
  * - nothing else under src gives a slot or a component name a colour: no stylesheet
  *   declares one, and no TypeScript pairs one with a colour literal. Slots come from the
  *   resolver (lib/theme.ts, ThemeScope), component names from the alias block.
@@ -47,17 +48,28 @@ describe("theme tiers", () => {
     for (const slot of Object.values(COMPONENT_ALIASES)) expect(SLOT_NAMES, slot).toContain(slot);
   });
 
-  it("every colour Tailwind exposes is a component name in the alias block", () => {
-    const exposed = [...code(indexCss).matchAll(/--color-[\w-]+:\s*var\((--[\w-]+)\)/g)].map((m) => m[1] ?? "");
-    expect(exposed.length).toBeGreaterThan(40);
+  it("every colour Tailwind exposes is a component name in the alias block or a --cf-* slot", () => {
+    const exposed = [...code(indexCss).matchAll(/--color-([\w-]+):\s*var\((--[\w-]+)\)/g)].map((m) => ({ utility: m[1] ?? "", name: m[2] ?? "" }));
+    expect(exposed.length).toBeGreaterThan(100);
     const block = aliasBlock();
-    expect(exposed.filter((n) => !block.has(n))).toEqual([]);
+    expect(exposed.filter(({ name }) => !block.has(name) && !(name.startsWith("--cf-") && isSlot(name))).map((e) => e.name)).toEqual([]);
+    // A slot's utility is its own name: --color-cf-surface-raised reads --cf-surface-raised.
+    expect(exposed.filter(({ utility, name }) => name.startsWith("--cf-") && `--${utility}` !== name)).toEqual([]);
+  });
+
+  // docs/notes/theme-slots-2-components.md: components use bg-cf-*, text-cf-*, border-cf-*, ...
+  it("every --cf-* slot has a Tailwind utility (--color-cf-<slot>)", () => {
+    const exposed = new Set([...code(indexCss).matchAll(/--color-(cf-[\w-]+):\s*var\(--cf-[\w-]+\)/g)].map((m) => `--${m[1] ?? ""}`));
+    const cf = SLOT_NAMES.filter((n) => n.startsWith("--cf-"));
+    expect(cf).toHaveLength(67);
+    expect(cf.filter((n) => !exposed.has(n))).toEqual([]);
   });
 
   // Tailwind declares `--color-foreground: var(--foreground)` once, on :root, so it resolves to
   // the window's theme there; a rule that reads it paints a preview scope in the window's
-  // colours (the type roles did: a dark preview's thread text was the light window's).
-  it("index.css's own rules read component names, never Tailwind's --color-* (resolved at :root)", () => {
+  // colours (the type roles did: a dark preview's thread text was the light window's). The
+  // rules read the slots, set inline on <html> and on every preview scope.
+  it("index.css's own rules never read Tailwind's --color-* (resolved at :root)", () => {
     const lines = code(indexCss)
       .split("\n")
       .map((text, i) => ({ text, line: i + 1 }))
