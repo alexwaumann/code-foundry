@@ -176,7 +176,7 @@ func (r *runner) respawn() {
 	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
-	argv, env, extras := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
+	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
 		Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},
@@ -200,11 +200,17 @@ func (r *runner) respawn() {
 	st.proc, st.conn = proc, proc.Conn()
 	st.connMu.Unlock()
 	// The new process has the current extras: no longer stale (envstale.go).
-	r.m.update(r.id, false, func(rec *record) {
+	r.m.update(r.id, mem.fresh, func(rec *record) {
 		if rec.run == r {
 			rec.spawnedWith(extras)
 		}
+		if mem.fresh {
+			rec.s.MemoryHash = mem.hash // a conversation not saved yet starts again with the memory as it is now
+		}
 	})
+	// A resumed conversation keeps its system prompt: a changed memory goes with the next
+	// message (memory.go).
+	r.memNote, r.memHash = mem.note, mem.hash
 	st.events = st.conn.Events()
 	st.initialized, st.outputEnded, st.exited, st.commandsPushed = false, false, false, false
 	st.restartFrom, st.effort = st.effort, s.Effort

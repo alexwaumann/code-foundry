@@ -87,6 +87,10 @@ type ArgSpec struct {
 	// Repeatable lets the CLI take the flag more than once; it sends the values joined
 	// by newlines (thread.subscribe's --arg k=v). String args only, not positional.
 	Repeatable bool
+	// Rest makes the last positional arg take every bare word left on the CLI, joined
+	// by spaces: `memory add always open PRs as drafts` needs no quotes. String
+	// positional args only.
+	Rest bool
 }
 
 // positional is s taking a bare word on the CLI too: `thread archive 8f3a`.
@@ -126,6 +130,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("an id list needs an id kind and no context")
 	case s.Repeatable && (s.Type != String || s.Positional || s.Context != NoContext):
 		return errors.New("only a string flag without a context can be repeated")
+	case s.Rest && (s.Type != String || !s.Positional):
+		return errors.New("only a string positional arg can take the rest of the words")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {

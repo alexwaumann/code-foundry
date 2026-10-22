@@ -42,6 +42,9 @@ type runner struct {
 	// of this fresh session's first message, until it went out (sendMessage).
 	reseedPending bool
 	seed          string
+	// memNote is the app memory's refresh the next message of a resumed conversation
+	// starts with, until it went out; memHash is the hash the row takes then (memory.go).
+	memNote, memHash string
 
 	closing bool
 	// disconnectAs is the disconnect reason a close the daemon began itself records

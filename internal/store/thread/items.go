@@ -133,6 +133,10 @@ type Item struct {
 	// SeedPrefix: user_message's seed prefix, what Claude got before the text (and the
 	// resume note) as the first message of a fresh session a reseed asked for (reseed.go).
 	SeedPrefix string
+	// MemoryNote: user_message's app memory refresh, the standing preferences Claude got
+	// before the text (and the seed prefix and resume note) because they changed since its
+	// conversation started (memory.go). Not shown: the message shows as typed.
+	MemoryNote string
 	// Queued: a user_message Claude has but has not read yet. A message sent while a turn
 	// runs waits in Claude Code's queue until its next tool call (or the end of the reply);
 	// the item is in the log from its arrival so the send shows at once (queued.go).

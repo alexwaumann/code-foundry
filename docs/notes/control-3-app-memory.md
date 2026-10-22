@@ -33,7 +33,9 @@ skill; no GUI.
   * add, remove and clear end with "(applies to threads started from now on)".
 * **Injection**: `thread.Options.Memory` (the daemon passes `memory.Store.Texts`) is read
   in `claudeCommand`, so at every spawn: create, start on send, fork, effort restart,
-  reseed. `systemPrompt(workspaceLine, memory, threadAppend)` puts the block after
+  reseed. (Corrected in control-6-memory-fixes.md: only a fresh conversation uses the
+  prompt; a resumed one, after a start on send, a restart or a fork, keeps the one it
+  started with, so a changed memory now goes with its next message.) `systemPrompt(workspaceLine, memory, threadAppend)` puts the block after
   ThreadPrompt and the workspace line, before the thread's own append (a reseed's or
   Ember's seed), separated by a blank line:
 

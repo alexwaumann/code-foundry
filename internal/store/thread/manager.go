@@ -809,6 +809,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Epoch: 1,
+		// The fork resumes the parent's conversation, system prompt and all (memory.go).
+		MemoryHash: parent.MemoryHash,
 	}
 	m.mu.Lock()
 	// The fork's transcript starts with the copied history, so its first user
@@ -884,7 +886,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	argv, env, extras := m.claudeCommand(ctx, s, l, grants{}, true)
+	argv, env, extras, mem := m.claudeCommand(ctx, s, l, grants{}, true)
+	r.memNote, r.memHash = mem.note, mem.hash
 	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
 		return err
 	}
@@ -900,6 +903,9 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	rec.run = r
 	rec.release()
 	rec.spawnedWith(extras)
+	if mem.fresh {
+		rec.s.MemoryHash = mem.hash // its system prompt has the memory as it is now
+	}
 	rec.s.State = StateStarting
 	// The fresh process owns status from here: the persisted one is cleared, or, with a
 	// message waiting for the handshake, the thread is on that turn already.
@@ -943,14 +949,16 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // is the first user message). g is what the conversation's allow-for-thread answers
 // granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
 // briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
-// x is the extras it applied, for the staleness fingerprint (envstale.go).
-func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
+// x is the extras it applied, for the staleness fingerprint (envstale.go); mem is what
+// the spawn did with the app memory (memory.go).
+func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras, mem spawnMemory) {
 	// A resident's own rules (residenthooks.go) come before the conversation's grants.
 	residentAllow, residentDeny := m.residentRules(s)
-	mem := m.memory(s.ID)
+	entries, memOK := m.memory(s.ID)
+	mem = memorySpawned(l, s.MemoryHash, entries, memOK)
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: allowedTools(append(residentAllow, g.allow...)), disallowedTools: append(residentDeny, g.deny...),
-		appendSystemPrompt: systemPrompt("", mem, s.SystemPromptAppend)}
+		appendSystemPrompt: systemPrompt("", entries, s.SystemPromptAppend)}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
@@ -970,7 +978,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		}
 		var ok bool
 		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.appendSystemPrompt = systemPrompt(wl.prompt, mem, s.SystemPromptAppend)
+			sa.appendSystemPrompt = systemPrompt(wl.prompt, entries, s.SystemPromptAppend)
 			env = append(slices.Clip(env), wl.env...)
 			members = wl.projects
 			if len(wl.missing) > 0 {
@@ -1000,7 +1008,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	if p := prependPath(env, x.PathPrepend, os.Getenv("PATH")); p != "" {
 		env = append(env, p)
 	}
-	return l.argv(m.opts.Claude, sa), env, x
+	return l.argv(m.opts.Claude, sa), env, x, mem
 }
 
 // Rename sets a user-chosen name and disables auto-naming.

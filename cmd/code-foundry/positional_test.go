@@ -49,6 +49,46 @@ func TestParseWithPositionalsNegativeNumbers(t *testing.T) {
 	}
 }
 
+// A rest positional takes every word left, joined by spaces, after the positionals
+// before it took theirs.
+func TestAssignPositionalsRest(t *testing.T) {
+	str := v1.ArgType_ARG_TYPE_STRING
+	key := &v1.ArgSpec{Name: "key", Type: str, Positional: true}
+	text := &v1.ArgSpec{Name: "text", Type: str, Positional: true, Rest: true}
+	for _, tt := range []struct {
+		name  string
+		specs []*v1.ArgSpec
+		words []string
+		want  []string // each flag's value
+	}{
+		{name: "one word", specs: []*v1.ArgSpec{text}, words: []string{"tabs"}, want: []string{"tabs"}},
+		{name: "several words", specs: []*v1.ArgSpec{text}, words: []string{"always", "open", "PRs", "as", "drafts"},
+			want: []string{"always open PRs as drafts"}},
+		{name: "after an earlier positional", specs: []*v1.ArgSpec{key, text}, words: []string{"k", "a", "b"}, want: []string{"k", "a b"}},
+		{name: "no words", specs: []*v1.ArgSpec{text}, words: nil, want: []string{""}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var stderr bytes.Buffer
+			cl := &cli{stderr: &stderr}
+			fs := cl.newFlagSet("x")
+			flags := make([]*argFlag, len(tt.specs))
+			var got []string
+			for i, s := range tt.specs {
+				flags[i] = &argFlag{spec: s}
+			}
+			if err := cl.assignPositionals(fs, flags, tt.words); err != nil {
+				t.Fatalf("err %v, stderr %q", err, stderr.String())
+			}
+			for _, f := range flags {
+				got = append(got, f.value)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("values %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // Stray words name the id flag they were probably meant for.
 func TestAssignPositionalsHint(t *testing.T) {
 	str := v1.ArgType_ARG_TYPE_STRING

@@ -248,8 +248,12 @@ func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []str
 			return nil
 		}
 		if f.spec.GetPositional() && !f.set {
-			_ = f.Set(words[0])
-			words = words[1:]
+			n := 1
+			if f.spec.GetRest() {
+				n = len(words) // the last positional: every word left, joined by spaces
+			}
+			_ = f.Set(strings.Join(words[:n], " "))
+			words = words[n:]
 			took = append(took, f)
 		}
 	}

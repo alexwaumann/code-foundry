@@ -234,7 +234,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		AttachmentsDir: p.Attachments(), SkillsDir: p.Claude(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
 		// The user's standing preferences, read at every spawn into the system prompt
 		// (docs/notes/control-3-app-memory.md).
-		Memory: s.memory.Texts,
+		Memory: s.memory.Injected,
 		// Development aids: how long a thread's process stays up at least, and how often
 		// idle threads are checked against their cache expiry (Go durations; unset or
 		// invalid: the defaults, 5m and 30s). See docs/notes/thread-lifecycle.md.

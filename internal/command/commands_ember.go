@@ -128,7 +128,8 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			Name:  "ember.remember",
 			Title: "Ember: Remember",
 			Description: "Keep a fact in Ember's memory now: a dated line under MEMORY.md's Notes, kept across epochs " +
-				"(a preference, a decision, a person). The rest of the memory is rewritten at each new epoch.",
+				"(a convention, a decision, a person). The rest of the memory is rewritten at each new epoch. " +
+				"A preference about how threads behave in the app goes to memory.add, which every thread gets.",
 			Category:     emberCategory,
 			NoKeybinding: true,
 			Args:         []ArgSpec{{Name: "fact", Type: String, Required: true, Positional: true, Description: "The fact, one line (at most 1000 characters)"}},

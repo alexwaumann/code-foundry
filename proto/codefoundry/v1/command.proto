@@ -67,6 +67,9 @@ message ArgSpec {
   // project, worktree). The CLI refuses an explicitly empty value, which would
   // otherwise mean the active one.
   bool context_bound = 13;
+  // The last positional arg takes every bare word left on the CLI, joined by spaces
+  // (`code-foundry memory add always open PRs as drafts`).
+  bool rest = 14;
 }
 
 message Command {
