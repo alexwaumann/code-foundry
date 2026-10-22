@@ -44,12 +44,12 @@ func workspacePrompt(name string) string {
 // rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
-	"In this app: when the user says how you should act from now on (always, never, keep answers short), run code-foundry memory add <their words> at once, without asking (every thread then follows it), never your own memory files; " +
+	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
 	"cost and usage: code-foundry usage.show; " +
 	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
-	"a file path in your reply is a clickable chip, an .html file renders interactively; " +
+	"a path in your reply is a clickable chip, an .html file renders interactively; " +
 	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
-	"threads work In place (the project folder) unless the user picks Fresh copy (a worktree); " +
+	"threads work In place unless the user picks Fresh copy (a worktree); " +
 	"never tell the user to type /model or /cost, which the app replaces; " +
 	"page verbs (view.*) move every window: prefer panel verbs; " +
 	"say what you will do, not command or skill names. " +

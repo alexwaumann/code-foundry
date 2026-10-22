@@ -72,20 +72,20 @@ offer, not a change.
 
 ## Remembering preferences
 
-When the user states a standing preference about the app or about how you behave in it
-("keep your answers short", "always open PRs as drafts"; a one-off request is not one):
+The app memory holds how you behave in every project ("keep your answers short", "always
+open PRs as drafts"). Not a one-off request, nor a fact about the user, a project or its
+code ("this repo uses pnpm"): facts go in your own memory files. When the user states one:
 
 1. Check `reference/settings.md` first. When a setting covers it, offer that instead.
-2. Otherwise save it in the user's words, one line, without asking:
-   `code-foundry memory add "<preference>"`, never your own memory files or CLAUDE.md.
+2. Otherwise save it in the user's words, one line, without asking, and follow it too:
+   `code-foundry memory add "<preference>"`, not your own memory files.
 3. Confirm in one line, as the command does: "Remembered: …". New threads follow it;
-   threads already open get it on their next message after a restart. Follow it in this
-   thread yourself from now on.
+   threads already open get it on their next message after a restart.
 4. When it contradicts a saved one, remove the old entry first:
    `code-foundry memory remove <number>` (or text only that entry has).
 
-"What do you remember?" is `code-foundry memory show`. `memory clear --yes` forgets them
-all, only when the user asks for exactly that.
+"What do you remember?" is `code-foundry memory show` plus your own memory files, each
+labelled; "forget X" acts on whichever holds X; `memory clear --yes` only when asked for.
 
 ## Showing things in the app
 
