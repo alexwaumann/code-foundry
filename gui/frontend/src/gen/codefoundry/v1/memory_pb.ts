@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/memory.proto.
  */
 export const file_codefoundry_v1_memory: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9tZW1vcnkucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIp8BCgtNZW1vcnlFbnRyeRINCgVpbmRleBgBIAEoBRIMCgR0ZXh0GAIgASgJEgwKBGZpbGUYAyABKAkSKwoHY3JlYXRlZBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJdGhyZWFkX2lkGAUgASgJEhMKC3RocmVhZF9uYW1lGAYgASgJEhAKCGluamVjdGVkGAcgASgIItYBCg5NZW1vcnlTbmFwc2hvdBIsCgdlbnRyaWVzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RW50cnkSEAoIaW5qZWN0ZWQYAiABKAUSFgoOaW5qZWN0ZWRfYnl0ZXMYAyABKAUSEwoLbWF4X2VudHJpZXMYBCABKAUSEQoJbWF4X2J5dGVzGAUgASgFEhcKD21heF9lbnRyeV9jaGFycxgGIAEoBRILCgNkaXIYByABKAkSDQoFZXJyb3IYCCABKAkSDwoHdmVyc2lvbhgJIAEoBCISChBHZXRNZW1vcnlSZXF1ZXN0IkMKEUdldE1lbW9yeVJlc3BvbnNlEi4KBm1lbW9yeRgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90IhQKEldhdGNoTWVtb3J5UmVxdWVzdCI/CgtNZW1vcnlFdmVudBIwCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90MqsBCg1NZW1vcnlTZXJ2aWNlEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldE1lbW9yeVJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRNZW1vcnlSZXNwb25zZSIAEkwKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hNZW1vcnlSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC01lbW9yeVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9tZW1vcnkucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr0BCgtNZW1vcnlFbnRyeRINCgVpbmRleBgBIAEoBRIMCgR0ZXh0GAIgASgJEgwKBGZpbGUYAyABKAkSKwoHY3JlYXRlZBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJdGhyZWFkX2lkGAUgASgJEhMKC3RocmVhZF9uYW1lGAYgASgJEhAKCGluamVjdGVkGAcgASgIEgoKAmlkGAggASgJEhAKCGxlZnRfb3V0GAkgASgJItYBCg5NZW1vcnlTbmFwc2hvdBIsCgdlbnRyaWVzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RW50cnkSEAoIaW5qZWN0ZWQYAiABKAUSFgoOaW5qZWN0ZWRfYnl0ZXMYAyABKAUSEwoLbWF4X2VudHJpZXMYBCABKAUSEQoJbWF4X2J5dGVzGAUgASgFEhcKD21heF9lbnRyeV9jaGFycxgGIAEoBRILCgNkaXIYByABKAkSDQoFZXJyb3IYCCABKAkSDwoHdmVyc2lvbhgJIAEoBCISChBHZXRNZW1vcnlSZXF1ZXN0IkMKEUdldE1lbW9yeVJlc3BvbnNlEi4KBm1lbW9yeRgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90IhQKEldhdGNoTWVtb3J5UmVxdWVzdCI/CgtNZW1vcnlFdmVudBIwCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90MqsBCg1NZW1vcnlTZXJ2aWNlEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldE1lbW9yeVJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRNZW1vcnlSZXNwb25zZSIAEkwKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hNZW1vcnlSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC01lbW9yeVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * MemoryEntry is one remembered preference.
@@ -63,11 +63,28 @@ export type MemoryEntry = Message<"codefoundry.v1.MemoryEntry"> & {
   threadName: string;
 
   /**
-   * Whether threads get it: false past the caps, in a directory edited by hand.
+   * Whether threads get it: false past the caps or longer than max_entry_chars (an
+   * import or a directory edited by hand); left_out says which.
    *
    * @generated from field: bool injected = 7;
    */
   injected: boolean;
+
+  /**
+   * Its stable id: the file name without ".md". `memory remove --id` takes it, and
+   * refuses (NotFound) once the file is gone, whatever the list looks like then.
+   *
+   * @generated from field: string id = 8;
+   */
+  id: string;
+
+  /**
+   * Why threads do not get it: "too_long" (past max_entry_chars), "entries" (past
+   * max_entries) or "bytes" (past max_bytes); empty when they do.
+   *
+   * @generated from field: string left_out = 9;
+   */
+  leftOut: string;
 };
 
 /**
@@ -91,7 +108,7 @@ export type MemorySnapshot = Message<"codefoundry.v1.MemorySnapshot"> & {
   entries: MemoryEntry[];
 
   /**
-   * How many entries threads get (the first ones) and their size rendered as the
+   * How many entries threads get (those with injected) and their size rendered as the
    * prompt lists them, which max_bytes caps.
    *
    * @generated from field: int32 injected = 2;

@@ -147,6 +147,9 @@ message ConfirmationRequired {
   // never sees this confirmation and sends none: the command then does what it does
   // today.
   map<string, string> bind = 6;
+  // The confirm button's words when the command names them ("Forget all"); empty: the
+  // title without a "Category: " prefix.
+  string confirm_label = 7;
 }
 
 // CommandFailed is the error detail of an Invoke whose command could not do what it was

@@ -17,7 +17,7 @@ func TestCommandInvokeConfirm(t *testing.T) {
 	if err := r.Register(command.Command{
 		Name: "thread.remove", Title: "Remove Thread", Category: "Thread",
 		Args:    []command.ArgSpec{{Name: "id", Type: command.String, Required: true, Context: command.ContextThread, Positional: true}},
-		Confirm: "Remove thread {id}?",
+		Confirm: "Remove thread {id}?", ConfirmLabel: "Remove",
 		Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
 			ran++
 			return command.Result{Message: "removed"}, nil
@@ -50,7 +50,7 @@ func TestCommandInvokeConfirm(t *testing.T) {
 			}
 		}
 	}
-	if got == nil || got.GetMessage() != "Remove thread s1?" || got.GetCommand() != "thread.remove" || got.GetTitle() != "Remove Thread" {
+	if got == nil || got.GetMessage() != "Remove thread s1?" || got.GetCommand() != "thread.remove" || got.GetTitle() != "Remove Thread" || got.GetConfirmLabel() != "Remove" {
 		t.Fatalf("detail = %v", got)
 	}
 	if ran != 0 {
