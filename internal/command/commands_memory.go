@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -17,10 +18,11 @@ import (
 // standing preferences, which every thread's system prompt carries from its start, and
 // a resumed thread gets with its next message after a restart
 // (docs/notes/control-3-app-memory.md, control-6-memory-fixes.md). *memory.Store
-// implements it. by is the thread that asked ("" for the user outside one), for the log.
+// implements it. by is the thread that asked ("" for the user outside one): Add records
+// it with the entry, the others log it.
 type MemoryBackend interface {
 	Entries() ([]memory.Entry, error)
-	Add(text, by string) (memory.Added, error)
+	Add(text string, by memory.Origin) (memory.Added, error)
 	Remove(ref, by string) (memory.Entry, error)
 	Clear(by string) (int, error)
 }
@@ -50,21 +52,41 @@ const memoryApplies = "New threads will follow it; threads already open get it o
 // would otherwise add a line to every thread's system prompt without the user seeing.
 var errMemoryChildThread = errors.New("memory is written from the user's own threads only")
 
+// MemoryEntryView is an entry in the memory.* commands' JSON: its number and text, and
+// where it came from (docs/notes/memory-dir.md). Created is RFC 3339 in UTC, "" when
+// unknown (a file added by hand); ThreadID and ThreadName are the thread that added it
+// and its name then, "" when the user did (their terminal, the GUI).
+type MemoryEntryView struct {
+	Index      int    `json:"index"`
+	Text       string `json:"text"`
+	Created    string `json:"created"`
+	ThreadID   string `json:"thread_id"`
+	ThreadName string `json:"thread_name"`
+}
+
+func memoryEntryView(e memory.Entry) MemoryEntryView {
+	v := MemoryEntryView{Index: e.Index, Text: e.Text, ThreadID: e.ThreadID, ThreadName: e.ThreadName}
+	if !e.Created.IsZero() {
+		v.Created = e.Created.UTC().Format(time.RFC3339Nano)
+	}
+	return v
+}
+
 // MemoryView is memory.show's JSON.
 type MemoryView struct {
-	Entries []memory.Entry `json:"entries"`
+	Entries []MemoryEntryView `json:"entries"`
 }
 
 // MemoryAddView is memory.add's JSON: the entry, and whether it was added (false: the
 // memory had it already).
 type MemoryAddView struct {
-	Entry memory.Entry `json:"entry"`
-	Added bool         `json:"added"`
+	Entry MemoryEntryView `json:"entry"`
+	Added bool            `json:"added"`
 }
 
 // MemoryRemoveView is memory.remove's JSON.
 type MemoryRemoveView struct {
-	Removed memory.Entry `json:"removed"`
+	Removed MemoryEntryView `json:"removed"`
 }
 
 // MemoryClearView is memory.clear's JSON: how many entries were forgotten.
@@ -91,10 +113,11 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 				if err != nil {
 					return Result{}, memoryErr("", err)
 				}
-				if entries == nil {
-					entries = []memory.Entry{}
+				views := make([]MemoryEntryView, len(entries))
+				for i, e := range entries {
+					views[i] = memoryEntryView(e)
 				}
-				return Result{Message: formatMemory(entries), JSON: MemoryView{Entries: entries}}, nil
+				return Result{Message: formatMemory(entries), JSON: MemoryView{Entries: views}}, nil
 			},
 		},
 		Command{
@@ -109,22 +132,22 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			Args: []ArgSpec{{Name: "text", Type: String, Required: true, Positional: true, Rest: true,
 				Description: "The preference, one line (several words need no quotes)"}},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-				by, name, err := memoryCaller(ctx, d.Threads, uctx)
+				c, err := memoryCaller(ctx, d.Threads, uctx)
 				if err != nil {
 					return Result{}, err
 				}
-				added, err := b.Add(a.String("text"), by)
+				added, err := b.Add(a.String("text"), c.origin)
 				if err != nil {
 					return Result{}, memoryErr("text", err)
 				}
 				e := added.Entry
 				if added.Duplicate {
 					return Result{Message: fmt.Sprintf("Already remembered: %q (nothing changed).", e.Text),
-						JSON: MemoryAddView{Entry: e}}, nil
+						JSON: MemoryAddView{Entry: memoryEntryView(e)}}, nil
 				}
-				memoryNotify(d.Emitter, by, name, "Remembered: "+e.Text)
+				memoryNotify(d.Emitter, c, "Remembered: "+e.Text)
 				return Result{Message: fmt.Sprintf("Remembered: %q. %s", e.Text, memoryApplies),
-					JSON: MemoryAddView{Entry: e, Added: true}}, nil
+					JSON: MemoryAddView{Entry: memoryEntryView(e), Added: true}}, nil
 			},
 		},
 		Command{
@@ -137,16 +160,16 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			Args: []ArgSpec{{Name: "entry", Type: String, Required: true, Positional: true, Rest: true,
 				Description: "The entry's number in memory show, its text, or text that only that entry contains"}},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-				by, name, err := memoryCaller(ctx, d.Threads, uctx)
+				c, err := memoryCaller(ctx, d.Threads, uctx)
 				if err != nil {
 					return Result{}, err
 				}
-				e, err := b.Remove(a.String("entry"), by)
+				e, err := b.Remove(a.String("entry"), c.origin.ThreadID)
 				if err != nil {
 					return Result{}, memoryErr("entry", err)
 				}
-				memoryNotify(d.Emitter, by, name, "Forgot: "+e.Text)
-				return Result{Message: fmt.Sprintf("Forgot: %q.", e.Text), JSON: MemoryRemoveView{Removed: e}}, nil
+				memoryNotify(d.Emitter, c, "Forgot: "+e.Text)
+				return Result{Message: fmt.Sprintf("Forgot: %q.", e.Text), JSON: MemoryRemoveView{Removed: memoryEntryView(e)}}, nil
 			},
 		},
 		Command{
@@ -157,11 +180,11 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			NoKeybinding: true,
 			Confirm:      "Forget every remembered preference? New threads get none.",
 			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
-				by, _, err := memoryCaller(ctx, d.Threads, uctx)
+				c, err := memoryCaller(ctx, d.Threads, uctx)
 				if err != nil {
 					return Result{}, err
 				}
-				n, err := b.Clear(by)
+				n, err := b.Clear(c.origin.ThreadID)
 				if err != nil {
 					return Result{}, memoryErr("", err)
 				}
@@ -174,43 +197,51 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 	)
 }
 
+// memoryCallerInfo is who a memory change comes from: origin is what an added entry
+// records (the thread's id and its name now; zero for the user), label the thread's
+// name, else its id, for the notification.
+type memoryCallerInfo struct {
+	origin memory.Origin
+	label  string
+}
+
 // memoryCaller is the thread a memory change comes from: the CLI's thread
-// ($CODE_FOUNDRY_THREAD; ActiveView is empty only there), "" for the user's own
+// ($CODE_FOUNDRY_THREAD; ActiveView is empty only there), none for the user's own
 // terminal or the GUI. A thread another thread started is refused (PermissionDenied).
-// name is the thread's name, else its id, for the notification. A thread the store no
-// longer has (a stale environment) counts as the user's.
-func memoryCaller(ctx context.Context, threads MemoryThreads, uctx Context) (by, name string, err error) {
+// A thread the store no longer has (a stale environment) counts as the user's, with
+// its id recorded and no name.
+func memoryCaller(ctx context.Context, threads MemoryThreads, uctx Context) (memoryCallerInfo, error) {
 	if uctx.ActiveView != "" || uctx.CallerThreadID == "" {
-		return "", "", nil
+		return memoryCallerInfo{}, nil
 	}
-	by = uctx.CallerThreadID
+	by := uctx.CallerThreadID
 	if threads == nil {
-		return by, by, nil
+		return memoryCallerInfo{origin: memory.Origin{ThreadID: by}, label: by}, nil
 	}
 	res, err := threads.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: by}))
 	if connect.CodeOf(err) == connect.CodeNotFound {
-		return by, by, nil
+		return memoryCallerInfo{origin: memory.Origin{ThreadID: by}, label: by}, nil
 	}
 	if err != nil {
-		return "", "", Failed(fmt.Errorf("look up the calling thread %s: %w", by, err))
+		return memoryCallerInfo{}, Failed(fmt.Errorf("look up the calling thread %s: %w", by, err))
 	}
 	s := res.Msg.GetThread()
 	if creator := s.GetCreatedBy(); creator != "" {
 		slog.Warn("memory: change refused from a thread another thread started", "thread", by, "created_by", creator)
-		return "", "", connect.NewError(connect.CodePermissionDenied, fmt.Errorf(
+		return memoryCallerInfo{}, connect.NewError(connect.CodePermissionDenied, fmt.Errorf(
 			"%w: thread %s was started by thread %s; tell that thread instead", errMemoryChildThread, by, creator))
 	}
-	return by, threadNameOrID(s), nil
+	return memoryCallerInfo{origin: memory.Origin{ThreadID: by, ThreadName: s.GetName()}, label: threadNameOrID(s)}, nil
 }
 
 // memoryNotify shows a change a thread made in every window, so a line added to every
 // thread's system prompt is never silent. A change outside a thread (the user's) shows
 // nothing: the user made it.
-func memoryNotify(e Emitter, by, name, title string) {
-	if e == nil || by == "" {
+func memoryNotify(e Emitter, c memoryCallerInfo, title string) {
+	if e == nil || c.origin.ThreadID == "" {
 		return
 	}
-	body := fmt.Sprintf("By thread %q.", name)
+	body := fmt.Sprintf("By thread %q.", c.label)
 	e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: clipText(title, 120), Body: body,
 	}}})
@@ -251,7 +282,7 @@ type noMemory struct{}
 
 var errNoMemory = connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no app memory"))
 
-func (noMemory) Entries() ([]memory.Entry, error)            { return nil, errNoMemory }
-func (noMemory) Add(string, string) (memory.Added, error)    { return memory.Added{}, errNoMemory }
-func (noMemory) Remove(string, string) (memory.Entry, error) { return memory.Entry{}, errNoMemory }
-func (noMemory) Clear(string) (int, error)                   { return 0, errNoMemory }
+func (noMemory) Entries() ([]memory.Entry, error)                { return nil, errNoMemory }
+func (noMemory) Add(string, memory.Origin) (memory.Added, error) { return memory.Added{}, errNoMemory }
+func (noMemory) Remove(string, string) (memory.Entry, error)     { return memory.Entry{}, errNoMemory }
+func (noMemory) Clear(string) (int, error)                       { return 0, errNoMemory }

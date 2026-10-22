@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 )
 
 // The memory.* verbs against a real daemon: the CLI goes through the daemon, which owns
-// <home>/memory.md.
+// <home>/memory/.
 func TestCLIMemory(t *testing.T) {
 	c := startTestDaemon(t)
 	r := runCLI(c, "daemon", "status", "--json")
@@ -21,7 +22,7 @@ func TestCLIMemory(t *testing.T) {
 	if err := json.Unmarshal([]byte(r.stdout), &status); err != nil || status.Home == "" {
 		t.Fatalf("daemon status: %v %q", err, r.stdout)
 	}
-	file := paths.New(status.Home).Memory()
+	dir := paths.New(status.Home).Memory()
 
 	for _, tt := range []struct {
 		name       string
@@ -37,7 +38,9 @@ func TestCLIMemory(t *testing.T) {
 		{"several words", []string{"memory", "add", "Never", "open", "the", "side", "panel", "on", "your", "own."}, nil,
 			`Remembered: "Never open the side panel on your own".`, ""},
 		{"add a third", []string{"memory", "add", "Draft commit messages first", "--json"}, nil,
-			`{"entry":{"index":3,"text":"Draft commit messages first"},"added":true}`, ""},
+			`{"entry":{"index":3,"text":"Draft commit messages first","created":"20`, ""},
+		{"add from the user's terminal records no thread", []string{"memory", "add", "Draft commit messages first", "--json"}, nil,
+			`"thread_id":"","thread_name":""},"added":false}`, ""},
 		{"duplicate", []string{"memory", "add", "always open prs as drafts"}, nil,
 			`Already remembered: "Always open PRs as drafts" (nothing changed).` + "\n", ""},
 		{"multi-line", []string{"memory", "add", "one\ntwo"}, errUsage, "", "one line"},
@@ -45,7 +48,7 @@ func TestCLIMemory(t *testing.T) {
 		{"show", []string{"memory", "show"}, nil,
 			"1. Always open PRs as drafts\n2. Never open the side panel on your own\n3. Draft commit messages first\n", ""},
 		{"show json", []string{"memory", "show", "--json"}, nil,
-			`{"entries":[{"index":1,"text":"Always open PRs as drafts"},{"index":2,"text":"Never open the side panel on your own"},{"index":3,"text":"Draft commit messages first"}]}`, ""},
+			`{"index":3,"text":"Draft commit messages first","created":"20`, ""},
 		{"ambiguous", []string{"memory", "remove", "draft"}, errUsage, "", `"draft" is in 2 entries; give the number of one:`},
 		{"no match", []string{"memory", "remove", "rebase"}, errUsage, "", `no entry contains "rebase"`},
 		{"remove by substring", []string{"memory", "remove", "side", "panel"}, nil,
@@ -67,14 +70,18 @@ func TestCLIMemory(t *testing.T) {
 		})
 	}
 
-	if b, err := os.ReadFile(file); err != nil || string(b) != "- Always open PRs as drafts\n" {
-		t.Errorf("%s = %q, %v", file, b, err)
+	if b, err := os.ReadFile(filepath.Join(dir, "MEMORY.md")); err != nil || string(b) != "- [Always open PRs as drafts](always-open-prs-as-drafts.md)\n" {
+		t.Errorf("index = %q, %v", b, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "always-open-prs-as-drafts.md")); err != nil ||
+		!strings.HasPrefix(string(b), "---\ncreated: ") || !strings.HasSuffix(string(b), "\n---\nAlways open PRs as drafts\n") {
+		t.Errorf("entry file = %q, %v", b, err)
 	}
 	if r := runCLI(c, "memory", "clear", "--yes"); r.err != nil || r.stdout != "Forgot 1 preference.\n" {
 		t.Errorf("clear --yes = %v %q %q", r.err, r.stdout, r.stderr)
 	}
-	if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("memory file after clear: %v", err)
+	if des, err := os.ReadDir(dir); err != nil || len(des) != 1 {
+		t.Errorf("memory directory after clear: %v, %v", des, err)
 	}
 	if r := runCLI(c, "help", "memory", "remove"); !strings.Contains(r.stdout, "code-foundry memory.remove <entry>") {
 		t.Errorf("help memory remove = %q", r.stdout)
