@@ -23,7 +23,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
-	"github.com/alexwaumann/code-foundry/internal/store/usertheme"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -31,6 +30,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/usertheme"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )

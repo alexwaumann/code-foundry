@@ -64,11 +64,15 @@ func TestRegisterValidation(t *testing.T) {
 		}), "not the last positional"},
 		{"enum without values", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum}} }), "needs values"},
 		{"values on non-enum", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Enum: []string{"a"}}} }), "non-enum"},
-		{"enum listed by a function", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum, EnumFunc: func() []string { return nil }}} }), ""},
+		{"enum listed by a function", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: Enum, EnumFunc: func() []string { return nil }}}
+		}), ""},
 		{"enum function and values", valid(func(c *Command) {
 			c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, EnumFunc: func() []string { return nil }}}
 		}), "both values and a function"},
-		{"enum function on non-enum", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, EnumFunc: func() []string { return nil }}} }), "non-enum"},
+		{"enum function on non-enum", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: String, EnumFunc: func() []string { return nil }}}
+		}), "non-enum"},
 		{"enum function with a default", valid(func(c *Command) {
 			c.Args = []ArgSpec{{Name: "x", Type: Enum, Default: "a", EnumFunc: func() []string { return []string{"a"} }}}
 		}), "cannot have a default"},
