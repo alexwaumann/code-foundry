@@ -28,6 +28,11 @@ Click **New thread** (<kbd>⌘N</kbd>), pick the project, type what you want and
 Enter. Paste or attach screenshots with the paperclip. Type <kbd>@</kbd> to mention a
 file and <kbd>/</kbd> to run one of the project's skills or commands.
 
+Under the prompt, **Model** picks the model, **Effort** how hard it thinks, and
+**Permissions** what it may do without asking: **Supervised** asks before edits and
+commands, **Accept edits** edits files and asks for the rest, **Auto** lets Claude's
+classifier decide. You can change all three in a running thread too.
+
 ### Where changes go
 
 **Work in**, under the prompt, decides where the thread edits files:
@@ -51,6 +56,10 @@ When a thread's agent starts threads of its own, they belong to that thread: the
 out of the sidebar and the Dock badge, and its **Threads** tab in the side panel lists
 them. Hover one there and click **Show in sidebar** to take it over, or turn on
 Settings › Threads › **Show threads created by other threads** to list them all.
+
+Tell any thread how you like things done ("keep your answers short", "always open pull
+requests as drafts") and it remembers that for every thread in every project; a
+**Remembered** notice confirms it. Ask a thread what it remembers, or to forget one.
 
 Closing the window stops nothing. Open the app again and every thread is where you
 left it.
