@@ -234,9 +234,12 @@ func memoryCaller(ctx context.Context, threads MemoryThreads, uctx Context) (mem
 	return memoryCallerInfo{origin: memory.Origin{ThreadID: by, ThreadName: s.GetName()}, label: threadNameOrID(s)}, nil
 }
 
+// memoryLink is the GUI's Settings › Memory page (UiIntent.Notify.link).
+const memoryLink = "settings:memory"
+
 // memoryNotify shows a change a thread made in every window, so a line added to every
-// thread's system prompt is never silent. A change outside a thread (the user's) shows
-// nothing: the user made it.
+// thread's system prompt is never silent; its button opens Settings › Memory. A change
+// outside a thread (the user's) shows nothing: the user made it.
 func memoryNotify(e Emitter, c memoryCallerInfo, title string) {
 	if e == nil || c.origin.ThreadID == "" {
 		return
@@ -244,6 +247,7 @@ func memoryNotify(e Emitter, c memoryCallerInfo, title string) {
 	body := fmt.Sprintf("By thread %q.", c.label)
 	e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: clipText(title, 120), Body: body,
+		Link: memoryLink, LinkLabel: "Show in Settings",
 	}}})
 }
 

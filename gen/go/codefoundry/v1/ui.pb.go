@@ -839,10 +839,16 @@ func (x *UiIntent_OpenPalette) GetQuery() string {
 }
 
 type UiIntent_Notify struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Level         UiIntent_Notify_Level  `protobuf:"varint,1,opt,name=level,proto3,enum=codefoundry.v1.UiIntent_Notify_Level" json:"level,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Level UiIntent_Notify_Level  `protobuf:"varint,1,opt,name=level,proto3,enum=codefoundry.v1.UiIntent_Notify_Level" json:"level,omitempty"`
+	Title string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Body  string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	// Where the notification leads, shown as a button on it; a window ignores a target it
+	// does not know. "settings:<page id>" opens that Settings page ("settings:memory":
+	// the app memory's "Remembered: ..." and "Forgot: ..." toasts). Empty: no button.
+	Link string `protobuf:"bytes,4,opt,name=link,proto3" json:"link,omitempty"`
+	// The button's words ("Show in Settings"); empty: "Open".
+	LinkLabel     string `protobuf:"bytes,5,opt,name=link_label,json=linkLabel,proto3" json:"link_label,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -898,12 +904,26 @@ func (x *UiIntent_Notify) GetBody() string {
 	return ""
 }
 
+func (x *UiIntent_Notify) GetLink() string {
+	if x != nil {
+		return x.Link
+	}
+	return ""
+}
+
+func (x *UiIntent_Notify) GetLinkLabel() string {
+	if x != nil {
+		return x.LinkLabel
+	}
+	return ""
+}
+
 var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\"\x15\n" +
-	"\x13WatchIntentsRequest\"\x94\r\n" +
+	"\x13WatchIntentsRequest\"\xc7\r\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -945,11 +965,14 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x1a#\n" +
 	"\vOpenPalette\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xc3\x01\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xf6\x01\n" +
 	"\x06Notify\x12;\n" +
 	"\x05level\x18\x01 \x01(\x0e2%.codefoundry.v1.UiIntent.Notify.LevelR\x05level\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
-	"\x04body\x18\x03 \x01(\tR\x04body\"R\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\x12\x12\n" +
+	"\x04link\x18\x04 \x01(\tR\x04link\x12\x1d\n" +
+	"\n" +
+	"link_label\x18\x05 \x01(\tR\tlinkLabel\"R\n" +
 	"\x05Level\x12\x15\n" +
 	"\x11LEVEL_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +

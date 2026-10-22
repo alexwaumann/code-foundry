@@ -268,6 +268,9 @@ func TestMemoryCaller(t *testing.T) {
 				if len(intents) != 1 || intents[0].GetNotify().GetTitle() != tt.wantTitle || intents[0].GetNotify().GetBody() != tt.wantBody {
 					t.Errorf("intents = %v, want %q / %q", intents, tt.wantTitle, tt.wantBody)
 				}
+				if n := intents[0].GetNotify(); n.GetLink() != "settings:memory" || n.GetLinkLabel() != "Show in Settings" {
+					t.Errorf("link = %q / %q, want settings:memory / Show in Settings", n.GetLink(), n.GetLinkLabel())
+				}
 			}
 			if left, err := s.Texts(); err != nil || !slices.Equal(left, tt.wantLeft) {
 				t.Errorf("memory = %q, %v; want %q", left, err, tt.wantLeft)
