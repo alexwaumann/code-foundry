@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -109,8 +110,13 @@ func TestRender(t *testing.T) {
 			t.Errorf("%s runs a shell command when it loads (!`...`)", p)
 		}
 	}
+	checkProvenance(t, files, src)
+	if want := "Rendered by Code Foundry v9.9.9 (commit 0123456789ab) · source: https://github.com/alexwaumann/code-foundry/tree/v9.9.9\n"; src.Provenance()+"\n" != want {
+		t.Errorf("provenance of a release = %q, want %q", src.Provenance(), want)
+	}
 
-	// Frontmatter: names, short descriptions, invocation.
+	// Frontmatter: names, short descriptions, invocation. Each cap includes the two
+	// lines of the provenance line under the title (control-2-skill-provenance).
 	for _, tt := range []struct {
 		skill, userInvocable string
 		maxDesc, maxLines    int
@@ -122,9 +128,9 @@ func TestRender(t *testing.T) {
 		// orchestration experiments (orch-round-3) put nine lines of rules back inline
 		// (shared checkout, conflict-free prompts, quiet wake turns, leads, re-reports):
 		// the references were read late or not at all, so those rules earn their place.
-		{skills.Orchestrate, "false", 600, 136},
+		{skills.Orchestrate, "false", 600, 138},
 		{skills.Help, "", 400, 120},   // both: no invocation keys
-		{skills.Plugin, "", 600, 120}, // both; names the words that should trigger it
+		{skills.Plugin, "", 600, 122}, // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
 		fm := frontmatter(t, p, files[p])
@@ -187,9 +193,6 @@ func TestRender(t *testing.T) {
 				t.Errorf("%s lacks %s", tt.path, m)
 			}
 		}
-		if !strings.Contains(got, "(v9.9.9)") {
-			t.Errorf("%s does not name the version", tt.path)
-		}
 	}
 	if help := string(files[skills.Help+"/reference/commands.md"]); strings.Contains(help, "  - `--request-id") {
 		t.Error("the help skill lists thread.new's args; it has the one-line form")
@@ -212,13 +215,16 @@ func TestRender(t *testing.T) {
 		}
 	}
 
-	// The getting started guide is the repo's file, the one the GUI bundles.
+	// The getting started guide is the repo's file, the one the GUI bundles, with the
+	// provenance line under its title.
 	repo, err := os.ReadFile("../../docs/GETTING-STARTED.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(files[skills.Help+"/reference/getting-started.md"], repo) || !bytes.Equal(docs.GettingStarted, repo) {
-		t.Error("reference/getting-started.md is not docs/GETTING-STARTED.md")
+	title, rest, _ := bytes.Cut(repo, []byte("\n"))
+	shipped := slices.Concat(title, []byte("\n\n"+src.Provenance()+"\n"), rest)
+	if !bytes.Equal(files[skills.Help+"/reference/getting-started.md"], shipped) || !bytes.Equal(docs.GettingStarted, repo) {
+		t.Error("reference/getting-started.md is not docs/GETTING-STARTED.md with the provenance line under its title")
 	}
 
 	// The orchestrate skill keeps its line cap by pointing at reference files: worked
@@ -266,6 +272,40 @@ func TestRender(t *testing.T) {
 	}
 }
 
+// checkProvenance checks every file but the plugin skill's example (a new plugin's own
+// files, copied out as they are) carries src's provenance line once, right under its
+// title, and has no placeholder left.
+func checkProvenance(t *testing.T, files skills.Files, src skills.Sources) {
+	t.Helper()
+	line := src.Provenance()
+	if !strings.HasPrefix(line, "Rendered by Code Foundry "+src.Version+" (commit ") ||
+		!strings.Contains(line, " · source: https://github.com/alexwaumann/code-foundry") {
+		t.Fatalf("provenance line %q", line)
+	}
+	for p, b := range files {
+		if strings.HasPrefix(p, skills.Plugin+"/example/") {
+			if bytes.Contains(b, []byte("Rendered by Code Foundry")) {
+				t.Errorf("%s (the example) has the provenance line", p)
+			}
+			continue
+		}
+		body := string(b)
+		if fm, rest, ok := strings.Cut(body, "\n---\n\n"); ok && strings.HasPrefix(fm, "---\n") {
+			body = rest // a SKILL.md's frontmatter
+		}
+		title, _, _ := strings.Cut(body, "\n")
+		switch {
+		case strings.Count(string(b), line) != 1:
+			t.Errorf("%s has the provenance line %d times, want once", p, strings.Count(string(b), line))
+		case !strings.HasPrefix(title, "# ") || !strings.HasPrefix(body, title+"\n\n"+line+"\n\n"):
+			t.Errorf("%s does not have the provenance line right under its title", p)
+		}
+		if strings.Contains(body, "{{cf.") {
+			t.Errorf("%s has an unfilled placeholder", p)
+		}
+	}
+}
+
 // Ember's skill is only Ember's: Render leaves it out, EmberFiles has it whole.
 func TestEmberSkill(t *testing.T) {
 	files, err := skills.Render(skills.Sources{Version: "v1"})
@@ -277,13 +317,19 @@ func TestEmberSkill(t *testing.T) {
 			t.Errorf("Render wrote %s", p)
 		}
 	}
-	ember, err := skills.EmberFiles()
+	// A dev build: the line names the commit and says the source may differ.
+	src := skills.Sources{Version: "dev", Commit: "0123456789abcdef0123456789abcdef01234567-dirty"}
+	ember, err := skills.EmberFiles(src)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := skills.Ember + "/SKILL.md"
 	if len(ember) != 1 || len(ember[p]) == 0 {
 		t.Fatalf("EmberFiles = %v", ember)
+	}
+	checkProvenance(t, ember, src)
+	if want := "Rendered by Code Foundry dev (commit 0123456789ab-dirty) · source: https://github.com/alexwaumann/code-foundry/tree/0123456789abcdef0123456789abcdef01234567 (dev build"; !bytes.Contains(ember[p], []byte(want)) {
+		t.Errorf("%s lacks %q", p, want)
 	}
 	fm := frontmatter(t, p, ember[p])
 	if fm["name"] != skills.Ember || fm["user-invocable"] != "false" {

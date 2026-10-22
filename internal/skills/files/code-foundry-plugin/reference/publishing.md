@@ -1,5 +1,7 @@
 # Publishing a plugin
 
+{{cf.provenance}}
+
 A plugin ships as GitHub release tarballs listed in a registry: a git repository (public,
 or a workplace's private one) whose `plugins/<name>.json` entries name each plugin's
 tarballs and their SHA-256 sums, checked by its `scripts/validate.py` in CI. Code Foundry

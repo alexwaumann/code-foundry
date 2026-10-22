@@ -1,5 +1,7 @@
 # The host API (`*pluginsdk.Host`)
 
+{{cf.provenance}}
+
 Every handler gets `h *pluginsdk.Host`. Each method is one protocol call; the host checks
 it against what the user granted (the manifest's `permissions`) and answers
 -32001 `CodePermissionDenied` otherwise. Requests take a context: pass the handler's `ctx`

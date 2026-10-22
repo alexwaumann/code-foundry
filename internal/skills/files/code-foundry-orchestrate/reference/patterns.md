@@ -1,5 +1,7 @@
 # Orchestration patterns
 
+{{cf.provenance}}
+
 Worked examples for the code-foundry-orchestrate skill. Ids and paths are examples;
 use the ones the commands print (`code-foundry project list` prints the project ids).
 Every command runs in your Bash tool.

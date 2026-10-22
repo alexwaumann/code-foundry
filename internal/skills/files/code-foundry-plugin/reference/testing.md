@@ -1,5 +1,7 @@
 # Testing a plugin
 
+{{cf.provenance}}
+
 Two layers: unit tests against a fake host (`pluginsdk/plugintest`, fast, in `go test`),
 then the real daemon (`plugin dev`, `plugin surface`, `plugin act`, `plugin logs`).
 

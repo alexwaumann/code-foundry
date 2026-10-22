@@ -1,5 +1,7 @@
 # Reading wakes
 
+{{cf.provenance}}
+
 For the code-foundry-orchestrate skill: what a `[code-foundry wake]` message tells you
 and what to do in the turn it starts. Every command runs in your Bash tool.
 

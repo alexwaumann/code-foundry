@@ -5,6 +5,8 @@ description: "Answer how-to questions about Code Foundry, the app this thread ru
 
 # Answering questions about Code Foundry
 
+{{cf.provenance}}
+
 Code Foundry is the macOS app this thread runs in. It runs Claude Code threads on the
 user's projects (folders on their Mac), each thread in the project's folder or in its own
 worktree. A daemon on the Mac does the work; the window shows it; the `code-foundry` CLI,

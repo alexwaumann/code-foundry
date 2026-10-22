@@ -1,5 +1,7 @@
 # Leads (children that orchestrate)
 
+{{cf.provenance}}
+
 For the code-foundry-orchestrate skill: how a parent makes a child a lead, and the rules
 the lead follows.
 

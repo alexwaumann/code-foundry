@@ -1,5 +1,7 @@
 # The plugin protocol
 
+{{cf.provenance}}
+
 `pluginsdk.Serve` implements all of this; read it to know what the host does and when.
 The method names are constants in `pluginsdk` (`MethodSurfaceOpen`, …) and every params
 and result type is a Go type there (`go doc github.com/alexwaumann/code-foundry/pluginsdk`).

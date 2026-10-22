@@ -6,6 +6,8 @@ user-invocable: false
 
 # Orchestrating Code Foundry threads
 
+{{cf.provenance}}
+
 You run inside Code Foundry, an app that runs Claude Code threads (conversations like
 this one) in git worktrees. `$CODE_FOUNDRY_THREAD` is your own thread's id. The user sees
 their threads in the app's sidebar; the ones you create stay out of it unless you hand
