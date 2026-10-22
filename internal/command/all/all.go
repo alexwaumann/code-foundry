@@ -15,6 +15,8 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
+	// Presence backs ui.presence. Nil fields read as no GUI.
+	Presence command.PresenceDeps
 	// Terminal backs terminal.* (terminal.new also reads Project and Thread to find a
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
@@ -129,6 +131,7 @@ func Register(r *command.Registry, d Deps) error {
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
+		command.RegisterPresence(r, d.Presence),
 		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
 		command.RegisterProject(r, d.Project, d.NotGit),
 		command.RegisterProjectAdd(r, d.Project, d.Clone),

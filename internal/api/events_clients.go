@@ -46,6 +46,13 @@ func (c *Clients) Presence() presence.State {
 	return c.presenceLocked()
 }
 
+// Windows is the number of GUI streams joined now: one per open window (ui.presence).
+func (c *Clients) Windows() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.byID) + len(c.anon)
+}
+
 func (c *Clients) presenceLocked() presence.State {
 	all := make([]presence.Client, 0, len(c.byID)+len(c.anon))
 	for _, g := range c.byID {
