@@ -99,6 +99,9 @@ var references = []reference{
 	{Help + "/reference/getting-started.md", func(w io.Writer, src Sources) {
 		_, _ = w.Write(underTitle(docs.GettingStarted, src.Provenance()))
 	}},
+	{Help + "/reference/themes.md", func(w io.Writer, src Sources) {
+		_, _ = w.Write(underTitle(docs.Themes, src.Provenance()))
+	}},
 	{Plugin + "/reference/cli.md", pluginCLIReference},
 	{Plugin + "/reference/host-commands.md", hostCommandsReference},
 }

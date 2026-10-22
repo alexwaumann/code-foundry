@@ -124,15 +124,15 @@ describe("rules", () => {
   });
 
   it.each([
-    ["a readable red is kept as the fill (its text steps for the tint on the grey sheet)", "light", { error: "#cf222e" }, "error", "#cf222e", null],
-    ["a pale yellow fill is darkened to 3:1, its text further", "light", { warning: "#e5c07b" }, "warning", null, null],
-    ["a yellow at 3:1 stays a bright fill on light", "light", { warning: "#a87800" }, "warning", "#a87800", null],
-    ["a dark red is lifted on dark, its text further", "dark", { error: "#7f2a33", surface: "#2e3440", canvas: "#242933" }, "error", null, null],
-  ] as const)("status: %s", (_, scheme, patch, tone, fill, text) => {
+    ["a readable red is kept as the fill (its text steps for the tint on the grey sheet)", "light", { error: "#cf222e" }, "error", "#cf222e"],
+    ["a pale yellow fill is darkened to 3:1, its text further", "light", { warning: "#e5c07b" }, "warning", null],
+    ["a yellow at 3:1 stays a bright fill on light", "light", { warning: "#a87800" }, "warning", "#a87800"],
+    ["a dark red is lifted on dark, its text further", "dark", { error: "#7f2a33", surface: "#2e3440", canvas: "#242933" }, "error", null],
+  ] as const)("status: %s", (_, scheme, patch, tone, fill) => {
     const v = resolve(scheme, patch);
     const k = `--cf-${tone}`;
     if (fill) expect(v(k)).toBe(fill);
-    if (text) expect(v(`${k}-text`)).toBe(text);
+    else expect(v(k)).not.toBe((patch as Record<string, string>)[tone]);
     for (const bg of ["--cf-surface", "--cf-canvas"]) {
       expect(contrast(v(k), v(bg)), `fill on ${bg}`).toBeGreaterThanOrEqual(3);
       expect(contrast(v(`${k}-text`), v(bg)), `text on ${bg}`).toBeGreaterThanOrEqual(4.5);

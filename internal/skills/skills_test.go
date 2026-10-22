@@ -96,6 +96,7 @@ func TestRender(t *testing.T) {
 		"code-foundry-orchestrate/reference/leads.md", "code-foundry-orchestrate/reference/sidebar.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
 		"code-foundry-help/reference/settings.md", "code-foundry-help/reference/commands.md",
+		"code-foundry-help/reference/themes.md",
 	}
 	want = append(want, pluginSkillFiles...)
 	if len(files) != len(want) {
@@ -237,8 +238,16 @@ func TestRender(t *testing.T) {
 		}
 	}
 	// Pages the model writes link the frame stylesheet and may follow the theme live
-	// (theme-css-route); the entry skill says the first half.
-	for _, want := range []string{"`<link rel=\"stylesheet\" href=\"/cf/theme.css\">`", "`--cf-*` variables", "status triples", "type-role classes", "`{type: \"cf:theme\", id, scheme, vars}`"} {
+	// (theme-css-route); the entry skill says the first half. Status text is the tone's
+	// -text slot, the tone itself a fill (theme-slots-3); the help skill points at the
+	// theme notes for every slot.
+	if entry := string(files[skills.Entry+"/SKILL.md"]); !strings.Contains(entry, "the status fills") || !strings.Contains(entry, "(their text `-text`, tint `-surface`)") {
+		t.Error("entry SKILL.md does not name the status fills and their -text")
+	}
+	if !strings.Contains(helpSkill, "every slot and what it paints: reference/themes.md") {
+		t.Error("help SKILL.md does not point at reference/themes.md")
+	}
+	for _, want := range []string{"`<link rel=\"stylesheet\" href=\"/cf/theme.css\">`", "`--cf-*` variables", "type-role classes", "`{type: \"cf:theme\", id, scheme, vars}`"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
@@ -323,6 +332,15 @@ func TestRender(t *testing.T) {
 	shipped := slices.Concat(title, []byte("\n\n"+src.Provenance()+"\n"), rest)
 	if !bytes.Equal(files[skills.Help+"/reference/getting-started.md"], shipped) || !bytes.Equal(docs.GettingStarted, repo) {
 		t.Error("reference/getting-started.md is not docs/GETTING-STARTED.md with the provenance line under its title")
+	}
+	// So are the theme notes (theme-slots-3).
+	themesRepo, err := os.ReadFile("../../docs/THEMES.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	themesTitle, themesRest, _ := bytes.Cut(themesRepo, []byte("\n"))
+	if !bytes.Equal(files[skills.Help+"/reference/themes.md"], slices.Concat(themesTitle, []byte("\n\n"+src.Provenance()+"\n"), themesRest)) || !bytes.Equal(docs.Themes, themesRepo) {
+		t.Error("reference/themes.md is not docs/THEMES.md with the provenance line under its title")
 	}
 
 	// The orchestrate skill keeps its line cap by pointing at reference files: worked

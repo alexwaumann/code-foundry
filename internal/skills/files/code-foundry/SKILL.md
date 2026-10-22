@@ -51,8 +51,8 @@ only when asked. A path in your reply is a chip that opens the file.
 Write a page in `$CODE_FOUNDRY_PAGES` (your thread's own folder), never in the repository
 or the home folder. It links `<link rel="stylesheet" href="/cf/theme.css">` and paints only
 with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised`,
-`--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status triples
-`--cf-success`, `--cf-warning`, `--cf-error` (each also `-surface`, `-foreground`), or the
+`--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status fills
+`--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
 It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline card.
 `view.inline` warns about what a page misses. More: code-foundry-help.
