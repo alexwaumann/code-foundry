@@ -5,14 +5,20 @@ import { fieldRows, rowBorder, type SectionFields } from "./model";
 import { sectionLinks } from "./sectionLinks";
 import { SettingRow, SettingRowPair } from "./SettingRow";
 
-/** A section: its heading and description above a bordered card of hairline-separated rows. */
-export function SectionCard({ id, heading, description, children }: { id: string; heading: string; description?: string; children: ReactNode }) {
+/**
+ * A section: its heading and description above a bordered card of hairline-separated rows.
+ * `aside` sits at the heading's right, on its last line (a count, a section-wide action).
+ */
+export function SectionCard({ id, heading, description, aside, children }: { id: string; heading: string; description?: string; aside?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-6" data-testid="settings-section" data-section={id} aria-label={heading || undefined}>
-      {(heading || description) && (
-        <div className="mb-2 ml-0.5">
-          {heading && <h3 className="text-subheading">{heading}</h3>}
-          {description && <p className="mt-px text-caption">{description}</p>}
+      {(heading || description || aside) && (
+        <div className="mb-2 ml-0.5 flex items-end gap-4">
+          <div className="min-w-0 flex-1">
+            {heading && <h3 className="text-subheading">{heading}</h3>}
+            {description && <p className="mt-px text-caption">{description}</p>}
+          </div>
+          {aside}
         </div>
       )}
       <div className="overflow-hidden rounded-lg border border-border">{children}</div>

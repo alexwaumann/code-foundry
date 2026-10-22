@@ -502,6 +502,11 @@ function requestPromptFocus(): void {
   if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
+/** Opens the settings page on one of its pages (SettingPageView.id), over any other window page. */
+export function openSettingsPage(page: string): void {
+  useViewsStore.setState({ settingsOpen: true, settingsPage: page, usageOpen: false, themesOpen: false, helpOpen: false });
+}
+
 /** Shows a page of the open settings page (its left nav). */
 export function setSettingsPage(page: string): void {
   useViewsStore.setState({ settingsPage: page });

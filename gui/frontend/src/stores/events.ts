@@ -12,6 +12,7 @@ import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } fro
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
+import { applyMemoryEvent } from "./memory";
 import { onPluginEvent } from "./plugins";
 import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
@@ -85,8 +86,8 @@ const handlers: Handlers = {
   plugin: onPluginEvent,
   // The Skills marketplace read again: an open Settings → Skills re-reads (stores/skill.ts).
   skill: (ev) => { onSkillEpoch(ev.epoch); },
-  // The app memory: nothing shows it yet (a Settings › Memory page will keep it).
-  memory: () => {},
+  // The app memory, for Settings › Memory (stores/memory.ts).
+  memory: applyMemoryEvent,
 };
 
 export function dispatchEvent(ev: EventView): void {

@@ -5,6 +5,7 @@ import { threadFocus } from "@/lib/inSidebar";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
+import { notifyLinkAction } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
 import { getShowCreatedThreads } from "./settings";
@@ -124,7 +125,12 @@ export function applyIntent(intent: UiIntentView): void {
       ui.openPalette(intent.query);
       break;
     case "notify": {
-      const opts = intent.body ? { description: intent.body } : undefined;
+      // A link it carries ("settings:memory") is a button on the toast.
+      const open = intent.link ? notifyLinkAction(intent.link) : null;
+      const opts =
+        intent.body || open
+          ? { ...(intent.body ? { description: intent.body } : {}), ...(open ? { action: { label: intent.linkLabel ?? "Open", onClick: open } } : {}) }
+          : undefined;
       const title = intent.title || intent.body;
       if (intent.level === "error") toast.error(title, opts);
       else if (intent.level === "warning") toast.warning(title, opts);

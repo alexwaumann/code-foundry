@@ -4,8 +4,9 @@
  * is the GUI's only lists its sections, so the settings search finds them (model.ts
  * searchGuiPages); one that is also a schema page (Plugins) is found by its fields.
  */
-import { Puzzle, Sparkles, type LucideIcon } from "lucide-react";
+import { BrainCircuit, Puzzle, Sparkles, type LucideIcon } from "lucide-react";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
+import { MemoryPage } from "@/components/memory/settings/MemoryPage";
 import { PluginsPage } from "@/components/plugin/settings/PluginsPage";
 import { SkillsPage } from "@/components/skill/settings/SkillsPage";
 
@@ -34,5 +35,15 @@ export const guiPages: readonly GuiPage[] = [
     },
     icon: Sparkles,
     component: SkillsPage,
+  },
+  {
+    page: {
+      id: "memory",
+      title: "Memory",
+      description: "What threads have been told to remember about this app and how they work in it.",
+      sections: [{ id: "remembered", title: "Remembered", description: "Every thread in every project reads these before its first action." }],
+    },
+    icon: BrainCircuit,
+    component: MemoryPage,
   },
 ];
