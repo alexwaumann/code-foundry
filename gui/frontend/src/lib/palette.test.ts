@@ -13,15 +13,16 @@ import { describe, expect, it } from "vitest";
  *   ALLOW;
  * - a colour literal in a component stylesheet (`#cf222e`, `oklch(1 0 0 / 5%)`, `white`),
  *   except the deliberate ones in CSS_ALLOW: those alias a token (`var(--terminal-ansi-1)`)
- *   or mix one (`color-mix(in oklab, var(--foreground) 5%, transparent)`).
- * index.css only aliases component names to theme slots and is not scanned; the colours
- * themselves are theme files (src/themes/catalog.json) resolved by src/themes/slots.ts,
- * and src/design/slots.test.ts keeps them out of every other file.
+ *   or mix one (`color-mix(in oklab, var(--cf-text) 5%, transparent)`).
+ * index.css is scanned with the component stylesheets (it aliases names to slots and holds
+ * no colour of its own); the colours themselves are theme files (src/themes/catalog.json)
+ * resolved by src/themes/slots.ts, and src/design/slots.test.ts keeps them out of every
+ * other file.
  */
 
 const sources = import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/gen/**", "!/src/lib/palette.test.ts"], { query: "?raw", import: "default", eager: true });
 // Vitest hands stylesheets back empty unless they are "?raw" (vite.config.ts test.css).
-const stylesheets = import.meta.glob<string>("/src/components/**/*.css", { query: "?raw", import: "default", eager: true });
+const stylesheets = import.meta.glob<string>(["/src/components/**/*.css", "/src/index.css"], { query: "?raw", import: "default", eager: true });
 
 const SHADES = "(?:50|[1-9]00|950)";
 const HUES = "(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)";
@@ -95,12 +96,13 @@ const isTest = (file: string) => /\.test\.tsx?$/.test(file);
 describe("palette guard", () => {
   it("reads the sources", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(100);
-    expect(sources["/src/components/sidebar/SidebarRow.tsx"]).toContain("text-warning");
+    expect(sources["/src/components/sidebar/SidebarRow.tsx"]).toContain("text-cf-warning");
     expect(Object.keys(stylesheets).length).toBeGreaterThan(3);
-    expect(stylesheets["/src/components/thread/thread.css"]).toContain("--t-bubble: color-mix(in oklab, var(--primary) 8%, transparent)");
+    expect(stylesheets["/src/components/thread/thread.css"]).toContain("background: var(--cf-message-surface);");
+    expect(stylesheets["/src/index.css"]).toContain("--color-cf-surface-raised: var(--cf-surface-raised);");
   });
 
-  it("no Tailwind palette classes: use the theme tokens (text-warning, bg-success/15, border-info/30, ...)", () => {
+  it("no Tailwind palette classes: use the theme slots (text-cf-warning, bg-cf-success-surface, border-cf-info/30, ...)", () => {
     expect(show(scan(PALETTE_CLASS))).toEqual([]);
   });
 
@@ -112,7 +114,7 @@ describe("palette guard", () => {
     expect(show(scan(COLOR_LITERAL, (f) => !isTest(f)).filter((h) => !allowed(h)))).toEqual([]);
   });
 
-  it("no white/black classes outside the allowlist: use a token (text-destructive-foreground, bg-foreground/5, ...)", () => {
+  it("no white/black classes outside the allowlist: use a slot (text-cf-error-foreground, bg-cf-text/5, ...)", () => {
     expect(show(scan(BW_CLASS, (f) => !isTest(f)).filter((h) => !allowed(h)))).toEqual([]);
   });
 
@@ -131,7 +133,7 @@ describe("palette guard", () => {
 
   it("the patterns catch what they guard against", () => {
     for (const s of ["text-amber-600", "dark:bg-sky-400/10", "hover:border-emerald-500/30", "fill-red-500", "border-t-violet-300"]) expect(PALETTE_CLASS.test(s), s).toBe(true);
-    for (const s of ["text-warning", "bg-success/15", "text-muted-foreground", "data-tone=amber", "max-w-24", "border-border"]) expect(PALETTE_CLASS.test(s), s).toBe(false);
+    for (const s of ["text-cf-warning", "bg-cf-success-surface", "text-cf-text-muted", "text-warning", "data-tone=amber", "max-w-24", "border-border"]) expect(PALETTE_CLASS.test(s), s).toBe(false);
     for (const s of ["bg-[#0a0a0a]", "text-[oklch(0.7_0.1_200)]", "[--chip-accent:oklch(0.6_0.1_230)]", "border-[rgb(0_0_0)]"]) expect(ARBITRARY_COLOR.test(s), s).toBe(true);
     for (const s of ["[--chip-accent:var(--info)]", "bg-[color-mix(in_oklab,var(--chip-accent)_11%,transparent)]", "bg-[Highlight]/30", "h-[1.41em]"]) expect(ARBITRARY_COLOR.test(s), s).toBe(false);
     for (const s of ['"#d97757"', "oklch(0.5 0 0)", "rgb(1 2 3)"]) expect(COLOR_LITERAL.test(s), s).toBe(true);
