@@ -85,6 +85,8 @@ const handlers: Handlers = {
   plugin: onPluginEvent,
   // The Skills marketplace read again: an open Settings → Skills re-reads (stores/skill.ts).
   skill: (ev) => { onSkillEpoch(ev.epoch); },
+  // The app memory: nothing shows it yet (a Settings › Memory page will keep it).
+  memory: () => {},
 };
 
 export function dispatchEvent(ev: EventView): void {
