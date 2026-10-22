@@ -98,6 +98,12 @@ type Field struct {
 	// unlisted, when set, explains an Enum value outside Enum in place of the generic
 	// "want one of" (a theme of the other scheme).
 	unlisted func(v string) error
+	// themeScheme marks a theme slot (themeField): its Enum, labels, unlisted and
+	// fallback come from the theme set the store knows (withThemes).
+	themeScheme string
+	// fallback, when set, is the value a rejected one shows instead of the default, and
+	// the words that say so ("" when there is none): a gone user theme's from.
+	fallback func(v string) (value, why string)
 }
 
 // Name is the key within its group's table.
@@ -655,18 +661,47 @@ func effortLabels(efforts []string) []string {
 	return out
 }
 
-// themeField is a theme slot on Appearance › Theme: an Enum of the scheme's themes from
-// the GUI's catalog (internal/theme), labelled with their names. A theme of the other
-// scheme is refused with a message that says so. A value on disk the catalog no longer
-// has (a theme removed later) falls back to the default like any rejected value:
-// reported in Issues and logged at start, the file left as it is.
+// themeField is a theme slot on Appearance › Theme: an Enum of the scheme's themes, the
+// user's own first (store/usertheme), then the GUI's catalog (internal/theme), labelled
+// with their names. A theme of the other scheme is refused with a message that says so.
+// A value on disk that names no theme now (a theme removed later, a user theme deleted
+// or whose file no longer reads) is rejected like any value: reported in Issues and
+// logged once, the file left as it is. It shows the default, or, for a user theme that
+// went away, the theme it was copied from (theme.Set.Fallback).
 func themeField(key, scheme, title, desc string, bind func(s *Settings) any) Field {
 	return Field{
 		Key: key, Group: GroupAppearance, Page: PageAppearance, Section: "theme", Type: Enum, Title: title, Description: desc,
-		Enum: theme.IDs(scheme), EnumLabels: theme.Names(scheme), Default: theme.Default(scheme),
-		bind:     bind,
-		unlisted: func(v string) error { return theme.Check(v, scheme) },
+		Default: theme.Default(scheme), bind: bind, themeScheme: scheme,
+	}.withThemes(theme.Set{})
+}
+
+// withThemes fills a theme slot's choices and checks from set; other fields are
+// returned as they are.
+func (f Field) withThemes(set theme.Set) Field {
+	scheme := f.themeScheme
+	if scheme == "" {
+		return f
 	}
+	f.Enum, f.EnumLabels = set.IDs(scheme), set.Names(scheme)
+	f.unlisted = func(v string) error { return set.Check(v, scheme) }
+	f.fallback = func(v string) (string, string) {
+		id := set.Fallback(v, scheme)
+		if id == "" {
+			return "", ""
+		}
+		t, _ := set.ByID(id)
+		return id, fmt.Sprintf("showing %s (%q), the theme it was copied from", t.Name, id)
+	}
+	return f
+}
+
+// fieldsFor is staticFields with the theme slots' choices from themes.
+func fieldsFor(themes theme.Set) []Field {
+	out := slices.Clone(staticFields)
+	for i, f := range out {
+		out[i] = f.withThemes(themes)
+	}
+	return out
 }
 
 // CommandInfo is what the keybinding fields need to know about a registry command.

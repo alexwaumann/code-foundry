@@ -180,6 +180,11 @@ func (p Paths) DisabledSkills() string { return filepath.Join(p.home, "skills", 
 // the system prompt; only the daemon writes it.
 func (p Paths) Memory() string { return filepath.Join(p.home, "memory") }
 
+// Themes is the user's own colour themes, one <id>.json theme file each
+// (internal/store/usertheme, docs/notes/user-themes.md). The theme.* commands write it;
+// a file written by hand is read the same way.
+func (p Paths) Themes() string { return filepath.Join(p.home, "themes") }
+
 // LegacyMemory is the single memory file before the directory, one "- <text>" line per
 // entry. The daemon imports it into Memory at start and renames it to
 // memory.md.imported.

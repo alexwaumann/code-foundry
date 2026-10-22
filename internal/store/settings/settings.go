@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // FileName is the settings file's name inside the config home.
@@ -253,18 +254,30 @@ type resolved struct {
 	issues   []Issue
 }
 
-// resolve builds Settings and the effective values from raw file values (string-encoded,
-// keyed by settings key). cmds may be nil when the command registry is not known yet:
-// keybinding overrides are then checked for syntax only. Rejected values fall back to
-// their defaults and are reported as issues.
+// resolve is resolveThemes with the curated themes only.
 func resolve(raw map[string]string, cmds []CommandInfo) resolved {
+	return resolveThemes(raw, cmds, theme.Set{})
+}
+
+// resolveThemes builds Settings and the effective values from raw file values
+// (string-encoded, keyed by settings key). cmds may be nil when the command registry is
+// not known yet: keybinding overrides are then checked for syntax only. themes are the
+// themes a theme slot can name. Rejected values fall back to their defaults (or the
+// field's fallback) and are reported as issues.
+func resolveThemes(raw map[string]string, cmds []CommandInfo, themes theme.Set) resolved {
 	r := resolved{values: make(map[string]string, len(staticFields)), accepted: map[string]string{}}
-	for _, f := range staticFields {
+	for _, f := range fieldsFor(themes) {
 		v := f.Default
 		if rv, ok := raw[f.Key]; ok && rv != "" {
 			p, err := f.parse(rv)
 			if err != nil {
-				r.issues = append(r.issues, Issue{f.Key, err.Error()})
+				msg := err.Error()
+				if f.fallback != nil {
+					if fb, why := f.fallback(rv); fb != "" {
+						v, msg = fb, msg+"; "+why
+					}
+				}
+				r.issues = append(r.issues, Issue{f.Key, msg})
 			} else {
 				v = p
 				r.accepted[f.Key] = p

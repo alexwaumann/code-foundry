@@ -18,6 +18,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // DefaultDebounce coalesces the burst of fs events one save produces.
@@ -74,6 +75,10 @@ type Options struct {
 	// appearance.backdrop = custom unless appearance.backdrop_file names a file in it.
 	// Empty: only an empty appearance.backdrop_file is refused.
 	BackdropsDir string
+	// Themes are the themes appearance.theme_dark / theme_light can name at Open: the
+	// user's (store/usertheme) and the catalog. The zero Set is the catalog alone.
+	// SetThemes changes it.
+	Themes theme.Set
 }
 
 // Store is the file-backed settings store. Methods are safe for concurrent use.
@@ -86,6 +91,7 @@ type Store struct {
 	mu      sync.Mutex
 	raw     map[string]string
 	cmds    []CommandInfo
+	themes  theme.Set
 	loadErr string
 	startup map[string]string // Restart fields' values at Open
 	hooks   []func(*Snapshot)
@@ -124,7 +130,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	if opts.Debounce <= 0 {
 		opts.Debounce = DefaultDebounce
 	}
-	s := &Store{opts: opts, log: opts.Log, raw: map[string]string{}, stop: make(chan struct{})}
+	s := &Store{opts: opts, log: opts.Log, raw: map[string]string{}, themes: opts.Themes, stop: make(chan struct{})}
 
 	data, err := os.ReadFile(opts.Path)
 	switch {
@@ -148,7 +154,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 			s.saveLastGood(data)
 		}
 	}
-	r := resolve(s.raw, nil)
+	r := resolveThemes(s.raw, nil, s.themes)
 	s.startup = map[string]string{}
 	for _, f := range staticFields {
 		if f.Restart {
@@ -196,7 +202,7 @@ func (s *Store) Settings() Settings { return s.Snapshot().Settings }
 func (s *Store) Fields() []Field {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append(slices.Clone(staticFields), keybindingFields(s.cmds)...)
+	return append(fieldsFor(s.themes), keybindingFields(s.cmds)...)
 }
 
 // Pages returns the pages and sections in display order.
@@ -215,12 +221,28 @@ func (s *Store) SetCommands(cmds []CommandInfo) {
 	if s.cmds == nil {
 		s.cmds = []CommandInfo{}
 	}
-	r := resolve(s.raw, s.cmds)
+	r := resolveThemes(s.raw, s.cmds, s.themes)
 	// The plugin store calls this whenever plugins' commands come or go: log only what
 	// is new.
 	for _, is := range r.issues {
 		if isKeybindingKey(is.Key) && !slices.Contains(s.Snapshot().Issues, is) {
 			s.log.Warn("settings: keybinding ignored", "key", is.Key, "reason", is.Message)
+		}
+	}
+	s.publishLocked(r)
+}
+
+// SetThemes tells the store which themes the theme slots can name (the user theme
+// store calls it on every change of its directory, before it publishes). A slot whose
+// user theme went away now shows its fallback; the issue is logged once.
+func (s *Store) SetThemes(themes theme.Set) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.themes = themes
+	r := resolveThemes(s.raw, s.cmds, s.themes)
+	for _, is := range r.issues {
+		if (is.Key == KeyThemeDark || is.Key == KeyThemeLight) && !slices.Contains(s.Snapshot().Issues, is) {
+			s.log.Warn("settings: value ignored", "key", is.Key, "reason", is.Message)
 		}
 	}
 	s.publishLocked(r)
@@ -247,7 +269,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 		return nil, fmt.Errorf("%w: %s; fix %s by hand first", ErrFileInvalid, s.loadErr, s.opts.Path)
 	}
 	known := map[string]bool{}
-	for _, f := range append(slices.Clone(staticFields), keybindingFields(s.cmds)...) {
+	for _, f := range append(fieldsFor(s.themes), keybindingFields(s.cmds)...) {
 		known[f.Key] = true
 	}
 	var bad []Issue
@@ -263,7 +285,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 			next[k] = v
 		}
 	}
-	r := resolve(next, s.cmds)
+	r := resolveThemes(next, s.cmds, s.themes)
 	for _, is := range r.issues {
 		if _, ok := partial[is.Key]; ok {
 			bad = append(bad, is)
@@ -286,7 +308,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 	// The file now holds exactly these values; keeping raw equal to it makes the
 	// watcher's reload of our own write a no-op.
 	s.raw = keep
-	s.publishLocked(resolve(s.raw, s.cmds))
+	s.publishLocked(resolveThemes(s.raw, s.cmds, s.themes))
 	return s.Snapshot(), nil
 }
 
@@ -318,7 +340,7 @@ func (s *Store) reload() {
 			s.saveLastGood(data)
 		}
 	}
-	s.publishLocked(resolve(s.raw, s.cmds))
+	s.publishLocked(resolveThemes(s.raw, s.cmds, s.themes))
 }
 
 // lastGoodPath is the copy of the last settings file that parsed.
