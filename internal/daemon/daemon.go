@@ -260,6 +260,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Skills:            st.skills,
 		Ember:             st.ember,
 		Memory:            st.memory,
+		ShippedSkills:     shippedSkills(log, p.Claude()),
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })

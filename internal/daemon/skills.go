@@ -10,11 +10,26 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/skills"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
+
+// shippedSkills lists the skills installSkills writes under dir, for daemon.capabilities.
+// They are embedded, so the list is read once; a failure is logged and lists none.
+func shippedSkills(log *slog.Logger, dir string) func() []command.ShippedSkill {
+	list, err := skills.Shipped(filepath.Join(dir, skills.SkillsDir))
+	if err != nil {
+		log.Error("daemon.capabilities lists no skills", "err", err)
+	}
+	out := make([]command.ShippedSkill, len(list))
+	for i, s := range list {
+		out[i] = command.ShippedSkill{Name: s.Name, Purpose: s.Purpose, Path: s.Path}
+	}
+	return func() []command.ShippedSkill { return out }
+}
 
 // installSkills renders the skills every thread gets (internal/skills) from this
 // daemon's commands and settings schema and writes them to dir (paths.Paths.Claude,

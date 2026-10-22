@@ -90,6 +90,7 @@ func TestRender(t *testing.T) {
 		paths = append(paths, p)
 	}
 	want := []string{
+		"code-foundry/SKILL.md",
 		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
 		"code-foundry-orchestrate/reference/patterns.md", "code-foundry-orchestrate/reference/wakes.md",
 		"code-foundry-orchestrate/reference/leads.md", "code-foundry-orchestrate/reference/sidebar.md",
@@ -129,7 +130,12 @@ func TestRender(t *testing.T) {
 		// (shared checkout, conflict-free prompts, quiet wake turns, leads, re-reports):
 		// the references were read late or not at all, so those rules earn their place.
 		{skills.Orchestrate, "false", 600, 138},
-		{skills.Help, "", 400, 120},   // both: no invocation keys
+		// The entry skill (control-4-capabilities): what the app is, the one rule and the
+		// routing table; what exists is daemon.capabilities, not a list in the file.
+		{skills.Entry, "false", 400, 70},
+		// Its routing and the app's description moved to the entry skill (control-4);
+		// the cap came down from 120 with them.
+		{skills.Help, "", 400, 105},   // both: no invocation keys
 		{skills.Plugin, "", 600, 122}, // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
@@ -210,6 +216,34 @@ func TestRender(t *testing.T) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
 	}
+	// It fires before showing something in the side panel and keeps that section's
+	// rules (control-1), pointing at the panel group for the full list (control-4).
+	for _, want := range []string{"or before you show something in the app's side panel", "\n## Showing things in the app\n",
+		"`code-foundry ui.presence --json`", "`viewed` is true", "Never\npass `--focus`", "`code-foundry daemon.capabilities --group panel`",
+		"\n## Explain first, then offer\n", "Run it only after the user says yes", "the code-foundry skill"} {
+		if !strings.Contains(helpSkill, want) {
+			t.Errorf("help SKILL.md lacks %q", want)
+		}
+	}
+
+	// The entry skill routes to every other skill and to daemon.capabilities, carries
+	// the one rule, and says that the model, not the skill, runs commands. The rules
+	// that moved out of the help skill (the --id default, project and thread) are here.
+	entry := string(files[skills.Entry+"/SKILL.md"])
+	for _, want := range []string{"the code-foundry-help skill", "the code-foundry-orchestrate skill", "the code-foundry-plugin skill",
+		"`code-foundry daemon.capabilities`, then `--group <name>`", "\"Reading the source\"", "the line under this title",
+		"if you can do it with the CLI,\noffer it and do it", "Skills never run\ncommands themselves: you run `code-foundry …` with your Bash tool",
+		"Thread commands without `--id` act on it", "A **project** is a folder on the Mac", "\"Work in\"", "`--yes`"} {
+		if !strings.Contains(entry, want) {
+			t.Errorf("entry SKILL.md lacks %q", want)
+		}
+	}
+	// Every group the index names is a real group.
+	for _, g := range command.CapabilityGroups() {
+		if !strings.Contains(entry, g) {
+			t.Errorf("entry SKILL.md does not name the capabilities group %s", g)
+		}
+	}
 
 	// The settings reference has one entry per setting with its type and default.
 	set := string(files[skills.Help+"/reference/settings.md"])
@@ -288,7 +322,7 @@ func TestRender(t *testing.T) {
 	}
 
 	// The skills reference their files by the paths they are installed at.
-	for _, skill := range []string{skills.Orchestrate, skills.Help, skills.Plugin} {
+	for _, skill := range []string{skills.Entry, skills.Orchestrate, skills.Help, skills.Plugin} {
 		body := string(files[skill+"/SKILL.md"])
 		for _, ref := range regexp.MustCompile("`(reference/[a-z-]+\\.md)`").FindAllStringSubmatch(body, -1) {
 			if _, ok := files[skill+"/"+ref[1]]; !ok {
@@ -386,5 +420,33 @@ func TestEmberSkill(t *testing.T) {
 	}
 	if dynamicCommand.Match(ember[p]) {
 		t.Errorf("%s runs a shell command when it loads", p)
+	}
+}
+
+// Shipped lists what Render ships (not Ember's), each with its description's first
+// clause as a one-line purpose and its installed SKILL.md path.
+func TestShipped(t *testing.T) {
+	got, err := skills.Shipped("/home/.claude/skills")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []skills.Skill{
+		{Name: skills.Entry, Purpose: "Start here for anything about Code Foundry, the app this thread runs in", Path: "/home/.claude/skills/code-foundry/SKILL.md"},
+		{Name: skills.Help, Purpose: "Answer how-to questions about Code Foundry, the app this thread runs in", Path: "/home/.claude/skills/code-foundry-help/SKILL.md"},
+		{Name: skills.Orchestrate, Purpose: "Run several pieces of work in parallel as Code Foundry threads, each in its own worktree and branch",
+			Path: "/home/.claude/skills/code-foundry-orchestrate/SKILL.md"},
+		{Name: skills.Plugin, Purpose: "Build, debug and publish a Code Foundry plugin", Path: "/home/.claude/skills/code-foundry-plugin/SKILL.md"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Shipped = %+v\nwant %+v", got, want)
+	}
+	files, err := skills.Render(skills.Sources{Version: "v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range got {
+		if _, ok := files[s.Name+"/SKILL.md"]; !ok {
+			t.Errorf("Shipped lists %s, which Render does not ship", s.Name)
+		}
 	}
 }

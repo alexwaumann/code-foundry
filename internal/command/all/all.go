@@ -85,6 +85,10 @@ type Deps struct {
 	// Memory backs memory.* (the app memory). Nil registers them failing with
 	// Unimplemented.
 	Memory command.MemoryBackend
+	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
+	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
+	// and Presence. Nil: none listed.
+	ShippedSkills func() []command.ShippedSkill
 }
 
 // Register registers every domain's commands into r.
@@ -166,5 +170,9 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
 		command.RegisterMemory(r, d.Memory),
+		command.RegisterCapabilities(r, command.CapabilitiesDeps{
+			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,
+			Skills: d.Skills, Shipped: d.ShippedSkills, Presence: d.Presence,
+		}),
 	)
 }
