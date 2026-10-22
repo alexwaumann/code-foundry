@@ -41,9 +41,15 @@ func allowedTools(granted []string) []string {
 	return out
 }
 
-// threadTmp is thread id's TMPDIR under root (Options.TmpRoot): its claude, and every
-// command Claude runs, writes its scratch files there instead of the machine's shared
-// /tmp names (children wrote /tmp/bench.txt side by side, E4). "" without a root.
+// threadTmp is thread id's own directory under root, "" without a root or an id. Two
+// roots hold one each:
+//
+//   - Options.TmpRoot: its TMPDIR. Its claude, and every command Claude runs, writes its
+//     scratch files there instead of the machine's shared /tmp names (children wrote
+//     /tmp/bench.txt side by side, E4).
+//   - Options.PagesRoot: where it writes the HTML pages it shows (view.inline), given as
+//     paths.EnvPages and --add-dir, so the pages stay out of the repo and the home root
+//     and an accept-edits thread writes them without asking (inline-html-2-fixes.md).
 func threadTmp(root, id string) string {
 	if root == "" || id == "" {
 		return ""
@@ -51,41 +57,65 @@ func threadTmp(root, id string) string {
 	return filepath.Join(root, id)
 }
 
+// makeThreadDir makes thread id's directory under root (threadTmp) and returns it; ""
+// without a root, or, with a warning, when it cannot be made. what names it in the log.
+func (m *Manager) makeThreadDir(root, id, what string) string {
+	dir := threadTmp(root, id)
+	if dir == "" {
+		return ""
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		m.log.Warn("create a thread's "+what, "thread", id, "dir", dir, "err", err)
+		return ""
+	}
+	return dir
+}
+
 // tmpEnv makes thread id's TMPDIR and returns its environment entry; nil, with a
 // warning, when it cannot be made (the process keeps the daemon's TMPDIR).
 func (m *Manager) tmpEnv(id string) []string {
-	dir := threadTmp(m.opts.TmpRoot, id)
+	dir := m.makeThreadDir(m.opts.TmpRoot, id, "TMPDIR; keeping the daemon's")
 	if dir == "" {
-		return nil
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		m.log.Warn("create thread TMPDIR; keeping the daemon's", "thread", id, "dir", dir, "err", err)
 		return nil
 	}
 	return []string{"TMPDIR=" + dir}
 }
 
-// removeThreadTmp removes thread id's TMPDIR (Remove, once its process is gone).
+// pagesDir makes thread id's pages directory and returns it; "" when there is none.
+func (m *Manager) pagesDir(id string) string {
+	return m.makeThreadDir(m.opts.PagesRoot, id, "pages directory")
+}
+
+// removeThreadTmp removes thread id's TMPDIR and pages directory (Remove, once its
+// process is gone).
 func (m *Manager) removeThreadTmp(id string) {
-	dir := threadTmp(m.opts.TmpRoot, id)
-	if dir == "" {
-		return
-	}
-	if err := os.RemoveAll(dir); err != nil {
-		m.log.Warn("remove thread TMPDIR", "thread", id, "dir", dir, "err", err)
+	for _, root := range []string{m.opts.TmpRoot, m.opts.PagesRoot} {
+		dir := threadTmp(root, id)
+		if dir == "" {
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			m.log.Warn("remove a thread's directory", "thread", id, "dir", dir, "err", err)
+		}
 	}
 }
 
-// reapThreadTmps removes the TMPDIRs of threads that no longer exist (removed while the
-// daemon was down, or a removal that failed to delete it), at New.
+// reapThreadTmps removes the TMPDIRs and pages directories of threads that no longer
+// exist (removed while the daemon was down, or a removal that failed to delete it), at New.
 func (m *Manager) reapThreadTmps() {
-	if m.opts.TmpRoot == "" {
+	for _, root := range []string{m.opts.TmpRoot, m.opts.PagesRoot} {
+		m.reapThreadDirs(root)
+	}
+}
+
+func (m *Manager) reapThreadDirs(root string) {
+	if root == "" {
 		return
 	}
-	entries, err := os.ReadDir(m.opts.TmpRoot)
+	entries, err := os.ReadDir(root)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			m.log.Warn("read threads' TMPDIR root", "dir", m.opts.TmpRoot, "err", err)
+			m.log.Warn("read a root of threads' directories", "dir", root, "err", err)
 		}
 		return
 	}
@@ -94,13 +124,13 @@ func (m *Manager) reapThreadTmps() {
 		if _, ok := m.recs[e.Name()]; ok {
 			continue
 		}
-		if err := os.RemoveAll(filepath.Join(m.opts.TmpRoot, e.Name())); err != nil {
-			m.log.Warn("remove a gone thread's TMPDIR", "dir", e.Name(), "err", err)
+		if err := os.RemoveAll(filepath.Join(root, e.Name())); err != nil {
+			m.log.Warn("remove a gone thread's directory", "root", root, "dir", e.Name(), "err", err)
 			continue
 		}
 		n++
 	}
 	if n > 0 {
-		m.log.Info("removed the TMPDIRs of threads that are gone", "count", n)
+		m.log.Info("removed the directories of threads that are gone", "root", root, "count", n)
 	}
 }
