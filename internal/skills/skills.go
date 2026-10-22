@@ -1,7 +1,7 @@
 // Package skills renders and installs the Claude Code skills the daemon ships to every
-// thread: code-foundry-orchestrate (delegating work to other threads),
-// code-foundry-help (how-to questions about the app) and code-foundry-plugin (building
-// plugins). Their SKILL.md files and the worked examples are static (files/, embedded);
+// thread: code-foundry (the entry skill: what the app can do and which skill to read),
+// code-foundry-orchestrate (delegating work to other threads), code-foundry-help (how-to
+// questions about the app) and code-foundry-plugin (building plugins). Their SKILL.md files and the worked examples are static (files/, embedded);
 // their command and settings references are rendered from the daemon's own registry and
 // settings schema at every start (internal/guide), so they never drift from the build
 // that serves them. Nothing in a skill runs a shell command when it loads (managed
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"path"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/docs"
@@ -26,6 +27,9 @@ import (
 
 // The skills' names (their directories under .claude/skills).
 const (
+	// Entry routes a thread to the other skills and to daemon.capabilities
+	// (docs/notes/control-4-capabilities.md).
+	Entry       = "code-foundry"
 	Orchestrate = "code-foundry-orchestrate"
 	Help        = "code-foundry-help"
 	// Ember is the resident agent's own skill: only Ember's skills directory gets it
@@ -135,6 +139,59 @@ func Render(src Sources) (Files, error) {
 		out[r.path] = buf.Bytes()
 	}
 	return out, nil
+}
+
+// Skill is one skill Render ships: its name, its description's first clause (the
+// purpose daemon.capabilities shows) and where its SKILL.md is installed.
+type Skill struct {
+	Name, Purpose, Path string
+}
+
+// Shipped lists the skills Render ships to every thread, by name, from their embedded
+// SKILL.md frontmatter; skillsDir is where Install puts them.
+func Shipped(skillsDir string) ([]Skill, error) {
+	dirs, err := static.ReadDir(staticRoot)
+	if err != nil {
+		return nil, fmt.Errorf("skills: %w", err)
+	}
+	var out []Skill
+	for _, d := range dirs {
+		if !d.IsDir() || d.Name() == Ember {
+			continue
+		}
+		b, err := static.ReadFile(staticRoot + "/" + d.Name() + "/SKILL.md")
+		if err != nil {
+			return nil, fmt.Errorf("skills: %w", err)
+		}
+		out = append(out, Skill{Name: d.Name(), Purpose: purpose(frontmatterValue(b, "description")),
+			Path: path.Join(skillsDir, d.Name(), "SKILL.md")})
+	}
+	return out, nil
+}
+
+// frontmatterValue is key's value in b's YAML frontmatter, unquoted; "" when absent.
+func frontmatterValue(b []byte, key string) string {
+	head, ok := strings.CutPrefix(string(b), "---\n")
+	head, _, ok2 := strings.Cut(head, "\n---\n")
+	if !ok || !ok2 {
+		return ""
+	}
+	for _, line := range strings.Split(head, "\n") {
+		if v, ok := strings.CutPrefix(line, key+": "); ok {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return ""
+}
+
+// purpose is a description's first clause: up to its first ": " or ". ".
+func purpose(desc string) string {
+	for _, sep := range []string{": ", ". "} {
+		if i := strings.Index(desc, sep); i >= 0 {
+			desc = desc[:i]
+		}
+	}
+	return strings.TrimSuffix(desc, ".")
 }
 
 // EmberFiles returns the files of Ember's own skill (static, placeholders filled from
