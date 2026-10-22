@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -224,7 +225,15 @@ func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string
 		return nil, InvalidArg("number", "thread %s links #%d in %d repositories (%s); open it from the Linked PRs tab", t.GetId(), n, len(linked), strings.Join(linked, ", "))
 	}
 	res, err := d.PullRequests.GetPullRequest(ctx, connect.NewRequest(&v1.GetPullRequestRequest{RepoSlug: slug, Number: int32(n)}))
-	if err != nil {
+	switch {
+	case connect.CodeOf(err) == connect.CodeNotFound:
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no pull request #%d in %s", n, slug))
+	case err != nil:
+		// The CLI prints a connect error's own message: name the pull request in it.
+		var ce *connect.Error
+		if errors.As(err, &ce) {
+			return nil, connect.NewError(ce.Code(), fmt.Errorf("pull request %s#%d: %s", slug, n, ce.Message()))
+		}
 		return nil, fmt.Errorf("pull request %s#%d: %w", slug, n, err)
 	}
 	if s := res.Msg.GetPullRequest().GetRepoSlug(); s != "" {

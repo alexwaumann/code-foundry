@@ -450,6 +450,8 @@ func TestPanelPR(t *testing.T) {
 		{name: "no project", thread: &v1.Thread{}, number: "3", prs: ok(), code: connect.CodeFailedPrecondition},
 		{name: "unknown to GitHub", thread: richThread(), number: "99999", code: connect.CodeNotFound,
 			prs: &commandtest.PullRequestChecks{Err: connect.NewError(connect.CodeNotFound, errors.New("not found"))}},
+		{name: "GitHub unreachable keeps its code", thread: richThread(), number: "12", code: connect.CodeUnavailable,
+			prs: &commandtest.PullRequestChecks{Err: connect.NewError(connect.CodeUnavailable, errors.New("offline"))}},
 		{name: "zero", thread: richThread(), number: "0", prs: ok(), argErr: "number"},
 	}
 	for _, tt := range tests {
