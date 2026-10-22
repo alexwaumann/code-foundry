@@ -189,12 +189,13 @@ export function catalogJson(catalog: ThemeFile[]): string {
 }
 
 /**
- * The daemon's copy (internal/theme, go:embed): what it needs to validate and list the
- * appearance.theme_dark / theme_light settings. No colours: the daemon never paints.
+ * The daemon's copy (internal/theme, go:embed): the defaults and every theme file, so it
+ * can validate and list the appearance.theme_dark / theme_light settings, print a theme
+ * (theme.show) and copy one into the user's themes (theme.duplicate). The daemon stores
+ * the files as they are and derives no colour from them: the GUI resolves the slots.
  */
 export function goCatalogJson(catalog: ThemeFile[]): string {
-  const themes = catalog.map((t) => ({ id: t.id, name: t.name, scheme: t.scheme, ...(t.pair ? { pair: t.pair } : {}) }));
-  return JSON.stringify({ defaults: { dark: DEFAULT_DARK, light: DEFAULT_LIGHT }, themes }, null, 2) + "\n";
+  return JSON.stringify({ defaults: { dark: DEFAULT_DARK, light: DEFAULT_LIGHT }, themes: catalog }, null, 2) + "\n";
 }
 
 // ---------------------------------------------------------------- CLI

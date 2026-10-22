@@ -1,10 +1,13 @@
-// Package theme is the daemon's view of the GUI's colour themes: ids, names, schemes and
-// the default of each scheme, enough to validate and list the appearance.theme_dark and
-// appearance.theme_light settings. catalog.json is generated with the GUI's own catalog by
+// Package theme is the daemon's view of the GUI's colour themes: the curated catalog
+// (ids, names, schemes, the default of each scheme, and each theme's file), enough to
+// validate and list the appearance.theme_dark and appearance.theme_light settings, print
+// a theme and copy one. catalog.json is generated with the GUI's own catalog by
 // gui/frontend/themes/convert.ts (`pnpm run themes`) and committed; its drift test covers
-// this copy too. Never edit it by hand. The colours are resolved only in the GUI
-// (docs/notes/theme-slots-1-engine.md); the daemon keeps the GUI's published slots for
-// the frame stylesheet (frame.go, docs/notes/theme-css-route.md) and derives none.
+// this copy too. Never edit it by hand. The user's own themes are files in the themes
+// directory (store/usertheme, file.go); a Set is both (set.go). The colours are resolved
+// only in the GUI (docs/notes/theme-slots-1-engine.md); the daemon keeps the GUI's
+// published slots for the frame stylesheet (frame.go, docs/notes/theme-css-route.md) and
+// derives none.
 package theme
 
 import (
@@ -22,18 +25,30 @@ const (
 	SchemeLight = "light"
 )
 
-// Theme is one catalog entry.
+// Theme is one theme's entry: a curated one, or (User) one of the user's.
 type Theme struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Scheme string `json:"scheme"`
 	// Pair is the sibling of the other scheme (GitHub Dark and Light), or "".
 	Pair string `json:"pair,omitempty"`
+	// From is the theme a user theme was copied from, or "" (File.From).
+	From string `json:"from,omitempty"`
+	// CreatedBy is the thread that wrote a user theme, or "" (File.CreatedBy).
+	CreatedBy string `json:"created_by,omitempty"`
+	// User is true for a theme in the themes directory, false for a curated one.
+	User bool `json:"user,omitempty"`
 }
 
 type catalogFile struct {
 	Defaults map[string]string `json:"defaults"`
-	Themes   []Theme           `json:"themes"`
+	Themes   []File            `json:"themes"`
+}
+
+type parsedCatalog struct {
+	Defaults map[string]string
+	Themes   []Theme
+	Files    map[string]File
 }
 
 //go:embed catalog.json
@@ -43,12 +58,32 @@ var catalog = mustParse(catalogJSON)
 
 // mustParse reads the embedded catalog. A malformed file is a build defect that
 // TestCatalog catches, so it yields an empty catalog rather than a panic.
-func mustParse(data []byte) catalogFile {
+func mustParse(data []byte) parsedCatalog {
 	var c catalogFile
 	if err := json.Unmarshal(data, &c); err != nil {
-		return catalogFile{}
+		return parsedCatalog{}
 	}
-	return c
+	out := parsedCatalog{Defaults: c.Defaults, Files: make(map[string]File, len(c.Themes))}
+	for _, f := range c.Themes {
+		out.Themes = append(out.Themes, Theme{ID: f.ID, Name: f.Name, Scheme: f.Scheme, Pair: f.Pair})
+		out.Files[f.ID] = f
+	}
+	return out
+}
+
+// Curated returns a curated theme's file (a copy), as the GUI's catalog has it.
+func Curated(id string) (File, bool) {
+	f, ok := catalog.Files[id]
+	if !ok {
+		return File{}, false
+	}
+	return f.Clone(), true
+}
+
+// IsCurated reports whether id is a curated theme's id: a user theme may not use it.
+func IsCurated(id string) bool {
+	_, ok := catalog.Files[id]
+	return ok
 }
 
 // Themes returns every theme: dark ones first, the default (GitHub) first in each scheme.
