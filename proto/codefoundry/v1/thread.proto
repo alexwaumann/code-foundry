@@ -199,6 +199,12 @@ service ThreadService {
   // daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
   // `commands` event). See docs/notes/slash-commands-1-daemon.md.
   rpc SlashCommands(SlashCommandsRequest) returns (SlashCommandsResponse) {}
+  // ShowHtml shows an HTML page inline in a thread's conversation: an `html` item at the
+  // thread's current position (inside the running turn when one is live, else after the
+  // last item), which the GUI renders as a sandboxed frame (code-foundry view.inline;
+  // docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
+  // home directory (InvalidArgument otherwise, NotFound when missing).
+  rpc ShowHtml(ShowThreadHtmlRequest) returns (ShowThreadHtmlResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -236,7 +242,20 @@ message ThreadItem {
     CommandOutputItem command_output = 19;
     // A line the daemon adds, not Claude (a fork's "Forked from <parent>").
     NoteItem note = 20;
+    // An HTML page shown inline (ThreadService.ShowHtml).
+    HtmlItem html = 21;
   }
+}
+
+// An HTML page the model showed inline (code-foundry view.inline). The GUI renders the
+// file live in a sandboxed frame (FilesystemService.PreviewFile), from disk each time.
+message HtmlItem {
+  // Relative to the thread's cwd when the file is inside it, else absolute.
+  string path = 1;
+  // The page's title as the caller gave it; empty: the GUI shows the file name.
+  string title = 2;
+  // The thread's cwd when the item was made: the base a relative path resolves against.
+  string base_dir = 3;
 }
 
 // What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,
@@ -876,6 +895,17 @@ message ThreadSlashCommandsChange {
   uint64 seq = 2;
   // The whole new list.
   repeated SlashCommand commands = 3;
+}
+
+message ShowThreadHtmlRequest {
+  string thread_id = 1;
+  // Absolute (the CLI resolves a relative path against its own directory).
+  string path = 2;
+  string title = 3;
+}
+
+message ShowThreadHtmlResponse {
+  ThreadItem item = 1;
 }
 
 message SlashCommandsRequest {
