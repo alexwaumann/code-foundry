@@ -1,36 +1,28 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions, workspaces. Use when the user asks how to do something in Code Foundry, how it works, or wants a setting changed (explain, then offer to run the command), or states a standing preference about the app or how you work in it (remember it)."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions. Use when the user asks how to do something in it or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), or before you show something in the app's side panel."
 ---
 
 # Answering questions about Code Foundry
 
 {{cf.provenance}}
 
-Code Foundry is the macOS app this thread runs in. It runs Claude Code threads on the
-user's projects (folders on their Mac), each thread in the project's folder or in its own
-worktree. A daemon on the Mac does the work; the window shows it; the `code-foundry` CLI,
-which you can run with your Bash tool, drives the same daemon. Commands you run change
-the user's real app.
+What the app is and which skill covers what: the code-foundry skill. Commands you run
+(the `code-foundry` CLI, with your Bash tool) change the user's real app.
 
 ## Where to look
 
 Read these with your Read tool (they are next to this file) instead of answering from
 memory:
 
-- `reference/getting-started.md`: the user guide (in the app under Help › Getting
-  Started). Find the topic here first and use its words for buttons, pages and
-  shortcuts.
+- `reference/getting-started.md`: the user guide (Help › Getting Started in the app).
+  Find the topic here first and use its words for buttons, pages and shortcuts.
 - `reference/settings.md`: every setting, one entry each: key, title, what it does,
   type and allowed values, default, and whether it needs a daemon restart.
 - `reference/commands.md`: the commands for projects, settings, threads, pull requests,
   actions and views. Every button and menu item in the app is one of these commands,
-  also found in the command palette (⌘K).
-- `code-foundry help <command>` prints every flag of one command (for a flag you do not
-  see in the references); `code-foundry commands` lists them all.
-- The current values: `code-foundry settings get` (every setting) or
-  `code-foundry settings get <key>`; `--json` adds each setting's title, description,
-  type and default.
+  also found in the command palette (⌘K). `code-foundry help <command>` prints every
+  flag of one.
 
 If none of these covers the question, read the source (below); if that does not answer
 it either, say so rather than guess; the Help menu has a way to report a problem.
@@ -71,7 +63,8 @@ offer, not a change.
 
 - `code-foundry settings set <key> <value>` validates the value against the setting's
   type and writes it; `code-foundry settings reset <key>` returns it to its default;
-  `code-foundry settings get [<key>]` reads.
+  `code-foundry settings get [<key>]` reads the current values (`--json` adds each one's
+  title, description, type and default).
 - Values: an enum takes one of the values listed in `reference/settings.md` (quote model
   ids in the shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its
   bounds; a keybinding a chord such as `cmd+shift+n`, or `none` to unbind.
@@ -108,12 +101,4 @@ First run `code-foundry ui.presence --json`: open it only when `viewed` is true 
 shows this thread) and no saved preference says not to; otherwise say it in your reply,
 or `code-foundry ui.notify --title "<what happened>"` if the user should know now. Never
 pass `--focus` (it pulls every window to this thread) unless the user asked for it.
-
-## Good to know
-
-- A **project** is a folder on the Mac; a **thread** is one conversation with an agent in
-  it. "Work in" decides where a new thread edits: the project folder itself (In place)
-  or a fresh copy, a worktree with its own branch (Fresh copy).
-- Thread commands without `--id` act on this thread (`$CODE_FOUNDRY_THREAD`). To act on
-  another thread, pass `--id <thread id>`; `code-foundry thread list` prints the ids.
-- To delegate work to other threads, use the code-foundry-orchestrate skill.
+`code-foundry daemon.capabilities --group panel` lists every surface and its verb.
