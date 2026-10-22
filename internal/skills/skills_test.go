@@ -171,7 +171,8 @@ func TestRender(t *testing.T) {
 			notCats: []string{"Workspace", "View", "Terminal"},
 			// Settings in full, Thread one line each.
 			detailed:  "  - `<value>`",
-			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`"},
+			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`",
+				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`"},
 		},
 	} {
 		got := string(files[tt.path])
@@ -196,6 +197,16 @@ func TestRender(t *testing.T) {
 	}
 	if help := string(files[skills.Help+"/reference/commands.md"]); strings.Contains(help, "  - `--request-id") {
 		t.Error("the help skill lists thread.new's args; it has the one-line form")
+	}
+	// The help skill saves standing preferences to the app memory, a setting first
+	// (docs/notes/control-3-app-memory.md); its description names them so it fires.
+	help := string(files[skills.Help+"/SKILL.md"])
+	for _, want := range []string{"standing preference about the app or how you work in it", "\n## Remembering preferences\n",
+		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "applies to threads started from now on",
+		"remove the old entry first", "`code-foundry memory show`"} {
+		if !strings.Contains(help, want) {
+			t.Errorf("help SKILL.md lacks %q", want)
+		}
 	}
 
 	// The settings reference has one entry per setting with its type and default.
