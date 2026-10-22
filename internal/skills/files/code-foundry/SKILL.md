@@ -30,7 +30,8 @@ Never tell the user skill or command names: say what you will do, not which comm
 | How to do something, a setting or keybinding | the code-foundry-help skill |
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
-| To see a file, a change, a PR, a page or chart you make | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`; write a page or chart as an `.html` file |
+| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
+| A page, chart or HTML you make | write an `.html` file, then `code-foundry view.inline <path>`: it shows in this conversation |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
@@ -41,15 +42,14 @@ Load a skill with your Skill tool (or Read its SKILL.md: `--group skills` has th
 
 ## Showing things
 
-Panel verbs open a surface in your own thread's side panel and move nothing else:
-`view.panel.file`, `diff`, `pr`, `usage`, `worktree`, `linked-prs`, `agents`, `threads`,
-`mcp`, `workspace`. Add `--focus` only when the user asks to be taken there. Page verbs
-(`view.projects`, `view.usage`…) move every window: only when asked. A file path in your
-reply is a chip that opens the file; an `.html` file renders there interactively (no
-server, no browser). Have the page link `<link rel="stylesheet" href="/cf/theme.css">` and
-paint with its `--cf-*` variables (surfaces, text, accent, status triples, sidebar, diff,
-charts) or the type-role classes (`text-body`, `text-caption`…) so it follows the user's
-theme. Details: code-foundry-help, "Showing things in the app".
+To show a page inline in the conversation: `code-foundry view.inline <path>` (your own
+thread; `--panel` also opens it beside the thread). Panel verbs open a surface in your own
+side panel: `view.panel.file`, `diff`, `pr`, `usage`, `worktree`, `threads`, `mcp`….
+Add `--focus` only when the user asks to be taken there. Page verbs move every window:
+only when asked. A path in your reply is a chip that opens the file. A page links
+`<link rel="stylesheet" href="/cf/theme.css">` and paints with its `--cf-*` variables
+(status triples, charts…) or type-role classes so it follows the theme; it posts
+`{type: "cf:resize", height}` (body height) to size its inline card. More: code-foundry-help.
 
 ## Discovering what exists
 
