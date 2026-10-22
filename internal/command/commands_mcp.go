@@ -22,6 +22,8 @@ import (
 type McpBackend interface {
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
+	// view.panel.mcp --thread checks the thread exists.
+	ThreadGetter
 }
 
 var (
@@ -100,9 +102,9 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			// No default chord, like view.panel.usage (M opens it while the panel has
 			// focus).
 			When: hasThread,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPanelMcp}}})
-				return Result{JSON: EmitResult{Delivered: n}}, nil
+			Args: panelThreadArgs(),
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				return showPanel(ctx, b, e, uctx, a, ViewPanelMcp, nil)
 			},
 		},
 	)

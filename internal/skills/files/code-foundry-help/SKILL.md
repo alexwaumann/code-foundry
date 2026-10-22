@@ -23,9 +23,9 @@ memory:
   shortcuts.
 - `reference/settings.md`: every setting, one entry each: key, title, what it does,
   type and allowed values, default, and whether it needs a daemon restart.
-- `reference/commands.md`: the commands for projects, settings, threads, pull requests
-  and actions. Every button and menu item in the app is one of these commands, also
-  found in the command palette (⌘K).
+- `reference/commands.md`: the commands for projects, settings, threads, pull requests,
+  actions and views. Every button and menu item in the app is one of these commands,
+  also found in the command palette (⌘K).
 - `code-foundry help <command>` prints every flag of one command (for a flag you do not
   see in the references); `code-foundry commands` lists them all.
 - The current values: `code-foundry settings get` (every setting) or
@@ -98,6 +98,16 @@ when you use them"); a one-off request about the task at hand is not one:
 
 "What do you remember?" is `code-foundry memory show`. `memory clear --yes` forgets them
 all, only when the user asks for exactly that.
+
+## Showing things in the app
+
+After something worth seeing, you may open it in this thread's side panel
+(`view.panel.linked-prs` after opening a pull request, `view.panel.worktree` after
+changing files); from this thread it changes only its panel, never what the user sees.
+First run `code-foundry ui.presence --json`: open it only when `viewed` is true (a window
+shows this thread) and no saved preference says not to; otherwise say it in your reply,
+or `code-foundry ui.notify --title "<what happened>"` if the user should know now. Never
+pass `--focus` (it pulls every window to this thread) unless the user asked for it.
 
 ## Good to know
 

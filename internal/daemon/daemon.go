@@ -213,7 +213,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
 		},
-		Emitter:  command.BusEmitter{Bus: events},
+		Emitter: command.BusEmitter{Bus: events},
+		// The same presence the thread store's Options.Attended reads (openStores).
+		Presence: command.PresenceDeps{Presence: pres.Current, Windows: clients.Windows, Viewed: st.thread.Viewed},
 		Terminal: terminalAPI,
 		IsShellTerminal: func(id string) bool {
 			t, err := st.terminal.Get(context.Background(), id)

@@ -89,8 +89,8 @@ var references = []reference{
 		"Commands for orchestrating threads",
 		[]guide.Category{{Name: "Thread", Detailed: true}, {Name: "Action"}, {Name: "Workspace"}, {Name: "Project"}})},
 	{Help + "/reference/commands.md", commandsReference(
-		"Commands for projects, settings, threads, pull requests and actions",
-		[]guide.Category{{Name: "Project"}, {Name: "Settings", Detailed: true}, {Name: "Thread"}, {Name: "Pull Request"}, {Name: "Action"}})},
+		"Commands for projects, settings, threads, pull requests, actions and the app's views",
+		[]guide.Category{{Name: "Project"}, {Name: "Settings", Detailed: true}, {Name: "Thread"}, {Name: "Pull Request"}, {Name: "Action"}, {Name: "View"}})},
 	{Help + "/reference/settings.md", settingsReference},
 	{Help + "/reference/getting-started.md", func(w io.Writer, src Sources) {
 		_, _ = w.Write(underTitle(docs.GettingStarted, src.Provenance()))

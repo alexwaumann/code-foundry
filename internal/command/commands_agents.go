@@ -74,9 +74,9 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 			// No default chord, like view.panel.mcp (the surface has its own key while the
 			// panel has focus).
 			When: hasThread,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPanelAgents}}})
-				return Result{JSON: EmitResult{Delivered: n}}, nil
+			Args: panelThreadArgs(),
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				return showPanel(ctx, b, e, uctx, a, ViewPanelAgents, nil)
 			},
 		},
 	)

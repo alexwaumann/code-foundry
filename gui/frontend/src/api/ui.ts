@@ -9,7 +9,12 @@ export type UiIntentView =
   | { kind: "focusProject"; projectId: string; worktreePath: string }
   | { kind: "openPalette"; query: string }
   | { kind: "notify"; level: NotifyLevel; title: string; body: string }
-  | { kind: "showView"; name: string }
+  /**
+   * A named view, or a panel action. `threadId` (a view.panel.* verb run inside a thread)
+   * scopes a panel action to that thread's panel, whatever the window has selected
+   * (stores/threadPanelIntent.ts); absent, it acts on the selection.
+   */
+  | { kind: "showView"; name: string; threadId?: string }
   | { kind: "playAlertSound"; volume: number }
   /** thread.agent.open: select the thread and show one of its own subagent runs read-only. */
   | { kind: "showAgentRun"; threadId: string; runId: string }
@@ -40,7 +45,7 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
     case "notify":
       return { kind: "notify", level: levelMap[e.value.level], title: e.value.title, body: e.value.body };
     case "showView":
-      return { kind: "showView", name: e.value.name };
+      return e.value.threadId ? { kind: "showView", name: e.value.name, threadId: e.value.threadId } : { kind: "showView", name: e.value.name };
     case "playAlertSound":
       return { kind: "playAlertSound", volume: e.value.volume };
     case "showAgentRun":

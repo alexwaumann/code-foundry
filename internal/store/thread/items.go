@@ -702,6 +702,11 @@ func (m *Manager) addViewer(id string, d int) {
 	}
 }
 
+// Viewed reports whether the thread has a viewer now: a GUI view showing it holds a
+// ThreadService.WatchThread stream (WatchItems), whether or not presence is attended.
+// Read-only; ui.presence reports it to the thread's own model.
+func (m *Manager) Viewed(id string) bool { return m.viewerCount(id) > 0 }
+
 func (m *Manager) viewerCount(id string) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()

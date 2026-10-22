@@ -23,6 +23,7 @@ import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type Thre
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { launchShell, type ShellCall } from "./shells";
+import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 import type { UiIntentInit } from "./world";
 
 export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
@@ -357,10 +358,10 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
         category: "View",
         description: "Open the Agents surface in the selected thread's side panel: its subagent runs with their status, activity and report.",
         keybindings: [],
-        args: [],
+        args: panelThreadArgs,
       },
       when,
-      run: () => `delivered=${String(emit({ intent: { case: "showView", value: { name: "panel.agents" } } }))}`,
+      run: (_ctx, args) => runPanelVerb(emit, "panel.agents", args),
     },
     {
       cmd: {

@@ -10,6 +10,7 @@ import { PENDING_FOCUS_MS } from "./bottomPanel";
 import { getShowCreatedThreads } from "./settings";
 import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
+import { showThreadView } from "./threadPanelIntent";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
@@ -129,6 +130,12 @@ export function applyIntent(intent: UiIntentView): void {
       break;
     }
     case "showView":
+      if (intent.threadId) {
+        // A panel action scoped to one thread (a view.panel.* verb run inside it): the
+        // window does not move, so a pending focus stays pending too.
+        showThreadView(intent.name, intent.threadId);
+        break;
+      }
       clearPendingFocus();
       showView(intent.name);
       break;

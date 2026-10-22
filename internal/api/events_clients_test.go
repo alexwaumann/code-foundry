@@ -129,6 +129,26 @@ func TestClientsPresence(t *testing.T) {
 	}
 }
 
+// Windows counts the joined GUI streams: with an id or without, a reused id once.
+func TestClientsWindows(t *testing.T) {
+	c := NewClients(nil)
+	if n := c.Windows(); n != 0 {
+		t.Fatalf("windows = %d with nobody", n)
+	}
+	leaveA := c.Join("a", presence.Client{Visible: true})
+	leaveAnon := c.Join("", presence.Client{})
+	c.Join("b", presence.Client{})
+	c.Join("b", presence.Client{Visible: true}) // replaces the first b
+	if n := c.Windows(); n != 3 {
+		t.Errorf("windows = %d, want 3", n)
+	}
+	leaveA()
+	leaveAnon()
+	if n := c.Windows(); n != 1 {
+		t.Errorf("windows = %d after two left, want 1", n)
+	}
+}
+
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

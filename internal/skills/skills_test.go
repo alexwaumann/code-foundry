@@ -167,12 +167,14 @@ func TestRender(t *testing.T) {
 				"`project.worktree.cleanup <project> <path> --yes`", "`workspace.new <name>`"},
 		},
 		{
-			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action"},
-			notCats: []string{"Workspace", "View", "Terminal"},
+			path: skills.Help + "/reference/commands.md", cats: []string{"Project", "Settings", "Thread", "Pull Request", "Action", "View"},
+			notCats: []string{"Workspace", "Terminal"},
 			// Settings in full, Thread one line each.
 			detailed: "  - `<value>`",
+			// memory.* for "Remembering preferences", View for "Showing things in the app".
 			mentioned: []string{"`settings.set <key> <value>`", "`pr.create`", "`project.add <path>`", "`thread.new`",
-				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`"},
+				"`memory.show`", "`memory.add <text>`", "`memory.remove <entry>`", "`memory.clear --yes`",
+				"`view.panel.worktree`", "`view.panel.linked-prs`", "`ui.presence`", "`ui.notify`"},
 		},
 	} {
 		got := string(files[tt.path])
