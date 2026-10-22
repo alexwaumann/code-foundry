@@ -10,7 +10,25 @@ service UiService {
   rpc WatchIntents(WatchIntentsRequest) returns (stream UiIntent) {}
   // Emit publishes an intent to all watchers. Commands use this to drive the GUI.
   rpc Emit(EmitIntentRequest) returns (EmitIntentResponse) {}
+  // PublishTheme records the GUI's active theme and its resolved slots, so pages the model
+  // writes can paint in it: the loopback listener serves it as GET /cf/theme.css and
+  // /cf/theme.json (docs/notes/theme-css-route.md). The GUI calls it on connect and on
+  // every theme change. One per daemon, in memory: with several windows the last writer
+  // wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
+  rpc PublishTheme(PublishThemeRequest) returns (PublishThemeResponse) {}
 }
+
+message PublishThemeRequest {
+  // The theme's id ("github-dark"): lowercase letters, digits and dashes.
+  string id = 1;
+  // "dark" or "light".
+  string scheme = 2;
+  // Every resolved slot: "--cf-*", "--terminal-*", "--syn-*" and "--sh-*" names to
+  // "#rrggbb" or "#rrggbbaa" (gui/frontend/src/themes/slots.ts resolveSlots).
+  map<string, string> vars = 3;
+}
+
+message PublishThemeResponse {}
 
 message WatchIntentsRequest {}
 

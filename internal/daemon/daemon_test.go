@@ -126,10 +126,11 @@ func TestWriteFileAtomicPerms(t *testing.T) {
 	}
 }
 
-func TestLoopbackHandlerPreviewNeedsNoBearer(t *testing.T) {
+func TestLoopbackHandlerOpenRoutesNeedNoBearer(t *testing.T) {
 	previewH := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
 	rest := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	h := loopbackHandler("secret", previewH, rest)
+	themeH := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	h := loopbackHandler("secret", map[string]http.Handler{"/preview/": previewH, "/cf/": themeH}, rest)
 	tests := []struct {
 		name, path, auth string
 		want             int
@@ -139,6 +140,10 @@ func TestLoopbackHandlerPreviewNeedsNoBearer(t *testing.T) {
 		{"rpc without token", "/codefoundry.v1.ThreadService/List", "", http.StatusUnauthorized},
 		{"rpc with token", "/codefoundry.v1.ThreadService/List", "Bearer secret", http.StatusOK},
 		{"preview-ish path outside the prefix", "/previewx", "", http.StatusUnauthorized},
+		{"theme stylesheet without token", "/cf/theme.css", "", http.StatusAccepted},
+		{"theme json without token", "/cf/theme.json", "", http.StatusAccepted},
+		{"unknown /cf/ path reaches the theme handler", "/cf/x", "", http.StatusAccepted},
+		{"cf-ish path outside the prefix", "/cfx/theme.css", "", http.StatusUnauthorized},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -158,7 +163,7 @@ func TestLoopbackHandlerPreviewNeedsNoBearer(t *testing.T) {
 func TestRequireBearerAndCORS(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
 	// Through loopbackHandler, so the test covers CORS being mounted on the API side.
-	h := loopbackHandler("secret", http.NotFoundHandler(), ok)
+	h := loopbackHandler("secret", map[string]http.Handler{"/preview/": http.NotFoundHandler()}, ok)
 	tests := []struct {
 		name       string
 		method     string

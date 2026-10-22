@@ -1,5 +1,7 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setThemePreference, setThemeSlots } from "@/lib/theme";
+import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
 import { HTML_PREVIEW_SANDBOX, HtmlPreview } from "./HtmlPreview";
 
 const previewFile = vi.fn();
@@ -11,6 +13,8 @@ vi.mock("@/api/files", async (orig) => ({
 afterEach(() => {
   cleanup();
   previewFile.mockReset();
+  setThemePreference("system");
+  setThemeSlots({ light: DEFAULT_LIGHT, dark: DEFAULT_DARK });
 });
 
 describe("HtmlPreview", () => {
@@ -37,6 +41,30 @@ describe("HtmlPreview", () => {
       expect(screen.getByTestId("file-html-frame")).not.toBe(first);
     });
     expect(previewFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("posts the theme to the frame on load and on every theme change", async () => {
+    setThemePreference("dark");
+    previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
+    render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+    const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+    const win = frame.contentWindow;
+    if (!win) throw new Error("no contentWindow");
+    const post = vi.spyOn(win, "postMessage").mockImplementation(() => undefined);
+    fireEvent.load(frame);
+    const [msg, target] = post.mock.lastCall ?? [];
+    expect(target).toBe("*");
+    expect(msg).toMatchObject({ type: "cf:theme", id: "github-dark", scheme: "dark" });
+    expect((msg as { vars: Record<string, string> }).vars["--cf-text"]).toMatch(/^#/);
+    act(() => {
+      setThemeSlots({ dark: "nord" });
+    });
+    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: "cf:theme", id: "nord", scheme: "dark" }), "*");
+    act(() => {
+      setThemePreference("light");
+    });
+    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: "cf:theme", id: "github-light", scheme: "light" }), "*");
+    expect(post).toHaveBeenCalledTimes(3);
   });
 
   it("shows the error with a Retry that asks again", async () => {

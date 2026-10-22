@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/alexwaumann/code-foundry/internal/preview"
 )
 
 // newToken returns 32 random bytes, hex encoded.
@@ -62,13 +60,16 @@ func requireBearer(token string, next http.Handler) http.Handler {
 	})
 }
 
-// loopbackHandler is what the TCP listener serves: the HTML preview's route, whose
-// credential is the grant in its URL because an <iframe src> cannot send a header
-// (package preview) and which sets its own CORS header, and behind CORS and the bearer
-// token everything else.
-func loopbackHandler(token string, previewH, rest http.Handler) http.Handler {
+// loopbackHandler is what the TCP listener serves: the open routes, keyed by path prefix,
+// and behind CORS and the bearer token everything else. The open routes are what a page in
+// the HTML preview loads, which cannot send a header: the preview (preview.Prefix), whose
+// credential is the grant in its URL (package preview), and the frame stylesheet
+// (theme.FramePrefix), which reveals only colours. Each sets its own CORS header.
+func loopbackHandler(token string, open map[string]http.Handler, rest http.Handler) http.Handler {
 	m := http.NewServeMux()
-	m.Handle(preview.Prefix, previewH)
+	for prefix, h := range open {
+		m.Handle(prefix, h)
+	}
 	m.Handle("/", cors(requireBearer(token, rest)))
 	return m
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
 import { previewFile, type FilePreview } from "@/api/files";
 import { errorMessage, isAbort } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { tildify } from "@/lib/path";
+import { subscribeThemeSlots, themeFrameMessage } from "@/lib/theme";
 import { FileEmptyState, FileLoading } from "./states";
 
 /**
@@ -14,6 +15,11 @@ import { FileEmptyState, FileLoading } from "./states";
  */
 export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
 
+/** Posts the active theme to a preview frame (it ignores the message unless it listens). */
+function postTheme(frame: HTMLIFrameElement | null): void {
+  frame?.contentWindow?.postMessage(themeFrameMessage(), "*");
+}
+
 /**
  * An HTML file rendered live: the daemon serves it, and everything under its scope (its
  * checkout, else its directory; the file alone when that directory is home or another
@@ -23,8 +29,21 @@ export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allo
  * app's own URL and navigated the frame into the app's blank shell (docs/notes/
  * html-preview-interactive.md). The frame reloads when the file's text changes (the thread
  * edited it). A white canvas, as in a browser; a footer says what the page can reach.
+ *
+ * A page that links `/cf/theme.css` paints in the user's theme (the daemon serves the
+ * slots the GUI published); the frame is also posted `{ type: "cf:theme", id, scheme,
+ * vars }` on load and on every theme change, for a page that follows it live
+ * (docs/notes/theme-css-route.md). The target is "*": the frame is opaque-origin.
  */
 export function HtmlPreview({ path, text, name }: { path: string; text: string; name: string }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useEffect(
+    () =>
+      subscribeThemeSlots(() => {
+        postTheme(frameRef.current);
+      }),
+    [],
+  );
   const [state, setState] = useState<{ path: string; preview: FilePreview | null; error: string | null }>({ path: "", preview: null, error: null });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -76,6 +95,10 @@ export function HtmlPreview({ path, text, name }: { path: string; text: string; 
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-html">
       <iframe
         key={version}
+        ref={frameRef}
+        onLoad={() => {
+          postTheme(frameRef.current);
+        }}
         aria-label={`${name} (rendered)`}
         src={current.preview.url}
         sandbox={HTML_PREVIEW_SANDBOX}

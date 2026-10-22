@@ -2,7 +2,9 @@
  * Ghostty themes -> theme files (docs/notes/theme-slots-1-engine.md). `pnpm run themes`
  * regenerates src/themes/catalog.json (every curated theme as a theme file: base +
  * overrides) and the daemon's copy internal/theme/catalog.json (ids, names, schemes, pairs
- * and the defaults); both committed. `pnpm run themes -- --refresh` first re-copies the
+ * and the defaults), plus the frame stylesheet's static part and defaults
+ * (internal/theme/frame.css, frame-defaults.json; themes/frame.ts); all committed.
+ * `pnpm run themes -- --refresh` first re-copies the
  * vendored Ghostty files from /Applications/Ghostty.app. themes/convert.test.ts regenerates
  * in memory and fails on drift.
  *
@@ -17,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "../src/themes/defaults.ts";
 import { chroma, contrast, lightness, parseHex, shiftL, toHex } from "../src/themes/color.ts";
 import { parseThemeFile, resolveSlots, type ThemeBase, type ThemeFile, type ThemeScheme } from "../src/themes/slots.ts";
+import { frameCss, frameDefaultsJson } from "./frame.ts";
 
 export type Scheme = ThemeScheme;
 
@@ -49,6 +52,9 @@ export const PATHS = {
   overrides: path.join(here, "overrides.json"),
   catalog: path.join(here, "../src/themes/catalog.json"),
   goCatalog: path.join(here, "../../../internal/theme/catalog.json"),
+  indexCss: path.join(here, "../src/index.css"),
+  frameCss: path.join(here, "../../../internal/theme/frame.css"),
+  frameDefaults: path.join(here, "../../../internal/theme/frame-defaults.json"),
 };
 const GHOSTTY_APP = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes";
 
@@ -204,6 +210,8 @@ function main(): void {
   const catalog = buildCatalog(inputs);
   fs.writeFileSync(PATHS.catalog, catalogJson(catalog));
   fs.writeFileSync(PATHS.goCatalog, goCatalogJson(catalog));
+  fs.writeFileSync(PATHS.frameCss, frameCss(fs.readFileSync(PATHS.indexCss, "utf8")));
+  fs.writeFileSync(PATHS.frameDefaults, frameDefaultsJson(catalog));
   const r = (a: string | undefined, b: string | undefined) => (a && b ? Number(contrast(a, b).toFixed(1)) : NaN);
   console.table(
     catalog.map((t) => {

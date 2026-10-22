@@ -198,6 +198,7 @@ import { emberStateNames } from "./ember";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
+import { publishMockTheme, themeRoute } from "./theme";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
@@ -435,6 +436,10 @@ function routes(router: ConnectRouter): void {
   router.service(UiService, {
     watchIntents: (_req, ctx) => tracked("UiService/WatchIntents", world.intents.subscribe(ctx.signal)),
     emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
+    publishTheme: (req) => {
+      publishMockTheme({ id: req.id, scheme: req.scheme, vars: req.vars });
+      return {};
+    },
   });
 
   router.service(ThreadService, {
@@ -1380,6 +1385,13 @@ const server = createServer((req, res) => {
   if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
+    return;
+  }
+  // The frame stylesheet needs no credential, like the daemon's (internal/theme/frame.go).
+  if (url.pathname.startsWith("/cf/")) {
+    const r = themeRoute(url.pathname);
+    res.writeHead(r ? 200 : 404, { "Content-Type": r?.type ?? "text/plain", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Access-Control-Allow-Origin": "*" });
+    res.end(r?.body ?? "404 page not found\n");
     return;
   }
   // The HTML preview's route authenticates by the grant in its URL, like the daemon's (internal/preview).

@@ -2,8 +2,9 @@
 // the default of each scheme, enough to validate and list the appearance.theme_dark and
 // appearance.theme_light settings. catalog.json is generated with the GUI's own catalog by
 // gui/frontend/themes/convert.ts (`pnpm run themes`) and committed; its drift test covers
-// this copy too. Never edit it by hand. The colours live only in the GUI
-// (docs/notes/theme-engine-2-engine.md).
+// this copy too. Never edit it by hand. The colours are resolved only in the GUI
+// (docs/notes/theme-slots-1-engine.md); the daemon keeps the GUI's published slots for
+// the frame stylesheet (frame.go, docs/notes/theme-css-route.md) and derives none.
 package theme
 
 import (

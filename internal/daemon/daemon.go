@@ -37,6 +37,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
@@ -178,6 +179,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
 	grants := preview.NewGrants(preview.NewFloor(st.home, p))
+	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css).
+	liveTheme := theme.NewLive()
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
@@ -289,7 +292,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),
-		api.NewUI(events).Route(),
+		api.NewUI(events, liveTheme).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
 		projectAPI.Route(),
@@ -341,7 +344,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
 	previewH := preview.Handler(grants, log.With("component", "preview"))
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, previewH, mux)))
+	open := map[string]http.Handler{preview.Prefix: previewH, theme.FramePrefix: theme.FrameHandler(liveTheme)}
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, open, mux)))
 
 	errc := make(chan error, 2)
 	go func() { errc <- serve(unixSrv, unixLn) }()
