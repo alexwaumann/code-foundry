@@ -23,6 +23,23 @@ func TestSystemPrompt(t *testing.T) {
 			t.Errorf("ThreadPrompt does not name %q: %q", want, ThreadPrompt)
 		}
 	}
+	// The routing that holds when no skill fires (control-7-skill-routing): preferences,
+	// cost, showing things in the thread's own panel, path chips and HTML, pull
+	// requests, the In place default, replaced slash commands, page verbs, no command
+	// names to the user.
+	for _, want := range []string{"from now on (always, never, keep answers short), run code-foundry memory add <their words> at once, without asking (every thread then follows it), never your own memory files",
+		"code-foundry usage.show", "view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked)",
+		"clickable chip", ".html file renders interactively", "code-foundry pr.create (project.github.publish", "threads work In place",
+		"/model or /cost", "page verbs (view.*) move every window: prefer panel verbs", "not command or skill names"} {
+		if !strings.Contains(ThreadPrompt, want) {
+			t.Errorf("ThreadPrompt does not route %q: %q", want, ThreadPrompt)
+		}
+	}
+	// It is paid on every request of every thread (about 260 tokens over the
+	// orchestration-only line, measured with claude -p): grow it only by cutting.
+	if n := len(ThreadPrompt); n > 1400 {
+		t.Errorf("ThreadPrompt has %d bytes; keep it under 1400", n)
+	}
 	ws := workspacePrompt("login")
 	if got := systemPrompt(ws, nil, ""); got != ThreadPrompt+" "+ws {
 		t.Errorf("workspace thread: %q", got)

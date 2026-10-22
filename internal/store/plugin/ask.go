@@ -19,6 +19,13 @@ func (a *actor) askUser(err error, p pluginsdk.InvokeParams) (pluginsdk.CommandR
 	if p.Confirm != pluginsdk.ConfirmAsk || !errors.As(err, &ce) || a.m.opts.Emitter == nil {
 		return pluginsdk.CommandResult{}, false
 	}
+	// Only a window can show the dialog: a CLI events stream or a plugin receives the
+	// intent too, so the emit's count says nothing about windows (control-5-fixes).
+	windows := a.m.opts.Emitter.Windows()
+	if windows == 0 {
+		a.hostLog("host/invoke %s: asks the user first and no app window is open", p.Command)
+		return pluginsdk.CommandResult{}, false
+	}
 	n := a.m.opts.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_InvokeCommand_{InvokeCommand: &v1.UiIntent_InvokeCommand{
 		Name: p.Command, Args: p.Args, Caller: "plugin:" + a.name,
 		Context: &v1.UiContext{
@@ -26,11 +33,7 @@ func (a *actor) askUser(err error, p pluginsdk.InvokeParams) (pluginsdk.CommandR
 			ActiveTerminalId: p.Context.TerminalID, ActiveWorkspaceId: p.Context.WorkspaceID, ActiveView: p.Context.View,
 		},
 	}}})
-	if n == 0 {
-		a.hostLog("host/invoke %s: asks the user first and no GUI is connected", p.Command)
-		return pluginsdk.CommandResult{}, false
-	}
-	a.hostLog("host/invoke %s: handed to the GUI to confirm (%d window(s))", p.Command, n)
-	js, _ := json.Marshal(pluginsdk.AskedResult{Asked: true, Delivered: n})
+	a.hostLog("host/invoke %s: handed to the GUI to confirm (%d window(s))", p.Command, windows)
+	js, _ := json.Marshal(pluginsdk.AskedResult{Asked: true, Windows: windows, Receivers: n, Delivered: n})
 	return pluginsdk.CommandResult{Message: "asked the user to confirm " + p.Command, JSON: js}, true
 }

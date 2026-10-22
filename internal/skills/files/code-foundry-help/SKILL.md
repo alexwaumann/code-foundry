@@ -1,6 +1,6 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions. Use when the user asks how to do something in it or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), or before you show something in the app's side panel."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions. Use when the user asks how to do something in it or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), asks to see something, or before you show something in the app's side panel."
 ---
 
 # Answering questions about Code Foundry
@@ -12,17 +12,15 @@ What the app is and which skill covers what: the code-foundry skill. Commands yo
 
 ## Where to look
 
-Read these with your Read tool (they are next to this file) instead of answering from
-memory:
+Read these (next to this file) with your Read tool instead of answering from memory:
 
 - `reference/getting-started.md`: the user guide (Help › Getting Started in the app).
   Find the topic here first and use its words for buttons, pages and shortcuts.
-- `reference/settings.md`: every setting, one entry each: key, title, what it does,
-  type and allowed values, default, and whether it needs a daemon restart.
+- `reference/settings.md`: every setting: key, title (the Settings page's label), what
+  it does, allowed values, default, and whether it needs a daemon restart.
 - `reference/commands.md`: the commands for projects, settings, threads, pull requests,
-  actions and views. Every button and menu item in the app is one of these commands,
-  also found in the command palette (⌘K). `code-foundry help <command>` prints every
-  flag of one.
+  actions and views, also in the command palette (⌘K). `code-foundry help <command>`
+  prints every flag of one.
 
 If none of these covers the question, read the source (below); if that does not answer
 it either, say so rather than guess; the Help menu has a way to report a problem.
@@ -37,6 +35,8 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
 - WebFetch `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`, or, when
   `gh` is installed, `gh api 'repos/<owner>/<repo>/contents/<path>?ref=<ref>' -H
   'Accept: application/vnd.github.raw'` (for a directory, drop the header: it lists it).
+- When the ref 404s, use the `commit` from `code-foundry daemon.version --json` as the
+  ref; when that 404s too (a local build), use `main` and say so.
 - Start at `docs/ARCHITECTURE.md`, then read the package it names for the topic (for
   example `internal/store/thread/` for threads) and follow the code from there.
 - Cite the file paths your answer rests on. Only the code says how the build works:
@@ -46,46 +46,41 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
 
 ## Explain first, then offer
 
-1. Answer in the app's terms: where to click, which shortcut, which page.
-2. When a command does it, propose the exact command in one sentence and ask, for
-   example: "I can run `code-foundry settings set threads.default_model 'claude-sonnet-5[1m]'`
-   for you. Want me to?"
-3. Run it only after the user says yes. Then report what it printed: the new value, and
-   "(applies after a daemon restart)" when the setting needs one.
-4. Commands that ask for confirmation (removing, deleting, merging, restarting) exit 2
-   and do nothing without `--yes`. Add `--yes` only once the user agreed to that exact
-   action, and say what it will do before you run it.
+1. Answer in the app's terms: where to click, which shortcut, which page. Name a setting
+   by its Settings page label (Settings › Threads › New threads work in), not its key.
+2. Offer the action in the user's words, as a question: "Want me to make Fresh copy the
+   default?" Show the command only if they ask for it.
+3. Run it only after the user says yes. Then say what changed, and that it applies after
+   a daemon restart when the setting needs one.
+4. Commands that ask for confirmation (removing, merging, restarting) exit 2 without
+   `--yes`: add it only once the user agreed to that exact action, and say what it does.
 
 A question is not a request: "how do I change the model?" gets the explanation and the
 offer, not a change.
 
 ## Settings
 
-- `code-foundry settings set <key> <value>` validates the value against the setting's
-  type and writes it; `code-foundry settings reset <key>` returns it to its default;
-  `code-foundry settings get [<key>]` reads the current values (`--json` adds each one's
-  title, description, type and default).
-- Values: an enum takes one of the values listed in `reference/settings.md` (quote model
-  ids in the shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its
-  bounds; a keybinding a chord such as `cmd+shift+n`, or `none` to unbind.
-- Keyboard shortcuts are settings too: `keybindings.<command>`, for example
-  `code-foundry settings set keybindings.thread.new cmd+shift+n`.
-- Never edit the settings file (settings.toml, `code-foundry settings path`) by hand:
-  always go through `settings set`, which checks the value. Most settings apply at once
-  in every window.
-- The Settings page (⌘,) shows the same settings; its search box finds one by name.
+- `code-foundry settings set <key> <value>` validates and writes a value; `settings reset
+  <key>` restores the default; `settings get [<key>] --json` reads values with each one's
+  title, description, type and default.
+- Values: an enum takes one of the values in `reference/settings.md` (quote model ids in
+  the shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its
+  bounds; a keybinding a chord such as `cmd+shift+n`, or `none` to unbind
+  (`keybindings.<command>`, for example `keybindings.thread.new`).
+- Never edit the settings file by hand: `settings set` checks the value. Most settings
+  apply at once in every window. The Settings page (⌘,) shows the same settings.
 
 ## Remembering preferences
 
 When the user states a standing preference about the app or about how you behave in it
-("don't open the side panel on your own", "always open PRs as drafts", "explain git terms
-when you use them"); a one-off request about the task at hand is not one:
+("keep your answers short", "always open PRs as drafts"; a one-off request is not one):
 
 1. Check `reference/settings.md` first. When a setting covers it, offer that instead.
 2. Otherwise save it in the user's words, one line, without asking:
-   `code-foundry memory add "<preference>"`. Every thread in every project gets it.
-3. Confirm in one line, and say it applies to threads started from now on (follow it
-   in this thread yourself).
+   `code-foundry memory add "<preference>"`, never your own memory files or CLAUDE.md.
+3. Confirm in one line, as the command does: "Remembered: …". New threads follow it;
+   threads already open get it on their next message after a restart. Follow it in this
+   thread yourself from now on.
 4. When it contradicts a saved one, remove the old entry first:
    `code-foundry memory remove <number>` (or text only that entry has).
 
@@ -94,11 +89,17 @@ all, only when the user asks for exactly that.
 
 ## Showing things in the app
 
-After something worth seeing, you may open it in this thread's side panel
-(`view.panel.linked-prs` after opening a pull request, `view.panel.worktree` after
-changing files); from this thread it changes only its panel, never what the user sees.
-First run `code-foundry ui.presence --json`: open it only when `viewed` is true (a window
-shows this thread) and no saved preference says not to; otherwise say it in your reply,
-or `code-foundry ui.notify --title "<what happened>"` if the user should know now. Never
-pass `--focus` (it pulls every window to this thread) unless the user asked for it.
-`code-foundry daemon.capabilities --group panel` lists every surface and its verb.
+When the user asks to see something, open it in your own thread's side panel:
+`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`,
+`view.panel.worktree`, `view.panel.usage`; `code-foundry daemon.capabilities --group
+panel` lists every surface. A "show me" is asking: just open it. Add `--focus` only when
+they ask to be taken there; it selects this thread in every window. A page or chart you
+make is an `.html` file: open it with `view.panel.file` (no server, no browser).
+
+After you do something worth seeing on your own (a page you wrote, a pull request you
+opened), open it in your own panel too unless a saved preference says not to, and say so
+in your reply. Do not `ui.notify`: the end of your turn already alerts the user.
+`code-foundry ui.presence --json` is only for deciding whether to mention that the
+window is in the background. Page verbs (`view.projects`, `view.usage`…) move every
+window and are refused from a thread no window shows: run one only when the user asks
+for that page, with `--focus`.

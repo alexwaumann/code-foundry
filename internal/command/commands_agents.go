@@ -69,7 +69,7 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 		Command{
 			Name:        "view.panel.agents",
 			Title:       "Show Agents",
-			Description: "Open the Agents surface in a thread's side panel (from a thread: its own; in the app: the selected one): its subagent runs with their status, activity and report.",
+			Description: "Open the Agents surface in a thread's side panel (from a thread: its own; in the app: the selected one): the thread's subagent runs with their status, activity and report.",
 			Category:    "View",
 			// No default chord, like view.panel.mcp (the surface has its own key while the
 			// panel has focus).

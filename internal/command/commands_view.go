@@ -343,7 +343,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:  "view.panel.workspace",
 			Title: "Show Workspace in Side Panel",
 			Description: "Open the workspace surface in a workspace thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
+				"the workspace's members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
 			Category: "View",
 			// No default chord, like view.panel.expand (W opens it while the panel has focus).
 			When: func(c Context) bool { return hasWorkspaceThreadContext(c) || cliThread(c) },
@@ -367,7 +367,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:  "view.panel.usage",
 			Title: "Show Usage in Side Panel",
 			Description: "Open the Usage surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"its cost at Claude API rates, tokens and requests, per model and per token kind.",
+				"the thread's cost at Claude API rates, tokens and requests, per model and per token kind.",
 			Category: "View",
 			// No default chord, like view.panel.linked-prs (U opens it while the panel has
 			// focus). Available for any thread, even one without usage yet.
@@ -392,7 +392,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:  "view.panel.worktree",
 			Title: "Show Worktree in Side Panel",
 			Description: "Open the Worktree surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
+				"the overview of the worktree the thread runs in, with sync state, GitHub activity, changed files and log.",
 			Category: "View",
 			// No default chord, like view.panel.workspace (T opens it while the panel has focus).
 			When: func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },

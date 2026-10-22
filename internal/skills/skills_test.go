@@ -210,19 +210,32 @@ func TestRender(t *testing.T) {
 	// (docs/notes/control-3-app-memory.md); its description names them so it fires.
 	helpSkill := string(files[skills.Help+"/SKILL.md"])
 	for _, want := range []string{"standing preference about the app or how you work in it", "\n## Remembering preferences\n",
-		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "applies to threads started from now on",
+		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "never your own memory files",
+		// The memory verbs' own wording (control-6-memory-fixes).
+		"\"Remembered: …\". New threads follow it;\n   threads already open get it on their next message after a restart",
 		"remove the old entry first", "`code-foundry memory show`"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
 	}
-	// It fires before showing something in the side panel and keeps that section's
-	// rules (control-1), pointing at the panel group for the full list (control-4).
-	for _, want := range []string{"or before you show something in the app's side panel", "\n## Showing things in the app\n",
-		"`code-foundry ui.presence --json`", "`viewed` is true", "Never\npass `--focus`", "`code-foundry daemon.capabilities --group panel`",
-		"\n## Explain first, then offer\n", "Run it only after the user says yes", "the code-foundry skill"} {
+	// It fires when the user asks to see something and before showing something in the
+	// side panel: a "show me" opens it in the thread's own panel without a presence
+	// check, ui.presence only decides what to mention, no ui.notify, page verbs only
+	// when asked (control-7-skill-routing). It offers actions in the user's words.
+	for _, want := range []string{"asks to see something, or before you show something in the app's side panel", "\n## Showing things in the app\n",
+		"open it in your own thread's side panel", "A \"show me\" is asking: just open it", "Add `--focus` only when\nthey ask to be taken there",
+		"`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`", "Do not `ui.notify`",
+		"`code-foundry ui.presence --json` is only for deciding whether to mention", "refused from a thread no window shows",
+		"`code-foundry daemon.capabilities --group\npanel`", "unless a saved preference says not to",
+		"\n## Explain first, then offer\n", "Run it only after the user says yes", "\"Want me to make Fresh copy the\n   default?\"",
+		"Show the command only if they ask for it", "by its Settings page label", "the code-foundry skill"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
+		}
+	}
+	for _, gone := range []string{"`viewed` is true", "check presence", "started from now on"} {
+		if strings.Contains(helpSkill, gone) {
+			t.Errorf("help SKILL.md still has %q", gone)
 		}
 	}
 
@@ -233,9 +246,21 @@ func TestRender(t *testing.T) {
 	for _, want := range []string{"the code-foundry-help skill", "the code-foundry-orchestrate skill", "the code-foundry-plugin skill",
 		"`code-foundry daemon.capabilities`, then `--group <name>`", "\"Reading the source\"", "the line under this title",
 		"if you can do it with the CLI,\noffer it and do it", "Skills never run\ncommands themselves: you run `code-foundry …` with your Bash tool",
-		"Thread commands without `--id` act on it", "A **project** is a folder on the Mac", "\"Work in\"", "`--yes`"} {
+		"Thread commands without `--id` act on it", "A **project** is a folder on the Mac", "\"Work in\"", "`--yes`",
+		// The routing testers' threads missed (control-7-skill-routing).
+		"Never tell the user skill or command names: say what you will do, not which command",
+		"`code-foundry memory add <text>`", "`code-foundry usage.show`", "`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>`",
+		"`.html` file", "`code-foundry pr.create`, `code-foundry project.github.publish`", "Add `--focus` only when the user asks",
+		"the default, setting `threads.default_worktree`", "The app replaces /model, /effort"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
+		}
+	}
+	// Its description names the words of the prompts that loaded no skill.
+	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML or chart", "preference", "remember", "PR"} {
+		if !strings.Contains(entryDesc, w) {
+			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}
 	}
 	// Every group the index names is a real group.

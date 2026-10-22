@@ -705,8 +705,13 @@ func TestInvokeAskAndToasts(t *testing.T) {
 	if ask == nil || ask.GetName() != "thread.archive" || ask.GetCaller() != "plugin:surf" || ask.GetContext().GetActiveThreadId() != "s-1" {
 		t.Errorf("intent %v", ask)
 	}
-	// Nobody to ask: the plugin gets confirmation-required as before.
-	e.emit.Delivered = 0
+	// The plugin returns the host's result as is: windows and receivers counted apart.
+	if want := `{"asked":true,"windows":1,"receivers":1,"delivered":1}`; mustJSON(t, r) != want {
+		t.Errorf("ask JSON = %s, want %s", mustJSON(t, r), want)
+	}
+	// No window to ask in, though a stream (a CLI events stream) receives intents: the
+	// plugin gets confirmation-required as before.
+	e.emit.OpenWindows = 0
 	if _, err := e.invoke("plugin.surf.ask", nil, command.Context{}); err == nil || !strings.Contains(err.Error(), "asks the user first") {
 		t.Errorf("no GUI: %v", err)
 	}
@@ -813,4 +818,14 @@ func TestSurfaceSelectAndNodeTabActs(t *testing.T) {
 	if el := els["pt2"]; el.Kind != pluginsdk.ActTab || el.Node != "ptabs" || el.Label != "Two" {
 		t.Errorf("pt2 element %+v", el)
 	}
+}
+
+// mustJSON is r's JSON as the CLI prints it.
+func mustJSON(t *testing.T, r command.Result) string {
+	t.Helper()
+	js, err := r.EncodeJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return js
 }
