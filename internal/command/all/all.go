@@ -151,7 +151,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterTheme(r, d.Settings),
 		command.RegisterThemePick(r, d.Emitter),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
-		command.RegisterView(r, d.Emitter),
+		command.RegisterView(r, d.Emitter, d.Thread),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),

@@ -135,12 +135,20 @@ func hasWorktreeThreadContext(c Context) bool {
 // view.panel.threads, which opens the thread's lineage in it, and
 // view.panel.worktree, which opens the thread's own worktree in it (all emitted as
 // UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
-func RegisterView(r *Registry, e Emitter) error {
+//
+// The view.panel.* verbs take --thread and --focus (commands_view_thread.go): from
+// inside a thread they act on that thread's panel only, which t reads to check it.
+func RegisterView(r *Registry, e Emitter, t ThreadGetter) error {
 	show := func(name string) Result {
 		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
 		// No Message: the GUI toasts non-empty messages, and the view change is
 		// feedback enough. The CLI's --json still reports delivery.
 		return Result{JSON: EmitResult{Delivered: n}}
+	}
+	panel := func(name string, place panelPlace) func(context.Context, Context, Args) (Result, error) {
+		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			return showPanel(ctx, t, e, uctx, a, name, place)
+		}
 	}
 	return r.RegisterAll(
 		Command{
@@ -189,9 +197,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			Description: "Show or hide the side panel next to the selected thread or page.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+e"},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelToggle), nil
-			},
+			Args:        panelThreadArgs(),
+			Run:         panel(ViewPanelToggle, nil),
 		},
 		Command{
 			Name:        "view.bottom.toggle",
@@ -209,9 +216,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			Description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.",
 			Category:    "View",
 			// No default chord (the user's choice); bindable in settings.
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelExpand), nil
-			},
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelExpand, nil),
 		},
 		Command{
 			Name:        "view.panel.new-tab",
@@ -220,9 +226,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			Category:    "View",
 			// No default chord, like view.panel.expand: the + after the panel's tabs runs
 			// it, and while the panel has focus each surface's letter opens that surface.
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelNewTab), nil
-			},
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelNewTab, nil),
 		},
 		Command{
 			Name:        "view.panel.split",
@@ -230,9 +235,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			Description: "Split or unsplit the side panel of the selected thread or page into two tab groups.",
 			Category:    "View",
 			Keybindings: []string{`cmd+\`},
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelSplit), nil
-			},
+			Args:        panelThreadArgs(),
+			Run:         panel(ViewPanelSplit, nil),
 		},
 		Command{
 			Name:        "view.back",
@@ -281,10 +285,9 @@ func RegisterView(r *Registry, e Emitter) error {
 				"its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
 			Category: "View",
 			// No default chord, like view.panel.expand (W opens it while the panel has focus).
-			When: hasWorkspaceThreadContext,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelWorkspace), nil
-			},
+			When: func(c Context) bool { return hasWorkspaceThreadContext(c) || cliThread(c) },
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelWorkspace, inWorkspace),
 		},
 		Command{
 			Name:  "view.panel.linked-prs",
@@ -296,9 +299,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			// focus). Available for any thread, even one without links, so the palette
 			// finds it and the GUI can say there are none yet.
 			When: hasThread,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelLinkedPRs), nil
-			},
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelLinkedPRs, nil),
 		},
 		Command{
 			Name:  "view.panel.usage",
@@ -309,9 +311,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord, like view.panel.linked-prs (U opens it while the panel has
 			// focus). Available for any thread, even one without usage yet.
 			When: hasThread,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelUsage), nil
-			},
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelUsage, nil),
 		},
 		Command{
 			Name:  "view.panel.threads",
@@ -322,9 +323,8 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord, like view.panel.usage (H opens it while the panel has focus).
 			// Available for any thread, even one no agent created and that created none.
 			When: hasThread,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelThreads), nil
-			},
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelThreads, nil),
 		},
 		Command{
 			Name:  "view.panel.worktree",
@@ -333,10 +333,9 @@ func RegisterView(r *Registry, e Emitter) error {
 				"the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
 			Category: "View",
 			// No default chord, like view.panel.workspace (T opens it while the panel has focus).
-			When: hasWorktreeThreadContext,
-			Run: func(context.Context, Context, Args) (Result, error) {
-				return show(ViewPanelWorktree), nil
-			},
+			When: func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelWorktree, inWorktree),
 		},
 	)
 }

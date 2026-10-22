@@ -35,7 +35,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		t.Run(tt.command, func(t *testing.T) {
 			reg := command.NewRegistry()
 			emit := &commandtest.Emitter{Delivered: 1}
-			if err := command.RegisterView(reg, emit); err != nil {
+			if err := command.RegisterView(reg, emit, &commandtest.Thread{}); err != nil {
 				t.Fatal(err)
 			}
 			// A workspace thread in a worktree, so view.panel.workspace and view.panel.worktree are available too.
@@ -68,9 +68,11 @@ func TestViewPanelWorkspaceAvailability(t *testing.T) {
 		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
 		{name: "CLI without context", ctx: command.Context{}, want: false},
 		{name: "CLI with --context-thread and --context-workspace", ctx: command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1"}, want: true},
+		// Run reads the thread's workspace (commands_view_thread.go).
+		{name: "CLI in a thread ($CODE_FOUNDRY_THREAD)", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
+	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range tests {
@@ -105,7 +107,7 @@ func TestViewPanelThreadSurfacesAvailability(t *testing.T) {
 		{name: "CLI with --context-thread", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
+	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
 		t.Fatal(err)
 	}
 	// All are available for any thread (the GUI says when there is nothing to show).
@@ -143,9 +145,11 @@ func TestViewPanelWorktreeAvailability(t *testing.T) {
 		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
 		{name: "CLI without context", ctx: command.Context{}, want: false},
 		{name: "CLI with --context-thread, --context-project and --context-worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, want: true},
+		// Run reads the thread's worktree (commands_view_thread.go).
+		{name: "CLI in a thread ($CODE_FOUNDRY_THREAD)", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
+	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}, &commandtest.Thread{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range tests {
