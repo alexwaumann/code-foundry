@@ -283,7 +283,10 @@ Services (v1):
   prompts again on a terminal, and `--yes` never answers it
   (`docs/notes/dirty-worktree-confirm.md`).
 * `UiService` — WatchIntents (server stream: focus thread, open palette, …); Emit (from
-  CLI).
+  CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+  changes only that thread's side panel and never a window's selection; `ui.presence`
+  tells a thread's model whether the user is looking and whether a window shows its
+  thread (`docs/notes/control-1-thread-scoped-views.md`).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
   update, action, plugin, skill, ui; the thread source carries threads' pending requests only, a
