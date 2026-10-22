@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -27,10 +26,11 @@ type Imported struct {
 // "- <text>" line per entry) into it, then renames the file to <name>.imported. It runs
 // at every daemon start and does nothing once the file is gone. Each line Parse keeps
 // becomes an entry with created the file's modification time (a millisecond apart, so
-// the order stays) and no thread; a line with no letter or digit ("---", "***") is
-// dropped as malformed, and a line already in the directory (an import cut short) is
-// not written twice. Lines past the caps are kept, like a hand edit: show and remove
-// see them, threads get the first ones within the caps (Injected).
+// the order stays) and no thread; a line with no letter or digit ("---", "***", a bullet
+// alone) is dropped as malformed (Clean refuses the same text), and a line already in
+// the directory (an import cut short) is not written twice. Lines past the caps are
+// kept, like a hand edit: show and remove see them, threads get the first ones within
+// the caps, and never one longer than MaxEntryChars (Injected).
 func (s *Store) Import() (Imported, error) {
 	var res Imported
 	legacy := s.opts.Legacy
@@ -66,18 +66,19 @@ func (s *Store) Import() (Imported, error) {
 		return res, err
 	}
 	created := fi.ModTime().UTC().Truncate(time.Millisecond)
-	for i, text := range Parse(string(b)) {
-		if !wellFormed(text) {
-			res.Skipped++
-			s.log.Warn("memory: import skipped a malformed line", "file", legacy, "line", text)
-			continue
-		}
+	texts, malformed := Parse(string(b))
+	for _, line := range malformed {
+		res.Skipped++
+		s.log.Warn("memory: import skipped a malformed line", "file", legacy, "line", line, "why", NoLetter)
+	}
+	for i, text := range texts {
 		if have[strings.ToLower(text)] {
 			res.Existing++
 			continue
 		}
-		if n := utf8.RuneCountInString(text); n > MaxEntryChars {
-			s.log.Warn("memory: imported an entry longer than an add allows", "file", legacy, "chars", n, "max", MaxEntryChars)
+		if TooLong(text) {
+			s.log.Warn("memory: imported an entry longer than an add allows; threads do not get it",
+				"file", legacy, "chars", utf8.RuneCountInString(text), "max", MaxEntryChars)
 		}
 		name := fileName(text, taken)
 		if err := s.writeFile(name, renderEntry(text, created.Add(time.Duration(i)*time.Millisecond), Origin{})); err != nil {
@@ -97,10 +98,4 @@ func (s *Store) Import() (Imported, error) {
 	s.log.Info("memory: imported the single memory file into the directory",
 		"from", legacy, "renamed", res.Renamed, "dir", s.opts.Dir, "entries", res.Entries, "skipped", res.Skipped, "existing", res.Existing)
 	return res, nil
-}
-
-// wellFormed reports a line that can be a preference: one with a letter or a digit
-// ("---", "***", "|---|" are not).
-func wellFormed(text string) bool {
-	return strings.ContainsFunc(text, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) })
 }

@@ -19,16 +19,37 @@ const CreatedLayout = "2006-01-02T15:04:05.000Z07:00"
 // maxSlug caps an entry file's name before ".md" and a de-duplicating suffix.
 const maxSlug = 48
 
+// latin maps the common Latin letters with diacritics (and the ligatures) to the ASCII
+// a slug keeps of them: "naïve café" is naive-cafe. Built from latinTable.
+var latin = func() map[rune]string {
+	m := map[rune]string{}
+	for group := range strings.SplitSeq(latinTable, " ") {
+		letters, ascii, _ := strings.Cut(group, ":")
+		for _, r := range letters {
+			m[r] = ascii
+		}
+	}
+	return m
+}()
+
+const latinTable = "àáâãäåāăą:a çćĉċč:c ďđð:d èéêëēĕėęě:e ĝğġģ:g ĥħ:h ìíîïĩīĭįı:i ĵ:j ķ:k ĺļľŀł:l " +
+	"ñńņňŉ:n òóôõöøōŏő:o ŕŗř:r śŝşšș:s ţťŧț:t ùúûüũūŭůűų:u ŵ:w ýÿŷ:y źżž:z ß:ss æ:ae œ:oe þ:th"
+
 // slug is an entry file's name for text, before ".md": lowercase ASCII letters and
-// digits, every other run a dash, at most maxSlug bytes (cut at a dash when one is past
-// half way). "entry" when nothing is left.
+// digits (a Latin letter with a diacritic as its plain letter), every other run a dash,
+// at most maxSlug bytes (cut at a dash when one is past half way). "entry" when nothing
+// is left (a text in another script; Clean refuses one with no letter or digit).
 func slug(text string) string {
 	var b strings.Builder
 	dash := false
 	for _, r := range strings.ToLower(text) {
+		ascii, ok := latin[r]
 		switch {
 		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
 			b.WriteRune(r)
+			dash = false
+		case ok:
+			b.WriteString(ascii)
 			dash = false
 		case b.Len() > 0 && !dash:
 			b.WriteByte('-')

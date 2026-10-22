@@ -230,6 +230,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		log.Warn("memory: the single memory file was not imported; it stays for the next start", "err", err)
 	}
 	s.memory.Load()
+	// Hand edits reach the Settings page within a moment (docs/notes/memory-fixes-2.md).
+	s.memory.Watch(ctx)
 	threadLog := log.With("store", "thread")
 	if s.thread, err = thread.New(ctx, thread.Options{
 		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
