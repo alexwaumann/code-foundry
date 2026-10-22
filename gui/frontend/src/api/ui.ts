@@ -1,5 +1,30 @@
-import { UiIntent_Notify_Level, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
+import { UiIntent_Notify_Level, UiService, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
 import type { UiContextView } from "./command";
+import { daemon, invalidateOnTransportError, type DaemonConnection } from "./endpoint";
+import { orOutdatedDaemon } from "./errors";
+
+/** The active theme as the GUI publishes it (UiService.PublishTheme) and frames receive it. */
+export interface PublishedTheme {
+  id: string;
+  scheme: "dark" | "light";
+  /** Every resolved slot (`--cf-*`, `--terminal-*`, `--syn-*`, `--sh-*`) to `#rrggbb` / `#rrggbbaa`. */
+  vars: Readonly<Record<string, string>>;
+}
+
+/**
+ * Hands the daemon the active theme, which it serves to pages the model writes as
+ * GET /cf/theme.css and /cf/theme.json (docs/notes/theme-css-route.md). A daemon older
+ * than the RPC fails with OutdatedDaemonError.
+ */
+export async function publishTheme(theme: PublishedTheme, conn: DaemonConnection = daemon): Promise<void> {
+  try {
+    const c = await conn.client(UiService);
+    await c.publishTheme({ id: theme.id, scheme: theme.scheme, vars: { ...theme.vars } });
+  } catch (err) {
+    invalidateOnTransportError(err, conn);
+    throw orOutdatedDaemon(err);
+  }
+}
 
 export type NotifyLevel = "info" | "warning" | "error";
 

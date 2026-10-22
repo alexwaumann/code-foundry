@@ -26,7 +26,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { startMenuCommands } from "@/keys/menu";
-import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
+import { startThemePublish, syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { syncWindowBackground } from "@/lib/windowBackground";
 import { cn } from "@/lib/utils";
 import { useWindowTitle } from "@/lib/title";
@@ -71,6 +71,7 @@ function startApp(): () => void {
   const stops = [
     startZoomSync(onResize),
     syncDocumentScheme(),
+    startThemePublish(),
     syncWindowBackground(),
     startHealthPolling(2000),
     startEventSync(),

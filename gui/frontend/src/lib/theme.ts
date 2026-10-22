@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from "react";
+import { publishTheme, type PublishedTheme } from "@/api/ui";
+import { useHealthStore } from "@/stores/health";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themeById, type Theme } from "@/themes";
 
 export type ColorScheme = "dark" | "light";
@@ -220,4 +222,65 @@ export function syncDocumentScheme(): () => void {
   };
   apply();
   return subscribe(apply);
+}
+
+/** The active theme as the daemon serves it to frames (GET /cf/theme.css, theme.json). */
+export function publishedTheme(): PublishedTheme {
+  const t = activeTheme();
+  return { id: t.id, scheme: t.scheme, vars: t.slots };
+}
+
+/**
+ * What an HTML preview's frame is posted on load and on every theme change
+ * (docs/notes/theme-css-route.md): `{ type: "cf:theme", id, scheme, vars }`, vars being
+ * every resolved slot (`--cf-*`, `--terminal-*`, `--syn-*`, `--sh-*`). A page that wants
+ * live updates listens for it; /cf/theme.css already gives it the theme on load.
+ */
+export interface ThemeFrameMessage extends PublishedTheme {
+  type: "cf:theme";
+}
+
+export function themeFrameMessage(): ThemeFrameMessage {
+  return { type: "cf:theme", ...publishedTheme() };
+}
+
+/**
+ * Calls cb whenever the GUI reaches a daemon: the first good ping, a restarted daemon (a
+ * new pid), and a recovery after a failed ping (the publish that failed meanwhile).
+ */
+function onDaemonConnect(cb: () => void): () => void {
+  let pid: number | null = null;
+  return useHealthStore.subscribe((s) => {
+    const next = s.status === "ok" ? (s.health?.pid ?? null) : null;
+    if (next !== null && next !== pid) cb();
+    pid = next;
+  });
+}
+
+/**
+ * Keeps the daemon's copy of the theme current (UiService.PublishTheme): on start, on
+ * every (re)connect and after every change of the active theme, debounced so a burst (the
+ * Themes page's arrow keys) sends once. With several windows the last writer wins: the
+ * theme is one per user. A failure is dropped: the next connect publishes again, and a
+ * daemon older than the RPC serves the default theme.
+ */
+export function startThemePublish(publish: (t: PublishedTheme) => Promise<void> = publishTheme, onConnect: (cb: () => void) => () => void = onDaemonConnect, debounceMs = 150): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const send = () => {
+    timer = undefined;
+    publish(publishedTheme()).catch(() => {
+      // Retried on the next connect (onConnect); an older daemon has nothing to serve it from.
+    });
+  };
+  const schedule = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(send, debounceMs);
+  };
+  const stopSlots = subscribeThemeSlots(schedule);
+  const stopConnect = onConnect(schedule);
+  return () => {
+    if (timer !== undefined) clearTimeout(timer);
+    stopSlots();
+    stopConnect();
+  };
 }
