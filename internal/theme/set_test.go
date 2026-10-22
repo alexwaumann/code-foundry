@@ -81,6 +81,15 @@ func TestSet(t *testing.T) {
 		}
 	}
 
+	// Without: what a delete leaves.
+	w := s.Without("ocean-dusk")
+	if w.Valid("ocean-dusk", SchemeDark) || w.Fallback("ocean-dusk", SchemeDark) != "catppuccin-mocha" || !s.Valid("ocean-dusk", SchemeDark) {
+		t.Errorf("Without: gone %v", w.Gone())
+	}
+	if w := s.Without("nord"); !w.Valid("nord", SchemeDark) {
+		t.Error("Without removed a curated theme")
+	}
+
 	// The zero Set is the catalog.
 	var zero Set
 	if !slices.Equal(zero.IDs(SchemeDark), IDs(SchemeDark)) || zero.Check("ocean-dusk", SchemeDark) == nil {

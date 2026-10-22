@@ -111,6 +111,22 @@ func (s Set) Check(id, scheme string) error {
 	return nil
 }
 
+// Without is the set once the user theme id is gone (as its delete leaves it): what a
+// slot naming it would fall back to before the file is removed.
+func (s Set) Without(id string) Set {
+	t, ok := s.ByID(id)
+	if !ok || !t.User {
+		return s
+	}
+	user := slices.DeleteFunc(slices.Clone(s.user), func(u Theme) bool { return u.ID == id })
+	gone := maps.Clone(s.gone)
+	if gone == nil {
+		gone = map[string]string{}
+	}
+	gone[id] = t.From
+	return NewSet(user, gone)
+}
+
 // Fallback is the theme a slot naming the gone user theme id shows instead: the theme
 // it was copied from, or that one's, and so on, the first that is a theme of scheme in
 // the set. "" when id is not gone or no theme it came from is left (the slot takes the

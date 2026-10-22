@@ -166,7 +166,9 @@ func (f *File) normalise() {
 // #rrggbbaa values. It does not check that an override names a real slot (the GUI owns
 // the slot list) or that an id exists anywhere. Errors wrap ErrInvalid.
 func (f File) Validate() error {
-	bad := func(format string, a ...any) error { return fmt.Errorf("%w: "+format, append([]any{ErrInvalid}, a...)...) }
+	bad := func(format string, a ...any) error {
+		return fmt.Errorf("%w: "+format, append([]any{ErrInvalid}, a...)...)
+	}
 	switch {
 	case f.ID == "":
 		return bad("no id")

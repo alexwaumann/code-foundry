@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // Fake is a settings.Service backed by a real Store in a test directory.
@@ -63,3 +64,7 @@ func (f *Fake) Update(ctx context.Context, partial map[string]string) (*settings
 
 // Watch returns the store's Watch channel.
 func (f *Fake) Watch(ctx context.Context) <-chan *settings.Snapshot { return f.store.Watch(ctx) }
+
+// SetThemes tells the store which themes the theme slots can name (as the user theme
+// store does in the daemon).
+func (f *Fake) SetThemes(themes theme.Set) { f.store.SetThemes(themes) }
