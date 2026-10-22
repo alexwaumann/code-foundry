@@ -43,8 +43,8 @@ classifier decide. You can change all three in a running thread too.
   branch, so several threads can work at once and you keep or discard each one. The app
   keeps these copies under `~/.code-foundry/worktrees`.
 
-The app remembers your last choice for each project. Set the default for every project
-under Settings › Threads › **New threads work in**.
+A choice applies to that thread only; the next one starts from the default again. Set
+the default for every project under Settings › Threads › **New threads work in**.
 
 ### While it runs
 

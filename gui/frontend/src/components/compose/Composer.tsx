@@ -49,7 +49,6 @@ import {
   loadRefs,
   noGitCheckout,
   openPreview,
-  pickWorktree,
   removeAttachment,
   sendDraft,
   updateDraft,
@@ -63,7 +62,6 @@ import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
-import { useRememberedWorkIn } from "@/stores/workIn";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
@@ -339,7 +337,6 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const worktrees = useWorktrees(projectId);
   const mainPath = worktrees.find((w) => w.isMain)?.path;
   const workInSetting = useSettingValue(WORK_IN_SETTING_KEY);
-  const remembered = useRememberedWorkIn(projectId);
   // A project without git runs threads in its folder only: Current checkout, no base.
   const noGitPath = useProjectsStore((s) => noGitCheckout(s.byId[projectId]));
   const wsBranch = useWorkspacesStore((s) => (target.kind === "workspace" ? (s.byId[target.workspaceId]?.branch ?? "") : ""));
@@ -363,7 +360,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         ? { kind: "existing", path: noGitPath }
         : multi
           ? { kind: "new" }
-          : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, remembered, mainPath }), worktrees);
+          : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, mainPath }), worktrees);
   const newWorktrees = home || worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? projectIds.length : 1;
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
@@ -652,9 +649,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 groups={worktreeGroups}
                 onChange={(v) => {
                   const next: WorktreeChoice = v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v };
-                  // A project's own pick (not one forced by Also in or a missing git) is remembered for it.
-                  if (target.kind === "project" && !multi && noGitPath === undefined && next.kind !== "members") pickWorktree(target.projectId, next);
-                  else updateDraft(draftKey, { worktree: next });
+                  // The pick is this draft's alone; the next draft starts from the setting again.
+                  updateDraft(draftKey, { worktree: next });
                 }}
                 footer={target.kind === "project" && noGitPath === undefined && !multi ? WORK_IN_FOOTER : undefined}
                 disabled={busy}

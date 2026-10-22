@@ -42,7 +42,6 @@ import {
   threadArgs,
   threadPlace,
   WORK_IN_SETTING_KEY,
-  workInMemory,
   type AttachmentLimits,
   type ComposePermission,
   type ComposeTarget,
@@ -63,7 +62,6 @@ import { useProjectsStore } from "./projects";
 import { THREAD_COMMANDS } from "./threadActions";
 import { useSettingsStore } from "./settings";
 import { useUiStore, type Selection } from "./ui";
-import { rememberedWorkIn, rememberWorkIn } from "./workIn";
 import { useWorkspacesStore } from "./workspaces";
 
 export interface DraftAttachment {
@@ -104,8 +102,8 @@ export interface Draft {
   effort: string | null;
   permission: ComposePermission;
   /**
-   * null: the project's default, resolved live (projectWorktree: the choice remembered
-   * for the project, else threads.default_worktree). Workspace drafts always have one.
+   * null: the project's default, resolved live (projectWorktree: threads.default_worktree).
+   * Workspace drafts always have one.
    */
   worktree: WorktreeChoice | null;
   /** null: the primary project's default base ref (ListRefs.default_ref). */
@@ -624,27 +622,15 @@ function mainCheckout(projectId: string): string | undefined {
 }
 
 /**
- * Where a project's new thread works until the user picks: the choice remembered for the
- * project, else threads.default_worktree (lib/compose defaultWorktree). The composer
- * resolves the same inputs with hooks.
+ * Where a project's new thread works until the user picks: threads.default_worktree
+ * (lib/compose defaultWorktree). The composer resolves the same inputs with hooks; a pick
+ * in the Work in picker is the draft's own (Draft.worktree) and changes no default.
  */
 export function projectWorktree(projectId: string): ProjectWorktree {
   return defaultWorktree({
     setting: useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY],
-    remembered: rememberedWorkIn(projectId),
     mainPath: mainCheckout(projectId),
   });
-}
-
-/**
- * The user picked where a project's thread works (the Work in picker): the draft takes
- * it, and a fresh copy or the main checkout becomes the project's default for new
- * threads (another existing worktree is a one-off).
- */
-export function pickWorktree(projectId: string, choice: ProjectWorktree): void {
-  updateDraft(projectId, { worktree: choice });
-  const mode = workInMemory(choice, mainCheckout(projectId));
-  if (mode) rememberWorkIn(projectId, mode);
 }
 
 /** The one checkout of a project without git (its main worktree, else its path); undefined for git or unknown. */
