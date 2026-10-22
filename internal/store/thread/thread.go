@@ -304,6 +304,10 @@ type Thread struct {
 	// conversation and cleared once it went out. Both persisted.
 	FreshStart bool
 	SeedPrefix string
+	// MemoryHash identifies the app memory's entries the thread's conversation last got:
+	// in its system prompt (a fresh spawn) or as a refresh before a message after a
+	// resumed one (memory.go). "" for none. A fork starts with its parent's. Persisted.
+	MemoryHash string
 	// ReseedPending: a Reseed waits for the running turn and background work to end
 	// before Claude stops (reseed.go). Never set on a stopped thread. Not persisted.
 	ReseedPending bool

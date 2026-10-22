@@ -567,6 +567,12 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if seed != "" {
 		prompt = seed + "\n\n" + prompt
 	}
+	// A resumed conversation whose app memory changed since it started gets the new list
+	// first (memory.go): the item keeps it apart, so the user's message shows as typed.
+	memNote := r.memNote
+	if memNote != "" {
+		prompt = memNote + "\n\n" + prompt
+	}
 	blocks := []claudestream.ContentBlock{claudestream.TextBlock(prompt)}
 	for _, a := range o.attachments {
 		if !a.inline() {
@@ -600,12 +606,12 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	var it Item
 	if o.itemID == "" {
 		u := userItem(id, o)
-		u.Queued, u.SeedPrefix = queued, seed
+		u.Queued, u.SeedPrefix, u.MemoryNote = queued, seed, memNote
 		it = st.proj.w.add(u)
-	} else if queued || seed != "" {
+	} else if queued || seed != "" || memNote != "" {
 		it, _ = st.proj.w.change(id, func(x *Item) {
 			x.Queued = x.Queued || queued
-			x.SeedPrefix = seed
+			x.SeedPrefix, x.MemoryNote = seed, memNote
 		})
 	} else {
 		it, _ = st.log.get(id)
@@ -620,6 +626,11 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		r.seed = ""
 		r.m.clearSeedPrefix(r.id, seed)
 		r.log().info("sent the seed prefix with the fresh session's first message", "prefix_bytes", len(seed))
+	}
+	if memNote != "" {
+		r.memNote = ""
+		r.m.memorySent(r.id, r.memHash)
+		r.log().info("sent the changed app memory with the resumed conversation's next message", "memory_hash", r.memHash)
 	}
 	st.sd.sent(o.origin != OriginWake)
 	r.activity = r.m.opts.Now()
