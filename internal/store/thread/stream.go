@@ -137,10 +137,11 @@ type threadCmd struct {
 	// ctx is the caller's: a send held across a restart is dropped once it is done.
 	ctx       context.Context
 	send      *outgoing
-	effort    *string // SetEffort
-	restart   bool    // Restart (restart.go)
-	reseed    *seed   // Reseed (reseed.go)
-	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
+	effort    *string   // SetEffort
+	restart   bool      // Restart (restart.go)
+	reseed    *seed     // Reseed (reseed.go)
+	wakeLimit bool      // the wake limit was reached (subscriptions_fire.go)
+	html      *HTMLPage // ShowHTML (html.go)
 	requestID string
 	decision  Decision
 	reply     chan threadReply
@@ -739,6 +740,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.thread, rep.restarted = r.onReseed(*cmd.reseed)
 	case cmd.wakeLimit:
 		rep.item = r.onWakeLimit()
+	case cmd.html != nil:
+		rep.item = r.onShowHTML(cmd.html)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}
