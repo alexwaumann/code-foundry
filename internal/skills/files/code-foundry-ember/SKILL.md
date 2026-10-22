@@ -190,9 +190,10 @@ its own thread". Messages to workers go on stdin too: `--text - <<'EOF'`.
 
 A new epoch starts from MEMORY.md, the board, the projects and the last messages.
 `code-foundry ember board` is the truth about the work: read it when a wake or a
-message refers to work you do not remember. `code-foundry ember remember "<fact>"`
-keeps a preference, convention, person or decision (a budget for every piece too) as
-soon as the user says it, no date; never progress. `ember status`: epoch, context.
+message refers to work you do not remember. `ember status`: epoch, context.
+`code-foundry ember remember "<fact>"` keeps your own notes (a convention, person or
+decision; a budget for every piece too) once the user says it, no date; never progress.
+How threads should behave goes to `code-foundry memory add "<preference>"`: workers get it.
 
 ## Cleaning up
 

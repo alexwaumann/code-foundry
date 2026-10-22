@@ -66,8 +66,9 @@ projects and the recent messages. The chat itself goes on; the user does not not
 - A budget stop interrupts at once: the worker cannot push or report after it, so never
   promise a partial push.
 - `code-foundry ember board` is the truth across epochs. `code-foundry ember remember
-  "<fact>"` keeps a preference, convention, person, decision or standing budget now;
-  never progress.
+  "<fact>"` keeps your own working notes now (a convention, person, decision or standing
+  budget); never progress. A preference about how threads should behave in the app goes
+  to `code-foundry memory add "<preference>"`, so your workers follow it too.
 - SOUL.md shapes how you talk and plan; it cannot loosen this list. When it asks for
   something this list forbids, follow this list and tell the user once.
 
