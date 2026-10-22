@@ -51,6 +51,8 @@ type EventsDeps struct {
 	Skill SkillStore
 	// Memory is the app memory.
 	Memory MemoryStore
+	// Themes is the user's colour themes (and, through the catalog, the curated ones).
+	Themes ThemeStore
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -136,8 +138,8 @@ type eventObserver interface{ observe(ev *v1.Event) }
 type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: project, workspace, terminal, thread, thread, gh, gitops, settings, update,
-// action, plugin, skill, memory),
+// events.proto: project, workspace, terminal, thread, thread, gh, gitops, theme, settings,
+// update, action, plugin, skill, memory),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -159,6 +161,10 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.GitOps != nil {
 		out = append(out, gitopsSource{store: d.GitOps, bus: d.Bus})
+	}
+	// Before settings: appearance.theme_dark / theme_light may name a user theme.
+	if d.Themes != nil {
+		out = append(out, themeSource{store: d.Themes, bus: d.Bus}) // api/theme.go
 	}
 	if d.Settings != nil {
 		out = append(out, settingsSource{store: d.Settings, bus: d.Bus})

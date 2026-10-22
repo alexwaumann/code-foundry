@@ -211,7 +211,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// and tell the plugins as they come and go (plugin_wakes.go).
 	st.thread.SetPluginWakes(threadPluginWakes{plugins: plugins})
 	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
-	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Done: ctx.Done(), Clients: clients})
+	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
 	if err := all.Register(commands, all.Deps{
@@ -267,6 +267,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Skills:            st.skills,
 		Ember:             st.ember,
 		Memory:            st.memory,
+		Themes:            st.themes,
 		ShippedSkills:     shippedSkills(log, p.Claude()),
 		Restart: func() {
 			// Let the command's response reach the caller first.
@@ -305,6 +306,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		pluginAPI.Route(),
 		api.NewSkill(st.skills, events).Route(),
 		api.NewMemory(st.memory, events).Route(),
+		api.NewTheme(st.themes, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
 		filesystemAPI.Route(),
 		eventsAPI.Route(),

@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// ThemeService reads the colour themes (docs/notes/user-themes.md): the curated catalog's
+// ids and the user's own theme files with their contents, so the GUI resolves a user
+// theme's slots with the same rules it uses for the catalog. The daemon derives no
+// colour. It only reads; saving, copying and deleting are the theme.* commands
+// (CommandService.Invoke), and picking a theme is the appearance.theme_dark /
+// theme_light settings.
+service ThemeService {
+  // List returns the themes as last read.
+  rpc List(ListThemesRequest) returns (ListThemesResponse) {}
+  // Watch sends the themes now, then again on every change to the themes directory. The
+  // GUI gets the same events from EventService (EVENT_SOURCE_THEME).
+  rpc Watch(WatchThemesRequest) returns (stream ThemeEvent) {}
+}
+
+// CuratedTheme is a theme of the curated catalog. Its colours are in the GUI's catalog.
+message CuratedTheme {
+  string id = 1;
+  string name = 2;
+  // "dark" or "light".
+  string scheme = 3;
+  // The sibling of the other scheme, or empty.
+  string pair = 4;
+}
+
+// ThemeTerminal is a theme file's terminal palette (base.terminal).
+message ThemeTerminal {
+  string foreground = 1;
+  // Empty when the file leaves them to the rules.
+  string cursor = 2;
+  string cursor_text = 3;
+  string selection = 4;
+  // ANSI 0-15.
+  repeated string ansi = 5;
+}
+
+// ThemeBase is what a theme file must supply (base). Every colour is #rrggbb.
+message ThemeBase {
+  string canvas = 1;
+  string surface = 2;
+  string text = 3;
+  string accent = 4;
+  string success = 5;
+  string warning = 6;
+  string error = 7;
+  string info = 8;
+  string highlight = 9;
+  // Empty: the info colour.
+  string link = 10;
+  ThemeTerminal terminal = 11;
+}
+
+// UserTheme is one of the user's theme files, valid, with its contents.
+message UserTheme {
+  string id = 1;
+  string name = 2;
+  // "dark" or "light".
+  string scheme = 3;
+  string pair = 4;
+  // The theme it was copied from (curated or user), or empty.
+  string from = 5;
+  // The thread that wrote it, or empty (the user, or unknown).
+  string created_by = 6;
+  string source = 7;
+  ThemeBase base = 8;
+  // Pinned slots: `--cf-*`, `--terminal-*`, `--syn-*`, `--sh-*` to #rrggbb or
+  // #rrggbbaa. A name that is not a slot (the daemon cannot tell) is ignored by the GUI.
+  map<string, string> overrides = 9;
+  // The file, in the themes directory.
+  string path = 10;
+}
+
+// ThemeFileIssue is a file in the themes directory that is not a theme the app can use.
+message ThemeFileIssue {
+  // Its name in the directory ("ocean.json").
+  string file = 1;
+  string message = 2;
+}
+
+// ThemeSnapshot is every theme.
+message ThemeSnapshot {
+  // The catalog, dark themes first, the default first in each scheme.
+  repeated CuratedTheme curated = 1;
+  // The user's themes, by name.
+  repeated UserTheme user = 2;
+  // The files that did not load, by file name.
+  repeated ThemeFileIssue issues = 3;
+  // The themes directory.
+  string dir = 4;
+  // Grows by one per change in this daemon's lifetime.
+  uint64 version = 5;
+}
+
+message ListThemesRequest {}
+
+message ListThemesResponse {
+  ThemeSnapshot themes = 1;
+}
+
+message WatchThemesRequest {}
+
+// ThemeEvent carries every theme, on connect and per change.
+message ThemeEvent {
+  ThemeSnapshot snapshot = 1;
+}

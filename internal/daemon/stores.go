@@ -23,6 +23,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
+	"github.com/alexwaumann/code-foundry/internal/store/usertheme"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -70,6 +71,11 @@ type stores struct {
 	// thread reads it at every spawn, the memory.* commands write it, MemoryService and
 	// EventService watch its snapshots. It holds no resources.
 	memory *memory.Store
+	// themes is the user's colour themes (<home>/themes/, docs/notes/user-themes.md): the
+	// theme.* commands write it, the settings store validates the theme slots against it
+	// (OnChange, before it publishes), ThemeService and EventService watch its snapshots.
+	// Its watch ends with the daemon's context.
+	themes *usertheme.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// skills reads the Skills marketplaces Claude Code has and what is installed
@@ -115,12 +121,18 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 			s.close()
 		}
 	}()
+	// The user's themes are read before the settings, so a theme slot naming one of them
+	// is valid from the first snapshot (and Open logs no false "value ignored").
+	s.themes = usertheme.New(usertheme.Options{Dir: p.Themes(), Bus: s.bus, Log: log.With("store", "themes")})
+	s.themes.Load()
 	if s.settings, err = settings.Open(ctx, settings.Options{
 		Path: filepath.Join(p.Home(), settings.FileName), Bus: s.bus, Log: log.With("store", "settings"),
-		BackdropsDir: p.Backdrops(),
+		BackdropsDir: p.Backdrops(), Themes: s.themes.Snapshot().Set(),
 	}); err != nil {
 		return nil, err
 	}
+	s.themes.OnChange(func(snap *usertheme.Snapshot) { s.settings.SetThemes(snap.Set()) })
+	s.themes.Watch(ctx)
 	s.backdrops = backdrop.New(backdrop.Options{Dir: p.Backdrops(), Settings: s.settings, Log: log.With("store", "backdrop")})
 	// Start-time settings (see internal/daemon/settings.go for the live ones).
 	cfg := s.settings.Settings()
