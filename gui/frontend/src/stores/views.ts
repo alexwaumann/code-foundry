@@ -2,8 +2,8 @@
  * Window-level views that are not selections: the settings, usage and themes pages (each replaces
  * the content area; at most one is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
  * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
- * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. Settings
- * and usage toggle: showing the one already open closes it.
+ * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
+ * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -85,18 +85,33 @@ export function bottomCanShow(key: string): boolean {
   return bottomVisible(key, true, pageOpen(), sideExpanded());
 }
 
-/** Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. */
+/**
+ * The window's own settings and usage keys and sidebar buttons (keys/bindings.ts): a
+ * toggle, closing the page that is already open. The daemon's ShowView only shows
+ * (showView), since "Show the Usage page" from the CLI or a thread must not close it.
+ */
+export function toggleView(name: "settings" | "usage"): boolean {
+  const v = useViewsStore.getState();
+  if (name === "settings" && v.settingsOpen) closeSettings();
+  else if (name === "usage" && v.usageOpen) closeUsage();
+  else return showView(name);
+  return true;
+}
+
+/**
+ * Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. Pages
+ * only show: one already open stays (toggleView is the window's own toggle).
+ */
 export function showView(name: string): boolean {
   switch (name) {
     case "settings":
-      // A toggle like usage: the sidebar's settings button (and view.settings, cmd+,) closes it again.
-      if (useViewsStore.getState().settingsOpen) closeSettings();
-      else useViewsStore.setState({ settingsOpen: true, settingsPage: SETTINGS_FIRST_PAGE, usageOpen: false, themesOpen: false, helpOpen: false });
+      // Already open: stays on the page it shows.
+      if (!useViewsStore.getState().settingsOpen) {
+        useViewsStore.setState({ settingsOpen: true, settingsPage: SETTINGS_FIRST_PAGE, usageOpen: false, themesOpen: false, helpOpen: false });
+      }
       return true;
     case "usage":
-      // A toggle: the sidebar's usage button (and view.usage from anywhere) closes it again.
-      if (useViewsStore.getState().usageOpen) closeUsage();
-      else useViewsStore.setState({ usageOpen: true, settingsOpen: false, themesOpen: false, helpOpen: false });
+      useViewsStore.setState({ usageOpen: true, settingsOpen: false, themesOpen: false, helpOpen: false });
       return true;
     case "themes":
     case "themes.dark":

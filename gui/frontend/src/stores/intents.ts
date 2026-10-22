@@ -50,13 +50,15 @@ useUiStore.subscribe((s, prev) => {
 /**
  * Shows a thread the daemon asked to focus (thread.new, thread.fork, pr.*, thread.focus),
  * unless it is a thread just created that is hidden from the sidebar (lib/inSidebar.ts
- * threadFocus): an agent creating its children must not take the user's view. One not in
- * the list yet is decided when it arrives.
+ * threadFocus): an agent creating its children must not take the user's view. An
+ * `explicit` one (a view.panel.* verb's --focus, which the user asked for) selects it
+ * anyway. One not in the list yet is decided when it arrives.
  */
-function focusThread(id: string): void {
+function focusThread(id: string, explicit: boolean): void {
   clearPendingFocus();
   const decide = (): boolean => {
-    const d = threadFocus(useThreadsStore.getState().byId[id], getShowCreatedThreads(), Date.now());
+    const t = useThreadsStore.getState().byId[id];
+    const d = explicit && t !== undefined ? "select" : threadFocus(t, getShowCreatedThreads(), Date.now());
     if (d === "select") useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
     return d !== "wait";
   };
@@ -112,7 +114,7 @@ export function applyIntent(intent: UiIntentView): void {
       focusTerminal(intent.terminalId);
       break;
     case "focusThread":
-      focusThread(intent.threadId);
+      focusThread(intent.threadId, intent.explicit ?? false);
       break;
     case "focusProject":
       // The Projects page with the worktree (default: the project's main one) in its panel.
@@ -133,7 +135,7 @@ export function applyIntent(intent: UiIntentView): void {
       if (intent.threadId) {
         // A panel action scoped to one thread (a view.panel.* verb run inside it): the
         // window does not move, so a pending focus stays pending too.
-        showThreadView(intent.name, intent.threadId);
+        showThreadView(intent.name, intent.threadId, intent.params);
         break;
       }
       clearPendingFocus();

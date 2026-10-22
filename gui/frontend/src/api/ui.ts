@@ -5,16 +5,21 @@ export type NotifyLevel = "info" | "warning" | "error";
 
 export type UiIntentView =
   | { kind: "focusTerminal"; terminalId: string }
-  | { kind: "focusThread"; threadId: string }
+  /**
+   * Select a thread. `explicit` (a view.panel.* verb's --focus: the user asked) selects
+   * even a hidden thread just created, which a focusThread otherwise leaves alone.
+   */
+  | { kind: "focusThread"; threadId: string; explicit?: boolean }
   | { kind: "focusProject"; projectId: string; worktreePath: string }
   | { kind: "openPalette"; query: string }
   | { kind: "notify"; level: NotifyLevel; title: string; body: string }
   /**
    * A named view, or a panel action. `threadId` (a view.panel.* verb run inside a thread)
    * scopes a panel action to that thread's panel, whatever the window has selected
-   * (stores/threadPanelIntent.ts); absent, it acts on the selection.
+   * (stores/threadPanelIntent.ts); absent, it acts on the selection. `params` name the
+   * item a panel action opens ("panel.file" path and line, "panel.diff", "panel.pr").
    */
-  | { kind: "showView"; name: string; threadId?: string }
+  | { kind: "showView"; name: string; threadId?: string; params?: Record<string, string> }
   | { kind: "playAlertSound"; volume: number }
   /** thread.agent.open: select the thread and show one of its own subagent runs read-only. */
   | { kind: "showAgentRun"; threadId: string; runId: string }
@@ -37,15 +42,18 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
     case "focusTerminal":
       return { kind: "focusTerminal", terminalId: e.value.terminalId };
     case "focusThread":
-      return { kind: "focusThread", threadId: e.value.threadId };
+      return e.value.explicit ? { kind: "focusThread", threadId: e.value.threadId, explicit: true } : { kind: "focusThread", threadId: e.value.threadId };
     case "focusProject":
       return { kind: "focusProject", projectId: e.value.projectId, worktreePath: e.value.worktreePath };
     case "openPalette":
       return { kind: "openPalette", query: e.value.query };
     case "notify":
       return { kind: "notify", level: levelMap[e.value.level], title: e.value.title, body: e.value.body };
-    case "showView":
-      return e.value.threadId ? { kind: "showView", name: e.value.name, threadId: e.value.threadId } : { kind: "showView", name: e.value.name };
+    case "showView": {
+      const { name, threadId, params } = e.value;
+      if (!threadId) return { kind: "showView", name };
+      return Object.keys(params).length > 0 ? { kind: "showView", name, threadId, params: { ...params } } : { kind: "showView", name, threadId };
+    }
     case "playAlertSound":
       return { kind: "playAlertSound", volume: e.value.volume };
     case "showAgentRun":

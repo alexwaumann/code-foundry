@@ -35,6 +35,7 @@ import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
+import { panelItemCommands } from "./panelItemVerbs";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -2659,6 +2660,10 @@ export class World {
       ...viewCommands((i) => this.emit(i)),
       ...this.logs.commands(),
       ...mcpCommands(this.logs, (i) => this.emit(i)),
+      ...panelItemCommands((id) => {
+        const t = this.threads.get(id);
+        return t ? { projectId: t.projectId, worktreePath: t.worktreePath, githubSlug: this.projects.get(t.projectId)?.githubSlug ?? "" } : undefined;
+      }, (i) => this.emit(i)),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...this.actions.commands(),
       ...this.plugins.commands(),

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getBottom, useBottomStore } from "./bottomPanel";
 import { getPanel, makeTab, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { closeUsage, expandPanelCommand, newPanelTabCommand, showView, startViewSync, toggleBottomCommand, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, newPanelTabCommand, setSettingsPage, showView, startViewSync, toggleBottomCommand, togglePanelCommand, toggleView, usagePanelCommand, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -214,21 +214,29 @@ describe("the usage page", () => {
     return { settingsOpen, usageOpen, helpOpen };
   };
 
-  it("\"usage\" toggles: opens, then closes and hands focus back to the terminal", () => {
-    expect(showView("usage")).toBe(true);
-    expect(views()).toEqual({ settingsOpen: false, usageOpen: true, helpOpen: false });
+  it.each(["usage", "settings"] as const)("a ShowView of %s only shows: the page stays open when it is open already", (name) => {
+    const key = name === "usage" ? "usageOpen" : "settingsOpen";
+    expect(showView(name)).toBe(true);
+    expect(views()[key]).toBe(true);
+    expect(showView(name)).toBe(true);
+    expect(views()[key]).toBe(true);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
-    expect(showView("usage")).toBe(true);
-    expect(views().usageOpen).toBe(false);
-    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 
-  it("\"settings\" toggles too: opens, then closes and hands focus back to the terminal", () => {
-    expect(showView("settings")).toBe(true);
-    expect(views()).toEqual({ settingsOpen: true, usageOpen: false, helpOpen: false });
+  it("a second ShowView of settings keeps the page it shows", () => {
+    showView("settings");
+    setSettingsPage("appearance");
+    showView("settings");
+    expect(useViewsStore.getState().settingsPage).toBe("appearance");
+  });
+
+  it.each(["usage", "settings"] as const)("the window's own %s key toggles: opens, then closes and hands focus back to the terminal", (name) => {
+    const key = name === "usage" ? "usageOpen" : "settingsOpen";
+    expect(toggleView(name)).toBe(true);
+    expect(views()).toEqual({ settingsOpen: name === "settings", usageOpen: name === "usage", helpOpen: false });
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
-    expect(showView("settings")).toBe(true);
-    expect(views().settingsOpen).toBe(false);
+    expect(toggleView(name)).toBe(true);
+    expect(views()[key]).toBe(false);
     expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 

@@ -23,6 +23,7 @@ export const panelThreadArgs = [
 /** Runs panel verb `name` (its ShowView name) with the caller's args. */
 export function runPanelVerb(emit: (i: UiIntentInit) => number, name: string, args: Readonly<Record<string, string>>): string {
   const threadId = args.thread ?? "";
-  if (threadId && args.focus === "true") emit({ intent: { case: "focusThread", value: { threadId } } });
+  // The user asked (--focus): explicit, so a hidden thread just created is selected too.
+  if (threadId && args.focus === "true") emit({ intent: { case: "focusThread", value: { threadId, explicit: true } } });
   return `delivered=${String(emit({ intent: { case: "showView", value: { name, threadId } } }))}`;
 }
