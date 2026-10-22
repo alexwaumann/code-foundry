@@ -2,7 +2,8 @@ import { useState } from "react";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tildify } from "@/lib/path";
-import { HtmlFrame, usePreviewGrant } from "./HtmlFrame";
+import { HtmlFrame } from "./HtmlFrame";
+import { usePreviewGrant } from "./previewGrant";
 import { FileEmptyState, FileLoading } from "./states";
 
 export { HTML_PREVIEW_SANDBOX } from "./HtmlFrame";
