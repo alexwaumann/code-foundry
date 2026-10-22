@@ -118,6 +118,20 @@ test("the CLI's ShowView reaches the window; a page has no Worktree entry", asyn
   await expect(tabs(page)).toHaveCount(0);
 });
 
+test("a ShowView scoped to another thread (view.panel.worktree inside it) leaves the window where it is; the tab waits there", async ({ page }) => {
+  await openApp(page);
+  await row(page, "s:s-2").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+  expect(await emit({ showView: { name: "panel.worktree", threadId: "s-3" } })).toBe(1);
+  // Still s-2, its panel still closed.
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+  await expect(panel(page)).toHaveCount(0);
+
+  await row(page, "s:s-3").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
+  await expect(tabs(page)).toHaveText(["code-foundry · fix/resize"]);
+});
+
 // ---- the overview -------------------------------------------------------------------
 
 const shots = process.env.SHOTS;

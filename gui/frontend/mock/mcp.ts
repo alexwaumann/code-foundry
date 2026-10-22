@@ -12,6 +12,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { McpCheckTrigger, McpServerStatus, type McpServerSchema, type ThreadMcpStatusSchema } from "../src/gen/codefoundry/v1/thread_pb";
+import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 import type { UiIntentInit } from "./world";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
@@ -200,10 +201,10 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
         category: "View",
         description: "Open the MCP surface in the selected thread's side panel: its MCP servers with status, errors and tools, and Reconnect.",
         keybindings: [],
-        args: [],
+        args: panelThreadArgs,
       },
       when,
-      run: () => `delivered=${String(emit({ intent: { case: "showView", value: { name: "panel.mcp" } } }))}`,
+      run: (_ctx, args) => runPanelVerb(emit, "panel.mcp", args),
     },
   ];
 }

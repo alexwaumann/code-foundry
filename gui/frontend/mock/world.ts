@@ -34,6 +34,7 @@ import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
+import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -3317,9 +3318,9 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: [] },
+        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: panelThreadArgs },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.toggle", args),
       },
       {
         cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: ["cmd+j"], args: [] },
@@ -3327,19 +3328,19 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.expand" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.expand", args),
       },
       {
-        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: panelThreadArgs },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.new-tab" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.new-tab", args),
       },
       {
-        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: ["cmd+\\"], args: [] },
+        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: ["cmd+\\"], args: panelThreadArgs },
         when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.split" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.split", args),
       },
       {
         cmd: { name: "view.back", title: "Back", category: "View", description: "Return to the previously selected thread or page.", keybindings: ["cmd+["], args: [] },
@@ -3368,11 +3369,11 @@ export class World {
           category: "View",
           description: "Open the workspace surface in the selected workspace thread's side panel: its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
           keybindings: [],
-          args: [],
+          args: panelThreadArgs,
         },
         // Like the daemon: a thread is active and it belongs to a workspace.
         when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeWorkspaceId),
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.workspace" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.workspace", args),
       },
       {
         cmd: {
@@ -3381,11 +3382,11 @@ export class World {
           category: "View",
           description: "Open the Worktree surface in the selected thread's side panel: the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
           keybindings: [],
-          args: [],
+          args: panelThreadArgs,
         },
         // Like the daemon: a thread is active and it sits in a registered worktree.
         when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeProjectId && ctx.activeWorktreePath),
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.worktree" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.worktree", args),
       },
       {
         cmd: {
@@ -3394,11 +3395,11 @@ export class World {
           category: "View",
           description: "Open the Linked PRs surface in the selected thread's side panel: the pull requests the thread created or touched, newest first, with state, checks and branch.",
           keybindings: [],
-          args: [],
+          args: panelThreadArgs,
         },
         // Like the daemon: a thread is active (with or without linked pull requests).
         when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.linked-prs" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.linked-prs", args),
       },
       {
         cmd: {
@@ -3407,11 +3408,11 @@ export class World {
           category: "View",
           description: "Open the Usage surface in the selected thread's side panel: its cost at Claude API rates, tokens and requests, per model and per token kind.",
           keybindings: [],
-          args: [],
+          args: panelThreadArgs,
         },
         // Like the daemon: a thread is active (with or without usage).
         when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.usage" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.usage", args),
       },
       {
         cmd: {
@@ -3420,11 +3421,11 @@ export class World {
           category: "View",
           description: "Open the Threads surface in the selected thread's side panel: the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
           keybindings: [],
-          args: [],
+          args: panelThreadArgs,
         },
         // Like the daemon: a thread is active (with or without lineage).
         when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.threads" } } }))}`,
+        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.threads", args),
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
