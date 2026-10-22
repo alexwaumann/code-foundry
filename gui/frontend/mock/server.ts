@@ -149,6 +149,12 @@
  *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
  *        listError=… (the marketplace list failed); pluginsError=…; epoch=1 (a read, like the hourly
  *        refresh). GET /__mock/skills: { epoch, calls, failures, installed } (mock/skills.ts)
+ *   MemoryService, the memory event source and memory.* (mock/memory.ts): four seeded entries (by s-1,
+ *        by s-3, from the user's terminal, by the removed s-gone); reset restores them.
+ *   POST /__mock/memory?set=empty|seed           (the entries, as a hand edit; published)
+ *   POST /__mock/memory/add?text=…&thread=s-1    (a thread's memory add: the entry and the "Remembered: …"
+ *                                                 toast with its Settings › Memory link)
+ *   GET  /__mock/memory                          ({ entries, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
  *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
@@ -185,6 +191,7 @@ import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefou
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
+import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
 import { emberStateNames } from "./ember";
@@ -561,6 +568,17 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // The app memory (mock/memory.ts): reads only; writes are the memory.* commands.
+  router.service(MemoryService, {
+    get: () => ({ memory: world.memory.snapshot() }),
+    watch: async function* (_req, ctx) {
+      yield world.memory.event();
+      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
+        if (source === EventSource.MEMORY && event.event?.case === "memory") yield event.event.value;
+      }
+    },
+  });
+
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
   router.service(EmberService, {
     getStatus: () => ({ status: world.ember.status() }),
@@ -572,12 +590,12 @@ function routes(router: ConnectRouter): void {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, settings, update, action, plugin, skill), then everything published, filtered by `sources`.
+    // thread, gh, gitops, settings, update, action, plugin, skill, memory), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -593,6 +611,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } },
         { source: EventSource.PLUGIN, event: { event: { case: "plugin", value: world.plugins.snapshot() } } },
         { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
+        { source: EventSource.MEMORY, event: { event: { case: "memory", value: world.memory.event() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1246,6 +1265,21 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/skills":
       json(res, 200, world.skills.control(q));
+      break;
+    case "GET /__mock/memory":
+      json(res, 200, world.memory.json());
+      break;
+    case "POST /__mock/memory":
+    case "POST /__mock/memory/add":
+      try {
+        if (path === "/__mock/memory") json(res, 200, world.memory.control(q));
+        else {
+          const id = q.get("thread") ?? "";
+          json(res, 200, { added: world.memory.add(q.get("text") ?? "", id, world.threads.get(id)?.name ?? "") });
+        }
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
       break;
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);

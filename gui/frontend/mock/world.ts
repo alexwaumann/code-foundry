@@ -30,6 +30,7 @@ import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
+import { MockMemory } from "./memory";
 import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
@@ -740,6 +741,11 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.SKILL, event: { event: { case: "skill", value: v } } }),
     startSetup: (ctx, name, dir, script) => this.startSkillSetup(ctx, name, dir, script),
   });
+  /** The app memory (mock/memory.ts); the EventService memory source. */
+  readonly memory = new MockMemory({
+    publish: (v) => this.events.publish({ source: EventSource.MEMORY, event: { event: { case: "memory", value: v } } }),
+    emit: (i) => this.emit(i),
+  });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => this.restartCost(),
@@ -810,6 +816,7 @@ export class World {
     this.gh.reset();
     this.plugins.reset();
     this.skills.reset();
+    this.memory.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
@@ -2668,6 +2675,7 @@ export class World {
       ...this.actions.commands(),
       ...this.plugins.commands(),
       ...this.skills.commands(),
+      ...this.memory.commands(),
       {
         cmd: {
           name: "terminal.new",
