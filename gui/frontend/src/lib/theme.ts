@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { publishTheme, type PublishedTheme } from "@/api/ui";
 import { useHealthStore } from "@/stores/health";
-import { DEFAULT_DARK, DEFAULT_LIGHT, themeById, type Theme } from "@/themes";
+import { DEFAULT_DARK, DEFAULT_LIGHT, subscribeUserThemes, themeById, type Theme } from "@/themes";
 
 export type ColorScheme = "dark" | "light";
 
@@ -103,6 +103,12 @@ export interface ThemeSlots {
 
 const DEFAULT_SLOTS: ThemeSlots = { light: DEFAULT_LIGHT, dark: DEFAULT_DARK };
 let slots: ThemeSlots = DEFAULT_SLOTS;
+/**
+ * The ids the settings asked for, before validSlot: a user theme the GUI does not know
+ * yet (its list arrives on the events stream, maybe after the settings) shows the
+ * default until it does, then itself (setUserThemes re-resolves).
+ */
+let wanted: { light?: string; dark?: string } = {};
 
 /** A slot's id if it names a theme of that scheme, else the scheme's default. */
 function validSlot(id: string | undefined, scheme: ColorScheme): string {
@@ -110,29 +116,46 @@ function validSlot(id: string | undefined, scheme: ColorScheme): string {
   return theme?.scheme === scheme ? theme.id : DEFAULT_SLOTS[scheme];
 }
 
-/**
- * Sets the light and dark theme slots. An id that is unknown, or a theme of the other
- * scheme, falls back to that slot's default (github-light / github-dark); a
- * missing key keeps the slot as it is.
- */
-export function setThemeSlots(next: { light?: string; dark?: string }): void {
-  const light = "light" in next ? validSlot(next.light, "light") : slots.light;
-  const dark = "dark" in next ? validSlot(next.dark, "dark") : slots.dark;
+function resolveWanted(): void {
+  const light = validSlot(wanted.light, "light");
+  const dark = validSlot(wanted.dark, "dark");
   if (light === slots.light && dark === slots.dark) return;
   slots = { light, dark };
   persist();
   for (const l of listeners) l();
 }
 
+/**
+ * Sets the light and dark theme slots. An id that is unknown, or a theme of the other
+ * scheme, falls back to that slot's default (github-light / github-dark) until a user
+ * theme with that id arrives; a missing key keeps the slot as it is.
+ */
+export function setThemeSlots(next: { light?: string; dark?: string }): void {
+  wanted = { light: "light" in next ? next.light : wanted.light, dark: "dark" in next ? next.dark : wanted.dark };
+  resolveWanted();
+}
+
 // Start from the last applied theme (THEME_STORAGE_KEY); anything unusable is the default.
 {
   const stored = readStored();
   if (stored.scheme === "system" || stored.scheme === "dark" || stored.scheme === "light") preference = stored.scheme;
-  slots = {
-    light: validSlot(typeof stored.light === "string" ? stored.light : undefined, "light"),
-    dark: validSlot(typeof stored.dark === "string" ? stored.dark : undefined, "dark"),
+  wanted = {
+    light: typeof stored.light === "string" ? stored.light : undefined,
+    dark: typeof stored.dark === "string" ? stored.dark : undefined,
   };
+  slots = { light: validSlot(wanted.light, "light"), dark: validSlot(wanted.dark, "dark") };
 }
+
+// A user theme that arrives (or goes, or changes) may be a slot's: resolve again, and
+// tell the subscribers when the active theme's colours changed with it.
+subscribeUserThemes(() => {
+  const before = slots;
+  resolveWanted();
+  if (slots === before) {
+    // Same ids, but a user theme's file may have changed under one of them.
+    for (const l of listeners) l();
+  }
+});
 
 export function themeSlots(): ThemeSlots {
   return slots;
@@ -145,9 +168,9 @@ export function useThemeSlots(): ThemeSlots {
 
 /** The theme in effect: the slot of the effective scheme. */
 export function activeTheme(): Theme {
-  const id = slots[effectiveScheme()];
-  const theme = themeById.get(id);
-  if (!theme) throw new Error(`theme ${id} is not in the catalog`);
+  const scheme = effectiveScheme();
+  const theme = themeById.get(slots[scheme]) ?? themeById.get(DEFAULT_SLOTS[scheme]);
+  if (!theme) throw new Error(`theme ${slots[scheme]} is not in the catalog`);
   return theme;
 }
 

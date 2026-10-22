@@ -13,6 +13,7 @@ import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyMemoryEvent } from "./memory";
+import { applyThemeEvent } from "./themes";
 import { onPluginEvent } from "./plugins";
 import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
@@ -88,6 +89,8 @@ const handlers: Handlers = {
   skill: (ev) => { onSkillEpoch(ev.epoch); },
   // The app memory, for Settings › Memory (stores/memory.ts).
   memory: applyMemoryEvent,
+  // The user's own themes (stores/themes.ts; src/themes resolves them).
+  theme: applyThemeEvent,
 };
 
 export function dispatchEvent(ev: EventView): void {

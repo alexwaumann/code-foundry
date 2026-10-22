@@ -3,10 +3,13 @@
  * the theme previewed in its gallery, and the pairing hint after an Apply. The preview is
  * page state only: the window keeps the applied theme (lib/theme.ts) until Apply writes the
  * slot's setting through theme.set-dark / theme.set-light. Closing the page drops it.
+ * The user's own themes (docs/notes/user-themes.md) list first; Customise copies a theme
+ * into them (theme.duplicate) and Delete removes one (theme.delete).
  */
+import { toast } from "sonner";
 import { create } from "zustand";
 import { effectiveScheme, themeSlots, type ColorScheme, type ThemePreference } from "@/lib/theme";
-import { themeById, themesFor } from "@/themes";
+import { subscribeUserThemes, themeById, themesFor } from "@/themes";
 import { runCommandForResult } from "./commands";
 
 export type ThemeSlot = ColorScheme;
@@ -74,7 +77,7 @@ export function schemeNote(pref: ThemePreference, scheme: ThemeSlot, showing: st
   return `Always ${pref}, showing ${showing}`;
 }
 
-/** Themes of a scheme whose name or id contains every word of the query (case-insensitive). */
+/** Themes of a scheme whose name or id contains every word of the query (case-insensitive): the user's first, then the catalog's. */
 export function filterThemes(scheme: ThemeSlot, query: string) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return themesFor(scheme).filter((t) => {
@@ -128,4 +131,73 @@ export async function acceptPairHint(): Promise<boolean> {
 
 export function dismissPairHint(): void {
   useThemePickerStore.setState({ hint: null });
+}
+
+/** Resolves once the theme id is known (a user theme's event may land after its command returns), or false after timeoutMs. */
+export function whenTheme(id: string, timeoutMs = 3000): Promise<boolean> {
+  if (themeById.has(id)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      unsub();
+      resolve(false);
+    }, timeoutMs);
+    const unsub = subscribeUserThemes(() => {
+      if (!themeById.has(id)) return;
+      clearTimeout(timer);
+      unsub();
+      resolve(true);
+    });
+  });
+}
+
+/** The id in theme.duplicate's JSON result, or null. */
+function copiedId(resultJson: string): string | null {
+  try {
+    const v: unknown = JSON.parse(resultJson);
+    return typeof v === "object" && v !== null && typeof (v as { id?: unknown }).id === "string" ? (v as { id: string }).id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Customise: copies the theme into the user's own (theme.duplicate: "<id>-copy", from the
+ * original), then previews the copy. Applying it is the usual Apply. PR 3's editor opens
+ * on the copy from here.
+ */
+export async function customiseTheme(id: string): Promise<string | null> {
+  const res = await runCommandForResult("theme.duplicate", { theme: id }, { quiet: true });
+  const copy = res ? copiedId(res.resultJson) : null;
+  if (!copy) return null;
+  if (!(await whenTheme(copy))) return null;
+  useThemePickerStore.setState({ query: "" });
+  previewTheme(copy);
+  return copy;
+}
+
+/**
+ * Delete: removes one of the user's themes (theme.delete, which asks first). A slot that
+ * used it moves to the theme it was copied from (the daemon says which); a preview of it
+ * goes back to the slot's theme.
+ */
+export async function deleteTheme(id: string): Promise<boolean> {
+  const name = themeById.get(id)?.name ?? id;
+  const res = await runCommandForResult("theme.delete", { theme: id }, { quiet: true });
+  if (!res) return false;
+  useThemePickerStore.setState((s) => (s.preview === id ? { preview: null } : s));
+  toast.success(`Deleted ${name}`, { description: movedSlots(res.resultJson) });
+  return true;
+}
+
+/** theme.delete's slots ({ "appearance.theme_dark": id }) as a sentence, or undefined. */
+function movedSlots(resultJson: string): string | undefined {
+  try {
+    const slots = (JSON.parse(resultJson) as { slots?: Record<string, string> }).slots ?? {};
+    const words = Object.entries(slots).map(([key, to]) => `the ${key.endsWith("_light") ? "light" : "dark"} theme is ${themeById.get(to)?.name ?? to} now`);
+    if (words.length === 0) return undefined;
+    const text = words.join("; ");
+    return text.charAt(0).toUpperCase() + text.slice(1) + ".";
+  } catch {
+    return undefined;
+  }
 }

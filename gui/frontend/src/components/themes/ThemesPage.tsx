@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Check, Link2, Monitor, Moon, Search, Sun, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,13 @@ import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { useColorScheme, useThemeSlots, type ThemePreference } from "@/lib/theme";
-import { themeById, type Theme } from "@/themes";
+import { DEFAULT_DARK, DEFAULT_LIGHT, themeById, type Theme } from "@/themes";
 import { saveSettings, useSettingValue } from "@/stores/settings";
 import {
   acceptPairHint,
   applyPreview,
+  customiseTheme,
+  deleteTheme,
   dismissPairHint,
   filterThemes,
   previewedId,
@@ -26,6 +28,7 @@ import {
   useThemePickerStore,
   type ThemeSlot,
 } from "@/stores/themePicker";
+import { useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
 import { ThemeAa, ThemeStrip } from "./ThemeChip";
 import { ThemeGallery } from "./ThemeGallery";
@@ -33,8 +36,11 @@ import { ThemeScope } from "./ThemeScope";
 
 const SLOT_LABEL: Record<ThemeSlot, string> = { dark: "Dark theme", light: "Light theme" };
 
-function themeOf(id: string): Theme {
-  const t = themeById.get(id);
+const DEFAULT_OF: Record<ThemeSlot, string> = { dark: DEFAULT_DARK, light: DEFAULT_LIGHT };
+
+/** The theme id names; a user theme that just went away reads as its scheme's default until the slot moves. */
+function themeOf(id: string, scheme?: ThemeSlot): Theme {
+  const t = themeById.get(id) ?? (scheme ? themeById.get(DEFAULT_OF[scheme]) : undefined);
   if (!t) throw new Error(`theme ${id} is not in the catalog`);
   return t;
 }
@@ -44,7 +50,9 @@ function themeOf(id: string): Theme {
  * scheme and the two slots, one of which is being edited), the editing slot's themes on
  * the left, and on the right a gallery in the previewed theme. Selecting a theme previews
  * it in the gallery only; Apply writes the slot (theme.set-dark / theme.set-light) and the
- * window follows. Leaving the page drops the preview.
+ * window follows. Leaving the page drops the preview. The list has two sections: the
+ * user's own themes (docs/notes/user-themes.md) above the curated ones; a row's hover
+ * actions copy a theme into them (Customise) or delete one of them.
  */
 export function ThemesPage() {
   const slot = useThemePickerStore((s) => s.slot);
@@ -55,7 +63,12 @@ export function ThemesPage() {
   const listRef = useRef<HTMLDivElement>(null);
   useEscapeCloses(closeThemes);
 
-  const list = useMemo(() => filterThemes(slot, query), [slot, query]);
+  // Re-renders when the user's themes change; filterThemes reads them (a few dozen rows: no memo).
+  useUserThemes();
+  const list = filterThemes(slot, query);
+  const yours = list.filter((t) => t.user);
+  const curated = list.filter((t) => !t.user);
+  const total = filterThemes(slot, "").length;
   const shownId = previewedId({ slot, preview }, slots);
 
   useEffect(() => {
@@ -122,7 +135,7 @@ export function ThemesPage() {
               ref={searchRef}
               type="search"
               aria-label="Search themes"
-              placeholder={`Search ${String(filterThemes(slot, "").length)} ${slot} themes`}
+              placeholder={`Search ${String(total)} ${slot} themes`}
               value={query}
               onChange={(e) => {
                 setPickerQuery(e.target.value);
@@ -144,9 +157,22 @@ export function ThemesPage() {
             className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 outline-none"
             data-testid="themes-list"
           >
-            {list.map((t) => (
-              <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
-            ))}
+            {(yours.length > 0 || !query) && (
+              <ListSection label="Yours" count={yours.length} testId="themes-yours">
+                {yours.map((t) => (
+                  <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
+                ))}
+                {yours.length === 0 && <p className="px-2 pb-1 text-caption-sm">Customise a theme to make one of your own.</p>}
+                {!query && <ThemeIssues />}
+              </ListSection>
+            )}
+            {curated.length > 0 && (
+              <ListSection label="Curated" count={curated.length} testId="themes-curated">
+                {curated.map((t) => (
+                  <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
+                ))}
+              </ListSection>
+            )}
             {list.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cf-divider px-3 py-2 text-caption-sm">
@@ -163,12 +189,12 @@ export function ThemesPage() {
           </div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <PreviewBar slot={slot} shown={themeOf(shownId)} current={themeOf(slots[slot])} previewing={preview !== null} />
+          <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />
           <PairHintLine slots={slots} />
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {/* inert: a picture of the app, so Tab and clicks stay in the page (and no
                 popover opens into the window's theme through a portal). */}
-            <ThemeScope theme={themeOf(shownId)} className="rounded-xl border border-cf-divider">
+            <ThemeScope theme={themeOf(shownId, slot)} className="rounded-xl border border-cf-divider">
               <div inert>
                 <ThemeGallery />
               </div>
@@ -180,7 +206,71 @@ export function ThemesPage() {
   );
 }
 
+/** A section of the list: its heading ("Yours · 2") and its rows. */
+function ListSection({ label, count, testId, children }: { label: string; count: number; testId: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} data-testid={testId}>
+      <p className="px-2 pt-2.5 pb-1 text-overline" aria-hidden>
+        {label} · {count}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+/** The files in the themes directory that did not load, under the user's themes. */
+function ThemeIssues() {
+  const issues = useThemesStore((s) => s.issues);
+  if (issues.length === 0) return null;
+  return (
+    <ul className="space-y-0.5 px-2 pb-1" data-testid="themes-issues">
+      {issues.map((is) => (
+        <li key={is.file} className="line-clamp-2 text-caption-sm text-cf-warning">
+          {is.file} did not load: {is.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A user theme's second line: where it came from and whether a thread made it. */
+function originLine(theme: Theme): string {
+  const parts: string[] = [];
+  if (theme.from) parts.push(`from ${themeById.get(theme.from)?.name ?? theme.from}`);
+  if (theme.createdBy) parts.push("by a thread");
+  return parts.join(" · ");
+}
+
+/**
+ * A row's actions, muted and shown on hover, on focus and on the previewed row: Customise
+ * on every theme, Delete on the user's. The editor (a later step) adds Edit on the user's
+ * rows here, beside Customise.
+ */
+function RowActions({ theme }: { theme: Theme }) {
+  const stop = (e: ReactMouseEvent) => {
+    e.stopPropagation();
+  };
+  return (
+    <span
+      className="hidden shrink-0 items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex group-aria-selected/row:flex"
+      onClick={stop}
+      onDoubleClick={stop}
+      data-testid="theme-row-actions"
+    >
+      <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void customiseTheme(theme.id)} aria-label={`Customise ${theme.name}`}>
+        Customise
+      </Button>
+      {theme.user && (
+        <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-error" onClick={() => void deleteTheme(theme.id)} aria-label={`Delete ${theme.name}`}>
+          Delete
+        </Button>
+      )}
+    </span>
+  );
+}
+
 function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: boolean; current: boolean }) {
+  const origin = theme.user ? originLine(theme) : "";
   return (
     <div
       id={`theme-option-${theme.id}`}
@@ -190,9 +280,11 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
       aria-label={theme.name}
       aria-current={current || undefined}
       data-theme-id={theme.id}
+      data-user={theme.user || undefined}
       data-current={current || undefined}
       className={cn(
-        "flex h-9 cursor-default items-center gap-2.5 rounded-md px-2 text-body-sm select-none",
+        "group/row flex min-h-9 cursor-default items-center gap-2.5 rounded-md px-2 text-body-sm select-none",
+        origin && "py-1",
         previewed ? "bg-cf-control-hover text-cf-text" : "hover:bg-cf-control-hover/50",
       )}
       onClick={() => {
@@ -203,10 +295,18 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
       }}
     >
       <ThemeAa theme={theme} />
-      <span className="min-w-0 flex-1 truncate" data-testid="theme-name">
-        {theme.name}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate" data-testid="theme-name">
+          {theme.name}
+        </span>
+        {origin && (
+          <span className="truncate text-caption-sm" data-testid="theme-origin">
+            {origin}
+          </span>
+        )}
       </span>
-      <ThemeStrip theme={theme} />
+      <ThemeStrip theme={theme} className="group-hover/row:hidden group-focus-within/row:hidden group-aria-selected/row:hidden" />
+      <RowActions theme={theme} />
       <span className="flex w-4 shrink-0 justify-center">
         {current && <Check className="size-3.5 text-cf-text" aria-hidden />}
       </span>
@@ -240,11 +340,11 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
       </div>
       <div className="flex items-center gap-2" role="group" aria-label="Slot to edit">
         {(["dark", "light"] as const).map((s) => (
-          <SlotChip key={s} slot={s} theme={themeOf(slots[s])} editing={s === slot} inUse={s === scheme} />
+          <SlotChip key={s} slot={s} theme={themeOf(slots[s], s)} editing={s === slot} inUse={s === scheme} />
         ))}
       </div>
       <p className="min-w-0 truncate text-caption" data-testid="themes-scheme-note">
-        {schemeNote(pref, scheme, themeOf(slots[scheme]).name)}
+        {schemeNote(pref, scheme, themeOf(slots[scheme], scheme).name)}
       </p>
     </div>
   );
@@ -308,7 +408,8 @@ function PreviewBar({ slot, shown, current, previewing }: { slot: ThemeSlot; sho
 function PairHintLine({ slots }: { slots: { dark: string; light: string } }) {
   const hint = useThemePickerStore((s) => s.hint);
   if (!hint || slots[hint.slot] === hint.themeId) return null;
-  const pair = themeOf(hint.themeId);
+  const pair = themeById.get(hint.themeId);
+  if (!pair) return null;
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-cf-divider px-4 py-2 text-body-sm" role="status" data-testid="themes-pair-hint">
       <Link2 className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />

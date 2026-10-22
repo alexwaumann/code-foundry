@@ -4,9 +4,12 @@ import { setThemePreference, setThemeSlots } from "@/lib/theme";
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
 
+import { setUserThemes, themeById, type UserThemeFile } from "@/themes";
 import {
   acceptPairHint,
   applyPreview,
+  customiseTheme,
+  deleteTheme,
   filterThemes,
   pairHintFor,
   previewTheme,
@@ -148,5 +151,59 @@ describe("the page state", () => {
     openThemes();
     showView("usage");
     expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, usageOpen: true });
+  });
+});
+
+describe("the user's themes", () => {
+  const copyOf = (id: string, from: string): UserThemeFile => {
+    const src = themeById.get(from);
+    if (!src) throw new Error(from);
+    return { id, name: `${src.name} copy`, scheme: src.scheme, source: "", base: src.base, from, createdBy: "", path: "" };
+  };
+
+  it("list first, and filter like the rest", () => {
+    setUserThemes([copyOf("nord-copy", "nord")]);
+    expect(filterThemes("dark", "")[0]?.id).toBe("nord-copy");
+    expect(filterThemes("dark", "nord").map((t) => t.id)).toEqual(["nord-copy", "nord"]);
+    setUserThemes([]);
+  });
+
+  it("Customise copies through theme.duplicate and previews the copy once it arrives", async () => {
+    useThemePickerStore.setState({ slot: "dark", preview: null, query: "gruv" });
+    runCommandForResult.mockImplementation(() => {
+      // The theme event lands after the command answers.
+      setTimeout(() => {
+        setUserThemes([copyOf("gruvbox-dark-copy", "gruvbox-dark")]);
+      }, 5);
+      return Promise.resolve({ message: "saved", resultJson: JSON.stringify({ id: "gruvbox-dark-copy", scheme: "dark" }) });
+    });
+    await expect(customiseTheme("gruvbox-dark")).resolves.toBe("gruvbox-dark-copy");
+    expect(runCommandForResult).toHaveBeenCalledWith("theme.duplicate", { theme: "gruvbox-dark" }, { quiet: true });
+    expect(useThemePickerStore.getState()).toMatchObject({ preview: "gruvbox-dark-copy", query: "" });
+    setUserThemes([]);
+  });
+
+  it("Customise that fails changes nothing", async () => {
+    useThemePickerStore.setState({ slot: "dark", preview: "nord", query: "" });
+    runCommandForResult.mockResolvedValue(null);
+    await expect(customiseTheme("nord")).resolves.toBeNull();
+    expect(useThemePickerStore.getState().preview).toBe("nord");
+  });
+
+  it("Delete runs theme.delete and drops a preview of it", async () => {
+    setUserThemes([copyOf("nord-copy", "nord")]);
+    useThemePickerStore.setState({ slot: "dark", preview: "nord-copy" });
+    runCommandForResult.mockResolvedValue({ message: "deleted", resultJson: JSON.stringify({ id: "nord-copy", slots: { "appearance.theme_dark": "nord" } }) });
+    await expect(deleteTheme("nord-copy")).resolves.toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("theme.delete", { theme: "nord-copy" }, { quiet: true });
+    expect(useThemePickerStore.getState().preview).toBeNull();
+    setUserThemes([]);
+  });
+
+  it("Delete declined (or failed) keeps the preview", async () => {
+    useThemePickerStore.setState({ slot: "dark", preview: "nord" });
+    runCommandForResult.mockResolvedValue(null);
+    await expect(deleteTheme("nord")).resolves.toBe(false);
+    expect(useThemePickerStore.getState().preview).toBe("nord");
   });
 });
