@@ -200,11 +200,11 @@ func TestRender(t *testing.T) {
 	}
 	// The help skill saves standing preferences to the app memory, a setting first
 	// (docs/notes/control-3-app-memory.md); its description names them so it fires.
-	help := string(files[skills.Help+"/SKILL.md"])
+	helpSkill := string(files[skills.Help+"/SKILL.md"])
 	for _, want := range []string{"standing preference about the app or how you work in it", "\n## Remembering preferences\n",
 		"Check `reference/settings.md` first", "`code-foundry memory add \"<preference>\"`", "applies to threads started from now on",
 		"remove the old entry first", "`code-foundry memory show`"} {
-		if !strings.Contains(help, want) {
+		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
 	}
