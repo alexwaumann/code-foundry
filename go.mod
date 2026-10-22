@@ -10,7 +10,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/wailsapp/wails/v3 v3.0.0-beta.28
+	github.com/wailsapp/wails/v3 v3.0.0-beta.34
 	go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79
 	golang.org/x/sys v0.48.0
 	google.golang.org/protobuf v1.36.12
