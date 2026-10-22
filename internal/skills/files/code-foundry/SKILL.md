@@ -31,11 +31,11 @@ Never tell the user skill or command names: say what you will do, not which comm
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
-| A page, chart or HTML you make | write an `.html` file, then `code-foundry view.inline <path>`: it shows in this conversation |
+| A page, chart or HTML you make; a form, checklist or countdown "as a page" or "I can fill in" | an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
-| To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` |
+| To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`): it reads the running app |
 | How something works inside the app | its source at the ref in the line under this title, as the help skill's "Reading the source" says |
 
 Load a skill with your Skill tool (or Read its SKILL.md: `--group skills` has the paths).
@@ -46,16 +46,16 @@ To show a page inline in the conversation: `code-foundry view.inline <path>` (yo
 thread; `--panel` also opens it beside the thread). Panel verbs open a surface in your own
 side panel: `view.panel.file`, `diff`, `pr`, `usage`, `worktree`, `threads`, `mcp`….
 Add `--focus` only when the user asks to be taken there. Page verbs move every window:
-only when asked. A path in your reply is a chip that opens the file. A page links
-`<link rel="stylesheet" href="/cf/theme.css">` and paints with its `--cf-*` variables
-(status triples, charts…) or type-role classes so it follows the theme; it posts
-`{type: "cf:resize", height}` (body height, on load) to fit its inline card. More: code-foundry-help.
+only when asked. A path in your reply is a chip that opens the file.
 
-## Discovering what exists
-
-`code-foundry daemon.capabilities` prints one line per group: build, commands, pages,
-panel, rendering, skills, plugins, settings, memory, presence. Read the index, then only
-the group you need (`--group panel`, `--json`): it reads the running app, so it is current.
+Write a page in `$CODE_FOUNDRY_PAGES` (your thread's own folder), never in the repository
+or the home folder. It links `<link rel="stylesheet" href="/cf/theme.css">` and paints only
+with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised`,
+`--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status triples
+`--cf-success`, `--cf-warning`, `--cf-error` (each also `-surface`, `-foreground`), or the
+type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
+It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline card.
+`view.inline` warns about what a page misses. More: code-foundry-help.
 
 ## Good to know
 
