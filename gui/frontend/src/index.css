@@ -44,6 +44,8 @@
     --radius-2xl: 16px;
     --radius-pane: var(--radius);
     --spacing-shell: var(--gap-shell);
+    /* The shadcn colour names, for components/ui (vendored shadcn) only: everything else uses
+     * the --color-cf-* utilities below (src/design/guards.test.ts, colour guard). */
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-card: var(--card);
@@ -172,7 +174,8 @@
 }
 
 /* The component tier (docs/notes/theme-slots-1-engine.md): every shadcn and shell colour
- * name is an alias of a semantic slot. The slots themselves (--cf-*, --terminal-*, --syn-*,
+ * name is an alias of a semantic slot, kept for components/ui (vendored shadcn); the app's
+ * own components use the slots (docs/notes/theme-slots-2-components.md). The slots themselves (--cf-*, --terminal-*, --syn-*,
  * --sh-*) are set inline by lib/theme.ts on <html> from the active theme, and by
  * components/themes/ThemeScope.tsx on a preview. A var() alias resolves where it is
  * declared and inherits as a value, so the block is declared on every scope too, or a
@@ -230,7 +233,7 @@
 
 /* Type roles (docs/notes/design-system-1-tokens.md). One class bundles size, line-height,
  * weight, tracking and default colour; a colour or weight utility still wins over it
- * (`text-caption text-foreground`, `text-body font-medium`): Tailwind orders utilities by
+ * (`text-caption text-cf-text`, `text-body font-medium`): Tailwind orders utilities by
  * their first property, and font-family/font-size come before font-weight and color, so a
  * role always lands ahead of the single-property utilities (src/design/roles.test.ts).
  * src/design/tokens.ts lists the names too, for cn()'s merge table. */

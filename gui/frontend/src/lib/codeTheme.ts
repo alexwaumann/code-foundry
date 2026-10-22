@@ -1,11 +1,11 @@
 /**
  * The bridge from the app's themes to @pierre/diffs (docs/notes/file-viewer-2-code-foundation.md).
  * The library highlights with Shiki, so each app theme becomes a Shiki theme built from the
- * theme's resolved slots (`theme.slots`): the surface as the editor background, the seven syntax
- * slots thread.css paints with (`--syn-*`) on TextMate scopes, and the diff slots as the diff's added and
- * deleted (modified stays the info colour, as before the slots). Code in a diff or a file then reads like the thread's own fenced
- * blocks (lib/highlight.ts) in every theme. A theme is registered on first use, under
- * `cf-<id>`; nothing is shipped as theme JSON.
+ * theme's resolved slots (`theme.slots`): the surface as the editor background, the seven
+ * syntax slots thread.css paints with (`--syn-*`) on TextMate scopes, and the diff slots as
+ * the diff's added and deleted (modified stays the info colour it was). Code in a diff or a
+ * file then reads like the thread's own fenced blocks (lib/highlight.ts) in every theme. A
+ * theme is registered on first use, under `cf-<id>`; nothing is shipped as theme JSON.
  */
 import { useMemo } from "react";
 import { registerCustomTheme, type ThemeRegistration } from "@pierre/diffs";
