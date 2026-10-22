@@ -436,7 +436,12 @@ func TestEmberSkill(t *testing.T) {
 		"--budget", "ember remember", "ember board", "Skill tool", "never progress", "thread send --id <worker>", "thread respond --id <worker>",
 		"thread subscribe --at", "git -C <worktree> log origin/<branch>", "--branch <branch>",
 		"--prompt - <<'EOF'", "never in double quotes", "merge-tree --write-tree", `"no text`, "ember task cancel", "thread unsubscribe",
-		"project branch delete", "pr merge", "at most 1000 characters", "no new errors against the base", "report `blocked`, not `done`"} {
+		"project branch delete", "pr merge", "at most 1000 characters", "no new errors against the base", "report `blocked`, not `done`",
+		// ember-research-tasks: Ember reads to split and assign; a question about code is a
+		// research task in the project's checkout that reports findings and closes without a branch.
+		"never answer it yourself", "per piece. Anything past a handful of reads", "is a research task", "## Research",
+		"--new-worktree=false --prompt - <<'EOF'`: the project's checkout", "touches nothing", `"findings": [...]`,
+		`done <task id> "<finding>"` + "` (no `--branch`)", "a parent or research task"} {
 		if !bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s lacks %q", p, w)
 		}
@@ -444,7 +449,10 @@ func TestEmberSkill(t *testing.T) {
 	// Gone with ember task start: the two-command dance and its $(...) footgun. Gone in
 	// round 2: a prompt in double quotes (its backticks ran in Ember's shell) and "every
 	// caveat in the summary" (over the report cap).
-	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread", `--prompt "`, "every caveat"} {
+	// Gone with ember-research-tasks: "Understand it" and its unbounded reads (a file whole
+	// before saying what a project has or lacks), which let Ember run research itself.
+	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread", `--prompt "`, "every caveat",
+		"**Understand it.**", "before you say what a project has or lacks"} {
 		if bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s still has %q", p, w)
 		}

@@ -229,6 +229,14 @@ func TestPrefixAndSystemPrompt(t *testing.T) {
 	if len(Rules()) > 6<<10 {
 		t.Errorf("rules.md has %d bytes; keep it under 6 KB", len(Rules()))
 	}
+	// ember-research-tasks: Ember reads to split and assign; a question about code is a
+	// worker's research task, not Ember's own read loop.
+	for _, w := range []string{"research included", "You read only to split the work and assign its files",
+		"never to answer a question about code", "research task, a worker that touches nothing"} {
+		if !strings.Contains(Rules(), w) {
+			t.Errorf("rules.md lacks %q", w)
+		}
+	}
 	if big := SystemPrompt(Rules(), strings.Repeat("s", 60<<10)); len(big) > maxSystemPrompt || !strings.HasSuffix(big, "too long]") {
 		t.Errorf("a long soul: %d bytes", len(big))
 	}
