@@ -1,7 +1,7 @@
 // Package paths resolves the on-disk locations code-foundry uses: the config home,
 // the daemon's socket, token, port and lock files, the SQLite database, logs, the
 // worktrees New Worktree creates, cloned and created projects, staged prompt
-// attachments, backdrop images, and the skills shipped to threads.
+// attachments, backdrop images, the skills shipped to threads, and the app memory.
 //
 // The home directory is, in order of precedence:
 //
@@ -163,6 +163,11 @@ func (p Paths) PluginLogs() string { return filepath.Join(p.Logs(), "plugins") }
 // ~/.claude/skills so Claude Code no longer loads them: <DisabledSkills>/<name>
 // (internal/store/skill).
 func (p Paths) DisabledSkills() string { return filepath.Join(p.home, "skills", "disabled") }
+
+// Memory is the app memory: the user's standing preferences about the app and the model
+// inside it, one "- <text>" line each (internal/store/memory). The daemon reads it at
+// every thread spawn and appends it to the system prompt; only the daemon writes it.
+func (p Paths) Memory() string { return filepath.Join(p.home, "memory.md") }
 
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)

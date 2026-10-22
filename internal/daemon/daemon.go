@@ -257,6 +257,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
 		Skills:            st.skills,
 		Ember:             st.ember,
+		Memory:            st.memory,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })

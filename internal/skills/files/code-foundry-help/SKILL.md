@@ -1,6 +1,6 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions, workspaces. Use when the user asks how to do something in Code Foundry, how it works, or wants a setting changed; explain, then offer to run the command."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions, workspaces. Use when the user asks how to do something in Code Foundry, how it works, or wants a setting changed (explain, then offer to run the command), or states a standing preference about the app or how you work in it (remember it)."
 ---
 
 # Answering questions about Code Foundry
@@ -81,6 +81,23 @@ offer, not a change.
   always go through `settings set`, which checks the value. Most settings apply at once
   in every window.
 - The Settings page (⌘,) shows the same settings; its search box finds one by name.
+
+## Remembering preferences
+
+When the user states a standing preference about the app or about how you behave in it
+("don't open the side panel on your own", "always open PRs as drafts", "explain git terms
+when you use them"); a one-off request about the task at hand is not one:
+
+1. Check `reference/settings.md` first. When a setting covers it, offer that instead.
+2. Otherwise save it in the user's words, one line, without asking:
+   `code-foundry memory add "<preference>"`. Every thread in every project gets it.
+3. Confirm in one line, and say it applies to threads started from now on (follow it
+   in this thread yourself).
+4. When it contradicts a saved one, remove the old entry first:
+   `code-foundry memory remove <number>` (or text only that entry has).
+
+"What do you remember?" is `code-foundry memory show`. `memory clear --yes` forgets them
+all, only when the user asks for exactly that.
 
 ## Good to know
 

@@ -22,6 +22,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/memory"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -65,6 +66,10 @@ type stores struct {
 	thread *thread.Manager
 	// ember is the resident agent's store (ember.go); closed before thread.
 	ember *ember.Store
+	// memory is the app memory (<home>/memory.md), the user's standing preferences:
+	// thread reads it at every spawn, the memory.* commands write it. It holds no
+	// resources.
+	memory *memory.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// skills reads the Skills marketplaces Claude Code has and what is installed
@@ -218,6 +223,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
+	s.memory = memory.New(p.Memory(), log.With("store", "memory"))
 	threadLog := log.With("store", "thread")
 	if s.thread, err = thread.New(ctx, thread.Options{
 		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
@@ -226,6 +232,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		BranchNaming:   branchNaming(s.settings),
 		BaseFromOrigin: baseFromOrigin(s.settings),
 		AttachmentsDir: p.Attachments(), SkillsDir: p.Claude(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
+		// The user's standing preferences, read at every spawn into the system prompt
+		// (docs/notes/control-3-app-memory.md).
+		Memory: s.memory.Texts,
 		// Development aids: how long a thread's process stays up at least, and how often
 		// idle threads are checked against their cache expiry (Go durations; unset or
 		// invalid: the defaults, 5m and 30s). See docs/notes/thread-lifecycle.md.
