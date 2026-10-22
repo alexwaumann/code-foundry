@@ -40,13 +40,13 @@ func TestLayout(t *testing.T) {
 		"socket": p.Socket(), "token": p.Token(), "port": p.Port(), "lock": p.Lock(),
 		"db": p.DB(), "logs": p.Logs(), "daemonlog": p.DaemonLog(), "worktrees": p.Worktrees(),
 		"attachments": p.Attachments(), "projects": p.Projects(), "backdrops": p.Backdrops(),
-		"disabledskills": p.DisabledSkills(),
+		"disabledskills": p.DisabledSkills(), "memory": p.Memory(),
 	}
 	want := map[string]string{
 		"socket": "/h/daemon.sock", "token": "/h/daemon.token", "port": "/h/daemon.port",
 		"lock": "/h/daemon.lock", "db": "/h/db.sqlite", "logs": "/h/logs", "daemonlog": "/h/logs/daemon.log",
 		"worktrees": "/h/worktrees", "attachments": "/h/attachments", "projects": "/h/projects", "backdrops": "/h/backdrops",
-		"disabledskills": "/h/skills/disabled",
+		"disabledskills": "/h/skills/disabled", "memory": "/h/memory.md",
 	}
 	for k, w := range want {
 		if got[k] != w {
