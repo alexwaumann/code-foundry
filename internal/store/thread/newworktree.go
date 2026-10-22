@@ -42,6 +42,15 @@ type createdWorktree struct {
 	late <-chan namingResult
 }
 
+// fromOrigin is a new worktree's project.CreateWorktreeOptions.BaseFromOrigin: the
+// call's override (thread new --base-from-origin) when set, else the setting.
+func (m *Manager) fromOrigin(override *bool) bool {
+	if override != nil {
+		return *override
+	}
+	return m.opts.BaseFromOrigin()
+}
+
 // newWorktree resolves the branch and creates the worktree for a new thread.
 func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOptions) (createdWorktree, error) {
 	var nw createdWorktree
@@ -86,7 +95,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 		base = ""
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true, BaseFromOrigin: m.opts.BaseFromOrigin(),
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true, BaseFromOrigin: m.fromOrigin(o.NewWorktree.BaseFromOrigin),
 	})
 	if err != nil {
 		return nw, projectError("create worktree "+branch, err)

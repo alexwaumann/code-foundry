@@ -135,6 +135,9 @@ type NewWorkspace struct {
 	Name string
 	// Branch steers the one branch of every member, as NewWorktree.Branch.
 	Branch string
+	// BaseFromOrigin overrides projects.base_from_origin for every member, as
+	// NewWorktree.BaseFromOrigin.
+	BaseFromOrigin *bool
 }
 
 // createdWorkspace is what newWorkspace made.
@@ -301,7 +304,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 	}
 	w, err := m.opts.Workspaces.Create(ctx, workspace.CreateOptions{
-		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true,
+		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true, BaseFromOrigin: nw.BaseFromOrigin,
 	})
 	if err != nil {
 		return cw, workspaceError("create workspace "+wsName, err)

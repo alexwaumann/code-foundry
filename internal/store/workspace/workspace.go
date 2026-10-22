@@ -113,6 +113,9 @@ type CreateOptions struct {
 	BaseRef string
 	// Fetch refreshes each remote-tracking base first (see project.CreateWorktreeOptions).
 	Fetch bool
+	// BaseFromOrigin, when set, overrides Options.BaseFromOrigin (projects.base_from_origin)
+	// for every member (project.CreateWorktreeOptions.BaseFromOrigin).
+	BaseFromOrigin *bool
 }
 
 // AddProjectOptions configures Store.AddProject.

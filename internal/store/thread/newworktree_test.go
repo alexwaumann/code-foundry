@@ -457,8 +457,9 @@ func (r resolvingProjects) CreateWorktree(ctx context.Context, o project.CreateW
 	return wt, err
 }
 
-// projects.base_from_origin is read at every new worktree, and the thread records the
-// project store's start point as its base.
+// projects.base_from_origin is read at every new worktree unless NewWorktree.BaseFromOrigin
+// (thread new --base-from-origin) overrides it, and the thread records the project
+// store's start point as its base.
 func TestNewWorktreeBaseFromOrigin(t *testing.T) {
 	on := true
 	e, rr := newWorktreeEnv(t, nil, func(o *Options) {
@@ -466,26 +467,43 @@ func TestNewWorktreeBaseFromOrigin(t *testing.T) {
 		o.Projects = resolvingProjects{o.Projects.(*recordingProjects)}
 	})
 	for _, tt := range []struct {
-		on       bool
-		base     string
-		wantBase string
+		on         bool  // the setting
+		override   *bool // NewWorktree.BaseFromOrigin
+		base       string
+		wantOrigin bool
+		wantBase   string
 	}{
-		{true, "main", "origin/main"},
-		{true, "", "origin/main"},
-		{false, "main", "main"},
-		{false, "", "main"},
+		{true, nil, "main", true, "origin/main"},
+		{true, nil, "", true, "origin/main"},
+		{false, nil, "main", false, "main"},
+		{false, nil, "", false, "main"},
+		{true, new(false), "feat/lead", false, "feat/lead"},
+		{true, new(false), "", false, "main"},
+		{false, new(true), "main", true, "origin/main"},
+		{false, new(true), "", true, "origin/main"},
+		{true, new(true), "main", true, "origin/main"},
+		{false, new(false), "main", false, "main"},
 	} {
 		on = tt.on
-		s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: tt.base}})
+		s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x",
+			NewWorktree: &NewWorktree{BaseRef: tt.base, BaseFromOrigin: tt.override}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		got := rr.created()
-		if last := got[len(got)-1]; last.BaseFromOrigin != tt.on || last.BaseRef != tt.base {
-			t.Errorf("on=%v base %q: CreateWorktree got %+v", tt.on, tt.base, last)
+		if last := got[len(got)-1]; last.BaseFromOrigin != tt.wantOrigin || last.BaseRef != tt.base {
+			t.Errorf("on=%v override %v base %q: CreateWorktree got %+v", tt.on, ptrStr(tt.override), tt.base, last)
 		}
 		if s.BaseRef != tt.wantBase {
-			t.Errorf("on=%v base %q: thread base = %q, want %q", tt.on, tt.base, s.BaseRef, tt.wantBase)
+			t.Errorf("on=%v override %v base %q: thread base = %q, want %q", tt.on, ptrStr(tt.override), tt.base, s.BaseRef, tt.wantBase)
 		}
 	}
+}
+
+// ptrStr prints an optional bool for a test's message.
+func ptrStr(b *bool) string {
+	if b == nil {
+		return "unset"
+	}
+	return fmt.Sprint(*b)
 }

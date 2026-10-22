@@ -55,6 +55,20 @@ func TestProjectBaseFromOrigin(t *testing.T) {
 		}
 	}
 
+	// The request's base_from_origin (project worktree new --base-from-origin) overrides
+	// the setting for that call.
+	for _, tt := range []struct{ on, override bool }{{true, false}, {false, true}} {
+		on.Store(tt.on)
+		if _, err := c.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
+			ProjectId: r.ID, Branch: "o-" + map[bool]string{true: "on", false: "off"}[tt.on], BaseRef: "main", Fetch: true, BaseFromOrigin: &tt.override,
+		})); err != nil {
+			t.Fatal(err)
+		}
+		if got := fake.Creates[len(fake.Creates)-1]; got.BaseFromOrigin != tt.override {
+			t.Errorf("on=%v override=%v: store got BaseFromOrigin=%v", tt.on, tt.override, got.BaseFromOrigin)
+		}
+	}
+
 	// The default handler (no WithBaseFromOrigin) is on.
 	route = NewProject(fake, b).Route()
 	mux = http.NewServeMux()

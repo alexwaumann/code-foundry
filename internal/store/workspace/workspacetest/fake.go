@@ -116,7 +116,11 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 			projects[i] += ":" + m.BaseRef
 		}
 	}
-	if err := f.record("Create " + o.Name + " " + strings.Join(projects, ",")); err != nil {
+	call := "Create " + o.Name + " " + strings.Join(projects, ",")
+	if o.BaseFromOrigin != nil {
+		call += " base-from-origin=" + strconv.FormatBool(*o.BaseFromOrigin)
+	}
+	if err := f.record(call); err != nil {
 		return workspace.Workspace{}, err
 	}
 	if o.Name == "" || len(o.Members) == 0 {

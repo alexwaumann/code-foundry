@@ -178,7 +178,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	}
 	var made []created
 	for _, p := range plans {
-		c, err := m.createMember(ctx, p.r, branch, p.base, o.Fetch)
+		c, err := m.createMember(ctx, p.r, branch, p.base, o.Fetch, m.fromOrigin(o.BaseFromOrigin))
 		if err != nil {
 			m.rollback(ctx, made)
 			return Workspace{}, err
@@ -229,7 +229,7 @@ func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspac
 	if mem, ok := w.Member(r.ID); ok {
 		return Workspace{}, fmt.Errorf("%w: %s is already in workspace %s (%s)", ErrFailedPrecondition, r.Name, w.Name, mem.WorktreePath)
 	}
-	c, err := m.createMember(ctx, r, w.Branch, strings.TrimSpace(o.Member.BaseRef), o.Fetch)
+	c, err := m.createMember(ctx, r, w.Branch, strings.TrimSpace(o.Member.BaseRef), o.Fetch, m.opts.BaseFromOrigin())
 	if err != nil {
 		return Workspace{}, err
 	}
@@ -353,9 +353,18 @@ func withStartPoints(w Workspace, made []created) Workspace {
 	return w
 }
 
+// fromOrigin is a call's override of projects.base_from_origin, else the setting.
+func (m *Manager) fromOrigin(override *bool) bool {
+	if override != nil {
+		return *override
+	}
+	return m.opts.BaseFromOrigin()
+}
+
 // createMember makes r's worktree on branch (the same path a new thread's worktree
-// takes: fetch the base, git worktree add) and pre-trusts it.
-func (m *Manager) createMember(ctx context.Context, r project.Project, branch, base string, fetch bool) (created, error) {
+// takes: fetch the base, git worktree add) and pre-trusts it. fromOrigin is
+// project.CreateWorktreeOptions.BaseFromOrigin.
+func (m *Manager) createMember(ctx context.Context, r project.Project, branch, base string, fetch, fromOrigin bool) (created, error) {
 	existed := true
 	if refs, err := m.opts.Projects.ListRefs(ctx, r.ID); err == nil {
 		existed = slices.Contains(refs.Local, branch)
@@ -367,7 +376,7 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 		}
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch, BaseFromOrigin: m.opts.BaseFromOrigin(),
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch, BaseFromOrigin: fromOrigin,
 	})
 	if err != nil {
 		return created{}, projectError("create worktree "+branch+" in "+r.Name, err)
