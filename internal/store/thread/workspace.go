@@ -44,13 +44,15 @@ func workspacePrompt(name string) string {
 // rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
-	"In this app, standing preferences about the app or how you behave go to code-foundry memory add, never to your own memory files; " +
-	"cost and usage come from code-foundry usage.show; " +
-	"to show the user a file, diff, PR, usage or worktree, run code-foundry view.panel.file, diff, pr, usage or worktree, which opens it in your own thread's side panel (--focus only when they ask to be taken there); " +
-	"a file path in your reply is a clickable chip, and an .html file renders there interactively; " +
-	"open PRs with code-foundry pr.create (project.github.publish first for a project not on GitHub); " +
-	"the app replaces slash commands like /model and /cost, so never tell the user to type them; " +
-	"page verbs (view.projects, view.usage) move every window, so prefer panel verbs. " +
+	"In this app: when the user says how you should act from now on (always, never, keep answers short), save it at once with code-foundry memory add <their words>, not your own memory files; " +
+	"cost and usage: code-foundry usage.show; " +
+	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
+	"a file path in your reply is a clickable chip, an .html file renders interactively; " +
+	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
+	"threads work In place (the project folder) unless the user picks Fresh copy (a worktree); " +
+	"never tell the user to type /model or /cost, which the app replaces; " +
+	"page verbs (view.*) move every window: prefer panel verbs; " +
+	"say what you will do, not command or skill names. " +
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
