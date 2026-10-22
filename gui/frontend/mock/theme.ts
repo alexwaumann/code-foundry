@@ -19,7 +19,30 @@ const defaults = JSON.parse(read("frame-defaults.json")) as Record<"dark" | "lig
 
 let published: MockFrame | null = null;
 
+/** Every slot name, as the daemon reads them from the defaults (internal/theme SlotNames). */
+const slotNames = Object.keys(defaults.dark.vars).sort();
+
+/**
+ * Why the daemon would refuse f (Frame.Check's slot-set rule: exactly every slot), or null.
+ * The id, scheme and value checks are the daemon's tests' job; the mock only mirrors the
+ * rule a GUI change could break.
+ */
+export function mockThemeProblem(f: MockFrame): string | null {
+  const missing = slotNames.filter((n) => !(n in f.vars));
+  const unknown = Object.keys(f.vars)
+    .filter((n) => !slotNames.includes(n))
+    .sort();
+  const parts = [
+    ...(missing.length ? [`missing ${String(missing.length)} of the ${String(slotNames.length)} slots: ${missing.join(", ")}`] : []),
+    ...(unknown.length ? [`${String(unknown.length)} unknown: ${unknown.join(", ")}`] : []),
+  ];
+  return parts.length ? `a theme publishes every slot the GUI resolves, exactly: ${parts.join("; ")}` : null;
+}
+
+/** Makes f the served theme; throws (the daemon's InvalidArgument) and keeps the last one when f is refused. */
 export function publishMockTheme(f: MockFrame): void {
+  const problem = mockThemeProblem(f);
+  if (problem) throw new Error(problem);
   published = { id: f.id, scheme: f.scheme, vars: { ...f.vars } };
 }
 
