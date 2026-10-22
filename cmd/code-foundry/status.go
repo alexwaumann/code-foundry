@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -65,12 +64,7 @@ func runVersion(_ context.Context, cl *cli, args []string) error {
 }
 
 func formatVersion(v, commit string) string {
-	if base, dirty := strings.CutSuffix(commit, "-dirty"); len(base) > 12 {
-		commit = base[:12]
-		if dirty {
-			commit += "-dirty"
-		}
-	}
+	commit = version.Info{Commit: commit}.ShortCommit()
 	if commit == "" {
 		return v
 	}
