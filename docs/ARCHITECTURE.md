@@ -108,6 +108,8 @@ internal/
     ember/                 Ember, the resident agent: its home (SOUL.md, MEMORY.md, seed/),
                            epochs (consolidation by a one-shot claude -p, then a reseed), the
                            task board, its workers' models (docs/notes/ember-2-store.md)
+    memory/                the app memory: the user's standing preferences (<home>/memory.md),
+                           appended to every thread's system prompt at spawn
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   procscan/                the user's processes by working directory (sysctl + lsof), and
                            stopping process groups: what a thread left running in its worktree
@@ -435,6 +437,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   title (`version.Info.Provenance`: the build, and its source on GitHub at the release
   tag or commit), and the help skill sends internals questions to that source
   (`docs/notes/control-2-skill-provenance.md`).
+* **App memory** (`internal/store/memory`): the user's standing preferences about the app
+  and the model inside it, one `- <text>` line each in `<config home>/memory.md` (at most
+  40 entries, 4 KiB), written only by the daemon through `memory.*`. Every spawn reads the
+  file (`Options.Memory`) and, when it has entries, appends them under one heading after
+  the `ThreadPrompt` (and workspace) line, before a thread's own append
+  (`docs/notes/control-3-app-memory.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
   same `claudeCommand` path, read from the plugin store by a function the daemon sets
   (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,
