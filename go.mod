@@ -2,7 +2,7 @@ module github.com/alexwaumann/code-foundry
 
 go 1.26.0
 
-toolchain go1.26.8
+toolchain go1.26.10
 
 require (
 	connectrpc.com/connect v1.21.0
