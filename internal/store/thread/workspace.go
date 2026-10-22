@@ -33,14 +33,24 @@ func workspacePrompt(name string) string {
 	return "This thread belongs to workspace " + name + ". Run `code-foundry workspace members` for the current worktrees."
 }
 
-// ThreadPrompt is the one line every thread's system prompt gets: it points at the
+// ThreadPrompt is the paragraph every thread's system prompt gets. It points at the
 // skills the daemon ships to every thread (Options.SkillsDir, internal/skills), the
 // entry skill first, which says what the app can do and routes to the others: driving
 // other threads, answering questions about the app, building plugins
-// (docs/notes/agent-skills.md, control-4-capabilities.md). Its last sentence holds the
-// orchestration rule even when the skill does not fire (docs/notes/orch-skill-v2.md).
-// Static for the same reason as workspacePrompt: it never varies per spawn.
+// (docs/notes/agent-skills.md, control-4-capabilities.md). Then the routing a thread
+// needs when no skill fires, as on ordinary task-shaped prompts: where preferences,
+// cost, showing things, pull requests and slash commands go in this app
+// (docs/notes/control-7-skill-routing.md). Its last sentence holds the orchestration
+// rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
+// never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
+	"In this app, standing preferences about the app or how you behave go to code-foundry memory add, never to your own memory files; " +
+	"cost and usage come from code-foundry usage.show; " +
+	"to show the user a file, diff, PR, usage or worktree, run code-foundry view.panel.file, diff, pr, usage or worktree, which opens it in your own thread's side panel (--focus only when they ask to be taken there); " +
+	"a file path in your reply is a clickable chip, and an .html file renders there interactively; " +
+	"open PRs with code-foundry pr.create (project.github.publish first for a project not on GitHub); " +
+	"the app replaces slash commands like /model and /cost, so never tell the user to type them; " +
+	"page verbs (view.projects, view.usage) move every window, so prefer panel verbs. " +
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
