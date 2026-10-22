@@ -15,7 +15,7 @@ export function Pill({ pill, outline = false, className, testId }: { pill: Skill
     <span
       className={cn(
         "shrink-0 rounded-full px-1.5 text-caption-sm font-medium whitespace-nowrap",
-        outline ? "border border-border text-muted-foreground" : tonePill[pill.tone],
+        outline ? "border border-cf-border text-cf-text-muted" : tonePill[pill.tone],
         className,
       )}
       data-testid={testId}
@@ -46,7 +46,7 @@ export function PluginSkills({ skills, open, onToggle }: { skills: readonly stri
     <div className="flex min-w-0 flex-col gap-1">
       <button
         type="button"
-        className="flex w-fit items-center gap-0.5 rounded-sm text-caption-sm outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex w-fit items-center gap-0.5 rounded-sm text-caption-sm outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
         aria-expanded={open}
         onClick={onToggle}
         data-testid="skill-plugin-skills"
@@ -57,7 +57,7 @@ export function PluginSkills({ skills, open, onToggle }: { skills: readonly stri
       {open && (
         <ul className="flex min-w-0 flex-wrap gap-1" data-testid="skill-plugin-skill-list">
           {skills.map((s) => (
-            <li key={s} className="rounded-sm bg-muted px-1.5 font-mono text-caption-sm">
+            <li key={s} className="rounded-sm bg-cf-surface-sunken px-1.5 font-mono text-caption-sm">
               {s}
             </li>
           ))}
@@ -72,12 +72,12 @@ export function FailureLine({ itemKey }: { itemKey: string }) {
   const f = useSkillFailure(itemKey);
   if (!f) return null;
   return (
-    <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-destructive" role="alert" data-testid="skill-failure" data-action={f.action}>
+    <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-error" role="alert" data-testid="skill-failure" data-action={f.action}>
       <span className="min-w-0 flex-1 break-words">{f.message}</span>
       <Button
         variant="ghost"
         size="icon-xs"
-        className="shrink-0 text-muted-foreground hover:text-foreground"
+        className="shrink-0 text-cf-text-muted hover:text-cf-text"
         aria-label="Dismiss"
         onClick={() => {
           dismissSkillFailure(itemKey);
@@ -91,7 +91,7 @@ export function FailureLine({ itemKey }: { itemKey: string }) {
 }
 
 /** The amber-outlined main action of a row (no filled buttons), as the plugin page's. */
-export const mainAction = "bg-transparent dark:bg-transparent border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/40";
+export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40";
 
 /** A muted ghost action. */
-export const quietAction = "text-muted-foreground hover:text-foreground";
+export const quietAction = "text-cf-text-muted hover:text-cf-text";

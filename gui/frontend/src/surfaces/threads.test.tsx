@@ -169,9 +169,9 @@ describe("Threads surface", () => {
       ["s3", "Archived"],
       ["c1", "Idle"],
     ]);
-    expect(within(rowOf("p"), "lineage-status")?.className).toContain("text-info");
-    expect(within(rowOf("s2"), "lineage-status")?.className).toContain("text-warning");
-    expect(within(rowOf("me"), "lineage-status")?.className).toContain("text-success");
+    expect(within(rowOf("p"), "lineage-status")?.className).toContain("text-cf-info");
+    expect(within(rowOf("s2"), "lineage-status")?.className).toContain("text-cf-warning");
+    expect(within(rowOf("me"), "lineage-status")?.className).toContain("text-cf-success");
     expect(within(rowOf("me"), "lineage-place")?.textContent).toBe("auth-service @ cf/login-retry");
     expect(within(rowOf("me"), "lineage-age")?.textContent).toBe("1h");
     expect(within(rowOf("me"), "lineage-brief")?.textContent).toBe("Add retry, keep the PR small");

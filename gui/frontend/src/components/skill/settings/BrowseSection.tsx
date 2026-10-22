@@ -37,8 +37,8 @@ function Chip({ label, on, onClick, testId }: { label: string; on: boolean; onCl
       type="button"
       aria-pressed={on}
       className={cn(
-        "flex h-6 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-body-sm outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-accent/50",
-        on ? "bg-accent text-foreground dark:bg-accent/50" : "text-muted-foreground",
+        "flex h-6 shrink-0 items-center gap-1 rounded-md border border-cf-border px-2 text-body-sm outline-none hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus dark:hover:bg-cf-control-hover/50",
+        on ? "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50" : "text-cf-text-muted",
       )}
       onClick={onClick}
       data-testid={testId}
@@ -72,7 +72,7 @@ function EntryRow({ itemKey, open, onToggle, className }: { itemKey: string; ope
         )}
         {e.description && <p className="line-clamp-2 text-caption">{e.description}</p>}
         {e.keywords.length > 0 && (
-          <p className="truncate text-caption-sm text-muted-foreground/80" data-testid="skill-keywords">
+          <p className="truncate text-caption-sm text-cf-text-muted/80" data-testid="skill-keywords">
             {e.keywords.join(" · ")}
           </p>
         )}
@@ -160,7 +160,7 @@ function SearchBar() {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 py-2.5">
       <div className="relative min-w-48 flex-1">
-        <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-cf-text-muted" aria-hidden />
         <Input
           type="search"
           aria-label="Search plugins and skills"
@@ -216,17 +216,17 @@ function StatusLine() {
   const error = useSkillSearchError();
   return (
     <>
-      <div className="flex min-w-0 items-center gap-1.5 border-t border-border px-4 py-2 text-caption-sm" data-testid="skill-results" role="status">
+      <div className="flex min-w-0 items-center gap-1.5 border-t border-cf-border px-4 py-2 text-caption-sm" data-testid="skill-results" role="status">
         {searching && <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />}
         <span className="min-w-0 truncate">{total === null ? "Searching…" : resultsWords(total, shown)}</span>
       </div>
       {error && (
-        <p className="border-t border-border px-4 py-2.5 text-caption break-words text-destructive" role="alert" data-testid="skill-search-error">
+        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-error" role="alert" data-testid="skill-search-error">
           The search failed: {error}
         </p>
       )}
       {refreshError && (
-        <p className="border-t border-border px-4 py-2.5 text-caption break-words text-warning" role="alert" data-testid="skill-refresh-error">
+        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-warning" role="alert" data-testid="skill-refresh-error">
           The refresh failed, so this is the last read: {refreshError}
         </p>
       )}
@@ -256,7 +256,7 @@ export function BrowseSection() {
       <SearchBar />
       <StatusLine />
       {answered && keys.length === 0 && (
-        <p className="border-t border-border px-4 py-3 text-caption" data-testid="skill-results-none">
+        <p className="border-t border-cf-border px-4 py-3 text-caption" data-testid="skill-results-none">
           {text ? `Nothing matches “${text}”.` : "Nothing to browse yet: see Registries below."}
         </p>
       )}
@@ -265,7 +265,7 @@ export function BrowseSection() {
         itemKey={(k) => k}
         estimate={96}
         testId="skill-entries"
-        render={(k) => <EntryRow itemKey={k} open={open.has(k)} onToggle={toggle} className="border-t border-border" />}
+        render={(k) => <EntryRow itemKey={k} open={open.has(k)} onToggle={toggle} className="border-t border-cf-border" />}
       />
     </SectionCard>
   );

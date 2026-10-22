@@ -21,7 +21,7 @@ export function SectionCard({ id, heading, description, aside, children }: { id:
           {aside}
         </div>
       )}
-      <div className="overflow-hidden rounded-lg border border-border">{children}</div>
+      <div className="overflow-hidden rounded-lg border border-cf-border">{children}</div>
     </section>
   );
 }

@@ -60,7 +60,7 @@ function PublishBody({ projectId }: { projectId: string }) {
       </p>
       <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy} error={error} />
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={nameId} className="w-16 text-caption text-muted-foreground">
+        <Label htmlFor={nameId} className="w-16 text-caption text-cf-text-muted">
           Name
         </Label>
         <Input
@@ -80,13 +80,13 @@ function PublishBody({ projectId }: { projectId: string }) {
         />
       </div>
       {nameError && (
-        <p className="text-caption text-destructive" data-testid="publish-name-error">
+        <p className="text-caption text-cf-error" data-testid="publish-name-error">
           {nameError}
         </p>
       )}
       {choice.owner && (
         <p className="text-caption">
-          As <span className="font-mono text-foreground" data-testid="publish-slug">{`${choice.owner}/${name || project}`}</span>
+          As <span className="font-mono text-cf-text" data-testid="publish-slug">{`${choice.owner}/${name || project}`}</span>
         </p>
       )}
       <div className="flex items-center justify-end gap-2">

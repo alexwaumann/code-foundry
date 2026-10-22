@@ -9,28 +9,28 @@ import type { Status, Tone } from "@/api/plugin";
 /** Text colour per tone; `ok` reads neutral on text. */
 export const toneText: Record<Tone, string> = {
   "": "",
-  muted: "text-muted-foreground",
-  attention: "text-warning",
-  error: "text-destructive",
+  muted: "text-cf-text-muted",
+  attention: "text-cf-warning",
+  error: "text-cf-error",
   ok: "",
 };
 
 /** A pill's tint per tone (MCP's PILL). */
 export const tonePill: Record<Tone, string> = {
-  "": "bg-muted text-muted-foreground",
-  muted: "bg-muted text-muted-foreground",
-  attention: "bg-warning/15 text-warning",
-  error: "bg-destructive/15 text-destructive",
-  ok: "bg-success/15 text-success",
+  "": "bg-cf-surface-sunken text-cf-text-muted",
+  muted: "bg-cf-surface-sunken text-cf-text-muted",
+  attention: "bg-cf-warning-surface text-cf-warning",
+  error: "bg-cf-error-surface text-cf-error",
+  ok: "bg-cf-success-surface text-cf-success",
 };
 
 /** A card's or notice's border per tone. */
 export const toneBorder: Record<Tone, string> = {
-  "": "border-border",
-  muted: "border-border",
-  attention: "border-warning/35",
-  error: "border-destructive/35",
-  ok: "border-border",
+  "": "border-cf-border",
+  muted: "border-cf-border",
+  attention: "border-cf-warning/35",
+  error: "border-cf-error/35",
+  ok: "border-cf-border",
 };
 
 /**
@@ -38,26 +38,26 @@ export const toneBorder: Record<Tone, string> = {
  * spinner) and skipped (a dash, so it never reads as pending) are drawn by GlyphView.
  */
 export const statusDot: Record<Status, string> = {
-  "": "bg-muted-foreground/40",
-  ok: "bg-success",
-  failed: "bg-destructive",
-  attention: "bg-warning",
+  "": "bg-cf-text-muted/40",
+  ok: "bg-cf-success",
+  failed: "bg-cf-error",
+  attention: "bg-cf-warning",
   running: "",
-  pending: "border-[1.5px] border-muted-foreground/60",
+  pending: "border-[1.5px] border-cf-text-muted/60",
   skipped: "",
-  off: "bg-muted-foreground/40",
+  off: "bg-cf-text-muted/40",
 };
 
 /** A status as an icon (chips, step lists) with its colour. */
 export const statusIcon: Record<Status, { icon: LucideIcon; className: string }> = {
-  "": { icon: CircleDashed, className: "text-muted-foreground" },
-  ok: { icon: CircleCheck, className: "text-success" },
-  failed: { icon: CircleX, className: "text-destructive" },
-  attention: { icon: TriangleAlert, className: "text-warning" },
-  running: { icon: LoaderCircle, className: "animate-spin text-muted-foreground motion-reduce:animate-none" },
-  pending: { icon: CircleDashed, className: "text-muted-foreground" },
-  skipped: { icon: CircleSlash, className: "text-muted-foreground" },
-  off: { icon: Ban, className: "text-muted-foreground" },
+  "": { icon: CircleDashed, className: "text-cf-text-muted" },
+  ok: { icon: CircleCheck, className: "text-cf-success" },
+  failed: { icon: CircleX, className: "text-cf-error" },
+  attention: { icon: TriangleAlert, className: "text-cf-warning" },
+  running: { icon: LoaderCircle, className: "animate-spin text-cf-text-muted motion-reduce:animate-none" },
+  pending: { icon: CircleDashed, className: "text-cf-text-muted" },
+  skipped: { icon: CircleSlash, className: "text-cf-text-muted" },
+  off: { icon: Ban, className: "text-cf-text-muted" },
 };
 
 /** Tone of the word a status reads as (a chip's border and label). */

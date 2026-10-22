@@ -29,7 +29,7 @@ function TabGhost({ tab }: { tab: Tab }) {
     <div
       aria-hidden
       data-testid="panel-tab-ghost"
-      className="flex size-full items-center gap-1.5 rounded-md bg-popover pr-3 pl-2 text-body-sm text-popover-foreground shadow-md ring-1 ring-border [--wails-draggable:no-drag]"
+      className="flex size-full items-center gap-1.5 rounded-md bg-cf-surface-overlay pr-3 pl-2 text-body-sm text-cf-text shadow-md ring-1 ring-cf-border [--wails-draggable:no-drag]"
     >
       {Icon && <Icon className="size-3.5 shrink-0" />}
       <span className="truncate">{tab.title}</span>

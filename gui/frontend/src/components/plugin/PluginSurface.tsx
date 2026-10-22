@@ -30,14 +30,14 @@ function StateNotice({ tone, heading, children, action, testId }: { tone: "atten
   const Icon = tone === "error" ? CircleAlert : TriangleAlert;
   return (
     <div
-      className={cn("mx-4 mt-3 flex min-w-0 flex-col gap-1 rounded-lg border px-3 pt-2.5 pb-2 @max-[340px]:mx-3", tone === "error" ? "border-destructive/35" : tone === "attention" ? "border-warning/35" : "border-border")}
+      className={cn("mx-4 mt-3 flex min-w-0 flex-col gap-1 rounded-lg border px-3 pt-2.5 pb-2 @max-[340px]:mx-3", tone === "error" ? "border-cf-error/35" : tone === "attention" ? "border-cf-warning/35" : "border-cf-border")}
       role="status"
       data-testid={testId}
     >
       <div className="flex min-w-0 items-start gap-2">
-        <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone === "error" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-muted-foreground")} aria-hidden />
+        <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone === "error" ? "text-cf-error" : tone === "attention" ? "text-cf-warning" : "text-cf-text-muted")} aria-hidden />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className={cn("text-body-sm font-semibold", tone === "error" ? "text-destructive" : tone === "attention" ? "text-warning" : "")}>{heading}</p>
+          <p className={cn("text-body-sm font-semibold", tone === "error" ? "text-cf-error" : tone === "attention" ? "text-cf-warning" : "")}>{heading}</p>
           {children && <div className="text-caption-sm break-words">{children}</div>}
         </div>
       </div>
@@ -48,7 +48,7 @@ function StateNotice({ tone, heading, children, action, testId }: { tone: "atten
 
 function RestartButton({ plugin, label }: { plugin: string; label: string }) {
   return (
-    <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={() => void runCommand("plugin.restart", { name: plugin })} data-testid="plugin-restart">
+    <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.restart", { name: plugin })} data-testid="plugin-restart">
       <RotateCcw aria-hidden />
       Restart {label}
     </Button>
@@ -133,7 +133,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   if (!known) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center" data-testid="plugin-missing">
-        <Puzzle className="size-5 text-muted-foreground" aria-hidden />
+        <Puzzle className="size-5 text-cf-text-muted" aria-hidden />
         <p className="text-body-sm font-medium">This surface is gone</p>
         <p className="max-w-64 text-caption">The plugin {plugin} is not installed, or no longer offers {surface}.</p>
       </div>

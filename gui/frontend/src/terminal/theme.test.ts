@@ -3,9 +3,9 @@ import { sameTheme, terminalTheme, watchTerminalTheme } from "./theme";
 
 // A stand-in for src/index.css: the scheme is the `dark` class on <html>.
 const css = `
-:root { --pane: #ffffff; --terminal-fg: #24292f; --terminal-ansi-1: #cf222e; }
-.dark { --pane: #080808; --terminal-fg: #d8dadf; --terminal-ansi-1: #e06c75; }
-html[data-theme="catppuccin-mocha"] { --pane: #1e1e2e; --terminal-fg: #cdd6f4; --terminal-ansi-1: #f38ba8; }
+:root { --cf-surface: #ffffff; --terminal-fg: #24292f; --terminal-ansi-1: #cf222e; }
+.dark { --cf-surface: #080808; --terminal-fg: #d8dadf; --terminal-ansi-1: #e06c75; }
+html[data-theme="catppuccin-mocha"] { --cf-surface: #1e1e2e; --terminal-fg: #cdd6f4; --terminal-ansi-1: #f38ba8; }
 `;
 
 function install(): () => void {
@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("terminalTheme", () => {
-  it("reads the palette for the scheme on <html>, background from --pane", () => {
+  it("reads the palette for the scheme on <html>, background from --cf-surface", () => {
     cleanup = install();
     expect(terminalTheme()).toEqual({ background: "#ffffff", foreground: "#24292f", red: "#cf222e" });
     document.documentElement.classList.add("dark");

@@ -23,7 +23,7 @@ export function PaneHeader({ className, style, ...rest }: ComponentProps<"header
     <header
       {...rest}
       data-pane-header
-      className={cn("flex shrink-0 items-center border-b border-pane-border [--wails-draggable:drag]", className)}
+      className={cn("flex shrink-0 items-center border-b border-cf-divider [--wails-draggable:drag]", className)}
       style={{ height: PANE_HEADER_HEIGHT, ...style, ...(sidebarHidden ? { paddingLeft: gutter } : null) }}
     />
   );

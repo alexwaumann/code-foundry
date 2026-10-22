@@ -33,10 +33,10 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown }:
       aria-pressed={clickable && !onActivate ? selected : undefined}
       aria-current={(!clickable || onActivate) && selected ? "true" : undefined}
       className={cn(
-        "-mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "-mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
         dense ? "h-6 items-center" : "items-start py-1.5",
-        clickable && "cursor-default hover:bg-accent dark:hover:bg-accent/50",
-        selected && "bg-accent dark:bg-accent/50",
+        clickable && "cursor-default hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50",
+        selected && "bg-cf-control-hover dark:bg-cf-control-hover/50",
       )}
       data-testid="plugin-row"
       data-key={row.key}

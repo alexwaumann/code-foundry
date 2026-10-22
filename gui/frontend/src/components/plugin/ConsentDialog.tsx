@@ -30,20 +30,20 @@ export function ConsentDialog() {
     >
       <DialogContent className="max-w-md p-5" data-testid="consent-dialog">
         <div className="flex gap-3">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-cf-text-muted" aria-hidden />
           <div className="min-w-0 flex-1 space-y-2">
             <DialogTitle data-testid="consent-title">{title}</DialogTitle>
             <DialogDescription className="break-words">{rest || "It asks for no permissions."}</DialogDescription>
             {regrant && (
-              <p className="text-caption text-warning" data-testid="consent-grew">
+              <p className="text-caption text-cf-warning" data-testid="consent-grew">
                 It now asks for more than you allowed before.
               </p>
             )}
             {items.length > 0 && (
-              <ul className="flex flex-col gap-1 rounded-lg border border-border px-3 py-2" data-testid="consent-permissions">
+              <ul className="flex flex-col gap-1 rounded-lg border border-cf-border px-3 py-2" data-testid="consent-permissions">
                 {items.map((p) => (
                   <li key={p} className="flex gap-2 text-body-sm break-words">
-                    <span className="text-muted-foreground" aria-hidden>
+                    <span className="text-cf-text-muted" aria-hidden>
                       •
                     </span>
                     <span className="min-w-0">{p}</span>

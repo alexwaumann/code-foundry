@@ -60,8 +60,8 @@ function Header({ threadId }: { threadId: string }) {
   const name = useThreadsStore((s) => s.byId[threadId]?.name || threadId);
   const count = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   return (
-    <header className="flex min-w-0 items-center gap-1.5 border-b border-pane-border px-4 py-2.5 text-heading @max-[340px]:px-3" data-testid="linkedprs-header">
-      <GitPullRequestArrow className="size-4 shrink-0 text-success" aria-hidden />
+    <header className="flex min-w-0 items-center gap-1.5 border-b border-cf-divider px-4 py-2.5 text-heading @max-[340px]:px-3" data-testid="linkedprs-header">
+      <GitPullRequestArrow className="size-4 shrink-0 text-cf-success" aria-hidden />
       <span className="min-w-0 truncate" data-testid="linkedprs-thread">
         {name}
       </span>
@@ -115,7 +115,7 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
       className="group/link flex h-full flex-col justify-center gap-0.5 px-2"
     >
       <span className="flex min-w-0 items-center gap-1.5 text-body" data-testid="linkedpr" data-url={link.url} data-loaded={pr ? "true" : "false"}>
-        <span className="shrink-0 font-medium text-muted-foreground tabular-nums" data-testid="linkedpr-number">
+        <span className="shrink-0 font-medium text-cf-text-muted tabular-nums" data-testid="linkedpr-number">
           #{link.number}
         </span>
         {pr ? (
@@ -215,14 +215,14 @@ export function LinkedPRsSurface() {
     // @container: the header and rows adapt to the panel's width (down to 280px).
     <div className="@container flex min-w-0 flex-col" data-testid="linkedprs-surface" data-thread={threadId || undefined}>
       {!known ? (
-        <p className="px-4 py-3 text-body text-muted-foreground" data-testid="linkedprs-missing">
+        <p className="px-4 py-3 text-body text-cf-text-muted" data-testid="linkedprs-missing">
           Select a thread to see the pull requests it linked.
         </p>
       ) : (
         <>
           <Header threadId={threadId} />
           {rows.length === 0 ? (
-            <p className="px-4 py-3 text-body text-muted-foreground" data-testid="linkedprs-empty">
+            <p className="px-4 py-3 text-body text-cf-text-muted" data-testid="linkedprs-empty">
               No linked PRs yet. Pull requests this thread creates or mentions show up here.
             </p>
           ) : (

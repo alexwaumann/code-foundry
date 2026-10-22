@@ -2,11 +2,11 @@ import type { ITheme } from "@xterm/xterm";
 
 /**
  * xterm ITheme keys and the CSS variables on <html> they come from (the active theme's
- * slots, set by lib/theme.ts; src/themes/slots.ts). The background is --pane: the terminal
- * is part of its pane.
+ * slots, set by lib/theme.ts; src/themes/slots.ts). The background is the surface (--cf-surface):
+ * the terminal is part of its pane.
  */
 const VARS: readonly (readonly [keyof ITheme, string])[] = [
-  ["background", "--pane"],
+  ["background", "--cf-surface"],
   ["foreground", "--terminal-fg"],
   ["cursor", "--terminal-cursor"],
   ["cursorAccent", "--terminal-cursor-accent"],

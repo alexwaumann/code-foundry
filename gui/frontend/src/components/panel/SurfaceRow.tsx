@@ -20,7 +20,7 @@ export function SurfaceRow({ spec, ctx, group, trailing }: { spec: SurfaceSpec; 
         disabled={!enabled}
         data-surface={spec.kind}
         data-availability={availability}
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
+        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label enabled:hover:bg-cf-control-hover disabled:cursor-default disabled:opacity-45"
         onClick={(e) => {
           const now = surfaceContext(ctx.panelKey);
           const tab = spec.openDefault(now);
@@ -29,7 +29,7 @@ export function SurfaceRow({ spec, ctx, group, trailing }: { spec: SurfaceSpec; 
           openSurface(ctx.panelKey, tab, { group });
         }}
       >
-        <spec.icon className="size-4 text-muted-foreground" aria-hidden />
+        <spec.icon className="size-4 text-cf-text-muted" aria-hidden />
         <span className="flex-1 truncate">{spec.title}</span>
         {trailing ?? (spec.hotkey && <Kbd>{spec.hotkey.toUpperCase()}</Kbd>)}
       </button>

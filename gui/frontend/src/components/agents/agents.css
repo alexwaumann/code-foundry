@@ -7,7 +7,7 @@
   }
 }
 .cf-agents-shimmer {
-  background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 50%, var(--muted-foreground) 100%);
+  background: linear-gradient(90deg, var(--cf-text-muted) 0%, var(--cf-text) 50%, var(--cf-text-muted) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -28,7 +28,7 @@
   top: 0;
   height: 20px;
   width: 8px;
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--cf-border);
+  border-bottom: 1px solid var(--cf-border);
   border-bottom-left-radius: 6px;
 }

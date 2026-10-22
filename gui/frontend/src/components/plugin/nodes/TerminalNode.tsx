@@ -60,7 +60,7 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
     <Button
       variant="ghost"
       size={narrow ? "icon-xs" : "xs"}
-      className="text-muted-foreground hover:text-foreground"
+      className="text-cf-text-muted hover:text-cf-text"
       disabled={inert || inBottom}
       aria-label={narrow ? "Open in bottom panel" : undefined}
       onClick={() => {
@@ -75,7 +75,7 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
   return (
     <div
       ref={setBox}
-      className="isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
+      className="isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface"
       data-testid="plugin-terminal"
       data-key={node.key}
       data-terminal-id={data.terminalId}
@@ -83,7 +83,7 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
       data-narrow={narrow || undefined}
       data-live={attached || undefined}
     >
-      <div className="flex min-w-0 items-center gap-1.5 border-b border-border py-1 pr-1 pl-2.5">
+      <div className="flex min-w-0 items-center gap-1.5 border-b border-cf-border py-1 pr-1 pl-2.5">
         <span className="min-w-0 flex-1 truncate text-caption font-medium">{data.title || "Terminal"}</span>
         <span className="flex shrink-0 items-center gap-0.5">
           {data.actions?.map((b) => (

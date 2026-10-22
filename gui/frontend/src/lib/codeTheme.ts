@@ -1,9 +1,9 @@
 /**
  * The bridge from the app's themes to @pierre/diffs (docs/notes/file-viewer-2-code-foundation.md).
  * The library highlights with Shiki, so each app theme becomes a Shiki theme built from the
- * theme's resolved values (`theme.vars`): the pane as the editor background, the seven syntax
- * slots thread.css paints with (`--syn-*`) on TextMate scopes, and the status colours as the diff's added,
- * deleted and modified. Code in a diff or a file then reads like the thread's own fenced
+ * theme's resolved slots (`theme.slots`): the surface as the editor background, the seven syntax
+ * slots thread.css paints with (`--syn-*`) on TextMate scopes, and the diff slots as the diff's added and
+ * deleted (modified stays the info colour, as before the slots). Code in a diff or a file then reads like the thread's own fenced
  * blocks (lib/highlight.ts) in every theme. A theme is registered on first use, under
  * `cf-<id>`; nothing is shipped as theme JSON.
  */
@@ -36,7 +36,7 @@ const SCOPES: readonly (readonly [Syn, readonly string[], string?])[] = [
 ];
 
 function hex(theme: Theme, name: string): string {
-  const v = theme.vars[name];
+  const v = theme.slots[name];
   if (!v || !/^#[0-9a-f]{6}$/i.test(v)) throw new Error(`theme ${theme.id} has no ${name}`);
   return v;
 }
@@ -48,14 +48,14 @@ export function codeThemeOf(theme: Theme): ThemeRegistration {
     name: codeThemeName(theme.id),
     type: theme.scheme,
     fg,
-    bg: hex(theme, "--pane"),
+    bg: hex(theme, "--cf-surface"),
     colors: {
-      "editor.background": hex(theme, "--pane"),
+      "editor.background": hex(theme, "--cf-surface"),
       "editor.foreground": fg,
       // Read by the library for the diff's tints and bars (getHighlighterThemeStyles).
-      "gitDecoration.addedResourceForeground": hex(theme, "--success"),
-      "gitDecoration.deletedResourceForeground": hex(theme, "--destructive"),
-      "gitDecoration.modifiedResourceForeground": hex(theme, "--info"),
+      "gitDecoration.addedResourceForeground": hex(theme, "--cf-diff-addition"),
+      "gitDecoration.deletedResourceForeground": hex(theme, "--cf-diff-deletion"),
+      "gitDecoration.modifiedResourceForeground": hex(theme, "--cf-info"),
     },
     tokenColors: SCOPES.map(([v, scope, fontStyle]) => ({
       scope: [...scope],

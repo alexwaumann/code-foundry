@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 export function NoGitBadge({ className, tip = true }: { className?: string; tip?: boolean }) {
   const badge = (
-    <span className={cn("inline-flex shrink-0 items-center rounded-sm bg-muted px-1 text-caption-sm font-medium", className)} data-testid="no-git-badge">
+    <span className={cn("inline-flex shrink-0 items-center rounded-sm bg-cf-surface-sunken px-1 text-caption-sm font-medium", className)} data-testid="no-git-badge">
       No git
     </span>
   );

@@ -14,7 +14,7 @@ function Detail({ item }: { item: CompletionItem }) {
   for (const [from, to] of item.emphasis ?? []) {
     if (from > at) parts.push(item.detail.slice(at, from));
     parts.push(
-      <b key={from} className="font-medium text-foreground" data-testid="completion-hit">
+      <b key={from} className="font-medium text-cf-text" data-testid="completion-hit">
         {item.detail.slice(from, to)}
       </b>,
     );
@@ -157,7 +157,7 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
     <div
       ref={cardRef}
       className={cn(
-        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-lg border border-border bg-card/85 text-body-sm shadow-sm backdrop-blur-xl",
+        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised/85 text-body-sm shadow-sm backdrop-blur-xl",
         above ? "bottom-full mb-2" : "top-full mt-2",
       )}
       data-testid="completion-card"
@@ -185,7 +185,7 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                     aria-selected={on}
                     data-testid="completion-item"
                     data-selected={on || undefined}
-                    className={cn("mx-1 flex h-7 cursor-pointer items-center gap-2 rounded-md px-2", on && "bg-accent")}
+                    className={cn("mx-1 flex h-7 cursor-pointer items-center gap-2 rounded-md px-2", on && "bg-cf-control-hover")}
                     onMouseMove={() => {
                       select(i);
                     }}
@@ -193,11 +193,11 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                       insert(i);
                     }}
                   >
-                    <span className={cn("shrink-0 font-medium text-foreground", item.mono && "font-mono")} data-testid="completion-label">
+                    <span className={cn("shrink-0 font-medium text-cf-text", item.mono && "font-mono")} data-testid="completion-label">
                       {item.label}
                     </span>
                     {item.hint && (
-                      <span className="max-w-[40%] shrink-0 truncate text-caption text-muted-foreground/70" data-testid="completion-hint">
+                      <span className="max-w-[40%] shrink-0 truncate text-caption text-cf-text-muted/70" data-testid="completion-hint">
                         {item.hint}
                       </span>
                     )}

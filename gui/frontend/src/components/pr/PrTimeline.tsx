@@ -26,7 +26,7 @@ interface RailPos {
 function Entry({ rail, children, kind, pos, onOpen, tip }: { rail: ReactNode; children: ReactNode; kind: TimelineEntry["kind"]; pos: RailPos; onOpen?: () => void; tip?: string }) {
   const body = (
     <>
-      <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-pane">{rail}</span>
+      <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-cf-surface">{rail}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1">{children}</div>
     </>
   );
@@ -35,11 +35,11 @@ function Entry({ rail, children, kind, pos, onOpen, tip }: { rail: ReactNode; ch
     <div role="listitem" className="relative" data-testid="pr-timeline-entry" data-kind={kind}>
       {!(pos.first && pos.last) && (
         // 24px is the icon's centre (py-2 + half of size-8).
-        <span className={cn("absolute left-[20px] w-px bg-foreground/20", pos.first ? "top-6" : "top-0", pos.last ? "h-6" : "bottom-0")} aria-hidden data-testid="pr-timeline-rail" />
+        <span className={cn("absolute left-[20px] w-px bg-cf-text/20", pos.first ? "top-6" : "top-0", pos.last ? "h-6" : "bottom-0")} aria-hidden data-testid="pr-timeline-rail" />
       )}
       {onOpen ? (
         <Tip label={tip} align="start">
-          <button type="button" className={cn(cls, "outline-none hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring")} onClick={onOpen}>
+          <button type="button" className={cn(cls, "outline-none hover:bg-cf-control-hover/40 focus-visible:ring-1 focus-visible:ring-cf-focus")} onClick={onOpen}>
             {body}
           </button>
         </Tip>
@@ -74,7 +74,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
       );
     case "opened":
       return (
-        <Entry kind="opened" pos={pos} rail={<GitPullRequest className="size-4 text-muted-foreground" aria-hidden />}>
+        <Entry kind="opened" pos={pos} rail={<GitPullRequest className="size-4 text-cf-text-muted" aria-hidden />}>
           <span className="text-body-sm font-medium">
             {e.actor && <span className="mr-1.5">{e.actor}</span>}Pull request opened
           </span>
@@ -104,7 +104,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
     case "review": {
       const c = e.comment;
       const verdict = e.kind === "review" ? reviewVerb(c.reviewState) : "commented";
-      const tone = c.reviewState === "approved" ? toneText.success : c.reviewState === "changes_requested" ? toneText.failure : "text-muted-foreground";
+      const tone = c.reviewState === "approved" ? toneText.success : c.reviewState === "changes_requested" ? toneText.failure : "text-cf-text-muted";
       return (
         <Entry kind={e.kind} pos={pos} rail={<Avatar login={c.author} src={c.authorAvatarUrl} size={24} />}>
           {/* The verdict and age wrap under a long login instead of cutting it short. */}
@@ -112,7 +112,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
             <span className="max-w-full min-w-0 truncate font-medium" data-testid="pr-timeline-author">
               {c.author || "ghost"}
             </span>
-            <span className={cn("whitespace-nowrap", e.kind === "review" ? tone : "text-muted-foreground")}>{verdict}</span>
+            <span className={cn("whitespace-nowrap", e.kind === "review" ? tone : "text-cf-text-muted")}>{verdict}</span>
             <span className="text-caption whitespace-nowrap">{ago(e.atMs, now)}</span>
           </span>
           {c.body && <Markdown className="line-clamp-4">{c.body}</Markdown>}

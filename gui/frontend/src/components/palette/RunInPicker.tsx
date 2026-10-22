@@ -22,7 +22,7 @@ function MemberItem({ projectId, path, current, queued, onPick }: { projectId: s
       data-member={projectId}
       className="gap-3 py-2"
     >
-      <FolderGit2 className="size-4 text-info/90" aria-hidden />
+      <FolderGit2 className="size-4 text-cf-info/90" aria-hidden />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
         <span className="truncate text-caption">

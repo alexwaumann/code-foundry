@@ -9,7 +9,7 @@ import { StripRow } from "./StripRow";
  */
 export function ToolbarBar({ nodes, stale }: { nodes: readonly ViewNode[]; stale?: boolean }) {
   return (
-    <div className={cn("shrink-0 border-b border-pane-border bg-pane px-4 py-2 @max-[340px]:px-3", stale && "opacity-60 [&_.animate-spin]:animate-none")} role="region" aria-label="Toolbar" data-testid="plugin-toolbar">
+    <div className={cn("shrink-0 border-b border-cf-divider bg-cf-surface px-4 py-2 @max-[340px]:px-3", stale && "opacity-60 [&_.animate-spin]:animate-none")} role="region" aria-label="Toolbar" data-testid="plugin-toolbar">
       <StripRow nodes={nodes} slot="toolbar" />
     </div>
   );

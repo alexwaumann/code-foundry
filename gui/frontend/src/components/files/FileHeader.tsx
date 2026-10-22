@@ -16,9 +16,9 @@ import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
  */
 export function FileHeader({ icon: Icon, name, dir, fullPath, actions, children }: { icon: LucideIcon; name: string; dir: string; fullPath: string; actions: ReactNode; children: ReactNode }) {
   return (
-    <header className="flex shrink-0 flex-col gap-1 border-b border-pane-border px-3 pt-2 pb-1.5" data-testid="file-header">
+    <header className="flex shrink-0 flex-col gap-1 border-b border-cf-divider px-3 pt-2 pb-1.5" data-testid="file-header">
       <div className="flex h-7 min-w-0 items-center gap-2">
-        <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <Icon className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
         <Tip label={fullPath} align="start">
           <span className="flex min-w-0 flex-1 items-baseline gap-2" data-testid="file-header-path">
             <span className="max-w-full shrink-0 truncate text-heading" data-testid="file-header-name">
@@ -46,7 +46,7 @@ export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { 
       <Button
         variant="ghost"
         size="icon-xs"
-        className={cn("text-muted-foreground hover:text-foreground", pressed && "bg-accent text-foreground")}
+        className={cn("text-cf-text-muted hover:text-cf-text", pressed && "bg-cf-control-hover text-cf-text")}
         aria-label={label}
         aria-pressed={pressed}
         data-testid={testId}

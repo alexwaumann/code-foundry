@@ -106,7 +106,7 @@ export function HtmlPreview({ path, text, name }: { path: string; text: string; 
         className="min-h-0 w-full flex-1 border-0 bg-white"
         data-testid="file-html-frame"
       />
-      <div className="flex shrink-0 items-center gap-1.5 border-t border-pane-border px-3 py-1 text-caption-sm" data-testid="file-html-footer">
+      <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="file-html-footer">
         <ShieldCheck className="size-3 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">
           Sandboxed from Code Foundry · scripts and network on · {current.preview.singleFile ? "loads this file only" : `loads files under ${tildify(current.preview.scope)}`}

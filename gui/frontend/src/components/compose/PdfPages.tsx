@@ -91,7 +91,7 @@ function PdfPage({ doc, n, aspect, root }: { doc: PdfDocument; n: number; aspect
       data-testid="pdf-page"
       data-page={n}
       data-rendered={state === "done" || undefined}
-      className="relative w-full shrink-0 overflow-hidden border bg-muted shadow-sm"
+      className="relative w-full shrink-0 overflow-hidden border bg-cf-surface-sunken shadow-sm"
       style={{ aspectRatio: String(ratio) }}
     >
       <canvas ref={canvas} className={cn("block size-full", state !== "done" && "invisible")} />
@@ -146,7 +146,7 @@ export function PdfPages({ file, fill = false, onPages }: { file: Blob; fill?: b
       className={cn("overflow-y-auto p-4", fill ? "min-h-0 flex-1" : "max-h-[calc(85vh/var(--cf-zoom))] min-h-40")}
       data-testid="pdf-pages" data-pages={open?.doc.pages}>
       {failed ? (
-        <p className="py-12 text-center text-body text-muted-foreground">This PDF could not be shown.</p>
+        <p className="py-12 text-center text-body text-cf-text-muted">This PDF could not be shown.</p>
       ) : open ? (
         <div className="flex flex-col gap-4">
           {Array.from({ length: open.doc.pages }, (_, i) => (
@@ -154,7 +154,7 @@ export function PdfPages({ file, fill = false, onPages }: { file: Blob; fill?: b
           ))}
         </div>
       ) : (
-        <p className="py-12 text-center text-body text-muted-foreground">Loading…</p>
+        <p className="py-12 text-center text-body text-cf-text-muted">Loading…</p>
       )}
     </div>
   );

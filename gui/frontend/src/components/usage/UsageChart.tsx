@@ -71,8 +71,8 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
         <g>
           {grid.map((v) => (
             <g key={v}>
-              <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-foreground/8" strokeWidth={1} />
-              <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-caption-sm tabular-nums">
+              <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-cf-text/8" strokeWidth={1} />
+              <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-cf-text-muted text-caption-sm tabular-nums">
                 {formatTick(v, mode)}
               </text>
             </g>
@@ -90,7 +90,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           let acc = 0;
           return (
             <g key={d.day} data-day={d.day}>
-              {hover?.index === i && <rect x={LEFT + slot * i} y={TOP} width={slot} height={H - TOP - BOTTOM} className="fill-foreground/4" />}
+              {hover?.index === i && <rect x={LEFT + slot * i} y={TOP} width={slot} height={H - TOP - BOTTOM} className="fill-cf-text/4" />}
               {drawn.map((k, j) => {
                 const v = values(d)[k] ?? 0;
                 const y0 = y(acc + v);
@@ -115,7 +115,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           {labelledDays(n).map((i) => {
             const d = daily[i];
             return d ? (
-              <text key={d.day} x={LEFT + slot * i + slot / 2} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-caption-sm">
+              <text key={d.day} x={LEFT + slot * i + slot / 2} y={H - 6} textAnchor="middle" className="fill-cf-text-muted text-caption-sm">
                 {dayLabel(d.day).toUpperCase()}
               </text>
             ) : null;
@@ -147,11 +147,11 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
       </svg>
       {hover && hovered && (totals[hover.index] ?? 0) > 0 && (
         <div
-          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-border bg-popover px-2.5 py-2 text-caption-sm text-popover-foreground shadow-lg"
+          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-cf-border bg-cf-surface-overlay px-2.5 py-2 text-caption-sm text-cf-text shadow-lg"
           style={{ left: Math.max(0, Math.min(hover.x + 14, width - 220)), top: Math.max(0, hover.y - 10) }}
           data-testid="usage-page-tooltip"
         >
-          <div className="mb-1 text-muted-foreground">{dayLabel(hovered.day)}</div>
+          <div className="mb-1 text-cf-text-muted">{dayLabel(hovered.day)}</div>
           {series
             .filter((k) => (hovered.tokens[k] ?? 0) > 0)
             .map((k) => (
@@ -163,7 +163,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
                 <span className="tabular-nums">{formatValue(values(hovered)[k] ?? 0, mode)}</span>
               </div>
             ))}
-          <div className="mt-1 flex justify-between gap-4 border-t border-border pt-1 font-semibold">
+          <div className="mt-1 flex justify-between gap-4 border-t border-cf-border pt-1 font-semibold">
             <span>Total</span>
             <span className="tabular-nums">{formatValue(totals[hover.index] ?? 0, mode)}</span>
           </div>

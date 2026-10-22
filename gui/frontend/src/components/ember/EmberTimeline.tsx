@@ -175,7 +175,7 @@ const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
   const lead = row.live ? null : took ? `Worked for ${took}` : "Worked";
   // When the run ended (the reply after it came), right-aligned like a user message's time.
   const time = endMs === null ? null : (
-    <span className="ml-auto shrink-0 pl-3 text-caption-sm text-muted-foreground tabular-nums" data-testid="ember-work-time">
+    <span className="ml-auto shrink-0 pl-3 text-caption-sm text-cf-text-muted tabular-nums" data-testid="ember-work-time">
       {clockTime(endMs, now)}
     </span>
   );
@@ -235,7 +235,7 @@ export function TaskPointer({ id, name }: { id: string; name: string }) {
     <Tip label="Open on the board">
       <button
         type="button"
-        className="my-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-md text-left text-body-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="my-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-md text-left text-body-sm text-cf-text-muted outline-none hover:text-cf-text focus-visible:ring-2 focus-visible:ring-cf-focus/50"
         data-testid="ember-task-link"
         data-task={id}
         onClick={() => {
@@ -243,11 +243,11 @@ export function TaskPointer({ id, name }: { id: string; name: string }) {
         }}
       >
         <SquareKanban className="size-3.5 shrink-0 opacity-80" aria-hidden data-testid="ember-task-link-glyph" />
-        <span className="truncate font-medium text-foreground" data-testid="ember-task-link-title">
+        <span className="truncate font-medium text-cf-text" data-testid="ember-task-link-title">
           {title}
         </span>
         {meta && (
-          <span className={cn("shrink-0 truncate", waiting && "text-warning")} data-testid="ember-task-link-meta">
+          <span className={cn("shrink-0 truncate", waiting && "text-cf-warning")} data-testid="ember-task-link-meta">
             · {meta}
           </span>
         )}
@@ -271,7 +271,7 @@ const RestartRowView = memo(function RestartRowView({ row }: { row: RestartRow }
   const now = useNow(60_000);
   const at = row.atMs === null ? "" : ` at ${clockTime(row.atMs, now)}`;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 py-1 text-caption text-muted-foreground" data-testid="ember-restart" role="note">
+    <div className="flex min-w-0 items-center gap-1.5 py-1 text-caption text-cf-text-muted" data-testid="ember-restart" role="note">
       <RotateCcw className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate">
         Code Foundry restarted{at} while Ember was working

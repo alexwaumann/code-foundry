@@ -89,19 +89,19 @@ export function UsagePage() {
             ).map(([n, what], i) => (
               <span key={what}>
                 {i > 0 && " · "}
-                <b className="font-medium text-foreground">{n}</b> {what}
+                <b className="font-medium text-cf-text">{n}</b> {what}
               </span>
             ))}
           </p>
           {empty ? (
-            <p className="mt-10 text-body text-muted-foreground" data-testid="usage-page-empty">
+            <p className="mt-10 text-body text-cf-text-muted" data-testid="usage-page-empty">
               No usage in this range
             </p>
           ) : (
             <>
               <div className="mt-8 mb-2.5 flex items-center justify-between">
                 <h2 className="text-subheading">
-                  Daily<span className="ml-2 font-normal text-muted-foreground">by model</span>
+                  Daily<span className="ml-2 font-normal text-cf-text-muted">by model</span>
                 </h2>
                 <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} aria-label="Chart measure" data-testid="usage-page-mode" />
               </div>
@@ -118,7 +118,7 @@ export function UsagePage() {
 }
 
 function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; totalCost: number }) {
-  const th = "px-2 py-1.5 text-caption-sm font-medium border-b border-border";
+  const th = "px-2 py-1.5 text-caption-sm font-medium border-b border-cf-border";
   return (
     <table className="w-full border-collapse text-body-sm" data-testid="usage-page-models">
       <thead>
@@ -137,21 +137,21 @@ function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; tota
           const noRate = m.allUnpriced;
           return (
             <tr key={m.model} data-testid="usage-page-model-row" data-model={m.model}>
-              <td className="border-b border-border p-2">
+              <td className="border-b border-cf-border p-2">
                 <span className="flex items-center">
                   <Swatch model={m.model} />
                   <span className="font-mono">{m.model}</span>
                   {m.unpriced && (
-                    <span className="ml-1.5 rounded-sm border border-border px-1.5 py-px text-caption-sm" data-testid="usage-page-unpriced">
+                    <span className="ml-1.5 rounded-sm border border-cf-border px-1.5 py-px text-caption-sm" data-testid="usage-page-unpriced">
                       unpriced
                     </span>
                   )}
                 </span>
               </td>
-              <td className="border-b border-border p-2 text-right text-muted-foreground tabular-nums">{m.requests.toLocaleString("en-US")}</td>
-              <td className="border-b border-border p-2 text-right tabular-nums">{fmtTok(m.tokens)}</td>
-              <td className={`border-b border-border p-2 text-right tabular-nums ${noRate ? "text-muted-foreground" : ""}`}>{noRate ? "—" : fmtUsd(m.costUsd)}</td>
-              <td className="border-b border-border p-2 text-right text-muted-foreground tabular-nums">{noRate ? "—" : fmtShare(m.costUsd, totalCost)}</td>
+              <td className="border-b border-cf-border p-2 text-right text-cf-text-muted tabular-nums">{m.requests.toLocaleString("en-US")}</td>
+              <td className="border-b border-cf-border p-2 text-right tabular-nums">{fmtTok(m.tokens)}</td>
+              <td className={`border-b border-cf-border p-2 text-right tabular-nums ${noRate ? "text-cf-text-muted" : ""}`}>{noRate ? "—" : fmtUsd(m.costUsd)}</td>
+              <td className="border-b border-cf-border p-2 text-right text-cf-text-muted tabular-nums">{noRate ? "—" : fmtShare(m.costUsd, totalCost)}</td>
             </tr>
           );
         })}
@@ -170,7 +170,7 @@ function BucketStrip({ totals, cacheSavingsUsd }: { totals: UsageTotals; cacheSa
     ["Output", totals.output],
   ];
   return (
-    <div className="mt-5 flex flex-wrap gap-8 border-t border-border pt-4" data-testid="usage-page-buckets">
+    <div className="mt-5 flex flex-wrap gap-8 border-t border-cf-border pt-4" data-testid="usage-page-buckets">
       {items.map(([k, v]) => (
         <div key={k}>
           <div className="text-caption-sm">{k}</div>

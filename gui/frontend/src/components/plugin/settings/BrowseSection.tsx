@@ -10,7 +10,7 @@ import { PillView } from "../parts";
 import { emptyBrowse, entryAction, entryPill, progressWords, REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
 
 /** The amber-outlined main action of a row (no filled buttons). */
-export const mainAction = "bg-transparent dark:bg-transparent border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/40";
+export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40";
 
 /** An install in progress, or the last one's failure (the daemon's words, with a dismiss ×), under a row. */
 function Progress({ name }: { name: string }) {
@@ -18,14 +18,14 @@ function Progress({ name }: { name: string }) {
   if (!p) return null;
   const failed = p.phase === "failed";
   return (
-    <p className={cn("flex min-w-0 items-center gap-1.5 text-caption-sm", failed ? "break-words text-destructive" : "text-muted-foreground")} data-testid="registry-progress" data-phase={p.phase} role={failed ? "alert" : "status"}>
+    <p className={cn("flex min-w-0 items-center gap-1.5 text-caption-sm", failed ? "break-words text-cf-error" : "text-cf-text-muted")} data-testid="registry-progress" data-phase={p.phase} role={failed ? "alert" : "status"}>
       {!failed && <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />}
       <span className="min-w-0">{progressWords(p)}</span>
       {failed && (
         <Button
           variant="ghost"
           size="icon-xs"
-          className="ml-auto shrink-0 self-start text-muted-foreground hover:text-foreground"
+          className="ml-auto shrink-0 self-start text-cf-text-muted hover:text-cf-text"
           aria-label="Dismiss"
           onClick={() => {
             dismissInstallFailure(name);
@@ -97,13 +97,13 @@ function RegistryNotices() {
   return (
     <>
       {registries.map((r) => (
-        <div key={r.url} className="flex min-w-0 flex-col gap-0.5 border-t border-border px-4 py-2.5" data-testid="registry-status" data-error={r.error ? "true" : undefined}>
+        <div key={r.url} className="flex min-w-0 flex-col gap-0.5 border-t border-cf-border px-4 py-2.5" data-testid="registry-status" data-error={r.error ? "true" : undefined}>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate font-mono text-caption-sm text-foreground">{shortSource(r.url)}</span>
+            <span className="min-w-0 truncate font-mono text-caption-sm text-cf-text">{shortSource(r.url)}</span>
             <span className="ml-auto shrink-0 text-caption-sm">{registryLine(r)}</span>
           </div>
           {r.error && (
-            <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-warning" role="alert">
+            <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning" role="alert">
               <TriangleAlert className="mt-px size-3 shrink-0" aria-hidden />
               <span className="min-w-0 break-words">
                 {registryErrorWords(r.error)}
@@ -112,7 +112,7 @@ function RegistryNotices() {
             </p>
           )}
           {r.issues.map((i) => (
-            <p key={i} className="text-caption-sm break-words text-warning">
+            <p key={i} className="text-caption-sm break-words text-cf-warning">
               {i}
             </p>
           ))}
@@ -141,21 +141,21 @@ export function BrowseSection() {
     <SectionCard id="browse" heading="Browse" description="Plugins the registries list. Installing asks for your consent before anything runs.">
       <div className="flex min-w-0 items-center gap-2 px-4 py-2" data-testid="plugins-browse">
         <span className="min-w-0 truncate text-caption">{loaded ? `${String(names.length)} ${names.length === 1 ? "plugin" : "plugins"}` : "Reading the registries…"}</span>
-        <Button variant="ghost" size="xs" className="ml-auto text-muted-foreground hover:text-foreground" disabled={loading} onClick={() => void loadBrowse(true)} data-testid="registry-refresh">
+        <Button variant="ghost" size="xs" className="ml-auto text-cf-text-muted hover:text-cf-text" disabled={loading} onClick={() => void loadBrowse(true)} data-testid="registry-refresh">
           <RefreshCw className={cn(loading && "animate-spin")} aria-hidden />
           Refresh
         </Button>
       </div>
       {error && (
-        <p className="border-t border-border px-4 py-3 text-caption break-words text-destructive" role="alert" data-testid="registry-error">
+        <p className="border-t border-cf-border px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="registry-error">
           {error}
         </p>
       )}
       {names.map((n) => (
-        <EntryRow key={n} name={n} className="border-t border-border" />
+        <EntryRow key={n} name={n} className="border-t border-cf-border" />
       ))}
       {empty === "no-registry" && (
-        <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-none">
+        <p className="border-t border-cf-border px-4 py-3 text-caption" data-testid="registry-none">
           No registry configured.{" "}
           <button
             type="button"
@@ -170,7 +170,7 @@ export function BrowseSection() {
         </p>
       )}
       {empty === "none-listed" && (
-        <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-empty">
+        <p className="border-t border-cf-border px-4 py-3 text-caption" data-testid="registry-empty">
           No plugins listed yet.
         </p>
       )}

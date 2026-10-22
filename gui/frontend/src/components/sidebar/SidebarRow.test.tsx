@@ -80,7 +80,7 @@ describe("SidebarRow running agents", () => {
   it("is sky with a bot icon", () => {
     renderRow({ agentsRunning: 2 });
     const el = screen.getByTestId("row-agents");
-    expect(el.className).toContain("text-info");
+    expect(el.className).toContain("text-cf-info");
     expect(el.querySelector("svg")).not.toBeNull();
   });
 });
@@ -94,7 +94,7 @@ describe("SidebarRow provisional name", () => {
     renderRow(o);
     const el = screen.getByTestId("thread-name");
     expect(el.textContent).toBe(text);
-    expect(el.className.includes("text-muted-foreground")).toBe(muted);
+    expect(el.className.includes("text-cf-sidebar-muted-foreground")).toBe(muted);
     expect(el.className.includes("italic")).toBe(italic);
     expect(el.getAttribute("data-provisional")).toBe(italic ? "true" : null);
     // One role above the row's text-body-sm, semibold; a named thread keeps the row's colour.
@@ -159,7 +159,7 @@ describe("SidebarRow archived", () => {
   it("an unnamed thread shows its id, muted", () => {
     renderArchived({ name: "", archivedAtMs: Date.now() });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
-    expect(screen.getByTestId("thread-name").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("thread-name").className).toContain("text-cf-sidebar-muted-foreground");
     expect(screen.getByTestId("row-archived-age").textContent).toBe("0m");
   });
 });
@@ -195,7 +195,7 @@ describe("SidebarRow snoozed", () => {
   it("an unnamed thread shows its id, muted", () => {
     renderSnoozed({ name: "", snoozedUntilMs: Date.now() + 3_600_000 + 1000 });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
-    expect(screen.getByTestId("thread-name").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("thread-name").className).toContain("text-cf-sidebar-muted-foreground");
     expect(screen.getByTestId("row-snooze-left").textContent).toBe("1h");
   });
 });
@@ -204,7 +204,7 @@ describe("SidebarRow line 2 after a snooze", () => {
   it("a woken thread reads Snooze ended with how long ago, amber, without the place", () => {
     renderRow({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 2 * 60_000 });
     expect(screen.getByTestId("row-place").textContent).toBe("Snooze ended · 2 min ago");
-    expect(screen.getByTestId("row-status").className).toContain("text-warning");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-warning");
     expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("snoozeEnded");
   });
 });
@@ -236,7 +236,7 @@ describe("SidebarRow created by a thread", () => {
     renderRow({ name: "Child", createdBy: "s-p", createdByName: "Parent" });
     const g = glyph();
     expect(g).not.toBeNull();
-    expect(g?.getAttribute("class")).toContain("text-muted-foreground");
+    expect(g?.getAttribute("class")).toContain("text-cf-sidebar-muted-foreground");
     expect(g?.nextElementSibling?.getAttribute("data-testid")).toBe("thread-name");
     expect(screen.getByTestId("row-place").textContent).toBe("code-foundry @ main");
   });
@@ -264,7 +264,7 @@ describe("SidebarRow waiting on its child threads", () => {
     expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("waiting");
     expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
     expect(screen.getByTestId("row-status").className).toBe("");
-    expect(screen.getByTestId("row-waiting").getAttribute("class")).toContain("text-muted-foreground");
+    expect(screen.getByTestId("row-waiting").getAttribute("class")).toContain("text-cf-sidebar-muted-foreground");
   });
 });
 
@@ -293,9 +293,9 @@ describe("SidebarRow linked PRs tag", () => {
   });
 
   it.each([
-    ["open: green, the PR icon", pr(142, "open"), "open", "success", "text-success"],
-    ["draft: the draft tone", pr(145, "open", { draft: true }), "draft", "draft", "text-muted-foreground"],
-    ["merged: the merged tone", pr(138, "merged"), "merged", "merged", "text-highlight"],
+    ["open: green, the PR icon", pr(142, "open"), "open", "success", "text-cf-success"],
+    ["draft: the draft tone", pr(145, "open", { draft: true }), "draft", "draft", "text-cf-text-muted"],
+    ["merged: the merged tone", pr(138, "merged"), "merged", "merged", "text-cf-highlight"],
   ])("one %s, the bare number", (_name, p, state, tone, cls) => {
     dashboardResource.set("tracked", { data: dashboard([p]) });
     renderRow({ linkedPullRequests: [link(p.number)] });

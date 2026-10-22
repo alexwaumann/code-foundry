@@ -19,7 +19,7 @@ export function Avatar({ login, name = "", src = "", size = 20, className }: { l
         src={url}
         alt=""
         style={style}
-        className={cn("shrink-0 rounded-full bg-muted object-cover", className)}
+        className={cn("shrink-0 rounded-full bg-cf-surface-sunken object-cover", className)}
         loading="lazy"
         referrerPolicy="no-referrer"
         draggable={false}
@@ -34,7 +34,7 @@ export function Avatar({ login, name = "", src = "", size = 20, className }: { l
     <span
       aria-hidden
       style={{ ...style, fontSize: Math.max(9, Math.round(size * 0.45)) }}
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground uppercase", className)}
+      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-cf-surface-sunken font-medium text-cf-text-muted uppercase", className)}
     >
       {team ? <Users style={{ width: size * 0.6, height: size * 0.6 }} /> : (login || name).charAt(0) || "?"}
     </span>

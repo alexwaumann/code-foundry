@@ -36,13 +36,13 @@ function RunOutput({ runId }: { runId: string }) {
 
   if (load.phase === "loading")
     return (
-      <p className="mt-3 flex items-center gap-2 text-body text-muted-foreground">
+      <p className="mt-3 flex items-center gap-2 text-body text-cf-text-muted">
         <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the output…
       </p>
     );
   if (load.phase === "error")
     return (
-      <p className="mt-3 text-body text-destructive" role="alert">
+      <p className="mt-3 text-body text-cf-error" role="alert">
         {load.message}
       </p>
     );
@@ -55,8 +55,8 @@ function RunOutput({ runId }: { runId: string }) {
       {/* One line: only the path gives way, its directory first (a middle ellipsis), so the
           branch folder at its end stays readable. */}
       <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-caption whitespace-nowrap" data-testid="action-run-meta">
-        <CircleX className="size-3.5 shrink-0 text-destructive" aria-hidden />
-        <span className="shrink-0 text-destructive">Exited with code {run.exitCode}</span>
+        <CircleX className="size-3.5 shrink-0 text-cf-error" aria-hidden />
+        <span className="shrink-0 text-cf-error">Exited with code {run.exitCode}</span>
         {took && (
           <span aria-hidden className="shrink-0 opacity-50">
             ·
@@ -77,9 +77,9 @@ function RunOutput({ runId }: { runId: string }) {
       <Tip label={run.command} whenTruncated={!run.command.includes("\n")} align="start">
         <p className="mt-3 truncate text-caption font-mono">$ {run.command.split("\n")[0]}</p>
       </Tip>
-      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-pane p-2.5 text-body-sm font-mono whitespace-pre-wrap" data-testid="action-run-output">
-        {truncated && <span className="text-muted-foreground">…{"\n"}</span>}
-        {output || <span className="text-muted-foreground">(no output)</span>}
+      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-cf-surface p-2.5 text-body-sm font-mono whitespace-pre-wrap" data-testid="action-run-output">
+        {truncated && <span className="text-cf-text-muted">…{"\n"}</span>}
+        {output || <span className="text-cf-text-muted">(no output)</span>}
       </pre>
       <div className="mt-4 flex items-center justify-end gap-2">
         <DialogClose asChild>
@@ -120,7 +120,7 @@ export function ActionRunDialog() {
         <DialogTitle>Setup action {name} failed</DialogTitle>
         {runId !== null && <RunOutput key={seq} runId={runId} />}
         <DialogClose
-          className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50"
           aria-label="Close"
         >
           <X className="size-4" aria-hidden />

@@ -5,20 +5,20 @@
  * amber, underlined). The overlay is the fallback where ::highlight is missing.
  */
 ::highlight(cf-cite-held) {
-  background-color: color-mix(in oklab, var(--info) 18%, transparent);
+  background-color: color-mix(in oklab, var(--cf-info) 18%, transparent);
 }
 ::highlight(cf-cite-mark) {
-  background-color: color-mix(in oklab, var(--warning) 20%, transparent);
+  background-color: color-mix(in oklab, var(--cf-warning) 20%, transparent);
   text-decoration-line: underline;
-  text-decoration-color: color-mix(in oklab, var(--warning) 70%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--cf-warning) 70%, transparent);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .dark ::highlight(cf-cite-held) {
-  background-color: color-mix(in oklab, var(--info) 22%, transparent);
+  background-color: color-mix(in oklab, var(--cf-info) 22%, transparent);
 }
 .dark ::highlight(cf-cite-mark) {
-  background-color: color-mix(in oklab, var(--warning) 18%, transparent);
+  background-color: color-mix(in oklab, var(--cf-warning) 18%, transparent);
 }
 
 .cite-overlay {
@@ -32,9 +32,9 @@
   border-radius: 2px;
 }
 .cite-overlay[data-cite-overlay="cf-cite-held"] > div {
-  background: color-mix(in oklab, var(--info) 18%, transparent);
+  background: color-mix(in oklab, var(--cf-info) 18%, transparent);
 }
 .cite-overlay[data-cite-overlay="cf-cite-mark"] > div {
-  background: color-mix(in oklab, var(--warning) 20%, transparent);
-  box-shadow: inset 0 -1.5px 0 color-mix(in oklab, var(--warning) 70%, transparent);
+  background: color-mix(in oklab, var(--cf-warning) 20%, transparent);
+  box-shadow: inset 0 -1.5px 0 color-mix(in oklab, var(--cf-warning) 70%, transparent);
 }

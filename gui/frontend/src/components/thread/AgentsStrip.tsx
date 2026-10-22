@@ -6,9 +6,9 @@ import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
 import { useThreadsStore } from "@/stores/threads";
 
 const STRIP =
-  "agents-strip flex min-w-0 items-center gap-2.5 rounded-lg border border-info/35 bg-info/[0.07] py-[7px] pr-2 pl-3 text-body-sm";
-const ICON = "size-3.5 shrink-0 text-info";
-const LABEL = "shrink-0 font-medium whitespace-nowrap text-info";
+  "agents-strip flex min-w-0 items-center gap-2.5 rounded-lg border border-cf-info/35 bg-cf-info/[0.07] py-[7px] pr-2 pl-3 text-body-sm";
+const ICON = "size-3.5 shrink-0 text-cf-info";
+const LABEL = "shrink-0 font-medium whitespace-nowrap text-cf-info";
 
 /**
  * The sky-tinted bar above the composer while the thread's work keeps running after its
@@ -51,7 +51,7 @@ function StripRun({ threadId, id, first }: { threadId: string; id: string; first
       {can ? (
         <button
           type="button"
-          className="cursor-default text-foreground/80 decoration-dotted underline-offset-2 hover:text-foreground hover:underline focus-visible:underline focus-visible:outline-none"
+          className="cursor-default text-cf-text/80 decoration-dotted underline-offset-2 hover:text-cf-text hover:underline focus-visible:underline focus-visible:outline-none"
           data-testid="agents-strip-name"
           onClick={() => {
             void openAgentRun(threadId, id);
@@ -75,7 +75,7 @@ function Strip({ threadId, agents, shells }: { threadId: string; agents: number;
       <span className={LABEL} data-testid="agents-strip-count">
         {backgroundLabel(agents, shells)}
       </span>
-      <span className="min-w-0 flex-1 truncate text-muted-foreground" data-testid="agents-strip-runs">
+      <span className="min-w-0 flex-1 truncate text-cf-text-muted" data-testid="agents-strip-runs">
         {ids.map((id, i) => (
           <StripRun key={id} threadId={threadId} id={id} first={i === 0} />
         ))}
@@ -85,7 +85,7 @@ function Strip({ threadId, agents, shells }: { threadId: string; agents: number;
         whenUnavailable="hide"
         variant="ghost"
         size="xs"
-        className="ml-auto h-6 shrink-0 gap-1 px-1.5 font-medium text-info hover:bg-info/10 hover:text-info dark:hover:bg-info/15"
+        className="ml-auto h-6 shrink-0 gap-1 px-1.5 font-medium text-cf-info hover:bg-cf-info-surface hover:text-cf-info dark:hover:bg-cf-info/15"
         data-testid="agents-strip-open"
       >
         Agents

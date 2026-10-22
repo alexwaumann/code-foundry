@@ -8,7 +8,7 @@ import { toneBorder, toneText } from "../tones";
 export function NoticeNode({ node, data }: NodeProps<"notice">) {
   const tone = data.tone ?? "";
   const Icon = tone === "error" ? CircleAlert : tone === "attention" ? TriangleAlert : Info;
-  const iconClass = cn("mt-0.5 size-3.5 shrink-0", tone ? toneText[tone] : "text-muted-foreground");
+  const iconClass = cn("mt-0.5 size-3.5 shrink-0", tone ? toneText[tone] : "text-cf-text-muted");
   return (
     <div
       className={cn("flex min-w-0 flex-col gap-1.5 rounded-lg border px-3 pt-2.5 pb-2", toneBorder[tone])}
@@ -26,7 +26,7 @@ export function NoticeNode({ node, data }: NodeProps<"notice">) {
               <InlineView value={data.body} />
             </p>
           )}
-          {data.detail && <p className={cn("font-mono text-caption-sm break-words whitespace-pre-wrap", tone ? toneText[tone] : "text-muted-foreground")}>{data.detail}</p>}
+          {data.detail && <p className={cn("font-mono text-caption-sm break-words whitespace-pre-wrap", tone ? toneText[tone] : "text-cf-text-muted")}>{data.detail}</p>}
         </div>
       </div>
       <ButtonBar buttons={data.actions} className="pl-5.5" />

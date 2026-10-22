@@ -39,7 +39,7 @@ export function PluginSurfaceRows({ ctx, group }: { ctx: SurfaceContext; group?:
   const rows = kinds ? kinds.split("\u0001").map((r) => r.split("\u0000") as [string, string]) : [];
   if (rows.length === 0) return null;
   return (
-    <ul className="mt-2 flex flex-col gap-0.5 border-t border-border pt-2" data-testid="panel-plugin-surfaces">
+    <ul className="mt-2 flex flex-col gap-0.5 border-t border-cf-border pt-2" data-testid="panel-plugin-surfaces">
       {rows.map(([kind, plugin]) => {
         const spec = pluginSurfaceSpec(kind);
         if (!spec) return null;
@@ -51,7 +51,7 @@ export function PluginSurfaceRows({ ctx, group }: { ctx: SurfaceContext; group?:
             group={group}
             trailing={
               <Tip label={`From the ${plugin} plugin`}>
-                <span className="inline-flex shrink-0 text-muted-foreground" data-testid="plugin-mark">
+                <span className="inline-flex shrink-0 text-cf-text-muted" data-testid="plugin-mark">
                   <Puzzle className="size-3.5" aria-label={`Plugin ${plugin}`} />
                 </span>
               </Tip>

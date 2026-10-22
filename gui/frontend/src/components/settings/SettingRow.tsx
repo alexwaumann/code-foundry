@@ -15,13 +15,13 @@ type FieldState = ReturnType<typeof useSettingField>;
 export function RestartChip({ field, restartPending }: { field: SettingFieldView; restartPending: boolean }) {
   if (restartPending)
     return (
-      <span className="rounded-sm bg-warning/15 px-1.5 py-px text-caption-sm font-medium text-warning" data-testid="restart-pending">
+      <span className="rounded-sm bg-cf-warning-surface px-1.5 py-px text-caption-sm font-medium text-cf-warning" data-testid="restart-pending">
         Restart the daemon to apply
       </span>
     );
   if (!field.restartRequired) return null;
   return (
-    <span className="rounded-sm bg-muted px-1.5 py-px text-caption-sm" data-testid="restart-hint">
+    <span className="rounded-sm bg-cf-surface-sunken px-1.5 py-px text-caption-sm" data-testid="restart-hint">
       Applies after daemon restart
     </span>
   );
@@ -35,7 +35,7 @@ export function ResetButton({ field, state }: { field: SettingFieldView; state: 
       <button
         type="button"
         aria-label={`Reset ${field.title}`}
-        className={cn("shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
+        className={cn("shrink-0 rounded-sm p-1 text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text", !modified && "invisible")}
         disabled={pending || !modified}
         onClick={() => {
           commit("");
@@ -50,7 +50,7 @@ export function ResetButton({ field, state }: { field: SettingFieldView; state: 
 export function FieldError({ message, className }: { message: string | null; className?: string }) {
   if (!message) return null;
   return (
-    <p className={cn("text-caption break-words text-destructive", className)} role="alert" data-testid="setting-error">
+    <p className={cn("text-caption break-words text-cf-error", className)} role="alert" data-testid="setting-error">
       {message}
     </p>
   );
@@ -99,7 +99,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
         tallKeyEditors.has(field.key) ? "items-start" : "items-center",
         // The hairline from the parent row down to this one, ending in a short elbow.
         indent &&
-          "pl-10 before:absolute before:top-0 before:bottom-4 before:left-5 before:w-px before:bg-border after:absolute after:bottom-4 after:left-5 after:h-px after:w-2 after:bg-border",
+          "pl-10 before:absolute before:top-0 before:bottom-4 before:left-5 before:w-px before:bg-cf-border after:absolute after:bottom-4 after:left-5 after:h-px after:w-2 after:bg-cf-border",
         className,
       )}
       data-setting={field.key}
@@ -121,7 +121,7 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
         )}
         {dimmed && note && <p className="mt-0.5 text-caption-sm">{note}</p>}
         {words && words.length > 0 && (
-          <p className="mt-0.5 text-caption-sm font-mono text-muted-foreground/75" data-testid="setting-key">
+          <p className="mt-0.5 text-caption-sm font-mono text-cf-text-muted/75" data-testid="setting-key">
             <Highlight text={field.key} words={words} />
           </p>
         )}

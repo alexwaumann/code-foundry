@@ -39,8 +39,8 @@ describe("FlagChip", () => {
   });
 
   it.each([
-    ["error", "text-destructive"],
-    ["attention", "text-warning"],
+    ["error", "text-cf-error"],
+    ["attention", "text-cf-warning"],
   ] as const)("shows the plugin and reason of an %s flag in its colour, text only", (level, tone) => {
     renderChip([flag({ level })]);
     const chip = screen.getByTestId("thread-flag");

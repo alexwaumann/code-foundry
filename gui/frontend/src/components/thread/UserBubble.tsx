@@ -15,7 +15,7 @@ import { CiteChip } from "./cite/CiteChip";
 import { QueuedTag } from "./QueuedTag";
 
 /** The image chip's accent: green, the success token. */
-const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
+const IMAGE_ACCENT = "[--chip-accent:var(--cf-success)]";
 
 /** A sent PDF's page count: the one the daemon put in its staged name, else pdf.js's (null while counting). */
 function sentPages(path: string, summary: PdfSummary | null): number | null {
@@ -95,7 +95,7 @@ function Thumbnail({ path }: { path: string }) {
   const name = path.slice(path.lastIndexOf("/") + 1);
   const Icon = pdf ? FileText : ImageIcon;
   return (
-    <li className="size-16 overflow-hidden rounded-lg border bg-muted/40" data-testid="thread-attachment" data-kind={pdf ? "pdf" : "image"} data-pages={pages ?? undefined}>
+    <li className="size-16 overflow-hidden rounded-lg border bg-cf-surface-sunken/40" data-testid="thread-attachment" data-kind={pdf ? "pdf" : "image"} data-pages={pages ?? undefined}>
       {url ? (
         <button
           type="button"
@@ -109,7 +109,7 @@ function Thumbnail({ path }: { path: string }) {
           {pdf ? <PdfTile thumb={summary?.thumb ?? null} /> : <img src={url} alt={name} className="size-full object-cover" />}
         </button>
       ) : (
-        <span className="flex size-full items-center justify-center text-muted-foreground">
+        <span className="flex size-full items-center justify-center text-cf-text-muted">
           <Icon className="size-4" aria-hidden />
         </span>
       )}

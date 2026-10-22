@@ -83,10 +83,10 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
                 data-day={`${String(d.year)}-${String(d.month + 1).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`}
                 data-today={isToday || undefined}
                 className={cn(
-                  "h-7 rounded-md border border-transparent text-body-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-35",
-                  isSelected ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent",
-                  isToday && !isSelected && "border-border",
-                  outside && !isSelected && "text-muted-foreground",
+                  "h-7 rounded-md border border-transparent text-body-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-35",
+                  isSelected ? "bg-cf-accent font-medium text-cf-accent-foreground" : "hover:bg-cf-control-hover",
+                  isToday && !isSelected && "border-cf-border",
+                  outside && !isSelected && "text-cf-text-muted",
                 )}
                 onClick={() => {
                   onSelect(d);
@@ -131,7 +131,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
       <Calendar now={now} selected={day} onSelect={setDay} />
       <div className="flex items-center gap-3">
         <div className="relative flex min-w-0 flex-1 items-center">
-          <Clock className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" aria-hidden />
+          <Clock className="pointer-events-none absolute left-2.5 size-3.5 text-cf-text-muted" aria-hidden />
           <Input
             type="time"
             value={time}
@@ -143,7 +143,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
             data-testid="snooze-time"
           />
         </div>
-        <span className={cn("shrink-0 text-caption tabular-nums", untilMs !== null && !ready ? "text-destructive" : "text-muted-foreground")} data-testid="snooze-summary">
+        <span className={cn("shrink-0 text-caption tabular-nums", untilMs !== null && !ready ? "text-cf-error" : "text-cf-text-muted")} data-testid="snooze-summary">
           {untilMs !== null && !ready ? "In the past" : formatDay(day, now)}
         </span>
       </div>

@@ -115,9 +115,9 @@ export function ThemesPage() {
       </PaneHeader>
       <ControlBar slot={slot} slots={slots} />
       <div className="flex min-h-0 flex-1">
-        <div className="flex w-[300px] shrink-0 flex-col border-r border-pane-border">
+        <div className="flex w-[300px] shrink-0 flex-col border-r border-cf-divider">
           <div className="relative px-3 pt-3 pb-2">
-            <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-cf-text-muted" />
             <Input
               ref={searchRef}
               type="search"
@@ -149,7 +149,7 @@ export function ThemesPage() {
             ))}
             {list.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-pane-border px-3 py-2 text-caption-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cf-divider px-3 py-2 text-caption-sm">
             <span className="flex items-center gap-1">
               <Kbd size="sm">↑</Kbd>
               <Kbd size="sm">↓</Kbd> preview
@@ -168,7 +168,7 @@ export function ThemesPage() {
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {/* inert: a picture of the app, so Tab and clicks stay in the page (and no
                 popover opens into the window's theme through a portal). */}
-            <ThemeScope theme={themeOf(shownId)} className="rounded-xl border border-pane-border">
+            <ThemeScope theme={themeOf(shownId)} className="rounded-xl border border-cf-divider">
               <div inert>
                 <ThemeGallery />
               </div>
@@ -193,7 +193,7 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
       data-current={current || undefined}
       className={cn(
         "flex h-9 cursor-default items-center gap-2.5 rounded-md px-2 text-body-sm select-none",
-        previewed ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+        previewed ? "bg-cf-control-hover text-cf-text" : "hover:bg-cf-control-hover/50",
       )}
       onClick={() => {
         previewTheme(theme.id);
@@ -208,7 +208,7 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
       </span>
       <ThemeStrip theme={theme} />
       <span className="flex w-4 shrink-0 justify-center">
-        {current && <Check className="size-3.5 text-foreground" aria-hidden />}
+        {current && <Check className="size-3.5 text-cf-text" aria-hidden />}
       </span>
     </div>
   );
@@ -223,7 +223,7 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
     });
   };
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-pane-border px-4 py-2.5" data-testid="themes-controls">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-cf-divider px-4 py-2.5" data-testid="themes-controls">
       <div className="flex items-center gap-2">
         <span className="text-caption">Scheme</span>
         <RadioGroup variant="segmented" value={pref} onValueChange={save} aria-label="Scheme" data-testid="themes-scheme">
@@ -257,14 +257,14 @@ function SlotChip({ slot, theme, editing, inUse }: { slot: ThemeSlot; theme: The
       variant="outline"
       size="sm"
       aria-pressed={editing}
-      className={cn("h-8 gap-2 px-2.5 font-normal", editing && "border-primary ring-1 ring-primary/40 dark:border-primary")}
+      className={cn("h-8 gap-2 px-2.5 font-normal", editing && "border-cf-accent ring-1 ring-cf-accent/40 dark:border-cf-accent")}
       onClick={() => {
         setPickerSlot(slot);
       }}
       data-testid={`themes-slot-${slot}`}
     >
-      <Icon className="text-muted-foreground" />
-      <span className="text-muted-foreground">{SLOT_LABEL[slot]}:</span>
+      <Icon className="text-cf-text-muted" />
+      <span className="text-cf-text-muted">{SLOT_LABEL[slot]}:</span>
       <ThemeAa theme={theme} className="h-4 w-6" />
       <span className="font-medium">{theme.name}</span>
       {inUse && (
@@ -279,9 +279,9 @@ function SlotChip({ slot, theme, editing, inUse }: { slot: ThemeSlot; theme: The
 function PreviewBar({ slot, shown, current, previewing }: { slot: ThemeSlot; shown: Theme; current: Theme; previewing: boolean }) {
   const applying = useThemePickerStore((s) => s.applying);
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border px-4" data-testid="themes-preview-bar">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-cf-divider px-4" data-testid="themes-preview-bar">
       <span className="truncate text-body-sm">
-        <span className="text-muted-foreground">{previewing ? "Previewing " : "Current: "}</span>
+        <span className="text-cf-text-muted">{previewing ? "Previewing " : "Current: "}</span>
         <span className="font-medium" data-testid="themes-previewed-name">
           {shown.name}
         </span>
@@ -310,11 +310,11 @@ function PairHintLine({ slots }: { slots: { dark: string; light: string } }) {
   if (!hint || slots[hint.slot] === hint.themeId) return null;
   const pair = themeOf(hint.themeId);
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-pane-border px-4 py-2 text-body-sm" role="status" data-testid="themes-pair-hint">
-      <Link2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+    <div className="flex shrink-0 items-center gap-2 border-b border-cf-divider px-4 py-2 text-body-sm" role="status" data-testid="themes-pair-hint">
+      <Link2 className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
       <ThemeAa theme={pair} className="h-4 w-6" />
-      <span className="min-w-0 truncate text-muted-foreground">
-        <span className="text-foreground">{pair.name}</span> is this theme&rsquo;s {hint.slot} companion. Use it for {hint.slot}?
+      <span className="min-w-0 truncate text-cf-text-muted">
+        <span className="text-cf-text">{pair.name}</span> is this theme&rsquo;s {hint.slot} companion. Use it for {hint.slot}?
       </span>
       <Button variant="outline" size="xs" onClick={() => void acceptPairHint()} data-testid="themes-pair-accept">
         Use for {hint.slot}

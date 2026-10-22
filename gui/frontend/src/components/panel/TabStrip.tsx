@@ -15,8 +15,8 @@ import { usePanelDrop } from "./panelDrop";
 import { revealElement, revealTab } from "./reveal";
 
 /** The active tab (and the "+" while picking): full tint in the focused group, lighter in the other one. */
-const ACTIVE_FOCUSED = "bg-accent text-accent-foreground dark:bg-accent/50";
-const ACTIVE_UNFOCUSED = "bg-accent/40 text-foreground dark:bg-accent/25";
+const ACTIVE_FOCUSED = "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50";
+const ACTIVE_UNFOCUSED = "bg-cf-control-hover/40 text-cf-text dark:bg-cf-control-hover/25";
 
 /**
  * One tab, sortable: a pointer drag (past 4px, so clicks, the × and middle click work as
@@ -60,7 +60,7 @@ function TabButton({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
         "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-body-sm [--wails-draggable:no-drag]",
-        active ? (focused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+        active ? (focused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
         // The lifted tab's slot: the ghost under the pointer is the tab now.
         isDragging && "opacity-40",
       )}
@@ -81,7 +81,7 @@ function TabButton({
         aria-controls={active ? bodyDomId(group) : undefined}
         aria-describedby={attributes["aria-describedby"]}
         tabIndex={focusable ? 0 : -1}
-        className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-cf-focus"
         onClick={() => {
           activatePanelTab(panelKey, tab.id);
         }}
@@ -95,7 +95,7 @@ function TabButton({
           tabIndex={focusable ? 0 : -1}
           aria-label={`Close ${tab.title}`}
           className={cn(
-            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
+            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-cf-text/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cf-focus",
             active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
           onClick={() => {
@@ -110,7 +110,7 @@ function TabButton({
         <span
           aria-hidden
           data-testid="panel-drop-marker"
-          className={cn("pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-ring", drop === "first" ? "left-0" : drop === "before" ? "-left-[3px]" : "-right-[3px]")}
+          className={cn("pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-cf-focus", drop === "first" ? "left-0" : drop === "before" ? "-left-[3px]" : "-right-[3px]")}
         />
       )}
     </div>
@@ -171,9 +171,9 @@ function NewTabButton({ picking, focused }: { picking: boolean; focused: boolean
         "size-7 [--wails-draggable:no-drag]",
         picking
           ? focused
-            ? "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground dark:bg-accent/50 dark:hover:bg-accent/50"
-            : "bg-accent/40 text-foreground hover:bg-accent/40 hover:text-foreground dark:bg-accent/25 dark:hover:bg-accent/25"
-          : "text-muted-foreground hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40",
+            ? "bg-cf-control-hover text-cf-text hover:bg-cf-control-hover hover:text-cf-text dark:bg-cf-control-hover/50 dark:hover:bg-cf-control-hover/50"
+            : "bg-cf-control-hover/40 text-cf-text hover:bg-cf-control-hover/40 hover:text-cf-text dark:bg-cf-control-hover/25 dark:hover:bg-cf-control-hover/25"
+          : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text dark:hover:bg-cf-control-hover/40",
       )}
       data-testid="panel-new-tab"
     />

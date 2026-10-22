@@ -49,7 +49,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
     <li
       className={cn(
         "flex h-7 max-w-72 min-w-0 items-center rounded-full border text-body-sm transition-colors",
-        primary ? "border-primary/50 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
+        primary ? "border-cf-accent/50 bg-cf-control-hover text-cf-text" : "border-cf-border bg-cf-surface-raised text-cf-text-muted",
       )}
       data-testid="composer-member"
       data-project={member.projectId}
@@ -62,14 +62,14 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         aria-label={`${name}${member.noGit ? ", not a git repository" : member.branch ? ` on ${member.branch}` : ""}${primary ? ", primary: the thread runs here" : ""}`}
         data-compose-stop
         className={cn(
-          "flex h-full min-w-0 items-center gap-1.5 rounded-full pr-2.5 pl-2.5 outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60",
+          "flex h-full min-w-0 items-center gap-1.5 rounded-full pr-2.5 pl-2.5 outline-none hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:opacity-60",
           member.removable && "pr-1",
         )}
         onClick={() => {
           setPrimary(draftKey, member.projectId);
         }}
       >
-        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-primary" : "bg-muted-foreground/40")} />
+        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-cf-accent" : "bg-cf-text-muted/40")} />
         <span className="truncate font-medium">{name}</span>
         {member.noGit ? (
           <NoGitBadge />
@@ -81,7 +81,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
           )
         )}
         {primary && (
-          <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-caption-sm font-medium text-primary" data-testid="composer-member-primary">
+          <span className="shrink-0 rounded-sm bg-cf-accent-surface px-1 text-caption-sm font-medium text-cf-accent" data-testid="composer-member-primary">
             primary
           </span>
         )}
@@ -93,7 +93,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
             disabled={disabled}
             aria-label={`Remove ${name}`}
             data-compose-stop
-            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
+            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-cf-text-muted outline-none hover:bg-cf-canvas hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:hidden"
             onClick={() => {
               void removeWithConfirm(draftKey, member.projectId, name);
             }}

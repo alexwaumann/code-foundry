@@ -81,7 +81,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
       data-kind={action ? "action" : "shell"}
       className={cn(
         "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-body-sm [--wails-draggable:no-drag]",
-        active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+        active ? "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50" : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
       )}
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault(); // middle click closes, below
@@ -99,7 +99,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
           aria-selected={active}
           aria-controls={active ? BODY_ID : undefined}
           tabIndex={focusable ? 0 : -1}
-          className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-cf-focus"
           onClick={() => {
             openTab(panelKey, id);
           }}
@@ -115,7 +115,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
           tabIndex={focusable ? 0 : -1}
           aria-label={`Close ${title}`}
           className={cn(
-            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
+            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-cf-text/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cf-focus",
             active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
           onClick={() => void closeBottomTerminal(id)}
@@ -171,7 +171,7 @@ function NewTerminalButton({ panelKey }: { panelKey: string }) {
         type="button"
         variant="ghost"
         size="icon-xs"
-        className="size-7 text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40"
+        className="size-7 text-cf-text-muted [--wails-draggable:no-drag] hover:bg-cf-control-hover/40 hover:text-cf-text dark:hover:bg-cf-control-hover/40"
         aria-label={title}
         data-testid="bottom-new-terminal"
         data-strip-stop
@@ -234,11 +234,11 @@ function EmptyState({ panelKey }: { panelKey: string }) {
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label hover:bg-accent"
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label hover:bg-cf-control-hover"
                 data-testid="bottom-empty-new"
                 onClick={() => void newBottomTerminal(panelKey)}
               >
-                <SquareTerminal className="size-4 text-muted-foreground" aria-hidden />
+                <SquareTerminal className="size-4 text-cf-text-muted" aria-hidden />
                 <span className="flex-1 truncate">{title}</span>
                 {chord && <Kbd>{formatChord(chord)}</Kbd>}
               </button>
@@ -258,7 +258,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
  */
 function BottomHeader({ panelKey, ids, activeId }: { panelKey: string; ids: readonly string[]; activeId: string | null }) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-pane-border pr-1.5 pl-1 [--wails-draggable:no-drag]" data-testid="bottom-header">
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-cf-divider pr-1.5 pl-1 [--wails-draggable:no-drag]" data-testid="bottom-header">
       <TabStrip panelKey={panelKey} ids={ids} activeId={activeId} />
       <CommandButton command="view.bottom.toggle" icon={X} tooltip="Close bottom panel" className="shrink-0 [--wails-draggable:no-drag]" data-testid="bottom-close" />
     </div>
@@ -320,7 +320,7 @@ function Panel({
         aria-label="Bottom panel"
         data-testid="bottom-panel"
         data-panel-key={panelKey}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs outline-none"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs outline-none"
       >
         <BottomHeader panelKey={panelKey} ids={ids} activeId={activeId} />
         <div

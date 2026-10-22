@@ -12,13 +12,13 @@
   @apply text-title;
   margin-top: 1.2em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--cf-border);
 }
 .cf-file-md .cf-markdown h2 {
   @apply text-heading;
   margin-top: 1.4em;
   padding-bottom: 0.25em;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--cf-border);
 }
 .cf-file-md .cf-markdown :where(h3, h4, h5, h6) {
   @apply text-subheading;
@@ -28,8 +28,8 @@
 }
 
 .cf-checker {
-  --checker: color-mix(in oklab, var(--foreground) 7%, transparent);
-  background-color: var(--pane);
+  --checker: color-mix(in oklab, var(--cf-text) 7%, transparent);
+  background-color: var(--cf-surface);
   background-image: conic-gradient(var(--checker) 25%, transparent 0 50%, var(--checker) 0 75%, transparent 0);
   background-size: 16px 16px;
 }

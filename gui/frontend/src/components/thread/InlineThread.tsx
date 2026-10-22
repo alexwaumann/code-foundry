@@ -32,14 +32,14 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread cf-thread-inline relative flex h-full min-h-0 min-w-0 flex-col" aria-label="Thread" data-thread-id={threadId} data-testid="inline-thread">
         {loaded && catchingUp && (
-          <div className="pointer-events-none absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-md border bg-popover/90 px-2 py-0.5 text-caption-sm" data-testid="thread-catching-up">
+          <div className="pointer-events-none absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm" data-testid="thread-catching-up">
             <Loader2 className="size-3 animate-spin" />
             catching up…
           </div>
         )}
-        {!loaded && <p className="absolute inset-x-0 top-6 px-4 text-center text-body-sm text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+        {!loaded && <p className="absolute inset-x-0 top-6 px-4 text-center text-body-sm text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
         {loaded && empty && !working && (
-          <p className="absolute inset-x-0 top-6 px-4 text-center text-body-sm text-muted-foreground" data-testid="thread-empty">
+          <p className="absolute inset-x-0 top-6 px-4 text-center text-body-sm text-cf-text-muted" data-testid="thread-empty">
             No messages yet.
           </p>
         )}

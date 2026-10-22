@@ -20,7 +20,7 @@ export function SurfaceFrame({ top, toolbar, footer, stale = false, children }: 
   const fillBox = useMemo(() => ({ box: scroll, bottom: FILL_BOTTOM }), [scroll]);
   return (
     <>
-      <div className="shrink-0 bg-pane" data-testid="plugin-top">
+      <div className="shrink-0 bg-cf-surface" data-testid="plugin-top">
         {top}
         {toolbar.length > 0 && <ToolbarBar nodes={toolbar} stale={stale} />}
       </div>

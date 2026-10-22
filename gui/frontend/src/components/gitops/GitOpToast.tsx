@@ -17,7 +17,7 @@ function where(op: GitOpView): string {
 /** Body of the progress toast while an operation is queued or running. */
 export function GitOpProgress({ op }: { op: GitOpView }) {
   return (
-    <span data-testid="gitop-toast" data-op-id={op.id} data-state={op.state} className="text-muted-foreground">
+    <span data-testid="gitop-toast" data-op-id={op.id} data-state={op.state} className="text-cf-text-muted">
       {where(op)}
       {op.state === "queued" ? " · waiting for the previous operation" : ""}
     </span>
@@ -34,7 +34,7 @@ export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView;
   const meta = [where(op), formatDuration(op.durationMs)].filter(Boolean).join(" · ");
   return (
     <div data-testid="gitop-toast" data-op-id={op.id} data-state={op.state} className="flex min-w-0 flex-col gap-1">
-      <span data-testid="gitop-summary" className="break-words text-foreground">
+      <span data-testid="gitop-summary" className="break-words text-cf-text">
         {op.summary}
       </span>
       {meta && <span className="text-caption">{meta}</span>}
@@ -43,7 +43,7 @@ export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView;
           <button
             type="button"
             data-testid="gitop-output-toggle"
-            className="self-start text-caption underline underline-offset-2 hover:text-foreground"
+            className="self-start text-caption underline underline-offset-2 hover:text-cf-text"
             onClick={onToggle}
           >
             {expanded ? "Hide output" : "Show output"}
@@ -51,7 +51,7 @@ export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView;
           {expanded && (
             <pre
               data-testid="gitop-output"
-              className="max-h-64 w-full max-w-full overflow-auto whitespace-pre-wrap break-words rounded-sm bg-muted p-2 text-caption-sm font-mono leading-snug text-foreground"
+              className="max-h-64 w-full max-w-full overflow-auto whitespace-pre-wrap break-words rounded-sm bg-cf-surface-sunken p-2 text-caption-sm font-mono leading-snug text-cf-text"
             >
               {op.output}
             </pre>

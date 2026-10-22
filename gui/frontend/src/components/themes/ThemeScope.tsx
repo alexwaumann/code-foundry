@@ -15,7 +15,7 @@ import type { Theme } from "@/themes";
 export function ThemeScope({ theme, className, children }: { theme: Theme; className?: string; children: ReactNode }) {
   const style = { ...theme.slots, colorScheme: theme.scheme } as CSSProperties;
   return (
-    <div data-theme-scope="" data-theme={theme.id} style={style} className={cn(theme.scheme, "bg-sheet text-foreground", className)} data-testid="theme-scope">
+    <div data-theme-scope="" data-theme={theme.id} style={style} className={cn(theme.scheme, "bg-cf-canvas text-cf-text", className)} data-testid="theme-scope">
       {children}
     </div>
   );

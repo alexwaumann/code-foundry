@@ -51,13 +51,13 @@ export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; d
           <DialogTitle>{displayName} log</DialogTitle>
           <DialogDescription className="font-mono text-caption-sm break-all">{path ? tildify(path) : "…"}</DialogDescription>
         </div>
-        {error && <p className="text-caption-sm text-destructive">{error}</p>}
-        <div className="min-h-40 flex-1 overflow-auto rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-caption-sm select-text" data-testid="plugin-logs-lines">
-          {lines.length === 0 && !error && <p className="text-muted-foreground">Nothing logged yet.</p>}
+        {error && <p className="text-caption-sm text-cf-error">{error}</p>}
+        <div className="min-h-40 flex-1 overflow-auto rounded-md border border-cf-border bg-cf-surface-sunken/40 px-2 py-1.5 font-mono text-caption-sm select-text" data-testid="plugin-logs-lines">
+          {lines.length === 0 && !error && <p className="text-cf-text-muted">Nothing logged yet.</p>}
           {lines.map((l) => (
-            <div key={l.seq} className={cn("flex gap-2 whitespace-pre-wrap", l.level === "error" ? "text-destructive" : l.level === "warn" ? "text-warning" : "text-foreground")}>
-              <span className="shrink-0 text-muted-foreground tabular-nums">{clock(l.timeMs)}</span>
-              <span className="w-16 shrink-0 text-muted-foreground">{l.source === "log" ? `log ${l.level}` : l.source}</span>
+            <div key={l.seq} className={cn("flex gap-2 whitespace-pre-wrap", l.level === "error" ? "text-cf-error" : l.level === "warn" ? "text-cf-warning" : "text-cf-text")}>
+              <span className="shrink-0 text-cf-text-muted tabular-nums">{clock(l.timeMs)}</span>
+              <span className="w-16 shrink-0 text-cf-text-muted">{l.source === "log" ? `log ${l.level}` : l.source}</span>
               <span className="min-w-0 break-words">{l.text}</span>
             </div>
           ))}

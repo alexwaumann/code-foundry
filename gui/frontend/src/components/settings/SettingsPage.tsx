@@ -45,21 +45,21 @@ function Banners() {
   return (
     <>
       {noService && (
-        <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-body-sm" data-testid="settings-unavailable">
+        <p className="mb-4 rounded-md border border-cf-warning/40 bg-cf-warning-surface px-3 py-2 text-body-sm" data-testid="settings-unavailable">
           The daemon has not sent settings yet. If this persists it may be older than this window; restart it.
         </p>
       )}
       {loadError && (
-        <div className="mb-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-body-sm" data-testid="settings-load-error">
-          <TriangleAlert className="size-4 shrink-0 text-destructive" />
+        <div className="mb-4 flex gap-2 rounded-md border border-cf-error/40 bg-cf-error-surface px-3 py-2 text-body-sm" data-testid="settings-load-error">
+          <TriangleAlert className="size-4 shrink-0 text-cf-error" />
           <div>
             <p className="font-medium">The settings file does not parse; the last settings that loaded stay in effect (the defaults if none have) and saving is paused until you fix it.</p>
-            <p className="mt-0.5 font-mono break-words text-muted-foreground">{loadError}</p>
+            <p className="mt-0.5 font-mono break-words text-cf-text-muted">{loadError}</p>
           </div>
         </div>
       )}
       {unknown.length > 0 && (
-        <p className="mb-4 rounded-md border border-border px-3 py-2 text-caption">
+        <p className="mb-4 rounded-md border border-cf-border px-3 py-2 text-caption">
           Unknown keys in the file are ignored: <span className="font-mono">{unknown.join(", ")}</span>
         </p>
       )}
@@ -70,7 +70,7 @@ function Banners() {
 /** The left nav: one item per page. While searching, each shows its match count and none is current. */
 function SettingsNav({ pages, current, counts, onPick }: { pages: readonly SettingPageView[]; current: string | null; counts: SearchResult["counts"] | null; onPick: (id: string) => void }) {
   return (
-    <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-pane-border p-2" aria-label="Settings pages">
+    <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-cf-divider p-2" aria-label="Settings pages">
       {pages.map((p) => {
         const Icon = pageIcons[p.id] ?? Settings2;
         const n = counts?.[p.id];
@@ -81,16 +81,16 @@ function SettingsNav({ pages, current, counts, onPick }: { pages: readonly Setti
             type="button"
             aria-current={on ? "page" : undefined}
             className={cn(
-              "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-body-sm outline-none hover:bg-accent focus-visible:bg-accent",
-              on && "bg-accent font-medium",
-              n === 0 && "text-muted-foreground opacity-60",
+              "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-body-sm outline-none hover:bg-cf-control-hover focus-visible:bg-cf-control-hover",
+              on && "bg-cf-control-hover font-medium",
+              n === 0 && "text-cf-text-muted opacity-60",
             )}
             onClick={() => {
               onPick(p.id);
             }}
             data-testid={`settings-nav-${p.id}`}
           >
-            <Icon className={cn("size-3.5 shrink-0", on ? "text-foreground" : "text-muted-foreground")} aria-hidden />
+            <Icon className={cn("size-3.5 shrink-0", on ? "text-cf-text" : "text-cf-text-muted")} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{p.title}</span>
             {n !== undefined && (
               <span className="text-caption-sm tabular-nums" data-testid="settings-nav-count">
@@ -208,7 +208,7 @@ export function SettingsPage() {
       <PaneHeader className="gap-3 px-4">
         <h1 className="text-heading">Settings</h1>
         <div className="relative max-w-xs flex-1 [--wails-draggable:no-drag]">
-          <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-cf-text-muted" />
           <Input
             ref={searchRef}
             type="search"
@@ -245,8 +245,8 @@ export function SettingsPage() {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
           <div className="mx-auto max-w-3xl" data-testid="settings-body" data-page={searching ? undefined : page?.id}>
             <Banners />
-            {schemaError && <p className="text-body text-destructive">Cannot load the settings schema: {schemaError}</p>}
-            {!schema && !schemaError && <p className="text-body text-muted-foreground">Loading…</p>}
+            {schemaError && <p className="text-body text-cf-error">Cannot load the settings schema: {schemaError}</p>}
+            {!schema && !schemaError && <p className="text-body text-cf-text-muted">Loading…</p>}
             {schema && result && <SearchResults query={query.trim()} words={words} result={result} sections={guiHits?.hits} onOpenSection={openSection} back={page?.title ?? "the page"} />}
             {schema && !result && page && Page && <Page key={page.id} schema={schema} page={page} />}
           </div>

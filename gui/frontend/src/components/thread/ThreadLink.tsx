@@ -15,7 +15,7 @@ export function ThreadLink({ id, icon, detail }: { id: string; icon?: ReactNode;
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-accent"
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-cf-control-hover"
       data-thread-link={id}
       onClick={() => {
         useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });

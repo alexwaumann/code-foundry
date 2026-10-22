@@ -21,10 +21,10 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
       aria-disabled={!clickable || undefined}
       aria-pressed={chip.selected ?? false}
       className={cn(
-        "flex h-6 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        tone === "error" ? "border-destructive/35 text-destructive" : tone === "attention" ? "border-warning/35 text-warning" : "border-border",
-        clickable && "hover:bg-accent dark:hover:bg-accent/50",
-        chip.selected && "bg-accent dark:bg-accent/50",
+        "flex h-6 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
+        tone === "error" ? "border-cf-error/35 text-cf-error" : tone === "attention" ? "border-cf-warning/35 text-cf-warning" : "border-cf-border",
+        clickable && "hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50",
+        chip.selected && "bg-cf-control-hover dark:bg-cf-control-hover/50",
       )}
       data-testid="plugin-chip"
       data-key={chip.key}

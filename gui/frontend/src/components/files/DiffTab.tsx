@@ -109,14 +109,14 @@ export function DiffTab({ target }: { target: DiffTarget }) {
           <HeaderMeta testId="diff-meta">
             {d.status && (
               <>
-                <span className={cn("font-mono font-semibold", statusColor[d.status] ?? "text-muted-foreground")} data-testid="diff-status">
+                <span className={cn("font-mono font-semibold", statusColor[d.status] ?? "text-cf-text-muted")} data-testid="diff-status">
                   {d.status}
                 </span>
                 {" · "}
               </>
             )}
-            {stats.added > 0 && <span className="text-success">+{stats.added} </span>}
-            {stats.removed > 0 && <span className="text-destructive">−{stats.removed} </span>}
+            {stats.added > 0 && <span className="text-cf-diff-addition">+{stats.added} </span>}
+            {stats.removed > 0 && <span className="text-cf-diff-deletion">−{stats.removed} </span>}
             {(stats.added > 0 || stats.removed > 0) && "· "}vs {base}
           </HeaderMeta>
         )}

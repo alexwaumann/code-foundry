@@ -29,9 +29,9 @@ function Header({ workspaceId }: { workspaceId: string }) {
   const branch = useWorkspacesStore((s) => s.byId[workspaceId]?.branch ?? "");
   const count = useWorkspacesStore((s) => s.byId[workspaceId]?.members.length ?? 0);
   return (
-    <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="workspace-surface-header">
+    <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="workspace-surface-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Layers className="size-4 shrink-0 text-highlight/90" aria-hidden />
+        <Layers className="size-4 shrink-0 text-cf-highlight/90" aria-hidden />
         <span className="min-w-0 truncate" data-testid="workspace-surface-name">
           {name}
         </span>
@@ -83,7 +83,7 @@ export function WorkspaceSurface({ workspaceId }: { workspaceId: string }) {
     // @container: the header and rows adapt to the panel's width (down to 280px).
     <div className="@container flex min-w-0 flex-col" data-testid="workspace-surface" data-workspace={workspaceId} data-thread={threadId || undefined}>
       {!known ? (
-        <p className="px-4 py-3 text-body text-muted-foreground" data-testid="workspace-surface-missing">
+        <p className="px-4 py-3 text-body text-cf-text-muted" data-testid="workspace-surface-missing">
           {loaded ? "This workspace no longer exists." : "Loading workspace…"}
         </p>
       ) : (

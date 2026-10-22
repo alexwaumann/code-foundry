@@ -58,7 +58,7 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
         ref.current = e;
         setEl(e);
       }}
-      className="relative isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
+      className="relative isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface"
       style={{ height }}
       data-testid="plugin-thread"
       data-key={node.key}
@@ -77,7 +77,7 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
         {waiting && <LivePaused kind="thread" reason="connections" />}
       </div>
       {archived && (
-        <div className="flex shrink-0 items-center gap-1.5 border-t border-border px-3 py-1.5 text-caption" data-testid="plugin-thread-archived">
+        <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-border px-3 py-1.5 text-caption" data-testid="plugin-thread-archived">
           <Archive className="size-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 truncate">Archived · read-only</span>
         </div>

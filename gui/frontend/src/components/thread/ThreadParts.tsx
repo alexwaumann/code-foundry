@@ -26,7 +26,7 @@ function ThreadName({ id }: { id: string }) {
       command="thread.rename"
       whenUnavailable="plain"
       size="xs"
-      className={cn("-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-foreground", provisional && "text-muted-foreground italic")}
+      className={cn("-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-cf-text", provisional && "text-cf-text-muted italic")}
       data-testid="thread-title"
     >
       <span className="truncate">{name}</span>
@@ -61,7 +61,7 @@ function ThreadLocation({ id }: { id: string }) {
       command="view.panel.worktree"
       whenUnavailable="plain"
       size="xs"
-      className="flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-muted-foreground"
+      className="flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-cf-text-muted"
       data-testid="thread-location"
     >
       <Icon className="size-3.5 shrink-0" aria-hidden />
@@ -83,7 +83,7 @@ function ThreadLocation({ id }: { id: string }) {
   );
 }
 
-const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center gap-[5px] rounded-md bg-foreground/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-muted-foreground";
+const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center gap-[5px] rounded-md bg-cf-text/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-cf-text-muted";
 
 /**
  * "↳ from <creator>" for a thread an agent created (docs/notes/agents-3-lineage-gui.md,
@@ -100,7 +100,7 @@ function CreatedByChip({ id }: { id: string }) {
     <>
       <CornerDownRight className="size-3 shrink-0" aria-hidden />
       <span className="min-w-0 truncate">
-        from <span className={creator.exists ? "font-medium text-foreground/80" : undefined}>{creator.name}</span>
+        from <span className={creator.exists ? "font-medium text-cf-text/80" : undefined}>{creator.name}</span>
       </span>
     </>
   );
@@ -113,7 +113,7 @@ function CreatedByChip({ id }: { id: string }) {
       </Tip>
     );
   return (
-    <CommandButton command="view.panel.threads" whenUnavailable="plain" size="xs" className={`${CREATED_BY_CHIP} hover:bg-foreground/12 hover:text-muted-foreground dark:hover:bg-foreground/12`} data-testid="thread-created-by">
+    <CommandButton command="view.panel.threads" whenUnavailable="plain" size="xs" className={`${CREATED_BY_CHIP} hover:bg-cf-text/12 hover:text-cf-text-muted dark:hover:bg-cf-text/12`} data-testid="thread-created-by">
       {content}
     </CommandButton>
   );

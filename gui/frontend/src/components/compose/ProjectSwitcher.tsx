@@ -57,12 +57,12 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
           data-testid="composer-project-trigger"
           // The underline is on the inline span: the button's box is the heading's line
           // height, so a border on it would float below the descenders.
-          className="group cursor-pointer rounded-sm text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default"
+          className="group cursor-pointer rounded-sm text-cf-text outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:cursor-default"
         >
           {/* The popover centres on the name itself, whatever box the button gets. */}
           <PopoverAnchor asChild>
             <span
-              className="border-b-[1.5px] border-dotted border-foreground/45 transition-colors group-hover:border-foreground group-disabled:border-foreground/45 group-data-[state=open]:border-foreground"
+              className="border-b-[1.5px] border-dotted border-cf-text/45 transition-colors group-hover:border-cf-text group-disabled:border-cf-text/45 group-data-[state=open]:border-cf-text"
               data-testid="composer-project-name"
             >
               {name}

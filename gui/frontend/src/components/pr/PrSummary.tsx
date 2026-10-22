@@ -28,7 +28,7 @@ function Section({ tabKey, section, title, count, extra, children, testId }: { t
         <button
           type="button"
           aria-expanded={open}
-          className="-ml-1 flex items-center gap-1 rounded-sm px-1 text-label text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="-ml-1 flex items-center gap-1 rounded-sm px-1 text-label text-cf-text-muted outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
           onClick={() => {
             toggleSection(tabKey, section);
           }}
@@ -47,8 +47,8 @@ function Section({ tabKey, section, title, count, extra, children, testId }: { t
 const reviewerIcon: Record<ReviewerStatus, { icon: typeof Check; cls: string } | null> = {
   approved: { icon: Check, cls: toneText.success },
   changes_requested: { icon: FileDiff, cls: toneText.failure },
-  commented: { icon: MessageSquare, cls: "text-muted-foreground" },
-  dismissed: { icon: CircleMinus, cls: "text-muted-foreground" },
+  commented: { icon: MessageSquare, cls: "text-cf-text-muted" },
+  dismissed: { icon: CircleMinus, cls: "text-cf-text-muted" },
   requested: { icon: Clock, cls: toneText.pending },
   none: null,
 };
@@ -60,7 +60,7 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
   return (
     <Tip label={label ? `${r.login}: ${label}` : null}>
       <span
-        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-body-sm", r.stale && "opacity-70")}
+        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-cf-border bg-cf-surface-sunken/40 pr-2 pl-0.5 text-body-sm", r.stale && "opacity-70")}
         data-testid="pr-reviewer"
         data-login={r.login}
         data-status={status}
@@ -68,7 +68,7 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
       >
         <Avatar login={r.login} src={r.avatarUrl} size={18} />
         <span className="max-w-36 min-w-0 truncate">{r.login}</span>
-        {r.isBot && <Bot className="size-3 shrink-0 text-muted-foreground" aria-label="bot" />}
+        {r.isBot && <Bot className="size-3 shrink-0 text-cf-text-muted" aria-label="bot" />}
         {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
         {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
       </span>
@@ -102,7 +102,7 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
         <button
           type="button"
           disabled={!c.url}
-          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default"
+          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-cf-control-hover/60 focus-visible:ring-1 focus-visible:ring-cf-focus disabled:cursor-default"
           data-testid="pr-check"
           data-tone={tone}
           onClick={() => void openUrl(c.url)}
@@ -113,7 +113,7 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="pr-check-meta">
             {checkMeta(c, now)}
           </span>
-          <ExternalLink className={cn("size-3 shrink-0 text-muted-foreground opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
+          <ExternalLink className={cn("size-3 shrink-0 text-cf-text-muted opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
         </button>
       </li>
     </Tip>
@@ -150,20 +150,20 @@ function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: numbe
       <Avatar login={c.author} src={c.authorAvatarUrl} size={20} />
       {/* The verb and age wrap under a long login instead of cutting it short. */}
       <span className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
-        <span className="max-w-full min-w-0 truncate font-medium text-foreground" data-testid="pr-comment-author">
+        <span className="max-w-full min-w-0 truncate font-medium text-cf-text" data-testid="pr-comment-author">
           {c.author || "ghost"}
         </span>
         {c.authorIsBot && <span className="rounded-sm border px-1 text-caption-sm">bot</span>}
         {verb}
         <Tip label={c.createdAtMs === null ? null : new Date(c.createdAtMs).toLocaleString()}>
-          <span className="whitespace-nowrap text-muted-foreground">{ago(c.createdAtMs, now)}</span>
+          <span className="whitespace-nowrap text-cf-text-muted">{ago(c.createdAtMs, now)}</span>
         </Tip>
       </span>
       {c.url && (
         <Tip label="Open on GitHub">
           <button
             type="button"
-            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 outline-none group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm text-cf-text-muted opacity-0 outline-none group-hover:opacity-100 hover:bg-cf-control-hover hover:text-cf-text focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cf-focus"
             aria-label="Open on GitHub"
             onClick={() => void openUrl(c.url)}
           >
@@ -180,7 +180,7 @@ const verdictTone = { approved: toneText.success, changes_requested: toneText.fa
 function Comment({ c, now }: { c: PullRequestCommentView; now: number }) {
   const verb =
     c.kind === "review" ? (
-      <span className={cn("whitespace-nowrap", verdictTone[c.reviewState] ?? "text-muted-foreground")} data-testid="pr-review-verdict">
+      <span className={cn("whitespace-nowrap", verdictTone[c.reviewState] ?? "text-cf-text-muted")} data-testid="pr-review-verdict">
         {reviewVerb(c.reviewState)}
       </span>
     ) : null;
@@ -198,9 +198,9 @@ function Badge({ children, tone }: { children: ReactNode; tone: "success" | "pen
     <span
       className={cn(
         "rounded-full border px-1.5 text-caption-sm",
-        tone === "success" && "border-success/30 text-success",
-        tone === "pending" && "border-warning/30 text-warning",
-        tone === "neutral" && "border-border text-muted-foreground",
+        tone === "success" && "border-cf-success/30 text-cf-success",
+        tone === "pending" && "border-cf-warning/30 text-cf-warning",
+        tone === "neutral" && "border-cf-border text-cf-text-muted",
       )}
     >
       {children}
@@ -213,13 +213,13 @@ const baseOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
 function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
   return (
-    <article className={cn("my-1.5 rounded-lg border border-border", t.isResolved && "opacity-75")} data-testid="pr-thread" data-resolved={t.isResolved} data-outdated={t.isOutdated}>
-      <header className="flex items-center gap-2 border-b border-border px-2.5 py-1.5 text-body-sm">
-        <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+    <article className={cn("my-1.5 rounded-lg border border-cf-border", t.isResolved && "opacity-75")} data-testid="pr-thread" data-resolved={t.isResolved} data-outdated={t.isOutdated}>
+      <header className="flex items-center gap-2 border-b border-cf-border px-2.5 py-1.5 text-body-sm">
+        <FileCode2 className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
         {/* The directory gives way first, so the file and line stay readable. */}
         <Tip label={threadLocation(t)} whenTruncated align="start">
           <span className="flex min-w-0 font-mono" data-testid="pr-thread-location">
-            <span className="min-w-0 truncate text-muted-foreground">{dirOf(t.path)}</span>
+            <span className="min-w-0 truncate text-cf-text-muted">{dirOf(t.path)}</span>
             <span className="shrink-0">{threadLocation({ path: baseOf(t.path), line: t.line })}</span>
           </span>
         </Tip>
@@ -228,7 +228,7 @@ function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
           {t.isResolved ? <Badge tone="success">Resolved</Badge> : <Badge tone="neutral">Unresolved</Badge>}
         </span>
       </header>
-      <div className="flex flex-col divide-y divide-border px-2.5">
+      <div className="flex flex-col divide-y divide-cf-border px-2.5">
         {t.comments.map((c) => (
           <div key={c.id} className="group flex flex-col gap-1.5 py-2" data-testid="pr-thread-comment">
             <CommentHeader c={c} now={now} />
@@ -264,7 +264,7 @@ function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which
     <Tip label={label} whenTruncated>
       <button
         type="button"
-        className="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-caption whitespace-nowrap outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-caption whitespace-nowrap outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
         data-testid={which === "commentOrder" ? "pr-comment-order" : "pr-timeline-order"}
         data-order={order}
         onClick={() => {
@@ -307,7 +307,7 @@ export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRe
         {(d.commentsTruncated || d.reviewThreadsTruncated) && (
           <Notice>
             Older {d.commentsTruncated && d.reviewThreadsTruncated ? "comments and threads" : d.commentsTruncated ? "comments" : "threads"} are only on{" "}
-            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => void openUrl(d.pullRequest.url)}>
+            <button type="button" className="underline underline-offset-2 hover:text-cf-text" onClick={() => void openUrl(d.pullRequest.url)}>
               GitHub
             </button>
             .

@@ -68,7 +68,7 @@ export function CiteChip({ cite }: { cite: CitationBody }) {
           false,
           cn(
             TAG_ACCENT.cite,
-            "cursor-pointer data-[state=open]:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] data-[state=open]:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)]",
+            "cursor-pointer data-[state=open]:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--cf-border))] data-[state=open]:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)]",
           ),
         )}
       >
@@ -89,7 +89,7 @@ export function CiteChip({ cite }: { cite: CitationBody }) {
         }}
       >
         <div
-          className="max-h-[72px] overflow-y-auto border-l-2 border-[color-mix(in_oklab,var(--foreground)_22%,transparent)] py-px pl-2.5 text-body-sm whitespace-pre-wrap text-muted-foreground"
+          className="max-h-[72px] overflow-y-auto border-l-2 border-[color-mix(in_oklab,var(--cf-text)_22%,transparent)] py-px pl-2.5 text-body-sm whitespace-pre-wrap text-cf-text-muted"
           data-testid="cite-source-quote"
         >
           {cite.text}
@@ -100,7 +100,7 @@ export function CiteChip({ cite }: { cite: CitationBody }) {
           </p>
         )}
         <div className="mt-3 flex items-center gap-2 border-t pt-2.5">
-          <span className="text-caption-sm text-muted-foreground" data-testid="cite-source-meta">
+          <span className="text-caption-sm text-cf-text-muted" data-testid="cite-source-meta">
             {present ? ["Claude", time].filter(Boolean).join(" · ") : "No longer in this thread"}
           </span>
           <Button

@@ -419,7 +419,7 @@ function ThreadsUnavailable() {
   if (!unavailable) return null;
   return (
     <Tip label={error} side="right">
-      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="threads-unavailable">
+      <p className="shrink-0 border-t border-cf-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="threads-unavailable">
         Threads: service unavailable
       </p>
     </Tip>
@@ -448,7 +448,7 @@ function SidebarBand() {
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-1 pl-3">
         <span
-          className="min-w-0 overflow-hidden text-brand leading-none whitespace-nowrap text-sidebar-foreground select-none"
+          className="min-w-0 overflow-hidden text-brand leading-none whitespace-nowrap text-cf-sidebar-foreground select-none"
           data-testid="sidebar-app-name"
         >
           Code Foundry
@@ -469,7 +469,7 @@ function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef);
   return (
-    <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
+    <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
       {/* The content pane floats a shell gap (12px) off the sidebar (App.tsx ContentColumn's
           m-shell). Rows run to the sidebar's edges, so the same gap on the left (pl-shell)

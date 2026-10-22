@@ -175,8 +175,8 @@ function BackdropThumb({ image, index, selected, onSelect, onRemove }: { image: 
         aria-pressed={selected}
         onClick={onSelect}
         className={cn(
-          "block aspect-video w-full overflow-hidden rounded-md border bg-muted outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-          selected ? "border-primary ring-2 ring-primary" : "border-border hover:border-foreground/40",
+          "block aspect-video w-full overflow-hidden rounded-md border bg-cf-surface-sunken outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50",
+          selected ? "border-cf-accent ring-2 ring-cf-accent" : "border-cf-border hover:border-cf-text/40",
         )}
       >
         {url && <img src={url} alt="" draggable={false} className="size-full object-cover" />}
@@ -186,7 +186,7 @@ function BackdropThumb({ image, index, selected, onSelect, onRemove }: { image: 
           type="button"
           aria-label={`Remove image ${String(index + 1)}`}
           onClick={onRemove}
-          className="absolute top-1 right-1 rounded-full bg-background/85 p-0.5 text-muted-foreground opacity-0 shadow-sm group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+          className="absolute top-1 right-1 rounded-full bg-cf-canvas/85 p-0.5 text-cf-text-muted opacity-0 shadow-sm group-hover:opacity-100 hover:text-cf-text focus-visible:opacity-100"
         >
           <X className="size-3" />
         </button>

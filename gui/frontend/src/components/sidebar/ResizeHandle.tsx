@@ -14,7 +14,7 @@ export function ResizeHandle() {
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize sidebar"
-      className="absolute top-0 -right-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring active:after:bg-ring"
+      className="absolute top-0 -right-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-cf-focus active:after:bg-cf-focus"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

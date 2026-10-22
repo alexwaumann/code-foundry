@@ -62,7 +62,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
       defaultValue={name}
       aria-label="Thread name"
       data-testid="rename-input"
-      className="h-[22px] min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-body outline-none"
+      className="h-[22px] min-w-0 flex-1 rounded-sm border border-cf-focus bg-cf-canvas px-1 text-body outline-none"
       onClick={(e) => {
         e.stopPropagation();
       }}
@@ -98,7 +98,7 @@ function WorkspaceBadge({ id }: { id: string }) {
     // A click opens the workspace surface in the thread's side panel; the click goes on
     // to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-caption-sm font-medium text-highlight hover:bg-highlight/30"
+      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight hover:bg-cf-highlight/30"
       data-testid="row-workspace"
       onClick={() => {
         openWorkspaceSurface({ kind: "thread", id });
@@ -132,10 +132,10 @@ function useThreadPlace(id: string) {
 /** Status text colours: the theme's status tokens (index.css), sky info, amber warning, emerald success, red destructive. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
   muted: "",
-  sky: "text-info",
-  amber: "text-warning",
-  emerald: "text-success",
-  red: "text-destructive",
+  sky: "text-cf-info",
+  amber: "text-cf-warning",
+  emerald: "text-cf-success",
+  red: "text-cf-error",
 };
 
 /** Status text with a relative time; only these rows subscribe to the shared 30 s clock. */
@@ -176,7 +176,7 @@ function ThreadLine({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
       {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving">
+        <span className="flex min-w-0 items-center gap-1 text-cf-warning" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
           <span className="truncate">moving to {movingTo}…</span>
         </span>
@@ -185,7 +185,7 @@ function ThreadLine({ id }: { id: string }) {
           <AgentsRunning id={id} more={status || showsPlace(line.kind)} />
           {status && (
             <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
-              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-muted-foreground" aria-hidden data-testid="row-waiting" />}
+              {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-cf-sidebar-muted-foreground" aria-hidden data-testid="row-waiting" />}
               {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
             </span>
           )}
@@ -225,7 +225,7 @@ function ThreadLine({ id }: { id: string }) {
 function MadeByThreadGlyph({ id }: { id: string }) {
   const made = useMadeByThread(id);
   if (!made) return null;
-  return <CornerDownRight className="-mr-px size-3 shrink-0 text-muted-foreground opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
+  return <CornerDownRight className="-mr-px size-3 shrink-0 text-cf-sidebar-muted-foreground opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
 }
 
 /**
@@ -237,7 +237,7 @@ function MadeByThreadGlyph({ id }: { id: string }) {
  * lands) is muted and italic.
  */
 function nameClass(name: string, provisional: boolean): string {
-  return cn("truncate text-body font-semibold text-inherit", (!name || provisional) && "text-muted-foreground", provisional && "italic");
+  return cn("truncate text-body font-semibold text-inherit", (!name || provisional) && "text-cf-sidebar-muted-foreground", provisional && "italic");
 }
 
 function ThreadLabel({ id }: { id: string }) {
@@ -261,7 +261,7 @@ function ThreadLabel({ id }: { id: string }) {
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
               <LinkedPrsBadge id={id} />
               <WorkspaceBadge id={id} />
-              {pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="pinned" data-testid="row-pinned" />}
+              {pinned && <Pin className="size-3 shrink-0 text-cf-sidebar-muted-foreground" aria-label="pinned" data-testid="row-pinned" />}
             </span>
           </>
         )}
@@ -287,7 +287,7 @@ function TipRow({ icon, chip, children, testId }: { icon: ReactNode; chip?: stri
 }
 
 function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
-  return <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
+  return <Icon className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />;
 }
 
 const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
@@ -321,7 +321,7 @@ function TipSnooze({ id }: { id: string }) {
   if (until === null) return null;
   return (
     <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-snooze">
-      <AlarmClock className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <AlarmClock className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
       <span className="min-w-0 break-words">Snoozed until {snoozeTimeFull(until, now)}</span>
     </div>
   );
@@ -337,10 +337,10 @@ function TipCreatedBy({ id }: { id: string }) {
   if (creator === null) return null;
   return (
     <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-created-by" data-removed={!creator.exists || undefined}>
-      <CornerDownRight className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <CornerDownRight className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
       <span className="min-w-0 break-words">
-        Created by <span className={creator.exists ? "font-medium" : "text-muted-foreground"}>{creator.name}</span>
-        {!creator.exists && <span className="text-muted-foreground"> (removed)</span>}
+        Created by <span className={creator.exists ? "font-medium" : "text-cf-text-muted"}>{creator.name}</span>
+        {!creator.exists && <span className="text-cf-text-muted"> (removed)</span>}
       </span>
     </div>
   );
@@ -354,7 +354,7 @@ function TipMoving({ id }: { id: string }) {
   const { movingTo } = useThreadPlace(id);
   if (movingTo === null) return null;
   return (
-    <div className="mb-[3px] flex items-start gap-2 leading-5 text-warning" data-testid="tip-moving">
+    <div className="mb-[3px] flex items-start gap-2 leading-5 text-cf-warning" data-testid="tip-moving">
       <ArrowRightLeft className="mt-[3px] size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">Runs in {movingTo} once it is idle at its prompt</span>
     </div>
@@ -403,7 +403,7 @@ function ThreadTipBody({ id }: { id: string }) {
       )}
       <TipRow icon={<ClaudeMark className="size-3.5 shrink-0" style={{ color: CLAUDE_ORANGE }} />} testId="tip-model">
         {modelLabel(model, models)}
-        {effort && <span className="text-muted-foreground"> ({effort})</span>}
+        {effort && <span className="text-cf-text-muted"> ({effort})</span>}
       </TipRow>
     </>
   );
@@ -467,7 +467,7 @@ function SectionHeader({ row }: { row: HeaderRow }) {
         type="button"
         aria-expanded={!row.collapsed}
         data-testid={`${row.section}-header`}
-        className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-muted-foreground outline-none hover:bg-sidebar-accent/50 focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+        className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-cf-sidebar-muted-foreground outline-none hover:bg-cf-sidebar-row-hover focus-visible:ring-1 focus-visible:ring-cf-focus"
         onMouseDown={(e) => {
           e.preventDefault();
         }}
@@ -555,8 +555,8 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
         data-cursor={cursor || undefined}
         className={cn(
           "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
-          selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
-          cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
+          selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
+          cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
         )}
         onClick={() => {
           onActivate(row, "click");

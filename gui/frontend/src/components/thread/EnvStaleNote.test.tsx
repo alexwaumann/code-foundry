@@ -38,7 +38,7 @@ describe("EnvStaleNote", () => {
     renderNote({ pluginEnvStale: true, pluginEnvChange: "Hello removed CF_HELLO" });
     const note = screen.getByTestId("thread-env-stale");
     expect(note.textContent).toBe("Plugin environment changed·Restartto apply");
-    expect(note.className).toContain("text-muted-foreground");
+    expect(note.className).toContain("text-cf-text-muted");
     expect(note.className).toContain("text-caption-sm");
   });
 

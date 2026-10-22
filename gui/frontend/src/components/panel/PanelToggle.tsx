@@ -32,7 +32,7 @@ export function PanelToggle({ className, inPanel = false }: { className?: string
       command="view.panel.toggle"
       icon={PanelRight}
       pressed={open}
-      className={cn("[--wails-draggable:no-drag]", open && "bg-accent text-accent-foreground dark:bg-accent/50", className)}
+      className={cn("[--wails-draggable:no-drag]", open && "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50", className)}
       data-testid="panel-toggle"
     />
   );

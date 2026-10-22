@@ -122,7 +122,7 @@ export function TabStrip({
   return (
     <div className={className} data-testid={testId} data-key={dataKey} data-overflow-start={edges.start || undefined} data-overflow-end={edges.end || undefined}>
       {edges.start && (
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-foreground" aria-label="Earlier tabs" tabIndex={-1} onClick={() => { scrollBy(-1); }} data-testid={`${testId}-prev`}>
+        <Button variant="ghost" size="icon-xs" className="text-cf-text-muted hover:text-cf-text" aria-label="Earlier tabs" tabIndex={-1} onClick={() => { scrollBy(-1); }} data-testid={`${testId}-prev`}>
           <ChevronLeft aria-hidden />
         </Button>
       )}
@@ -131,7 +131,7 @@ export function TabStrip({
         role="tablist"
         aria-label={label}
         aria-orientation="horizontal"
-        className={cn("relative flex min-w-0 items-center gap-0.5 overflow-x-auto bg-muted/60 p-0.5 [scrollbar-width:none] dark:bg-muted/40 [&::-webkit-scrollbar]:hidden", sizes[size].list)}
+        className={cn("relative flex min-w-0 items-center gap-0.5 overflow-x-auto bg-cf-surface-sunken/60 p-0.5 [scrollbar-width:none] dark:bg-cf-surface-sunken/40 [&::-webkit-scrollbar]:hidden", sizes[size].list)}
         style={{ maskImage: fadeMask(edges.start, edges.end), WebkitMaskImage: fadeMask(edges.start, edges.end) }}
         onScroll={() => {
           if (ownScroll.current) ownScroll.current = false;
@@ -155,9 +155,9 @@ export function TabStrip({
                 data-testid={tabTestId}
                 data-key={t.key}
                 className={cn(
-                  "flex max-w-[min(16rem,80%)] shrink-0 items-center outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60",
+                  "flex max-w-[min(16rem,80%)] shrink-0 items-center outline-none focus-visible:ring-1 focus-visible:ring-cf-focus disabled:opacity-60",
                   sizes[size].tab,
-                  on ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground hover:text-foreground",
+                  on ? "bg-cf-surface text-cf-text shadow-xs dark:bg-cf-control-hover" : "text-cf-text-muted hover:text-cf-text",
                 )}
                 onFocus={() => {
                   setCursor(t.key);
@@ -174,7 +174,7 @@ export function TabStrip({
         })}
       </div>
       {edges.end && (
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground hover:text-foreground" aria-label="More tabs" tabIndex={-1} onClick={() => { scrollBy(1); }} data-testid={`${testId}-next`}>
+        <Button variant="ghost" size="icon-xs" className="text-cf-text-muted hover:text-cf-text" aria-label="More tabs" tabIndex={-1} onClick={() => { scrollBy(1); }} data-testid={`${testId}-next`}>
           <ChevronRight aria-hidden />
         </Button>
       )}

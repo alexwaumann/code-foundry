@@ -19,7 +19,7 @@ export function ConfirmDialog() {
     >
       <DialogContent className={cn("max-w-md p-5", pending?.centered && "top-1/2 -translate-y-1/2")} data-testid="confirm-dialog">
         <div className="flex gap-3">
-          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-cf-error" aria-hidden />
           <div className="min-w-0 space-y-2">
             <DialogTitle>{pending?.title}</DialogTitle>
             <DialogDescription className="max-h-96 overflow-y-auto break-words whitespace-pre-line">{pending?.message}</DialogDescription>

@@ -42,7 +42,7 @@ export function PublishPicker({
   }
   if (owners.state === "error") {
     return (
-      <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-owners-error">
+      <p className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="publish-owners-error">
         Cannot list your GitHub accounts: {owners.message}
       </p>
     );
@@ -87,7 +87,7 @@ export function PublishPicker({
           Visibility
         </span>
         {options.length === 0 ? (
-          <span className="text-caption text-destructive" data-testid="publish-visibility-none">
+          <span className="text-caption text-cf-error" data-testid="publish-visibility-none">
             {value.owner} does not let members create repositories.
           </span>
         ) : (
@@ -123,7 +123,7 @@ export function PublishPicker({
         </p>
       )}
       {error && (
-        <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-error">
+        <p className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="publish-error">
           {error}
         </p>
       )}

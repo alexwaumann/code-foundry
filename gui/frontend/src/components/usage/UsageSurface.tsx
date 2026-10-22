@@ -32,7 +32,7 @@ function useUsage(threadId: string): readonly UsageBucketView[] {
 /** "unpriced": the model has no known rate (its cost is a dash). */
 function UnpricedTag() {
   return (
-    <span className="ml-1.5 inline-block rounded-sm border border-border px-[5px] py-px align-[1px] text-caption-sm leading-none" data-testid="usage-unpriced">
+    <span className="ml-1.5 inline-block rounded-sm border border-cf-border px-[5px] py-px align-[1px] text-caption-sm leading-none" data-testid="usage-unpriced">
       unpriced
     </span>
   );
@@ -41,7 +41,7 @@ function UnpricedTag() {
 function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
   const noCost = row.allUnpriced;
   return (
-    <div className="flex items-center gap-2.5 border-b border-border py-2 last:border-b-0" data-testid="usage-model" data-model={row.model}>
+    <div className="flex items-center gap-2.5 border-b border-cf-border py-2 last:border-b-0" data-testid="usage-model" data-model={row.model}>
       <span className={cn("size-2 shrink-0", SWATCH_BG)} style={modelColorVars(row.model) as CSSProperties} data-testid="usage-swatch" aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center">
@@ -57,7 +57,7 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
         </div>
       </div>
       <div className="shrink-0 text-right tabular-nums">
-        <div className={cn("text-body-sm", noCost && "text-muted-foreground")} data-testid="usage-model-cost">
+        <div className={cn("text-body-sm", noCost && "text-cf-text-muted")} data-testid="usage-model-cost">
           {noCost ? "—" : fmtUsd(row.costUsd)}
         </div>
         <div className="mt-0.5 text-caption-sm" data-testid="usage-model-share">
@@ -84,7 +84,7 @@ export function UsageSurface() {
 
   if (!known) {
     return (
-      <p className="px-4 py-3 text-body text-muted-foreground" data-testid="usage-missing">
+      <p className="px-4 py-3 text-body text-cf-text-muted" data-testid="usage-missing">
         Select a thread to see its usage.
       </p>
     );
@@ -92,7 +92,7 @@ export function UsageSurface() {
   if (total.requests === 0 && total.tokens === 0) {
     return (
       <div className="px-4 pt-5 pb-8" data-testid="usage-surface" data-thread={threadId}>
-        <p className="text-body text-muted-foreground" data-testid="usage-empty">
+        <p className="text-body text-cf-text-muted" data-testid="usage-empty">
           No usage yet. Tokens and cost show up here after the thread's first request.
         </p>
       </div>
@@ -102,11 +102,11 @@ export function UsageSurface() {
   return (
     // @container: tightens the padding when the panel is narrow (down to 280px).
     <div className="@container px-4 pt-5 pb-8 @max-[340px]:px-3" data-testid="usage-surface" data-thread={threadId}>
-      <div className={cn("text-display-sm", noCost && "text-muted-foreground")} data-testid="usage-cost">
+      <div className={cn("text-display-sm", noCost && "text-cf-text-muted")} data-testid="usage-cost">
         {noCost ? "—" : fmtUsd(total.costUsd)}
       </div>
       <div className="mt-2 text-caption" data-testid="usage-summary">
-        <b className="font-medium text-foreground tabular-nums">{fmtTok(total.tokens)}</b> tokens · <b className="font-medium text-foreground tabular-nums">{total.requests.toLocaleString("en-US")}</b>{" "}
+        <b className="font-medium text-cf-text tabular-nums">{fmtTok(total.tokens)}</b> tokens · <b className="font-medium text-cf-text tabular-nums">{total.requests.toLocaleString("en-US")}</b>{" "}
         {total.requests === 1 ? "request" : "requests"}
       </div>
 
@@ -119,16 +119,16 @@ export function UsageSurface() {
 
       <h3 className="mt-[26px] mb-1 text-subheading">Tokens</h3>
       <div className="mt-2 grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1.5 text-body-sm" data-testid="usage-tokens">
-        <div className="border-b border-border pb-1 text-caption-sm">Bucket</div>
-        <div className="border-b border-border pb-1 text-right text-caption-sm">Tokens</div>
-        <div className="border-b border-border pb-1 text-right text-caption-sm">Cost</div>
+        <div className="border-b border-cf-border pb-1 text-caption-sm">Bucket</div>
+        <div className="border-b border-cf-border pb-1 text-right text-caption-sm">Tokens</div>
+        <div className="border-b border-cf-border pb-1 text-right text-caption-sm">Cost</div>
         {TOKEN_KINDS.map((k) => (
           <div key={k.kind} className="contents" data-testid="usage-kind" data-kind={k.kind}>
             <div>{k.label}</div>
             <div className="text-right tabular-nums" data-testid="usage-kind-tokens">
               {fmtTok(total[k.kind])}
             </div>
-            <div className="text-right text-muted-foreground tabular-nums" data-testid="usage-kind-cost">
+            <div className="text-right text-cf-text-muted tabular-nums" data-testid="usage-kind-cost">
               {noCost ? "—" : fmtUsd(total[k.cost])}
             </div>
           </div>

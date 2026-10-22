@@ -9,15 +9,15 @@ import { cn } from "@/lib/utils";
 /** A PDF tile's face: the first page on a muted ground (the icon until it renders) over a "PDF" strip. */
 export function PdfTile({ thumb }: { thumb: string | null }) {
   return (
-    <span className="flex size-full flex-col bg-muted">
+    <span className="flex size-full flex-col bg-cf-surface-sunken">
       <span className="flex min-h-0 flex-1 items-center justify-center p-1">
         {thumb ? (
-          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm ring-1 ring-border" />
+          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm ring-1 ring-cf-border" />
         ) : (
-          <FileText aria-hidden className="size-5 text-muted-foreground" />
+          <FileText aria-hidden className="size-5 text-cf-text-muted" />
         )}
       </span>
-      <span aria-hidden className="border-t bg-popover text-center text-caption-sm font-medium text-muted-foreground">
+      <span aria-hidden className="border-t bg-cf-surface-overlay text-center text-caption-sm font-medium text-cf-text-muted">
         PDF
       </span>
     </span>
@@ -33,7 +33,7 @@ export function ChipFace({ pdf, src, name, detail }: { pdf: boolean; src: string
   return (
     <>
       {src ? (
-        <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top ring-1 ring-border")} />
+        <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top ring-1 ring-cf-border")} />
       ) : (
         <Icon aria-hidden className="size-[1.17em] shrink-0" />
       )}

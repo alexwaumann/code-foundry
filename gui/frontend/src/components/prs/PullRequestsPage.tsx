@@ -54,15 +54,15 @@ function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView;
       onCmdClick={() => void openUrl(pr.url)}
       className={cn("grid h-full items-center gap-3 rounded-md px-2 text-body", columns[section])}>
       <Tip label={pr.repoSlug}>
-        <span className="truncate text-muted-foreground">{repoName(pr.repoSlug)}</span>
+        <span className="truncate text-cf-text-muted">{repoName(pr.repoSlug)}</span>
       </Tip>
-      <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
+      <span className="flex items-center gap-1 text-cf-text-muted tabular-nums">
         <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
       </span>
-      {section !== "authored" && <span className="truncate text-muted-foreground">{author}</span>}
+      {section !== "authored" && <span className="truncate text-cf-text-muted">{author}</span>}
       <Tip label={pr.title}>
         <span className="truncate">
-          {pr.draft && <span className="mr-1.5 rounded-sm bg-muted px-1 text-caption-sm uppercase">draft</span>}
+          {pr.draft && <span className="mr-1.5 rounded-sm bg-cf-surface-sunken px-1 text-caption-sm uppercase">draft</span>}
           {pr.title}
         </span>
       </Tip>
@@ -78,7 +78,7 @@ function PrTable({ section, title, rows, empty, viewer }: { section: Section; ti
     <section data-testid={`prs-${section}`}>
       <SectionTitle count={rows.length}>{title}</SectionTitle>
       {rows.length === 0 ? (
-        <p className="px-2 text-body text-muted-foreground">{empty}</p>
+        <p className="px-2 text-body text-cf-text-muted">{empty}</p>
       ) : (
         <div className="rounded-lg border">
           <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
@@ -99,7 +99,7 @@ function PrTable({ section, title, rows, empty, viewer }: { section: Section; ti
 
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
-    <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-warning/40 bg-warning/10 text-warning" : "text-muted-foreground")} role="status">
+    <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-cf-warning/40 bg-cf-warning-surface text-cf-warning" : "text-cf-text-muted")} role="status">
       {children}
     </p>
   );
@@ -152,7 +152,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         {!includeAll && d.trackedSlugs.length === 0 && (
           <Banner tone="info">
             No registered project has a GitHub remote, so the lists are empty.{" "}
-            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={toggle} data-testid="prs-show-all">
+            <button type="button" className="underline underline-offset-2 hover:text-cf-text" onClick={toggle} data-testid="prs-show-all">
               Show pull requests from every repository
             </button>
           </Banner>
@@ -176,12 +176,12 @@ export function PullRequestsPage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
       <PaneHeader className="gap-3 px-5">
-        <GitPullRequest className="size-4 text-muted-foreground" aria-hidden />
+        <GitPullRequest className="size-4 text-cf-text-muted" aria-hidden />
         <h1 className="text-heading">Pull Requests</h1>
         <button
           type="button"
           onClick={toggle}
-          className="rounded-sm border px-1.5 py-0.5 text-caption-sm [--wails-draggable:no-drag] hover:bg-accent"
+          className="rounded-sm border px-1.5 py-0.5 text-caption-sm [--wails-draggable:no-drag] hover:bg-cf-control-hover"
           data-testid="prs-scope"
         >
           {includeAll ? "all repositories" : "registered projects"}
@@ -205,7 +205,7 @@ export function PullRequestsPage() {
         ) : entry?.error ? (
           <Banner tone="warn">Cannot load pull requests: {entry.error}</Banner>
         ) : (
-          <p className="text-body text-muted-foreground">Loading…</p>
+          <p className="text-body text-cf-text-muted">Loading…</p>
         )}
       </div>
     </section>
@@ -220,7 +220,7 @@ export function PullRequestsNav() {
       type="button"
       className={cn(
         "mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
-        active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+        active ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground hover:bg-cf-sidebar-row-hover",
       )}
       data-testid="nav-pullrequests"
       aria-current={active ? "page" : undefined}
@@ -228,7 +228,7 @@ export function PullRequestsNav() {
         useUiStore.getState().select({ kind: "view", name: "pullrequests" });
       }}
     >
-      <GitPullRequest className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <GitPullRequest className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
       <span className="truncate">Pull Requests</span>
     </button>
   );

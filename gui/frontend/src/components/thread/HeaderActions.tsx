@@ -58,7 +58,7 @@ function LinkedPrs({ threadId }: { threadId: string }) {
   const count = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   if (count === 0) return null;
   if (count === 1) return <SingleLinkedPr threadId={threadId} />;
-  return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} className="text-muted-foreground" data-testid="pane-linked-prs" />;
+  return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} className="text-cf-text-muted" data-testid="pane-linked-prs" />;
 }
 
 /** The owning workspace by name, opening its surface (view.panel.workspace); only listed for a workspace thread. */
@@ -73,7 +73,7 @@ function WorkspaceChip({ threadId }: { threadId: string }) {
       icon={Layers}
       label={name}
       size="xs"
-      className="min-w-0 gap-1.5 px-1.5 text-caption-sm text-muted-foreground [&_svg]:size-3.5"
+      className="min-w-0 gap-1.5 px-1.5 text-caption-sm text-cf-text-muted [&_svg]:size-3.5"
       data-testid="pane-workspace"
     />
   );

@@ -20,20 +20,20 @@ const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The sidebar's status colours (SidebarRow toneClasses). */
 const TONE: Readonly<Record<StatusTone, string>> = {
-  muted: "text-muted-foreground",
-  sky: "text-info",
-  amber: "text-warning",
-  emerald: "text-success",
-  red: "text-destructive",
+  muted: "text-cf-text-muted",
+  sky: "text-cf-info",
+  amber: "text-cf-warning",
+  emerald: "text-cf-success",
+  red: "text-cf-error",
 };
 
 const DOT: Readonly<Record<Exclude<LineageStatus, "working">, string>> = {
-  input: "bg-warning",
-  finished: "bg-success",
-  error: "bg-destructive",
-  idle: "border-[1.5px] border-muted-foreground opacity-60",
-  archived: "border-[1.5px] border-muted-foreground opacity-60",
-  snoozed: "border-[1.5px] border-muted-foreground opacity-60",
+  input: "bg-cf-warning",
+  finished: "bg-cf-success",
+  error: "bg-cf-error",
+  idle: "border-[1.5px] border-cf-text-muted opacity-60",
+  archived: "border-[1.5px] border-cf-text-muted opacity-60",
+  snoozed: "border-[1.5px] border-cf-text-muted opacity-60",
 };
 
 /** The thread this panel belongs to: the selected thread ("" otherwise). */
@@ -50,7 +50,7 @@ function openThread(id: string): void {
 function StatusMark({ status }: { status: LineageStatus }) {
   return (
     <span className="flex size-3 shrink-0 items-center justify-center" aria-hidden>
-      {status === "working" ? <LoaderCircle className="size-3 animate-spin text-info" /> : <span className={cn("block size-2 rounded-full", DOT[status])} />}
+      {status === "working" ? <LoaderCircle className="size-3 animate-spin text-cf-info" /> : <span className={cn("block size-2 rounded-full", DOT[status])} />}
     </span>
   );
 }
@@ -117,7 +117,7 @@ function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: b
       <div className={cn("flex min-w-0 items-center gap-2 text-body-sm", archived && "opacity-60")}>
         <StatusMark status={status} />
         <span className="min-w-0 flex-1 truncate">
-          <span className={cn("font-medium", !name && "text-muted-foreground")} data-testid="lineage-name">
+          <span className={cn("font-medium", !name && "text-cf-text-muted")} data-testid="lineage-name">
             {name || id}
           </span>
           {me && <span className="ml-1.5 text-caption-sm">this thread</span>}
@@ -137,19 +137,19 @@ function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: b
       </div>
       {brief && (
         <Tip label={brief} whenTruncated>
-          <div className={cn("mt-0.5 ml-5 line-clamp-2 border-l-2 border-border pl-2 text-body-sm break-words text-foreground/70", archived && "opacity-60")} data-testid="lineage-brief">
+          <div className={cn("mt-0.5 ml-5 line-clamp-2 border-l-2 border-cf-border pl-2 text-body-sm break-words text-cf-text/70", archived && "opacity-60")} data-testid="lineage-brief">
             {brief}
           </div>
         </Tip>
       )}
     </>
   );
-  const common = "relative flex w-full min-w-0 flex-col gap-[3px] border-t border-pane-border px-4 pt-[9px] pb-2.5 text-left @max-[340px]:px-3";
+  const common = "relative flex w-full min-w-0 flex-col gap-[3px] border-t border-cf-divider px-4 pt-[9px] pb-2.5 text-left @max-[340px]:px-3";
   const data = { "data-testid": "lineage-row", "data-thread": id, "data-status": status, "data-me": me || undefined };
   if (me)
     return (
-      <li className={cn(common, "bg-primary/7 dark:bg-primary/10")} aria-current="true" {...data}>
-        <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-primary" aria-hidden />
+      <li className={cn(common, "bg-cf-accent/7 dark:bg-cf-accent-surface")} aria-current="true" {...data}>
+        <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-cf-accent" aria-hidden />
         {body}
       </li>
     );
@@ -157,7 +157,7 @@ function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: b
     <li className="group/row relative flex min-w-0">
       <button
         type="button"
-        className={cn(common, "cursor-default outline-none hover:bg-accent/50 focus-visible:bg-accent/50")}
+        className={cn(common, "cursor-default outline-none hover:bg-cf-control-hover/50 focus-visible:bg-cf-control-hover/50")}
         onClick={() => {
           openThread(id);
         }}
@@ -186,7 +186,7 @@ function SidebarToggle({ id, shown }: { id: string; shown: boolean }) {
         variant="ghost"
         size="icon-xs"
         aria-label={label}
-        className="absolute top-[27px] right-3 text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground focus-visible:opacity-100 @max-[340px]:right-2"
+        className="absolute top-[27px] right-3 text-cf-text-muted opacity-0 group-hover/row:opacity-100 hover:text-cf-text focus-visible:opacity-100 @max-[340px]:right-2"
         data-testid="lineage-sidebar"
         data-shown={shown}
         onClick={() => {
@@ -202,10 +202,10 @@ function SidebarToggle({ id, shown }: { id: string; shown: boolean }) {
 /** The creator's row when it was removed: its recorded name, "Removed", inert. */
 function RemovedCreatorRow({ name }: { name: string }) {
   return (
-    <li className="flex min-w-0 flex-col border-t border-pane-border px-4 pt-[9px] pb-2.5 @max-[340px]:px-3" data-testid="lineage-row" data-removed="true">
-      <div className="flex min-w-0 items-center gap-2 text-body-sm text-muted-foreground">
+    <li className="flex min-w-0 flex-col border-t border-cf-divider px-4 pt-[9px] pb-2.5 @max-[340px]:px-3" data-testid="lineage-row" data-removed="true">
+      <div className="flex min-w-0 items-center gap-2 text-body-sm text-cf-text-muted">
         <span className="flex size-3 shrink-0 items-center justify-center" aria-hidden>
-          <span className="block size-2 rounded-full border border-dashed border-muted-foreground" />
+          <span className="block size-2 rounded-full border border-dashed border-cf-text-muted" />
         </span>
         <span className="min-w-0 flex-1 truncate" data-testid="lineage-name">
           {name}
@@ -230,7 +230,7 @@ function Section({ id, label, count, children }: { id: string; label: string; co
           </span>
         )}
       </h3>
-      <ul className="flex min-w-0 flex-col border-b border-pane-border">{children}</ul>
+      <ul className="flex min-w-0 flex-col border-b border-cf-divider">{children}</ul>
     </section>
   );
 }
@@ -250,7 +250,7 @@ function Siblings({ threadId }: { threadId: string }) {
         <li className="flex min-w-0">
           <button
             type="button"
-            className="flex w-full cursor-default items-center border-t border-pane-border px-4 py-2 pl-9 text-left text-caption outline-none hover:bg-accent/50 hover:text-foreground focus-visible:bg-accent/50 @max-[340px]:px-3"
+            className="flex w-full cursor-default items-center border-t border-cf-divider px-4 py-2 pl-9 text-left text-caption outline-none hover:bg-cf-control-hover/50 hover:text-cf-text focus-visible:bg-cf-control-hover/50 @max-[340px]:px-3"
             data-testid="lineage-more"
             onClick={() => {
               setExpanded(true);
@@ -287,9 +287,9 @@ function Header({ threadId }: { threadId: string }) {
   const related = relatedCount(c);
   const tail = lineageTail(c);
   return (
-    <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="threads-header">
+    <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="threads-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Network className="size-4 shrink-0 text-info" aria-hidden />
+        <Network className="size-4 shrink-0 text-cf-info" aria-hidden />
         <span className="min-w-0 truncate">Threads</span>
         {related > 0 && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="threads-count">
@@ -303,7 +303,7 @@ function Header({ threadId }: { threadId: string }) {
           <span className="min-w-0 truncate">
             {c.creator === "created" ? (
               <>
-                Created by <span className="font-medium text-foreground">{c.creatorName}</span>
+                Created by <span className="font-medium text-cf-text">{c.creatorName}</span>
               </>
             ) : c.creator === "removed" ? (
               "Created by a removed thread"
@@ -331,7 +331,7 @@ export function ThreadsSurface() {
   const c = useLineageCounts(threadId);
   if (!known)
     return (
-      <p className="px-4 py-3 text-body text-muted-foreground @max-[340px]:px-3" data-testid="threads-missing">
+      <p className="px-4 py-3 text-body text-cf-text-muted @max-[340px]:px-3" data-testid="threads-missing">
         Select a thread to see the threads related to it.
       </p>
     );
@@ -343,7 +343,7 @@ export function ThreadsSurface() {
         <div className="flex flex-col gap-1.5 px-4 py-3.5 @max-[340px]:px-3" data-testid="threads-empty">
           <p className="text-body-sm">Created by you. No threads created from here.</p>
           <p className="text-caption">
-            When an agent in this thread runs <code className="text-code text-foreground">code-foundry thread new</code>, the threads it starts show here, with their status.
+            When an agent in this thread runs <code className="text-code text-cf-text">code-foundry thread new</code>, the threads it starts show here, with their status.
           </p>
         </div>
       ) : (

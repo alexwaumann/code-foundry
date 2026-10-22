@@ -21,7 +21,7 @@ export function displayValue(f: SettingFieldView, v: string): string {
 
 /** A card's rows after the first are separated by a hairline. */
 export function rowBorder(i: number): string | undefined {
-  return i > 0 ? "border-t border-border" : undefined;
+  return i > 0 ? "border-t border-cf-border" : undefined;
 }
 
 /** The search box's words, lower-cased; none for an empty or blank query. */
