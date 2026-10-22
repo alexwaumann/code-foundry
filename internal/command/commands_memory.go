@@ -94,7 +94,7 @@ func RegisterMemory(r *Registry, b MemoryBackend) error {
 					return Result{Message: fmt.Sprintf("already remembered as #%d: %s (nothing changed)", e.Index, e.Text),
 						JSON: MemoryAddView{Entry: e}}, nil
 				}
-				return Result{Message: fmt.Sprintf("remembered #%d: %s; %s", e.Index, e.Text, memoryApplies),
+				return Result{Message: fmt.Sprintf("remembered #%d: %s (%s)", e.Index, e.Text, memoryApplies),
 					JSON: MemoryAddView{Entry: e, Added: true}}, nil
 			},
 		},
@@ -112,7 +112,7 @@ func RegisterMemory(r *Registry, b MemoryBackend) error {
 				if err != nil {
 					return Result{}, memoryErr("entry", err)
 				}
-				return Result{Message: fmt.Sprintf("forgot #%d: %s; %s", e.Index, e.Text, memoryApplies),
+				return Result{Message: fmt.Sprintf("forgot #%d: %s (%s)", e.Index, e.Text, memoryApplies),
 					JSON: MemoryRemoveView{Removed: e}}, nil
 			},
 		},
@@ -131,7 +131,7 @@ func RegisterMemory(r *Registry, b MemoryBackend) error {
 				if n == 0 {
 					return Result{Message: "no preferences to forget", JSON: MemoryClearView{}}, nil
 				}
-				return Result{Message: fmt.Sprintf("forgot %s; %s", plural(n, "preference"), memoryApplies),
+				return Result{Message: fmt.Sprintf("forgot %s (%s)", plural(n, "preference"), memoryApplies),
 					JSON: MemoryClearView{Removed: n}}, nil
 			},
 		},
