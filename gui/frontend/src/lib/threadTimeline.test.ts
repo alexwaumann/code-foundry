@@ -33,7 +33,7 @@ function shape(rows: readonly TimelineRow[]): string[] {
       case "strip":
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
       case "html":
-        return `html:${r.id}${r.folded ? "(folded)" : ""}`;
+        return `html:${r.id}${r.folded ? (r.foldChosen ? "(folded by user)" : "(folded)") : ""}`;
       default:
         return `${r.type}:${r.id}`;
     }
@@ -483,6 +483,11 @@ describe("inline pages (html items)", () => {
     const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:a"]);
     expect(shape(buildRows(buildTurns(items), expanded))).toEqual(["user:u1", "header", "tool:Write", "html:h", "final:a"]);
+  });
+
+  it("say whether the user folded their turn (the card then closes even if seen open)", () => {
+    const items = [user("u1"), item("html", { id: "h" }), text("a"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(["user:u1", "header(folded 0)", "html:h(folded by user)", "final:a"]);
   });
 
   it("break a live strip's run and show on their own", () => {

@@ -38,8 +38,16 @@ export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode,
   const { threadId } = useThreadCtx();
   const item = useThreadItem(threadId, node.id);
   // The reader's choice holds per fold state: folding the turn closes the card, unfolding opens it.
+  // A card the reader saw open (it arrived live, or its turn was open) stays open when its turn
+  // folds by default at its end, so a page shown while they watch does not vanish as the turn
+  // ends; folding the turn themselves, or leaving the thread (which forgets this), closes it.
   const key = `html:${node.id}:${node.folded ? "folded" : "open"}`;
-  const open = useRowExpanded(threadId, key, !node.folded);
+  const seenKey = `html-seen:${node.id}`;
+  const seen = useRowExpanded(threadId, seenKey, false);
+  const open = useRowExpanded(threadId, key, !node.folded || (seen && !node.foldChosen));
+  useEffect(() => {
+    if (!node.folded && !seen) setRowExpanded(threadId, seenKey, true);
+  }, [threadId, seenKey, node.folded, seen]);
   const page = useMemo(() => (item?.kind === "html" ? inlinePage(item) : null), [item]);
   if (!page) return null;
   return (

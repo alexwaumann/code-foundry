@@ -111,12 +111,18 @@ test("open in side panel opens the file in the thread's own panel", async ({ pag
   await expect(page.getByTestId("panel-tabs").getByRole("tab", { selected: true })).toHaveText("hello.html");
 });
 
-test("the item folds with its turn: the row stays, the card and its frame go; the row opens it again", async ({ page }) => {
+test("the item folds with its turn: a card seen open survives the turn's own fold, not the user's or a revisit", async ({ page }) => {
   await openHtmlThread(page);
   await expect(page.getByTestId("thread-html-frame")).toHaveCount(1);
+  // The turn ends while the reader watches: it folds by default, the card they saw stays open.
   await mockPost("thread/finish");
   await expect(page.locator('[data-testid="thread-turn-header"][data-folded]')).toHaveCount(1);
   await expect(items(page)).toHaveCount(2);
+  await expect(hello(page).getByTestId("thread-html-frame")).toBeVisible();
+  // Unfold, then fold the turn: the user's fold closes every card; the row stays and reopens it.
+  await page.locator('[data-testid="thread-turn-header"]').getByRole("button", { name: "Show this turn's work" }).click();
+  await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
+  await page.locator('[data-testid="thread-turn-header"]').getByRole("button", { name: "Hide this turn's work" }).click();
   await expect(page.getByTestId("thread-html-card")).toHaveCount(0);
   await expect(page.getByTestId("thread-html-frame")).toHaveCount(0);
   const r = hello(page).getByTestId("thread-html-row");
@@ -124,9 +130,11 @@ test("the item folds with its turn: the row stays, the card and its frame go; th
   await expect(r).toContainText("folded");
   await r.click();
   await expect(hello(page).getByTestId("thread-html-frame")).toBeVisible();
-  // Unfolding the turn opens every card; folding it again closes them.
-  await page.locator('[data-testid="thread-turn-header"]').getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(page.getByTestId("thread-html-card")).toHaveCount(2);
-  await page.locator('[data-testid="thread-turn-header"]').getByRole("button", { name: "Hide this turn's work" }).click();
-  await expect(page.getByTestId("thread-html-card")).toHaveCount(1);
+  // Leaving the thread forgets all that: on return the folded turn's cards are closed.
+  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
+  await expect(items(page)).toHaveCount(0);
+  await row(page, "s:s-r1").click();
+  await expect(items(page)).toHaveCount(2);
+  await expect(page.getByTestId("thread-html-card")).toHaveCount(0);
+  await expect(hello(page).getByTestId("thread-html-row")).toContainText("folded");
 });
