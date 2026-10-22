@@ -40,7 +40,8 @@ func workspacePrompt(name string) string {
 // (docs/notes/agent-skills.md, control-4-capabilities.md). Then the routing a thread
 // needs when no skill fires, as on ordinary task-shaped prompts: where preferences,
 // cost, showing things, pull requests and slash commands go in this app
-// (docs/notes/control-7-skill-routing.md). Its last sentence holds the orchestration
+// (docs/notes/control-7-skill-routing.md), and where thread new puts a thread, stated
+// without a recommendation: the model's call (docs/notes/thread-new-base-origin.md). Its last sentence holds the orchestration
 // rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
@@ -49,7 +50,7 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"to show a file, diff, PR, usage or worktree: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
 	"a path in your reply is a clickable chip, an .html file renders interactively; " +
 	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
-	"threads work In place unless the user picks Fresh copy (a worktree); " +
+	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
 	"never tell the user to type /model or /cost, which the app replaces; " +
 	"page verbs (view.*) move every window: prefer panel verbs; " +
 	"say what you will do, not command or skill names. " +
@@ -135,6 +136,9 @@ type NewWorkspace struct {
 	Name string
 	// Branch steers the one branch of every member, as NewWorktree.Branch.
 	Branch string
+	// BaseFromOrigin overrides projects.base_from_origin for every member, as
+	// NewWorktree.BaseFromOrigin.
+	BaseFromOrigin *bool
 }
 
 // createdWorkspace is what newWorkspace made.
@@ -301,7 +305,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 	}
 	w, err := m.opts.Workspaces.Create(ctx, workspace.CreateOptions{
-		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true,
+		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true, BaseFromOrigin: nw.BaseFromOrigin,
 	})
 	if err != nil {
 		return cw, workspaceError("create workspace "+wsName, err)

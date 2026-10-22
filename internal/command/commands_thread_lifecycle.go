@@ -66,7 +66,7 @@ func canStartThread(c Context) bool {
 // noProjectAlone refuses thread.new's no-project with any arg that places the thread
 // in a project or workspace.
 func noProjectAlone(a Args) error {
-	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base", "branch"} {
+	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base", "base-from-origin", "branch"} {
 		if a.String(name) != "" || a.Bool(name) {
 			return InvalidArg(name, "no-project starts a thread without a project; it does not take %s", name)
 		}
@@ -111,13 +111,14 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: supervisedHelp + ", accept-edits (edits allowed) or auto"},
 				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (its branch named from the prompt by settings projects.branch_naming, e.g. feat/add-filter; cf/<thread id> when naming fails); without it the thread works in the given worktree, else the project's own checkout (the GUI's threads.default_worktree does not apply)"},
-				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off); needs new-worktree; ignored when branch exists"},
+				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless base-from-origin is no or projects.base_from_origin is off); needs new-worktree; ignored when branch exists"},
+				baseFromOriginArg,
 				{Name: "branch", Type: String, Description: "The new worktree's branch: with a / it is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); an existing branch is checked out, not suffixed; needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
-				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree, base or branch)"},
+				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree, base, base-from-origin or branch)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
@@ -163,17 +164,23 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					}
 					req.BudgetUsd = usd
 				}
+				fromOrigin, err := baseFromOrigin(a)
+				if err != nil {
+					return Result{}, err
+				}
 				switch {
 				case len(projects) > 0 && !a.Bool("new-worktree"):
 					return Result{}, InvalidArg("projects", "only applies with new-worktree (a new workspace); for an existing one use workspace")
 				case ws != "" && a.Bool("new-worktree"):
 					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with projects")
 				case len(projects) > 0:
-					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base"), Branch: a.String("branch")}
+					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base"), Branch: a.String("branch"), BaseFromOrigin: fromOrigin}
 				case a.Bool("new-worktree"):
-					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base"), Branch: a.String("branch")}
+					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base"), Branch: a.String("branch"), BaseFromOrigin: fromOrigin}
 				case a.String("base") != "":
 					return Result{}, InvalidArg("base", "only applies with new-worktree")
+				case fromOrigin != nil:
+					return Result{}, InvalidArg("base-from-origin", "only applies with new-worktree")
 				case a.String("branch") != "":
 					return Result{}, InvalidArg("branch", "only applies with new-worktree")
 				}

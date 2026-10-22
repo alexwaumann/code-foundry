@@ -37,8 +37,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` |
 | How something works inside the app | its source at the ref in the line under this title, as the help skill's "Reading the source" says |
 
-Load a skill with your Skill tool (or Read its SKILL.md: `daemon.capabilities --group
-skills` gives the paths).
+Load a skill with your Skill tool (or Read its SKILL.md: `--group skills` has the paths).
 
 ## Showing things
 
@@ -59,8 +58,9 @@ the running app, so it is current where these files may not be.
 ## Good to know
 
 - A **project** is a folder on the Mac; a **thread** is one conversation with an agent in
-  it. "Work in" decides where a new thread edits: In place (the project folder itself,
-  the default, setting `threads.default_worktree`) or Fresh copy (a worktree and branch).
+  it. The composer's "Work in" places the user's own threads: In place (the project
+  folder) or Fresh copy (a worktree and branch), default `threads.default_worktree`.
+  Threads you create with `thread new` are yours to place: in place or `--new-worktree`.
 - The app replaces /model, /effort, /fast, /mcp, /rename and /clear: the composer's
   Model, Effort and Permissions pickers, the MCP panel, Rename Thread, a new thread.
 - `$CODE_FOUNDRY_THREAD` is your thread's id. Thread commands without `--id` act on it;

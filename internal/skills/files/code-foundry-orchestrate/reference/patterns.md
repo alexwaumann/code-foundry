@@ -128,6 +128,12 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/feat
   --name "CLI --tag flag" --notify --request-id batch-1018-tag --prompt "..."
 ```
 
+Before it is pushed (a lead's or a sibling's branch with local commits only), name the
+local branch and keep it local: `--base feat/add-filter --base-from-origin no` starts
+from that branch as it is now, without a fetch (without the flag, a branch origin also
+has starts from origin's copy, under the default `projects.base_from_origin`). Later
+commits on it do not reach the new branch: rebase onto it once it is pushed.
+
 Merge order is then first branch, second branch. Stack only when the work depends on
 the sibling's branch or the user agreed; for line-level overlap, assign anchors (§0)
 instead. When the first branch changes after the second was started (a review fix),

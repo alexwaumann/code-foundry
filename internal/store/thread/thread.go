@@ -463,6 +463,9 @@ type NewWorktree struct {
 	// else the slug the projects.branch_naming mode wraps. An existing one is checked
 	// out. Empty: generated (branchname.go).
 	Branch string
+	// BaseFromOrigin, when set, overrides projects.base_from_origin
+	// (Options.BaseFromOrigin) for this worktree: thread new --base-from-origin yes|no.
+	BaseFromOrigin *bool
 }
 
 // Store is the thread store API. *Manager implements it; threadtest.Fake is an

@@ -105,7 +105,9 @@ func (f *Fake) Snapshot() *workspace.Snapshot {
 }
 
 // Create implements workspace.Store. Project refs are used as project ids verbatim; the
-// branch defaults to cf/<slug of name>, as the real store's without DefaultBranch.
+// branch defaults to cf/<slug of name>, as the real store's without DefaultBranch. It
+// records "Create <name> <project[:base],...>", then " base-from-origin=<bool>" when
+// CreateOptions.BaseFromOrigin is set.
 func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -116,7 +118,11 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 			projects[i] += ":" + m.BaseRef
 		}
 	}
-	if err := f.record("Create " + o.Name + " " + strings.Join(projects, ",")); err != nil {
+	call := "Create " + o.Name + " " + strings.Join(projects, ",")
+	if o.BaseFromOrigin != nil {
+		call += " base-from-origin=" + strconv.FormatBool(*o.BaseFromOrigin)
+	}
+	if err := f.record(call); err != nil {
 		return workspace.Workspace{}, err
 	}
 	if o.Name == "" || len(o.Members) == 0 {

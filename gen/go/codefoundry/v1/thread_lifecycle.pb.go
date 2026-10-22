@@ -2104,9 +2104,12 @@ type NewWorktree struct {
 	// hint to custom instructions). An existing branch (local or on origin) is checked
 	// out rather than suffixed. Empty: generated from the naming model's reply, else
 	// cf/<thread id>.
-	Branch        string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	// Overrides projects.base_from_origin for this worktree, as
+	// CreateWorktreeRequest.base_from_origin. Unset: the setting.
+	BaseFromOrigin *bool `protobuf:"varint,3,opt,name=base_from_origin,json=baseFromOrigin,proto3,oneof" json:"base_from_origin,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NewWorktree) Reset() {
@@ -2153,6 +2156,13 @@ func (x *NewWorktree) GetBranch() string {
 	return ""
 }
 
+func (x *NewWorktree) GetBaseFromOrigin() bool {
+	if x != nil && x.BaseFromOrigin != nil {
+		return *x.BaseFromOrigin
+	}
+	return false
+}
+
 type NewWorkspace struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Projects (id, name when unique, or an absolute path inside one), in member
@@ -2165,9 +2175,12 @@ type NewWorkspace struct {
 	// add-filter).
 	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	// Steers the one branch of every member, as NewWorktree.branch.
-	Branch        string `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Branch string `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
+	// Overrides projects.base_from_origin for every member, as
+	// NewWorktree.base_from_origin. Unset: the setting.
+	BaseFromOrigin *bool `protobuf:"varint,5,opt,name=base_from_origin,json=baseFromOrigin,proto3,oneof" json:"base_from_origin,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NewWorkspace) Reset() {
@@ -2226,6 +2239,13 @@ func (x *NewWorkspace) GetBranch() string {
 		return x.Branch
 	}
 	return ""
+}
+
+func (x *NewWorkspace) GetBaseFromOrigin() bool {
+	if x != nil && x.BaseFromOrigin != nil {
+		return *x.BaseFromOrigin
+	}
+	return false
 }
 
 type StageAttachmentRequest struct {
@@ -5103,15 +5123,19 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"in_sidebar\x18\x15 \x01(\bH\x00R\tinSidebar\x88\x01\x01\x12'\n" +
 	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +
 	"\x10effort_defaulted\x18\x17 \x01(\bR\x0feffortDefaultedB\r\n" +
-	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"@\n" +
+	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"\x84\x01\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\"q\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\x12-\n" +
+	"\x10base_from_origin\x18\x03 \x01(\bH\x00R\x0ebaseFromOrigin\x88\x01\x01B\x13\n" +
+	"\x11_base_from_origin\"\xb5\x01\n" +
 	"\fNewWorkspace\x12\x1a\n" +
 	"\bprojects\x18\x01 \x03(\tR\bprojects\x12\x19\n" +
 	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
-	"\x06branch\x18\x04 \x01(\tR\x06branch\"\x87\x01\n" +
+	"\x06branch\x18\x04 \x01(\tR\x06branch\x12-\n" +
+	"\x10base_from_origin\x18\x05 \x01(\bH\x00R\x0ebaseFromOrigin\x88\x01\x01B\x13\n" +
+	"\x11_base_from_origin\"\x87\x01\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
@@ -5489,6 +5513,8 @@ func file_codefoundry_v1_thread_lifecycle_proto_init() {
 	}
 	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[0].OneofWrappers = []any{}
 	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[6].OneofWrappers = []any{}
+	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[7].OneofWrappers = []any{}
+	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[8].OneofWrappers = []any{}
 	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[52].OneofWrappers = []any{
 		(*ThreadListEvent_Snapshot)(nil),
 		(*ThreadListEvent_Updated)(nil),

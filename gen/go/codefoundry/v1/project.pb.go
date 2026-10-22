@@ -1002,9 +1002,13 @@ type CreateWorktreeRequest struct {
 	// Fetch the remote branch the new branch starts from first (origin's copy of a
 	// bare name, or a remote-tracking base_ref). Bounded; a failed fetch is logged and
 	// the stale ref is used. Nothing is fetched with projects.base_from_origin off.
-	Fetch         bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Fetch bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
+	// Overrides projects.base_from_origin for this call: true is origin's copy of the
+	// default branch or a bare branch name (fetched with fetch), false the local one,
+	// base_ref used as typed and nothing fetched. Unset: the setting.
+	BaseFromOrigin *bool `protobuf:"varint,6,opt,name=base_from_origin,json=baseFromOrigin,proto3,oneof" json:"base_from_origin,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateWorktreeRequest) Reset() {
@@ -1061,6 +1065,13 @@ func (x *CreateWorktreeRequest) GetBaseRef() string {
 func (x *CreateWorktreeRequest) GetFetch() bool {
 	if x != nil {
 		return x.Fetch
+	}
+	return false
+}
+
+func (x *CreateWorktreeRequest) GetBaseFromOrigin() bool {
+	if x != nil && x.BaseFromOrigin != nil {
+		return *x.BaseFromOrigin
 	}
 	return false
 }
@@ -4103,13 +4114,15 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x11GetProjectRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
 	"\x12GetProjectResponse\x121\n" +
-	"\aproject\x18\x01 \x01(\v2\x17.codefoundry.v1.ProjectR\aproject\"\x8b\x01\n" +
+	"\aproject\x18\x01 \x01(\v2\x17.codefoundry.v1.ProjectR\aproject\"\xcf\x01\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x19\n" +
 	"\bbase_ref\x18\x03 \x01(\tR\abaseRef\x12\x14\n" +
-	"\x05fetch\x18\x05 \x01(\bR\x05fetchJ\x04\b\x04\x10\x05R\x04path\"N\n" +
+	"\x05fetch\x18\x05 \x01(\bR\x05fetch\x12-\n" +
+	"\x10base_from_origin\x18\x06 \x01(\bH\x00R\x0ebaseFromOrigin\x88\x01\x01B\x13\n" +
+	"\x11_base_from_originJ\x04\b\x04\x10\x05R\x04path\"N\n" +
 	"\x16CreateWorktreeResponse\x124\n" +
 	"\bworktree\x18\x01 \x01(\v2\x18.codefoundry.v1.WorktreeR\bworktree\"\x85\x01\n" +
 	"\x15RemoveWorktreeRequest\x12\x1d\n" +
@@ -4540,6 +4553,7 @@ func file_codefoundry_v1_project_proto_init() {
 	if File_codefoundry_v1_project_proto != nil {
 		return
 	}
+	file_codefoundry_v1_project_proto_msgTypes[11].OneofWrappers = []any{}
 	file_codefoundry_v1_project_proto_msgTypes[29].OneofWrappers = []any{
 		(*ProjectEvent_ProjectUpdated)(nil),
 		(*ProjectEvent_ProjectRemovedId)(nil),

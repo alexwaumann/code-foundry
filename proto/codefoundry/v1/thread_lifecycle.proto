@@ -557,6 +557,9 @@ message NewWorktree {
   // out rather than suffixed. Empty: generated from the naming model's reply, else
   // cf/<thread id>.
   string branch = 2;
+  // Overrides projects.base_from_origin for this worktree, as
+  // CreateWorktreeRequest.base_from_origin. Unset: the setting.
+  optional bool base_from_origin = 3;
 }
 
 message NewWorkspace {
@@ -571,6 +574,9 @@ message NewWorkspace {
   string name = 3;
   // Steers the one branch of every member, as NewWorktree.branch.
   string branch = 4;
+  // Overrides projects.base_from_origin for every member, as
+  // NewWorktree.base_from_origin. Unset: the setting.
+  optional bool base_from_origin = 5;
 }
 
 message StageAttachmentRequest {

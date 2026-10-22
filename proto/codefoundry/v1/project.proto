@@ -221,6 +221,10 @@ message CreateWorktreeRequest {
   // bare name, or a remote-tracking base_ref). Bounded; a failed fetch is logged and
   // the stale ref is used. Nothing is fetched with projects.base_from_origin off.
   bool fetch = 5;
+  // Overrides projects.base_from_origin for this call: true is origin's copy of the
+  // default branch or a bare branch name (fetched with fetch), false the local one,
+  // base_ref used as typed and nothing fetched. Unset: the setting.
+  optional bool base_from_origin = 6;
 }
 
 message CreateWorktreeResponse {

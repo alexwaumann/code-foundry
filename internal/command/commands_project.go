@@ -118,17 +118,23 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Args: []ArgSpec{
 				projectArg,
 				{Name: "branch", Type: String, Required: true, Description: "Branch to check out"},
-				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
-				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy; never with projects.base_from_origin off)"},
+				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch; a branch name means origin's copy, fetched, unless base-from-origin is no or projects.base_from_origin is off)"},
+				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy; never with base-from-origin no or projects.base_from_origin off)"},
+				baseFromOriginArg,
 			},
 			When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
 			WhyUnavailable: notGit.whyNotGit,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				fromOrigin, err := baseFromOrigin(a)
+				if err != nil {
+					return Result{}, err
+				}
 				res, err := b.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
-					ProjectId: a.String("project"),
-					Branch:    a.String("branch"),
-					BaseRef:   a.String("base"),
-					Fetch:     a.Bool("fetch"),
+					ProjectId:      a.String("project"),
+					Branch:         a.String("branch"),
+					BaseRef:        a.String("base"),
+					Fetch:          a.Bool("fetch"),
+					BaseFromOrigin: fromOrigin,
 				}))
 				if err != nil {
 					return Result{}, err

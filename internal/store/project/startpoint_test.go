@@ -137,6 +137,27 @@ func TestStartPoint(t *testing.T) {
 			name: "off, origin/main: the stale ref, no fetch", base: "origin/main",
 			expect: func(s map[string]string) want { return want{s["local"], "origin/main", 0, ""} },
 		},
+		// thread new --base <branch> --base-from-origin no|yes, for a lead's branch whose
+		// newer commits are not pushed yet (docs/notes/thread-new-base-origin.md).
+		{
+			name: "on, local branch origin has an older copy of: origin's, fetched", on: true, base: "feat/lead",
+			setup: leadBranch,
+			expect: func(s map[string]string) want {
+				return want{s["pushed"], "origin/feat/lead", 1, "start_point=origin/feat/lead"}
+			},
+		},
+		{
+			name: "off, local branch origin has an older copy of: the local one, no fetch", base: "feat/lead",
+			setup:  leadBranch,
+			expect: func(s map[string]string) want { return want{s["lead"], "feat/lead", 0, ""} },
+		},
+		{
+			name: "off, unpushed local branch: as typed, no fetch", base: "feat/lead",
+			setup: func(t *testing.T, f fixture, s map[string]string) {
+				git(t, f.project, "branch", "feat/lead")
+			},
+			expect: func(s map[string]string) want { return want{s["local"], "feat/lead", 0, ""} },
+		},
 		{
 			name: "off, tag: as typed", base: "v1",
 			setup: func(t *testing.T, f fixture, s map[string]string) {
@@ -207,6 +228,18 @@ func TestStartPoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+// leadBranch is a lead's branch feat/lead: pushed once (s["pushed"]), then a commit
+// more in the project that origin does not have (s["lead"]).
+func leadBranch(t *testing.T, f fixture, s map[string]string) {
+	t.Helper()
+	git(t, f.other, "checkout", "-q", "-b", "feat/lead")
+	s["pushed"] = pushCommit(t, f.other, "pushed")
+	git(t, f.project, "fetch", "-q", "origin", "feat/lead:refs/remotes/origin/feat/lead")
+	git(t, f.project, "branch", "feat/lead", "origin/feat/lead")
+	s["lead"] = git(t, f.project, "commit-tree", "-p", "feat/lead", "-m", "unpushed", "feat/lead^{tree}")
+	git(t, f.project, "update-ref", "refs/heads/feat/lead", s["lead"])
 }
 
 // With the setting off nothing reaches origin: an unreachable origin is never tried

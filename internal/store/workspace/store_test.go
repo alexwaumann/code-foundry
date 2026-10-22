@@ -524,7 +524,8 @@ func TestCreateExistingRemoteBranchIgnoresBase(t *testing.T) {
 	}
 }
 
-// projects.base_from_origin is read at every member worktree.
+// projects.base_from_origin is read at every member worktree; CreateOptions.BaseFromOrigin
+// (thread new --projects --base-from-origin) overrides it.
 func TestCreateBaseFromOrigin(t *testing.T) {
 	h := newHarness(t)
 	on := false
@@ -533,15 +534,23 @@ func TestCreateBaseFromOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {
-		name string
-		on   bool
-	}{{"off", false}, {"on", true}} {
+		name     string
+		on       bool
+		override *bool
+		want     bool
+	}{
+		{"off", false, nil, false},
+		{"on", true, nil, true},
+		{"on, overridden off", true, new(false), false},
+		{"off, overridden on", false, new(true), true},
+	} {
 		on = tt.on
-		if _, err := m.Create(context.Background(), CreateOptions{Name: "ws " + tt.name, Members: []MemberSpec{{Project: "web"}}, Fetch: true}); err != nil {
+		if _, err := m.Create(context.Background(), CreateOptions{Name: "ws " + tt.name, Members: []MemberSpec{{Project: "web"}}, Fetch: true,
+			BaseFromOrigin: tt.override}); err != nil {
 			t.Fatal(err)
 		}
-		if got := h.projects.Creates[len(h.projects.Creates)-1]; got.BaseFromOrigin != tt.on {
-			t.Errorf("%s: BaseFromOrigin = %v", tt.name, got.BaseFromOrigin)
+		if got := h.projects.Creates[len(h.projects.Creates)-1]; got.BaseFromOrigin != tt.want {
+			t.Errorf("%s: BaseFromOrigin = %v, want %v", tt.name, got.BaseFromOrigin, tt.want)
 		}
 	}
 }
