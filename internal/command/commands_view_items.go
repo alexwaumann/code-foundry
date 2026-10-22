@@ -116,7 +116,7 @@ func (d ViewDeps) itemCommands() []Command {
 			Name:  "view.panel.pr",
 			Title: "Show Pull Request in Side Panel",
 			Description: "Open a pull request in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"its summary, checks, reviews, timeline and changed files, with Merge and Review.",
+				"the pull request's summary, checks, reviews, timeline and changed files, with Merge and Review.",
 			Category:     "View",
 			NoKeybinding: true,
 			When:         hasThread,

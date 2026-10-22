@@ -314,7 +314,8 @@ func capPages(_ context.Context, env capEnv) (capDetail, error) {
 	pages := pageCommands(env.r)
 	var b strings.Builder
 	fmt.Fprintf(&b, "pages: %d. Each verb shows its page in every app window, moving every window away from what the user sees: "+
-		"run one only when asked. From a thread no window shows, a page verb refuses unless --focus (the user asked to be taken there).\n", len(pages))
+		"run one only when asked, and to show something prefer a panel verb. From a thread no window shows, a page verb refuses unless "+
+		"--focus (the user asked to be taken there).\n", len(pages))
 	for _, p := range pages {
 		fmt.Fprintf(&b, "  %-20s %s\n", p.Command, p.Description)
 	}
@@ -354,10 +355,13 @@ func surfaceWhat(desc string) string {
 	return desc
 }
 
-// presenceRule is what a thread checks before it opens something in its own side panel
-// (the help skill's "Showing things in the app").
-const presenceRule = "Before opening one from a thread, run `code-foundry ui.presence --json`: open it only when `viewed` " +
-	"is true and no remembered preference says not to, otherwise say it in your reply; never pass --focus unasked."
+// presenceRule is when a thread opens something in its own side panel, and what
+// ui.presence is for (the help skill's "Showing things in the app",
+// docs/notes/control-7-skill-routing.md): on the user's request, no presence check.
+const presenceRule = "From a thread: when the user asks to see something, open it in your own panel (a \"show me\" is asking); " +
+	"after something worth seeing on your own, open it too unless a remembered preference says not to, and say so in your reply " +
+	"(no ui.notify: the turn's end alerts). `code-foundry ui.presence --json` only tells you whether to mention that the window " +
+	"is in the background. Pass --focus only when the user asks to be taken there."
 
 // CapabilityPanel is --group panel's JSON.
 type CapabilityPanel struct {
