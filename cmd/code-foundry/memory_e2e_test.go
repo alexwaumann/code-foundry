@@ -33,12 +33,13 @@ func TestCLIMemory(t *testing.T) {
 		{"show empty", []string{"memory", "show"}, nil, "No preferences remembered", ""},
 		{"show empty json", []string{"memory.show", "--json"}, nil, `{"entries":[]}`, ""},
 		{"add positional", []string{"memory", "add", "Always open PRs as drafts"}, nil,
-			"remembered #1: Always open PRs as drafts (applies to threads started from now on)\n", ""},
-		{"add another", []string{"memory", "add", "Never open the side panel on your own"}, nil, "remembered #2", ""},
+			`Remembered: "Always open PRs as drafts". New threads will follow it; threads already open get it on their next message after a restart.` + "\n", ""},
+		{"several words", []string{"memory", "add", "Never", "open", "the", "side", "panel", "on", "your", "own."}, nil,
+			`Remembered: "Never open the side panel on your own".`, ""},
 		{"add a third", []string{"memory", "add", "Draft commit messages first", "--json"}, nil,
 			`{"entry":{"index":3,"text":"Draft commit messages first"},"added":true}`, ""},
 		{"duplicate", []string{"memory", "add", "always open prs as drafts"}, nil,
-			"already remembered as #1: Always open PRs as drafts (nothing changed)\n", ""},
+			`Already remembered: "Always open PRs as drafts" (nothing changed).` + "\n", ""},
 		{"multi-line", []string{"memory", "add", "one\ntwo"}, errUsage, "", "one line"},
 		{"missing text", []string{"memory", "add"}, errUsage, "", `missing required argument "text"`},
 		{"show", []string{"memory", "show"}, nil,
@@ -47,9 +48,9 @@ func TestCLIMemory(t *testing.T) {
 			`{"entries":[{"index":1,"text":"Always open PRs as drafts"},{"index":2,"text":"Never open the side panel on your own"},{"index":3,"text":"Draft commit messages first"}]}`, ""},
 		{"ambiguous", []string{"memory", "remove", "draft"}, errUsage, "", `"draft" is in 2 entries; give the number of one:`},
 		{"no match", []string{"memory", "remove", "rebase"}, errUsage, "", `no entry contains "rebase"`},
-		{"remove by substring", []string{"memory", "remove", "side panel"}, nil,
-			"forgot #2: Never open the side panel on your own (applies to threads started from now on)\n", ""},
-		{"remove by index", []string{"memory", "remove", "2"}, nil, "forgot #2: Draft commit messages first", ""},
+		{"remove by substring", []string{"memory", "remove", "side", "panel"}, nil,
+			`Forgot: "Never open the side panel on your own".` + "\n", ""},
+		{"remove by index", []string{"memory", "remove", "2"}, nil, `Forgot: "Draft commit messages first".`, ""},
 		{"clear needs --yes", []string{"memory", "clear"}, errUsage, "", "Re-run with --yes to confirm."},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -69,7 +70,7 @@ func TestCLIMemory(t *testing.T) {
 	if b, err := os.ReadFile(file); err != nil || string(b) != "- Always open PRs as drafts\n" {
 		t.Errorf("%s = %q, %v", file, b, err)
 	}
-	if r := runCLI(c, "memory", "clear", "--yes"); r.err != nil || r.stdout != "forgot 1 preference (applies to threads started from now on)\n" {
+	if r := runCLI(c, "memory", "clear", "--yes"); r.err != nil || r.stdout != "Forgot 1 preference.\n" {
 		t.Errorf("clear --yes = %v %q %q", r.err, r.stdout, r.stderr)
 	}
 	if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
