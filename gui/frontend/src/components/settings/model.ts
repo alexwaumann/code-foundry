@@ -133,7 +133,7 @@ export function searchGuiPages(pages: readonly SettingPageView[], schemaPageIds:
   for (const page of pages) {
     if (schemaPageIds.has(page.id)) continue;
     const found = page.sections.filter((s) => {
-      const hay = `${page.title} ${s.title} ${s.description}`.toLowerCase();
+      const hay = `${page.title} ${s.title} ${s.description} ${(s.keywords ?? []).join(" ")}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
     for (const section of found) hits.push({ page, section });

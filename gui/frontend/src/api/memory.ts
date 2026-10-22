@@ -6,6 +6,7 @@
  * uses the generated memory types.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import {
   MemoryService,
   type MemoryEntry,
@@ -23,14 +24,27 @@ export type MemoryOriginView =
 export interface MemoryEntryView {
   /** Its file in the memory directory: stable while the text is, so a list keys on it. */
   file: string;
+  /** Its id (the file name without ".md"): `memory remove --id` takes it and refuses once it is gone. */
+  id: string;
   /** The number `memory show` prints and `memory remove` takes. */
   index: number;
   text: string;
   /** When it was added (ms); null when unknown (a file added by hand). */
   createdMs: number | null;
   origin: MemoryOriginView;
-  /** Whether threads get it: false past the caps, in a directory edited by hand. */
+  /** Whether threads get it: false past the caps or too long (an import, a hand edit). */
   injected: boolean;
+  /** Why threads do not get it; "" when they do. */
+  leftOut: MemoryLeftOut;
+}
+
+/** Why threads do not get an entry: longer than maxEntryChars, past maxEntries, past maxBytes; "" when they do. */
+export type MemoryLeftOut = "" | "too_long" | "entries" | "bytes";
+
+function toLeftOut(s: string, injected: boolean): MemoryLeftOut {
+  if (s === "too_long" || s === "entries" || s === "bytes") return s;
+  // An older daemon only said injected (false past the caps).
+  return injected ? "" : "entries";
 }
 
 /** The whole memory, with its caps. */
@@ -56,11 +70,13 @@ export interface MemoryEventView {
 function toEntry(e: MemoryEntry): MemoryEntryView {
   return {
     file: e.file,
+    id: e.id || e.file.replace(/\.md$/i, ""),
     index: e.index,
     text: e.text,
     createdMs: e.created ? timestampMs(e.created) : null,
     origin: e.threadId ? { kind: "thread", threadId: e.threadId, threadName: e.threadName } : { kind: "user" },
     injected: e.injected,
+    leftOut: toLeftOut(e.leftOut, e.injected),
   };
 }
 
@@ -80,6 +96,14 @@ export function toMemorySnapshotView(m: MemorySnapshot | undefined): MemorySnaps
 
 export function toMemoryEventView(ev: MemoryEvent): MemoryEventView {
   return { snapshot: toMemorySnapshotView(ev.snapshot) };
+}
+
+/**
+ * A `memory.remove --id` refused because the entry is gone (NotFound): its file was
+ * removed or renamed since the list was shown.
+ */
+export function isMemoryEntryGone(err: unknown): boolean {
+  return err instanceof ConnectError && err.code === Code.NotFound;
 }
 
 /** Reads the memory now (a hand edit since the last read included). */

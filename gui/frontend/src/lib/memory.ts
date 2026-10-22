@@ -2,7 +2,7 @@
  * Settings › Memory's words (docs/notes/memory-page.md): when an entry was remembered and
  * which thread did it. Pure; the store's selectors (stores/memory.ts) feed them.
  */
-import type { MemoryOriginView } from "@/api/memory";
+import type { MemoryLeftOut, MemoryOriginView } from "@/api/memory";
 import type { ThreadView } from "@/api/threads";
 
 /**
@@ -46,4 +46,21 @@ export function rememberedWhen(ms: number | null, now: number): string {
   const d = new Date(ms);
   const day = `${MONTHS[d.getMonth()] ?? ""} ${String(d.getDate())}`;
   return d.getFullYear() === new Date(now).getFullYear() ? `on ${day}` : `on ${day}, ${String(d.getFullYear())}`;
+}
+
+/**
+ * Why threads do not get an entry, as its row says it (memory show's reasons): only an
+ * import or a hand edit leaves one too long or past the caps. "" when they do.
+ */
+export function leftOutReason(leftOut: MemoryLeftOut, caps: { maxEntries: number; maxBytes: number; maxEntryChars: number }): string {
+  switch (leftOut) {
+    case "too_long":
+      return `Not given to threads: longer than ${String(caps.maxEntryChars)} characters. Forget it and say it shorter.`;
+    case "entries":
+      return `Not given to threads: past the ${String(caps.maxEntries)}-entry limit.`;
+    case "bytes":
+      return `Not given to threads: past the ${String(Math.round(caps.maxBytes / 1024))} KiB limit.`;
+    case "":
+      return "";
+  }
 }

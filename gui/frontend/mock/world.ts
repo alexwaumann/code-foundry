@@ -195,6 +195,8 @@ interface CmdDef {
   confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   /** Like the daemon's Command.ConfirmIf: when set, confirmation is asked only when it returns true. */
   confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
+  /** Like the daemon's Command.ConfirmLabel: the confirm button's words. */
+  confirmLabel?: string;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -374,6 +376,7 @@ export class ConfirmNeeded extends Error {
     readonly command: string,
     readonly title: string,
     message: string,
+    readonly confirmLabel = "",
   ) {
     super(message);
   }
@@ -3544,7 +3547,7 @@ export class World {
 
   listCommands(ctx: UiContext | undefined, includeUnavailable: boolean): (Omit<CmdDef, "confirm" | "confirmIf"> & { available: boolean; requiresConfirmation: boolean })[] {
     return this.effectiveRegistry()
-      .map(({ cmd: { confirm, confirmIf: _if, ...cmd }, when }) => ({ ...cmd, available: when(ctx), requiresConfirmation: confirm !== undefined }))
+      .map(({ cmd: { confirm, confirmIf: _if, confirmLabel: _label, ...cmd }, when }) => ({ ...cmd, available: when(ctx), requiresConfirmation: confirm !== undefined }))
       .filter((c) => includeUnavailable || c.available);
   }
 
@@ -3575,7 +3578,7 @@ export class World {
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
-    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, args) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args));
+    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, args) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args), entry.cmd.confirmLabel);
     return entry.run(ctx, args);
   }
 }

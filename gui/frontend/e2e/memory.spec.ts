@@ -37,7 +37,8 @@ test("lists every entry with when and by which thread", async ({ page }) => {
     /^Remembered on \w{3} \d+ · by Usage page polish \(removed\)$/,
   ]);
   await expect(page.getByTestId("memory-count")).toHaveText("4 of 40");
-  await expect(page.getByTestId("memory-footnote")).toHaveText("Applies to threads started from now on. Facts about a project stay in Claude's own memory files.");
+  await expect(page.getByTestId("memory-footnote")).toHaveText("Applies to new threads at once, and to open threads with their next message after a restart.");
+  await expect(page.getByTestId("memory-left-out")).toHaveCount(0);
   // The removed thread is not a link.
   const gone = rowWith(page, "Keep answers short").getByTestId("memory-by");
   await expect(gone).toHaveAttribute("data-state", "removed");
@@ -57,13 +58,42 @@ test("a thread's link opens it; an archived one stays a link, struck through", a
   await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
 });
 
-test("Forget removes the row live", async ({ page }) => {
+test("Forget removes the row live, by its id", async ({ page }) => {
   await openMemory(page);
   await rowWith(page, "Open PRs").getByTestId("memory-forget").click();
   await expect(rows(page)).toHaveCount(3);
   await expect(rowWith(page, "Open PRs")).toHaveCount(0);
   await expect(page.getByTestId("memory-count")).toHaveText("3 of 40");
-  expect((await invocations()).some((c) => c.name === "memory.remove" && c.args.entry === "2")).toBe(true);
+  expect((await invocations()).some((c) => c.name === "memory.remove" && c.args.id === "open-prs-as-drafts" && !c.args.entry)).toBe(true);
+});
+
+test("a stale list: Forget never takes another entry, says the entry is gone and refreshes", async ({ page }) => {
+  await openMemory(page);
+  // The first entry's file goes by hand and no event says so: the page still shows four.
+  await mockPost("memory?drop=never-open-the-side-panel-on-your-own.md&quiet=1");
+  await expect(rows(page)).toHaveCount(4);
+  await rowWith(page, "Never open").getByTestId("memory-forget").click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "That entry is gone; the list was refreshed." })).toBeVisible();
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.getByTestId("memory-text")).toHaveText([
+    "Open PRs as drafts",
+    "Explain git terms the first time you use them in a thread",
+    "Keep answers short; one paragraph unless I ask for detail",
+  ]);
+  // Then another row goes, the right one.
+  await rowWith(page, "Explain git terms").getByTestId("memory-forget").click();
+  await expect(page.getByTestId("memory-text")).toHaveText(["Open PRs as drafts", "Keep answers short; one paragraph unless I ask for detail"]);
+});
+
+test("an entry too long for threads is listed, muted, and says why", async ({ page }) => {
+  await mockPost("memory?set=long");
+  await openMemory(page);
+  await expect(rows(page)).toHaveCount(5);
+  const long = rowWith(page, "Always write very detailed commit messages");
+  await expect(long).toHaveAttribute("data-injected", "false");
+  await expect(long.getByTestId("memory-meta")).toHaveText("Added by hand");
+  await expect(long.getByTestId("memory-left-out")).toHaveText("Not given to threads: longer than 500 characters. Forget it and say it shorter.");
+  await expect(page.getByTestId("memory-left-out")).toHaveCount(1);
 });
 
 test("Forget all asks first, then empties the page", async ({ page }) => {
@@ -71,6 +101,7 @@ test("Forget all asks first, then empties the page", async ({ page }) => {
   await page.getByTestId("memory-forget-all").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Forget every remembered preference? New threads get none.");
+  await expect(page.getByTestId("confirm-ok")).toHaveText("Forget all");
   await page.getByTestId("confirm-cancel").click();
   await expect(rows(page)).toHaveCount(4);
 
@@ -114,6 +145,10 @@ test("the settings search finds Remembered and opens the page there", async ({ p
   await page.getByTestId("settings-section-hit").click();
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "memory");
   await expect(page.locator('[data-section="remembered"]')).toBeInViewport();
+  for (const word of ["forget", "preferences", "standing"]) {
+    await page.getByRole("searchbox", { name: "Search settings" }).fill(word);
+    await expect(page.getByTestId("settings-section-hit").filter({ hasText: "Memory › Remembered" })).toHaveCount(1);
+  }
 });
 
 /** SHOTS=<dir>: the page with entries and empty, WebKit, 1440x900, dark and light. */
@@ -127,6 +162,10 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(rows(page)).toHaveCount(4);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/memory-${scheme}.png` });
+    await mockPost("memory?set=long");
+    await expect(page.getByTestId("memory-left-out")).toBeVisible();
+    await page.getByTestId("memory-left-out").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${String(shots)}/memory-long-${scheme}.png` });
     await mockPost("memory?set=empty");
     await expect(page.getByTestId("memory-empty")).toBeVisible();
     await page.screenshot({ path: `${String(shots)}/memory-empty-${scheme}.png` });

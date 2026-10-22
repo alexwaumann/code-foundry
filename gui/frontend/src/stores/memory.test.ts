@@ -5,7 +5,7 @@ import { applyMemoryEvent, loadMemory, resetMemory, useMemoryStore } from "./mem
 
 function snap(texts: string[], version = 1): MemorySnapshotView {
   return {
-    entries: texts.map((text, i) => ({ file: `${text}.md`, index: i + 1, text, createdMs: 1, origin: { kind: "user" }, injected: true })),
+    entries: texts.map((text, i) => ({ file: `${text}.md`, id: text, index: i + 1, text, createdMs: 1, origin: { kind: "user" }, injected: true, leftOut: "" })),
     injected: texts.length,
     injectedBytes: 0,
     maxEntries: 40,

@@ -65,6 +65,11 @@ export function useMemoryCount(): { count: number; max: number } {
   return useMemoryStore(useShallow((s) => ({ count: s.snapshot?.entries.length ?? 0, max: s.snapshot?.maxEntries ?? 0 })));
 }
 
+/** The caps an entry's "not given to threads" line names. */
+export function useMemoryCaps(): { maxEntries: number; maxBytes: number; maxEntryChars: number } {
+  return useMemoryStore(useShallow((s) => ({ maxEntries: s.snapshot?.maxEntries ?? 0, maxBytes: s.snapshot?.maxBytes ?? 0, maxEntryChars: s.snapshot?.maxEntryChars ?? 0 })));
+}
+
 /** loading (nothing yet), ready, error (the Get failed, no snapshot) or outdated (no MemoryService). */
 export function useMemoryStatus(): "loading" | "ready" | "error" | "outdated" {
   return useMemoryStore((s) => (s.snapshot ? "ready" : s.outdated ? "outdated" : s.loadError ? "error" : "loading"));
