@@ -572,8 +572,16 @@ func (x *UiIntent_PlayAlertSound) GetVolume() int32 {
 // ShowView opens a named GUI view: "help", "settings", "pullrequests".
 // Unknown names are ignored.
 type UiIntent_ShowView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)
+	// applies to, without changing what any window has selected: the thread's panel
+	// changes now if a window shows it, and is that way when the user opens it. Empty:
+	// the action applies to whatever each window has selected. Set by the view.panel.*
+	// verbs from inside a thread ($CODE_FOUNDRY_THREAD) or with --thread
+	// (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
+	// thread_id whose name is not a panel action.
+	ThreadId      string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -611,6 +619,13 @@ func (*UiIntent_ShowView) Descriptor() ([]byte, []int) {
 func (x *UiIntent_ShowView) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *UiIntent_ShowView) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
 	}
 	return ""
 }
@@ -865,7 +880,7 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xd8\v\n" +
+	"\x13WatchIntentsRequest\"\xf5\v\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -888,9 +903,10 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x1a(\n" +
 	"\x0ePlayAlertSound\x12\x16\n" +
-	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a\x1e\n" +
+	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a;\n" +
 	"\bShowView\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x1a*\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x1a*\n" +
 	"\vFocusThread\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x1a0\n" +
 	"\rFocusTerminal\x12\x1f\n" +

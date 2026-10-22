@@ -60,6 +60,14 @@ message UiIntent {
   // Unknown names are ignored.
   message ShowView {
     string name = 1;
+    // The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)
+    // applies to, without changing what any window has selected: the thread's panel
+    // changes now if a window shows it, and is that way when the user opens it. Empty:
+    // the action applies to whatever each window has selected. Set by the view.panel.*
+    // verbs from inside a thread ($CODE_FOUNDRY_THREAD) or with --thread
+    // (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
+    // thread_id whose name is not a panel action.
+    string thread_id = 2;
   }
 
   message FocusThread {
