@@ -104,7 +104,12 @@ function rowKeys(e: ReactKeyboardEvent<HTMLDivElement>): void {
   const inFilter = t.matches('[data-testid="editor-filter"]');
   if (at < 0 && !inFilter) return;
   e.preventDefault();
-  const next = inFilter ? (e.key === "ArrowDown" ? rows.find((r) => r.dataset.rowKey?.startsWith("slot") || r.dataset.rowKey?.startsWith("group")) : undefined) : rows[e.key === "ArrowDown" ? Math.min(rows.length - 1, at + 1) : Math.max(0, at - 1)];
+  let next: HTMLElement | undefined;
+  if (!inFilter) next = rows[e.key === "ArrowDown" ? Math.min(rows.length - 1, at + 1) : Math.max(0, at - 1)];
+  else if (e.key === "ArrowDown") {
+    const after = rows.filter((r) => t.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING);
+    next = after.find((r) => r.dataset.rowKey?.startsWith("slot:")) ?? after[0];
+  }
   next?.focus();
 }
 

@@ -9,6 +9,7 @@
  * Controls (mock/server.ts): POST /__mock/themes?set=empty|seed (the directory, as a hand
  * edit); POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true] (theme save run
  * from that thread: the card and, when applied, the toast; docs/notes/theme-model-flow.md);
+ * POST /__mock/themes/edit?theme=ocean-dusk&canvas=%23330000 (a save from outside the window);
  * GET /__mock/themes: { themes, calls, reports }.
  *
  * The GUI's contrast reports (docs/notes/theme-followups.md): UiService.PublishThemeReport
@@ -492,6 +493,19 @@ export class MockThemes {
     if (from && from.scheme === t.scheme) return { id: from.id, name: from.name };
     const def = curated.find((c) => c.scheme === t.scheme);
     return { id: def?.id ?? "", name: def?.name ?? "" };
+  }
+
+  /**
+   * POST /__mock/themes/edit?theme=<id>&<base key>=<#hex>…: a save of one of the user's
+   * themes from outside this window (the CLI, a thread, another window), base colours changed.
+   */
+  edit(q: URLSearchParams): { ok: true } {
+    const u = this.user.find((t) => t.id === q.get("theme"));
+    if (!u) throw new Error("want theme=<one of the user's themes>");
+    const base = { ...u.base };
+    for (const [k, v] of q) if (k !== "theme") (base as unknown as Record<string, string>)[k] = v;
+    this.save({ ...u, base });
+    return { ok: true };
   }
 
   /** POST /__mock/themes?set=empty|seed: the directory, as a hand edit. */

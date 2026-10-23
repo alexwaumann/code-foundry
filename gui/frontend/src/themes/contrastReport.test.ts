@@ -98,12 +98,13 @@ describe("fixContrast", () => {
     expect(fixContrast(base, "--cf-text")).toBeNull();
   });
 
-  // A mid-grey surface (still dark): no text colour reaches 7:1 on it.
-  const grey: EditableTheme = { ...base, base: { ...base.base, surface: "#6b6b6b" } };
+  // A mid-grey hovered row under a dark theme: muted text needs 4.5:1 on it and on the dark
+  // panes; white falls short on the grey, and anything dark enough for the grey fails the panes.
+  const grey = pinned({ "--cf-control-hover": "#8a8a8a" });
 
   it("leaves a slot alone when no lightness of it holds, and says on what", () => {
-    const fix = fixContrast(grey, "--cf-text");
-    expect(fix).toEqual({ kind: "none", reason: "unreachable", against: "--cf-surface", required: 7 });
+    const fix = fixContrast(grey, "--cf-text-muted");
+    expect(fix).toEqual({ kind: "none", reason: "unreachable", against: "--cf-control-hover", required: 4.5 });
   });
 
   it("never pins a value that still fails, or one that leaves more pairs failing (pressing Fix again does not undo it)", () => {

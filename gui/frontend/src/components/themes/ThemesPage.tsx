@@ -211,7 +211,7 @@ export function ThemesPage() {
                       ))}
                     </ListSection>
                   )}
-                  {list.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
+                  {list.length === 0 && shownIssues.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
                 </>
               )}
             </div>
@@ -242,7 +242,7 @@ export function ThemesPage() {
         )}
         {editingId && <ThemeInspector width={layout.inspector} />}
         <div className="flex min-w-0 flex-1 flex-col">
-          {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />}
+          {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={shownId !== slots[slot]} />}
           <PairHintLine slots={slots} />
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <GalleryScope shown={themeOf(shownId, slot)} />
@@ -401,6 +401,10 @@ function RowActions({ theme }: { theme: Theme }) {
       className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity group-hover/row:max-w-40 group-hover/row:opacity-100 focus-within:max-w-40 focus-within:opacity-100"
       onClick={stop}
       onDoubleClick={stop}
+      // One action per gesture: the second click of a double-click (a row may have moved under the pointer by then) does nothing.
+      onClickCapture={(e) => {
+        if (e.detail > 1) e.stopPropagation();
+      }}
       data-testid="theme-row-actions"
     >
       {theme.user && (
@@ -444,8 +448,8 @@ function ThemeRow({ theme, previewed, current, strip }: { theme: Theme; previewe
           data-user={theme.user || undefined}
           data-current={current || undefined}
           className={cn("flex h-8 cursor-default items-center justify-center rounded-md select-none", previewed ? "bg-cf-control-hover" : "hover:bg-cf-control-hover/50")}
-          onClick={() => {
-            pickRow(theme.id);
+          onClick={(e) => {
+            if (e.detail < 2) pickRow(theme.id);
           }}
         >
           <ThemeAa theme={theme} />
@@ -468,8 +472,10 @@ function ThemeRow({ theme, previewed, current, strip }: { theme: Theme; previewe
         origin && "py-1",
         previewed ? "bg-cf-control-hover text-cf-text" : "hover:bg-cf-control-hover/50",
       )}
-      onClick={() => {
-        pickRow(theme.id);
+      onClick={(e) => {
+        // The second click of a double-click is not a pick: the first one picked this row, and a
+        // Customise or the editor opening in between can move another row under the pointer.
+        if (e.detail < 2) pickRow(theme.id);
       }}
       onDoubleClick={() => {
         if (editingPins < 0 && useThemeEditorStore.getState().id === null) void applyPreview();

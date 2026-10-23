@@ -108,7 +108,8 @@ async function setSlot(slot: ThemeSlot, id: string): Promise<boolean> {
  */
 export async function applyPreview(): Promise<boolean> {
   const s = useThemePickerStore.getState();
-  if (s.preview === null || s.applying) return false;
+  // A preview of a theme that went away (previewedId shows the slot's again) has nothing to apply.
+  if (s.preview === null || s.applying || !themeById.has(s.preview)) return false;
   const id = s.preview;
   useThemePickerStore.setState({ applying: true, hint: null });
   const ok = await setSlot(s.slot, id);

@@ -4,6 +4,9 @@ import { mockUrl, openApp, resetMock } from "./fixtures";
 // The theme editor on the Themes page (docs/notes/theme-editor.md). The mock seeds Ocean
 // Dusk (dark, from Catppuccin Mocha, one pin: --cf-sidebar-row-selected #1e2e3c); the
 // slots start on GitHub Dark and Light, the browser is dark.
+// Wide enough for the full theme list beside the editor (narrower windows fold it to a
+// strip: theme-editor-fuzz.spec.ts).
+test.use({ viewport: { width: 1600, height: 900 } });
 
 test.beforeEach(async () => {
   await resetMock();
@@ -159,8 +162,8 @@ test("Customise opens the editor on the copy; leaving with changes asks first", 
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await page.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("themes-page")).toHaveCount(0);
-  // Nothing was written.
-  expect((await mockTheme("dracula-copy"))?.base).not.toHaveProperty("accent", "#ff79c6");
+  // Nothing was written, and the copy Customise made, never saved, is gone again.
+  await expect.poll(() => mockTheme("dracula-copy")).toBeUndefined();
 });
 
 test("a contrast failure shows its ratio and Fix pins a value that reads", async ({ page }) => {

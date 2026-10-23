@@ -152,6 +152,9 @@ export function markFreshCopy(id: string): void {
 
 let unsubDisk: (() => void) | null = null;
 
+/** The last unsaved copy's delete (stopEditing); leaveEditor waits for it. */
+let discarding: Promise<void> = Promise.resolve();
+
 /** Starts editing one of the user's themes (theme.edit's view). False for an unknown or curated id. */
 export function startEditing(id: string): boolean {
   const t = themeById.get(id);
@@ -175,7 +178,7 @@ export function stopEditing(opts: { keepCopy?: boolean } = {}): void {
   unsubDisk?.();
   unsubDisk = null;
   useThemeEditorStore.setState(closed());
-  if (s.fresh && !opts.keepCopy) void discardCopy(s.id);
+  if (s.fresh && !opts.keepCopy) discarding = discardCopy(s.id);
 }
 
 /**
@@ -245,6 +248,8 @@ export async function leaveEditor(why = "Leave the editor and drop them?"): Prom
     if (!yes) return false;
   }
   stopEditing();
+  // An unsaved Customise copy is gone before what comes next (another Customise must not number around it).
+  await discarding;
   return true;
 }
 
