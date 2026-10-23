@@ -280,6 +280,22 @@ test("a missing file says so and Retry reads again; the tab re-reads when the wo
   await expect.poll(async () => (await calls()).filter((c) => c === `read ${CF}/src/later.ts`).length).toBe(before + 1);
 });
 
+test("a path missing at the checkout opens the one file that ends with it (model-paths); two candidates stay not found", async ({ page }) => {
+  await openApp(page);
+  await worktreeTab(page, "s-1");
+
+  // The checkout's file search lists src/app.ts once: "app.ts" (written from src/) finds it.
+  await mockPost("files?project=repo-cf&path=src/app.ts&path=docs/a/spec.pdf&path=docs/b/spec.pdf");
+  await openFile(page, "app.ts", 12);
+  await expect(file(page)).toHaveAttribute("data-path", `${CF}/src/app.ts`);
+  await expect(file(page).getByTestId("file-code").locator('[data-line="12"][data-selected-line]').first()).toBeVisible();
+  await expect(activeTab(page)).toHaveText("app.ts");
+
+  // Two files end with "spec.pdf": no guess.
+  await openFile(page, "spec.pdf");
+  await expect(file(page).getByTestId("file-not-found")).toContainText("~/src/code-foundry/spec.pdf");
+});
+
 // ---- screenshots (SHOTS=<dir>) ------------------------------------------------------
 
 const shots = process.env.SHOTS;
