@@ -3529,6 +3529,23 @@ export class World {
           return `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`;
         },
       },
+      // Like internal/command/commands_theme_edit.go: the Themes page editing one of the user's themes.
+      {
+        cmd: {
+          name: "theme.edit",
+          title: "Edit Theme…",
+          category: "Settings",
+          description: "Open one of your themes in the Themes page's editor. A curated theme is copied first (theme duplicate <id>).",
+          keybindings: [],
+          args: [{ name: "theme", type: ArgType.ENUM, required: true, description: "One of your themes' ids (theme list marks them)", enumValues: [...this.themes.choices("dark"), ...this.themes.choices("light")].map((t) => t.id) }],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const id = args.theme ?? "";
+          if (!this.themes.isUser(id)) throw new CommandError("invalid", `argument "theme": ${JSON.stringify(id)} is not one of your themes`);
+          return `delivered=${String(this.emit({ intent: { case: "showView", value: { name: `themes.edit.${id}` } } }))}`;
+        },
+      },
       ...this.update.commands(),
     ];
   }

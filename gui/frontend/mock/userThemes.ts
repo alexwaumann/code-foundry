@@ -190,7 +190,18 @@ export class MockThemes {
   private lines(t: MockUserTheme, replaced: boolean): string[] {
     const pinned = Object.keys(t.overrides ?? {}).length;
     const from = t.from ? `from: ${themeById.get(t.from)?.name ?? t.from} (${t.from})` : "from: nothing (made from scratch)";
-    return [`${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`, from, `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`, `written to: ${DIR}/${t.id}.json`];
+    return [
+      `${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`,
+      from,
+      `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`,
+      `contrast: checked in the editor (theme edit ${t.id} shows failing pairs and stale pins)`,
+      `written to: ${DIR}/${t.id}.json`,
+    ];
+  }
+
+  /** Whether id is one of the user's themes (theme.edit's check). */
+  isUser(id: string): boolean {
+    return this.user.some((u) => u.id === id);
   }
 
   private savedJson(t: MockUserTheme, replaced: boolean, applied = ""): string {
