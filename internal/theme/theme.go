@@ -151,10 +151,18 @@ func Check(id, scheme string) error {
 	return nil
 }
 
+// maxQuoted is how many ids a message lists; with hundreds of user themes the rest are
+// counted (theme list prints them all).
+const maxQuoted = 20
+
 func quoted(ids []string) string {
-	q := make([]string, len(ids))
-	for i, id := range ids {
-		q[i] = strconv.Quote(id)
+	q := make([]string, 0, min(len(ids), maxQuoted))
+	for _, id := range ids[:min(len(ids), maxQuoted)] {
+		q = append(q, strconv.Quote(id))
 	}
-	return strings.Join(q, ", ")
+	s := strings.Join(q, ", ")
+	if n := len(ids) - maxQuoted; n > 0 {
+		s += fmt.Sprintf(" and %d more (theme list prints them all)", n)
+	}
+	return s
 }

@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -98,6 +99,15 @@ func TestSet(t *testing.T) {
 	}
 	if w := s.Without("nord"); !w.Valid("nord", SchemeDark) {
 		t.Error("Without removed a curated theme")
+	}
+
+	// A message lists at most 20 ids and counts the rest.
+	var many []Theme
+	for i := range 30 {
+		many = append(many, Theme{ID: fmt.Sprintf("t%02d", i), Name: fmt.Sprintf("T%02d", i), Scheme: SchemeDark})
+	}
+	if err := NewSet(many, nil).Check("sepia", SchemeDark); err == nil || !strings.HasSuffix(err.Error(), `"t19" and 25 more (theme list prints them all)`) {
+		t.Errorf("long list: %v", err)
 	}
 
 	// The zero Set is the catalog.
