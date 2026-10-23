@@ -572,13 +572,6 @@ export interface WorkRow {
   live: boolean;
 }
 
-/** Ember's own text (task links as pointer lines). */
-export interface EmberTextRow {
-  type: "etext";
-  key: string;
-  id: string;
-}
-
 /** "Code Foundry restarted at 01:26 while Ember was working": the line where the app's restart cut Ember's turn. */
 export interface RestartRow {
   type: "restart";
@@ -587,7 +580,7 @@ export interface RestartRow {
   atMs: number | null;
 }
 
-export type EmberRow = TimelineRow | WorkRow | EmberTextRow | RestartRow;
+export type EmberRow = TimelineRow | WorkRow | RestartRow;
 
 export interface EmberRowOptions {
   /** Whether a user message is a wake (the daemon's, not the user's). */
@@ -603,10 +596,37 @@ export interface EmberRowOptions {
 }
 
 /**
- * The chat's rows: the user's messages, Ember's text, system notes, errors and the prompts
- * waiting on the user (a pending permission's tool row, a pending question) show; every
- * run of anything else between them (tool calls, subagents, thinking, answered prompts,
- * wakes, compactions) is one work row, followed by its ordinary rows while expanded.
+ * The top-level text items that are Ember's reply: the last text of a turn that has ended
+ * (a turn end follows it before any later message) or that waits on the user (a pending
+ * question or permission follows it, no turn end between). Any other text (written
+ * between tool calls, or trailing a live turn) is work. A page or a theme card after the
+ * text does not take its place.
+ */
+function replyTexts(top: readonly TimelineItem[], pendingTool: (it: TimelineItem) => boolean): Set<string> {
+  const out = new Set<string>();
+  // Walking back: whether the next text seen is the last of a turn that ended or waits.
+  let closed = false;
+  for (let i = top.length - 1; i >= 0; i--) {
+    const it = top[i];
+    if (!it) continue;
+    if (it.kind === "turnEnd" || (it.kind === "question" && it.requestState === "pending") || (it.kind === "permission" && it.requestState === "pending") || pendingTool(it)) closed = true;
+    else if (it.kind === "user") closed = false;
+    else if (it.kind === "text") {
+      if (closed) out.add(it.id);
+      closed = false;
+    }
+  }
+  return out;
+}
+
+/**
+ * The chat's rows: the user's messages, Ember's reply (the last text of a turn that ended
+ * or waits on the user: replyTexts), inline pages, theme cards, system notes, errors and
+ * the prompts waiting on the user (a pending permission's tool row, a pending question)
+ * show; every run of anything else between them (tool calls, the text Ember writes
+ * between them, subagents, thinking, answered prompts, wakes, compactions) is one work
+ * row, followed by its ordinary rows while expanded. A reply does not stream: it shows
+ * when its turn ends.
  */
 export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOptions): EmberRow[] {
   // Subagent items nest under their Agent call (as buildTurns does); permissions by tool_use id.
@@ -624,20 +644,26 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
   const permissions = new Map<string, TimelineItem>();
   for (const it of items) if (it.kind === "permission" && it.toolUseId && toolUses.has(it.toolUseId)) permissions.set(it.toolUseId, it);
 
+  const pendingTool = (it: TimelineItem): boolean => it.kind === "tool" && permissions.get(it.toolUseId)?.requestState === "pending";
+  const replies = replyTexts(top, pendingTool);
+
   const visible = (it: TimelineItem): boolean => {
     switch (it.kind) {
       case "user":
         return !opts.wake(it.id);
       case "text":
+        return replies.has(it.id);
       case "note":
       case "error":
+      case "html":
+      case "theme":
         return true;
       case "question":
         return it.requestState === "pending";
       case "permission":
         return it.requestState === "pending";
       case "tool":
-        return permissions.get(it.toolUseId)?.requestState === "pending";
+        return pendingTool(it);
       default:
         return false;
     }
@@ -686,7 +712,8 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
     }
     flush(false, it.kind === "text");
     if (it.kind === "user") rows.push({ type: "user", key: it.id, id: it.id });
-    else if (it.kind === "text") rows.push({ type: "etext", key: it.id, id: it.id });
+    // The reply is the thread's own text row (its Copy answer copies this text alone).
+    else if (it.kind === "text") rows.push({ type: "text", key: it.id, id: it.id, final: true, answer: it.id });
     else rows.push(...workNodes([it], children, permissions));
   }
   const liveRun = flush(opts.working);
