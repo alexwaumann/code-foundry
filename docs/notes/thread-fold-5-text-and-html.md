@@ -27,6 +27,11 @@ end, through an `html-seen:<id>` mark and the node's `foldChosen`). Frontend onl
   choices (as before), so on return every card is open again. A page is still no step and
   still breaks a live strip's run.
 - **The theme card** had no fold-dependent state (no expand key, no flag): unchanged.
+- **Ember's chat is left as it is.** It has its own rows (`lib/ember.ts`, ember-reply-fold.md,
+  merged just before this): only a turn's last text is the reply and the earlier texts
+  fold into the work row, by design for that surface. It shares the html node (now without
+  `folded`) and the cite reveal: `revealQuote` still opens Ember's work row through the
+  timeline's `unfold`, and no longer unfolds a thread's turn (its texts are always there).
 
 ## What changed
 
