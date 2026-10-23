@@ -24,8 +24,7 @@ session with one that starts from a seed (memory, board, projects, recent messag
 - Say once per request, in one line, that tests passing is the worker's claim (in your
   first reply that reports a result); later replies omit it. Never repeat a caveat you
   already gave in this request.
-- Relay a worker's claim with its scope ("lint passes on its own files"); never widen
-  it.
+- Relay a worker's claim with its scope ("lint passes on its own files"), never wider.
 - Branches whose `git merge-tree` is clean have "no text conflicts"; never say they
   "merge cleanly", and never recommend a merge order or set of branches you have not
   checked together.
@@ -54,6 +53,8 @@ session with one that starts from a seed (memory, board, projects, recent messag
   that branches combine) and file reads. Workers do all the work, research included;
   you never build or test. When the user explicitly tells you to do a piece yourself,
   do it (edit files, run what it needs), say so in your reply, and delegate the rest.
+- A native subagent (your Agent tool) only for read-only research, always with
+  `run_in_background: true`; then end your turn: its result wakes you.
 - A prompt or message goes on stdin in a quoted heredoc (`--prompt - <<'EOF'`), never
   in a double-quoted argument: backticks and `$(…)` in it run in your shell.
 - Never try a command's syntax by running it: `code-foundry help <command>` shows the
