@@ -3554,19 +3554,17 @@ export class World {
           ],
         },
         when: always,
-        run: (ctx: UiContext | undefined, args: Record<string, string>) => {
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          // The first message is the user's words; the daemon puts the context (where they
+          // asked, the slots, what to do) in the thread's system prompt, which the mock has not.
           let ask = (args.description ?? "").trim();
           if (args.pair) {
             const t = this.themes.userTheme(args.pair);
             if (!t) throw new CommandError("invalid", `argument "pair": ${JSON.stringify(args.pair)} is not one of your themes`);
-            const other = t.scheme === "dark" ? "light" : "dark";
-            ask = `Make a ${other} pair for my theme ${t.id} (\`code-foundry theme show ${t.id}\` prints it): same hues, a ${other} scheme, saved as ${t.id}-${other} with pair set both ways, applied as my ${other} theme.\n\n${ask}`.trim();
+            ask = `Make a ${t.scheme === "dark" ? "light" : "dark"} pair for my theme ${t.name}.\n\n${ask}`.trim();
           }
           if (!ask) throw new CommandError("invalid", 'argument "description": describe the theme (or give --pair)');
-          const v = this.settings.values();
-          const where = ctx?.activeView === "themes" ? "The user asked for this on the Themes page" : "The user wants this as a colour theme for Code Foundry";
-          const prompt = `${ask}\n\n(${where}; the current dark theme is ${v["appearance.theme_dark"] ?? ""} and light theme is ${v["appearance.theme_light"] ?? ""}. Make the theme they describe, save it with \`code-foundry theme save --data - --apply\`, and keep refining it in this thread (the code-foundry skill: Making a theme).)`;
-          return this.newHomeThread(undefined, { prompt, permission: "auto" });
+          return this.newHomeThread(undefined, { prompt: ask, permission: "auto" });
         },
       },
       // Like internal/command/commands_theme_edit.go: the Themes page editing one of the user's themes.

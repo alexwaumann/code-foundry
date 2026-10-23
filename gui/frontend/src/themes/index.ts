@@ -21,6 +21,12 @@ export interface UserThemeFile extends ThemeFile {
   readonly createdBy: string;
   /** Its file in the themes directory. */
   readonly path: string;
+  /**
+   * The daemon's id of the file's contents (UserTheme.version), the key of the contrast
+   * report the GUI publishes on it (lib/themeReports.ts); absent before the daemon's list
+   * arrives (the localStorage copy keeps none).
+   */
+  readonly version?: string;
 }
 
 export interface Theme extends ThemeFile {
@@ -37,13 +43,15 @@ export interface Theme extends ThemeFile {
   readonly from?: string;
   /** A user theme: the thread that wrote it, "" when none. */
   readonly createdBy?: string;
+  /** A user theme: its file's version (UserThemeFile.version), when the daemon sent one. */
+  readonly version?: string;
 }
 
 /** A theme file with its slots resolved once, on first read. */
 export function themeOf(file: ThemeFile | UserThemeFile): Theme {
   let slots: Record<string, string> | undefined;
   let vars: Record<string, string> | undefined;
-  const user = "from" in file ? { user: true as const, from: file.from, createdBy: file.createdBy } : {};
+  const user = "from" in file ? { user: true as const, from: file.from, createdBy: file.createdBy, ...(file.version ? { version: file.version } : {}) } : {};
   return Object.freeze({
     ...file,
     ...user,
@@ -136,12 +144,13 @@ export function setUserThemes(files: readonly UserThemeFile[], persist = true): 
 /**
  * A user theme file (the daemon's JSON: `created_by`, optional `source`) read by the same
  * rules as the catalog's (parseThemeFile in user mode, which the daemon's theme.ParseFile
- * mirrors), with its path; null, and a console warning, for one those rules refuse.
+ * mirrors), with its path and version; null, and a console warning, for one those rules
+ * refuse.
  */
-export function readUserThemeFile(json: unknown, path: string): UserThemeFile | null {
+export function readUserThemeFile(json: unknown, path: string, version = ""): UserThemeFile | null {
   try {
     const { from = "", createdBy = "", ...file } = parseThemeFile(json, { user: true });
-    return { ...file, from, createdBy, path };
+    return { ...file, from, createdBy, path, ...(version ? { version } : {}) };
   } catch (err) {
     console.warn("user theme refused", err);
     return null;

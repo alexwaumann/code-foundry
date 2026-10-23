@@ -9,12 +9,18 @@
  * Controls (mock/server.ts): POST /__mock/themes?set=empty|seed (the directory, as a hand
  * edit); POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true] (theme save run
  * from that thread: the card and, when applied, the toast; docs/notes/theme-model-flow.md);
- * GET /__mock/themes: { themes, calls }.
+ * GET /__mock/themes: { themes, calls, reports }.
+ *
+ * The GUI's contrast reports (docs/notes/theme-followups.md): UiService.PublishThemeReport
+ * keeps the last report per theme, keyed by the file's version (a hash of its JSON, as the
+ * daemon's theme.File.Version); theme save waits up to 1.5 s for the report on the file it
+ * wrote and prints it, and theme check prints the latest.
  */
+import { createHash } from "node:crypto";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import type { ThemeEventSchema, ThemeSnapshotSchema, UserThemeSchema } from "../src/gen/codefoundry/v1/theme_pb";
-import { UiIntent_Notify_Level, type UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
+import { UiIntent_Notify_Level, type ThemeReport, type UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { themeById, themes as curated, type ThemeBase, type ThemeFile, type ThemeScheme } from "../src/themes";
 import { parseThemeFile } from "../src/themes/slots";
 import { CommandError } from "./errors";
@@ -108,6 +114,40 @@ function fileJson(t: MockUserTheme): Record<string, unknown> {
   };
 }
 
+/** The file's version: a hash of what it holds, as the daemon's theme.File.Version. */
+export function versionOf(t: MockUserTheme): string {
+  return createHash("sha256").update(JSON.stringify(fileJson(t))).digest("hex").slice(0, 32);
+}
+
+/** What a theme paints with: a save that changes none of it repaints nothing. */
+const paint = (t: MockUserTheme) => JSON.stringify({ scheme: t.scheme, base: t.base, overrides: t.overrides ?? {} });
+
+/** A report the GUI published, as the daemon keeps it. */
+interface MockReport {
+  version: string;
+  issues: { slot: string; against: string; label: string; ratio: number; required: number }[];
+  stale: { slot: string; pinned: string; basis: string; derived: string }[];
+}
+
+const ratioText = (r: number) => (r < 2 ? `${(Math.floor(r * 100) / 100).toFixed(2)}:1` : `${(Math.floor(r * 10) / 10).toFixed(1)}:1`);
+const short = (s: string) => s.replaceAll("--cf-", "");
+const issueText = (i: MockReport["issues"][number]) => `${short(i.label || `${i.slot} on ${i.against}`)} ${ratioText(i.ratio)} (needs ${String(i.required)})`;
+
+/** The report in words, as the daemon's ThemeCheck.lines: inline for save, one per line for check. */
+function reportLines(id: string, r: MockReport | undefined, full: boolean): string[] {
+  if (!r) return [`contrast: not checked yet (the app has not reported on this version yet; theme check ${id} in a moment)`];
+  const n = r.issues.length;
+  const plural = `${String(n)} ${n === 1 ? "issue" : "issues"}`;
+  const out =
+    n === 0
+      ? ["contrast: ok"]
+      : full
+        ? [`contrast: ${plural}`, ...r.issues.map((i) => `  ${issueText(i)}`)]
+        : [`contrast: ${plural} — ${[...r.issues.slice(0, 6).map(issueText), ...(n > 6 ? [`and ${String(n - 6)} more (theme check ${id} lists every one)`] : [])].join(", ")}`];
+  const stale = r.stale.map((p) => `${short(p.slot)} (pinned ${p.pinned} when its rule gave ${p.basis}; it gives ${p.derived} now)`);
+  return [...out, stale.length ? `stale pins: ${String(stale.length)} — ${stale.join(", ")}` : "stale pins: 0"];
+}
+
 /** A user theme as ThemeService's (and a theme card's) UserTheme. */
 function protoOf(t: MockUserTheme, path: string): UserThemeInit {
   return {
@@ -121,6 +161,7 @@ function protoOf(t: MockUserTheme, path: string): UserThemeInit {
     base: { ...t.base, link: t.base.link ?? "", terminal: { foreground: t.base.terminal.foreground, cursor: t.base.terminal.cursor ?? "", cursorText: t.base.terminal.cursorText ?? "", selection: t.base.terminal.selection ?? "", ansi: [...t.base.terminal.ansi] } },
     overrides: { ...(t.overrides ?? {}) },
     path,
+    version: versionOf(t),
   };
 }
 
@@ -129,6 +170,9 @@ export class MockThemes {
   private issues = [...SEED_ISSUES];
   private version = 1;
   readonly calls: string[] = [];
+  /** The GUI's contrast reports, by theme id (UiService.PublishThemeReport). */
+  private reports = new Map<string, MockReport>();
+  private reportWaiters = new Set<() => void>();
 
   constructor(
     private readonly deps: {
@@ -176,8 +220,49 @@ export class MockThemes {
     return { snapshot: this.snapshot() };
   }
 
-  json(): { themes: MockUserTheme[]; calls: string[] } {
-    return { themes: this.user, calls: this.calls };
+  json(): { themes: MockUserTheme[]; calls: string[]; reports: Record<string, MockReport> } {
+    return { themes: this.user, calls: this.calls, reports: Object.fromEntries(this.reports) };
+  }
+
+  /** UiService.PublishThemeReport: keeps each report, waking a save that waits for it. */
+  publishReports(reports: readonly ThemeReport[]): void {
+    for (const r of reports) {
+      if (!/^[0-9a-f]{1,64}$/.test(r.version)) throw new CommandError("invalid", `bad theme report: theme "${r.id}": version "${r.version}" is not a file version (lowercase hex)`);
+    }
+    for (const r of reports) {
+      this.reports.set(r.id, {
+        version: r.version,
+        issues: r.issues.map((i) => ({ slot: i.slot, against: i.against, label: i.label, ratio: i.ratio, required: i.required })),
+        stale: r.stale.map((p) => ({ slot: p.slot, pinned: p.pinned, basis: p.basis, derived: p.derived })),
+      });
+    }
+    for (const w of [...this.reportWaiters]) w();
+  }
+
+  /** The report on this version of t, waiting up to ms for it. */
+  private async reportOn(t: MockUserTheme, ms = 1500): Promise<MockReport | undefined> {
+    const version = versionOf(t);
+    const now = () => {
+      const r = this.reports.get(t.id);
+      return r?.version === version ? r : undefined;
+    };
+    const there = now();
+    if (there) return there;
+    return new Promise((resolve) => {
+      const done = (r: MockReport | undefined) => {
+        clearTimeout(timer);
+        this.reportWaiters.delete(check);
+        resolve(r);
+      };
+      const check = () => {
+        const r = now();
+        if (r) done(r);
+      };
+      const timer = setTimeout(() => {
+        done(undefined);
+      }, ms);
+      this.reportWaiters.add(check);
+    });
   }
 
   private changed(): void {
@@ -201,28 +286,29 @@ export class MockThemes {
     return { replaced };
   }
 
-  private lines(t: MockUserTheme, replaced: boolean): string[] {
+  private lines(t: MockUserTheme, replaced: boolean, contrast: string[]): string[] {
     const pinned = Object.keys(t.overrides ?? {}).length;
     const from = t.from ? `from: ${themeById.get(t.from)?.name ?? t.from} (${t.from})` : "from: nothing (made from scratch)";
-    return [
-      `${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`,
-      from,
-      `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`,
-      `contrast: checked in the editor (theme edit ${t.id} shows failing pairs and stale pins)`,
-      `written to: ${DIR}/${t.id}.json`,
-    ];
+    return [`${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`, from, `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`, ...contrast, `written to: ${DIR}/${t.id}.json`];
+  }
+
+  /** The save's contrast lines: from the app's editor none is waited for, as the daemon. */
+  private async contrastLines(c: UiContext | undefined, t: MockUserTheme): Promise<string[]> {
+    if (c?.activeView) return ["contrast: shown in the Themes page's editor"];
+    return reportLines(t.id, await this.reportOn(t), false);
   }
 
   /**
    * What theme save does after the write when it runs from a thread, like the daemon's
    * showThemeCard: the card (applied when --apply, or when the slot already had it; the
-   * slot's theme before as its Undo target) and, when applied, the "<name> applied to
+   * slot's theme before as its Undo target) and, when the save changed what the slot shows
+   * (another theme, or new colours: `was` is the file before), the "<name> applied to
    * <scheme>" toast with Undo and Edit, which a window on the Themes page skips.
    */
-  private fromThread(threadId: string, t: MockUserTheme, apply: boolean, before: string): void {
+  private fromThread(threadId: string, t: MockUserTheme, apply: boolean, before: string, was?: MockUserTheme): void {
     const applied = apply || before === t.id;
     const previous = this.deps.card?.(threadId, { theme: protoOf(t, ""), applied, previous: applied ? before : "" }) ?? (applied ? before : "");
-    if (!applied) return;
+    if (!applied || (before === t.id && was && paint(was) === paint(t))) return;
     const edit = { link: `theme-edit:${t.id}`, label: "Edit" };
     const undo = previous && previous !== t.id ? { link: `theme-set:${t.scheme}:${previous}`, label: "Undo" } : null;
     this.deps.emit?.({
@@ -249,7 +335,8 @@ export class MockThemes {
     const before = this.deps.slot(u.scheme);
     const apply = q.get("apply") === "true";
     if (apply) this.deps.setSlot(u.scheme, u.id);
-    this.fromThread(threadId, u, apply, before);
+    // The file unchanged: a repaint only when the slot moves onto it.
+    this.fromThread(threadId, u, apply, before, u);
     return { ok: true };
   }
 
@@ -298,23 +385,25 @@ export class MockThemes {
           { name: "apply", type: ArgType.BOOL, required: false, description: "Also set it as the dark or light theme, per its scheme" },
         ]),
         when: always,
-        run: (c, a) => {
+        run: async (c, a) => {
           this.calls.push(`theme.save ${a.data ? "data" : (a.file ?? "")}`);
           if (!a.data) throw new CommandError("invalid", "the mock reads --data only");
           const t = parse(a.data);
           const by = thread(c);
           if (by) t.createdBy = by;
           const before = this.deps.slot(t.scheme);
+          const was = this.user.find((u) => u.id === t.id);
           const { replaced } = this.save(t);
-          const lines = this.lines(t, replaced);
           let applied = "";
+          const after: string[] = [];
           if (a.apply === "true") {
             this.deps.setSlot(t.scheme, t.id);
             applied = `appearance.theme_${t.scheme}`;
-            lines.push(`applied: ${t.scheme} theme = ${t.name} (${t.id})`);
+            after.push(`applied: ${t.scheme} theme = ${t.name} (${t.id})`);
           }
-          if (by) this.fromThread(by, t, a.apply === "true", before);
-          return Promise.resolve({ message: lines.join("\n"), resultJson: this.savedJson(t, replaced, applied) });
+          if (by) this.fromThread(by, t, a.apply === "true", before, was);
+          const lines = [...this.lines(t, replaced, await this.contrastLines(c, t)), ...after];
+          return { message: lines.join("\n"), resultJson: this.savedJson(t, replaced, applied) };
         },
       },
       {
@@ -323,7 +412,7 @@ export class MockThemes {
           { name: "name", type: ArgType.STRING, required: false, description: 'The copy\'s name (default: "<name> copy")' },
         ]),
         when: always,
-        run: (c, a) => {
+        run: async (c, a) => {
           this.calls.push(`theme.duplicate ${a.theme ?? ""}`);
           const { file } = this.find(a.theme ?? "");
           const taken = (id: string) => this.user.some((u) => u.id === id) || curated.some((t) => t.id === id);
@@ -343,7 +432,21 @@ export class MockThemes {
             createdBy: thread(c),
           };
           this.save(t);
-          return Promise.resolve({ message: this.lines(t, false).join("\n"), resultJson: this.savedJson(t, false) });
+          return { message: this.lines(t, false, await this.contrastLines(c, t)).join("\n"), resultJson: this.savedJson(t, false) };
+        },
+      },
+      {
+        cmd: cmd("theme.check", "Check Theme Contrast", "Print the app's contrast check of one of your themes: each pair of colours that falls short and each pin whose rule the base has moved.", [
+          { name: "theme", type: ArgType.ENUM, required: true, description: "One of your themes' ids (theme list marks them)", enumValues: this.sorted().map((t) => t.id) },
+        ]),
+        when: always,
+        run: async (_c, a) => {
+          this.calls.push(`theme.check ${a.theme ?? ""}`);
+          const t = this.user.find((u) => u.id === a.theme);
+          if (!t) throw new CommandError("invalid", `argument "theme": "${a.theme ?? ""}" is not one of your themes`);
+          const r = await this.reportOn(t);
+          const message = [`${t.name} (${t.id}), a ${t.scheme} theme`, ...reportLines(t.id, r, true)].join("\n");
+          return { message, resultJson: JSON.stringify({ id: t.id, version: versionOf(t), checked: !!r, ...(r ? { issues: r.issues, stale: r.stale } : { reason: "the app has not reported on this version yet" }) }) };
         },
       },
       {

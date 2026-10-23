@@ -274,7 +274,7 @@ export function themeFrameMessage(): ThemeFrameMessage {
  * Calls cb whenever the GUI reaches a daemon: the first good ping, a restarted daemon (a
  * new pid), and a recovery after a failed ping (the publish that failed meanwhile).
  */
-function onDaemonConnect(cb: () => void): () => void {
+export function onDaemonConnect(cb: () => void): () => void {
   let pid: number | null = null;
   return useHealthStore.subscribe((s) => {
     const next = s.status === "ok" ? (s.health?.pid ?? null) : null;

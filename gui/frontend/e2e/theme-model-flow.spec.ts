@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { MOCK_TOKEN } from "../playwright.config";
 import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
@@ -142,4 +143,74 @@ test("the save modal's Also make a light pair asks the model for the pair after 
   await expect(dialog).toHaveCount(0);
   await expect.poll(async () => (await invocations()).find((i) => i.name === "theme.ask")?.args).toEqual({ pair: "ocean-dusk" });
   await expect(page.getByTestId("thread-pane")).toBeVisible();
+});
+
+async function invoke(name: string, args: Record<string, string>, context: Record<string, string> | null = null): Promise<{ message?: string }> {
+  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: JSON.stringify({ name, args, ...(context ? { context } : {}), confirmed: true }),
+  });
+  expect(res.ok, await res.clone().text()).toBe(true);
+  return (await res.json()) as { message?: string };
+}
+
+test("a card saved without applying offers Apply, which sets the slot and shows the badge", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await mockPost("themes/card?thread=s-1&theme=latte-softer");
+  const latte = card(page).filter({ hasText: "Latte, softer" });
+  await expect(latte).toBeVisible();
+  await expect(latte.getByTestId("thread-theme-applied")).toHaveCount(0);
+  const apply = latte.getByTestId("thread-theme-apply");
+  await expect(apply).toHaveText("Apply");
+  await shot(page, "theme-card-apply", () => latte);
+  await apply.click();
+  await expect.poll(() => raw("appearance.theme_light")).toBe("latte-softer");
+  await expect(latte.getByTestId("thread-theme-applied")).toHaveText("applied");
+  await expect(apply).toHaveCount(0);
+  await expect(invocations()).resolves.toContainEqual(expect.objectContaining({ name: "theme.set-light", args: { theme: "latte-softer" } }));
+  // The toast rules are unchanged: an Apply on the card is the user's own act.
+  await page.waitForTimeout(300);
+  await expect(toastOf(page, "Latte, softer applied")).toHaveCount(0);
+});
+
+test("theme save from a thread prints the app's contrast check, theme check reads it again, and a pair-only save toasts nothing", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  // Counts the "applied" toasts as they appear (a toast may expire before the next lands).
+  await page.evaluate(() => {
+    const w = window as unknown as { appliedToasts: number };
+    w.appliedToasts = 0;
+    const seen = new WeakSet<Element>();
+    new MutationObserver(() => {
+      for (const el of document.querySelectorAll("[data-sonner-toast]")) {
+        if (seen.has(el) || !el.textContent.includes("Ocean Dusk applied to dark")) continue;
+        seen.add(el);
+        w.appliedToasts++;
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  const toasts = () => page.evaluate(() => (window as unknown as { appliedToasts: number }).appliedToasts);
+  const file = JSON.parse((await invoke("theme.show", { theme: "ocean-dusk" })).message ?? "{}") as { base: { surface: string }; overrides?: Record<string, string> };
+  const fromThread = { activeThreadId: "s-1" };
+  // A warning text pinned to the pane's own colour fails its pairs.
+  const failing = { ...file, overrides: { ...file.overrides, "--cf-warning-text": file.base.surface } };
+  const saved = await invoke("theme.save", { data: JSON.stringify(failing), apply: "true" }, fromThread);
+  expect(saved.message).toMatch(/\ncontrast: \d+ issues — warning-text on surface 1\.00:1 \(needs 4\.5\)/);
+  expect(saved.message).toContain("\nstale pins: 0\n");
+  const checked = await invoke("theme.check", { theme: "ocean-dusk" });
+  expect(checked.message).toMatch(/^Ocean Dusk \(ocean-dusk\), a dark theme\ncontrast: \d+ issues\n {2}warning-text on surface 1\.00:1 \(needs 4\.5\)\n/);
+
+  // The fix: the pin goes, and the save says ok.
+  const fixed = await invoke("theme.save", { data: JSON.stringify(file), apply: "true" }, fromThread);
+  expect(fixed.message).toContain("\ncontrast: ok\nstale pins: 0\n");
+  await expect.poll(toasts).toBe(2);
+  // Only pair set: a card, but the slot shows the same colours, so no toast.
+  await invoke("theme.save", { data: JSON.stringify({ ...file, pair: "latte-softer" }), apply: "true" }, fromThread);
+  await expect(card(page)).toHaveCount(3);
+  await page.waitForTimeout(400);
+  expect(await toasts()).toBe(2);
 });

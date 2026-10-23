@@ -26,6 +26,35 @@ export async function publishTheme(theme: PublishedTheme, conn: DaemonConnection
   }
 }
 
+/**
+ * The GUI's contrast report on one version of a user theme (UiService.PublishThemeReport,
+ * docs/notes/theme-followups.md): the pairs that fall short and the stale pins.
+ */
+export interface ThemeReportView {
+  id: string;
+  /** UserThemeFile.version of the file it was computed on. */
+  version: string;
+  issues: readonly { slot: string; against: string; label: string; ratio: number; required: number }[];
+  stale: readonly { slot: string; pinned: string; basis: string; derived: string }[];
+}
+
+/**
+ * Hands the daemon the GUI's contrast reports on the user's themes, which theme save and
+ * theme check print (the daemon derives no colour). A daemon older than the RPC fails with
+ * OutdatedDaemonError.
+ */
+export async function publishThemeReports(reports: readonly ThemeReportView[], conn: DaemonConnection = daemon): Promise<void> {
+  try {
+    const c = await conn.client(UiService);
+    await c.publishThemeReport({
+      reports: reports.map((r) => ({ id: r.id, version: r.version, issues: r.issues.map((i) => ({ ...i })), stale: r.stale.map((p) => ({ ...p })) })),
+    });
+  } catch (err) {
+    invalidateOnTransportError(err, conn);
+    throw orOutdatedDaemon(err);
+  }
+}
+
 export type NotifyLevel = "info" | "warning" | "error";
 
 export type UiIntentView =
