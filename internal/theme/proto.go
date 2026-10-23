@@ -8,7 +8,7 @@ import (
 )
 
 // ToProto is f as the API's UserTheme (ThemeService's snapshot, a thread's theme card),
-// with its file's path ("" for none).
+// with its file's path ("" for none) and version.
 func ToProto(f File, path string) *v1.UserTheme {
 	b := f.Base
 	return &v1.UserTheme{
@@ -23,6 +23,7 @@ func ToProto(f File, path string) *v1.UserTheme {
 		},
 		Overrides: maps.Clone(f.Overrides),
 		Path:      path,
+		Version:   f.Version(),
 	}
 }
 

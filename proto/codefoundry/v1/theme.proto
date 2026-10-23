@@ -71,6 +71,9 @@ message UserTheme {
   map<string, string> overrides = 9;
   // The file, in the themes directory.
   string path = 10;
+  // Identifies the file's contents (a hash of the file as the daemon writes it): the key
+  // of the GUI's contrast report on it (UiService.PublishThemeReport).
+  string version = 11;
 }
 
 // ThemeFileIssue is a file in the themes directory that is not a theme the app can use.

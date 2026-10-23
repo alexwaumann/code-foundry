@@ -8,8 +8,11 @@ one in the Themes page's editor), read by the same rules as the curated ones: th
 the daemon refuse the same files.
 
 Run from a thread, `theme save` also puts a card in that thread's conversation (the theme's
-swatches and contrast, Undo back to the slot's previous theme, Edit) and, when it changes what
-a slot shows, a toast. `theme ask "<description>"` (the Themes page's Ask the model) starts a
+swatches and contrast, Undo back to the slot's previous theme, Edit, Apply when not applied)
+and, when it changes what a slot shows (another theme, or new colours), a toast. While the app
+is open, `theme save` prints the app's contrast check of the file it wrote: each failing pair
+with its ratio and the one it needs (`contrast: ok` when none), and the stale pins (pins whose
+rule the base has moved since they were made); `theme check <id>` prints it again. `theme ask "<description>"` (the Themes page's Ask the model) starts a
 thread with no project that makes the theme described; `--pair <id>` asks for the other
 scheme's pair of one of your themes.
 
@@ -125,7 +128,8 @@ Pages only (the app has no place for them yet; a page the model writes may use t
 
 ## Checking a theme
 
-From `gui/frontend`:
+One of your themes: `theme check <id>` prints the running app's check (the pairs below), as
+`theme save` does. Any file, in a checkout of the repository, from `gui/frontend`:
 
 ```
 pnpm run themes:check path/to/theme.json

@@ -36,8 +36,9 @@ var Renderings = []Rendering{
 		"or prefers-color-scheme blocks. view.inline shows a page inline in the conversation instead, in the same frame; " +
 		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink)."},
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
-		"Undo (back to the slot's theme before) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply, " +
-		"or the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card."},
+		"Undo (back to the slot's theme before) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
+		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +
+		"The save prints the app's contrast check of the file (failing pairs, stale pins) while the app is open; theme check <id> prints it again."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
 	{"file tab", "Opened by a path chip the user clicks, or by view.panel.file (view.panel.diff for a changed file's diff). " +
 		"It renders markdown, images, PDFs and HTML, and highlights other text files."},

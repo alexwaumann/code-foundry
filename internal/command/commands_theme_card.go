@@ -34,11 +34,12 @@ const (
 	ThemesPage = "themes"
 )
 
-// showThemeCard puts the saved theme's card in thread `by` and, when the save applied it,
-// shows the toast. before is the slot's theme before the save (the card's Undo target;
-// the store takes an earlier card's when it is the theme itself). A card that cannot be
-// added is a warning, not a failure: the theme is saved. shown: the card was added.
-func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, before string) (warnings []string, shown bool) {
+// showThemeCard puts the saved theme's card in thread `by` and, with toast, shows the
+// toast. applied: the slot shows the theme (the card's badge and Undo); before is the
+// slot's theme before the save (the card's Undo target; the store takes an earlier card's
+// when it is the theme itself). A card that cannot be added is a warning, not a failure:
+// the theme is saved. shown: the card was added.
+func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, before string, toast bool) (warnings []string, shown bool) {
 	previous := ""
 	if applied {
 		previous = before
@@ -55,7 +56,7 @@ func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, ap
 			previous, shown = res.Msg.GetItem().GetTheme().GetPrevious(), true
 		}
 	}
-	if applied && d.Emitter != nil {
+	if toast && d.Emitter != nil {
 		d.Emitter.Emit(themeAppliedToast(f, previous))
 	}
 	return warnings, shown

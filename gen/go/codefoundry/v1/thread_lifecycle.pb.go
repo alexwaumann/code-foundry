@@ -1905,8 +1905,13 @@ type CreateThreadRequest struct {
 	// (docs/notes/ember-2-store.md). An explicit model always wins.
 	ModelDefaulted  bool `protobuf:"varint,22,opt,name=model_defaulted,json=modelDefaulted,proto3" json:"model_defaulted,omitempty"`
 	EffortDefaulted bool `protobuf:"varint,23,opt,name=effort_defaulted,json=effortDefaulted,proto3" json:"effort_defaulted,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Appended to Claude's system prompt on every spawn of the thread (Thread's own append,
+	// as ReseedThreadRequest.system_prompt_append sets it): context the model needs that is
+	// not the user's words, so it stays out of the first message (theme.ask's "the user
+	// asked on the Themes page"). At most 64 KiB, no NUL. Empty: none.
+	SystemPromptAppend string `protobuf:"bytes,24,opt,name=system_prompt_append,json=systemPromptAppend,proto3" json:"system_prompt_append,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateThreadRequest) Reset() {
@@ -2091,6 +2096,13 @@ func (x *CreateThreadRequest) GetEffortDefaulted() bool {
 		return x.EffortDefaulted
 	}
 	return false
+}
+
+func (x *CreateThreadRequest) GetSystemPromptAppend() string {
+	if x != nil {
+		return x.SystemPromptAppend
+	}
+	return ""
 }
 
 type NewWorktree struct {
@@ -5092,7 +5104,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xd3\x06\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\x85\a\n" +
 	"\x13CreateThreadRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
@@ -5122,7 +5134,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"in_sidebar\x18\x15 \x01(\bH\x00R\tinSidebar\x88\x01\x01\x12'\n" +
 	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +
-	"\x10effort_defaulted\x18\x17 \x01(\bR\x0feffortDefaultedB\r\n" +
+	"\x10effort_defaulted\x18\x17 \x01(\bR\x0feffortDefaulted\x120\n" +
+	"\x14system_prompt_append\x18\x18 \x01(\tR\x12systemPromptAppendB\r\n" +
 	"\v_in_sidebarJ\x04\b\f\x10\rR\x06render\"\x84\x01\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\x12\x16\n" +

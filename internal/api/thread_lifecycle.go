@@ -25,6 +25,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(),
 		Notify: m.GetNotify(), InSidebar: optionalBool(m.InSidebar),
 		ModelDefaulted: m.GetModelDefaulted(), EffortDefaulted: m.GetEffortDefaulted(),
+		SystemPromptAppend: m.GetSystemPromptAppend(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef(), Branch: nw.GetBranch(), BaseFromOrigin: optionalBool(nw.BaseFromOrigin)}

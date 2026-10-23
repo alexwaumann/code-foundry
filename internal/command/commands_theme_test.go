@@ -140,7 +140,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 		wantErr string // substring of the error
 	}{
 		{name: "save from a file, from a thread, applied", uctx: thread, cmd: "theme.save", args: map[string]string{"file": path, "apply": "true"},
-			wantMsg: []string{"saved Ocean Dusk (ocean-dusk), a dark theme", "from: Catppuccin Mocha (catppuccin-mocha)", "pinned: 2 slots", "contrast: checked in the editor (theme edit ocean-dusk shows failing pairs and stale pins)",
+			wantMsg: []string{"saved Ocean Dusk (ocean-dusk), a dark theme", "from: Catppuccin Mocha (catppuccin-mocha)", "pinned: 2 slots", "contrast: not checked (this daemon keeps no contrast reports)",
 				"written to: " + filepath.Join(env.dir, "ocean-dusk.json"), "applied: dark theme = Ocean Dusk (ocean-dusk)"}},
 		{name: "list shows it first, marked", cmd: "theme.list",
 			wantMsg: []string{"dark themes (appearance.theme_dark):\n* ocean-dusk ", "Ocean Dusk  [yours, from catppuccin-mocha, by thread s-5f963f4547cc]"}},

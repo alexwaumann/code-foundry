@@ -444,6 +444,10 @@ type CreateOptions struct {
 	// spawn extras' (a plugin's thread/create; the caller validated them).
 	Env     []string
 	AddDirs []string
+	// SystemPromptAppend is Thread.SystemPromptAppend from the start: context for the
+	// model that is not the user's words (theme.ask's), on every spawn. At most 64 KiB, no
+	// NUL.
+	SystemPromptAppend string
 }
 
 // RunInTarget names the member a workspace thread should run in: its project id or

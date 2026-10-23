@@ -14,10 +14,11 @@ import (
 )
 
 // theme.ask (docs/notes/theme-model-flow.md): "Ask the model" on the Themes page. It
-// starts a no-project thread (cwd $HOME) whose first message is the user's description
-// after one sentence of context, and focuses it; the model saves and applies the theme
-// with theme.save, whose card and toast follow. --pair asks for the other scheme's pair
-// of one of the user's themes (the editor's "Also make a light pair").
+// starts a no-project thread (cwd $HOME) whose first message is the user's description,
+// with the context in the thread's own system prompt append (docs/notes/theme-followups.md),
+// and focuses it; the model saves and applies the theme with theme.save, whose card and
+// toast follow. --pair asks for the other scheme's pair of one of the user's themes (the
+// editor's "Also make a light pair").
 
 // ThemeAskDeps are theme.ask's dependencies.
 type ThemeAskDeps struct {
@@ -34,28 +35,46 @@ type ThemeAskDeps struct {
 // MaxThemeAskBytes bounds the description.
 const MaxThemeAskBytes = 4 << 10
 
-// ThemeAskPrompt is the new thread's first message: the user's words, then one sentence
-// of context (where the user is, the current slots, what to do). The words come first so
-// the thread's provisional name (its first line, until the naming model names it) is
-// theirs, and the message reads as theirs in the conversation.
-func ThemeAskPrompt(onPage bool, dark, light theme.Theme, ask string) string {
-	where := "The user wants this as a colour theme for Code Foundry"
+// ThemeAskContext is the new thread's own system prompt append (CreateThreadRequest.
+// system_prompt_append): where the user asked, the current slots, what to do and, for a
+// pair, which theme to pair. It stays out of the first message, which is the user's words
+// alone, so the bubble and the provisional name (the first line, until the naming model
+// names the thread) are theirs.
+func ThemeAskContext(onPage bool, dark, light theme.Theme, pair *theme.File) string {
+	where := "The user wants a colour theme for Code Foundry"
 	if onPage {
-		where = "The user asked for this on the Themes page"
+		where = "The user asked for a colour theme on Code Foundry's Themes page (Ask the model)"
 	}
-	return fmt.Sprintf("%s\n\n(%s; the current dark theme is %s (%s) and light theme is %s (%s). "+
+	ctx := fmt.Sprintf("%s; their first message in this thread describes it. The current dark theme is %s (%s) and the light theme is %s (%s). "+
 		"Make the theme they describe, save it with `code-foundry theme save --data - --apply`, and keep refining it in this thread "+
-		"(the code-foundry skill: Making a theme).)", ask, where, dark.Name, dark.ID, light.Name, light.ID)
+		"(the code-foundry skill: Making a theme).", where, dark.Name, dark.ID, light.Name, light.ID)
+	if pair != nil {
+		ctx += " " + ThemePairAsk(*pair)
+	}
+	return ctx
 }
 
-// ThemePairAsk is --pair's request: the other scheme's pair of f.
-func ThemePairAsk(f theme.File) string {
-	other := theme.SchemeLight
-	if f.Scheme == theme.SchemeLight {
-		other = theme.SchemeDark
+// ThemeAskMessage is the first message: the user's words; for a pair, a line in their
+// voice naming the theme first.
+func ThemeAskMessage(ask string, pair *theme.File) string {
+	if pair == nil {
+		return ask
 	}
-	return fmt.Sprintf("Make a %s pair for my theme %s (`code-foundry theme show %s` prints it): same hues, a %s scheme, "+
-		"saved as %s with pair set both ways, applied as my %s theme.", other, f.ID, f.ID, other, pairID(f.ID, f.Scheme, other), other)
+	return strings.TrimSpace(fmt.Sprintf("Make a %s pair for my theme %s.", otherScheme(pair.Scheme), pair.Name) + "\n\n" + ask)
+}
+
+// ThemePairAsk is --pair's instruction: the other scheme's pair of f.
+func ThemePairAsk(f theme.File) string {
+	other := otherScheme(f.Scheme)
+	return fmt.Sprintf("They want a %s pair for their theme %s (`code-foundry theme show %s` prints it): same hues, a %s scheme, "+
+		"saved as %s with pair set both ways, applied as their %s theme.", other, f.ID, f.ID, other, pairID(f.ID, f.Scheme, other), other)
+}
+
+func otherScheme(scheme string) string {
+	if scheme == theme.SchemeLight {
+		return theme.SchemeDark
+	}
+	return theme.SchemeLight
 }
 
 // pairID is the id a pair of id gets: its scheme word swapped ("ocean-dark" →
@@ -107,6 +126,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			ask := strings.TrimSpace(a.String("description"))
+			var pair *theme.File
 			if id := a.String("pair"); id != "" {
 				if d.Themes == nil {
 					return Result{}, connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no user themes"))
@@ -118,10 +138,10 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 				case !user:
 					return Result{}, InvalidArg("pair", "%q is a curated theme; copy it first (theme duplicate %s)", id, id)
 				}
-				ask = strings.TrimSpace(ThemePairAsk(f) + "\n\n" + ask)
+				pair = &f
 			}
 			switch {
-			case ask == "":
+			case ask == "" && pair == nil:
 				return Result{}, InvalidArg("description", "describe the theme (or give --pair)")
 			case len(ask) > MaxThemeAskBytes:
 				return Result{}, InvalidArg("description", "is %d bytes; keep it under %d", len(ask), MaxThemeAskBytes)
@@ -139,12 +159,12 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 				return t
 			}
 			// The Themes page's Ask the model and its save modal send the page as the view.
-			prompt := ThemeAskPrompt(uctx.ActiveView == ViewThemes, slot(theme.SchemeDark), slot(theme.SchemeLight), ask)
 			created, err := d.Thread.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
 				NoProject: true, Model: a.String("model"), Effort: a.String("effort"),
-				PermissionMode: threadPermissionModes[a.String("permission")], InitialPrompt: prompt,
-				ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
-				EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
+				PermissionMode: threadPermissionModes[a.String("permission")], InitialPrompt: ThemeAskMessage(ask, pair),
+				SystemPromptAppend: ThemeAskContext(uctx.ActiveView == ViewThemes, slot(theme.SchemeDark), slot(theme.SchemeLight), pair),
+				ModelDefaulted:     a.String("model") != "" && !a.Given("model"),
+				EffortDefaulted:    a.String("effort") != "" && !a.Given("effort"),
 			}))
 			if err != nil {
 				return Result{}, wrapStep("start thread", err)

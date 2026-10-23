@@ -89,6 +89,9 @@ type Deps struct {
 	// Themes backs the user-theme verbs (theme.show, save, duplicate, delete) and the
 	// user's themes in theme.list and the slot commands; nil: the catalog only.
 	Themes command.ThemeBackend
+	// ThemeReports is the GUI's contrast reports on the user's themes, for theme.save and
+	// theme.check; nil: they say nothing was checked.
+	ThemeReports command.ThemeReports
 	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
 	// view.panel.file. Nil makes it fail with Unimplemented.
 	Files command.FileReader
@@ -169,7 +172,7 @@ func Register(r *command.Registry, d Deps) error {
 		}),
 		command.RegisterSettings(r, d.Settings, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
-		command.RegisterTheme(r, command.ThemeDeps{Settings: d.Settings, Themes: d.Themes, Cards: d.Thread, Emitter: d.Emitter}),
+		command.RegisterTheme(r, command.ThemeDeps{Settings: d.Settings, Themes: d.Themes, Cards: d.Thread, Emitter: d.Emitter, Reports: d.ThemeReports}),
 		command.RegisterThemeAsk(r, command.ThemeAskDeps{Thread: d.Thread, Settings: d.Settings, Themes: d.Themes, Emitter: d.Emitter}),
 		command.RegisterThemePick(r, d.Emitter),
 		command.RegisterThemeEdit(r, d.Emitter, d.Themes),

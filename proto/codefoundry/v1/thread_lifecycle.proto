@@ -544,6 +544,11 @@ message CreateThreadRequest {
   // (docs/notes/ember-2-store.md). An explicit model always wins.
   bool model_defaulted = 22;
   bool effort_defaulted = 23;
+  // Appended to Claude's system prompt on every spawn of the thread (Thread's own append,
+  // as ReseedThreadRequest.system_prompt_append sets it): context the model needs that is
+  // not the user's words, so it stays out of the first message (theme.ask's "the user
+  // asked on the Themes page"). At most 64 KiB, no NUL. Empty: none.
+  string system_prompt_append = 24;
 }
 
 message NewWorktree {
