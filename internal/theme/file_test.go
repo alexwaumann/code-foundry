@@ -68,7 +68,18 @@ func TestParseFile(t *testing.T) {
 		{name: "override not a slot name", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--card": "#000000"} }, want: `"--card" is not a slot name`},
 		{name: "override bad value", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--cf-accent": "blue"} }, want: `"blue" is not #rrggbb or #rrggbbaa`},
 		{name: "override with alpha", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--cf-selection": "#11223344"} }},
-		{name: "override of an unknown slot is kept", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--cf-not-a-slot-yet": "#112233"} }},
+		{name: "override of an unknown slot", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--cf-not-a-slot-yet": "#112233"} }, want: `"--cf-not-a-slot-yet" is not a slot`},
+		{name: "override of a retired slot", edit: func(m map[string]any) { m["overrides"] = map[string]any{"--cf-icon": "#112233"} }, want: `"--cf-icon" was removed from the app; icons take`},
+		{name: "override of a status text slot", edit: func(m map[string]any) {
+			m["overrides"] = map[string]any{"--cf-warning-text": "#d29922", "--cf-update-text": "#58a6ff"}
+		}},
+		{name: "override of a terminal slot", edit: func(m map[string]any) {
+			m["overrides"] = map[string]any{"--terminal-ansi-15": "#ffffff", "--sh-flag": "#79c0ff"}
+		}},
+		{name: "dark scheme on a light surface", edit: func(m map[string]any) { base(m)["surface"] = "#f5ecd9" },
+			want: `scheme is "dark" but base.surface #f5ecd9 has OKLab lightness 0.95, a light surface (dark needs at most 0.45): set "scheme": "light", or give a dark surface`},
+		{name: "dark scheme on a mid grey", edit: func(m map[string]any) { base(m)["surface"] = "#808080" }, want: "too light for a dark scheme (at most 0.45) and too dark for a light one (at least 0.7)"},
+		{name: "light scheme on a dark surface", edit: func(m map[string]any) { m["scheme"] = "light" }, want: `scheme is "light" but base.surface #0d1117`},
 		{name: "too big", raw: `{"id":"x","pad":"` + strings.Repeat("x", MaxFileBytes) + `"}`, want: "more than 64 KiB"},
 	}
 	for _, tt := range tests {

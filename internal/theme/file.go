@@ -34,8 +34,8 @@ type File struct {
 	Source string `json:"source,omitempty"`
 	Base   Base   `json:"base"`
 	// Overrides are final values for single slots (`--cf-*`, `--terminal-*`, `--syn-*`,
-	// `--sh-*`), `#rrggbb` or `#rrggbbaa`. The daemon cannot resolve slots: a name that
-	// is shaped like one but is not a slot is kept, and the GUI ignores it.
+	// `--sh-*`), `#rrggbb` or `#rrggbbaa`. Each must be one of SlotNames(), the GUI's
+	// slots (its parseThemeFile, src/themes/slots.ts, refuses the same names).
 	Overrides map[string]string `json:"overrides,omitempty"`
 }
 
@@ -97,23 +97,55 @@ func ValidID(id string) bool { return len(id) <= MaxIDLen && idPattern.MatchStri
 // The result is normalised (lowercase hex, trimmed name). Errors wrap ErrInvalid and
 // name the first problem ("base.accent: "#12" is not #rrggbb").
 func ParseFile(data []byte) (File, error) {
+	f, _, err := parse(data, false)
+	return f, err
+}
+
+// retiredSlots are slots the app no longer has (docs/notes/theme-slots-3-hardening.md),
+// with what to pin instead. ParseFile refuses them with that hint; ParseStored drops them.
+var retiredSlots = map[string]string{
+	"--cf-icon":               "icons take their label's colour, or pin --cf-icon-muted",
+	"--cf-sidebar-row-active": "pin --cf-sidebar-row-selected",
+}
+
+// ParseStored is ParseFile for a file already in the themes directory: overrides of a
+// retired slot (one the app removed after the file was written) are dropped, not
+// refused, and returned, so an upgrade does not turn a working theme into an issue.
+// Writes go through ParseFile, so the file loses them the next time it is saved.
+func ParseStored(data []byte) (File, []string, error) {
+	return parse(data, true)
+}
+
+func parse(data []byte, dropRetired bool) (File, []string, error) {
 	if len(data) > MaxFileBytes {
-		return File{}, fmt.Errorf("%w: more than %d KiB", ErrInvalid, MaxFileBytes>>10)
+		return File{}, nil, fmt.Errorf("%w: more than %d KiB", ErrInvalid, MaxFileBytes>>10)
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var f File
 	if err := dec.Decode(&f); err != nil {
-		return File{}, fmt.Errorf("%w: %s", ErrInvalid, jsonProblem(err))
+		return File{}, nil, fmt.Errorf("%w: %s", ErrInvalid, jsonProblem(err))
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return File{}, fmt.Errorf("%w: more than one JSON value", ErrInvalid)
+		return File{}, nil, fmt.Errorf("%w: more than one JSON value", ErrInvalid)
 	}
 	f.normalise()
-	if err := f.Validate(); err != nil {
-		return File{}, err
+	var dropped []string
+	if dropRetired {
+		for _, k := range slices.Sorted(maps.Keys(f.Overrides)) {
+			if _, ok := retiredSlots[k]; ok {
+				delete(f.Overrides, k)
+				dropped = append(dropped, k)
+			}
+		}
+		if len(f.Overrides) == 0 {
+			f.Overrides = nil
+		}
 	}
-	return f, nil
+	if err := f.Validate(); err != nil {
+		return File{}, nil, err
+	}
+	return f, dropped, nil
 }
 
 // jsonProblem phrases a decode error for a person (or a model) fixing the file.
@@ -160,11 +192,11 @@ func (f *File) normalise() {
 	}
 }
 
-// Validate checks the shape the GUI needs: an id, a name, a scheme, the nine base
-// colours and the terminal foreground as #rrggbb, 16 ANSI colours, and overrides whose
-// names look like slots (`--cf-…`, `--terminal-…`, `--syn-…`, `--sh-…`) with #rrggbb or
-// #rrggbbaa values. It does not check that an override names a real slot (the GUI owns
-// the slot list) or that an id exists anywhere. Errors wrap ErrInvalid.
+// Validate checks what the GUI's parseThemeFile (src/themes/slots.ts) checks, so a file
+// one accepts the other does too: an id, a name, a scheme its surface can carry
+// (SchemeProblem), the nine base colours and the terminal foreground as #rrggbb, 16 ANSI
+// colours, and overrides of slots (SlotNames, the GUI's list) with #rrggbb or #rrggbbaa
+// values. It does not check that an id exists anywhere. Errors wrap ErrInvalid.
 func (f File) Validate() error {
 	bad := func(format string, a ...any) error {
 		return fmt.Errorf("%w: "+format, append([]any{ErrInvalid}, a...)...)
@@ -220,10 +252,19 @@ func (f File) Validate() error {
 	if len(f.Overrides) > MaxOverrides {
 		return bad("overrides: at most %d", MaxOverrides)
 	}
+	if p := SchemeProblem(f.Scheme, b.Surface); p != "" {
+		return bad("%s", p)
+	}
 	for _, k := range slices.Sorted(maps.Keys(f.Overrides)) {
 		v := f.Overrides[k]
 		if !overridePattern.MatchString(k) {
 			return bad("overrides: %q is not a slot name (--cf-…, --terminal-…, --syn-… or --sh-…)", k)
+		}
+		if hint, ok := retiredSlots[k]; ok {
+			return bad("overrides: %q was removed from the app; %s", k, hint)
+		}
+		if !IsSlot(k) {
+			return bad("overrides: %q is not a slot (docs/THEMES.md lists them; theme show github-dark prints a file to start from)", k)
 		}
 		if !anyHexPattern.MatchString(v) {
 			return bad("overrides[%q]: %q is not #rrggbb or #rrggbbaa", k, v)

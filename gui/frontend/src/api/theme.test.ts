@@ -43,6 +43,23 @@ describe("toThemesSnapshotView", () => {
     expect(t).not.toHaveProperty("pair");
   });
 
+  it("reads each file by the catalog's rules: a -text pin is kept, a retired slot or a scheme its surface cannot carry is refused", () => {
+    const user = (id: string, edit: { overrides?: Record<string, string>; scheme?: string }) => ({
+      id,
+      name: id,
+      scheme: edit.scheme ?? "dark",
+      base: { ...nord.base, link: "", terminal: { foreground: nord.base.terminal.foreground, cursor: "", cursorText: "", selection: "", ansi } },
+      overrides: edit.overrides ?? {},
+    });
+    const v = toThemesSnapshotView(
+      create(ThemeSnapshotSchema, {
+        user: [user("a", { overrides: { "--cf-warning-text": "#EBCB8B" } }), user("b", { overrides: { "--cf-icon": "#ffffff" } }), user("c", { scheme: "light" })],
+      }),
+    );
+    expect(v.user.map((t) => t.id)).toEqual(["a"]);
+    expect(v.user[0]?.overrides).toEqual({ "--cf-warning-text": "#ebcb8b" });
+  });
+
   it("an empty snapshot", () => {
     expect(toThemesSnapshotView(undefined)).toEqual({ user: [], issues: [], dir: "", version: 0 });
   });

@@ -6,7 +6,7 @@
  * copying and deleting are the theme.* commands.
  */
 import type { ThemeEvent, ThemeSnapshot, UserTheme } from "@/gen/codefoundry/v1/theme_pb";
-import type { ThemeScheme, UserThemeFile } from "@/themes";
+import { readUserThemeFile, type UserThemeFile } from "@/themes";
 
 /** A file in the themes directory that is not a theme the app can use. */
 export interface ThemeFileIssueView {
@@ -23,23 +23,24 @@ export interface ThemesSnapshotView {
   version: number;
 }
 
-const scheme = (s: string): ThemeScheme | null => (s === "dark" || s === "light" ? s : null);
-
-/** A user theme as a theme file (the catalog's format plus from, createdBy and its path); null for a scheme the GUI does not know. */
+/**
+ * A user theme as a theme file (the catalog's format plus from, createdBy and its path),
+ * read by the same rules as a curated file (readUserThemeFile: parseThemeFile, user mode);
+ * null for one those refuse (a scheme the GUI does not know, a retired slot, ...).
+ */
 export function toUserThemeFile(t: UserTheme): UserThemeFile | null {
-  const sc = scheme(t.scheme);
   const b = t.base;
   const term = b?.terminal;
-  if (!sc || !b || !term) return null;
-  const opt = (v: string) => (v ? v : undefined);
-  const overrides = Object.keys(t.overrides).length > 0 ? { ...t.overrides } : undefined;
-  return {
+  const opt = (k: string, v: string | undefined) => (v ? { [k]: v } : {});
+  const json = {
     id: t.id,
     name: t.name,
-    scheme: sc,
-    ...(t.pair ? { pair: t.pair } : {}),
-    source: t.source,
-    base: {
+    scheme: t.scheme,
+    ...opt("pair", t.pair),
+    ...opt("from", t.from),
+    ...opt("created_by", t.createdBy),
+    ...opt("source", t.source),
+    base: b && {
       canvas: b.canvas,
       surface: b.surface,
       text: b.text,
@@ -49,20 +50,18 @@ export function toUserThemeFile(t: UserTheme): UserThemeFile | null {
       error: b.error,
       info: b.info,
       highlight: b.highlight,
-      ...(opt(b.link) ? { link: b.link } : {}),
-      terminal: {
+      ...opt("link", b.link),
+      terminal: term && {
         foreground: term.foreground,
-        ...(opt(term.cursor) ? { cursor: term.cursor } : {}),
-        ...(opt(term.cursorText) ? { cursorText: term.cursorText } : {}),
-        ...(opt(term.selection) ? { selection: term.selection } : {}),
+        ...opt("cursor", term.cursor),
+        ...opt("cursorText", term.cursorText),
+        ...opt("selection", term.selection),
         ansi: [...term.ansi],
       },
     },
-    ...(overrides ? { overrides } : {}),
-    from: t.from,
-    createdBy: t.createdBy,
-    path: t.path,
+    ...(Object.keys(t.overrides).length > 0 ? { overrides: { ...t.overrides } } : {}),
   };
+  return readUserThemeFile(json, t.path);
 }
 
 export function toThemesSnapshotView(s: ThemeSnapshot | undefined): ThemesSnapshotView {
