@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Check, Link2, Monitor, Moon, Search, Sun, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
   customiseTheme,
   deleteTheme,
   dismissPairHint,
+  editTheme,
   filterThemes,
   previewedId,
   previewTheme,
@@ -29,8 +30,11 @@ import {
   useThemePickerStore,
   type ThemeSlot,
 } from "@/stores/themePicker";
+import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
 import { useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
+import { SaveThemeDialog } from "./editor/SaveThemeDialog";
+import { ThemeInspector } from "./editor/ThemeInspector";
 import { ThemeAa, ThemeStrip } from "./ThemeChip";
 import { ThemeGallery } from "./ThemeGallery";
 import { ThemeScope } from "./ThemeScope";
@@ -62,7 +66,9 @@ export function ThemesPage() {
   const slots = useThemeSlots();
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  useEscapeCloses(closeThemes);
+  const editingId = useThemeEditorStore((s) => s.id);
+  // In the editor, Escape first goes back from a colour's view to the lists.
+  useEscapeCloses(closeOrBack);
 
   // Re-renders when the user's themes change; filterThemes reads them (a few dozen rows: no memo).
   useUserThemes();
@@ -85,7 +91,7 @@ export function ThemesPage() {
     if (list.length === 0) return;
     const i = list.findIndex((t) => t.id === shownId);
     const next = list[i < 0 ? 0 : Math.min(list.length - 1, Math.max(0, i + delta))];
-    if (next) previewTheme(next.id);
+    if (next) pickRow(next.id);
   };
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
@@ -102,7 +108,8 @@ export function ThemesPage() {
         return;
       case "Enter":
         e.preventDefault();
-        void applyPreview();
+        // In the editor, Save… applies (the draft is not the file yet).
+        if (!editingId) void applyPreview();
         return;
       case "/":
         if (inSearch) return;
@@ -129,7 +136,7 @@ export function ThemesPage() {
       </PaneHeader>
       <ControlBar slot={slot} slots={slots} />
       <div className="flex min-h-0 flex-1">
-        <div className="flex w-[300px] shrink-0 flex-col border-r border-cf-divider">
+        <div className={cn("flex shrink-0 flex-col border-r border-cf-divider", editingId ? "w-[240px]" : "w-[300px]")}>
           <div className="relative px-3 pt-3 pb-2">
             <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-cf-text-muted" />
             <Input
@@ -189,21 +196,88 @@ export function ThemesPage() {
             </span>
           </div>
         </div>
+        {editingId && <ThemeInspector />}
         <div className="flex min-w-0 flex-1 flex-col">
-          <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />
+          {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />}
           <PairHintLine slots={slots} />
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {/* inert: a picture of the app, so Tab and clicks stay in the page (and no
-                popover opens into the window's theme through a portal). */}
-            <ThemeScope theme={themeOf(shownId, slot)} className="rounded-xl border border-cf-divider">
-              <div inert>
-                <ThemeGallery />
-              </div>
-            </ThemeScope>
+            <GalleryScope shown={themeOf(shownId, slot)} />
           </div>
         </div>
       </div>
+      <SaveThemeDialog />
     </section>
+  );
+}
+
+/** Escape on the page: back from a colour's view in the editor, else close (which asks first when the editor has changes). */
+function closeOrBack(): void {
+  if (!editorBack()) closeThemes();
+}
+
+/** A row picked (click, arrows): previews it; in the editor, on another theme, the editor closes first (asking when it has changes). */
+function pickRow(id: string): void {
+  const editing = useThemeEditorStore.getState().id;
+  if (editing === null || editing === id) {
+    previewTheme(id);
+    return;
+  }
+  afterLeavingEditor(() => {
+    previewTheme(id);
+  });
+}
+
+/**
+ * The gallery in the previewed theme, or in the editor's draft: every edit repaints it
+ * (only this scope's inline slots change; the gallery itself does not re-render).
+ */
+function GalleryScope({ shown }: { shown: Theme }) {
+  const analysis = useEditorAnalysis();
+  // inert: a picture of the app, so Tab and clicks stay in the page (and no popover opens
+  // into the window's theme through a portal).
+  const gallery = useMemo(
+    () => (
+      <div inert>
+        <ThemeGallery />
+      </div>
+    ),
+    [],
+  );
+  return (
+    <ThemeScope theme={analysis?.theme ?? shown} className="rounded-xl border border-cf-divider">
+      {gallery}
+    </ThemeScope>
+  );
+}
+
+/** The editor's bar over the gallery: "Editing <name> · from <from>", Revert, Save… and Done. */
+function EditBar() {
+  const draft = useThemeEditorStore((s) => s.draft);
+  const dirty = useThemeEditorStore((s) => editorDirty(s));
+  if (!draft) return null;
+  const from = draft.from ? (themeById.get(draft.from)?.name ?? draft.from) : "";
+  return (
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-cf-divider px-4" data-testid="themes-edit-bar">
+      <span className="min-w-0 truncate text-body-sm">
+        <span className="text-cf-text-muted">Editing </span>
+        <span className="font-medium" data-testid="themes-editing-name">
+          {draft.name}
+        </span>
+        {from && <span className="text-caption"> · from {from}</span>}
+        {dirty && <span className="text-caption"> · unsaved</span>}
+      </span>
+      <Button variant="ghost" size="sm" className="ml-auto" disabled={!dirty} onClick={revertEdits} data-testid="themes-revert">
+        Revert
+      </Button>
+      <Button size="sm" onClick={() => { setSaveOpen(true); }} data-testid="themes-save">
+        Save…
+      </Button>
+      <Tip label="Close the editor">
+        <Button variant="ghost" size="icon-xs" aria-label="Close the editor" onClick={() => void leaveEditor()} data-testid="themes-edit-done">
+          <X />
+        </Button>
+      </Tip>
+    </div>
   );
 }
 
@@ -244,8 +318,8 @@ function originLine(theme: Theme): string {
 
 /**
  * A row's actions, muted, shown on hover and on keyboard focus (they stay focusable while
- * folded away): Customise on every theme, Delete on the user's. The editor (a later step)
- * adds Edit on the user's rows here, beside Customise.
+ * folded away): Edit on the user's themes (theme.edit), Customise on every theme (a copy,
+ * then the editor on it), Delete on the user's.
  */
 function RowActions({ theme }: { theme: Theme }) {
   const stop = (e: ReactMouseEvent) => {
@@ -258,6 +332,11 @@ function RowActions({ theme }: { theme: Theme }) {
       onDoubleClick={stop}
       data-testid="theme-row-actions"
     >
+      {theme.user && (
+        <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void editTheme(theme.id)} aria-label={`Edit ${theme.name}`}>
+          Edit
+        </Button>
+      )}
       <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void customiseTheme(theme.id)} aria-label={`Customise ${theme.name}`}>
         Customise
       </Button>
@@ -273,7 +352,10 @@ function RowActions({ theme }: { theme: Theme }) {
 }
 
 function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: boolean; current: boolean }) {
-  const origin = theme.user ? originLine(theme) : "";
+  // The theme in the editor: its second line says so, with its pins (-1: not this row).
+  const inEditor = useThemeEditorStore((s) => s.id !== null);
+  const editingPins = useThemeEditorStore((s) => (s.id === theme.id ?Object.keys(s.draft?.overrides ?? {}).length : -1));
+  const origin = editingPins >= 0 ? `editing · ${String(editingPins)} pinned` : theme.user ? originLine(theme) : "";
   return (
     <div
       id={`theme-option-${theme.id}`}
@@ -291,10 +373,10 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
         previewed ? "bg-cf-control-hover text-cf-text" : "hover:bg-cf-control-hover/50",
       )}
       onClick={() => {
-        previewTheme(theme.id);
+        pickRow(theme.id);
       }}
       onDoubleClick={() => {
-        void applyPreview();
+        if (editingPins < 0 && useThemeEditorStore.getState().id === null) void applyPreview();
       }}
     >
       <ThemeAa theme={theme} />
@@ -308,8 +390,9 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
           </span>
         )}
       </span>
-      <ThemeStrip theme={theme} className="group-hover/row:hidden group-focus-within/row:hidden" />
-      <RowActions theme={theme} />
+      {/* In the editor the list is narrow: names over swatches; the edited row has no actions. */}
+      {!inEditor && <ThemeStrip theme={theme} className="group-hover/row:hidden group-focus-within/row:hidden" />}
+      {editingPins < 0 && <RowActions theme={theme} />}
       <span className="flex w-4 shrink-0 justify-center">
         {current && <Check className="size-3.5 text-cf-text" aria-hidden />}
       </span>
@@ -362,7 +445,7 @@ function SlotChip({ slot, theme, editing, inUse }: { slot: ThemeSlot; theme: The
       aria-pressed={editing}
       className={cn("h-8 gap-2 px-2.5 font-normal", editing && "border-cf-accent ring-1 ring-cf-accent/40 dark:border-cf-accent")}
       onClick={() => {
-        setPickerSlot(slot);
+        if (!editing) afterLeavingEditor(() => { setPickerSlot(slot); });
       }}
       data-testid={`themes-slot-${slot}`}
     >

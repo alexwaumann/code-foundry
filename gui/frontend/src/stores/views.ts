@@ -20,7 +20,9 @@ import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
-import { resetThemePicker, setPickerSlot, useThemePickerStore, type ThemeSlot } from "./themePicker";
+import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
+import { afterLeavingEditor, editorDirty, leaveEditor, startEditing, stopEditing, useThemeEditorStore } from "./themeEditor";
+import { themeById } from "@/themes";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -103,15 +105,20 @@ export function toggleView(name: "settings" | "usage"): boolean {
  * only show: one already open stays (toggleView is the window's own toggle).
  */
 export function showView(name: string): boolean {
+  // theme.edit: the Themes page in edit mode on one of the user's themes.
+  if (name.startsWith(THEME_EDIT_VIEW)) {
+    void openThemeEditor(name.slice(THEME_EDIT_VIEW.length));
+    return true;
+  }
   switch (name) {
     case "settings":
       // Already open: stays on the page it shows.
       if (!useViewsStore.getState().settingsOpen) {
-        useViewsStore.setState({ settingsOpen: true, settingsPage: SETTINGS_FIRST_PAGE, usageOpen: false, themesOpen: false, helpOpen: false });
+        setPages({ settingsOpen: true, settingsPage: SETTINGS_FIRST_PAGE, usageOpen: false, themesOpen: false, helpOpen: false });
       }
       return true;
     case "usage":
-      useViewsStore.setState({ usageOpen: true, settingsOpen: false, themesOpen: false, helpOpen: false });
+      setPages({ usageOpen: true, settingsOpen: false, themesOpen: false, helpOpen: false });
       return true;
     case "themes":
     case "themes.dark":
@@ -194,14 +201,19 @@ export function showView(name: string): boolean {
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a page would hide the panel.
       if (parsePluginView(name)) {
-        useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
-        return showPluginView(name);
+        if (!editingThemes()) {
+          useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
+          return showPluginView(name);
+        }
+        setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => void showPluginView(name));
+        return true;
       }
       // Top-level pages (the Pull Requests page) are selections. Closing settings and
       // usage here too covers re-selecting the page that is already selected.
       if (!viewNames.includes(name)) return false;
-      useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
-      useUiStore.getState().select({ kind: "view", name });
+      setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => {
+        useUiStore.getState().select({ kind: "view", name });
+      });
       return true;
   }
 }
@@ -504,7 +516,53 @@ function requestPromptFocus(): void {
 
 /** Opens the settings page on one of its pages (SettingPageView.id), over any other window page. */
 export function openSettingsPage(page: string): void {
-  useViewsStore.setState({ settingsOpen: true, settingsPage: page, usageOpen: false, themesOpen: false, helpOpen: false });
+  setPages({ settingsOpen: true, settingsPage: page, usageOpen: false, themesOpen: false, helpOpen: false });
+}
+
+/** The Themes page is open with unsaved edits in its editor. */
+function editingThemes(): boolean {
+  return useViewsStore.getState().themesOpen && editorDirty();
+}
+
+/**
+ * Sets the page flags, then runs `after`. When that closes the Themes page while its editor
+ * has unsaved edits, the confirm dialog asks first; on Cancel nothing changes.
+ */
+function setPages(next: Partial<ViewsState>, after?: () => void): void {
+  const apply = () => {
+    useViewsStore.setState(next);
+    after?.();
+  };
+  if (next.themesOpen === false && editingThemes()) afterLeavingEditor(apply);
+  else apply();
+}
+
+/** ShowView "themes.edit.<id>" (theme.edit). */
+export const THEME_EDIT_VIEW = "themes.edit.";
+
+/**
+ * theme.edit: opens the Themes page on the theme's scheme with the editor on it (after
+ * the confirm when another theme has unsaved edits). Waits for a theme just copied
+ * (Customise) to arrive. False when the id is not one of the user's themes.
+ */
+export async function openThemeEditor(id: string): Promise<boolean> {
+  if (!(await whenTheme(id))) return false;
+  const t = themeById.get(id);
+  if (!t?.user) {
+    toast.error("Cannot edit that theme", { description: `${t?.name ?? id} is not one of your themes. Customise copies it first.` });
+    return false;
+  }
+  const editing = useThemeEditorStore.getState().id;
+  if (editing !== id && !(await leaveEditor())) return false;
+  const views = useViewsStore.getState();
+  if (!views.themesOpen) {
+    resetThemePicker(t.scheme, views.settingsOpen ? "settings" : null);
+    setPages({ themesOpen: true, settingsOpen: false, usageOpen: false, helpOpen: false });
+  } else setPickerSlot(t.scheme);
+  setPickerQuery("");
+  previewTheme(id);
+  if (editing !== id) startEditing(id);
+  return true;
 }
 
 /** Shows a page of the open settings page (its left nav). */
@@ -526,15 +584,24 @@ export function closeSettings(): void {
 export function openThemes(slot?: ThemeSlot, from?: "settings"): void {
   const views = useViewsStore.getState();
   if (views.themesOpen) {
-    if (slot) setPickerSlot(slot);
+    // Another slot lists the other scheme's themes: the editor (on one theme) closes first.
+    if (slot && slot !== useThemePickerStore.getState().slot) afterLeavingEditor(() => { setPickerSlot(slot); });
     return;
   }
   resetThemePicker(slot, from ?? (views.settingsOpen ? "settings" : null));
   useViewsStore.setState({ themesOpen: true, settingsOpen: false, usageOpen: false, helpOpen: false });
 }
 
-/** Leaves the Themes page, dropping its preview; back to Settings when it came from there. */
+/**
+ * Leaves the Themes page, dropping its preview and its editor; back to Settings when it
+ * came from there. With unsaved edits the confirm dialog asks first.
+ */
 export function closeThemes(): void {
+  if (editorDirty()) {
+    afterLeavingEditor(closeThemes);
+    return;
+  }
+  stopEditing();
   const back = useThemePickerStore.getState().returnTo === "settings";
   resetThemePicker(undefined, null);
   useViewsStore.setState({ themesOpen: false, settingsOpen: back });
@@ -572,7 +639,15 @@ export function setHelpTab(tab: HelpTab): void {
 
 /** Selecting something in the sidebar leaves the settings or usage page. */
 export function startViewSync(): () => void {
-  return useUiStore.subscribe((s, prev) => {
-    if (s.selection !== prev.selection && pageOpen()) useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });
+  const unsubUi = useUiStore.subscribe((s, prev) => {
+    if (s.selection !== prev.selection && pageOpen()) setPages({ settingsOpen: false, usageOpen: false, themesOpen: false });
   });
+  // However the Themes page closes, its editor goes with it.
+  const unsubViews = useViewsStore.subscribe((s, prev) => {
+    if (prev.themesOpen && !s.themesOpen) stopEditing();
+  });
+  return () => {
+    unsubUi();
+    unsubViews();
+  };
 }

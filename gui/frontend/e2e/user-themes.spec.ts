@@ -62,7 +62,7 @@ test("a user theme previews and applies like a curated one", async ({ page }) =>
   expect(await page.locator("html").evaluate((el) => getComputedStyle(el).getPropertyValue("--pane").trim())).toBe("#16232f");
 });
 
-test("Customise copies a theme into Yours and previews the copy", async ({ page }) => {
+test("Customise copies a theme into Yours, previews the copy and edits it", async ({ page }) => {
   await openThemes(page);
   const dracula = option(page, "Dracula");
   // Folded away until the row is hovered (still focusable).
@@ -73,7 +73,9 @@ test("Customise copies a theme into Yours and previews the copy", async ({ page 
   await dracula.getByRole("button", { name: "Customise Dracula" }).click();
   await expect(yours(page).getByTestId("theme-name")).toHaveText(["Dracula copy", "Mocha, warmer", "Ocean Dusk"]);
   await expect(option(page, "Dracula copy")).toHaveAttribute("aria-selected", "true");
-  await expect(option(page, "Dracula copy").getByTestId("theme-origin")).toHaveText("from Dracula");
+  // The editor opens on the copy (theme-editor.spec.ts); its row says so instead of where it came from.
+  await expect(option(page, "Dracula copy").getByTestId("theme-origin")).toHaveText("editing · 0 pinned");
+  await expect(page.getByTestId("themes-edit-bar")).toContainText("Editing Dracula copy · from Dracula");
   await expect(scope(page)).toHaveAttribute("data-theme", "dracula-copy");
   // Previewed, not applied.
   expect(await raw("appearance.theme_dark")).toBeUndefined();
