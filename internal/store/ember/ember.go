@@ -1,8 +1,9 @@
 // Package ember is the store of Ember, the daemon's resident agent
 // (docs/notes/ember-2-store.md): one resident thread (thread.Manager.EnsureResident,
 // name "ember") that plans the user's work, creates worker threads with the orchestrate
-// protocol, follows them through wakes and reports in its own chat. It never edits
-// files: it runs only the code-foundry CLI and reads.
+// protocol, follows them through wakes and reports in its own chat. On its own it
+// never edits files: it runs only the code-foundry CLI and reads (rules.md; a piece the
+// user explicitly tells it to do itself is the exception).
 //
 // The store owns:
 //

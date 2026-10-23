@@ -490,7 +490,9 @@ func TestEmberSkill(t *testing.T) {
 		// research task in the project's checkout that reports findings and closes without a branch.
 		"never answer it yourself", "per piece. Anything past a handful of reads", "is a research task", "## Research",
 		"--new-worktree=false --prompt - <<'EOF'`: the project's checkout", "touches nothing", `"findings": [...]`,
-		`done <task id> "<finding>"` + "` (no `--branch`)", "a parent or research task"} {
+		`done <task id> "<finding>"` + "` (no `--branch`)", "a parent or research task",
+		// ember-rules-reply: only a turn's last text shows; edits only for an explicit ask.
+		"in your turn's last text (only it shows", "in your last text (it alone shows)", "piece the user tells you to do yourself"} {
 		if !bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s lacks %q", p, w)
 		}
@@ -501,7 +503,7 @@ func TestEmberSkill(t *testing.T) {
 	// Gone with ember-research-tasks: "Understand it" and its unbounded reads (a file whole
 	// before saying what a project has or lacks), which let Ember run research itself.
 	for _, w := range []string{"Two separate commands", "ember task update <task id> --thread", `--prompt "`, "every caveat",
-		"**Understand it.**", "before you say what a project has or lacks"} {
+		"**Understand it.**", "before you say what a project has or lacks", "You never edit files"} {
 		if bytes.Contains(ember[p], []byte(w)) {
 			t.Errorf("%s still has %q", p, w)
 		}
