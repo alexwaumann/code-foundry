@@ -31,7 +31,7 @@ import {
   type ThemeSlot,
 } from "@/stores/themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
-import { useThemesStore, useUserThemes } from "@/stores/themes";
+import { deleteThemeFile, useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
 import { useWidth } from "@/lib/useWidth";
 import { AskTheModel } from "./AskTheModel";
@@ -366,14 +366,35 @@ function ListSection({ label, count, testId, children }: { label: string; count:
   );
 }
 
-/** The files in the themes directory that did not load (those the search matches), under the user's themes. */
+/**
+ * The files in the themes directory that did not load (those the search matches), under the
+ * user's themes: each with its reason (cut to two lines; the tooltip has all of it, the fix
+ * is often at its end) and Delete (theme.delete --file, which asks first;
+ * docs/notes/theme-fuzz-daemon.md).
+ */
 function ThemeIssues({ issues }: { issues: readonly { file: string; message: string }[] }) {
   if (issues.length === 0) return null;
   return (
     <ul className="space-y-0.5 px-2 pb-1" data-testid="themes-issues">
       {issues.map((is) => (
-        <li key={is.file} className="line-clamp-2 text-caption-sm text-cf-warning">
-          {is.file} did not load: {is.message}
+        <li key={is.file} className="flex items-start gap-1" data-testid="themes-issue">
+          <Tip label={`${is.file} did not load: ${is.message}`}>
+            <span className="line-clamp-2 min-w-0 flex-1 text-caption-sm text-cf-warning">
+              {is.file} did not load: {is.message}
+            </span>
+          </Tip>
+          <Tip label="Delete the file">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 text-cf-text-muted hover:text-cf-error"
+              onClick={() => void deleteThemeFile(is.file)}
+              aria-label={`Delete ${is.file}`}
+              data-testid="themes-issue-delete"
+            >
+              <Trash2 />
+            </Button>
+          </Tip>
         </li>
       ))}
     </ul>

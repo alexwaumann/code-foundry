@@ -21,6 +21,7 @@ const snapshot = create(ThemeSnapshotSchema, {
       createdBy: "s-1",
       path: "/h/themes/nord-copy.json",
       version: "0123abcd",
+      history: ["00ff", "00ee"],
       base: { ...nord.base, link: "", terminal: { foreground: nord.base.terminal.foreground, cursor: "", cursorText: "", selection: "#434c5e", ansi } },
       overrides: { "--cf-accent": "#88c0d0" },
     },
@@ -35,7 +36,7 @@ const snapshot = create(ThemeSnapshotSchema, {
 describe("toThemesSnapshotView", () => {
   it("maps user themes to theme files, empty optional colours left out", () => {
     const v = toThemesSnapshotView(snapshot);
-    expect(v).toMatchObject({ dir: "/h/themes", version: 3, issues: [{ file: "broken.json", message: "not JSON" }] });
+    expect(v).toMatchObject({ dir: "/h/themes", version: 3, issues: [{ file: "broken.json", message: "not JSON" }], history: { "nord-copy": ["00ff", "00ee"] } });
     expect(v.user).toHaveLength(1);
     const t = v.user[0];
     expect(t).toMatchObject({ id: "nord-copy", name: "Nord, quieter", scheme: "dark", from: "nord", createdBy: "s-1", path: "/h/themes/nord-copy.json", version: "0123abcd", overrides: { "--cf-accent": "#88c0d0" } });
@@ -62,7 +63,7 @@ describe("toThemesSnapshotView", () => {
   });
 
   it("an empty snapshot", () => {
-    expect(toThemesSnapshotView(undefined)).toEqual({ user: [], issues: [], dir: "", version: 0 });
+    expect(toThemesSnapshotView(undefined)).toEqual({ user: [], issues: [], history: {}, dir: "", version: 0 });
   });
 
   it("arrives on the events stream as the theme source", () => {

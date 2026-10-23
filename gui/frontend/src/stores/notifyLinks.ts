@@ -3,7 +3,7 @@
  * "<kind>:<target>". A registry, not a switch: a new kind is one entry. A link this window
  * does not know gets no button.
  */
-import { editSavedTheme, undoTheme } from "./themeCards";
+import { editSavedTheme, undoFromLink } from "./themeCards";
 import { openSettingsPage, useViewsStore } from "./views";
 
 const kinds: Readonly<Record<string, (target: string) => void>> = {
@@ -15,10 +15,10 @@ const kinds: Readonly<Record<string, (target: string) => void>> = {
   "theme-edit": (id) => {
     void editSavedTheme(id);
   },
-  // "theme-set:<scheme>:<id>": that slot back on that theme (the toast's Undo).
-  "theme-set": (target) => {
-    const [scheme, id] = target.split(":", 2);
-    if ((scheme === "dark" || scheme === "light") && id) void undoTheme(scheme, id);
+  // "theme-undo:<scheme>:<id>:<previous>[:<version>]": a theme card's Undo, by the card's
+  // rule (stores/themeCards.ts), while the slot still shows the theme.
+  "theme-undo": (target) => {
+    undoFromLink(target);
   },
 };
 

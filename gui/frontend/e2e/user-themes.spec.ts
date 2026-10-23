@@ -123,6 +123,20 @@ test("Delete asks first; deleting the theme in use moves the slot to the theme i
   await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
 });
 
+// docs/notes/theme-fuzz-daemon.md (files 6): a file that did not load can be deleted from
+// its line, which shows all of its reason on hover.
+test("a file that did not load has Delete, which asks first", async ({ page }) => {
+  await openThemes(page);
+  const issue = page.getByTestId("themes-issue");
+  await expect(issue).toHaveCount(1);
+  await issue.getByTestId("themes-issue-delete").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText('Delete the file draft.json from the themes directory? It did not load: base.accent: "#5fb3" is not #rrggbb.');
+  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("themes-issues")).toHaveCount(0);
+  await expect.poll(async () => ((await (await fetch(`${mockUrl}/__mock/themes`)).json()) as { calls: string[] }).calls).toContain("theme.delete draft.json");
+});
+
 test("a theme written by hand arrives live; with none, Yours says how to make one", async ({ page }) => {
   await mockPost("themes?set=empty");
   await openThemes(page);

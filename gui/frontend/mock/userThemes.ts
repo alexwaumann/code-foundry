@@ -174,6 +174,8 @@ export class MockThemes {
   /** The GUI's contrast reports, by theme id (UiService.PublishThemeReport). */
   private reports = new Map<string, MockReport>();
   private reportWaiters = new Set<() => void>();
+  /** The versions each save replaced, newest first, at most 10 per theme (the daemon's .history). */
+  private history = new Map<string, MockUserTheme[]>();
 
   constructor(
     private readonly deps: {
@@ -181,8 +183,10 @@ export class MockThemes {
       /** The settings the slots are, read and written (mock/settings.ts). */
       slot: (scheme: ThemeScheme) => string;
       setSlot: (scheme: ThemeScheme, id: string) => void;
-      /** ThreadService.ShowTheme: appends the card, answering the Undo target it kept. */
-      card?: (threadId: string, card: { theme: UserThemeInit; applied: boolean; previous: string }) => string;
+      /** appearance.theme (theme.set-scheme). */
+      setScheme?: (scheme: string) => void;
+      /** ThreadService.ShowTheme: appends the card. */
+      card?: (threadId: string, card: { theme: UserThemeInit; applied: boolean; previous: string; previousVersion: string; previousGone: boolean }) => void;
       /** Shows a toast in the window (UiIntent). */
       emit?: (intent: IntentInit) => void;
     },
@@ -210,7 +214,7 @@ export class MockThemes {
   snapshot(): SnapshotInit {
     return {
       curated: curated.map((t) => ({ id: t.id, name: t.name, scheme: t.scheme, pair: t.pair ?? "" })),
-      user: this.sorted().map((t) => protoOf(t, `${DIR}/${t.id}.json`)),
+      user: this.sorted().map((t) => ({ ...protoOf(t, `${DIR}/${t.id}.json`), history: (this.history.get(t.id) ?? []).map(versionOf) })),
       issues: this.issues,
       dir: DIR,
       version: BigInt(this.version),
@@ -279,12 +283,19 @@ export class MockThemes {
     throw new CommandError("notfound", `no such theme "${id}"`);
   }
 
-  private save(t: MockUserTheme): { replaced: boolean } {
+  private save(t: MockUserTheme): { replaced: boolean; previousVersion: string } {
     if (curated.some((c) => c.id === t.id)) throw new CommandError("invalid", `"${t.id}" is a curated theme's id; save under another id (theme duplicate ${t.id} makes a copy)`);
-    const replaced = this.user.some((u) => u.id === t.id);
+    const was = this.user.find((u) => u.id === t.id);
+    let previousVersion = "";
+    if (was && versionOf(was) !== versionOf(t)) {
+      // The replaced version is kept for a card's Undo (theme.restore).
+      const kept = (this.history.get(t.id) ?? []).filter((h) => versionOf(h) !== versionOf(was));
+      this.history.set(t.id, [was, ...kept].slice(0, 10));
+      previousVersion = versionOf(was);
+    }
     this.user = [...this.user.filter((u) => u.id !== t.id), t];
     this.changed();
-    return { replaced };
+    return { replaced: !!was, previousVersion };
   }
 
   private lines(t: MockUserTheme, replaced: boolean, contrast: string[]): string[] {
@@ -301,17 +312,24 @@ export class MockThemes {
 
   /**
    * What theme save does after the write when it runs from a thread, like the daemon's
-   * showThemeCard: the card (applied when --apply, or when the slot already had it; the
-   * slot's theme before as its Undo target) and, when the save changed what the slot shows
+   * showThemeCard: the card (applied when --apply, or when the slot already had it; its
+   * Undo what the slot showed just before: another theme, or the version this save replaced,
+   * docs/notes/theme-fuzz-daemon.md) and, when the save changed what the slot shows
    * (another theme, or new colours: `was` is the file before), the "<name> applied to
    * <scheme>" toast with Undo and Edit, which a window on the Themes page skips.
    */
-  private fromThread(threadId: string, t: MockUserTheme, apply: boolean, before: string, was?: MockUserTheme): void {
+  private fromThread(threadId: string, t: MockUserTheme, apply: boolean, before: string, was: MockUserTheme | undefined, previousVersion: string): void {
     const applied = apply || before === t.id;
-    const previous = this.deps.card?.(threadId, { theme: protoOf(t, ""), applied, previous: applied ? before : "" }) ?? (applied ? before : "");
-    if (!applied || (before === t.id && was && paint(was) === paint(t))) return;
+    const repaint = before !== t.id || !was || paint(was) !== paint(t);
+    let previous = "";
+    let version = "";
+    if (applied && before && before !== t.id) previous = before;
+    else if (applied && before === t.id && was && paint(was) !== paint(t)) [previous, version] = [t.id, previousVersion];
+    const gone = previous !== "" && previous === t.id && !version;
+    this.deps.card?.(threadId, { theme: protoOf(t, ""), applied, previous, previousVersion: version, previousGone: gone });
+    if (!applied || !repaint) return;
     const edit = { link: `theme-edit:${t.id}`, label: "Edit" };
-    const undo = previous && previous !== t.id ? { link: `theme-set:${t.scheme}:${previous}`, label: "Undo" } : null;
+    const undo = previous && !gone ? { link: `theme-undo:${t.scheme}:${t.id}:${previous}${version ? `:${version}` : ""}`, label: "Undo" } : null;
     this.deps.emit?.({
       intent: {
         case: "notify",
@@ -337,7 +355,23 @@ export class MockThemes {
     const apply = q.get("apply") === "true";
     if (apply) this.deps.setSlot(u.scheme, u.id);
     // The file unchanged: a repaint only when the slot moves onto it.
-    this.fromThread(threadId, u, apply, before, u);
+    this.fromThread(threadId, u, apply, before, u, "");
+    return { ok: true };
+  }
+
+  /**
+   * POST /__mock/themes/recolour?thread=&theme=&accent=#rrggbb: theme save from that
+   * thread of the theme with a new accent, as a model's refinement of the theme in use.
+   */
+  recolour(q: URLSearchParams): { ok: true } {
+    const threadId = q.get("thread") ?? "";
+    const u = this.user.find((t) => t.id === q.get("theme"));
+    const accent = q.get("accent") ?? "";
+    if (!threadId || !u || !/^#[0-9a-f]{6}$/.test(accent)) throw new Error("want thread=<id>&theme=<one of the user's themes>&accent=#rrggbb");
+    const before = this.deps.slot(u.scheme);
+    const t: MockUserTheme = { ...u, base: { ...u.base, accent } };
+    const { previousVersion } = this.save(t);
+    this.fromThread(threadId, t, false, before, u, previousVersion);
     return { ok: true };
   }
 
@@ -384,6 +418,7 @@ export class MockThemes {
           { name: "file", type: ArgType.PATH, required: false, description: "The theme file (JSON) to read" },
           { name: "data", type: ArgType.STRING, required: false, description: "The theme file itself, its JSON (-: stdin, @file: a file); instead of --file" },
           { name: "apply", type: ArgType.BOOL, required: false, description: "Also set it as the dark or light theme, per its scheme" },
+          { name: "replace", type: ArgType.BOOL, required: false, description: "From a thread: replace a theme with this id that the thread did not make" },
         ]),
         when: always,
         run: async (c, a) => {
@@ -391,10 +426,16 @@ export class MockThemes {
           if (!a.data) throw new CommandError("invalid", "the mock reads --data only");
           const t = parse(a.data);
           const by = thread(c);
-          if (by) t.createdBy = by;
           const before = this.deps.slot(t.scheme);
           const was = this.user.find((u) => u.id === t.id);
-          const { replaced } = this.save(t);
+          if (was && by && was.createdBy !== by && a.replace !== "true") {
+            throw new CommandError("invalid", `${was.name} (${was.id}) is a theme this thread did not make; save under another id, or pass --replace once the user asked to change that theme`);
+          }
+          if (was && was.scheme !== t.scheme && this.deps.slot(was.scheme) === was.id) {
+            throw new CommandError("invalid", `${was.id} is your ${was.scheme} theme; a ${t.scheme} theme needs another id`);
+          }
+          if (by) t.createdBy = was ? was.createdBy : by;
+          const { replaced, previousVersion } = this.save(t);
           let applied = "";
           const after: string[] = [];
           if (a.apply === "true") {
@@ -402,7 +443,7 @@ export class MockThemes {
             applied = `appearance.theme_${t.scheme}`;
             after.push(`applied: ${t.scheme} theme = ${t.name} (${t.id})`);
           }
-          if (by) this.fromThread(by, t, a.apply === "true", before, was);
+          if (by) this.fromThread(by, t, a.apply === "true", before, was, previousVersion);
           const lines = [...this.lines(t, replaced, await this.contrastLines(c, t)), ...after];
           return { message: lines.join("\n"), resultJson: this.savedJson(t, replaced, applied) };
         },
@@ -425,7 +466,7 @@ export class MockThemes {
             id,
             name: a.name?.trim() || `${file.name} copy${n > 1 ? ` ${String(n)}` : ""}`,
             scheme: file.scheme,
-            ...(file.pair ? { pair: file.pair } : {}),
+            // No pair: the original's pair is the original's.
             source: file.source,
             base: { ...file.base, terminal: { ...file.base.terminal, ansi: [...file.base.terminal.ansi] } },
             ...(file.overrides ? { overrides: { ...file.overrides } } : {}),
@@ -434,6 +475,33 @@ export class MockThemes {
           };
           this.save(t);
           return { message: this.lines(t, false, await this.contrastLines(c, t)).join("\n"), resultJson: this.savedJson(t, false) };
+        },
+      },
+      {
+        cmd: cmd("theme.restore", "Restore Theme Colours", "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10).", [
+          { name: "theme", type: ArgType.ENUM, required: true, description: "One of your themes' ids", enumValues: this.sorted().map((t) => t.id) },
+          { name: "version", type: ArgType.STRING, required: true, description: "The version to put back (a theme card's previous_version)" },
+        ]),
+        when: always,
+        run: async (c, a) => {
+          this.calls.push(`theme.restore ${a.theme ?? ""} ${a.version ?? ""}`);
+          const kept = (this.history.get(a.theme ?? "") ?? []).find((h) => versionOf(h) === a.version);
+          if (!kept) throw new CommandError("notfound", `the version of "${a.theme ?? ""}" from before is no longer kept (only the last 10 are)`);
+          const { replaced } = this.save({ ...kept });
+          const lines = this.lines(kept, replaced, await this.contrastLines(c, kept));
+          lines[0] = `restored ${kept.name} (${kept.id}) to an earlier version`;
+          return { message: lines.join("\n"), resultJson: this.savedJson(kept, replaced) };
+        },
+      },
+      {
+        cmd: cmd("theme.set-scheme", "Set Color Scheme", "Choose whether the app is dark, light, or follows the Mac (system): the appearance.theme setting.", [
+          { name: "scheme", type: ArgType.ENUM, required: true, description: "system (follow the Mac), dark or light", enumValues: ["system", "dark", "light"] },
+        ]),
+        when: always,
+        run: (_c, a) => {
+          this.calls.push(`theme.set-scheme ${a.scheme ?? ""}`);
+          this.deps.setScheme?.(a.scheme ?? "system");
+          return Promise.resolve({ message: `scheme = ${a.scheme ?? ""} (appearance.theme)`, resultJson: JSON.stringify({ key: "appearance.theme", scheme: a.scheme }) });
         },
       },
       {
@@ -452,10 +520,13 @@ export class MockThemes {
       },
       {
         cmd: {
-          ...cmd("theme.delete", "Delete Theme", "Delete one of your themes (its file in the themes directory). A slot that used it shows the theme it was copied from, else the default.", [
-            { name: "theme", type: ArgType.STRING, required: true, description: "One of your themes' ids (theme list marks them)" },
+          ...cmd("theme.delete", "Delete Theme", "Delete one of your themes (its file in the themes directory). A slot that used it shows the theme it was copied from, else the default. --file removes a file that did not load.", [
+            { name: "theme", type: ArgType.STRING, required: false, description: "One of your themes' ids (theme list marks them)" },
+            { name: "file", type: ArgType.STRING, required: false, description: "A file in the themes directory that did not load, by its name" },
           ]),
           confirm: (_c, a) => {
+            const issue = this.issueOf(a);
+            if (issue) return `Delete the file ${issue.file} from the themes directory? It did not load: ${issue.message}.`;
             const t = this.user.find((u) => u.id === a.theme);
             if (!t) return `Delete the theme ${a.theme ?? ""}? Its file in the themes directory is removed.`;
             let msg = `Delete the theme ${t.name}? Its file in the themes directory is removed.`;
@@ -466,7 +537,14 @@ export class MockThemes {
         },
         when: always,
         run: (_c, a) => {
-          this.calls.push(`theme.delete ${a.theme ?? ""}`);
+          this.calls.push(`theme.delete ${a.theme ?? a.file ?? ""}`);
+          const issue = this.issueOf(a);
+          if (issue) {
+            this.issues = this.issues.filter((i) => i.file !== issue.file);
+            this.changed();
+            return Promise.resolve({ message: `deleted the file ${issue.file} (it did not load: ${issue.message})`, resultJson: JSON.stringify(issue) });
+          }
+          if (a.file) throw new CommandError("invalid", `no file "${a.file}" among those that did not load (theme list names them)`);
           const id = a.theme ?? "";
           if (curated.some((t) => t.id === id)) throw new CommandError("invalid", `"${id}" is a curated theme; only your own themes can be deleted`);
           const t = this.user.find((u) => u.id === id);
@@ -480,11 +558,19 @@ export class MockThemes {
             lines.push(`now ${t.scheme} theme = ${next.name} (${next.id})`);
           }
           this.user = this.user.filter((u) => u.id !== id);
+          this.history.delete(id);
           this.changed();
           return Promise.resolve({ message: lines.join("\n"), resultJson: JSON.stringify({ id: t.id, name: t.name, scheme: t.scheme, ...(Object.keys(slots).length ? { slots } : {}) }) });
         },
       },
     ];
+  }
+
+  /** The file that did not load a delete names: --file, or the id of its name. */
+  private issueOf(a: Record<string, string | undefined>): { file: string; message: string } | undefined {
+    if (a.file) return this.issues.find((i) => i.file === a.file);
+    if (a.theme && !this.user.some((u) => u.id === a.theme)) return this.issues.find((i) => i.file.toLowerCase() === `${a.theme ?? ""}.json`);
+    return undefined;
   }
 
   /** What a slot naming t shows once t is deleted: its from when that is a theme of its scheme, else the default. */

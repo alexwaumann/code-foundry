@@ -1252,25 +1252,17 @@ export class MockThreadLogs {
 
   /**
    * ThreadService.ShowTheme (code-foundry theme save from the thread;
-   * docs/notes/theme-model-flow.md): a theme item at the end of the log. A refinement (the
-   * slot already had the theme: previous is the theme itself) takes the latest earlier card's
-   * Undo target, as the daemon's store does.
+   * docs/notes/theme-model-flow.md): a theme item at the end of the log. Its Undo is what
+   * the slot showed just before the save, as the daemon's store keeps it
+   * (docs/notes/theme-fuzz-daemon.md): none when not applied, the replaced version when
+   * previous is the theme itself.
    */
   showTheme(id: string, theme: ThemeItemInit): ItemInit {
-    let previous = theme.applied ? (theme.previous ?? "") : "";
     const themeId = theme.theme?.id ?? "";
-    if (previous === themeId) {
-      previous = "";
-      for (const x of [...this.log(id).items].reverse()) {
-        if (x.payload?.case !== "theme") continue;
-        const prev = x.payload.value.previous ?? "";
-        if (x.payload.value.theme?.id === themeId && prev && prev !== themeId) {
-          previous = prev;
-          break;
-        }
-      }
-    }
-    return this.append(id, this.item(id, { case: "theme", value: { ...theme, previous } }));
+    let { previous = "", previousVersion = "", previousGone = false } = theme;
+    if (!theme.applied || (previous === themeId && !previousVersion && !previousGone)) [previous, previousVersion, previousGone] = ["", "", false];
+    else if (previous !== themeId) previousVersion = "";
+    return this.append(id, this.item(id, { case: "theme", value: { ...theme, previous, previousVersion, previousGone } }));
   }
 
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {

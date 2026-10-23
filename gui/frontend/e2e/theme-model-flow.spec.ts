@@ -214,3 +214,52 @@ test("theme save from a thread prints the app's contrast check, theme check read
   await page.waitForTimeout(400);
   expect(await toasts()).toBe(2);
 });
+
+// The one Undo rule (docs/notes/theme-fuzz-daemon.md): what the slot showed just before the
+// save, only while the slot still shows the card's colours.
+test("Undo hides once the slot moves on, is disabled when its theme is deleted, and a refinement's Undo restores the colours before", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
+  const first = card(page).first();
+  const undo = first.getByTestId("thread-theme-undo");
+  await expect(undo).toHaveText("Undo");
+  // The user picks another theme by hand: the card's Undo would replace it, so it goes.
+  await invoke("theme.set-dark", { theme: "nord" });
+  await expect(undo).toHaveCount(0);
+  // Back on the card's theme: Undo again.
+  await invoke("theme.set-dark", { theme: "ocean-dusk" });
+  await expect(undo).toHaveText("Undo");
+  await expect(undo).toBeEnabled();
+
+  // A refinement of the theme in use: its Undo restores the colours it replaced, and the
+  // earlier card hides (the slot no longer shows its colours).
+  await mockPost(`themes/recolour?thread=s-1&theme=ocean-dusk&accent=${encodeURIComponent("#e0a060")}`);
+  await expect(card(page)).toHaveCount(2);
+  const second = card(page).nth(1);
+  const undo2 = second.getByTestId("thread-theme-undo");
+  await expect(undo2).toHaveText("Undo");
+  await expect(undo).toHaveCount(0);
+  await shot(page, "theme-card-undo-refinement", () => second);
+  await undo2.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Undo restores the previous colours");
+  await undo2.click();
+  await expect(undo2).toHaveText("Undone");
+  await expect(invocations()).resolves.toContainEqual(expect.objectContaining({ name: "theme.restore" }));
+  // The first card's colours are back: its Undo (to GitHub Dark) is offered again.
+  await expect(undo).toHaveText("Undo");
+
+  // The theme it goes back to is deleted: disabled, with why.
+  await invoke("theme.duplicate", { theme: "nord", name: "Nord, mine" });
+  await invoke("theme.set-dark", { theme: "nord-copy" });
+  await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
+  const third = card(page).nth(2);
+  await invoke("theme.delete", { theme: "nord-copy" });
+  const undo3 = third.getByTestId("thread-theme-undo");
+  await expect(undo3).toBeDisabled();
+  await expect(undo3).toHaveAttribute("data-undo", "gone");
+  await third.getByTestId("thread-theme-undo-tip").hover();
+  await expect(page.getByRole("tooltip")).toHaveText("nord-copy was deleted");
+  await shot(page, "theme-card-undo-gone", () => third);
+});

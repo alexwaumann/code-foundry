@@ -158,9 +158,11 @@ export type ThreadItemView = ItemBase &
     /**
      * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): the
      * file as saved (null when the GUI's rules refuse it), whether the save changed what a
-     * slot shows, and the theme Undo puts back ("" for none).
+     * slot shows, and what Undo puts back (docs/notes/theme-fuzz-daemon.md): previous is
+     * another theme, or the theme's own id with previousVersion; "" for none; previousGone
+     * when the daemon found nothing to put back.
      */
-    | { kind: "theme"; theme: UserThemeFile | null; applied: boolean; previous: string }
+    | { kind: "theme"; theme: UserThemeFile | null; applied: boolean; previous: string; previousVersion: string; previousGone: boolean }
   );
 
 export type ThreadItemKind = ThreadItemView["kind"];
@@ -319,7 +321,8 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
     case "html":
       return { ...base, kind: "html", path: p.value.path, title: p.value.title, baseDir: p.value.baseDir };
     case "theme":
-      return { ...base, kind: "theme", theme: p.value.theme ? toUserThemeFile(p.value.theme) : null, applied: p.value.applied, previous: p.value.previous };
+      return { ...base, kind: "theme", theme: p.value.theme ? toUserThemeFile(p.value.theme) : null, applied: p.value.applied, previous: p.value.previous,
+        previousVersion: p.value.previousVersion, previousGone: p.value.previousGone };
     default:
       return null;
   }
