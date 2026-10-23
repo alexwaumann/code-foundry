@@ -161,6 +161,8 @@
  *        three user themes (Ocean Dusk and Mocha, warmer dark, Latte, softer light) and a file that
  *        does not load; reset restores them.
  *   POST /__mock/themes?set=empty|seed           (the themes directory, as a hand edit; published)
+ *   POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]   (theme save from that thread:
+ *        its theme card and, applied, the toast)
  *   GET  /__mock/themes                          ({ themes, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
@@ -1314,6 +1316,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/themes":
       json(res, 200, world.themes.json());
+      break;
+    case "POST /__mock/themes/card":
+      try {
+        json(res, 200, world.themes.card(q));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
       break;
     case "POST /__mock/themes":
       try {

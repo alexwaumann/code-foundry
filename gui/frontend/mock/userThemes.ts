@@ -7,11 +7,14 @@
  * by s-3), plus a file that does not load.
  *
  * Controls (mock/server.ts): POST /__mock/themes?set=empty|seed (the directory, as a hand
- * edit); GET /__mock/themes: { themes, calls }.
+ * edit); POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true] (theme save run
+ * from that thread: the card and, when applied, the toast; docs/notes/theme-model-flow.md);
+ * GET /__mock/themes: { themes, calls }.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import type { ThemeEventSchema, ThemeSnapshotSchema } from "../src/gen/codefoundry/v1/theme_pb";
+import type { ThemeEventSchema, ThemeSnapshotSchema, UserThemeSchema } from "../src/gen/codefoundry/v1/theme_pb";
+import { UiIntent_Notify_Level, type UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { themeById, themes as curated, type ThemeBase, type ThemeFile, type ThemeScheme } from "../src/themes";
 import { parseThemeFile } from "../src/themes/slots";
 import { CommandError } from "./errors";
@@ -19,6 +22,8 @@ import type { SkillCommand } from "./skills";
 
 export type ThemeEventInit = MessageInitShape<typeof ThemeEventSchema>;
 type SnapshotInit = MessageInitShape<typeof ThemeSnapshotSchema>;
+type UserThemeInit = MessageInitShape<typeof UserThemeSchema>;
+type IntentInit = MessageInitShape<typeof UiIntentSchema>;
 
 const DIR = "/Users/dev/.code-foundry/themes";
 
@@ -103,6 +108,22 @@ function fileJson(t: MockUserTheme): Record<string, unknown> {
   };
 }
 
+/** A user theme as ThemeService's (and a theme card's) UserTheme. */
+function protoOf(t: MockUserTheme, path: string): UserThemeInit {
+  return {
+    id: t.id,
+    name: t.name,
+    scheme: t.scheme,
+    pair: t.pair ?? "",
+    from: t.from,
+    createdBy: t.createdBy,
+    source: t.source,
+    base: { ...t.base, link: t.base.link ?? "", terminal: { foreground: t.base.terminal.foreground, cursor: t.base.terminal.cursor ?? "", cursorText: t.base.terminal.cursorText ?? "", selection: t.base.terminal.selection ?? "", ansi: [...t.base.terminal.ansi] } },
+    overrides: { ...(t.overrides ?? {}) },
+    path,
+  };
+}
+
 export class MockThemes {
   private user: MockUserTheme[] = seed();
   private issues = [...SEED_ISSUES];
@@ -115,6 +136,10 @@ export class MockThemes {
       /** The settings the slots are, read and written (mock/settings.ts). */
       slot: (scheme: ThemeScheme) => string;
       setSlot: (scheme: ThemeScheme, id: string) => void;
+      /** ThreadService.ShowTheme: appends the card, answering the Undo target it kept. */
+      card?: (threadId: string, card: { theme: UserThemeInit; applied: boolean; previous: string }) => string;
+      /** Shows a toast in the window (UiIntent). */
+      emit?: (intent: IntentInit) => void;
     },
   ) {}
 
@@ -140,18 +165,7 @@ export class MockThemes {
   snapshot(): SnapshotInit {
     return {
       curated: curated.map((t) => ({ id: t.id, name: t.name, scheme: t.scheme, pair: t.pair ?? "" })),
-      user: this.sorted().map((t) => ({
-        id: t.id,
-        name: t.name,
-        scheme: t.scheme,
-        pair: t.pair ?? "",
-        from: t.from,
-        createdBy: t.createdBy,
-        source: t.source,
-        base: { ...t.base, link: t.base.link ?? "", terminal: { foreground: t.base.terminal.foreground, cursor: t.base.terminal.cursor ?? "", cursorText: t.base.terminal.cursorText ?? "", selection: t.base.terminal.selection ?? "", ansi: [...t.base.terminal.ansi] } },
-        overrides: { ...(t.overrides ?? {}) },
-        path: `${DIR}/${t.id}.json`,
-      })),
+      user: this.sorted().map((t) => protoOf(t, `${DIR}/${t.id}.json`)),
       issues: this.issues,
       dir: DIR,
       version: BigInt(this.version),
@@ -199,6 +213,57 @@ export class MockThemes {
     ];
   }
 
+  /**
+   * What theme save does after the write when it runs from a thread, like the daemon's
+   * showThemeCard: the card (applied when --apply, or when the slot already had it; the
+   * slot's theme before as its Undo target) and, when applied, the "<name> applied to
+   * <scheme>" toast with Undo and Edit, which a window on the Themes page skips.
+   */
+  private fromThread(threadId: string, t: MockUserTheme, apply: boolean, before: string): void {
+    const applied = apply || before === t.id;
+    const previous = this.deps.card?.(threadId, { theme: protoOf(t, ""), applied, previous: applied ? before : "" }) ?? (applied ? before : "");
+    if (!applied) return;
+    const edit = { link: `theme-edit:${t.id}`, label: "Edit" };
+    const undo = previous && previous !== t.id ? { link: `theme-set:${t.scheme}:${previous}`, label: "Undo" } : null;
+    this.deps.emit?.({
+      intent: {
+        case: "notify",
+        value: {
+          level: UiIntent_Notify_Level.INFO,
+          title: `${t.name} applied to ${t.scheme}`,
+          unlessShowing: "themes",
+          ...(undo ? { link: undo.link, linkLabel: undo.label, secondaryLink: edit.link, secondaryLinkLabel: edit.label } : { link: edit.link, linkLabel: edit.label }),
+        },
+      },
+    });
+  }
+
+  /**
+   * POST /__mock/themes/card?thread=&theme=[&apply=true]: theme save of one of the user's
+   * themes run from that thread (the file unchanged), as the model's save would be.
+   */
+  card(q: URLSearchParams): { ok: true } {
+    const threadId = q.get("thread") ?? "";
+    const u = this.user.find((t) => t.id === q.get("theme"));
+    if (!threadId || !u) throw new Error("want thread=<id>&theme=<one of the user's themes>");
+    const before = this.deps.slot(u.scheme);
+    const apply = q.get("apply") === "true";
+    if (apply) this.deps.setSlot(u.scheme, u.id);
+    this.fromThread(threadId, u, apply, before);
+    return { ok: true };
+  }
+
+  /** One of the user's themes as a theme card's UserTheme (no path), or undefined. */
+  cardOf(id: string): UserThemeInit | undefined {
+    const t = this.userTheme(id);
+    return t && protoOf(t, "");
+  }
+
+  /** One of the user's themes, or undefined. */
+  userTheme(id: string): MockUserTheme | undefined {
+    return this.user.find((t) => t.id === id);
+  }
+
   /** Whether id is one of the user's themes (theme.edit's check). */
   isUser(id: string): boolean {
     return this.user.some((u) => u.id === id);
@@ -239,6 +304,7 @@ export class MockThemes {
           const t = parse(a.data);
           const by = thread(c);
           if (by) t.createdBy = by;
+          const before = this.deps.slot(t.scheme);
           const { replaced } = this.save(t);
           const lines = this.lines(t, replaced);
           let applied = "";
@@ -247,6 +313,7 @@ export class MockThemes {
             applied = `appearance.theme_${t.scheme}`;
             lines.push(`applied: ${t.scheme} theme = ${t.name} (${t.id})`);
           }
+          if (by) this.fromThread(by, t, a.apply === "true", before);
           return Promise.resolve({ message: lines.join("\n"), resultJson: this.savedJson(t, replaced, applied) });
         },
       },

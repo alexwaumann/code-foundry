@@ -8,7 +8,8 @@
  *   POST /__mock/thread?state=permission|question|streaming|idle|parallel|multi[&id=s-r1]
  *        (re)creates the scripted thread in that state; returns { id }. parallel: an Edit
  *        and a Bash permission pending at once (oldest first); multi: a multi-select question;
- *        html: a working turn with two inline pages, one rendering and one whose file is gone
+ *        html: a working turn with two inline pages, one rendering and one whose file is gone;
+ *        theme: a finished turn that made and applied Ocean Dusk, its theme card, the dark slot on it
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
@@ -38,6 +39,7 @@ import {
   type ThreadEventSchema,
   type ThreadItemSchema,
   type ThreadPendingRequestSchema,
+  type ThemeItemSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
 import { END_REPORTS, scriptAgents, type AgentRunInit } from "./agents";
 import { scriptEmberChat, scriptEmberRestartCut, scriptEmberRestartWake, type EmberChatScript } from "./emberChat";
@@ -50,6 +52,7 @@ import { scriptShells, shellSummary, type ShellCall } from "./shells";
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type PendingInit = MessageInitShape<typeof ThreadPendingRequestSchema>;
+export type ThemeItemInit = MessageInitShape<typeof ThemeItemSchema>;
 
 /**
  * A default-world thread's history (MockThreadLogs.seed): the prompt, Claude's first words
@@ -101,6 +104,10 @@ export interface ThreadWorld {
   recordResult(id: string, model: string): void;
   /** The thread's subagent runs changed: its thread's running counts follow (mock/agents.ts). */
   agentsChanged(id: string): void;
+  /** One of the user's themes as a theme card's file (mock/userThemes.ts), for the scripted theme state. */
+  themeCard(id: string): ThemeItemInit["theme"];
+  /** Puts a scheme's slot on a theme (the settings), as theme save --apply does. */
+  setThemeSlot(scheme: "dark" | "light", id: string): void;
 }
 
 /** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
@@ -130,8 +137,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "theme";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "theme"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -819,6 +826,30 @@ export class MockThreadLogs {
       this.world.setStatus(id, ThreadStatus.BUSY, "working");
       return;
     }
+    if (state === "theme") {
+      // The model made a theme (docs/notes/theme-model-flow.md): it saved and applied the
+      // seeded Ocean Dusk, whose card follows the save (Undo back to Catppuccin Mocha).
+      it({ case: "userMessage", value: { text: "Make me a dark theme that feels like a tide pool at night. Teal accent, keep the sidebar quieter than Mocha.", attachments: [] } }, { at: ago(2) });
+      tool("Bash", { command: "code-foundry theme show catppuccin-mocha" }, { output: '{\n  "id": "catppuccin-mocha", …' }, { at: ago(1, 55) });
+      tool("Write", { file_path: "/Users/dev/.code-foundry/pages/s-r1/ocean-dusk.json", content: '{ "id": "ocean-dusk", … }' }, { output: "File created successfully" }, { at: ago(1, 50) });
+      tool("Bash", { command: "code-foundry theme save --file ~/.code-foundry/pages/s-r1/ocean-dusk.json --apply" }, { output: "saved Ocean Dusk (ocean-dusk), a dark theme\napplied: dark theme = Ocean Dusk (ocean-dusk)" }, { at: ago(1, 45) });
+      const card = this.world.themeCard("ocean-dusk");
+      if (card) it({ case: "theme", value: { theme: card, applied: true, previous: "catppuccin-mocha" } }, { at: ago(1, 45) });
+      it(
+        {
+          case: "assistantText",
+          value: {
+            text: "Done. I started from Catppuccin Mocha, moved the canvas and surface to a deep blue-black, set the accent to teal, and pinned `sidebar-row-selected` a step lighter so the selected thread still reads on the quieter sidebar. Want the warning colour warmer, or a light pair for daytime?",
+          },
+        },
+        { at: ago(1, 40) },
+      );
+      it({ case: "turnEnd", value: { subtype: "success", durationMs: 24_000n, numTurns: 4, costUsd: 0.04, turnCostUsd: 0.04, stopReason: "end_turn" } }, { at: ago(1, 40) });
+      l.seq = l.items.length;
+      this.world.setThemeSlot("dark", "ocean-dusk");
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+      return;
+    }
     if (state === "html-idle") {
       // Pages a verb showed while the thread sat at its prompt (view.inline --thread from a
       // terminal or a child; docs/notes/inline-html-2-fixes.md): after a finished turn and
@@ -1217,6 +1248,29 @@ export class MockThreadLogs {
     const cwd = this.world.worktreeOf(id);
     const rel = cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
     return this.append(id, this.item(id, { case: "html", value: { path: rel, title, baseDir: cwd } }));
+  }
+
+  /**
+   * ThreadService.ShowTheme (code-foundry theme save from the thread;
+   * docs/notes/theme-model-flow.md): a theme item at the end of the log. A refinement (the
+   * slot already had the theme: previous is the theme itself) takes the latest earlier card's
+   * Undo target, as the daemon's store does.
+   */
+  showTheme(id: string, theme: ThemeItemInit): ItemInit {
+    let previous = theme.applied ? (theme.previous ?? "") : "";
+    const themeId = theme.theme?.id ?? "";
+    if (previous === themeId) {
+      previous = "";
+      for (const x of [...this.log(id).items].reverse()) {
+        if (x.payload?.case !== "theme") continue;
+        const prev = x.payload.value.previous ?? "";
+        if (x.payload.value.theme?.id === themeId && prev && prev !== themeId) {
+          previous = prev;
+          break;
+        }
+      }
+    }
+    return this.append(id, this.item(id, { case: "theme", value: { ...theme, previous } }));
   }
 
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {

@@ -5,7 +5,7 @@ import { threadFocus } from "@/lib/inSidebar";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
-import { notifyLinkAction } from "./notifyLinks";
+import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
 import { getShowCreatedThreads } from "./settings";
@@ -125,11 +125,18 @@ export function applyIntent(intent: UiIntentView): void {
       ui.openPalette(intent.query);
       break;
     case "notify": {
-      // A link it carries ("settings:memory") is a button on the toast.
+      // A page showing the change already (the Themes page for a theme a thread applied): no toast.
+      if (intent.unlessShowing && showingPage(intent.unlessShowing)) break;
+      // A link it carries ("settings:memory") is a button on the toast; a second one goes before it.
       const open = intent.link ? notifyLinkAction(intent.link) : null;
+      const second = intent.secondaryLink ? notifyLinkAction(intent.secondaryLink) : null;
       const opts =
-        intent.body || open
-          ? { ...(intent.body ? { description: intent.body } : {}), ...(open ? { action: { label: intent.linkLabel ?? "Open", onClick: open } } : {}) }
+        intent.body || open || second
+          ? {
+              ...(intent.body ? { description: intent.body } : {}),
+              ...(open ? { action: { label: intent.linkLabel ?? "Open", onClick: open } } : {}),
+              ...(second ? { cancel: { label: intent.secondaryLinkLabel ?? "Open", onClick: second } } : {}),
+            }
           : undefined;
       const title = intent.title || intent.body;
       if (intent.level === "error") toast.error(title, opts);

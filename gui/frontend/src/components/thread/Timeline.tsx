@@ -32,6 +32,8 @@ function estimate(r: { type: string } | undefined): number {
       return 46;
     case "html":
       return 470;
+    case "theme":
+      return 132;
     default:
       return 26;
   }

@@ -1,0 +1,125 @@
+import { memo, useMemo, useState } from "react";
+import { Pencil, Undo2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
+import { ThemeAa } from "@/components/themes/ThemeChip";
+import { cn } from "@/lib/utils";
+import { useSettingValue } from "@/stores/settings";
+import { useThreadItem } from "@/stores/thread";
+import { useUserThemes } from "@/stores/themes";
+import { editSavedTheme, undoTheme } from "@/stores/themeCards";
+import { contrastReport } from "@/themes/contrast";
+import { themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
+import { useThreadCtx } from "./context";
+
+/** The nine base colours a card shows, in this order. */
+const BASE = ["canvas", "surface", "text", "accent", "success", "warning", "error", "info", "highlight"] as const;
+
+/**
+ * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md),
+ * sketch C: the theme's "Aa", its name, "scheme · from <name>", an "applied" badge when
+ * the save changed a slot, its nine base colours, and a footer with the pinned count, the
+ * contrast check (computed here from the file as saved, as the editor does) and Undo /
+ * Edit. The card shows the file as it was saved: a later save of the same id is another
+ * card. Undo puts the slot back on the theme it had (disabled, "Undone", once it is);
+ * Edit opens the Themes page's editor on the theme as it is now.
+ */
+export const ThemeCardRow = memo(function ThemeCardRow({ id }: { id: string }) {
+  const { threadId } = useThreadCtx();
+  const item = useThreadItem(threadId, id);
+  if (item?.kind !== "theme" || !item.theme) return null;
+  return <ThemeCard file={item.theme} applied={item.applied} previous={item.previous} />;
+});
+
+function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: boolean; previous: string }) {
+  // The file as saved, resolved once: its slots paint the chip, its report the footer.
+  const theme = useMemo<Theme>(() => themeOf(file), [file]);
+  const issues = useMemo(() => contrastReport(file, theme.slots).length, [file, theme]);
+  const pinned = Object.keys(file.overrides ?? {}).length;
+  const from = file.from ? (themeById.get(file.from)?.name ?? file.from) : "";
+  return (
+    <div className="mt-1 mb-2.5 ml-1 max-w-md rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2.5" data-testid="thread-theme-card" data-theme-id={file.id}>
+      <div className="flex min-w-0 items-center gap-2">
+        <ThemeAa theme={theme} />
+        <span className="truncate text-body-sm font-medium" data-testid="thread-theme-name">
+          {file.name}
+        </span>
+        <span className="min-w-0 truncate text-caption text-cf-text-muted">
+          {file.scheme}
+          {from && ` · from ${from}`}
+        </span>
+        {applied && (
+          <Badge variant="secondary" className="ml-auto shrink-0 bg-cf-accent-surface px-1.5 py-0 text-cf-accent-surface-foreground" data-testid="thread-theme-applied">
+            applied
+          </Badge>
+        )}
+      </div>
+      <div className="mt-2 flex gap-1" aria-hidden data-testid="thread-theme-swatches">
+        {BASE.map((k) => (
+          <span key={k} className="size-4 rounded-sm border border-cf-border" style={{ background: file.base[k] }} />
+        ))}
+      </div>
+      <div className="mt-2 flex items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-caption text-cf-text-muted" data-testid="thread-theme-summary">
+          {pinned} pinned ·{" "}
+          {issues === 0 ? "contrast ok" : <span className="text-cf-warning-text">{issues === 1 ? "1 contrast issue" : `${String(issues)} contrast issues`}</span>}
+        </span>
+        {applied && previous && previous !== file.id && <UndoButton scheme={file.scheme} previous={previous} />}
+        <EditButton id={file.id} />
+      </div>
+    </div>
+  );
+}
+
+/** Undo: the slot back on `previous`; "Undone" (disabled) while the slot already is. */
+function UndoButton({ scheme, previous }: { scheme: UserThemeFile["scheme"]; previous: string }) {
+  const current = useSettingValue(`appearance.theme_${scheme}`);
+  const [busy, setBusy] = useState(false);
+  const undone = current === previous;
+  const name = themeById.get(previous)?.name ?? previous;
+  return (
+    <Tip label={undone ? `The ${scheme} theme is ${name} again` : `Back to ${name}`}>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      className="text-cf-text-muted"
+      disabled={undone || busy}
+      data-testid="thread-theme-undo"
+      onClick={() => {
+        setBusy(true);
+        void undoTheme(scheme, previous).finally(() => {
+          setBusy(false);
+        });
+      }}
+    >
+      <Undo2 aria-hidden />
+      {undone ? "Undone" : "Undo"}
+    </Button>
+    </Tip>
+  );
+}
+
+/** Edit: the editor on the theme; disabled once it is no longer one of the user's themes. */
+function EditButton({ id }: { id: string }) {
+  // Re-renders when the user's themes change (a deleted theme disables Edit).
+  useUserThemes();
+  const gone = !themeById.get(id)?.user;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      className={cn(gone && "text-cf-text-muted")}
+      disabled={gone}
+      data-testid="thread-theme-edit"
+      onClick={() => {
+        void editSavedTheme(id);
+      }}
+    >
+      <Pencil aria-hidden />
+      Edit
+    </Button>
+  );
+}

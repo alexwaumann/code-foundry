@@ -23,6 +23,8 @@ import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toAgentRunViews, type AgentRunView } from "./agents";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
+import { toUserThemeFile } from "./theme";
+import type { UserThemeFile } from "@/themes";
 
 export type ToolStatusView = "running" | "done" | "error" | "unknown";
 export type RequestStateView = "pending" | "allowed" | "denied" | "cancelled" | "unknown";
@@ -153,6 +155,12 @@ export type ThreadItemView = ItemBase &
      * caller gave it, "" for none.
      */
     | { kind: "html"; path: string; title: string; baseDir: string }
+    /**
+     * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): the
+     * file as saved (null when the GUI's rules refuse it), whether the save changed what a
+     * slot shows, and the theme Undo puts back ("" for none).
+     */
+    | { kind: "theme"; theme: UserThemeFile | null; applied: boolean; previous: string }
   );
 
 export type ThreadItemKind = ThreadItemView["kind"];
@@ -310,6 +318,8 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
       return { ...base, kind: "note", text: p.value.text, createdBy: p.value.createdBy };
     case "html":
       return { ...base, kind: "html", path: p.value.path, title: p.value.title, baseDir: p.value.baseDir };
+    case "theme":
+      return { ...base, kind: "theme", theme: p.value.theme ? toUserThemeFile(p.value.theme) : null, applied: p.value.applied, previous: p.value.previous };
     default:
       return null;
   }
