@@ -68,6 +68,17 @@ func TestRenderBoard(t *testing.T) {
 				"- Oct 21 14:05 UTC · once · sub-cccccccccccc\n\n## Done today\n",
 		}, nil},
 		{"scheduled with no tasks", nil, timers[:1], []string{"No tasks yet.", "## Scheduled", "· sub-aaaaaaaaaaaa\n"}, nil},
+		// Waiting on Ember alone: a worker that reported and stopped, a parent whose pieces closed.
+		{"unclosed", []Task{
+			{ID: "t-00000020", Title: "Flag and changelog", State: StateDoing},
+			{ID: "t-00000021", Title: "Flag", State: StateDone, DoneAt: today, ParentID: "t-00000020"},
+			{ID: "t-00000022", Title: "README", State: StateDoing, ThreadID: "s-333333333333", Thread: &TaskThread{ID: "s-333333333333",
+				State: thread.StateDisconnected, Status: thread.StatusNeedsAttention, StatusReason: "finished",
+				Report: thread.Report{Status: thread.ReportDone, Summary: "pushed"}, LastActivityAt: now.Add(-4 * time.Minute)}},
+		}, nil, []string{
+			"## In progress\n\n- t-00000020 Flag and changelog · unclosed: all its pieces are closed, waiting for Ember to close it\n",
+			"- t-00000022 README · unclosed: worker reported done, waiting for Ember to check · worker s-333333333333 needs attention (finished), report done: pushed, 4m\n",
+		}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

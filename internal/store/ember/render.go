@@ -188,11 +188,11 @@ func RenderBoard(tasks []Task, timers []Timer, now time.Time, loc *time.Location
 			if inSection(t.ParentID) {
 				continue // under its parent
 			}
-			b.WriteString("- " + taskLine(t, now) + "\n")
+			b.WriteString("- " + taskLine(t, tasks, now) + "\n")
 			shown++
 			for _, c := range list {
 				if c.ParentID == t.ID {
-					b.WriteString("  - " + taskLine(c, now) + "\n")
+					b.WriteString("  - " + taskLine(c, tasks, now) + "\n")
 					shown++
 				}
 			}
@@ -246,10 +246,13 @@ func clock(t, now time.Time, loc *time.Location) string {
 	return t.Format("Jan 2 15:04 MST")
 }
 
-// taskLine is one task on the board: id, title, its worker's progress, its branch and
-// its outcome.
-func taskLine(t Task, now time.Time) string {
+// taskLine is one task on the board: id, title, whether it waits on Ember's check
+// (UnclosedWords; tasks is the board), its worker's progress, its branch and its outcome.
+func taskLine(t Task, tasks []Task, now time.Time) string {
 	line := t.ID + " " + t.Title
+	if w := UnclosedWords(t, tasks); w != "" {
+		line += " · " + w
+	}
 	if t.Thread != nil {
 		line += " · " + ThreadProgress(t.Thread, now)
 	} else if t.ThreadID != "" {

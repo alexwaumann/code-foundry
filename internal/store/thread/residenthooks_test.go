@@ -4,6 +4,8 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -103,5 +105,47 @@ func TestCreateDefaults(t *testing.T) {
 	e.m.SetCreateDefaults(func(context.Context, string, bool, bool) (string, string) { return "", "loud" })
 	if _, err := e.m.Create(e.ctx(), CreateOptions{CreatedBy: creator.ID, Name: "bad"}); err == nil {
 		t.Error("an invalid default effort was accepted")
+	}
+}
+
+// A wake to a resident ends with its store's note, told which threads the wake is about;
+// another thread's wake has none, nor has a resident whose note is gone or blank.
+func TestResidentWakeNote(t *testing.T) {
+	e := newEnv(t)
+	r, _, err := e.m.EnsureResident(e.ctx(), "ember", ResidentOptions{Cwd: filepath.Join(e.home, "residents", "ember")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const note = "[code-foundry ember] Unclosed on your board: t-1."
+	var mu sync.Mutex
+	var abouts [][]string
+	e.m.SetResidentWakeNote("ember", func(about []string) string {
+		mu.Lock()
+		defer mu.Unlock()
+		abouts = append(abouts, slices.Clone(about))
+		return note
+	})
+	kid := e.create(CreateOptions{Name: "Worker", InitialPrompt: "go", CreatedBy: r.ID, Notify: true})
+	items := e.waitItems(r.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+	if w := wakes(items)[0]; !strings.HasSuffix(w.Text, "```\n\n"+note) || w.WakeTitle == "" {
+		t.Errorf("the resident's wake = %q", w.Text)
+	}
+	mu.Lock()
+	if len(abouts) != 1 || !slices.Equal(abouts[0], []string{kid.ID}) {
+		t.Errorf("about = %q, want [%s]", abouts, kid.ID)
+	}
+	mu.Unlock()
+
+	plain := e.stopped("Orchestrator")
+	if got := e.m.withWakeNote(plain.ID, Message{Text: "wake"}, nil); got.Text != "wake" {
+		t.Errorf("a plain thread's wake = %q", got.Text)
+	}
+	e.m.SetResidentWakeNote("ember", func([]string) string { return "  " })
+	if got := e.m.withWakeNote(r.ID, Message{Text: "wake"}, nil); got.Text != "wake" {
+		t.Errorf("a blank note = %q", got.Text)
+	}
+	e.m.SetResidentWakeNote("ember", nil)
+	if got := e.m.withWakeNote(r.ID, Message{Text: "wake"}, nil); got.Text != "wake" {
+		t.Errorf("after removal = %q", got.Text)
 	}
 }

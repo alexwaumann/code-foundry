@@ -134,6 +134,19 @@ func TestEmberCommands(t *testing.T) {
 	if res := f.invoke(t, "ember.task.done", map[string]string{"id": child.ID, "outcome": "pushed cf/readme"}); !strings.HasPrefix(res.Message, "done: "+child.ID+" [done] README line") ||
 		res.JSON.(command.EmberTaskView).DoneAt == nil {
 		t.Errorf("done = %q", res.Message)
+	} else if want := "\nevery piece of " + parent.ID + ` "Ship all docs" is closed now: check them together, then close it (code-foundry ember task done ` + parent.ID + ` "<outcome>")`; !strings.HasSuffix(res.Message, want) {
+		// The last piece closed: the parent waits on Ember alone, and every listing says so.
+		t.Errorf("done of the last piece = %q, want it to end %q", res.Message, want)
+	}
+	const unclosed = "unclosed: all its pieces are closed, waiting for Ember to close it"
+	if res := f.invoke(t, "ember.task.list", nil); !strings.Contains(res.Message, parent.ID+"  doing  Ship all docs  "+unclosed) {
+		t.Errorf("list with an unclosed parent = %q", res.Message)
+	}
+	if res := f.invoke(t, "ember.task.show", map[string]string{"id": parent.ID}); !strings.Contains(res.Message, "\n"+unclosed+"\n") || res.JSON.(command.EmberTaskView).Unclosed != unclosed {
+		t.Errorf("show of an unclosed parent = %q, %+v", res.Message, res.JSON)
+	}
+	if res := f.invoke(t, "ember.board", nil); !strings.Contains(res.Message, parent.ID+" Ship all docs · "+unclosed) {
+		t.Errorf("board with an unclosed parent = %q", res.Message)
 	}
 	if res := f.invoke(t, "ember.task.cancel", map[string]string{"id": parent.ID, "why": "not needed"}); !strings.Contains(res.Message, "— not needed") {
 		t.Errorf("cancel = %q", res.Message)

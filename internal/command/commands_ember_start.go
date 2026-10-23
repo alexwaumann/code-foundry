@@ -119,7 +119,7 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 			}
 			return Result{
 				Message: fmt.Sprintf("started task %s with thread %s in %s", t.ID, tid, w.GetWorktreePath()),
-				JSON:    EmberStartView{Task: emberTaskView(t, d.Now()), ThreadID: tid, WorktreePath: w.GetWorktreePath(), BaseRef: w.GetBaseRef()},
+				JSON:    EmberStartView{Task: emberTaskView(t, d.Ember.Snapshot().Tasks, d.Now()), ThreadID: tid, WorktreePath: w.GetWorktreePath(), BaseRef: w.GetBaseRef()},
 			}, nil
 		},
 	}

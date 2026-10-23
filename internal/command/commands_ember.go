@@ -121,7 +121,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			NoKeybinding: true,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				snap := d.Ember.Snapshot()
-				return Result{Message: strings.TrimRight(ember.RenderBoard(snap.Tasks, snap.Timers, d.Now(), time.Local), "\n"), JSON: emberTaskViews(snap.Tasks, d.Now())}, nil
+				return Result{Message: strings.TrimRight(ember.RenderBoard(snap.Tasks, snap.Timers, d.Now(), time.Local), "\n"), JSON: emberTaskViews(snap.Tasks, snap.Tasks, d.Now())}, nil
 			},
 		},
 		Command{

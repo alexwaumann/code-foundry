@@ -317,6 +317,9 @@ type Manager struct {
 	// residentTools are each resident's own --allowedTools rules (residenthooks.go):
 	// resident name -> ResidentTools.
 	residentTools sync.Map
+	// wakeNotes are each resident's wake notes (residenthooks.go): resident name ->
+	// WakeNoteFunc.
+	wakeNotes sync.Map
 }
 
 type record struct {
