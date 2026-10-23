@@ -12,9 +12,10 @@ swatches and contrast, Undo back to the slot's previous theme, Edit, Apply when 
 and, when it changes what a slot shows (another theme, or new colours), a toast. While the app
 is open, `theme save` prints the app's contrast check of the file it wrote: each failing pair
 with its ratio and the one it needs (`contrast: ok` when none), and the stale pins (pins whose
-rule the base has moved since they were made); `theme check <id>` prints it again. `theme ask "<description>"` (the Themes page's Ask the model) starts a
-thread with no project that makes the theme described; `--pair <id>` asks for the other
-scheme's pair of one of your themes.
+rule the base has moved since they were made); `theme check <id>` prints it again.
+`theme ask "<description>"` (the Themes page's Ask the model) starts a thread with no project
+that makes the theme described; `--pair <id>` asks for the other scheme's pair of one of your
+themes.
 
 ## A theme file
 
