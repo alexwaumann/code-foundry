@@ -204,7 +204,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 	}
 	env.themes.Load()
 	res, err := env.invoke(t, command.Context{}, "theme.list", nil)
-	if err != nil || !strings.Contains(res.Message, "not loaded (fix the file in " + env.dir + ", or remove it with theme delete --file <name>):\n  broken.json: no name") {
+	if err != nil || !strings.Contains(res.Message, "not loaded (fix the file in "+env.dir+", or remove it with theme delete --file <name>):\n  broken.json: no name") {
 		t.Errorf("list = %q, %v", res.Message, err)
 	}
 	if js, _ := json.Marshal(res.JSON); !strings.Contains(string(js), `"issues":[{"file":"broken.json","message":"no name"}]`) {

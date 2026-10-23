@@ -101,6 +101,7 @@ func FreePairID(id, scheme string, taken func(string) bool) string {
 		}
 	}
 }
+
 // RegisterThemeAsk registers theme.ask.
 func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 	if d.Emitter == nil || d.Settings == nil {

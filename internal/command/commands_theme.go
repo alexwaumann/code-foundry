@@ -75,9 +75,9 @@ type ThemeList struct {
 	// Showing is the scheme the app shows now (system resolved by the window; "" while
 	// unknown).
 	Showing string           `json:"showing,omitempty"`
-	Dark   string           `json:"dark"`
-	Light  string           `json:"light"`
-	Themes []ThemeListEntry `json:"themes"`
+	Dark    string           `json:"dark"`
+	Light   string           `json:"light"`
+	Themes  []ThemeListEntry `json:"themes"`
 	// Dir is the themes directory; Issues its files that did not load.
 	Dir    string           `json:"dir,omitempty"`
 	Issues []ThemeFileIssue `json:"issues,omitempty"`
