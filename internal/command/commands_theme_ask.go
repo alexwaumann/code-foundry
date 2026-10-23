@@ -34,16 +34,18 @@ type ThemeAskDeps struct {
 // MaxThemeAskBytes bounds the description.
 const MaxThemeAskBytes = 4 << 10
 
-// ThemeAskPrompt is the new thread's first message: one sentence of context (where the
-// user is, the current slots, what to do), then the user's words.
+// ThemeAskPrompt is the new thread's first message: the user's words, then one sentence
+// of context (where the user is, the current slots, what to do). The words come first so
+// the thread's provisional name (its first line, until the naming model names it) is
+// theirs, and the message reads as theirs in the conversation.
 func ThemeAskPrompt(onPage bool, dark, light theme.Theme, ask string) string {
-	where := "The user wants a colour theme for Code Foundry"
+	where := "The user wants this as a colour theme for Code Foundry"
 	if onPage {
-		where = "The user is on the Themes page"
+		where = "The user asked for this on the Themes page"
 	}
-	return fmt.Sprintf("%s; the current dark theme is %s (%s) and light theme is %s (%s). "+
+	return fmt.Sprintf("%s\n\n(%s; the current dark theme is %s (%s) and light theme is %s (%s). "+
 		"Make the theme they describe, save it with `code-foundry theme save --data - --apply`, and keep refining it in this thread "+
-		"(the code-foundry skill: Making a theme).\n\n%s", where, dark.Name, dark.ID, light.Name, light.ID, ask)
+		"(the code-foundry skill: Making a theme).)", ask, where, dark.Name, dark.ID, light.Name, light.ID)
 }
 
 // ThemePairAsk is --pair's request: the other scheme's pair of f.

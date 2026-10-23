@@ -107,8 +107,12 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 			for i, s := range tt.steps {
 				before := len(env.cardRequests())
 				toasts := len(env.emit.Intents())
-				if _, err := env.invoke(t, s.uctx, "theme.save", s.args); err != nil {
+				res, err := env.invoke(t, s.uctx, "theme.save", s.args)
+				if err != nil {
 					t.Fatalf("step %d: %v", i, err)
+				}
+				if got := strings.Contains(res.Message, command.ThemeCardContrastLine); got != s.card || strings.Contains(res.Message, "checked in the editor") == s.card {
+					t.Errorf("step %d: message %q: the card's contrast line %v, want %v", i, res.Message, got, s.card)
 				}
 				reqs := env.cardRequests()[before:]
 				switch {

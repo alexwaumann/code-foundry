@@ -60,12 +60,12 @@ It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline 
 
 ## Making a theme
 
-`code-foundry theme list` marks the themes in use; `theme show <id>` prints one's file. Copy
-the closest, with a new `id`, `name` and `"from": "<its id>"`; change base colours first, and
-pin `overrides` only where a rule gets a slot wrong (code-foundry-help's reference/themes.md).
-Write it in `$CODE_FOUNDRY_PAGES`, `theme save --file <path> --apply` (the app switches; a
-card with Undo shows here), say what changed in a sentence or two and offer the next step
-(warmer, cooler, a light pair). Refine by saving the same `id` again, without asking first.
+`code-foundry theme list` marks the themes in use; `theme show <id>` prints a file. Copy the
+closest, with a new `id`, `name` and `"from": "<its id>"` (`pair` only for your own pair).
+Change base colours first; pin `overrides` only where a rule gets a slot wrong (help's
+reference/themes.md). Write it in `$CODE_FOUNDRY_PAGES`, `theme save --file <path> --apply`:
+the app switches and its card here checks contrast (run no checker). Say what changed in a
+sentence or two, offer the next step (warmer, a light pair); refine by saving the `id` again.
 
 ## Good to know
 

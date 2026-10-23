@@ -37,13 +37,12 @@ const (
 // showThemeCard puts the saved theme's card in thread `by` and, when the save applied it,
 // shows the toast. before is the slot's theme before the save (the card's Undo target;
 // the store takes an earlier card's when it is the theme itself). A card that cannot be
-// added is a warning, not a failure: the theme is saved.
-func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, before string) []string {
+// added is a warning, not a failure: the theme is saved. shown: the card was added.
+func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, before string) (warnings []string, shown bool) {
 	previous := ""
 	if applied {
 		previous = before
 	}
-	var warnings []string
 	if d.Cards != nil {
 		res, err := d.Cards.ShowTheme(ctx, connect.NewRequest(&v1.ShowThreadThemeRequest{ThreadId: by, Theme: &v1.ThemeItem{
 			Theme: theme.ToProto(f, ""), Applied: applied, Previous: previous,
@@ -53,13 +52,13 @@ func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, ap
 			warnings = append(warnings, fmt.Sprintf("the theme is saved, but its card was not added to thread %s: %v", by, err))
 		} else {
 			// The store may have taken an earlier card's Undo target.
-			previous = res.Msg.GetItem().GetTheme().GetPrevious()
+			previous, shown = res.Msg.GetItem().GetTheme().GetPrevious(), true
 		}
 	}
 	if applied && d.Emitter != nil {
 		d.Emitter.Emit(themeAppliedToast(f, previous))
 	}
-	return warnings
+	return warnings, shown
 }
 
 // themeAppliedToast is "<name> applied to <scheme>" with Undo (back to previous, when

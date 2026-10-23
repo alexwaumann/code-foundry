@@ -298,7 +298,12 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				res := Result{Message: strings.Join(lines, "\n"), JSON: out}
 				if by := themeCaller(uctx); by != "" {
 					applied := a.Bool("apply") || before == saved.File.ID
-					res.Warnings = showThemeCard(ctx, d, by, saved.File, applied, before)
+					var shown bool
+					res.Warnings, shown = showThemeCard(ctx, d, by, saved.File, applied, before)
+					if shown {
+						// The card checks every pair where the user sees it: nothing for the model to run.
+						res.Message = strings.Replace(res.Message, themeContrastLine(saved.File.ID), ThemeCardContrastLine, 1)
+					}
 				}
 				return res, nil
 			},
@@ -449,10 +454,18 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	}
 	// The daemon derives no colours (the rules are the GUI's, src/themes/slots.ts), so it
 	// cannot say which pairs fall short or which pins the base has moved; the editor does.
-	contrast := fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", f.ID)
+	contrast := themeContrastLine(f.ID)
 	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, contrast, "written to: " + s.Path}
 	return out, lines
 }
+
+// themeContrastLine is the save's contrast line from the user's terminal.
+func themeContrastLine(id string) string {
+	return fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", id)
+}
+
+// ThemeCardContrastLine replaces it when the save added a card to the calling thread.
+const ThemeCardContrastLine = "contrast: checked on the theme card this save added to your conversation, which the user sees (nothing to run)"
 
 // themeName is "Name (id)", or the id alone for a theme the set does not have.
 func themeName(s theme.Set, id string) string {
