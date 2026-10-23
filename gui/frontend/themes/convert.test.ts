@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { lightness } from "../src/themes/color.ts";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "../src/themes/defaults.ts";
-import { parseThemeFile, resolveSlots, SLOT_NAMES } from "../src/themes/slots.ts";
+import { parseThemeFile, resolveSlots, SLOT_NAMES, type ThemeFile } from "../src/themes/slots.ts";
 import { buildCatalog, catalogJson, ghosttyBase, goCatalogJson, parseGhostty, PATHS, readInputs, type Inputs, type Override } from "./convert.ts";
 
 const inputs = readInputs();
@@ -17,12 +17,11 @@ describe("generated files", () => {
     expect(fs.readFileSync(PATHS.goCatalog, "utf8")).toBe(goCatalogJson(catalog));
   });
 
-  it("the daemon's catalog has every theme without colours, and the defaults", () => {
+  it("the daemon's catalog is every theme file, as the GUI's catalog has it, and the defaults", () => {
     const catalog = buildCatalog(inputs);
-    const go = JSON.parse(goCatalogJson(catalog)) as { defaults: Record<string, string>; themes: { id: string; scheme: string; pair?: string }[] };
+    const go = JSON.parse(goCatalogJson(catalog)) as { defaults: Record<string, string>; themes: ThemeFile[] };
     expect(go.defaults).toEqual({ dark: DEFAULT_DARK, light: DEFAULT_LIGHT });
-    expect(go.themes.map((t) => t.id)).toEqual(catalog.map((t) => t.id));
-    for (const t of go.themes) expect(Object.keys(t).every((k) => ["id", "name", "scheme", "pair"].includes(k)), t.id).toBe(true);
+    expect(go.themes).toEqual(JSON.parse(catalogJson(catalog)));
     for (const [scheme, id] of Object.entries(go.defaults)) expect(go.themes.find((t) => t.id === id)?.scheme).toBe(scheme);
   });
 

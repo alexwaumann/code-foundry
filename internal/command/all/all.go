@@ -86,6 +86,9 @@ type Deps struct {
 	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
 	Memory command.MemoryBackend
+	// Themes backs the user-theme verbs (theme.show, save, duplicate, delete) and the
+	// user's themes in theme.list and the slot commands; nil: the catalog only.
+	Themes command.ThemeBackend
 	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
 	// view.panel.file. Nil makes it fail with Unimplemented.
 	Files command.FileReader
@@ -166,7 +169,7 @@ func Register(r *command.Registry, d Deps) error {
 		}),
 		command.RegisterSettings(r, d.Settings, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
-		command.RegisterTheme(r, d.Settings),
+		command.RegisterTheme(r, d.Settings, d.Themes),
 		command.RegisterThemePick(r, d.Emitter),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, command.ViewDeps{

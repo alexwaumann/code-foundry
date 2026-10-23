@@ -57,6 +57,10 @@ type ArgSpec struct {
 	Description string
 	// Enum lists the allowed values for Type == Enum.
 	Enum []string
+	// EnumFunc, when set, lists them instead, again at every List, Get and Invoke
+	// (Registry.effective): values that change while the daemon runs (the theme ids,
+	// the user's own themes among them). Enum is left empty.
+	EnumFunc func() []string
 	// Default is used when the arg is absent. Must parse as Type. Not allowed with Required.
 	Default string
 	// Context, when set, makes the arg default to that field of the caller's Context.
@@ -108,10 +112,14 @@ func (s ArgSpec) validate() error {
 		return errors.New("name is reserved for a CLI flag")
 	case s.Type < String || s.Type > Path:
 		return fmt.Errorf("unknown type %d", s.Type)
-	case s.Type == Enum && len(s.Enum) == 0:
+	case s.Type == Enum && len(s.Enum) == 0 && s.EnumFunc == nil:
 		return errors.New("enum arg needs values")
-	case s.Type != Enum && len(s.Enum) > 0:
+	case s.Type == Enum && len(s.Enum) > 0 && s.EnumFunc != nil:
+		return errors.New("enum arg with both values and a function")
+	case s.Type != Enum && (len(s.Enum) > 0 || s.EnumFunc != nil):
 		return errors.New("enum values on a non-enum arg")
+	case s.EnumFunc != nil && s.Default != "":
+		return errors.New("an enum arg listed by a function cannot have a default")
 	case s.Required && s.Default != "":
 		return errors.New("required arg cannot have a default")
 	case s.Context < NoContext || s.Context > ContextWorktree:

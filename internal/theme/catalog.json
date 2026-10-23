@@ -8,125 +8,935 @@
       "id": "github-dark",
       "name": "GitHub Dark",
       "scheme": "dark",
-      "pair": "github-light"
+      "pair": "github-light",
+      "source": "GitHub Primer, github.com/primer/github-vscode-theme (MIT); Ghostty theme \"GitHub Dark Default\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#04070c",
+        "surface": "#0d1117",
+        "text": "#e6edf3",
+        "accent": "#4493f8",
+        "success": "#56d364",
+        "warning": "#e3b341",
+        "error": "#ffa198",
+        "info": "#79c0ff",
+        "highlight": "#d2a8ff",
+        "terminal": {
+          "foreground": "#e6edf3",
+          "cursor": "#2f81f7",
+          "cursorText": "#6fc1ff",
+          "selection": "#e6edf3",
+          "ansi": [
+            "#484f58",
+            "#ff7b72",
+            "#3fb950",
+            "#d29922",
+            "#58a6ff",
+            "#bc8cff",
+            "#39c5cf",
+            "#b1bac4",
+            "#6e7681",
+            "#ffa198",
+            "#56d364",
+            "#e3b341",
+            "#79c0ff",
+            "#d2a8ff",
+            "#56d4dd",
+            "#ffffff"
+          ]
+        }
+      }
     },
     {
       "id": "catppuccin-mocha",
       "name": "Catppuccin Mocha",
       "scheme": "dark",
-      "pair": "catppuccin-latte"
+      "pair": "catppuccin-latte",
+      "source": "Catppuccin, github.com/catppuccin/catppuccin (MIT); Ghostty theme \"Catppuccin Mocha\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#131222",
+        "surface": "#1e1e2e",
+        "text": "#cdd6f4",
+        "accent": "#cba6f7",
+        "success": "#a6e3a1",
+        "warning": "#f9e2af",
+        "error": "#f38ba8",
+        "info": "#89b4fa",
+        "highlight": "#f5c2e7",
+        "terminal": {
+          "foreground": "#cdd6f4",
+          "cursor": "#f5e0dc",
+          "cursorText": "#1e1e2e",
+          "selection": "#585b70",
+          "ansi": [
+            "#45475a",
+            "#f38ba8",
+            "#a6e3a1",
+            "#f9e2af",
+            "#89b4fa",
+            "#f5c2e7",
+            "#94e2d5",
+            "#a6adc8",
+            "#585b70",
+            "#f37799",
+            "#89d88b",
+            "#ebd391",
+            "#74a8fc",
+            "#f2aede",
+            "#6bd7ca",
+            "#bac2de"
+          ]
+        }
+      },
+      "overrides": {
+        "--syn-kw": "#cba6f7",
+        "--syn-num": "#fab387"
+      }
     },
     {
       "id": "graphite-dark",
       "name": "Graphite Dark",
       "scheme": "dark",
-      "pair": "graphite-light"
+      "pair": "graphite-light",
+      "source": "Code Foundry's original dark theme (index.css .dark before theme-slots-1)",
+      "base": {
+        "canvas": "#000000",
+        "surface": "#080808",
+        "text": "#fafafa",
+        "accent": "#e5e5e5",
+        "success": "#00d294",
+        "warning": "#fabc00",
+        "error": "#ff6568",
+        "info": "#00bbfd",
+        "highlight": "#a686ff",
+        "terminal": {
+          "foreground": "#d8dadf",
+          "cursor": "#e6e6e6",
+          "selection": "#3a4a6b",
+          "ansi": [
+            "#1d1f23",
+            "#e06c75",
+            "#98c379",
+            "#e5c07b",
+            "#61afef",
+            "#c678dd",
+            "#56b6c2",
+            "#c8ccd4",
+            "#5c6370",
+            "#ef8189",
+            "#a9d38a",
+            "#f0d08f",
+            "#7cc0f7",
+            "#d68ff0",
+            "#6fcbd6",
+            "#f2f3f5"
+          ]
+        }
+      },
+      "overrides": {
+        "--cf-accent-foreground": "#171717",
+        "--cf-focus": "#737373",
+        "--cf-sidebar-row-selected": "#1e1e1e",
+        "--terminal-selection-inactive": "#2c3446"
+      }
     },
     {
       "id": "dracula",
       "name": "Dracula",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Dracula, github.com/dracula/dracula-theme (MIT); Ghostty theme \"Dracula\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#1c1e29",
+        "surface": "#282a36",
+        "text": "#f8f8f2",
+        "accent": "#bd93f9",
+        "success": "#50fa7b",
+        "warning": "#f1fa8c",
+        "error": "#ff5555",
+        "info": "#8be9fd",
+        "highlight": "#ff79c6",
+        "terminal": {
+          "foreground": "#f8f8f2",
+          "cursor": "#f8f8f2",
+          "cursorText": "#282a36",
+          "selection": "#44475a",
+          "ansi": [
+            "#21222c",
+            "#ff5555",
+            "#50fa7b",
+            "#f1fa8c",
+            "#bd93f9",
+            "#ff79c6",
+            "#8be9fd",
+            "#f8f8f2",
+            "#6272a4",
+            "#ff6e6e",
+            "#69ff94",
+            "#ffffa5",
+            "#d6acff",
+            "#ff92df",
+            "#a4ffff",
+            "#ffffff"
+          ]
+        }
+      }
     },
     {
       "id": "gruvbox-dark",
       "name": "Gruvbox Dark",
       "scheme": "dark",
-      "pair": "gruvbox-light"
+      "pair": "gruvbox-light",
+      "source": "Gruvbox, github.com/morhetz/gruvbox (MIT); Ghostty theme \"Gruvbox Dark\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#1c1c1c",
+        "surface": "#282828",
+        "text": "#ebdbb2",
+        "accent": "#fe8019",
+        "success": "#b8bb26",
+        "warning": "#fabd2f",
+        "error": "#fb4934",
+        "info": "#83a598",
+        "highlight": "#d3869b",
+        "terminal": {
+          "foreground": "#ebdbb2",
+          "cursor": "#ebdbb2",
+          "cursorText": "#282828",
+          "selection": "#665c54",
+          "ansi": [
+            "#282828",
+            "#cc241d",
+            "#98971a",
+            "#d79921",
+            "#458588",
+            "#b16286",
+            "#689d6a",
+            "#a89984",
+            "#928374",
+            "#fb4934",
+            "#b8bb26",
+            "#fabd2f",
+            "#83a598",
+            "#d3869b",
+            "#8ec07c",
+            "#ebdbb2"
+          ]
+        }
+      }
     },
     {
       "id": "nord",
       "name": "Nord",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Nord, github.com/nordtheme/nord (MIT); Ghostty theme \"Nord\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#222833",
+        "surface": "#2e3440",
+        "text": "#d8dee9",
+        "accent": "#88c0d0",
+        "success": "#a3be8c",
+        "warning": "#ebcb8b",
+        "error": "#bf616a",
+        "info": "#81a1c1",
+        "highlight": "#b48ead",
+        "terminal": {
+          "foreground": "#d8dee9",
+          "cursor": "#eceff4",
+          "cursorText": "#282828",
+          "selection": "#eceff4",
+          "ansi": [
+            "#3b4252",
+            "#bf616a",
+            "#a3be8c",
+            "#ebcb8b",
+            "#81a1c1",
+            "#b48ead",
+            "#88c0d0",
+            "#e5e9f0",
+            "#596377",
+            "#bf616a",
+            "#a3be8c",
+            "#ebcb8b",
+            "#81a1c1",
+            "#b48ead",
+            "#8fbcbb",
+            "#eceff4"
+          ]
+        }
+      }
     },
     {
       "id": "tokyo-night",
       "name": "Tokyo Night",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Tokyo Night, github.com/enkia/tokyo-night-vscode-theme; Ghostty theme \"TokyoNight\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#0f101a",
+        "surface": "#1a1b26",
+        "text": "#c0caf5",
+        "accent": "#7aa2f7",
+        "success": "#9ece6a",
+        "warning": "#e0af68",
+        "error": "#f7768e",
+        "info": "#7aa2f7",
+        "highlight": "#bb9af7",
+        "terminal": {
+          "foreground": "#c0caf5",
+          "cursor": "#c0caf5",
+          "cursorText": "#15161e",
+          "selection": "#33467c",
+          "ansi": [
+            "#15161e",
+            "#f7768e",
+            "#9ece6a",
+            "#e0af68",
+            "#7aa2f7",
+            "#bb9af7",
+            "#7dcfff",
+            "#a9b1d6",
+            "#414868",
+            "#f7768e",
+            "#9ece6a",
+            "#e0af68",
+            "#7aa2f7",
+            "#bb9af7",
+            "#7dcfff",
+            "#c0caf5"
+          ]
+        }
+      }
     },
     {
       "id": "rose-pine",
       "name": "Rosé Pine",
       "scheme": "dark",
-      "pair": "rose-pine-dawn"
+      "pair": "rose-pine-dawn",
+      "source": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT); Ghostty theme \"Rose Pine\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#0e0c18",
+        "surface": "#191724",
+        "text": "#e0def4",
+        "accent": "#c4a7e7",
+        "success": "#95b1ac",
+        "warning": "#f6c177",
+        "error": "#eb6f92",
+        "info": "#9ccfd8",
+        "highlight": "#c4a7e7",
+        "terminal": {
+          "foreground": "#e0def4",
+          "cursor": "#e0def4",
+          "cursorText": "#191724",
+          "selection": "#403d52",
+          "ansi": [
+            "#26233a",
+            "#eb6f92",
+            "#31748f",
+            "#f6c177",
+            "#9ccfd8",
+            "#c4a7e7",
+            "#ebbcba",
+            "#e0def4",
+            "#6e6a86",
+            "#eb6f92",
+            "#31748f",
+            "#f6c177",
+            "#9ccfd8",
+            "#c4a7e7",
+            "#ebbcba",
+            "#e0def4"
+          ]
+        }
+      }
     },
     {
       "id": "atom-one-dark",
       "name": "Atom One Dark",
       "scheme": "dark",
-      "pair": "atom-one-light"
+      "pair": "atom-one-light",
+      "source": "Atom One, github.com/atom/atom (MIT); Ghostty theme \"Atom One Dark\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#15191f",
+        "surface": "#21252b",
+        "text": "#abb2bf",
+        "accent": "#61afef",
+        "success": "#98c379",
+        "warning": "#e5c07b",
+        "error": "#e06c75",
+        "info": "#61afef",
+        "highlight": "#c678dd",
+        "terminal": {
+          "foreground": "#abb2bf",
+          "cursor": "#abb2bf",
+          "cursorText": "#21252b",
+          "selection": "#323844",
+          "ansi": [
+            "#21252b",
+            "#e06c75",
+            "#98c379",
+            "#e5c07b",
+            "#61afef",
+            "#c678dd",
+            "#56b6c2",
+            "#abb2bf",
+            "#767676",
+            "#e06c75",
+            "#98c379",
+            "#e5c07b",
+            "#61afef",
+            "#c678dd",
+            "#56b6c2",
+            "#abb2bf"
+          ]
+        }
+      }
     },
     {
       "id": "solarized-dark",
       "name": "Solarized Dark",
       "scheme": "dark",
-      "pair": "solarized-light"
+      "pair": "solarized-light",
+      "source": "Solarized, github.com/altercation/solarized (MIT); Ghostty theme \"iTerm2 Solarized Dark\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#001e27",
+        "surface": "#002b36",
+        "text": "#839496",
+        "accent": "#268bd2",
+        "success": "#859900",
+        "warning": "#b58900",
+        "error": "#dc322f",
+        "info": "#268bd2",
+        "highlight": "#d33682",
+        "terminal": {
+          "foreground": "#839496",
+          "cursor": "#839496",
+          "cursorText": "#073642",
+          "selection": "#073642",
+          "ansi": [
+            "#073642",
+            "#dc322f",
+            "#859900",
+            "#b58900",
+            "#268bd2",
+            "#d33682",
+            "#2aa198",
+            "#eee8d5",
+            "#335e69",
+            "#cb4b16",
+            "#586e75",
+            "#657b83",
+            "#839496",
+            "#6c71c4",
+            "#93a1a1",
+            "#fdf6e3"
+          ]
+        }
+      }
     },
     {
       "id": "monokai-pro",
       "name": "Monokai Pro",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Monokai Pro, monokai.pro (palette via iTerm2-Color-Schemes); Ghostty theme \"Monokai Pro\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#211e22",
+        "surface": "#2d2a2e",
+        "text": "#fcfcfa",
+        "accent": "#ffd866",
+        "success": "#a9dc76",
+        "warning": "#fc9867",
+        "error": "#ff6188",
+        "info": "#78dce8",
+        "highlight": "#ab9df2",
+        "terminal": {
+          "foreground": "#fcfcfa",
+          "cursor": "#c1c0c0",
+          "cursorText": "#8e8d8d",
+          "selection": "#5b595c",
+          "ansi": [
+            "#2d2a2e",
+            "#ff6188",
+            "#a9dc76",
+            "#ffd866",
+            "#fc9867",
+            "#ab9df2",
+            "#78dce8",
+            "#fcfcfa",
+            "#727072",
+            "#ff6188",
+            "#a9dc76",
+            "#ffd866",
+            "#fc9867",
+            "#ab9df2",
+            "#78dce8",
+            "#fcfcfa"
+          ]
+        }
+      }
     },
     {
       "id": "kanagawa-wave",
       "name": "Kanagawa Wave",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Kanagawa, github.com/rebelot/kanagawa.nvim (MIT); Ghostty theme \"Kanagawa Wave\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#14141c",
+        "surface": "#1f1f28",
+        "text": "#dcd7ba",
+        "accent": "#7e9cd8",
+        "success": "#98bb6c",
+        "warning": "#e6c384",
+        "error": "#e82424",
+        "info": "#7fb4ca",
+        "highlight": "#938aa9",
+        "terminal": {
+          "foreground": "#dcd7ba",
+          "cursor": "#dcd7ba",
+          "cursorText": "#1f1f28",
+          "selection": "#dcd7ba",
+          "ansi": [
+            "#090618",
+            "#c34043",
+            "#76946a",
+            "#c0a36e",
+            "#7e9cd8",
+            "#957fb8",
+            "#6a9589",
+            "#c8c093",
+            "#727169",
+            "#e82424",
+            "#98bb6c",
+            "#e6c384",
+            "#7fb4ca",
+            "#938aa9",
+            "#7aa89f",
+            "#dcd7ba"
+          ]
+        }
+      }
     },
     {
       "id": "everforest-dark-hard",
       "name": "Everforest Dark Hard",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Everforest, github.com/sainnhe/everforest (MIT); Ghostty theme \"Everforest Dark Hard\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#13171a",
+        "surface": "#1e2326",
+        "text": "#d3c6aa",
+        "accent": "#a7c080",
+        "success": "#a7c080",
+        "warning": "#dbbc7f",
+        "error": "#e67e80",
+        "info": "#7fbbb3",
+        "highlight": "#d699b6",
+        "terminal": {
+          "foreground": "#d3c6aa",
+          "cursor": "#e69875",
+          "cursorText": "#4c3743",
+          "selection": "#4c3743",
+          "ansi": [
+            "#7a8478",
+            "#e67e80",
+            "#a7c080",
+            "#dbbc7f",
+            "#7fbbb3",
+            "#d699b6",
+            "#83c092",
+            "#f2efdf",
+            "#a6b0a0",
+            "#f85552",
+            "#8da101",
+            "#dfa000",
+            "#3a94c5",
+            "#df69ba",
+            "#35a77c",
+            "#fffbef"
+          ]
+        }
+      }
     },
     {
       "id": "ayu-mirage",
       "name": "Ayu Mirage",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Ayu, github.com/ayu-theme/ayu-colors (MIT); Ghostty theme \"Ayu Mirage\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#141824",
+        "surface": "#1f2430",
+        "text": "#cccac2",
+        "accent": "#ffad66",
+        "success": "#d5ff80",
+        "warning": "#ffd173",
+        "error": "#f28779",
+        "info": "#73d0ff",
+        "highlight": "#dfbfff",
+        "terminal": {
+          "foreground": "#cccac2",
+          "cursor": "#ffcc66",
+          "cursorText": "#1f2430",
+          "selection": "#409fff",
+          "ansi": [
+            "#171b24",
+            "#ed8274",
+            "#87d96c",
+            "#facc6e",
+            "#6dcbfa",
+            "#dabafa",
+            "#90e1c6",
+            "#c7c7c7",
+            "#686868",
+            "#f28779",
+            "#d5ff80",
+            "#ffd173",
+            "#73d0ff",
+            "#dfbfff",
+            "#95e6cb",
+            "#ffffff"
+          ]
+        }
+      }
     },
     {
       "id": "petros-dusk",
       "name": "Petros Dusk",
-      "scheme": "dark"
+      "scheme": "dark",
+      "source": "Peter Bybel's Ghostty theme (shared 2026-10-16); Ghostty theme \"Petros Dusk\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#240f35",
+        "surface": "#301b42",
+        "text": "#eb9b1a",
+        "accent": "#eb9b1a",
+        "success": "#47d422",
+        "warning": "#f2a4db",
+        "error": "#eb2d2d",
+        "info": "#34a4eb",
+        "highlight": "#f2a4db",
+        "terminal": {
+          "foreground": "#eb9b1a",
+          "ansi": [
+            "#000000",
+            "#ff0000",
+            "#26e823",
+            "#ed9507",
+            "#2d3f91",
+            "#f4b8e4",
+            "#2e9ae8",
+            "#a5adce",
+            "#626880",
+            "#eb2d2d",
+            "#47d422",
+            "#fca503",
+            "#33489c",
+            "#f2a4db",
+            "#34a4eb",
+            "#ffffff"
+          ]
+        }
+      }
     },
     {
       "id": "github-light",
       "name": "GitHub Light",
       "scheme": "light",
-      "pair": "github-dark"
+      "pair": "github-dark",
+      "source": "GitHub Primer, github.com/primer/github-vscode-theme (MIT); Ghostty theme \"GitHub Light Default\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#f0f0f0",
+        "surface": "#ffffff",
+        "text": "#1f2328",
+        "accent": "#0969da",
+        "success": "#116329",
+        "warning": "#9a6700",
+        "error": "#cf222e",
+        "info": "#0969da",
+        "highlight": "#8250df",
+        "terminal": {
+          "foreground": "#1f2328",
+          "cursor": "#0969da",
+          "cursorText": "#3c9cff",
+          "selection": "#1f2328",
+          "ansi": [
+            "#24292f",
+            "#cf222e",
+            "#116329",
+            "#4d2d00",
+            "#0969da",
+            "#8250df",
+            "#1b7c83",
+            "#6e7781",
+            "#57606a",
+            "#a40e26",
+            "#1a7f37",
+            "#633c01",
+            "#218bff",
+            "#a475f9",
+            "#3192aa",
+            "#8c959f"
+          ]
+        }
+      }
     },
     {
       "id": "catppuccin-latte",
       "name": "Catppuccin Latte",
       "scheme": "light",
-      "pair": "catppuccin-mocha"
+      "pair": "catppuccin-mocha",
+      "source": "Catppuccin, github.com/catppuccin/catppuccin (MIT); Ghostty theme \"Catppuccin Latte\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#e0e2e6",
+        "surface": "#eff1f5",
+        "text": "#4c4f69",
+        "accent": "#7287fd",
+        "success": "#40a02b",
+        "warning": "#df8e1d",
+        "error": "#d20f39",
+        "info": "#1e66f5",
+        "highlight": "#ea76cb",
+        "terminal": {
+          "foreground": "#4c4f69",
+          "cursor": "#dc8a78",
+          "cursorText": "#eff1f5",
+          "selection": "#acb0be",
+          "ansi": [
+            "#5c5f77",
+            "#d20f39",
+            "#40a02b",
+            "#df8e1d",
+            "#1e66f5",
+            "#ea76cb",
+            "#179299",
+            "#acb0be",
+            "#6c6f85",
+            "#de293e",
+            "#49af3d",
+            "#eea02d",
+            "#456eff",
+            "#fe85d8",
+            "#2d9fa8",
+            "#bcc0cc"
+          ]
+        }
+      },
+      "overrides": {
+        "--syn-kw": "#8433ea",
+        "--syn-num": "#b24200"
+      }
     },
     {
       "id": "graphite-light",
       "name": "Graphite Light",
       "scheme": "light",
-      "pair": "graphite-dark"
+      "pair": "graphite-dark",
+      "source": "Code Foundry's original light theme (index.css :root before theme-slots-1)",
+      "base": {
+        "canvas": "#f0f0f0",
+        "surface": "#ffffff",
+        "text": "#0a0a0a",
+        "accent": "#171717",
+        "success": "#007d57",
+        "warning": "#a55900",
+        "error": "#dc0015",
+        "info": "#0073ae",
+        "highlight": "#7f22fe",
+        "terminal": {
+          "foreground": "#24292f",
+          "cursor": "#24292f",
+          "selection": "#b6d3fb",
+          "ansi": [
+            "#24292f",
+            "#cf222e",
+            "#116329",
+            "#7d4e00",
+            "#0969da",
+            "#8250df",
+            "#1b7c83",
+            "#6e7781",
+            "#57606a",
+            "#a40e26",
+            "#1a7f37",
+            "#633c01",
+            "#218bff",
+            "#a475f9",
+            "#3192aa",
+            "#8c959f"
+          ]
+        }
+      },
+      "overrides": {
+        "--cf-text-muted": "#6d6d6d",
+        "--cf-surface-sunken": "#f5f5f5",
+        "--cf-control": "#f5f5f5",
+        "--cf-control-hover": "#f5f5f5",
+        "--cf-focus": "#a1a1a1",
+        "--cf-input": "#e5e5e5",
+        "--cf-sidebar-row-selected": "#e1e1e1"
+      }
     },
     {
       "id": "gruvbox-light",
       "name": "Gruvbox Light",
       "scheme": "light",
-      "pair": "gruvbox-dark"
+      "pair": "gruvbox-dark",
+      "source": "Gruvbox, github.com/morhetz/gruvbox (MIT); Ghostty theme \"Gruvbox Light\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#ece2b9",
+        "surface": "#fbf1c7",
+        "text": "#3c3836",
+        "accent": "#af3a03",
+        "success": "#79740e",
+        "warning": "#b57614",
+        "error": "#9d0006",
+        "info": "#076678",
+        "highlight": "#8f3f71",
+        "terminal": {
+          "foreground": "#3c3836",
+          "cursor": "#3c3836",
+          "cursorText": "#fbf1c7",
+          "selection": "#3c3836",
+          "ansi": [
+            "#fbf1c7",
+            "#cc241d",
+            "#98971a",
+            "#d79921",
+            "#458588",
+            "#b16286",
+            "#689d6a",
+            "#7c6f64",
+            "#928374",
+            "#9d0006",
+            "#79740e",
+            "#b57614",
+            "#076678",
+            "#8f3f71",
+            "#427b58",
+            "#3c3836"
+          ]
+        }
+      }
     },
     {
       "id": "rose-pine-dawn",
       "name": "Rosé Pine Dawn",
       "scheme": "light",
-      "pair": "rose-pine"
+      "pair": "rose-pine",
+      "source": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT); Ghostty theme \"Rose Pine Dawn\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#ebe5de",
+        "surface": "#faf4ed",
+        "text": "#575279",
+        "accent": "#907aa9",
+        "success": "#6d8f89",
+        "warning": "#ea9d34",
+        "error": "#b0405a",
+        "info": "#56949f",
+        "highlight": "#907aa9",
+        "terminal": {
+          "foreground": "#575279",
+          "cursor": "#575279",
+          "cursorText": "#faf4ed",
+          "selection": "#dfdad9",
+          "ansi": [
+            "#f2e9e1",
+            "#b4637a",
+            "#286983",
+            "#ea9d34",
+            "#56949f",
+            "#907aa9",
+            "#d7827e",
+            "#575279",
+            "#9893a5",
+            "#b4637a",
+            "#286983",
+            "#ea9d34",
+            "#56949f",
+            "#907aa9",
+            "#d7827e",
+            "#575279"
+          ]
+        }
+      }
     },
     {
       "id": "atom-one-light",
       "name": "Atom One Light",
       "scheme": "light",
-      "pair": "atom-one-dark"
+      "pair": "atom-one-dark",
+      "source": "Atom One, github.com/atom/atom (MIT); Ghostty theme \"Atom One Light\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#eaeaea",
+        "surface": "#f9f9f9",
+        "text": "#2a2c33",
+        "accent": "#4078f2",
+        "success": "#3f953a",
+        "warning": "#d2b67c",
+        "error": "#de3e35",
+        "info": "#2f5af3",
+        "highlight": "#950095",
+        "terminal": {
+          "foreground": "#2a2c33",
+          "cursor": "#bbbbbb",
+          "cursorText": "#ffffff",
+          "selection": "#ededed",
+          "ansi": [
+            "#000000",
+            "#de3e35",
+            "#3f953a",
+            "#d2b67c",
+            "#2f5af3",
+            "#950095",
+            "#3f953a",
+            "#bbbbbb",
+            "#000000",
+            "#de3e35",
+            "#3f953a",
+            "#d2b67c",
+            "#2f5af3",
+            "#a00095",
+            "#3f953a",
+            "#ffffff"
+          ]
+        }
+      }
     },
     {
       "id": "solarized-light",
       "name": "Solarized Light",
       "scheme": "light",
-      "pair": "solarized-dark"
+      "pair": "solarized-dark",
+      "source": "Solarized, github.com/altercation/solarized (MIT); Ghostty theme \"iTerm2 Solarized Light\" (iTerm2-Color-Schemes, MIT)",
+      "base": {
+        "canvas": "#eee7d4",
+        "surface": "#fdf6e3",
+        "text": "#657b83",
+        "accent": "#268bd2",
+        "success": "#859900",
+        "warning": "#b58900",
+        "error": "#dc322f",
+        "info": "#268bd2",
+        "highlight": "#d33682",
+        "terminal": {
+          "foreground": "#657b83",
+          "cursor": "#657b83",
+          "cursorText": "#eee8d5",
+          "selection": "#eee8d5",
+          "ansi": [
+            "#073642",
+            "#dc322f",
+            "#859900",
+            "#b58900",
+            "#268bd2",
+            "#d33682",
+            "#2aa198",
+            "#bbb5a2",
+            "#002b36",
+            "#cb4b16",
+            "#586e75",
+            "#657b83",
+            "#839496",
+            "#6c71c4",
+            "#93a1a1",
+            "#fdf6e3"
+          ]
+        }
+      }
     }
   ]
 }

@@ -64,6 +64,18 @@ func TestRegisterValidation(t *testing.T) {
 		}), "not the last positional"},
 		{"enum without values", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum}} }), "needs values"},
 		{"values on non-enum", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Enum: []string{"a"}}} }), "non-enum"},
+		{"enum listed by a function", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: Enum, EnumFunc: func() []string { return nil }}}
+		}), ""},
+		{"enum function and values", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, EnumFunc: func() []string { return nil }}}
+		}), "both values and a function"},
+		{"enum function on non-enum", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: String, EnumFunc: func() []string { return nil }}}
+		}), "non-enum"},
+		{"enum function with a default", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "x", Type: Enum, Default: "a", EnumFunc: func() []string { return []string{"a"} }}}
+		}), "cannot have a default"},
 		{"required with default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String, Required: true, Default: "a"}} }), "cannot have a default"},
 		{"bad int default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Int, Default: "ten"}} }), "default: want an integer"},
 		{"bad enum default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, Default: "b"}} }), "default: want one of"},
@@ -252,5 +264,41 @@ func TestInvokeRequiredWithoutContext(t *testing.T) {
 	var ae *ArgError
 	if !errors.As(err, &ae) || ae.Arg != "path" || err.Error() != `test.thing: missing required argument "path"` {
 		t.Fatalf("err = %v, want missing required path", err)
+	}
+}
+
+// An EnumFunc arg lists its values again at every List, Get and Invoke.
+func TestEnumFunc(t *testing.T) {
+	values := []string{"a"}
+	r := NewRegistry()
+	err := r.Register(valid(func(c *Command) {
+		c.Args = []ArgSpec{{Name: "x", Type: Enum, Positional: true, EnumFunc: func() []string { return values }}}
+		c.Run = func(_ context.Context, _ Context, a Args) (Result, error) { return Result{Message: a.String("x")}, nil }
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	enum := func() []string {
+		c, _ := r.Get("test.thing")
+		return c.Args[0].Enum
+	}
+	if got := enum(); !slices.Equal(got, []string{"a"}) {
+		t.Fatalf("Get enum = %v", got)
+	}
+	if _, err := r.Invoke(context.Background(), Context{}, "test.thing", map[string]string{"x": "b"}); !errors.Is(err, ErrInvalidArgs) {
+		t.Fatalf("Invoke(b) = %v, want invalid", err)
+	}
+	values = []string{"a", "b"}
+	if got := r.List(Context{}, true)[0].Args[0].Enum; !slices.Equal(got, values) {
+		t.Errorf("List enum = %v", got)
+	}
+	if res, err := r.Invoke(context.Background(), Context{}, "test.thing", map[string]string{"x": "b"}); err != nil || res.Message != "b" {
+		t.Fatalf("Invoke(b) = %+v, %v", res, err)
+	}
+	// The registered spec is not written to.
+	got := enum()
+	got[0] = "z"
+	if enum()[0] != "a" {
+		t.Error("Get shares the values")
 	}
 }

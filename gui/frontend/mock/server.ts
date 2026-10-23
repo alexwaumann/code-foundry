@@ -157,6 +157,11 @@
  *   POST /__mock/memory/add?text=…&thread=s-1    (a thread's memory add: the entry and the "Remembered: …"
  *                                                 toast with its Settings › Memory link)
  *   GET  /__mock/memory                          ({ entries, calls })
+ *   ThemeService, the theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
+ *        three user themes (Ocean Dusk and Mocha, warmer dark, Latte, softer light) and a file that
+ *        does not load; reset restores them.
+ *   POST /__mock/themes?set=empty|seed           (the themes directory, as a hand edit; published)
+ *   GET  /__mock/themes                          ({ themes, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
  *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
@@ -194,6 +199,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
+import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
 import { emberStateNames } from "./ember";
@@ -588,6 +594,17 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // The user's themes (mock/userThemes.ts): reads only; writes are the theme.* commands.
+  router.service(ThemeService, {
+    list: () => ({ themes: world.themes.snapshot() }),
+    watch: async function* (_req, ctx) {
+      yield world.themes.event();
+      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
+        if (source === EventSource.THEME && event.event?.case === "theme") yield event.event.value;
+      }
+    },
+  });
+
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
   router.service(EmberService, {
     getStatus: () => ({ status: world.ember.status() }),
@@ -599,12 +616,12 @@ function routes(router: ConnectRouter): void {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, settings, update, action, plugin, skill, memory), then everything published, filtered by `sources`.
+    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -615,6 +632,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.THREAD, event: { event: { case: "thread", value: world.logs.pendingSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
+        { source: EventSource.THEME, event: { event: { case: "theme", value: world.themes.event() } } },
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
         { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
         { source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } },
@@ -1286,6 +1304,16 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
           const id = q.get("thread") ?? "";
           json(res, 200, { added: world.memory.add(q.get("text") ?? "", id, world.threads.get(id)?.name ?? "") });
         }
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "GET /__mock/themes":
+      json(res, 200, world.themes.json());
+      break;
+    case "POST /__mock/themes":
+      try {
+        json(res, 200, world.themes.control(q));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

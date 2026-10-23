@@ -41,14 +41,23 @@ func (r *Registry) SetOverrides(ov Overrides) {
 	r.ov = ov
 }
 
-// effective returns c with overrides applied. r.mu must be held.
+// effective returns c with overrides applied and every EnumFunc arg's values listed.
+// r.mu must be held.
 func (r *Registry) effective(c *Command) Command {
 	out := *c
 	if kb, ok := r.ov.Keybindings[c.Name]; ok {
 		out.Keybindings = slices.Clone(kb)
 	}
-	if defs := r.ov.ArgDefaults[c.Name]; len(defs) > 0 {
+	if slices.ContainsFunc(c.Args, func(a ArgSpec) bool { return a.EnumFunc != nil }) {
 		out.Args = slices.Clone(c.Args)
+		for i, a := range out.Args {
+			if a.EnumFunc != nil {
+				out.Args[i].Enum = slices.Clone(a.EnumFunc())
+			}
+		}
+	}
+	if defs := r.ov.ArgDefaults[c.Name]; len(defs) > 0 {
+		out.Args = slices.Clone(out.Args)
 		for i, a := range out.Args {
 			d, ok := defs[a.Name]
 			if !ok || a.Required {

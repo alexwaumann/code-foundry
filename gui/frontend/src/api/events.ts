@@ -11,6 +11,7 @@ import { toSkillEventView, type SkillEventView } from "./skill";
 import { toThreadListEventView, type ThreadListEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
+import { toThemeEventView, type ThemesSnapshotView } from "./theme";
 import { toThreadEventView, type ThreadEventView } from "./thread";
 import { toUiIntentView, type UiIntentView } from "./ui";
 import { toUpdateEventView, type UpdateEventView } from "./update";
@@ -36,7 +37,8 @@ export type EventView =
   | { source: "action"; event: ActionEventView }
   | { source: "plugin"; event: PluginEventView }
   | { source: "skill"; event: SkillEventView }
-  | { source: "memory"; event: MemoryEventView };
+  | { source: "memory"; event: MemoryEventView }
+  | { source: "theme"; event: ThemesSnapshotView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -93,6 +95,8 @@ export function toEventView(ev: Event): EventView | null {
       return { source: "skill", event: toSkillEventView(e.value) };
     case "memory":
       return { source: "memory", event: toMemoryEventView(e.value) };
+    case "theme":
+      return { source: "theme", event: toThemeEventView(e.value) };
     default:
       return null;
   }

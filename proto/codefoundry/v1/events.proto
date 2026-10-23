@@ -7,6 +7,7 @@ import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
 import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/memory.proto";
+import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/plugin.proto";
 import "codefoundry/v1/project.proto";
 import "codefoundry/v1/settings.proto";
@@ -24,7 +25,7 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, plugin, skill, memory, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -116,6 +117,9 @@ enum EventSource {
   // The app memory: a MemoryEvent with the whole memory (after skill), then the whole
   // memory again per change (MemoryService.Watch).
   EVENT_SOURCE_MEMORY = 16;
+  // The colour themes: a ThemeEvent with every theme (after gitops, before settings,
+  // which name them), then all of them again per change (ThemeService.Watch).
+  EVENT_SOURCE_THEME = 17;
 }
 
 message Event {
@@ -144,6 +148,8 @@ message Event {
     SkillEvent skill = 16;
     // The app memory: all of it, on connect and per change.
     MemoryEvent memory = 17;
+    // The colour themes: all of them, on connect and per change.
+    ThemeEvent theme = 18;
   }
   // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
   // daemon lifetime, shared by every client and source (the same event has the same

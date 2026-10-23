@@ -21,9 +21,9 @@ export function ThemeAa({ theme, className }: { theme: Theme; className?: string
 }
 
 /** Error, warning, success, info and the accent as five joined swatches. */
-export function ThemeStrip({ theme }: { theme: Theme }) {
+export function ThemeStrip({ theme, className }: { theme: Theme; className?: string }) {
   return (
-    <span aria-hidden className="flex h-3 shrink-0 overflow-hidden rounded-sm" data-testid="theme-strip">
+    <span aria-hidden className={cn("flex h-3 shrink-0 overflow-hidden rounded-sm", className)} data-testid="theme-strip">
       {STRIP.map((k) => (
         <span key={k} className="w-2.5" style={{ background: theme.slots[k] }} />
       ))}

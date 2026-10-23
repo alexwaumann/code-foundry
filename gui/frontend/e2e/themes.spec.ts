@@ -5,6 +5,7 @@ import { emit, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
 // defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
+// The user's own themes (the Yours section) are e2e/user-themes.spec.ts.
 
 // The generated catalog, read as a file: Playwright's loader refuses a JSON import without
 // an import attribute, which src/themes (bundled by Vite) does not carry. Its entries are
@@ -53,10 +54,10 @@ async function openFromPalette(page: Page) {
 
 test("Choose… in Settings opens the page on that slot, listing only its scheme's themes", async ({ page }) => {
   await openFromSettings(page, "light");
-  await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(themesFor("light").map((t) => t.name));
+  await expect(page.getByTestId("themes-curated").getByTestId("theme-name")).toHaveText(themesFor("light").map((t) => t.name));
   await expect(option(page, "GitHub Light")).toHaveAttribute("data-current", "true");
   await page.getByTestId("themes-slot-dark").click();
-  await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(themesFor("dark").map((t) => t.name));
+  await expect(page.getByTestId("themes-curated").getByTestId("theme-name")).toHaveText(themesFor("dark").map((t) => t.name));
   // The dark slot is the one in use (the browser is dark): the badge and the sentence say so.
   await expect(page.getByTestId("themes-slot-dark")).toContainText("in use");
   await expect(page.getByTestId("themes-slot-light")).not.toContainText("in use");

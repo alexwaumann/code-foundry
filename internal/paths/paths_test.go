@@ -40,13 +40,13 @@ func TestLayout(t *testing.T) {
 		"socket": p.Socket(), "token": p.Token(), "port": p.Port(), "lock": p.Lock(),
 		"db": p.DB(), "logs": p.Logs(), "daemonlog": p.DaemonLog(), "worktrees": p.Worktrees(),
 		"attachments": p.Attachments(), "projects": p.Projects(), "backdrops": p.Backdrops(),
-		"disabledskills": p.DisabledSkills(), "memory": p.Memory(), "legacymemory": p.LegacyMemory(),
+		"disabledskills": p.DisabledSkills(), "memory": p.Memory(), "legacymemory": p.LegacyMemory(), "themes": p.Themes(),
 	}
 	want := map[string]string{
 		"socket": "/h/daemon.sock", "token": "/h/daemon.token", "port": "/h/daemon.port",
 		"lock": "/h/daemon.lock", "db": "/h/db.sqlite", "logs": "/h/logs", "daemonlog": "/h/logs/daemon.log",
 		"worktrees": "/h/worktrees", "attachments": "/h/attachments", "projects": "/h/projects", "backdrops": "/h/backdrops",
-		"disabledskills": "/h/skills/disabled", "memory": "/h/memory", "legacymemory": "/h/memory.md",
+		"disabledskills": "/h/skills/disabled", "memory": "/h/memory", "legacymemory": "/h/memory.md", "themes": "/h/themes",
 	}
 	for k, w := range want {
 		if got[k] != w {
