@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { expect, test, type Page } from "@playwright/test";
+import { dragSelect, invocations, mockPost, openApp, openTooltip, resetMock, row, textPoints } from "./fixtures";
 
 // Citations (docs/notes/citations.md): select text in one of Claude's answers, Cite,
 // comment, and the citation lands in the composer as an amber chip; sent, the bubble
@@ -30,56 +30,6 @@ async function openThread(page: Page): Promise<void> {
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(answer(page)).toContainText(LAST);
-}
-
-/** Viewport points at the start and end of `text` inside `within` (its first occurrence, across text nodes of one element). */
-async function textPoints(within: Locator, text: string): Promise<{ from: { x: number; y: number }; to: { x: number; y: number } }> {
-  return within.evaluate((root, needle) => {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const nodes: Text[] = [];
-    let all = "";
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      nodes.push(n as Text);
-      all += (n as Text).data;
-    }
-    const at = all.indexOf(needle);
-    if (at < 0) throw new Error(`no ${needle}`);
-    const point = (offset: number, end: boolean) => {
-      let acc = 0;
-      for (const t of nodes) {
-        if (offset < acc + t.data.length || (end && offset === acc + t.data.length)) {
-          const r = document.createRange();
-          const o = offset - acc;
-          r.setStart(t, end ? o - 1 : o);
-          r.setEnd(t, end ? o : o + 1);
-          const rect = r.getClientRects()[0] ?? r.getBoundingClientRect();
-          return { x: end ? rect.right - 1 : rect.left + 1, y: rect.top + rect.height / 2 };
-        }
-        acc += t.data.length;
-      }
-      throw new Error("offset out of range");
-    };
-    return { from: point(at, false), to: point(at + needle.length, true) };
-  }, text);
-}
-
-/** Drags the mouse over `text` (in `within`), from its start to its end, once the text has stopped moving (the virtualized list measures rows as they mount). */
-async function dragSelect(page: Page, within: Locator, text: string): Promise<{ x: number; y: number }> {
-  let pts = await textPoints(within, text);
-  for (let i = 0; i < 20; i++) {
-    await page.waitForTimeout(50);
-    const next = await textPoints(within, text);
-    const still = next.from.x === pts.from.x && next.from.y === pts.from.y && next.to.y === pts.to.y;
-    pts = next;
-    if (still) break;
-  }
-  const { from, to } = pts;
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 });
-  await page.mouse.move(to.x, to.y, { steps: 4 });
-  await page.mouse.up();
-  return to;
 }
 
 async function hasHighlight(page: Page, name: string): Promise<boolean> {

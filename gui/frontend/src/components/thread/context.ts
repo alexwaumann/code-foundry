@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { PathPlaceSource } from "@/lib/pathChips";
 
 /** The thread a timeline row belongs to, and its worktree (paths inside it are shown relative). */
@@ -28,3 +28,9 @@ export const KeepRowContext = createContext<(rowKey: string) => void>(() => unde
  * its project).
  */
 export const PathPlaceContext = createContext<PathPlaceSource | null>(null);
+
+/**
+ * What renders a finished text item's markdown in a text row (TextRow), when a chat has
+ * its own: Ember's splits out its task links as pointer lines. Null: ThreadMarkdown.
+ */
+export const TextMarkdownContext = createContext<((text: string) => ReactNode) | null>(null);

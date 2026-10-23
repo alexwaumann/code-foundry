@@ -201,3 +201,53 @@ export async function expectNoTooltip(page: Page, target: Locator): Promise<void
 
 /** A minimal valid PDF (mock/pdf.ts, shared with the mock daemon's file fixtures). */
 export { testPdf } from "../mock/pdf";
+
+/** Viewport points at the start and end of `text` inside `within` (its first occurrence, across text nodes of one element). */
+export async function textPoints(within: Locator, text: string): Promise<{ from: { x: number; y: number }; to: { x: number; y: number } }> {
+  return within.evaluate((root, needle) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    let all = "";
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      nodes.push(n as Text);
+      all += (n as Text).data;
+    }
+    const at = all.indexOf(needle);
+    if (at < 0) throw new Error(`no ${needle}`);
+    const point = (offset: number, end: boolean) => {
+      let acc = 0;
+      for (const t of nodes) {
+        if (offset < acc + t.data.length || (end && offset === acc + t.data.length)) {
+          const r = document.createRange();
+          const o = offset - acc;
+          r.setStart(t, end ? o - 1 : o);
+          r.setEnd(t, end ? o : o + 1);
+          const rect = r.getClientRects()[0] ?? r.getBoundingClientRect();
+          return { x: end ? rect.right - 1 : rect.left + 1, y: rect.top + rect.height / 2 };
+        }
+        acc += t.data.length;
+      }
+      throw new Error("offset out of range");
+    };
+    return { from: point(at, false), to: point(at + needle.length, true) };
+  }, text);
+}
+
+/** Drags the mouse over `text` (in `within`), from its start to its end, once the text has stopped moving (the virtualized list measures rows as they mount). */
+export async function dragSelect(page: Page, within: Locator, text: string): Promise<{ x: number; y: number }> {
+  let pts = await textPoints(within, text);
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(50);
+    const next = await textPoints(within, text);
+    const still = next.from.x === pts.from.x && next.from.y === pts.from.y && next.to.y === pts.to.y;
+    pts = next;
+    if (still) break;
+  }
+  const { from, to } = pts;
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 });
+  await page.mouse.move(to.x, to.y, { steps: 4 });
+  await page.mouse.up();
+  return to;
+}

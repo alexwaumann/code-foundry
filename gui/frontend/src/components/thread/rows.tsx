@@ -49,7 +49,7 @@ import { useUiStore } from "@/stores/ui";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
 import { StreamingMarkdown, ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
-import { KeepRowContext, useThreadCtx } from "./context";
+import { KeepRowContext, TextMarkdownContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
 import { QueuedTag } from "./QueuedTag";
 import { AgentOpen } from "./AgentOpen";
@@ -388,13 +388,12 @@ const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final
   // blocks are all complete, so the context needs no text and stays put across renders;
   // while it streams StreamingMarkdown gives the growing last block its own.
   const run = useMemo(() => ({ threadId, text: "", streaming: false }), [threadId]);
+  const markdown = useContext(TextMarkdownContext);
   if (it?.kind !== "text") return null;
   const md = it.streaming ? (
     <StreamingMarkdown text={it.text} threadId={threadId} />
   ) : (
-    <CodeRunContext.Provider value={run}>
-      <ThreadMarkdown>{it.text}</ThreadMarkdown>
-    </CodeRunContext.Provider>
+    <CodeRunContext.Provider value={run}>{markdown ? markdown(it.text) : <ThreadMarkdown>{it.text}</ThreadMarkdown>}</CodeRunContext.Provider>
   );
   // The thread's own answers can be cited (components/thread/cite); a subagent's text cannot.
   const citable = it.parentToolUseId === "";

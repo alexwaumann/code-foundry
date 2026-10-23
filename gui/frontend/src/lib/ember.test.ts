@@ -108,7 +108,7 @@ describe("splitTaskLinks", () => {
   });
 });
 
-/** Timeline items from short specs: "u:id", "w:id" (a wake), "t:id" (text), "b:id" (Bash), "r:id" (Read), "e:id" (turn end), "h:id" (thinking), "p:id:tool" (pending permission on a tool). */
+/** Timeline items from short specs: "u:id", "w:id" (a wake), "t:id" (text), "b:id" (Bash), "r:id" (Read), "e:id" (turn end), "h:id" (thinking), "p:id:tool" (pending permission on a tool), "q:id" (pending question), "x:id" (inline page), "m:id" (theme card). */
 function items(...specs: string[]): { list: TimelineItem[]; wakes: Set<string> } {
   const wakes = new Set<string>();
   const list = specs.flatMap((s): TimelineItem[] => {
@@ -132,6 +132,12 @@ function items(...specs: string[]): { list: TimelineItem[]; wakes: Set<string> }
         return [{ ...base, kind: "thinking" }];
       case "p":
         return [{ ...base, kind: "permission", name: "Bash", toolUseId: ref, requestState: "pending" }];
+      case "q":
+        return [{ ...base, kind: "question", requestState: "pending" }];
+      case "x":
+        return [{ ...base, kind: "html" }];
+      case "m":
+        return [{ ...base, kind: "theme" }];
       default:
         return [];
     }
@@ -182,13 +188,13 @@ describe("buildEmberRows", () => {
 
   it("folds every run between visible messages, wakes included; a reply's own turn end is no run", () => {
     const { list, wakes } = items("u:u1", "b:b1", "r:r1", "t:t1", "e:e1", "w:w1", "b:b2", "t:t2", "e:e2", "u:u2", "t:t3", "e:e3");
-    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(b1,r1)", "etext:t1", "work(e1,w1,b2)", "etext:t2", "user:u2", "etext:t3"]);
+    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(b1,r1)", "text:t1", "work(e1,w1,b2)", "text:t2", "user:u2", "text:t3"]);
   });
 
   it("opens runs with Show work, the user's choice winning; open runs are followed by their rows", () => {
-    const { list, wakes } = items("u:u1", "b:b1", "t:t1", "b:b2", "t:t2");
+    const { list, wakes } = items("u:u1", "b:b1", "t:t1", "e:e1", "u:u2", "b:b2", "t:t2", "e:e2");
     const rows = buildEmberRows(list, opts(wakes, { showWork: true, expanded: (k) => (k === "w:b2" ? false : undefined) }));
-    expect(shape(rows)).toEqual(["user:u1", "work(b1) open", "tool:b1", "etext:t1", "work(b2)", "etext:t2"]);
+    expect(shape(rows)).toEqual(["user:u1", "work(b1) open", "tool:b1", "text:t1", "user:u2", "work(b2)", "text:t2"]);
   });
 
   it("shows a tool waiting on a permission, splitting the run", () => {
@@ -207,20 +213,47 @@ describe("buildEmberRows", () => {
 
   it("draws no row for a wake Ember only thought about; one it replied to keeps its row; thinking alone still is a run", () => {
     const { list, wakes } = items("u:u1", "h:h1", "t:t1", "e:e1", "w:w1", "h:h2", "t:t2", "e:e2", "w:w2", "b:b1", "t:t3", "e:e3", "w:w3", "h:h3", "e:e4", "u:u2");
-    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(h1)", "etext:t1", "work(e1,w1,h2)", "etext:t2", "work(e2,w2,b1)", "etext:t3", "user:u2"]);
+    expect(shape(buildEmberRows(list, opts(wakes)))).toEqual(["user:u1", "work(h1)", "text:t1", "work(e1,w1,h2)", "text:t2", "work(e2,w2,b1)", "text:t3", "user:u2"]);
     // While it is live, the row stands: Ember may still run a tool.
     const live = items("u:u1", "t:t1", "e:e1", "w:w1", "h:h1");
-    expect(shape(buildEmberRows(live.list, opts(live.wakes, { working: true })))).toEqual(["user:u1", "etext:t1", "work(e1,w1,h1) live"]);
+    expect(shape(buildEmberRows(live.list, opts(live.wakes, { working: true })))).toEqual(["user:u1", "text:t1", "work(e1,w1,h1) live"]);
   });
 
   it("ends a run where the app's restart cut it, with a restart line", () => {
-    const { list, wakes } = items("u:u1", "h:h1", "b:b1", "e:e1", "u:u2", "t:t1");
+    const { list, wakes } = items("u:u1", "h:h1", "b:b1", "e:e1", "u:u2", "t:t1", "e:e2");
     const rows = buildEmberRows(list, opts(wakes, { cuts: new Map([["e1", 1234]]) }));
-    expect(shape(rows)).toEqual(["user:u1", "work(h1,b1,e1)", "restart:r:e1", "user:u2", "etext:t1"]);
+    expect(shape(rows)).toEqual(["user:u1", "work(h1,b1,e1)", "restart:r:e1", "user:u2", "text:t1"]);
     expect(rows[2]).toEqual({ type: "restart", key: "r:e1", atMs: 1234 });
     // A cut with nothing run before it still says so.
     const bare = items("u:u1", "e:e1");
     expect(shape(buildEmberRows(bare.list, opts(bare.wakes, { cuts: new Map([["e1", null]]) })))).toEqual(["user:u1", "restart:r:e1"]);
+  });
+
+  it("shows only a turn's last text, once the turn ended or waits on the user; the rest is work", () => {
+    const cases: { name: string; specs: string[]; working?: boolean; want: string[] }[] = [
+      { name: "text, tool, final text", specs: ["u:u1", "t:t1", "b:b1", "t:t2", "e:e1"], want: ["user:u1", "work(t1,b1)", "text:t2"] },
+      { name: "a live turn's trailing text", specs: ["u:u1", "b:b1", "t:t1"], working: true, want: ["user:u1", "work(b1,t1) live"] },
+      { name: "a trailing text with no turn end, not working", specs: ["u:u1", "b:b1", "t:t1"], want: ["user:u1", "work(b1,t1)"] },
+      { name: "text before a pending question", specs: ["u:u1", "b:b1", "t:t1", "q:q1"], want: ["user:u1", "work(b1)", "text:t1", "question:q1"] },
+      { name: "text before a tool waiting on a permission", specs: ["u:u1", "t:t1", "b:b1", "p:x:b1"], want: ["user:u1", "text:t1", "tool:b1"] },
+      { name: "two texts before a turn end", specs: ["u:u1", "t:t1", "t:t2", "e:e1"], want: ["user:u1", "work(t1)", "text:t2"] },
+      { name: "a reply, its turn end, then a wake", specs: ["u:u1", "b:b1", "t:t1", "e:e1", "w:w1", "b:b2"], want: ["user:u1", "work(b1)", "text:t1", "work(e1,w1,b2)"] },
+      { name: "a text a later message follows before any turn end", specs: ["u:u1", "t:t1", "u:u2", "t:t2", "e:e1"], want: ["user:u1", "work(t1)", "user:u2", "text:t2"] },
+      { name: "a page shows and closes the run", specs: ["u:u1", "b:b1", "x:x1", "b:b2", "t:t1", "e:e1"], want: ["user:u1", "work(b1)", "html:x1", "work(b2)", "text:t1"] },
+      { name: "a page after the reply leaves it the reply", specs: ["u:u1", "b:b1", "t:t1", "x:x1", "e:e1"], want: ["user:u1", "work(b1)", "text:t1", "html:x1"] },
+      { name: "a theme card shows; the text after it stays the reply", specs: ["u:u1", "t:t1", "m:m1", "t:t2", "e:e1"], want: ["user:u1", "work(t1)", "theme:m1", "text:t2"] },
+    ];
+    for (const c of cases) {
+      const { list, wakes } = items(...c.specs);
+      expect(shape(buildEmberRows(list, opts(wakes, { working: c.working ?? false }))), c.name).toEqual(c.want);
+    }
+  });
+
+  it("draws the reply as the thread's text row and a page open", () => {
+    const { list, wakes } = items("u:u1", "x:x1", "t:t1", "e:e1");
+    const rows = buildEmberRows(list, opts(wakes));
+    expect(rows[1]).toEqual({ type: "html", key: "x1", id: "x1", folded: false });
+    expect(rows[2]).toEqual({ type: "text", key: "t1", id: "t1", final: true, answer: "t1" });
   });
 
   it("keys a run by its first item, so it holds as the run grows", () => {

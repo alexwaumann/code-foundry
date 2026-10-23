@@ -85,11 +85,16 @@ export interface TimelineHandle {
   showRow(key: string): boolean;
   /** Stops following the bottom, before a scroll of the cite layer's own. */
   unpin(): void;
+  /** Opens the row that folds an item away (Ember's work row); false when none does. Unset: the item's turn unfolds. */
+  unfold?: ((itemId: string) => boolean) | undefined;
 }
 
 const timelines = new Map<string, TimelineHandle>();
 
-/** The thread's timeline registers itself while mounted. Returns the unregister. */
+/**
+ * The thread's timeline registers itself while mounted. Returns the unregister. One per
+ * thread: a thread shows in one body at a time (ThreadBody, or Ember's chat for Ember's).
+ */
 export function registerTimeline(threadId: string, handle: TimelineHandle): () => void {
   timelines.set(threadId, handle);
   return () => {
