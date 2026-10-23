@@ -243,7 +243,9 @@ func TestPrefixAndSystemPrompt(t *testing.T) {
 	// ember-research-tasks: Ember reads to split and assign; a question about code is a
 	// worker's research task, not Ember's own read loop.
 	for _, w := range []string{"research included", "You read only to split the work and assign its files",
-		"never to answer a question about code", "research task, a worker that touches nothing"} {
+		"never to answer a question about code", "research task, a worker that touches nothing",
+		// ember-fixes-3-board: subagents in the background; every wake closes what it reported.
+		"`run_in_background: true`; then end your turn", "close a parent once its last piece", "Unclosed on your board"} {
 		if !strings.Contains(Rules(), w) {
 			t.Errorf("rules.md lacks %q", w)
 		}
