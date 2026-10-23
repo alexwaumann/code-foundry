@@ -371,11 +371,11 @@ describe("an inline page (docs/notes/thread-fold-5-text-and-html.md)", () => {
   const card = (c: HTMLElement) => c.querySelector('[data-testid="thread-html-card"]');
   const row = (c: HTMLElement) => c.querySelector<HTMLButtonElement>('[data-testid="thread-html-row"]');
 
-  it.each([
+  it.each<[string, () => boolean | undefined]>([
     ["folds by default at its end", () => undefined],
     ["the reader folded", () => true],
     ["the reader unfolded", () => false],
-  ] as const)("a finished turn %s: the row is there and the card open, with no folded word", (_, fold) => {
+  ])("a finished turn %s: the row is there and the card open, with no folded word", (_, fold) => {
     const c = show(turn, { fold });
     expect(row(c)?.getAttribute("aria-expanded")).toBe("true");
     expect(row(c)?.textContent).toBe("Showed hello.html docsHello");
