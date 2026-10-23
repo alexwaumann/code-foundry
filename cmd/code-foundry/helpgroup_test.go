@@ -20,14 +20,12 @@ func (f *showGroupCommands) List(ctx context.Context, req *connect.Request[v1.Li
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range []*v1.Command{
-		{Name: "theme.show", Title: "Show Theme File", Category: "Settings", Available: true, Description: "Print a theme's file."},
-		{Name: "theme.save", Title: "Save Theme File", Category: "Settings", Available: true},
-		{Name: "theme.delete", Title: "Delete Theme", Category: "Settings", Available: true},
-		{Name: "usage.show", Title: "Show Usage", Category: "View", Available: true, Description: "Print what threads cost."},
-	} {
-		res.Msg.Commands = append(res.Msg.Commands, c)
-	}
+	res.Msg.Commands = append(res.Msg.Commands,
+		&v1.Command{Name: "theme.show", Title: "Show Theme File", Category: "Settings", Available: true, Description: "Print a theme's file."},
+		&v1.Command{Name: "theme.save", Title: "Save Theme File", Category: "Settings", Available: true},
+		&v1.Command{Name: "theme.delete", Title: "Delete Theme", Category: "Settings", Available: true},
+		&v1.Command{Name: "usage.show", Title: "Show Usage", Category: "View", Available: true, Description: "Print what threads cost."},
+	)
 	return res, nil
 }
 
