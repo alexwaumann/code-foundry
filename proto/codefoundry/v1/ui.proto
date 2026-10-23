@@ -16,7 +16,55 @@ service UiService {
   // every theme change. One per daemon, in memory: with several windows the last writer
   // wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
   rpc PublishTheme(PublishThemeRequest) returns (PublishThemeResponse) {}
+  // PublishThemeReport records the GUI's contrast report on the user's themes
+  // (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
+  // user theme it is sent and reports the pairs that fall short and the stale pins, keyed
+  // by the file's version (UserTheme.version). theme save waits briefly for the report on
+  // the file it wrote and prints it; theme check prints the latest. In memory, the last
+  // report per theme id wins. The GUI sends every report it holds on connect, then each
+  // new one, debounced. InvalidArgument for a bad id, version, slot name or value.
+  rpc PublishThemeReport(PublishThemeReportRequest) returns (PublishThemeReportResponse) {}
 }
+
+// ThemeContrastIssue is one pair of resolved slots that falls short (the GUI's
+// src/themes/contrastPairs.ts).
+message ThemeContrastIssue {
+  // The slot drawn on top ("--cf-warning-text").
+  string slot = 1;
+  // The slot it sits on ("--cf-warning-surface").
+  string against = 2;
+  // The pair in words: "--cf-warning-text on --cf-warning-surface over --cf-surface".
+  string label = 3;
+  // The WCAG ratio it has, and the one it must reach.
+  double ratio = 4;
+  double required = 5;
+}
+
+// ThemeStalePin is a pinned slot whose rule now derives another colour than when it was
+// pinned: the base moved under it (src/themes/contrast.ts staleOverrides).
+message ThemeStalePin {
+  string slot = 1;
+  // The pinned value, what the slot derived when pinned, and what it derives now.
+  string pinned = 2;
+  string basis = 3;
+  string derived = 4;
+}
+
+// ThemeReport is the GUI's report on one version of one user theme.
+message ThemeReport {
+  string id = 1;
+  // UserTheme.version of the file the report was computed on.
+  string version = 2;
+  repeated ThemeContrastIssue issues = 3;
+  repeated ThemeStalePin stale = 4;
+}
+
+message PublishThemeReportRequest {
+  // One per theme; several on connect.
+  repeated ThemeReport reports = 1;
+}
+
+message PublishThemeReportResponse {}
 
 message PublishThemeRequest {
   // The theme's id ("github-dark"): lowercase letters, digits and dashes.

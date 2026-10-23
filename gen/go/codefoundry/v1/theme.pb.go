@@ -315,7 +315,10 @@ type UserTheme struct {
 	// #rrggbbaa. A name that is not a slot (the daemon cannot tell) is ignored by the GUI.
 	Overrides map[string]string `protobuf:"bytes,9,rep,name=overrides,proto3" json:"overrides,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// The file, in the themes directory.
-	Path          string `protobuf:"bytes,10,opt,name=path,proto3" json:"path,omitempty"`
+	Path string `protobuf:"bytes,10,opt,name=path,proto3" json:"path,omitempty"`
+	// Identifies the file's contents (a hash of the file as the daemon writes it): the key
+	// of the GUI's contrast report on it (UiService.PublishThemeReport).
+	Version       string `protobuf:"bytes,11,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -416,6 +419,13 @@ func (x *UserTheme) GetOverrides() map[string]string {
 func (x *UserTheme) GetPath() string {
 	if x != nil {
 		return x.Path
+	}
+	return ""
+}
+
+func (x *UserTheme) GetVersion() string {
+	if x != nil {
+		return x.Version
 	}
 	return ""
 }
@@ -748,7 +758,7 @@ const file_codefoundry_v1_theme_proto_rawDesc = "" +
 	"\thighlight\x18\t \x01(\tR\thighlight\x12\x12\n" +
 	"\x04link\x18\n" +
 	" \x01(\tR\x04link\x129\n" +
-	"\bterminal\x18\v \x01(\v2\x1d.codefoundry.v1.ThemeTerminalR\bterminal\"\xef\x02\n" +
+	"\bterminal\x18\v \x01(\v2\x1d.codefoundry.v1.ThemeTerminalR\bterminal\"\x89\x03\n" +
 	"\tUserTheme\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -761,7 +771,8 @@ const file_codefoundry_v1_theme_proto_rawDesc = "" +
 	"\x04base\x18\b \x01(\v2\x19.codefoundry.v1.ThemeBaseR\x04base\x12F\n" +
 	"\toverrides\x18\t \x03(\v2(.codefoundry.v1.UserTheme.OverridesEntryR\toverrides\x12\x12\n" +
 	"\x04path\x18\n" +
-	" \x01(\tR\x04path\x1a<\n" +
+	" \x01(\tR\x04path\x12\x18\n" +
+	"\aversion\x18\v \x01(\tR\aversion\x1a<\n" +
 	"\x0eOverridesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +

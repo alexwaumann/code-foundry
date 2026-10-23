@@ -2,6 +2,8 @@ package theme
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -294,6 +296,15 @@ func (f File) Theme() Theme {
 	return Theme{ID: f.ID, Name: f.Name, Scheme: f.Scheme, Pair: f.Pair, From: f.From, CreatedBy: f.CreatedBy}
 }
 
+// SameColours reports whether a and b paint the same: scheme, base and overrides. A save
+// that changes only the name, pair, from or source repaints nothing.
+func SameColours(a, b File) bool {
+	paint := func(f File) string {
+		return string(File{Scheme: f.Scheme, Base: f.Base, Overrides: f.Overrides}.Marshal())
+	}
+	return paint(a) == paint(b)
+}
+
 // Clone is a deep copy (the ANSI slice and the overrides map are not shared).
 func (f File) Clone() File {
 	f.Base.Terminal.ANSI = append([]string(nil), f.Base.Terminal.ANSI...)
@@ -312,6 +323,14 @@ func (f File) Marshal() []byte {
 		return nil
 	}
 	return append(b, '\n')
+}
+
+// Version identifies the file's contents: the first 16 bytes of the SHA-256 of Marshal,
+// in hex. ThemeService sends it with each user theme and the GUI keys its contrast report
+// on it (Reports), so theme save can wait for the report on the file it just wrote.
+func (f File) Version() string {
+	sum := sha256.Sum256(f.Marshal())
+	return hex.EncodeToString(sum[:16])
 }
 
 // Header is the little of a file a setting's fallback needs, read from a file that does

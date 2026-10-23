@@ -18,7 +18,7 @@ import (
 
 func TestUIEmitFanOut(t *testing.T) {
 	mux := http.NewServeMux()
-	r := NewUI(bus.New(), theme.NewLive()).Route()
+	r := NewUI(bus.New(), theme.NewLive(), theme.NewReports()).Route()
 	mux.Handle(r.Path, r.Handler)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -81,7 +81,7 @@ func themeVars(patch map[string]string) map[string]string {
 func TestUIPublishTheme(t *testing.T) {
 	live := theme.NewLive()
 	mux := http.NewServeMux()
-	r := NewUI(bus.New(), live).Route()
+	r := NewUI(bus.New(), live, theme.NewReports()).Route()
 	mux.Handle(r.Path, r.Handler)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -114,5 +114,48 @@ func TestUIPublishTheme(t *testing.T) {
 	got, ok := live.Current()
 	if !ok || got.ID != "nord" || got.Scheme != "dark" || got.Vars["--cf-text"] != "#d8dee9" || got.Vars["--cf-accent-surface"] != "#88c0d01a" {
 		t.Fatalf("current %+v, %v", got, ok)
+	}
+}
+
+func TestUIPublishThemeReport(t *testing.T) {
+	reports := theme.NewReports()
+	mux := http.NewServeMux()
+	r := NewUI(bus.New(), theme.NewLive(), reports).Route()
+	mux.Handle(r.Path, r.Handler)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := codefoundryv1connect.NewUiServiceClient(srv.Client(), srv.URL)
+	ctx := context.Background()
+
+	issue := &v1.ThemeContrastIssue{Slot: "--cf-warning-text", Against: "--cf-warning-surface", Label: "--cf-warning-text on --cf-warning-surface over --cf-surface", Ratio: 3.9, Required: 4.5}
+	stale := &v1.ThemeStalePin{Slot: "--cf-sidebar", Pinned: "#0b141c", Basis: "#11111b", Derived: "#181825"}
+	tests := []struct {
+		name     string
+		reports  []*v1.ThemeReport
+		wantCode connect.Code // 0: ok
+	}{
+		{"one", []*v1.ThemeReport{{Id: "ocean-dusk", Version: "ab12", Issues: []*v1.ThemeContrastIssue{issue}, Stale: []*v1.ThemeStalePin{stale}}}, 0},
+		{"several, on connect", []*v1.ThemeReport{{Id: "a", Version: "1"}, {Id: "b", Version: "2"}}, 0},
+		{"a bad slot refuses the batch", []*v1.ThemeReport{{Id: "c", Version: "1"}, {Id: "d", Version: "1", Issues: []*v1.ThemeContrastIssue{{Slot: "--cf-nope", Against: "--cf-surface", Ratio: 2, Required: 3}}}}, connect.CodeInvalidArgument},
+		{"a bad version", []*v1.ThemeReport{{Id: "e", Version: "v1"}}, connect.CodeInvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := c.PublishThemeReport(ctx, connect.NewRequest(&v1.PublishThemeReportRequest{Reports: tt.reports}))
+			if tt.wantCode == 0 && err != nil {
+				t.Fatal(err)
+			}
+			if tt.wantCode != 0 && connect.CodeOf(err) != tt.wantCode {
+				t.Fatalf("code %v, want %v", connect.CodeOf(err), tt.wantCode)
+			}
+		})
+	}
+	got, ok := reports.Get("ocean-dusk")
+	if !ok || got.Version != "ab12" || len(got.Issues) != 1 || got.Issues[0].Ratio != 3.9 || got.Issues[0].Label != issue.Label ||
+		len(got.Stale) != 1 || got.Stale[0].Derived != "#181825" {
+		t.Errorf("kept %+v, %v", got, ok)
+	}
+	if _, ok := reports.Get("c"); ok {
+		t.Error("kept a report of a refused batch")
 	}
 }

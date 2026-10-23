@@ -454,6 +454,14 @@ function routes(router: ConnectRouter): void {
       }
       return {};
     },
+    publishThemeReport: (req) => {
+      try {
+        world.themes.publishReports(req.reports);
+      } catch (err) {
+        throw new ConnectError(err instanceof Error ? err.message : String(err), Code.InvalidArgument);
+      }
+      return {};
+    },
   });
 
   router.service(ThreadService, {

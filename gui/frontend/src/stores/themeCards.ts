@@ -2,17 +2,24 @@
  * The actions of a theme a thread saved (docs/notes/theme-model-flow.md): the thread's
  * theme card and the "<name> applied to dark" toast both offer Undo (the slot back to the
  * theme it had: theme.set-dark / theme.set-light) and Edit (theme.edit, the Themes page's
- * editor on it), and the Themes page's Ask the model starts the thread (theme.ask).
+ * editor on it); a card saved without applying offers Apply (theme.set-<scheme>); and the
+ * Themes page's Ask the model starts the thread (theme.ask).
  */
 import type { ThemeScheme } from "@/themes";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 import { editTheme } from "./themePicker";
 
-/** Puts a scheme's slot back on `id`. False when the command failed (it toasts why). */
-export async function undoTheme(scheme: ThemeScheme, id: string): Promise<boolean> {
+/** Puts a scheme's slot on `id`. False when the command failed (it toasts why). */
+async function setSlot(scheme: ThemeScheme, id: string): Promise<boolean> {
   return (await runCommandForResult(`theme.set-${scheme}`, { theme: id }, { quiet: true })) !== null;
 }
+
+/** Puts a scheme's slot back on `id` (the card's and the toast's Undo). */
+export const undoTheme = setSlot;
+
+/** Puts a scheme's slot on a theme a thread saved without applying (the card's Apply). */
+export const applySavedTheme = setSlot;
 
 /** Opens the Themes page's editor on one of the user's themes. */
 export function editSavedTheme(id: string): Promise<boolean> {

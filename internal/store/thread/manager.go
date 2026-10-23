@@ -594,6 +594,10 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err := CheckBudget(o.BudgetUSD); err != nil {
 		return Thread{}, err
 	}
+	appendPrompt, err := cleanSeed(o.SystemPromptAppend, nil, "")
+	if err != nil {
+		return Thread{}, err
+	}
 	// The creator's name now: the note and created_by_name keep it (metadata.go).
 	creatorID, creatorName, err := m.creator(o.CreatedBy)
 	if err != nil {
@@ -624,6 +628,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
 		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs), Epoch: 1,
+		SystemPromptAppend: appendPrompt.prompt,
 	}
 	if o.InSidebar != nil {
 		s.SidebarOverride = sidebarOverride(*o.InSidebar)

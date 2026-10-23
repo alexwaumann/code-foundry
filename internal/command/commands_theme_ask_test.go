@@ -50,21 +50,26 @@ func TestThemeAsk(t *testing.T) {
 		name    string
 		uctx    command.Context
 		args    map[string]string
-		want    []string // substrings of the prompt
+		message string   // the first message, exactly
+		want    []string // substrings of the system prompt append
 		mode    v1.PermissionMode
 		model   string
 		wantErr string
 	}{
-		{name: "from the Themes page", uctx: gui, args: map[string]string{"description": "warm dark, teal accent"},
-			want: []string{"warm dark, teal accent\n\n(The user asked for this on the Themes page; the current dark theme is Ocean Dusk (ocean-dusk) and light theme is GitHub Light (github-light). ",
-				"save it with `code-foundry theme save --data - --apply`", "(the code-foundry skill: Making a theme).)"},
+		{name: "from the Themes page", uctx: gui, args: map[string]string{"description": "warm dark, teal accent"}, message: "warm dark, teal accent",
+			want: []string{"The user asked for a colour theme on Code Foundry's Themes page (Ask the model); their first message in this thread describes it. " +
+				"The current dark theme is Ocean Dusk (ocean-dusk) and the light theme is GitHub Light (github-light). ",
+				"save it with `code-foundry theme save --data - --apply`", "(the code-foundry skill: Making a theme)."},
 			mode: v1.PermissionMode_PERMISSION_MODE_AUTO},
-		{name: "from the CLI, a model and supervised", args: map[string]string{"description": "sepia", "model": command.ThreadModels[0], "permission": "supervised"},
-			want: []string{"sepia\n\n(The user wants this as a colour theme for Code Foundry; the current dark theme"},
+		{name: "from the CLI, a model and supervised", args: map[string]string{"description": "sepia", "model": command.ThreadModels[0], "permission": "supervised"}, message: "sepia",
+			want: []string{"The user wants a colour theme for Code Foundry; their first message"},
 			mode: v1.PermissionMode_PERMISSION_MODE_SUPERVISED, model: command.ThreadModels[0]},
-		{name: "a light pair", uctx: gui, args: map[string]string{"pair": "ocean-dusk"},
-			want: []string{"Make a light pair for my theme ocean-dusk (`code-foundry theme show ocean-dusk` prints it): same hues, a light scheme, " +
-				"saved as ocean-dusk-light with pair set both ways, applied as my light theme."},
+		{name: "a light pair", uctx: gui, args: map[string]string{"pair": "ocean-dusk"}, message: "Make a light pair for my theme Ocean Dusk.",
+			want: []string{"They want a light pair for their theme ocean-dusk (`code-foundry theme show ocean-dusk` prints it): same hues, a light scheme, " +
+				"saved as ocean-dusk-light with pair set both ways, applied as their light theme."},
+			mode: v1.PermissionMode_PERMISSION_MODE_AUTO},
+		{name: "a pair with words", uctx: gui, args: map[string]string{"pair": "ocean-dusk", "description": "a bit warmer"},
+			message: "Make a light pair for my theme Ocean Dusk.\n\na bit warmer", want: []string{"saved as ocean-dusk-light"},
 			mode: v1.PermissionMode_PERMISSION_MODE_AUTO},
 		{name: "nothing to ask", args: map[string]string{"description": "  "}, wantErr: "describe the theme"},
 		{name: "a curated pair", args: map[string]string{"pair": "nord"}, wantErr: `"nord"`},
@@ -94,9 +99,13 @@ func TestThemeAsk(t *testing.T) {
 			if !ok || !req.GetNoProject() || req.GetPermissionMode() != tt.mode || req.GetModel() != tt.model {
 				t.Fatalf("create = %v", reqs[0])
 			}
+			// The bubble is the user's words; the context is the thread's system prompt.
+			if req.GetInitialPrompt() != tt.message {
+				t.Errorf("first message %q, want %q", req.GetInitialPrompt(), tt.message)
+			}
 			for _, w := range tt.want {
-				if !strings.Contains(req.GetInitialPrompt(), w) {
-					t.Errorf("prompt lacks %q:\n%s", w, req.GetInitialPrompt())
+				if !strings.Contains(req.GetSystemPromptAppend(), w) {
+					t.Errorf("system prompt append lacks %q:\n%s", w, req.GetSystemPromptAppend())
 				}
 			}
 			got := emit.Intents()[intents:]

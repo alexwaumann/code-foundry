@@ -179,8 +179,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
 	grants := preview.NewGrants(preview.NewFloor(st.home, p))
-	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css).
-	liveTheme := theme.NewLive()
+	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
+	// and its contrast reports on the user's themes (theme save, theme check).
+	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants)
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
@@ -268,6 +269,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Ember:             st.ember,
 		Memory:            st.memory,
 		Themes:            st.themes,
+		ThemeReports:      themeReports,
 		ShippedSkills:     shippedSkills(log, p.Claude()),
 		Restart: func() {
 			// Let the command's response reach the caller first.
@@ -293,7 +295,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),
-		api.NewUI(events, liveTheme).Route(),
+		api.NewUI(events, liveTheme, themeReports).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
 		projectAPI.Route(),

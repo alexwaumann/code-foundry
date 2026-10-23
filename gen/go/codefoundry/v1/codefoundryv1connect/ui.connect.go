@@ -39,6 +39,9 @@ const (
 	UiServiceEmitProcedure = "/codefoundry.v1.UiService/Emit"
 	// UiServicePublishThemeProcedure is the fully-qualified name of the UiService's PublishTheme RPC.
 	UiServicePublishThemeProcedure = "/codefoundry.v1.UiService/PublishTheme"
+	// UiServicePublishThemeReportProcedure is the fully-qualified name of the UiService's
+	// PublishThemeReport RPC.
+	UiServicePublishThemeReportProcedure = "/codefoundry.v1.UiService/PublishThemeReport"
 )
 
 // UiServiceClient is a client for the codefoundry.v1.UiService service.
@@ -53,6 +56,14 @@ type UiServiceClient interface {
 	// every theme change. One per daemon, in memory: with several windows the last writer
 	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
 	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
+	// PublishThemeReport records the GUI's contrast report on the user's themes
+	// (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
+	// user theme it is sent and reports the pairs that fall short and the stale pins, keyed
+	// by the file's version (UserTheme.version). theme save waits briefly for the report on
+	// the file it wrote and prints it; theme check prints the latest. In memory, the last
+	// report per theme id wins. The GUI sends every report it holds on connect, then each
+	// new one, debounced. InvalidArgument for a bad id, version, slot name or value.
+	PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error)
 }
 
 // NewUiServiceClient constructs a client for the codefoundry.v1.UiService service. By default, it
@@ -84,14 +95,21 @@ func NewUiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
 			connect.WithClientOptions(opts...),
 		),
+		publishThemeReport: connect.NewClient[v1.PublishThemeReportRequest, v1.PublishThemeReportResponse](
+			httpClient,
+			baseURL+UiServicePublishThemeReportProcedure,
+			connect.WithSchema(uiServiceMethods.ByName("PublishThemeReport")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // uiServiceClient implements UiServiceClient.
 type uiServiceClient struct {
-	watchIntents *connect.Client[v1.WatchIntentsRequest, v1.UiIntent]
-	emit         *connect.Client[v1.EmitIntentRequest, v1.EmitIntentResponse]
-	publishTheme *connect.Client[v1.PublishThemeRequest, v1.PublishThemeResponse]
+	watchIntents       *connect.Client[v1.WatchIntentsRequest, v1.UiIntent]
+	emit               *connect.Client[v1.EmitIntentRequest, v1.EmitIntentResponse]
+	publishTheme       *connect.Client[v1.PublishThemeRequest, v1.PublishThemeResponse]
+	publishThemeReport *connect.Client[v1.PublishThemeReportRequest, v1.PublishThemeReportResponse]
 }
 
 // WatchIntents calls codefoundry.v1.UiService.WatchIntents.
@@ -109,6 +127,11 @@ func (c *uiServiceClient) PublishTheme(ctx context.Context, req *connect.Request
 	return c.publishTheme.CallUnary(ctx, req)
 }
 
+// PublishThemeReport calls codefoundry.v1.UiService.PublishThemeReport.
+func (c *uiServiceClient) PublishThemeReport(ctx context.Context, req *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error) {
+	return c.publishThemeReport.CallUnary(ctx, req)
+}
+
 // UiServiceHandler is an implementation of the codefoundry.v1.UiService service.
 type UiServiceHandler interface {
 	// WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
@@ -121,6 +144,14 @@ type UiServiceHandler interface {
 	// every theme change. One per daemon, in memory: with several windows the last writer
 	// wins (the theme is one per user). InvalidArgument for a bad id, scheme, name or value.
 	PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error)
+	// PublishThemeReport records the GUI's contrast report on the user's themes
+	// (docs/notes/theme-followups.md): the daemon derives no colour, so the GUI resolves each
+	// user theme it is sent and reports the pairs that fall short and the stale pins, keyed
+	// by the file's version (UserTheme.version). theme save waits briefly for the report on
+	// the file it wrote and prints it; theme check prints the latest. In memory, the last
+	// report per theme id wins. The GUI sends every report it holds on connect, then each
+	// new one, debounced. InvalidArgument for a bad id, version, slot name or value.
+	PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error)
 }
 
 // NewUiServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -148,6 +179,12 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(uiServiceMethods.ByName("PublishTheme")),
 		connect.WithHandlerOptions(opts...),
 	)
+	uiServicePublishThemeReportHandler := connect.NewUnaryHandler(
+		UiServicePublishThemeReportProcedure,
+		svc.PublishThemeReport,
+		connect.WithSchema(uiServiceMethods.ByName("PublishThemeReport")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.UiService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UiServiceWatchIntentsProcedure:
@@ -156,6 +193,8 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 			uiServiceEmitHandler.ServeHTTP(w, r)
 		case UiServicePublishThemeProcedure:
 			uiServicePublishThemeHandler.ServeHTTP(w, r)
+		case UiServicePublishThemeReportProcedure:
+			uiServicePublishThemeReportHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -175,4 +214,8 @@ func (UnimplementedUiServiceHandler) Emit(context.Context, *connect.Request[v1.E
 
 func (UnimplementedUiServiceHandler) PublishTheme(context.Context, *connect.Request[v1.PublishThemeRequest]) (*connect.Response[v1.PublishThemeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishTheme is not implemented"))
+}
+
+func (UnimplementedUiServiceHandler) PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishThemeReport is not implemented"))
 }

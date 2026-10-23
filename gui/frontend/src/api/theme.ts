@@ -61,7 +61,7 @@ export function toUserThemeFile(t: UserTheme): UserThemeFile | null {
     },
     ...(Object.keys(t.overrides).length > 0 ? { overrides: { ...t.overrides } } : {}),
   };
-  return readUserThemeFile(json, t.path);
+  return readUserThemeFile(json, t.path, t.version);
 }
 
 export function toThemesSnapshotView(s: ThemeSnapshot | undefined): ThemesSnapshotView {

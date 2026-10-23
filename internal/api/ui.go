@@ -19,16 +19,21 @@ const intentBuffer = 32
 
 // UI implements codefoundryv1connect.UiServiceHandler. Intents travel on the bus as
 // command.IntentEvent, so ui.* commands and Emit reach the same watchers. PublishTheme
-// records the GUI's active theme for the frame stylesheet (theme.Live).
+// records the GUI's active theme for the frame stylesheet (theme.Live), PublishThemeReport
+// its contrast report on the user's themes (theme.Reports).
 type UI struct {
-	bus   *bus.Bus
-	theme *theme.Live
+	bus     *bus.Bus
+	theme   *theme.Live
+	reports *theme.Reports
 }
 
 var _ codefoundryv1connect.UiServiceHandler = (*UI)(nil)
 
-// NewUI returns a UiService handler on b that publishes themes to live.
-func NewUI(b *bus.Bus, live *theme.Live) *UI { return &UI{bus: b, theme: live} }
+// NewUI returns a UiService handler on b that publishes themes to live and theme reports
+// to reports.
+func NewUI(b *bus.Bus, live *theme.Live, reports *theme.Reports) *UI {
+	return &UI{bus: b, theme: live, reports: reports}
+}
 
 // Route mounts the service.
 func (h *UI) Route(opts ...connect.HandlerOption) Route {
@@ -79,4 +84,26 @@ func (h *UI) PublishTheme(_ context.Context, req *connect.Request[v1.PublishThem
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	return connect.NewResponse(&v1.PublishThemeResponse{}), nil
+}
+
+// PublishThemeReport keeps the GUI's contrast report on each user theme it names, for
+// theme save and theme check. InvalidArgument (and nothing kept) when any is refused
+// (theme.Report.Check).
+func (h *UI) PublishThemeReport(_ context.Context, req *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error) {
+	reps := make([]theme.Report, len(req.Msg.GetReports()))
+	for i, r := range req.Msg.GetReports() {
+		reps[i] = theme.Report{ID: r.GetId(), Version: r.GetVersion()}
+		for _, is := range r.GetIssues() {
+			reps[i].Issues = append(reps[i].Issues, theme.ContrastIssue{
+				Slot: is.GetSlot(), Against: is.GetAgainst(), Label: is.GetLabel(), Ratio: is.GetRatio(), Required: is.GetRequired(),
+			})
+		}
+		for _, p := range r.GetStale() {
+			reps[i].Stale = append(reps[i].Stale, theme.StalePin{Slot: p.GetSlot(), Pinned: p.GetPinned(), Basis: p.GetBasis(), Derived: p.GetDerived()})
+		}
+	}
+	if err := h.reports.Publish(reps...); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&v1.PublishThemeReportResponse{}), nil
 }

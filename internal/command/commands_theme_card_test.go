@@ -59,6 +59,11 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 	thread := command.Context{ActiveThreadID: "s-5f963f4547cc"}
 	gui := command.Context{ActiveView: "themes", ActiveThreadID: "s-1"}
 	data := string(oceanDusk(t))
+	recoloured := strings.Replace(data, `"#5fb3b3"`, `"#6fc3c3"`, 1)
+	paired := strings.Replace(data, `"scheme": "dark",`, "\"scheme\": \"dark\",\n  \"pair\": \"ocean-dawn\",", 1)
+	if recoloured == data || paired == data {
+		t.Fatal("the variants did not change the file")
+	}
 	notify := func(edit, undo string) *v1.UiIntent_Notify {
 		n := &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "Ocean Dusk applied to dark", UnlessShowing: "themes"}
 		if undo != "" {
@@ -90,9 +95,23 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 		{"a refinement of the theme in use counts as applied", []step{
 			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
 				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
-			// The fake echoes previous; the real store takes the first card's (theme_test.go).
-			{uctx: thread, args: map[string]string{"data": data}, card: true, apply: true, prev: "ocean-dusk",
+			// New colours repaint the slot: a toast. The fake echoes previous; the real
+			// store takes the first card's (theme_test.go).
+			{uctx: thread, args: map[string]string{"data": recoloured}, card: true, apply: true, prev: "ocean-dusk",
 				toast: notify("theme-edit:ocean-dusk", "")},
+		}},
+		{"a save that changes no colour of the theme in use: a card, no toast", []step{
+			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
+				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
+			// Only pair set (the pair turn re-saves the first theme): applied, nothing repainted.
+			{uctx: thread, args: map[string]string{"data": paired, "apply": "true"}, card: true, apply: true, prev: "ocean-dusk"},
+			// The same file again, without --apply.
+			{uctx: thread, args: map[string]string{"data": paired}, card: true, apply: true, prev: "ocean-dusk"},
+		}},
+		{"--apply of a theme saved before but not in use: the slot changes, a toast", []step{
+			{uctx: thread, args: map[string]string{"data": data}, card: true},
+			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
+				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
 		}},
 		{"from the GUI: no card, no toast", []step{
 			{uctx: gui, args: map[string]string{"data": data, "apply": "true"}},
@@ -111,8 +130,9 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 				if err != nil {
 					t.Fatalf("step %d: %v", i, err)
 				}
-				if got := strings.Contains(res.Message, command.ThemeCardContrastLine); got != s.card || strings.Contains(res.Message, "checked in the editor") == s.card {
-					t.Errorf("step %d: message %q: the card's contrast line %v, want %v", i, res.Message, got, s.card)
+				// The card no longer stands in for the contrast line (theme_check_test.go).
+				if !strings.Contains(res.Message, "\ncontrast: ") {
+					t.Errorf("step %d: no contrast line in %q", i, res.Message)
 				}
 				reqs := env.cardRequests()[before:]
 				switch {

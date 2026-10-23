@@ -27,6 +27,7 @@ import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { startMenuCommands } from "@/keys/menu";
 import { startThemePublish, syncDocumentScheme, useColorScheme } from "@/lib/theme";
+import { startThemeReports } from "@/lib/themeReports";
 import { syncWindowBackground } from "@/lib/windowBackground";
 import { cn } from "@/lib/utils";
 import { useWindowTitle } from "@/lib/title";
@@ -72,6 +73,7 @@ function startApp(): () => void {
     startZoomSync(onResize),
     syncDocumentScheme(),
     startThemePublish(),
+    startThemeReports(),
     syncWindowBackground(),
     startHealthPolling(2000),
     startEventSync(),

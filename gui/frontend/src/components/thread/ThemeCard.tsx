@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { Pencil, Undo2 } from "lucide-react";
+import { Check, Pencil, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useSettingValue } from "@/stores/settings";
 import { useThreadItem } from "@/stores/thread";
 import { useUserThemes } from "@/stores/themes";
-import { editSavedTheme, undoTheme } from "@/stores/themeCards";
+import { applySavedTheme, editSavedTheme, undoTheme } from "@/stores/themeCards";
 import { contrastReport } from "@/themes/contrast";
 import { themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
 import { useThreadCtx } from "./context";
@@ -23,7 +23,9 @@ const BASE = ["canvas", "surface", "text", "accent", "success", "warning", "erro
  * contrast check (computed here from the file as saved, as the editor does) and Undo /
  * Edit. The card shows the file as it was saved: a later save of the same id is another
  * card. Undo puts the slot back on the theme it had (disabled, "Undone", once it is);
- * Edit opens the Themes page's editor on the theme as it is now.
+ * Edit opens the Themes page's editor on the theme as it is now. A card saved without
+ * applying has Apply instead (theme.set-<scheme>), while its scheme's slot is on another
+ * theme; once the slot is on it, the badge shows (docs/notes/theme-followups.md).
  */
 export const ThemeCardRow = memo(function ThemeCardRow({ id }: { id: string }) {
   const { threadId } = useThreadCtx();
@@ -38,6 +40,10 @@ function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: 
   const issues = useMemo(() => contrastReport(file, theme.slots).length, [file, theme]);
   const pinned = Object.keys(file.overrides ?? {}).length;
   const from = file.from ? (themeById.get(file.from)?.name ?? file.from) : "";
+  // A card saved without applying: applied once the slot is on the theme (its own Apply, or
+  // any other way), and Apply again if the slot moves off it.
+  const slot = useSettingValue(`appearance.theme_${file.scheme}`);
+  const inUse = applied || slot === file.id;
   return (
     <div className="mt-1 mb-2.5 ml-1 max-w-md rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2.5" data-testid="thread-theme-card" data-theme-id={file.id}>
       <div className="flex min-w-0 items-center gap-2">
@@ -49,7 +55,7 @@ function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: 
           {file.scheme}
           {from && ` · from ${from}`}
         </span>
-        {applied && (
+        {inUse && (
           <Badge variant="secondary" className="ml-auto shrink-0 bg-cf-accent-surface px-1.5 py-0 text-cf-accent-surface-foreground" data-testid="thread-theme-applied">
             applied
           </Badge>
@@ -66,6 +72,7 @@ function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: 
           {issues === 0 ? "contrast ok" : <span className="text-cf-warning-text">{issues === 1 ? "1 contrast issue" : `${String(issues)} contrast issues`}</span>}
         </span>
         {applied && previous && previous !== file.id && <UndoButton scheme={file.scheme} previous={previous} />}
+        {!inUse && <ApplyButton scheme={file.scheme} id={file.id} />}
         <EditButton id={file.id} />
       </div>
     </div>
@@ -98,6 +105,30 @@ function UndoButton({ scheme, previous }: { scheme: UserThemeFile["scheme"]; pre
       {undone ? "Undone" : "Undo"}
     </Button>
     </Tip>
+  );
+}
+
+/** Apply: the scheme's slot on the theme; disabled once it is no longer one of the user's themes. */
+function ApplyButton({ scheme, id }: { scheme: UserThemeFile["scheme"]; id: string }) {
+  useUserThemes();
+  const [busy, setBusy] = useState(false);
+  const gone = !themeById.get(id)?.user;
+  return (
+    <Button
+      type="button"
+      size="xs"
+      disabled={gone || busy}
+      data-testid="thread-theme-apply"
+      onClick={() => {
+        setBusy(true);
+        void applySavedTheme(scheme, id).finally(() => {
+          setBusy(false);
+        });
+      }}
+    >
+      <Check aria-hidden />
+      Apply
+    </Button>
   );
 }
 

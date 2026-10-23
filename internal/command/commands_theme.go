@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -96,6 +98,8 @@ type ThemeSaved struct {
 	Replaced bool   `json:"replaced"`
 	// Applied is the setting --apply wrote ("" without it).
 	Applied string `json:"applied,omitempty"`
+	// Contrast is the app's check of the file as written (docs/notes/theme-followups.md).
+	Contrast ThemeCheck `json:"contrast"`
 }
 
 // ThemeDeleted is theme.delete's JSON result: the theme, and the slots that named it
@@ -141,8 +145,15 @@ type ThemeDeps struct {
 	// Cards puts a theme card in the thread a theme.save runs from
 	// (docs/notes/theme-model-flow.md); nil: no card.
 	Cards ThemeCardShower
-	// Emitter shows the toast for a theme a thread applied; nil: none.
+	// Emitter shows the toast for a theme a thread applied, and counts the app windows
+	// that could report on a saved theme's contrast; nil: none.
 	Emitter Emitter
+	// Reports is the GUI's contrast reports on the user's themes (theme.Reports); nil:
+	// theme save and theme check say nothing was checked.
+	Reports ThemeReports
+	// ReportWait bounds the wait for a report on a file just written; 0:
+	// DefaultThemeReportWait.
+	ReportWait time.Duration
 }
 
 // RegisterTheme registers the theme.* commands but theme.pick: list, set-dark and
@@ -172,6 +183,17 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			return connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no user themes"))
 		}
 		return nil
+	}
+	userIDs := func() []string {
+		if themes == nil {
+			return nil
+		}
+		snap := themes.Snapshot()
+		ids := make([]string, len(snap.Themes))
+		for i, f := range snap.Themes {
+			ids[i] = f.ID
+		}
+		return ids
 	}
 	// setSlot writes a scheme's slot and says what it shows now.
 	setSlot := func(ctx context.Context, scheme, id string) (string, ThemeSet, error) {
@@ -282,6 +304,8 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				if vals, err := values(ctx); err == nil {
 					before = vals[themeSlotKey[f.Scheme]]
 				}
+				// The file before it, to tell a recolour from a save that changes no colour.
+				was, existed := themes.Snapshot().Get(f.ID)
 				saved, err := themes.Save(f)
 				if err != nil {
 					return Result{}, themeErr(arg, err)
@@ -295,17 +319,20 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 					out.Applied = js.Key
 					lines = append(lines, "applied: "+msg)
 				}
-				res := Result{Message: strings.Join(lines, "\n"), JSON: out}
+				var warnings []string
 				if by := themeCaller(uctx); by != "" {
+					// The card says applied when the slot shows the theme; the toast only
+					// when the save changed what the slot shows: another theme, or new
+					// colours. A save that only sets pair repaints nothing.
 					applied := a.Bool("apply") || before == saved.File.ID
-					var shown bool
-					res.Warnings, shown = showThemeCard(ctx, d, by, saved.File, applied, before)
-					if shown {
-						// The card checks every pair where the user sees it: nothing for the model to run.
-						res.Message = strings.Replace(res.Message, themeContrastLine(saved.File.ID), ThemeCardContrastLine, 1)
-					}
+					repaint := before != saved.File.ID || !existed || !theme.SameColours(was, saved.File)
+					warnings, _ = showThemeCard(ctx, d, by, saved.File, applied, before, applied && repaint)
 				}
-				return res, nil
+				// Last, so the card and the window's repaint do not wait on it. From the
+				// app (its editor) there is no wait: the editor shows the report itself.
+				out.Contrast = themeCheck(ctx, d, saved.File, uctx.ActiveView == "")
+				lines = slices.Insert(lines, themeContrastAt, out.Contrast.lines(false)...)
+				return Result{Message: strings.Join(lines, "\n"), JSON: out, Warnings: warnings}, nil
 			},
 		},
 		Command{
@@ -318,7 +345,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				withDescription(anyTheme, "The theme to copy (theme list prints the ids)"),
 				{Name: "name", Type: String, Description: "The copy's name (default: \"<name> copy\")"},
 			},
-			Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := needThemes(); err != nil {
 					return Result{}, err
 				}
@@ -327,6 +354,8 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 					return Result{}, themeErr("theme", err)
 				}
 				out, lines := themeSaved(saved, set())
+				out.Contrast = themeCheck(ctx, d, saved.File, uctx.ActiveView == "")
+				lines = slices.Insert(lines, themeContrastAt, out.Contrast.lines(false)...)
 				return Result{Message: strings.Join(lines, "\n"), JSON: out}, nil
 			},
 		},
@@ -387,6 +416,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				return Result{Message: strings.Join(lines, "\n"), JSON: out}, nil
 			},
 		},
+		themeCheckCommand(d, userIDs, needThemes),
 	)
 }
 
@@ -435,8 +465,12 @@ func themeInput(a Args) ([]byte, string, error) {
 	return data, "file", nil
 }
 
+// themeContrastAt is where the contrast lines go among themeSaved's: after the pinned count.
+const themeContrastAt = 3
+
 // themeSaved is a written theme's JSON and its lines: what it is, where it came from,
-// how many slots it pins, and where it was written.
+// how many slots it pins, and where it was written. The caller inserts the contrast check
+// at themeContrastAt.
 func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	f := s.File
 	out := ThemeSaved{ID: f.ID, Name: f.Name, Scheme: f.Scheme, From: f.From, CreatedBy: f.CreatedBy, Pinned: f.Pinned(), Path: s.Path, Replaced: s.Replaced}
@@ -452,20 +486,9 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	if f.Pinned() == 1 {
 		pinned = "pinned: 1 slot"
 	}
-	// The daemon derives no colours (the rules are the GUI's, src/themes/slots.ts), so it
-	// cannot say which pairs fall short or which pins the base has moved; the editor does.
-	contrast := themeContrastLine(f.ID)
-	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, contrast, "written to: " + s.Path}
+	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path}
 	return out, lines
 }
-
-// themeContrastLine is the save's contrast line from the user's terminal.
-func themeContrastLine(id string) string {
-	return fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", id)
-}
-
-// ThemeCardContrastLine replaces it when the save added a card to the calling thread.
-const ThemeCardContrastLine = "contrast: checked on the theme card this save added to your conversation, which the user sees (nothing to run)"
 
 // themeName is "Name (id)", or the id alone for a theme the set does not have.
 func themeName(s theme.Set, id string) string {
