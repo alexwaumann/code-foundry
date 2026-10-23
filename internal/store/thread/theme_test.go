@@ -21,8 +21,8 @@ func oceanDusk(t *testing.T) theme.File {
 }
 
 // ShowTheme puts a card in a live thread and a stopped one; each keeps the file it was
-// given (a later save of the same id is another card), a refinement takes the first
-// card's Undo target, and the cards come back after a restart.
+// given (a later save of the same id is another card), a refinement's Undo is the version
+// it replaced, and the cards come back after a restart.
 func TestShowTheme(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{NoProject: true})
@@ -37,12 +37,12 @@ func TestShowTheme(t *testing.T) {
 	// A refinement: the slot already had the theme, so Previous is the theme itself.
 	warmer := f.Clone()
 	warmer.Base.Accent = "#6fc3a3"
-	second, err := e.m.ShowTheme(e.ctx(), s.ID, ThemeCard{File: warmer, Applied: true, Previous: "ocean-dusk"})
+	second, err := e.m.ShowTheme(e.ctx(), s.ID, ThemeCard{File: warmer, Applied: true, Previous: "ocean-dusk", PreviousVersion: f.Version()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if second.Theme.Previous != "catppuccin-mocha" {
-		t.Errorf("refinement's previous = %q, want the first card's catppuccin-mocha", second.Theme.Previous)
+	if second.Theme.Previous != "ocean-dusk" || second.Theme.PreviousVersion != f.Version() {
+		t.Errorf("refinement's previous = %q %q, want the version it replaced", second.Theme.Previous, second.Theme.PreviousVersion)
 	}
 	e.restart()
 	// Stopped: straight onto the log. Not applied: no Undo target, whatever was sent.
@@ -65,7 +65,7 @@ func TestShowTheme(t *testing.T) {
 		}
 	}
 	if len(got) != 3 || got[0].Theme.File.Base.Accent != "#5fb3b3" || got[1].Theme.File.Base.Accent != "#6fc3a3" ||
-		got[0].Theme.File.Overrides["--cf-sidebar-row-selected"] != "#1e2e3c" || got[1].Theme.Previous != "catppuccin-mocha" {
+		got[0].Theme.File.Overrides["--cf-sidebar-row-selected"] != "#1e2e3c" || got[1].Theme.PreviousVersion != f.Version() {
 		t.Fatalf("reloaded theme items = %+v", got)
 	}
 }
@@ -83,32 +83,34 @@ func TestShowThemeRefusesABadFile(t *testing.T) {
 	}
 }
 
-func TestInheritPrevious(t *testing.T) {
-	card := func(id, scheme, prev string, applied bool) Item {
-		f := theme.File{ID: id, Scheme: scheme}
-		return Item{Kind: KindTheme, Theme: &ThemeCard{File: f, Applied: applied, Previous: prev}}
-	}
+// ShowTheme keeps only an Undo that can mean something (theme-fuzz-daemon, model 4-6):
+// another theme, or this theme's replaced version; nothing for a card not applied.
+func TestShowThemeUndoTarget(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{NoProject: true})
+	f := oceanDusk(t)
 	tests := []struct {
-		name string
-		log  []Item
-		card Item
-		want string
+		name                 string
+		in                   ThemeCard
+		wantPrev, wantVer    string
+		wantGone             bool
 	}{
-		{"a first apply keeps its own", nil, card("a", "dark", "mocha", true), "mocha"},
-		{"a refinement takes the latest earlier one", []Item{card("a", "dark", "nord", true), card("a", "dark", "mocha", true)}, card("a", "dark", "a", true), "mocha"},
-		{"skips cards with no target", []Item{card("a", "dark", "nord", true), card("a", "dark", "", true)}, card("a", "dark", "a", true), "nord"},
-		{"another theme's card does not count", []Item{card("b", "dark", "nord", true)}, card("a", "dark", "a", true), ""},
-		{"nothing earlier: no target", nil, card("a", "dark", "a", true), ""},
-		{"not applied: untouched", []Item{card("a", "dark", "nord", true)}, card("a", "dark", "", false), ""},
+		{name: "another theme", in: ThemeCard{Applied: true, Previous: "nord", PreviousVersion: "ignored", PreviousGone: true}, wantPrev: "nord", wantGone: true},
+		{name: "its own replaced version", in: ThemeCard{Applied: true, Previous: "ocean-dusk", PreviousVersion: "0123"}, wantPrev: "ocean-dusk", wantVer: "0123"},
+		{name: "its own id with no version", in: ThemeCard{Applied: true, Previous: "ocean-dusk"}},
+		{name: "not applied", in: ThemeCard{Previous: "nord", PreviousVersion: "x", PreviousGone: true}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log := &threadLog{items: tt.log}
-			c := *tt.card.Theme
-			inheritPrevious(log, &c)
-			if c.Previous != tt.want {
-				t.Errorf("previous = %q, want %q", c.Previous, tt.want)
+			tt.in.File = f
+			it, err := e.m.ShowTheme(e.ctx(), s.ID, tt.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c := it.Theme; c.Previous != tt.wantPrev || c.PreviousVersion != tt.wantVer || c.PreviousGone != tt.wantGone {
+				t.Errorf("card = %q %q %v", c.Previous, c.PreviousVersion, c.PreviousGone)
 			}
 		})
 	}
 }
+

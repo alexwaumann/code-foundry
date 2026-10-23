@@ -74,6 +74,9 @@ message UserTheme {
   // Identifies the file's contents (a hash of the file as the daemon writes it): the key
   // of the GUI's contrast report on it (UiService.PublishThemeReport).
   string version = 11;
+  // The earlier versions of the file kept in the themes directory's history, newest first
+  // (a theme card's Undo restores one: theme.restore). Empty in a card's theme.
+  repeated string history = 12;
 }
 
 // ThemeFileIssue is a file in the themes directory that is not a theme the app can use.

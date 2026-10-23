@@ -27,7 +27,7 @@ func TestShowTheme(t *testing.T) {
 	}
 	f.ID, f.Name, f.From = "nord-warmer", "Nord, warmer", "nord"
 	f.Overrides = map[string]string{"--cf-sidebar-row-selected": "#3b4252"}
-	want := &v1.ThemeItem{Theme: theme.ToProto(f, ""), Applied: true, Previous: "github-dark"}
+	want := &v1.ThemeItem{Theme: theme.ToProto(f, ""), Applied: true, Previous: "github-dark", PreviousGone: true}
 	res, err := h.ShowTheme(context.Background(), connect.NewRequest(&v1.ShowThreadThemeRequest{ThreadId: "s-1", Theme: want}))
 	if err != nil {
 		t.Fatal(err)

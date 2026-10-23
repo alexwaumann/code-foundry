@@ -936,9 +936,19 @@ type ThemeItem struct {
 	Theme *UserTheme `protobuf:"bytes,1,opt,name=theme,proto3" json:"theme,omitempty"`
 	// The save changed what a slot shows: --apply, or a save of the theme a slot already has.
 	Applied bool `protobuf:"varint,2,opt,name=applied,proto3" json:"applied,omitempty"`
-	// When applied: the theme the slot had before this thread first applied this one (Undo
-	// puts it back); empty when unknown, or when the slot already had this theme.
-	Previous      string `protobuf:"bytes,3,opt,name=previous,proto3" json:"previous,omitempty"`
+	// When applied: what the slot showed immediately before this save, which Undo puts back
+	// (docs/notes/theme-fuzz-daemon.md): another theme's id, or this theme's own id with
+	// previous_version when the save replaced the theme the slot already showed. Empty when
+	// there is nothing to undo (unknown, or a save that changed no colour). Undo is offered
+	// only while the slot still shows this card's colours.
+	Previous string `protobuf:"bytes,3,opt,name=previous,proto3" json:"previous,omitempty"`
+	// With previous = this theme's id: the version of its file this save replaced, kept in
+	// the themes directory's history (theme.restore puts it back).
+	PreviousVersion string `protobuf:"bytes,4,opt,name=previous_version,json=previousVersion,proto3" json:"previous_version,omitempty"`
+	// What previous (and previous_version) name was not there to put back when the card was
+	// made (a slot on a theme that is gone, a version that could not be kept). The GUI
+	// checks again against the themes it has (a theme deleted since, a version dropped).
+	PreviousGone  bool `protobuf:"varint,5,opt,name=previous_gone,json=previousGone,proto3" json:"previous_gone,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -992,6 +1002,20 @@ func (x *ThemeItem) GetPrevious() string {
 		return x.Previous
 	}
 	return ""
+}
+
+func (x *ThemeItem) GetPreviousVersion() string {
+	if x != nil {
+		return x.PreviousVersion
+	}
+	return ""
+}
+
+func (x *ThemeItem) GetPreviousGone() bool {
+	if x != nil {
+		return x.PreviousGone
+	}
+	return false
 }
 
 // What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,
@@ -5078,11 +5102,13 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\bHtmlItem\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x19\n" +
-	"\bbase_dir\x18\x03 \x01(\tR\abaseDir\"r\n" +
+	"\bbase_dir\x18\x03 \x01(\tR\abaseDir\"\xc2\x01\n" +
 	"\tThemeItem\x12/\n" +
 	"\x05theme\x18\x01 \x01(\v2\x19.codefoundry.v1.UserThemeR\x05theme\x12\x18\n" +
 	"\aapplied\x18\x02 \x01(\bR\aapplied\x12\x1a\n" +
-	"\bprevious\x18\x03 \x01(\tR\bprevious\"\xb9\x02\n" +
+	"\bprevious\x18\x03 \x01(\tR\bprevious\x12)\n" +
+	"\x10previous_version\x18\x04 \x01(\tR\x0fpreviousVersion\x12#\n" +
+	"\rprevious_gone\x18\x05 \x01(\bR\fpreviousGone\"\xb9\x02\n" +
 	"\x0fUserMessageItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
 	"\vattachments\x18\x02 \x03(\tR\vattachments\x12#\n" +

@@ -318,7 +318,10 @@ type UserTheme struct {
 	Path string `protobuf:"bytes,10,opt,name=path,proto3" json:"path,omitempty"`
 	// Identifies the file's contents (a hash of the file as the daemon writes it): the key
 	// of the GUI's contrast report on it (UiService.PublishThemeReport).
-	Version       string `protobuf:"bytes,11,opt,name=version,proto3" json:"version,omitempty"`
+	Version string `protobuf:"bytes,11,opt,name=version,proto3" json:"version,omitempty"`
+	// The earlier versions of the file kept in the themes directory's history, newest first
+	// (a theme card's Undo restores one: theme.restore). Empty in a card's theme.
+	History       []string `protobuf:"bytes,12,rep,name=history,proto3" json:"history,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -428,6 +431,13 @@ func (x *UserTheme) GetVersion() string {
 		return x.Version
 	}
 	return ""
+}
+
+func (x *UserTheme) GetHistory() []string {
+	if x != nil {
+		return x.History
+	}
+	return nil
 }
 
 // ThemeFileIssue is a file in the themes directory that is not a theme the app can use.
@@ -758,7 +768,7 @@ const file_codefoundry_v1_theme_proto_rawDesc = "" +
 	"\thighlight\x18\t \x01(\tR\thighlight\x12\x12\n" +
 	"\x04link\x18\n" +
 	" \x01(\tR\x04link\x129\n" +
-	"\bterminal\x18\v \x01(\v2\x1d.codefoundry.v1.ThemeTerminalR\bterminal\"\x89\x03\n" +
+	"\bterminal\x18\v \x01(\v2\x1d.codefoundry.v1.ThemeTerminalR\bterminal\"\xa3\x03\n" +
 	"\tUserTheme\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -772,7 +782,8 @@ const file_codefoundry_v1_theme_proto_rawDesc = "" +
 	"\toverrides\x18\t \x03(\v2(.codefoundry.v1.UserTheme.OverridesEntryR\toverrides\x12\x12\n" +
 	"\x04path\x18\n" +
 	" \x01(\tR\x04path\x12\x18\n" +
-	"\aversion\x18\v \x01(\tR\aversion\x1a<\n" +
+	"\aversion\x18\v \x01(\tR\aversion\x12\x18\n" +
+	"\ahistory\x18\f \x03(\tR\ahistory\x1a<\n" +
 	"\x0eOverridesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +

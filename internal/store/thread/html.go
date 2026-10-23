@@ -102,7 +102,7 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, e
 // theme card: the daemon's, not Claude's), which build makes from the thread's record. On
 // the runner's goroutine while it runs, so it lands inside the running turn after the
 // tool call that made it; else straight onto the stopped thread's log. The item's id is
-// "<kind>-…"; finishVerbItem completes it against the log either way.
+// "<kind>-…".
 func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (Item, error)) (Item, error) {
 	for {
 		live, closing, reserved, s, err := m.lifecycle(id)
@@ -139,7 +139,6 @@ func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (I
 		}
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
 		it.ID = string(it.Kind) + "-" + itemSuffix()
-		finishVerbItem(log, &it)
 		return w.add(it), nil
 	}
 }
@@ -147,14 +146,5 @@ func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (I
 // onVerbItem is verbItem on the runner's goroutine.
 func (r *runner) onVerbItem(it Item) Item {
 	it.ID = r.st.proj.nextID(string(it.Kind))
-	finishVerbItem(r.st.proj.w.log, &it)
 	return r.st.proj.w.add(it)
-}
-
-// finishVerbItem completes a verb's item against the thread's log just before it is
-// added: a theme card takes its Undo target from an earlier card (theme.go).
-func finishVerbItem(log *threadLog, it *Item) {
-	if it.Kind == KindTheme {
-		inheritPrevious(log, it.Theme)
-	}
 }

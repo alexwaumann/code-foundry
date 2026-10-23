@@ -360,7 +360,8 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 		}
 	case thread.KindTheme:
 		if c := it.Theme; c != nil {
-			p.Payload = &v1.ThreadItem_Theme{Theme: &v1.ThemeItem{Theme: theme.ToProto(c.File, ""), Applied: c.Applied, Previous: c.Previous}}
+			p.Payload = &v1.ThreadItem_Theme{Theme: &v1.ThemeItem{Theme: theme.ToProto(c.File, ""), Applied: c.Applied, Previous: c.Previous,
+				PreviousVersion: c.PreviousVersion, PreviousGone: c.PreviousGone}}
 		}
 	}
 	return p
