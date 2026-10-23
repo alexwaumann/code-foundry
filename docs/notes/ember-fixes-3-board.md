@@ -142,9 +142,13 @@ mention subagents, so it has no line for it.
 
 ## Caps and trims
 
-- rules.md: 6047 of 6144 bytes. Trimmed: the filesystem-search line (now "`find /`,
-  `mdfind`, `locate`: PROJECTS.md has every project and the orchestrate skill's path")
-  and the epoch sentence ("The chat goes on.").
+- rules.md: 6141 of 6144 bytes. Main's #336 (rules for the folded reply) had left it at
+  6135, so the two new rules were paid for by rewording, nothing dropped: the epoch
+  sentence, the view.inline line (its flags are in `code-foundry help`, as the next rule
+  says), "never run a command to try its syntax", "read a file whole" (the "never from a
+  cut read" tail), the filesystem-search line (`find /`, `mdfind`), the orchestrate skill
+  line, the empty-wake line, the claim's scope, the cost line, the time zone, the memory
+  verbs and the "Where things are" MEMORY.md bullet.
 - SKILL.md: 204 lines (under 205). The "Memory and epochs" paragraph went from five lines
   to three; what each memory verb keeps is in the rules already.
 - render_test pins the new rule words.
