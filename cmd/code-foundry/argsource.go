@@ -60,5 +60,13 @@ func (cl *cli) readArgSource(name, v string) (string, error) {
 	if len(b) > maxArgSource {
 		return "", fmt.Errorf("--%s: more than %d bytes", name, maxArgSource)
 	}
+	if len(b) == 0 {
+		// An empty value is no value to the daemon: say what was empty, not that the arg
+		// is missing.
+		if v == "-" {
+			return "", fmt.Errorf("--%s -: stdin was empty", name)
+		}
+		return "", fmt.Errorf("--%s %s: the file is empty", name, v)
+	}
 	return string(b), nil
 }

@@ -22,44 +22,34 @@ type ThemeCard struct {
 	// Applied: the save changed what a slot shows (--apply, or a save of the theme the
 	// slot already has).
 	Applied bool `json:"applied,omitempty"`
-	// Previous is the theme the slot had before this thread first applied this one, the
-	// one Undo puts back; "" when unknown or when the slot already had it.
+	// Previous is what the slot showed immediately before this save, the theme Undo puts
+	// back (docs/notes/theme-fuzz-daemon.md); this theme's own id with PreviousVersion when
+	// the save replaced the colours the slot showed; "" for nothing to undo.
 	Previous string `json:"previous,omitempty"`
+	// PreviousVersion is the version of this theme's file the save replaced (kept in the
+	// themes directory's history), when Previous is this theme's id.
+	PreviousVersion string `json:"previous_version,omitempty"`
+	// PreviousGone: what Previous names was not there to put back when the card was made.
+	PreviousGone bool `json:"previous_gone,omitempty"`
 }
 
 // ShowTheme implements Store: it appends a theme item to thread id, where ShowHTML puts
-// a page. The file must validate (ErrInvalidArgument).
+// a page. The file must validate (ErrInvalidArgument). A card that is not applied has
+// nothing to undo; one whose previous is its own theme needs the version it replaced.
 func (m *Manager) ShowTheme(ctx context.Context, id string, card ThemeCard) (Item, error) {
 	f, err := theme.ParseFile(card.File.Marshal())
 	if err != nil {
 		return Item{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
 	}
 	card.File = f
-	if !card.Applied {
-		card.Previous = ""
+	switch {
+	case !card.Applied, card.Previous == f.ID && card.PreviousVersion == "" && !card.PreviousGone:
+		card.Previous, card.PreviousVersion, card.PreviousGone = "", "", false
+	case card.Previous != f.ID:
+		card.PreviousVersion = ""
 	}
 	return m.verbItem(ctx, id, func(Thread) (Item, error) {
 		c := card
 		return Item{Kind: KindTheme, Theme: &c}, nil
 	})
-}
-
-// inheritPrevious gives a card whose slot already had its theme (a refinement: Previous
-// is the theme itself) the Undo target of the thread's latest earlier card of the same
-// theme that has one, so Undo on any of the thread's cards goes back to the theme the
-// slot had before the thread's first one. Nothing found: no Undo target.
-func inheritPrevious(log *threadLog, c *ThemeCard) {
-	if c == nil || !c.Applied || c.Previous != c.File.ID {
-		return
-	}
-	c.Previous = ""
-	log.mu.Lock()
-	defer log.mu.Unlock()
-	for i := len(log.items) - 1; i >= 0; i-- {
-		t := log.items[i].Theme
-		if log.items[i].Kind == KindTheme && t != nil && t.File.ID == c.File.ID && t.File.Scheme == c.File.Scheme && t.Previous != "" && t.Previous != c.File.ID {
-			c.Previous = t.Previous
-			return
-		}
-	}
 }

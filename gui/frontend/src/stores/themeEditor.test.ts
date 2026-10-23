@@ -262,7 +262,7 @@ describe("what theme.save would refuse", () => {
   });
 
   it("a name it does not take", () => {
-    expect(draftRefusal(OCEAN, "Ocean\twarm")).toEqual({ kind: "file", message: "name: no control characters" });
+    expect(draftRefusal(OCEAN, "Ocean\twarm")).toEqual({ kind: "file", message: "name: no control or format characters" });
     expect(draftRefusal(OCEAN, "x".repeat(81))?.message).toBe("name: at most 80 characters");
     expect(draftRefusal(OCEAN, "x".repeat(80))).toBeNull();
   });

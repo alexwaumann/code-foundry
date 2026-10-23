@@ -759,9 +759,9 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.THEME, event: { event: { case: "theme", value: v } } }),
     slot: (scheme) => this.settings.values()[`appearance.theme_${scheme}`] ?? "",
     setSlot: (scheme, id) => this.settings.update({ [`appearance.theme_${scheme}`]: id }),
+    setScheme: (scheme) => this.settings.update({ "appearance.theme": scheme }),
     card: (threadId, card) => {
-      const it = this.logs.showTheme(threadId, card);
-      return it.payload?.case === "theme" ? (it.payload.value.previous ?? "") : "";
+      this.logs.showTheme(threadId, card);
     },
     emit: (intent) => {
       this.emit(intent);

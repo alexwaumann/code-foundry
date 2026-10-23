@@ -79,6 +79,9 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 		card  bool   // a card was asked for
 		apply bool   // the card says applied
 		prev  string // the card's previous
+		// own: previous is the theme's own id with the version this save replaced, and
+		// the toast's Undo restores it.
+		own   bool
 		toast *v1.UiIntent_Notify
 	}
 	tests := []struct {
@@ -87,31 +90,32 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 	}{
 		{"from a thread with --apply: card and toast with Undo", []step{
 			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
-				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
+				toast: notify("theme-edit:ocean-dusk", "theme-undo:dark:ocean-dusk:github-dark")},
 		}},
 		{"saved without --apply: a card, not applied, no toast", []step{
 			{uctx: thread, args: map[string]string{"data": data}, card: true},
 		}},
 		{"a refinement of the theme in use counts as applied", []step{
 			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
-				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
-			// New colours repaint the slot: a toast. The fake echoes previous; the real
-			// store takes the first card's (theme_test.go).
-			{uctx: thread, args: map[string]string{"data": recoloured}, card: true, apply: true, prev: "ocean-dusk",
-				toast: notify("theme-edit:ocean-dusk", "")},
+				toast: notify("theme-edit:ocean-dusk", "theme-undo:dark:ocean-dusk:github-dark")},
+			// New colours repaint the slot: a toast, whose Undo puts the colours before
+			// back (the version the store kept).
+			{uctx: thread, args: map[string]string{"data": recoloured}, card: true, apply: true, prev: "ocean-dusk", own: true,
+				toast: notify("theme-edit:ocean-dusk", "theme-undo:dark:ocean-dusk:ocean-dusk:")},
 		}},
 		{"a save that changes no colour of the theme in use: a card, no toast", []step{
 			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
-				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
-			// Only pair set (the pair turn re-saves the first theme): applied, nothing repainted.
-			{uctx: thread, args: map[string]string{"data": paired, "apply": "true"}, card: true, apply: true, prev: "ocean-dusk"},
+				toast: notify("theme-edit:ocean-dusk", "theme-undo:dark:ocean-dusk:github-dark")},
+			// Only pair set (the pair turn re-saves the first theme): applied, nothing
+			// repainted, nothing to undo.
+			{uctx: thread, args: map[string]string{"data": paired, "apply": "true"}, card: true, apply: true},
 			// The same file again, without --apply.
-			{uctx: thread, args: map[string]string{"data": paired}, card: true, apply: true, prev: "ocean-dusk"},
+			{uctx: thread, args: map[string]string{"data": paired}, card: true, apply: true},
 		}},
 		{"--apply of a theme saved before but not in use: the slot changes, a toast", []step{
 			{uctx: thread, args: map[string]string{"data": data}, card: true},
 			{uctx: thread, args: map[string]string{"data": data, "apply": "true"}, card: true, apply: true, prev: "github-dark",
-				toast: notify("theme-edit:ocean-dusk", "theme-set:dark:github-dark")},
+				toast: notify("theme-edit:ocean-dusk", "theme-undo:dark:ocean-dusk:github-dark")},
 		}},
 		{"from the GUI: no card, no toast", []step{
 			{uctx: gui, args: map[string]string{"data": data, "apply": "true"}},
@@ -126,6 +130,12 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 			for i, s := range tt.steps {
 				before := len(env.cardRequests())
 				toasts := len(env.emit.Intents())
+				was, _ := env.themes.Snapshot().Get("ocean-dusk")
+				wantVer := ""
+				if s.own {
+					wantVer = was.Version()
+					s.toast.Link += wantVer
+				}
 				res, err := env.invoke(t, s.uctx, "theme.save", s.args)
 				if err != nil {
 					t.Fatalf("step %d: %v", i, err)
@@ -144,8 +154,9 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 					r := reqs[0]
 					c := r.GetTheme()
 					if r.GetThreadId() != "s-5f963f4547cc" || c.GetTheme().GetId() != "ocean-dusk" || c.GetTheme().GetFrom() != "catppuccin-mocha" ||
-						c.GetTheme().GetCreatedBy() != "s-5f963f4547cc" || len(c.GetTheme().GetOverrides()) != 2 || c.GetApplied() != s.apply || c.GetPrevious() != s.prev {
-						t.Errorf("step %d: card %v, want applied %v previous %q", i, r, s.apply, s.prev)
+						c.GetTheme().GetCreatedBy() != "s-5f963f4547cc" || len(c.GetTheme().GetOverrides()) != 2 || c.GetApplied() != s.apply || c.GetPrevious() != s.prev ||
+						c.GetPreviousVersion() != wantVer || c.GetPreviousGone() {
+						t.Errorf("step %d: card %v, want applied %v previous %q %q", i, r, s.apply, s.prev, wantVer)
 					}
 				}
 				got := env.emit.Intents()[toasts:]

@@ -566,8 +566,9 @@ export function parseThemeFile(json: unknown, opts: { user?: boolean } = {}): Pa
   onlyKeys(json, FILE_KEYS, id);
   const name = str("name");
   if (Array.from(name).length > 80) throw new Error(`${id}: name: at most 80 characters`);
-  // eslint-disable-next-line no-control-regex -- the daemon refuses control characters in a name
-  if (/[\u0000-\u001f\u007f-\u009f]/.test(name)) throw new Error(`${id}: name: no control characters`);
+  // The daemon refuses control and format characters in a name (U+200B hides a name,
+  // U+202E reverses the rest of a line).
+  if (/[\p{Cc}\p{Cf}]/u.test(name)) throw new Error(`${id}: name: no control or format characters`);
   const scheme = json.scheme;
   if (scheme !== "light" && scheme !== "dark") throw new Error(`${id}: scheme must be light or dark`);
   const b = json.base;

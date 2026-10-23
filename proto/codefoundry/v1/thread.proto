@@ -274,9 +274,19 @@ message ThemeItem {
   UserTheme theme = 1;
   // The save changed what a slot shows: --apply, or a save of the theme a slot already has.
   bool applied = 2;
-  // When applied: the theme the slot had before this thread first applied this one (Undo
-  // puts it back); empty when unknown, or when the slot already had this theme.
+  // When applied: what the slot showed immediately before this save, which Undo puts back
+  // (docs/notes/theme-fuzz-daemon.md): another theme's id, or this theme's own id with
+  // previous_version when the save replaced the theme the slot already showed. Empty when
+  // there is nothing to undo (unknown, or a save that changed no colour). Undo is offered
+  // only while the slot still shows this card's colours.
   string previous = 3;
+  // With previous = this theme's id: the version of its file this save replaced, kept in
+  // the themes directory's history (theme.restore puts it back).
+  string previous_version = 4;
+  // What previous (and previous_version) name was not there to put back when the card was
+  // made (a slot on a theme that is gone, a version that could not be kept). The GUI
+  // checks again against the themes it has (a theme deleted since, a version dropped).
+  bool previous_gone = 5;
 }
 
 // What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,

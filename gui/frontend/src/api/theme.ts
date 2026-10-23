@@ -18,6 +18,8 @@ export interface ThemesSnapshotView {
   /** The user's valid themes, by name. */
   user: readonly UserThemeFile[];
   issues: readonly ThemeFileIssueView[];
+  /** The earlier versions kept of each user theme, newest first (a card's Undo restores one). */
+  history: Readonly<Record<string, readonly string[]>>;
   /** The themes directory. */
   dir: string;
   version: number;
@@ -68,6 +70,7 @@ export function toThemesSnapshotView(s: ThemeSnapshot | undefined): ThemesSnapsh
   return {
     user: (s?.user ?? []).map(toUserThemeFile).filter((t): t is UserThemeFile => t !== null),
     issues: (s?.issues ?? []).map((i) => ({ file: i.file, message: i.message })),
+    history: Object.fromEntries((s?.user ?? []).filter((t) => t.history.length > 0).map((t) => [t.id, [...t.history]])),
     dir: s?.dir ?? "",
     version: Number(s?.version ?? 0n),
   };

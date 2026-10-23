@@ -164,6 +164,8 @@
  *   POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]   (theme save from that thread:
  *        its theme card and, applied, the toast)
  *   POST /__mock/themes/edit?theme=ocean-dusk&canvas=%23330000   (a save of that theme from outside the window: base colours changed)
+ *   POST /__mock/themes/recolour?thread=s-1&theme=ocean-dusk&accent=%23e0a060   (that thread's
+ *        refinement of the theme: the replaced version kept, a card whose Undo restores it)
  *   GET  /__mock/themes                          ({ themes, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
@@ -1336,6 +1338,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/themes/edit":
       try {
         json(res, 200, world.themes.edit(q));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/themes/recolour":
+      try {
+        json(res, 200, world.themes.recolour(q));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

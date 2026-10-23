@@ -14,7 +14,8 @@ import (
 // (code-foundry theme save from the thread; docs/notes/theme-model-flow.md).
 func (h *Thread) ShowTheme(ctx context.Context, req *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
 	t := req.Msg.GetTheme()
-	card := thread.ThemeCard{File: theme.FromProto(t.GetTheme()), Applied: t.GetApplied(), Previous: t.GetPrevious()}
+	card := thread.ThemeCard{File: theme.FromProto(t.GetTheme()), Applied: t.GetApplied(), Previous: t.GetPrevious(),
+		PreviousVersion: t.GetPreviousVersion(), PreviousGone: t.GetPreviousGone()}
 	it, err := h.store.ShowTheme(ctx, req.Msg.GetThreadId(), card)
 	if err != nil {
 		return nil, threadError(err)

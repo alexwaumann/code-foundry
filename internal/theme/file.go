@@ -110,18 +110,25 @@ var retiredSlots = map[string]string{
 	"--cf-sidebar-row-active": "pin --cf-sidebar-row-selected",
 }
 
-// ParseStored is ParseFile for a file already in the themes directory: overrides of a
-// retired slot (one the app removed after the file was written) are dropped, not
-// refused, and returned, so an upgrade does not turn a working theme into an issue.
-// Writes go through ParseFile, so the file loses them the next time it is saved.
+// ParseStored is ParseFile for a file already in the themes directory, forgiving what an
+// older release accepted (docs/notes/theme-fuzz-daemon.md), so an upgrade does not turn a
+// working theme into an issue: a pin of a name that is not a slot (a retired slot, a
+// misspelling, a shadcn name) is dropped, and a scheme its surface contradicts (a light
+// surface on a "dark" theme) is read as the surface's. Each forgiveness is a note ("dropped
+// the pin --cf-primary: not a slot"). A mid-grey surface suits neither scheme and is still
+// refused. Writes go through ParseFile, so the file is put right the next time it is saved.
 func ParseStored(data []byte) (File, []string, error) {
 	return parse(data, true)
 }
 
-func parse(data []byte, dropRetired bool) (File, []string, error) {
+// utf8BOM is what some editors put before the JSON; it is not part of it.
+var utf8BOM = []byte("\xef\xbb\xbf")
+
+func parse(data []byte, stored bool) (File, []string, error) {
 	if len(data) > MaxFileBytes {
 		return File{}, nil, fmt.Errorf("%w: more than %d KiB", ErrInvalid, MaxFileBytes>>10)
 	}
+	data = bytes.TrimPrefix(data, utf8BOM)
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var f File
@@ -132,22 +139,44 @@ func parse(data []byte, dropRetired bool) (File, []string, error) {
 		return File{}, nil, fmt.Errorf("%w: more than one JSON value", ErrInvalid)
 	}
 	f.normalise()
-	var dropped []string
-	if dropRetired {
-		for _, k := range slices.Sorted(maps.Keys(f.Overrides)) {
-			if _, ok := retiredSlots[k]; ok {
-				delete(f.Overrides, k)
-				dropped = append(dropped, k)
-			}
-		}
-		if len(f.Overrides) == 0 {
-			f.Overrides = nil
-		}
+	var notes []string
+	if stored {
+		notes = f.forgive()
 	}
 	if err := f.Validate(); err != nil {
 		return File{}, nil, err
 	}
-	return f, dropped, nil
+	return f, notes, nil
+}
+
+// forgive puts right what ParseStored forgives, and says what it did.
+func (f *File) forgive() []string {
+	var notes []string
+	for _, k := range slices.Sorted(maps.Keys(f.Overrides)) {
+		if _, retired := retiredSlots[k]; retired {
+			notes = append(notes, fmt.Sprintf("dropped the pin %s: the app no longer has that slot", k))
+		} else if !IsSlot(k) {
+			notes = append(notes, fmt.Sprintf("dropped the pin %s: not a slot", k))
+		} else {
+			continue
+		}
+		delete(f.Overrides, k)
+	}
+	if len(f.Overrides) == 0 {
+		f.Overrides = nil
+	}
+	if l, ok := oklabLightness(f.Base.Surface); ok && SchemeProblem(f.Scheme, f.Base.Surface) != "" {
+		switch {
+		case f.Scheme == SchemeDark && l >= SchemeLightMinL:
+			f.Scheme = SchemeLight
+		case f.Scheme == SchemeLight && l <= SchemeDarkMaxL:
+			f.Scheme = SchemeDark
+		default:
+			return notes
+		}
+		notes = append(notes, fmt.Sprintf("read as a %s theme: its surface %s is %s", f.Scheme, f.Base.Surface, f.Scheme))
+	}
+	return notes
 }
 
 // jsonProblem phrases a decode error for a person (or a model) fixing the file.
@@ -159,9 +188,9 @@ func jsonProblem(err error) string {
 		return fmt.Sprintf("not JSON (%s at byte %d)", syn.Error(), syn.Offset)
 	case errors.As(err, &typ):
 		if typ.Field != "" {
-			return fmt.Sprintf("%s: want a %s, got a %s", typ.Field, typ.Type, typ.Value)
+			return fmt.Sprintf("%s: want a %s, got %s", typ.Field, typ.Type, withArticle(typ.Value))
 		}
-		return fmt.Sprintf("want a JSON object, got a %s", typ.Value)
+		return fmt.Sprintf("want a JSON object, got %s", withArticle(typ.Value))
 	case errors.Is(err, io.ErrUnexpectedEOF):
 		return "not JSON (it ends too soon)"
 	case errors.Is(err, io.EOF):
@@ -170,8 +199,19 @@ func jsonProblem(err error) string {
 	return strings.TrimPrefix(err.Error(), "json: ")
 }
 
+// withArticle is "an array", "a string".
+func withArticle(noun string) string {
+	if noun != "" && strings.ContainsRune("aeiou", rune(noun[0])) {
+		return "an " + noun
+	}
+	return "a " + noun
+}
+
 func (f *File) normalise() {
-	f.Name = strings.TrimSpace(f.Name)
+	// The GUI's parseThemeFile trims the ids too.
+	for _, p := range []*string{&f.ID, &f.Name, &f.Pair, &f.From, &f.CreatedBy} {
+		*p = strings.TrimSpace(*p)
+	}
 	f.Source = strings.TrimSpace(f.Source)
 	lower := func(s *string) { *s = strings.ToLower(strings.TrimSpace(*s)) }
 	b := &f.Base
@@ -212,8 +252,8 @@ func (f File) Validate() error {
 		return bad("no name")
 	case utf8.RuneCountInString(f.Name) > MaxNameLen:
 		return bad("name: at most %d characters", MaxNameLen)
-	case strings.ContainsFunc(f.Name, unicode.IsControl):
-		return bad("name: no control characters")
+	case strings.ContainsFunc(f.Name, invisible):
+		return bad("name: no control or format characters (a zero-width space, a direction override)")
 	case f.Scheme != SchemeDark && f.Scheme != SchemeLight:
 		return bad("scheme %q: must be dark or light", f.Scheme)
 	case f.Pair != "" && !ValidID(f.Pair):
@@ -266,7 +306,7 @@ func (f File) Validate() error {
 			return bad("overrides: %q was removed from the app; %s", k, hint)
 		}
 		if !IsSlot(k) {
-			return bad("overrides: %q is not a slot (docs/THEMES.md lists them; theme show github-dark prints a file to start from)", k)
+			return bad("overrides: %q is not a slot (the Slots section of THEMES.md, the help skill's reference/themes.md, lists them; theme show github-dark prints a file to start from)", k)
 		}
 		if !anyHexPattern.MatchString(v) {
 			return bad("overrides[%q]: %q is not #rrggbb or #rrggbbaa", k, v)
@@ -274,6 +314,10 @@ func (f File) Validate() error {
 	}
 	return nil
 }
+
+// invisible: a control character, or a format character (U+200B, U+202E…) that hides
+// itself or reorders the rest of a line.
+func invisible(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }
 
 func opaque(where, v string, required bool) error {
 	if v == "" {

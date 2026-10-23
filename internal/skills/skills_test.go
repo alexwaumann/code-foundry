@@ -134,7 +134,9 @@ func TestRender(t *testing.T) {
 		// The entry skill (control-4-capabilities): what the app is, the one rule and the
 		// routing table; what exists is daemon.capabilities, not a list in the file. 80, up
 		// from 70, for "Making a theme" (theme-model-flow): the theme flow has no other skill.
-		{skills.Entry, "false", 400, 80},
+		// 83 for the three lines the theme fuzz showed models missing (theme-fuzz-daemon): the
+		// verbs, the contrast floors and how to lower contrast, --replace and the scheme.
+		{skills.Entry, "false", 400, 83},
 		// Its routing and the app's description moved to the entry skill (control-4);
 		// the cap came down from 120 with them.
 		{skills.Help, "", 400, 105},   // both: no invocation keys
@@ -287,7 +289,15 @@ func TestRender(t *testing.T) {
 		"default `threads.default_worktree`", "The app replaces /model, /effort",
 		// The setting is the composer's; where thread new puts a thread is the model's call
 		// (thread-new-base-origin).
-		"Threads you create with `thread new` are yours to place: in place or `--new-worktree`"} {
+		"Threads you create with `thread new` are yours to place: in place or `--new-worktree`",
+		// The theme fuzz (theme-fuzz-daemon): a theme request in any thread, every verb, the
+		// reference by its installed path, the floors, --replace and the scheme.
+		"The app's colours, in any thread", "never\nedit the themes folder",
+		"`theme list|show|save|check|edit|duplicate|delete|restore|set-dark|`\n`set-light|set-scheme|ask`",
+		"(/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-help/reference/themes.md)",
+		"Body text keeps 7:1, status text\n4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text",
+		"Fix every\npair the save's `contrast:` lists before you reply", "needs\n`--replace`, once the user asked",
+		"offer `theme set-scheme light`, never switch unasked"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}

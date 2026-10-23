@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { useViewsStore } from "./views";
 
-const theme = vi.hoisted(() => ({ edit: vi.fn<(id: string) => Promise<boolean>>(), undo: vi.fn<(scheme: string, id: string) => Promise<boolean>>() }));
-vi.mock("./themeCards", () => ({ editSavedTheme: theme.edit, undoTheme: theme.undo }));
+const theme = vi.hoisted(() => ({ edit: vi.fn<(id: string) => Promise<boolean>>(), undo: vi.fn<(target: string) => void>() }));
+vi.mock("./themeCards", () => ({ editSavedTheme: theme.edit, undoFromLink: theme.undo }));
 
 describe("notifyLinkAction", () => {
   beforeEach(() => {
@@ -19,17 +19,14 @@ describe("notifyLinkAction", () => {
     expect(notifyLinkAction(link)).toBeNull();
   });
 
-  it("theme-edit:<id> edits the theme; theme-set:<scheme>:<id> puts the slot back", () => {
+  it("theme-edit:<id> edits the theme; theme-undo:<…> is the card's Undo", () => {
     theme.edit.mockResolvedValue(true);
-    theme.undo.mockResolvedValue(true);
     notifyLinkAction("theme-edit:ocean-dusk")?.();
     expect(theme.edit).toHaveBeenCalledWith("ocean-dusk");
-    notifyLinkAction("theme-set:dark:catppuccin-mocha")?.();
-    expect(theme.undo).toHaveBeenCalledWith("dark", "catppuccin-mocha");
-    theme.undo.mockClear();
-    notifyLinkAction("theme-set:sepia:nord")?.();
-    notifyLinkAction("theme-set:dark")?.();
-    expect(theme.undo).not.toHaveBeenCalled();
+    notifyLinkAction("theme-undo:dark:ocean-dusk:catppuccin-mocha")?.();
+    expect(theme.undo).toHaveBeenCalledWith("dark:ocean-dusk:catppuccin-mocha");
+    // The old link kind is gone.
+    expect(notifyLinkAction("theme-set:dark:nord")).toBeNull();
   });
 });
 

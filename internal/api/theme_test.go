@@ -67,6 +67,23 @@ func TestThemeList(t *testing.T) {
 	if is := m.GetIssues(); len(is) != 1 || is[0].GetFile() != "broken.json" || is[0].GetMessage() == "" {
 		t.Errorf("issues = %v", is)
 	}
+	if len(u.GetHistory()) != 0 {
+		t.Errorf("history of a new theme = %v", u.GetHistory())
+	}
+	// A save of new colours keeps the version it replaced, which the snapshot lists.
+	f, _ := s.Snapshot().Get("nord-copy")
+	was := f.Version()
+	f.Base.Accent = "#5fb3b3"
+	if _, err := s.Save(f); err != nil {
+		t.Fatal(err)
+	}
+	res, err = c.List(context.Background(), connect.NewRequest(&v1.ListThemesRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := res.Msg.GetThemes().GetUser()[0].GetHistory(); len(h) != 1 || h[0] != was {
+		t.Errorf("history = %v, want [%s]", h, was)
+	}
 }
 
 func TestThemeWatchAndEvents(t *testing.T) {

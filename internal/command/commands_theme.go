@@ -38,7 +38,11 @@ type ThemeBackend interface {
 	Get(id string) (f theme.File, user bool, err error)
 	Save(f theme.File) (usertheme.Saved, error)
 	Duplicate(id, name, createdBy string) (usertheme.Saved, error)
+	// Restore puts back a kept version of a user theme (a card's Undo).
+	Restore(id, version string) (usertheme.Saved, error)
 	Delete(id string) (theme.File, error)
+	// DeleteFile removes a file that did not load, by its name or the id of its name.
+	DeleteFile(name string) (usertheme.Issue, error)
 }
 
 var _ ThemeBackend = (*usertheme.Store)(nil)
@@ -67,10 +71,13 @@ type ThemeFileIssue struct {
 // ThemeList is theme.list's JSON result.
 type ThemeList struct {
 	// Scheme is appearance.theme: system, dark, or light.
-	Scheme string           `json:"scheme"`
-	Dark   string           `json:"dark"`
-	Light  string           `json:"light"`
-	Themes []ThemeListEntry `json:"themes"`
+	Scheme string `json:"scheme"`
+	// Showing is the scheme the app shows now (system resolved by the window; "" while
+	// unknown).
+	Showing string           `json:"showing,omitempty"`
+	Dark    string           `json:"dark"`
+	Light   string           `json:"light"`
+	Themes  []ThemeListEntry `json:"themes"`
 	// Dir is the themes directory; Issues its files that did not load.
 	Dir    string           `json:"dir,omitempty"`
 	Issues []ThemeFileIssue `json:"issues,omitempty"`
@@ -154,15 +161,25 @@ type ThemeDeps struct {
 	// ReportWait bounds the wait for a report on a file just written; 0:
 	// DefaultThemeReportWait.
 	ReportWait time.Duration
+	// Showing is the scheme the app's window shows now (the GUI's published theme), for
+	// a "system" scheme; ok false while no window has published one. Nil: unknown.
+	Showing func() (scheme string, ok bool)
 }
 
-// RegisterTheme registers the theme.* commands but theme.pick: list, set-dark and
-// set-light (the appearance.theme_dark / theme_light settings), and show, save, duplicate
-// and delete (the user's own themes, docs/notes/user-themes.md). The settings store
-// validates a slot against the themes and the scheme; the slot args list the scheme's
-// ids (the user's included, again at every call), so the palette offers a pick list and
-// the CLI refuses another scheme's theme before sending. Without themes (nil) only the
-// curated catalog is known and the user-theme verbs fail Unimplemented.
+// ThemeFileDeleted is theme.delete's JSON result for a file that did not load.
+type ThemeFileDeleted struct {
+	File    string `json:"file"`
+	Message string `json:"message"`
+}
+
+// RegisterTheme registers the theme.* commands but theme.pick: list, set-dark,
+// set-light and set-scheme (the appearance.theme_dark / theme_light / theme settings),
+// and show, save, duplicate, restore and delete (the user's own themes,
+// docs/notes/user-themes.md). The settings store validates a slot against the themes and
+// the scheme; the slot args list the scheme's ids (the user's included, again at every
+// call), so the palette offers a pick list, and a value that is not one says why (another
+// scheme's, curated, gone). Without themes (nil) only the curated catalog is known and the
+// user-theme verbs fail Unimplemented.
 func RegisterTheme(r *Registry, d ThemeDeps) error {
 	b, themes := d.Settings, d.Themes
 	values := func(ctx context.Context) (map[string]string, error) {
@@ -195,6 +212,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		}
 		return ids
 	}
+	showing := func(vals map[string]string) string { return themeShowing(d, vals) }
 	// setSlot writes a scheme's slot and says what it shows now.
 	setSlot := func(ctx context.Context, scheme, id string) (string, ThemeSet, error) {
 		key := themeSlotKey[scheme]
@@ -204,10 +222,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		}
 		vals := res.Msg.GetSettings().GetValues()
 		t, _ := set().ByID(vals[key])
-		msg := fmt.Sprintf("%s theme = %s (%s)", scheme, t.Name, t.ID)
-		if s := vals[keyThemeScheme]; s != "system" && s != scheme {
-			msg += fmt.Sprintf("; the scheme is %s, so it shows after `code-foundry settings set %s %s`", s, keyThemeScheme, scheme)
-		}
+		msg := fmt.Sprintf("%s theme = %s (%s)", scheme, t.Name, t.ID) + themeSchemeNote(vals[keyThemeScheme], showing(vals), scheme)
 		return msg, ThemeSet{Key: key, ID: t.ID, Name: t.Name, Scheme: t.Scheme}, nil
 	}
 	slotCmd := func(scheme string) Command {
@@ -218,6 +233,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			Description: fmt.Sprintf("Choose the theme used when the scheme is %s (the %s setting): a curated one or one of yours. Run theme list for the ids.", scheme, themeSlotKey[scheme]),
 			Category:    "Settings",
 			Args: []ArgSpec{{Name: "theme", Type: Enum, EnumFunc: func() []string { return set().IDs(scheme) }, Required: true, Positional: true,
+				EnumMiss:    func(v string) error { return set().Check(v, scheme) },
 				Description: "A " + scheme + " theme id, e.g. " + theme.Default(scheme)}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				msg, js, err := setSlot(ctx, scheme, a.String("theme"))
@@ -236,7 +252,8 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				ids[i] = t.ID
 			}
 			return ids
-		}}
+		},
+		EnumMiss: func(v string) error { return fmt.Errorf("no theme %q (theme list prints the ids)", v) }}
 	return r.RegisterAll(
 		Command{
 			Name:         "theme.list",
@@ -249,11 +266,35 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return themeList(vals, set(), themes), nil
+				return themeList(vals, showing(vals), set(), themes), nil
 			},
 		},
 		slotCmd(theme.SchemeDark),
 		slotCmd(theme.SchemeLight),
+		Command{
+			Name:  "theme.set-scheme",
+			Title: "Set Color Scheme",
+			Description: "Choose whether the app is dark, light, or follows the Mac (system): the appearance.theme setting. " +
+				"Each scheme shows its own theme (theme set-dark, theme set-light).",
+			Category: "Settings",
+			Args: []ArgSpec{{Name: "scheme", Type: Enum, Enum: []string{"system", theme.SchemeDark, theme.SchemeLight}, Required: true, Positional: true,
+				Description: "system (follow the Mac), dark or light"}},
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				res, err := b.Update(ctx, connect.NewRequest(&v1.UpdateSettingsRequest{Values: map[string]string{keyThemeScheme: a.String("scheme")}}))
+				if err != nil {
+					return Result{}, err
+				}
+				vals := res.Msg.GetSettings().GetValues()
+				name := func(scheme string) string { return themeName(set(), vals[themeSlotKey[scheme]]) }
+				msg := fmt.Sprintf("scheme = %s (%s): ", vals[keyThemeScheme], keyThemeScheme)
+				if s := vals[keyThemeScheme]; s == theme.SchemeDark || s == theme.SchemeLight {
+					msg += "the app shows " + name(s)
+				} else {
+					msg += fmt.Sprintf("the app follows the Mac: %s when dark, %s when light", name(theme.SchemeDark), name(theme.SchemeLight))
+				}
+				return Result{Message: msg, JSON: map[string]string{"key": keyThemeScheme, "scheme": vals[keyThemeScheme]}}, nil
+			},
+		},
 		Command{
 			Name:         "theme.show",
 			Title:        "Show Theme File",
@@ -275,14 +316,16 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		Command{
 			Name:  "theme.save",
 			Title: "Save Theme File",
-			Description: "Save a theme file as one of your themes. It replaces yours with the same id; a curated id is refused. " +
-				"From a thread, the file records the thread as created_by. --apply also makes it the dark or light theme, per its scheme.",
+			Description: "Save a theme file as one of your themes. It replaces yours with the same id (the version it replaces is kept for Undo); a curated id is refused. " +
+				"From a thread, the file records the thread as created_by, and replacing a theme the thread did not make needs --replace. " +
+				"--apply also makes it the dark or light theme, per its scheme.",
 			Category:     "Settings",
 			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "file", Type: Path, Description: "The theme file (JSON) to read"},
 				{Name: "data", Type: String, FileOrStdin: true, Description: "The theme file itself, its JSON (-: stdin, @file: a file); instead of --file"},
 				{Name: "apply", Type: Bool, Description: "Also set it as the dark or light theme, per its scheme"},
+				{Name: "replace", Type: Bool, Description: "From a thread: replace a theme with this id that the thread did not make (once the user asked to change it)"},
 			},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := needThemes(); err != nil {
@@ -296,42 +339,60 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				if err != nil {
 					return Result{}, themeErr(arg, err)
 				}
-				if by := themeCaller(uctx); by != "" {
-					f.CreatedBy = by
-				}
-				// The slot before the save: what a thread's card puts back on Undo.
+				by := themeCaller(uctx)
+				// The slots before the save: what a thread's card puts back on Undo.
+				vals, verr := values(ctx)
 				before := ""
-				if vals, err := values(ctx); err == nil {
+				if verr == nil {
 					before = vals[themeSlotKey[f.Scheme]]
 				}
 				// The file before it, to tell a recolour from a save that changes no colour.
 				was, existed := themes.Snapshot().Get(f.ID)
+				if existed {
+					if err := themeSaveGuard(by, was, f, vals, a.Bool("replace"), set()); err != nil {
+						return Result{}, err
+					}
+				}
+				switch {
+				case existed && by != "":
+					f.CreatedBy = was.CreatedBy // who made it stays
+				case by != "":
+					f.CreatedBy = by
+				}
 				saved, err := themes.Save(f)
 				if err != nil {
 					return Result{}, themeErr(arg, err)
 				}
 				out, lines := themeSaved(saved, set())
+				var applyErr error
 				if a.Bool("apply") {
 					msg, js, err := setSlot(ctx, saved.File.Scheme, saved.File.ID)
 					if err != nil {
-						return Result{Message: strings.Join(lines, "\n")}, err
+						applyErr = err
+					} else {
+						out.Applied = js.Key
+						lines = append(lines, "applied: "+msg)
 					}
-					out.Applied = js.Key
-					lines = append(lines, "applied: "+msg)
 				}
 				var warnings []string
-				if by := themeCaller(uctx); by != "" {
+				if by != "" {
 					// The card says applied when the slot shows the theme; the toast only
 					// when the save changed what the slot shows: another theme, or new
 					// colours. A save that only sets pair repaints nothing.
-					applied := a.Bool("apply") || before == saved.File.ID
+					applied := (a.Bool("apply") && applyErr == nil) || before == saved.File.ID
 					repaint := before != saved.File.ID || !existed || !theme.SameColours(was, saved.File)
-					warnings, _ = showThemeCard(ctx, d, by, saved.File, applied, before, applied && repaint)
+					undo := themeUndoOf(applied, before, was, existed, saved, set())
+					warnings, _ = showThemeCard(ctx, d, by, saved.File, applied, undo, applied && repaint)
 				}
 				// Last, so the card and the window's repaint do not wait on it. From the
 				// app (its editor) there is no wait: the editor shows the report itself.
 				out.Contrast = themeCheck(ctx, d, saved.File, uctx.ActiveView == "")
 				lines = slices.Insert(lines, themeContrastAt, out.Contrast.lines(false)...)
+				if applyErr != nil {
+					// Saved, but not applied: both, so a retry is not read as a new save.
+					lines = append(append(lines, warnings...), "not applied: "+strings.TrimPrefix(connectMessage(applyErr), "invalid settings: "))
+					return Result{}, Failed(errors.New(strings.Join(lines, "\n")))
+				}
 				return Result{Message: strings.Join(lines, "\n"), JSON: out, Warnings: warnings}, nil
 			},
 		},
@@ -360,64 +421,127 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			},
 		},
 		Command{
-			Name:         "theme.delete",
-			Title:        "Delete Theme",
-			Description:  "Delete one of your themes. A slot that used it shows the theme it was copied from, else the default.",
+			Name:  "theme.restore",
+			Title: "Restore Theme Colours",
+			Description: "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10). " +
+				"A theme card's Undo runs it when the save changed the colours of the theme in use.",
 			Category:     "Settings",
-			Args:         []ArgSpec{{Name: "theme", Type: String, Required: true, Positional: true, Description: "One of your themes' ids (theme list marks them)"}},
-			Confirm:      "Delete the theme {theme}? Its file in the themes directory is removed.",
-			ConfirmLabel: "Delete",
-			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
-				if themes == nil {
-					return ""
-				}
-				f, user, err := themes.Get(a.String("theme"))
-				if err != nil || !user {
-					return ""
-				}
-				msg := fmt.Sprintf("Delete the theme %s? Its file in the themes directory is removed.", f.Name)
-				if vals, err := values(ctx); err == nil && vals[themeSlotKey[f.Scheme]] == f.ID {
-					next := themeAfterDelete(set(), f)
-					msg += fmt.Sprintf(" It is your %s theme; the %s theme becomes %s.", f.Scheme, f.Scheme, next.Name)
-				}
-				return msg
+			NoKeybinding: true,
+			Args: []ArgSpec{
+				{Name: "theme", Type: Enum, EnumFunc: userIDs, EnumMiss: userThemeMiss(set), Required: true, Positional: true, Description: "One of your themes' ids"},
+				{Name: "version", Type: String, Required: true, Description: "The version to put back (a theme card's previous_version)"},
 			},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := needThemes(); err != nil {
 					return Result{}, err
 				}
-				id := a.String("theme")
-				f, user, err := themes.Get(id)
-				switch {
-				case err != nil:
-					return Result{}, themeErr("theme", err)
-				case !user:
-					return Result{}, InvalidArg("theme", "%q is a curated theme; only your own themes can be deleted", id)
-				}
-				vals, err := values(ctx)
+				saved, err := themes.Restore(a.String("theme"), a.String("version"))
 				if err != nil {
-					return Result{}, err
+					return Result{}, themeErr("version", err)
 				}
-				out := ThemeDeleted{ID: f.ID, Name: f.Name, Scheme: f.Scheme}
-				lines := []string{fmt.Sprintf("deleted %s (%s)", f.Name, f.ID)}
-				// The slot moves first, so the settings never name a theme that is gone.
-				if key := themeSlotKey[f.Scheme]; vals[key] == f.ID {
-					next := themeAfterDelete(set(), f)
-					msg, js, err := setSlot(ctx, f.Scheme, next.ID)
-					if err != nil {
-						return Result{}, fmt.Errorf("move the %s theme off %s first: %w", f.Scheme, f.ID, err)
-					}
-					out.Slots = map[string]string{key: js.ID}
-					lines = append(lines, "now "+msg)
-				}
-				if _, err := themes.Delete(id); err != nil {
-					return Result{}, themeErr("theme", err)
-				}
+				out, lines := themeSaved(saved, set())
+				lines[0] = fmt.Sprintf("restored %s (%s) to an earlier version", saved.File.Name, saved.File.ID)
+				out.Contrast = themeCheck(ctx, d, saved.File, uctx.ActiveView == "")
+				lines = slices.Insert(lines, themeContrastAt, out.Contrast.lines(false)...)
 				return Result{Message: strings.Join(lines, "\n"), JSON: out}, nil
 			},
 		},
+		themeDeleteCommand(d, values, set, setSlot),
 		themeCheckCommand(d, userIDs, needThemes),
 	)
+}
+
+// themeSaveGuard refuses a save over the existing theme was that would lose something: from
+// a thread, a theme it did not make without --replace (theme-fuzz-daemon, model 3); and a
+// change of scheme while a slot of the old scheme shows the theme (files 1: the slot would
+// drop to its fallback without a word).
+func themeSaveGuard(by string, was, f theme.File, vals map[string]string, replace bool, set theme.Set) error {
+	if by != "" && was.CreatedBy != by && !replace {
+		maker := "one the user made"
+		if was.CreatedBy != "" {
+			maker = "made by thread " + was.CreatedBy
+		}
+		return InvalidArg("replace", "%s is a theme this thread did not make (%s): save under another id, "+
+			"or pass --replace once the user asked to change that theme (the version it replaces is kept for Undo)", themeName(set, was.ID), maker)
+	}
+	if was.Scheme != f.Scheme && vals != nil && vals[themeSlotKey[was.Scheme]] == was.ID {
+		return InvalidArg("file", "%s is your %s theme; a %s theme needs another id (or first put the %s slot on another theme: theme set-%s <id>)",
+			was.ID, was.Scheme, f.Scheme, was.Scheme, was.Scheme)
+	}
+	return nil
+}
+
+// themeUndo is what a theme card's Undo puts back: another theme (id), or this theme's
+// replaced version (id is the theme's own, version set); gone when it is not there to put
+// back. The zero value: no Undo.
+type themeUndo struct {
+	id, version string
+	gone        bool
+}
+
+// themeUndoOf is the card's Undo (docs/notes/theme-fuzz-daemon.md): what the slot showed
+// immediately before this save, when the save changed what it shows. A slot on another
+// theme goes back to it; a slot already on this theme goes back to the colours the save
+// replaced (the version the store kept); a save that changed no colour has none.
+func themeUndoOf(applied bool, before string, was theme.File, existed bool, saved usertheme.Saved, set theme.Set) themeUndo {
+	switch {
+	case !applied || before == "":
+		return themeUndo{}
+	case before != saved.File.ID:
+		return themeUndo{id: before, gone: !set.Valid(before, saved.File.Scheme)}
+	case existed && !theme.SameColours(was, saved.File):
+		return themeUndo{id: before, version: saved.PreviousVersion, gone: saved.PreviousVersion == ""}
+	}
+	return themeUndo{}
+}
+
+// userThemeMiss explains a value that is not one of the user's themes: a curated id to
+// copy first, else an unknown one.
+func userThemeMiss(set func() theme.Set) func(string) error {
+	return func(v string) error {
+		if t, ok := set().ByID(v); ok && !t.User {
+			return fmt.Errorf("%s (%q) is a curated theme; copy it first (theme duplicate %s)", t.Name, v, v)
+		}
+		return fmt.Errorf("no theme %q among yours (theme list marks them)", v)
+	}
+}
+
+// themeShowing is the scheme the app shows: appearance.theme, or for system what the
+// window published ("" while unknown).
+func themeShowing(d ThemeDeps, vals map[string]string) string {
+	if s := vals[keyThemeScheme]; s == theme.SchemeDark || s == theme.SchemeLight {
+		return s
+	}
+	if d.Showing != nil {
+		if s, ok := d.Showing(); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// themeSchemeNote is what follows a slot set for a scheme the app does not show now: it
+// changes nothing on screen until the scheme is that one, and the command that switches
+// it. "" when it shows.
+func themeSchemeNote(pref, showing, scheme string) string {
+	switch {
+	case showing == scheme:
+		return ""
+	case pref == "system" && showing == "":
+		return fmt.Sprintf("; the scheme is system (the Mac's appearance decides), so it shows while the Mac is %s", scheme)
+	case pref == "system":
+		return fmt.Sprintf("; the scheme is system, currently %s, so nothing changes on screen until the Mac is %s (theme set-scheme %s switches the app)", showing, scheme, scheme)
+	}
+	return fmt.Sprintf("; the scheme is %s, so nothing changes on screen until it is %s (theme set-scheme %s switches it)", pref, scheme, scheme)
+}
+
+// connectMessage is err's message without connect's code prefix.
+func connectMessage(err error) string {
+	var ce *connect.Error
+	if errors.As(err, &ce) {
+		return ce.Message()
+	}
+	return err.Error()
 }
 
 func withDescription(a ArgSpec, d string) ArgSpec {
@@ -486,7 +610,7 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	if f.Pinned() == 1 {
 		pinned = "pinned: 1 slot"
 	}
-	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path}
+	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path + " (change it with theme save, not in place: an edit there adds no card)"}
 	return out, lines
 }
 
@@ -500,11 +624,15 @@ func themeName(s theme.Set, id string) string {
 
 // themeList is theme.list's result: the scheme, then each scheme's themes, the user's
 // first (marked, with the theme each came from), then the files that did not load.
-func themeList(vals map[string]string, set theme.Set, themes ThemeBackend) Result {
-	out := ThemeList{Scheme: vals[keyThemeScheme], Dark: vals[keyThemeDark], Light: vals[keyThemeLight]}
+func themeList(vals map[string]string, showing string, set theme.Set, themes ThemeBackend) Result {
+	out := ThemeList{Scheme: vals[keyThemeScheme], Showing: showing, Dark: vals[keyThemeDark], Light: vals[keyThemeLight]}
 	slot := map[string]string{theme.SchemeDark: out.Dark, theme.SchemeLight: out.Light}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "scheme: %s (%s)\n", out.Scheme, keyThemeScheme)
+	fmt.Fprintf(&sb, "scheme: %s (%s)", out.Scheme, keyThemeScheme)
+	if out.Scheme == "system" && showing != "" {
+		fmt.Fprintf(&sb, ", currently %s", showing)
+	}
+	sb.WriteString("\n")
 	for _, scheme := range []string{theme.SchemeDark, theme.SchemeLight} {
 		fmt.Fprintf(&sb, "\n%s themes (%s):\n", scheme, themeSlotKey[scheme])
 		ts := set.For(scheme)
@@ -535,13 +663,16 @@ func themeList(vals map[string]string, set theme.Set, themes ThemeBackend) Resul
 	}
 	if themes != nil {
 		out.Dir = themes.Dir()
-		fmt.Fprintf(&sb, "\nyour themes are files in %s (theme show <id> prints one)\n", out.Dir)
+		// Not "your themes are files in …": a thread read that as leave to edit them in
+		// place, which adds no card and keeps no Undo (theme-fuzz-daemon, model 2).
+		sb.WriteString("\nchange one of yours with theme edit <id> (the app's editor), or save a new version with theme save " +
+			"(theme show <id> prints the file to start from)\n")
 		snap := themes.Snapshot()
 		for _, is := range snap.Issues {
 			out.Issues = append(out.Issues, ThemeFileIssue{File: is.File, Message: is.Message})
 		}
 		if len(out.Issues) > 0 {
-			fmt.Fprintf(&sb, "not loaded (fix the file, or delete it):\n")
+			fmt.Fprintf(&sb, "not loaded (fix the file in %s, or remove it with theme delete --file <name>):\n", out.Dir)
 			for _, is := range out.Issues {
 				fmt.Fprintf(&sb, "  %s: %s\n", is.File, is.Message)
 			}

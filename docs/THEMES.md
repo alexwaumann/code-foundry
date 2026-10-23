@@ -3,19 +3,28 @@
 How a Code Foundry colour theme is written, what each colour does and how to check one. The
 app resolves every colour from a small base by rules (`gui/frontend/src/themes/slots.ts`);
 pages the model writes get the same colours from `/cf/theme.css`. Your own themes are files
-in the themes directory (`theme save`, `theme show`, `theme duplicate`; `theme edit` opens
-one in the Themes page's editor), read by the same rules as the curated ones: the GUI and
-the daemon refuse the same files.
+in the themes directory, read by the same rules as the curated ones: the GUI and the daemon
+refuse the same files. Change them with the theme verbs (`code-foundry theme --help` lists
+them: `list`, `show`, `save`, `check`, `edit`, `duplicate`, `delete`, `restore`, `set-dark`,
+`set-light`, `set-scheme`, `ask`) or the Themes page's editor, not by editing the files: each
+save keeps the version it replaces (the last 10 of each theme), which a card's Undo or
+`theme restore <id> --version <v>` puts back. A hand edit is read too, but adds no card.
 
 Run from a thread, `theme save` also puts a card in that thread's conversation (the theme's
-swatches and contrast, Undo back to the slot's previous theme, Edit, Apply when not applied)
-and, when it changes what a slot shows (another theme, or new colours), a toast. While the app
-is open, `theme save` prints the app's contrast check of the file it wrote: each failing pair
+swatches and contrast, Undo, Edit, Apply when not applied) and, when it changes what a slot
+shows (another theme, or new colours), a toast. Undo puts back what the slot showed
+immediately before that save: another theme, or the colours the save replaced; it is offered
+only while the slot still shows the card's colours. From a thread, replacing a theme the
+thread did not make needs `--replace` (pass it once the user asked to change that theme), and
+a theme a slot shows keeps its scheme (a light version of your dark theme needs another id).
+A theme saved for the scheme the app does not show changes nothing on screen, and the save
+says so; `theme set-scheme light` (or `dark`, `system`) switches the app. While the app is
+open, `theme save` prints the app's contrast check of the file it wrote: each failing pair
 with its ratio and the one it needs (`contrast: ok` when none), and the stale pins (pins whose
 rule the base has moved since they were made); `theme check <id>` prints it again.
 `theme ask "<description>"` (the Themes page's Ask the model) starts a thread with no project
 that makes the theme described; `--pair <id>` asks for the other scheme's pair of one of your
-themes.
+themes, under an id no theme has.
 
 ## A theme file
 
@@ -62,10 +71,11 @@ themes.
 
 ## Overrides
 
-`overrides` sets individual slots (below) to final values: applied as is, with no
-contrast guard, and every slot derived after it follows (override `--cf-surface` and the
-sunken, border and control mixes move with it). Use them only for what the rules cannot
-say; check the file afterwards. A key must be one of the slots below: a misspelt or
+`overrides` sets individual slots (below) to final values: applied as is, and every slot
+derived after it follows (override `--cf-surface` and the sunken, border and control mixes
+move with it). The rules' contrast lifts do not apply to a pinned slot, so a text pin under
+its floor (Checking a theme) stays unreadable, and the save's check lists it. Use them only
+for what the rules cannot say, never to get under a floor. A key must be one of the slots below: a misspelt or
 removed one (`--cf-icon`, `--cf-sidebar-row-active`) refuses the file. The Themes page's
 editor calls an override a pin.
 
@@ -129,18 +139,17 @@ Pages only (the app has no place for them yet; a page the model writes may use t
 
 ## Checking a theme
 
-One of your themes: `theme check <id>` prints the running app's check (the pairs below), as
-`theme save` does. Any file, in a checkout of the repository, from `gui/frontend`:
+`theme save` prints the running app's check of the file it wrote, and `theme check <id>`
+prints it again: read it after every save and fix each failing pair before calling the
+theme done (in the base first; a pin only where the base cannot). The app resolves the
+slots and checks every contrast pair in `src/themes/contrastPairs.ts`: body text 7:1 on the
+pane; muted, secondary and placeholder text, links, status text (on the pane, the sheet and
+its own tint), text on fills and accents, code and syntax 4.5:1; fills, focus rings,
+comments and chart series 3:1; the selected sidebar row 1.25:1 against the sidebar. The
+curated themes pass every pair.
 
-```
-pnpm run themes:check path/to/theme.json
-```
-
-It reads the file as the app would (the fields, the id, the hex, the scheme against the
-surface, the override names) and checks every contrast pair in
-`src/themes/contrastPairs.ts` on the resolved slots: body text 7:1 on the pane; muted,
-secondary and placeholder text, links, status text (on the pane, the sheet and its own tint),
-text on fills and accents, code and syntax 4.5:1; fills, focus rings, comments and chart
-series 3:1; the selected sidebar row 1.25:1 against the sidebar. A file may hold one theme
-or an array. The curated themes and two base-only fixtures pass every pair
-(`src/themes/contrast.test.ts`).
+The floors are also the rules: `--cf-text` is lifted to 7:1 on the pane and each status
+text to 4.5:1 whatever `base.text` and the tones say, so dimming `base.text` past the floor
+changes nothing in the app. For less contrast ("my eyes hurt", "softer"), move `surface` and `canvas`
+toward the text (a lighter dark surface, a darker light one) and soften the accent and the
+terminal; the text follows to keep its floor. Pinning a text slot lower fails the check.

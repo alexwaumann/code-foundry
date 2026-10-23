@@ -61,6 +61,10 @@ type ArgSpec struct {
 	// (Registry.effective): values that change while the daemon runs (the theme ids,
 	// the user's own themes among them). Enum is left empty.
 	EnumFunc func() []string
+	// EnumMiss, when set, explains a value that is not one of the enum's instead of
+	// listing them all ("GitHub Light is a light theme…", "nord is curated: theme
+	// duplicate nord first"); nil from it falls back to the list.
+	EnumMiss func(v string) error
 	// Default is used when the arg is absent. Must parse as Type. Not allowed with Required.
 	Default string
 	// Context, when set, makes the arg default to that field of the caller's Context.
@@ -290,6 +294,10 @@ func missingContextArg(specs []ArgSpec, a Args) error {
 	return nil
 }
 
+// maxEnumListed is how many values an enum's error lists before it counts the rest (an
+// enum of the user's themes can hold hundreds).
+const maxEnumListed = 30
+
 // parse converts one non-empty raw value to its typed form.
 func (s ArgSpec) parse(v string) (any, error) {
 	switch s.Type {
@@ -307,7 +315,16 @@ func (s ArgSpec) parse(v string) (any, error) {
 		return n, nil
 	case Enum:
 		if !slices.Contains(s.Enum, v) {
-			return nil, fmt.Errorf("want one of %s, got %q", strings.Join(s.Enum, ", "), v)
+			if s.EnumMiss != nil {
+				if err := s.EnumMiss(v); err != nil {
+					return nil, err
+				}
+			}
+			list := strings.Join(s.Enum[:min(len(s.Enum), maxEnumListed)], ", ")
+			if n := len(s.Enum) - maxEnumListed; n > 0 {
+				list += fmt.Sprintf(" and %d more", n)
+			}
+			return nil, fmt.Errorf("want one of %s, got %q", list, v)
 		}
 		return v, nil
 	case Path:

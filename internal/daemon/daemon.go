@@ -270,7 +270,11 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Memory:            st.memory,
 		Themes:            st.themes,
 		ThemeReports:      themeReports,
-		ShippedSkills:     shippedSkills(log, p.Claude()),
+		ThemeShowing: func() (string, bool) {
+			f, ok := liveTheme.Current()
+			return f.Scheme, ok
+		},
+		ShippedSkills: shippedSkills(log, p.Claude()),
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })

@@ -7,8 +7,8 @@ import { ThemeAa } from "@/components/themes/ThemeChip";
 import { cn } from "@/lib/utils";
 import { useSettingValue } from "@/stores/settings";
 import { useThreadItem } from "@/stores/thread";
-import { useUserThemes } from "@/stores/themes";
-import { applySavedTheme, editSavedTheme, undoTheme } from "@/stores/themeCards";
+import { useThemesStore, useUserThemes } from "@/stores/themes";
+import { applySavedTheme, editSavedTheme, themeUndoState, undoTheme, type ThemeUndoTarget } from "@/stores/themeCards";
 import { contrastReport } from "@/themes/contrast";
 import { themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
 import { useThreadCtx } from "./context";
@@ -22,7 +22,9 @@ const BASE = ["canvas", "surface", "text", "accent", "success", "warning", "erro
  * the save changed a slot, its nine base colours, and a footer with the pinned count, the
  * contrast check (computed here from the file as saved, as the editor does) and Undo /
  * Edit. The card shows the file as it was saved: a later save of the same id is another
- * card. Undo puts the slot back on the theme it had (disabled, "Undone", once it is);
+ * card. Undo puts back what the slot showed just before this save, another theme or the
+ * colours this save replaced, while the slot still shows this card's colours ("Undone"
+ * once it is back; disabled, with why, when that is gone: stores/themeCards.ts);
  * Edit opens the Themes page's editor on the theme as it is now. A card saved without
  * applying has Apply instead (theme.set-<scheme>), while its scheme's slot is on another
  * theme; once the slot is on it, the badge shows (docs/notes/theme-followups.md).
@@ -31,10 +33,17 @@ export const ThemeCardRow = memo(function ThemeCardRow({ id }: { id: string }) {
   const { threadId } = useThreadCtx();
   const item = useThreadItem(threadId, id);
   if (item?.kind !== "theme" || !item.theme) return null;
-  return <ThemeCard file={item.theme} applied={item.applied} previous={item.previous} />;
+  const undo: ThemeUndoTarget = {
+    scheme: item.theme.scheme,
+    id: item.theme.id,
+    previous: item.applied ? item.previous : "",
+    version: item.previousVersion,
+    gone: item.previousGone,
+  };
+  return <ThemeCard file={item.theme} applied={item.applied} undo={undo} />;
 });
 
-function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: boolean; previous: string }) {
+function ThemeCard({ file, applied, undo }: { file: UserThemeFile; applied: boolean; undo: ThemeUndoTarget }) {
   // The file as saved, resolved once: its slots paint the chip, its report the footer.
   const theme = useMemo<Theme>(() => themeOf(file), [file]);
   const issues = useMemo(() => contrastReport(file, theme.slots).length, [file, theme]);
@@ -71,7 +80,7 @@ function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: 
           {pinned} pinned ·{" "}
           {issues === 0 ? "contrast ok" : <span className="text-cf-warning-text">{issues === 1 ? "1 contrast issue" : `${String(issues)} contrast issues`}</span>}
         </span>
-        {applied && previous && previous !== file.id && <UndoButton scheme={file.scheme} previous={previous} />}
+        {applied && undo.previous && <UndoButton undo={undo} saved={file} />}
         {!inUse && <ApplyButton scheme={file.scheme} id={file.id} />}
         <EditButton id={file.id} />
       </div>
@@ -79,31 +88,43 @@ function ThemeCard({ file, applied, previous }: { file: UserThemeFile; applied: 
   );
 }
 
-/** Undo: the slot back on `previous`; "Undone" (disabled) while the slot already is. */
-function UndoButton({ scheme, previous }: { scheme: UserThemeFile["scheme"]; previous: string }) {
-  const current = useSettingValue(`appearance.theme_${scheme}`);
+/**
+ * Undo (stores/themeCards.ts themeUndoState): what the slot showed just before this save
+ * back; shown only while the slot still shows this card's colours; "Undone" (disabled) once
+ * the slot is back on it; disabled with why when that is gone.
+ */
+function UndoButton({ undo, saved }: { undo: ThemeUndoTarget; saved: UserThemeFile }) {
+  const slot = useSettingValue(`appearance.theme_${undo.scheme}`);
+  // Re-renders when the user's themes or their kept versions change.
+  useUserThemes();
+  const history = useThemesStore((s) => s.history[undo.id]);
   const [busy, setBusy] = useState(false);
-  const undone = current === previous;
-  const name = themeById.get(previous)?.name ?? previous;
+  const state = useMemo(() => themeUndoState(undo, saved, slot), [undo, saved, slot, history]); // eslint-disable-line react-hooks/exhaustive-deps -- history: the lookup reads it
+  if (state.kind === "none" || state.kind === "hidden") return null;
+  const undone = state.kind === "undone";
   return (
-    <Tip label={undone ? `The ${scheme} theme is ${name} again` : `Back to ${name}`}>
-    <Button
-      type="button"
-      variant="ghost"
-      size="xs"
-      className="text-cf-text-muted"
-      disabled={undone || busy}
-      data-testid="thread-theme-undo"
-      onClick={() => {
-        setBusy(true);
-        void undoTheme(scheme, previous).finally(() => {
-          setBusy(false);
-        });
-      }}
-    >
-      <Undo2 aria-hidden />
-      {undone ? "Undone" : "Undo"}
-    </Button>
+    <Tip label={state.tip}>
+      {/* A disabled button takes no hover: the span carries the tooltip. */}
+      <span className="inline-flex" data-testid="thread-theme-undo-tip">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="text-cf-text-muted"
+          disabled={state.kind !== "undo" || busy}
+          data-testid="thread-theme-undo"
+          data-undo={state.kind}
+          onClick={() => {
+            setBusy(true);
+            void undoTheme(undo).finally(() => {
+              setBusy(false);
+            });
+          }}
+        >
+          <Undo2 aria-hidden />
+          {undone ? "Undone" : "Undo"}
+        </Button>
+      </span>
     </Tip>
   );
 }

@@ -160,6 +160,14 @@ func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string
 	}
 	words := leadingWords(args)
 	cmd, n := resolveCommand(cmds, words)
+	if cmd != nil && cmd.GetName() != strings.Join(words[:n], ".") && wantsHelp(args[n:]) {
+		// `theme --help`: the group's own help, not that of the .show it would run.
+		if group := groupCommands(cmds, words[:n]); len(group) > 1 {
+			writeGroup(cl.stdout, strings.Join(words[:n], " "), group)
+			fmt.Fprintf(cl.stdout, "(`code-foundry %s` alone runs %s)\n", strings.Join(words[:n], " "), cmd.GetName())
+			return nil, nil, errHelp
+		}
+	}
 	if cmd == nil {
 		if group := groupCommands(cmds, words); len(group) > 0 {
 			// `code-foundry thread`: a group, not a command; say what is in it.
@@ -171,6 +179,19 @@ func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string
 		return nil, nil, errUsage
 	}
 	return cmd, args[n:], nil
+}
+
+// wantsHelp: the args before any `--` ask for help (-h, -help, --help).
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--":
+			return false
+		case "-h", "-help", "--help":
+			return true
+		}
+	}
+	return false
 }
 
 // groupCommands are the commands whose dotted names start with words as segments
@@ -204,6 +225,9 @@ func writeGroup(w io.Writer, group string, cmds []*v1.Command) {
 // runRegistry invokes a daemon command.
 func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	cmd, rest, err := cl.lookup(ctx, args)
+	if errors.Is(err, errHelp) {
+		return nil // the group's help, asked for
+	}
 	if err != nil {
 		return err
 	}
@@ -479,8 +503,10 @@ func (cl *cli) commandHelp(ctx context.Context, words []string) error {
 	if err != nil {
 		return err
 	}
-	if cmd, _ := resolveCommand(cmds, leadingWords(words)); cmd == nil {
-		if group := groupCommands(cmds, words); len(group) > 0 && len(leadingWords(words)) == len(words) {
+	// A group (`help thread`, and `help theme`, which alone would run theme.show) lists
+	// its commands.
+	if cmd, n := resolveCommand(cmds, leadingWords(words)); cmd == nil || (n == len(words) && cmd.GetName() != strings.Join(words, ".")) {
+		if group := groupCommands(cmds, words); (len(group) > 1 || cmd == nil && len(group) > 0) && len(leadingWords(words)) == len(words) {
 			writeGroup(cl.stdout, strings.Join(words, " "), group)
 			return nil
 		}

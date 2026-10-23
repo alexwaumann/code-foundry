@@ -176,14 +176,14 @@ describe("ui intent mapping", () => {
     [
       {
         case: "notify" as const,
-        value: { title: "Ocean Dusk applied to dark", link: "theme-set:dark:nord", linkLabel: "Undo", secondaryLink: "theme-edit:ocean-dusk", secondaryLinkLabel: "Edit", unlessShowing: "themes" },
+        value: { title: "Ocean Dusk applied to dark", link: "theme-undo:dark:ocean-dusk:nord", linkLabel: "Undo", secondaryLink: "theme-edit:ocean-dusk", secondaryLinkLabel: "Edit", unlessShowing: "themes" },
       },
       {
         kind: "notify",
         level: "info",
         title: "Ocean Dusk applied to dark",
         body: "",
-        link: "theme-set:dark:nord",
+        link: "theme-undo:dark:ocean-dusk:nord",
         linkLabel: "Undo",
         secondaryLink: "theme-edit:ocean-dusk",
         secondaryLinkLabel: "Edit",

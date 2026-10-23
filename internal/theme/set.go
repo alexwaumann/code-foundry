@@ -127,15 +127,19 @@ func (s Set) Without(id string) Set {
 	return NewSet(user, gone)
 }
 
-// Fallback is the theme a slot naming the gone user theme id shows instead: the theme
-// it was copied from, or that one's, and so on, the first that is a theme of scheme in
-// the set. "" when id is not gone or no theme it came from is left (the slot takes the
+// Fallback is the theme a slot naming the user theme id shows when id cannot fill it
+// (the user theme is gone, or is now of the other scheme): the theme it was copied from,
+// or that one's, and so on, the first that is a theme of scheme in the set. "" when id
+// is not such a user theme or no theme it came from is left (the slot takes the
 // default).
 func (s Set) Fallback(id, scheme string) string {
 	seen := map[string]bool{}
 	for cur := id; !seen[cur]; {
 		seen[cur] = true
 		from, gone := s.gone[cur]
+		if t, ok := s.ByID(cur); ok && t.User && t.Scheme != scheme {
+			from, gone = t.From, true
+		}
 		if !gone || from == "" {
 			return ""
 		}

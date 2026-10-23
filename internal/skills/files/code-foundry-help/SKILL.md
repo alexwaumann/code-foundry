@@ -58,7 +58,7 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
   the shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its
   bounds; a keybinding a chord such as `cmd+shift+n`, or `none` to unbind
   (`keybindings.<command>`, for example `keybindings.thread.new`).
-- Never edit the settings file by hand: `settings set` checks the value. Most apply at once.
+- Never edit settings or theme files by hand: `settings set`; colours, `theme save` (the code-foundry skill).
 
 ## Remembering preferences
 

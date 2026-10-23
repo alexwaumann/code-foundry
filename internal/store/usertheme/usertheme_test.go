@@ -65,6 +65,12 @@ func TestRead(t *testing.T) {
 		{name: "invalid colour", files: map[string]string{"bad.json": strings.Replace(valid("bad", "Bad"), `"canvas": "#04070c"`, `"canvas": "#0407"`, 1)}, wantIssues: []string{`bad.json: base.canvas: "#0407" is not #rrggbb`}},
 		{name: "id does not match the file name", files: map[string]string{"ocean.json": valid("sea", "Sea")}, wantIssues: []string{`ocean.json: its id "sea" does not match the file name; name the file sea.json`}},
 		{name: "a curated id", files: map[string]string{"nord.json": valid("nord", "My Nord")}, wantIssues: []string{`nord.json: "nord" is a curated theme's id`}},
+		{name: "a Finder copy: the id is taken", files: map[string]string{"ocean.json": valid("ocean", "Ocean"), "ocean copy.json": valid("ocean", "Ocean")},
+			wantIDs: []string{"ocean"}, wantIssues: []string{`ocean copy.json: its id "ocean" is taken by ocean.json: give this file a new "id"`}},
+		{name: "a name that differs from the id in case", files: map[string]string{"Ocean.json": valid("ocean", "Ocean")},
+			wantIssues: []string{`Ocean.json: its name differs from its id "ocean" only in case: name the file ocean.json (theme save ocean does)`}},
+		{name: "a pin that is not a slot loads without it", files: map[string]string{"ocean.json": strings.Replace(valid("ocean", "Ocean"), `"base"`, `"overrides": {"--cf-primary": "#112233"}, "base"`, 1)},
+			wantIDs: []string{"ocean"}},
 		{name: "valid and invalid side by side", files: map[string]string{"a.json": valid("a", "A"), "b.json": "[]"}, wantIDs: []string{"a"}, wantIssues: []string{"b.json: want a JSON object"}},
 	}
 	for _, tt := range tests {
@@ -151,8 +157,8 @@ func TestSaveDuplicateDelete(t *testing.T) {
 		wantID, wantName   string
 		wantFrom, wantPair string
 	}{
-		{"gruvbox-dark", "", "", "gruvbox-dark-copy", "Gruvbox Dark copy", "gruvbox-dark", "gruvbox-light"},
-		{"gruvbox-dark", "", "s-1", "gruvbox-dark-copy-2", "Gruvbox Dark copy 2", "gruvbox-dark", "gruvbox-light"},
+		{"gruvbox-dark", "", "", "gruvbox-dark-copy", "Gruvbox Dark copy", "gruvbox-dark", ""}, // the curated pair is not copied
+		{"gruvbox-dark", "", "s-1", "gruvbox-dark-copy-2", "Gruvbox Dark copy 2", "gruvbox-dark", ""},
 		{"ocean-dusk", "  Tide pool ", "", "ocean-dusk-copy", "Tide pool", "ocean-dusk", ""},
 	}
 	for _, d := range dups {

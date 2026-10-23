@@ -67,6 +67,9 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte(prompt), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "empty.json"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	inThread := map[string]string{paths.EnvThread: "s-parent"}
 	t.Setenv("HOME", dir)
 	tests := []struct {
@@ -94,6 +97,9 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		{name: "data from stdin", stdin: `{"s":true}`, args: []string{"thread", "report", "done", "--data", "-"},
 			want: map[string]string{"status": "done", "data": `{"s":true}`}},
 		{name: "a missing file", args: []string{"thread", "report", "done", "--data", "@nope.json"}, wantErr: "--data: open"},
+		// Empty is no value to the daemon, which would say the arg is missing.
+		{name: "empty stdin", args: []string{"thread", "report", "done", "--data", "-"}, wantErr: "--data -: stdin was empty"},
+		{name: "an empty file", args: []string{"thread", "report", "done", "--data", "@empty.json"}, wantErr: "--data @empty.json: the file is empty"},
 		// A summary that starts with a flag's name (e6 §4.4) is text: it has spaces.
 		{name: "a summary that starts with --", args: []string{"thread", "report", "done", "--json now emits JSON Lines", "--data", "{}"},
 			want: map[string]string{"status": "done", "summary": "--json now emits JSON Lines", "data": "{}"}},

@@ -41,6 +41,27 @@ func Read(path string) Settings {
 	return resolve(raw, nil).settings
 }
 
+// ThemeSlots is what the file at path names for the two theme slots, as written (a theme
+// that is gone included), without opening a store: the user theme store reads those
+// themes' files first (usertheme.Options.InUse). Nil when the file does not read.
+func ThemeSlots(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	raw, err := decode(data)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, k := range []string{KeyThemeDark, KeyThemeLight} {
+		if v := raw[k]; v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)

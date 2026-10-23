@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"slices"
 
 	"connectrpc.com/connect"
 
@@ -103,7 +104,9 @@ func themeSnapshotToProto(store ThemeStore, snap *usertheme.Snapshot) *v1.ThemeS
 		out.Curated = append(out.Curated, &v1.CuratedTheme{Id: t.ID, Name: t.Name, Scheme: t.Scheme, Pair: t.Pair})
 	}
 	for _, f := range snap.Themes {
-		out.User = append(out.User, theme.ToProto(f, store.Path(f.ID)))
+		u := theme.ToProto(f, store.Path(f.ID))
+		u.History = slices.Clone(snap.History[f.ID])
+		out.User = append(out.User, u)
 	}
 	for _, is := range snap.Issues {
 		out.Issues = append(out.Issues, &v1.ThemeFileIssue{File: is.File, Message: is.Message})

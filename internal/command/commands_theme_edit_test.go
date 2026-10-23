@@ -35,7 +35,7 @@ func TestThemeEdit(t *testing.T) {
 	}{
 		{name: "from the CLI", args: map[string]string{"theme": "ocean-dusk"}, view: "themes.edit.ocean-dusk", msg: "editing ocean-dusk in the Themes page (windows=2)"},
 		{name: "from the GUI the page is the feedback", uctx: command.Context{ActiveView: "themes"}, args: map[string]string{"theme": "ocean-dusk"}, view: "themes.edit.ocean-dusk"},
-		{name: "a curated theme is not one of yours", args: map[string]string{"theme": "nord"}, wantErr: `argument "theme": want one of ocean-dusk`},
+		{name: "a curated theme is not one of yours", args: map[string]string{"theme": "nord"}, wantErr: `argument "theme": Nord ("nord") is a curated theme; copy it first (theme duplicate nord) and edit the copy`},
 		{name: "no theme", wantErr: `"theme"`},
 	}
 	for _, tt := range tests {

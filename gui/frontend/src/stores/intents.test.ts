@@ -227,7 +227,7 @@ describe("notify", () => {
       level: "info" as const,
       title: "Ocean Dusk applied to dark",
       body: "",
-      link: "theme-set:dark:nord",
+      link: "theme-undo:dark:ocean-dusk:nord",
       linkLabel: "Undo",
       secondaryLink: "theme-edit:ocean-dusk",
       secondaryLinkLabel: "Edit",
