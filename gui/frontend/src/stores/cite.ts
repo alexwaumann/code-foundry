@@ -85,7 +85,7 @@ export interface TimelineHandle {
   showRow(key: string): boolean;
   /** Stops following the bottom, before a scroll of the cite layer's own. */
   unpin(): void;
-  /** Opens the row that folds an item away (Ember's work row); false when none does. Unset: the item's turn unfolds. */
+  /** Opens the row that folds an item away (Ember's work row); false when none does. Unset (a thread's timeline, whose fold never hides text): nothing to open. */
   unfold?: ((itemId: string) => boolean) | undefined;
 }
 

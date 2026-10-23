@@ -13,8 +13,9 @@
  *   permission request annotates its tool call (pending: "waiting for you");
  * - every finished turn has a header under its user message, at the top of its work
  *   (duration, steps, its cost, model) that folds it; every finished turn, the latest
- *   included, folds by default: only the user message, the header, the final assistant text
- *   (the trailing text of the turn), notes and steers show. A turn that ends while the
+ *   included, folds by default: only the user message, the header, Claude's text (every
+ *   text row in its place, the final answer included), notes, steers and inline pages
+ *   show; the fold hides the work (tools, groups, Agent rows, thinking). A turn that ends while the
  *   user reads scrolled up stays open until the list is at the bottom again (`deferred`,
  *   docs/notes/thread-fold-4-pinned-fold.md). The running turn has the same
  *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
@@ -71,7 +72,7 @@ export type WorkNode =
    * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
    * and, while open, its card with the page. The turn's fold never touches it: its row and
    * card stay as they are, folded or not (only the row opens and closes the card). It is no
-   * step and breaks a strip's run (docs/notes/inline-html.md, inline-html-3-never-folds.md).
+   * step and breaks a strip's run (docs/notes/inline-html.md, thread-fold-5-text-and-html.md).
    */
   | { type: "html"; key: string; id: string }
   /**
@@ -236,9 +237,15 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes), steers, inline pages (row and card, untouched by the fold) and theme cards stay visible in a folded turn. */
+/**
+ * What a folded turn hides: its work (tool, group, Agent and thinking rows, questions and
+ * permission requests). Claude's text (every text row, not only the final answer), notes
+ * (errors, compactions, command output, system notes), steers, inline pages (row and card,
+ * untouched by the fold) and theme cards stay visible in their place
+ * (docs/notes/thread-fold-5-text-and-html.md).
+ */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
+  return n.type !== "text" && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
 }
 
 /**
@@ -318,7 +325,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   return turns;
 }
 
-/** A turn's work rows: what folding it hides (a group or Agent row counts as one; steers and notes are not steps). */
+/** A turn's work rows: what folding it hides (a group or Agent row counts as one; text, steers, notes and pages are not steps). */
 function stepCount(body: readonly WorkNode[]): number {
   return body.filter(foldsAway).length;
 }

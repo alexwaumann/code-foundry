@@ -360,7 +360,7 @@ describe("a finished turn with nothing to fold", () => {
   });
 });
 
-describe("an inline page (docs/notes/inline-html-3-never-folds.md)", () => {
+describe("an inline page (docs/notes/thread-fold-5-text-and-html.md)", () => {
   const turn: ThreadItemView[] = [
     { ...base, id: "u", ordinal: 1, kind: "user", text: "show it", attachments: [], composerText: "" },
     { ...base, id: "t1", ordinal: 2, kind: "tool", toolUseId: "t1", name: "Write", inputJson: '{"file_path":"/w/docs/hello.html"}', status: "done", output: "", isError: false, resultJson: "" },

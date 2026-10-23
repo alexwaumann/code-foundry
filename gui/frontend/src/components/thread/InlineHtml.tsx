@@ -26,7 +26,7 @@ import { useThreadCtx } from "./context";
  * save as artifact) over the page in the same sandboxed frame as the File tab's preview
  * (HtmlFrame). The page may ask for its height (`{ type: "cf:resize", height }`); the card
  * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
- * the turn's fold never closes it: only its row does (docs/notes/inline-html-3-never-folds.md).
+ * the turn's fold never closes it: only its row does (docs/notes/thread-fold-5-text-and-html.md).
  * A closed card and a row scrolled away (the timeline is virtualized) hold no frame.
  */
 

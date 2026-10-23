@@ -198,28 +198,36 @@ test("Escape and a click outside cancel; an empty comment is fine", async ({ pag
   await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toMatch(/^\[Assistant quote\]\(cf-cite:\/\/v1\/s-r1\/[^?]+\?text=412%20tests%20pass&start=\d+&end=\d+&prefix=[^&)]*&suffix=[^&)]*\) ok$/);
 });
 
-test("a chip whose answer is in a folded turn unfolds it; a quote no longer in the thread cannot go to its source", async ({ page }) => {
+test("a chip whose answer is in a folded turn goes to it, the turn left folded; a quote no longer in the thread cannot go to its source", async ({ page }) => {
   await openThread(page);
-  // Turn 1's intermediate text shows only while the turn is open.
+  // Turn 1's intermediate text shows while the turn is folded (thread-fold-5-text-and-html).
   const header = page.getByTestId("thread-turn-header").first();
-  const toggle = () => header.evaluate((el) => (el.querySelector("button") ?? el).dispatchEvent(new MouseEvent("click", { bubbles: true })));
-  await toggle();
+  await expect(header).toHaveAttribute("data-folded", "true");
   const mid = pane(page).locator('[data-testid="thread-text"]').filter({ hasText: "Now the fingerprint itself." });
   await expect(mid).toBeVisible();
-  // Away from the list's edges: a drag near one autoscrolls it.
-  await mid.evaluate((el) => {
-    el.scrollIntoView({ block: "center" });
-  });
+  // Away from the list's edges (a drag near one autoscrolls it), by the user's wheel: the
+  // list is pinned at the bottom and follows it back after a scroll nobody asked for.
+  const box = await page.getByTestId("thread-timeline").boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+  for (let i = 0; i < 40; i++) {
+    const m = await mid.boundingBox();
+    if (m && box && m.y >= box.y + 100 && m.y + m.height <= box.y + box.height - 100) break;
+    await page.mouse.wheel(0, -120);
+    await page.waitForTimeout(50);
+  }
   await dragSelect(page, mid, "fingerprint itself");
   await citeButton(page).click();
   await page.keyboard.press("Enter");
   await expect(chips(page)).toHaveText(["fingerprint itself"]);
-  await toggle();
-  await expect(mid).toHaveCount(0);
+  // Scrolled away to the bottom, the chip brings the folded turn's text back into view.
+  await page.getByTestId("thread-timeline").evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
   await chips(page).first().click();
   await expect(popover(page)).toBeVisible();
-  await expect(mid).toBeVisible();
+  await expect(mid).toBeInViewport();
   expect(await hasHighlight(page, "cf-cite-mark")).toBe(true);
+  await expect(header).toHaveAttribute("data-folded", "true");
   await page.keyboard.press("Escape");
   await expect(popover(page)).toHaveCount(0);
 
