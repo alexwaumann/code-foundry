@@ -629,7 +629,7 @@ export class World {
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
   /** Threads' conversations (mock/thread.ts); the EventService thread source carries their pending requests. */
-  readonly logs = new MockThreadLogs(
+  readonly logs: MockThreadLogs = new MockThreadLogs(
     {
       worktreeOf: (id) => this.thread(id).worktreePath,
       modelOf: (id) => this.thread(id).model,
@@ -667,6 +667,10 @@ export class World {
         const s = this.thread(id);
         recordResult(s, model);
         this.publishThread(s);
+      },
+      themeCard: (id) => this.themes.cardOf(id),
+      setThemeSlot: (scheme, id) => {
+        this.settings.update({ [`appearance.theme_${scheme}`]: id });
       },
       agentsChanged: (id) => {
         const s = this.threads.get(id);
@@ -751,10 +755,17 @@ export class World {
     emit: (i) => this.emit(i),
   });
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
-  readonly themes = new MockThemes({
+  readonly themes: MockThemes = new MockThemes({
     publish: (v) => this.events.publish({ source: EventSource.THEME, event: { event: { case: "theme", value: v } } }),
     slot: (scheme) => this.settings.values()[`appearance.theme_${scheme}`] ?? "",
     setSlot: (scheme, id) => this.settings.update({ [`appearance.theme_${scheme}`]: id }),
+    card: (threadId, card) => {
+      const it = this.logs.showTheme(threadId, card);
+      return it.payload?.case === "theme" ? (it.payload.value.previous ?? "") : "";
+    },
+    emit: (intent) => {
+      this.emit(intent);
+    },
   });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
@@ -3527,6 +3538,35 @@ export class World {
         run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
           const name = args.slot ? `themes.${args.slot}` : "themes";
           return `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`;
+        },
+      },
+      // Like internal/command/commands_theme_ask.go: a no-project thread that makes the theme described.
+      {
+        cmd: {
+          name: "theme.ask",
+          title: "Ask the Model for a Theme…",
+          category: "Settings",
+          description: "Start a thread that makes the colour theme you describe: the model saves and applies it, and the thread shows it as a card with Undo and Edit.",
+          keybindings: [],
+          args: [
+            { name: "description", type: ArgType.STRING, required: false, positional: true, description: "The theme, in your words" },
+            { name: "pair", type: ArgType.ENUM, required: false, description: "One of your themes: ask for its pair of the other scheme", enumValues: [...this.themes.choices("dark"), ...this.themes.choices("light")].map((t) => t.id) },
+          ],
+        },
+        when: always,
+        run: (ctx: UiContext | undefined, args: Record<string, string>) => {
+          let ask = (args.description ?? "").trim();
+          if (args.pair) {
+            const t = this.themes.userTheme(args.pair);
+            if (!t) throw new CommandError("invalid", `argument "pair": ${JSON.stringify(args.pair)} is not one of your themes`);
+            const other = t.scheme === "dark" ? "light" : "dark";
+            ask = `Make a ${other} pair for my theme ${t.id} (\`code-foundry theme show ${t.id}\` prints it): same hues, a ${other} scheme, saved as ${t.id}-${other} with pair set both ways, applied as my ${other} theme.\n\n${ask}`.trim();
+          }
+          if (!ask) throw new CommandError("invalid", 'argument "description": describe the theme (or give --pair)');
+          const v = this.settings.values();
+          const where = ctx?.activeView === "themes" ? "The user asked for this on the Themes page" : "The user wants this as a colour theme for Code Foundry";
+          const prompt = `${ask}\n\n(${where}; the current dark theme is ${v["appearance.theme_dark"] ?? ""} and light theme is ${v["appearance.theme_light"] ?? ""}. Make the theme they describe, save it with \`code-foundry theme save --data - --apply\`, and keep refining it in this thread (the code-foundry skill: Making a theme).)`;
+          return this.newHomeThread(undefined, { prompt, permission: "auto" });
         },
       },
       // Like internal/command/commands_theme_edit.go: the Themes page editing one of the user's themes.

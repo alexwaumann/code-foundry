@@ -41,7 +41,19 @@ export type UiIntentView =
    * A toast. `link` (a target stores/notifyLinks.ts knows, "settings:memory") is a button
    * on it, worded `linkLabel`; absent when the daemon sent none.
    */
-  | { kind: "notify"; level: NotifyLevel; title: string; body: string; link?: string; linkLabel?: string }
+  | {
+      kind: "notify";
+      level: NotifyLevel;
+      title: string;
+      body: string;
+      link?: string;
+      linkLabel?: string;
+      /** A second button before the first ("theme-edit:<id>", "Edit"); absent when none. */
+      secondaryLink?: string;
+      secondaryLinkLabel?: string;
+      /** A page id ("themes"): a window showing that page skips the toast (the page shows the change). */
+      unlessShowing?: string;
+    }
   /**
    * A named view, or a panel action. `threadId` (a view.panel.* verb run inside a thread)
    * scopes a panel action to that thread's panel, whatever the window has selected
@@ -77,9 +89,16 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
     case "openPalette":
       return { kind: "openPalette", query: e.value.query };
     case "notify": {
-      const { level, title, body, link, linkLabel } = e.value;
-      const view = { kind: "notify" as const, level: levelMap[level], title, body };
-      return link ? { ...view, link, linkLabel: linkLabel || "Open" } : view;
+      const { level, title, body, link, linkLabel, secondaryLink, secondaryLinkLabel, unlessShowing } = e.value;
+      return {
+        kind: "notify" as const,
+        level: levelMap[level],
+        title,
+        body,
+        ...(link ? { link, linkLabel: linkLabel || "Open" } : {}),
+        ...(secondaryLink ? { secondaryLink, secondaryLinkLabel: secondaryLinkLabel || "Open" } : {}),
+        ...(unlessShowing ? { unlessShowing } : {}),
+      };
     }
     case "showView": {
       const { name, threadId, params } = e.value;

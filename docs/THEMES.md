@@ -7,6 +7,12 @@ in the themes directory (`theme save`, `theme show`, `theme duplicate`; `theme e
 one in the Themes page's editor), read by the same rules as the curated ones: the GUI and
 the daemon refuse the same files.
 
+Run from a thread, `theme save` also puts a card in that thread's conversation (the theme's
+swatches and contrast, Undo back to the slot's previous theme, Edit) and, when it changes what
+a slot shows, a toast. `theme ask "<description>"` (the Themes page's Ask the model) starts a
+thread with no project that makes the theme described; `--pair <id>` asks for the other
+scheme's pair of one of your themes.
+
 ## A theme file
 
 ```json

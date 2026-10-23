@@ -119,6 +119,8 @@ const (
 	ThreadServiceSlashCommandsProcedure = "/codefoundry.v1.ThreadService/SlashCommands"
 	// ThreadServiceShowHtmlProcedure is the fully-qualified name of the ThreadService's ShowHtml RPC.
 	ThreadServiceShowHtmlProcedure = "/codefoundry.v1.ThreadService/ShowHtml"
+	// ThreadServiceShowThemeProcedure is the fully-qualified name of the ThreadService's ShowTheme RPC.
+	ThreadServiceShowThemeProcedure = "/codefoundry.v1.ThreadService/ShowTheme"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -312,6 +314,11 @@ type ThreadServiceClient interface {
 	// docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
 	// home directory (InvalidArgument otherwise, NotFound when missing).
 	ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error)
+	// ShowTheme puts a theme card in a thread's conversation: a `theme` item at the thread's
+	// current position, as ShowHtml places a page. code-foundry theme save adds one when it
+	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
+	// file (InvalidArgument otherwise); nothing is written to the themes directory.
+	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -553,6 +560,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ShowHtml")),
 			connect.WithClientOptions(opts...),
 		),
+		showTheme: connect.NewClient[v1.ShowThreadThemeRequest, v1.ShowThreadThemeResponse](
+			httpClient,
+			baseURL+ThreadServiceShowThemeProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -596,6 +609,7 @@ type threadServiceClient struct {
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
 	showHtml          *connect.Client[v1.ShowThreadHtmlRequest, v1.ShowThreadHtmlResponse]
+	showTheme         *connect.Client[v1.ShowThreadThemeRequest, v1.ShowThreadThemeResponse]
 }
 
 // Create calls codefoundry.v1.ThreadService.Create.
@@ -786,6 +800,11 @@ func (c *threadServiceClient) SlashCommands(ctx context.Context, req *connect.Re
 // ShowHtml calls codefoundry.v1.ThreadService.ShowHtml.
 func (c *threadServiceClient) ShowHtml(ctx context.Context, req *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error) {
 	return c.showHtml.CallUnary(ctx, req)
+}
+
+// ShowTheme calls codefoundry.v1.ThreadService.ShowTheme.
+func (c *threadServiceClient) ShowTheme(ctx context.Context, req *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
+	return c.showTheme.CallUnary(ctx, req)
 }
 
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
@@ -979,6 +998,11 @@ type ThreadServiceHandler interface {
 	// docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
 	// home directory (InvalidArgument otherwise, NotFound when missing).
 	ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error)
+	// ShowTheme puts a theme card in a thread's conversation: a `theme` item at the thread's
+	// current position, as ShowHtml places a page. code-foundry theme save adds one when it
+	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
+	// file (InvalidArgument otherwise); nothing is written to the themes directory.
+	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1216,6 +1240,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ShowHtml")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceShowThemeHandler := connect.NewUnaryHandler(
+		ThreadServiceShowThemeProcedure,
+		svc.ShowTheme,
+		connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceCreateProcedure:
@@ -1294,6 +1324,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSlashCommandsHandler.ServeHTTP(w, r)
 		case ThreadServiceShowHtmlProcedure:
 			threadServiceShowHtmlHandler.ServeHTTP(w, r)
+		case ThreadServiceShowThemeProcedure:
+			threadServiceShowThemeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1453,4 +1485,8 @@ func (UnimplementedThreadServiceHandler) SlashCommands(context.Context, *connect
 
 func (UnimplementedThreadServiceHandler) ShowHtml(context.Context, *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ShowHtml is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ShowTheme is not implemented"))
 }

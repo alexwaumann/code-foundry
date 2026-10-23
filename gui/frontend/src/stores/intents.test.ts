@@ -219,6 +219,32 @@ describe("notify", () => {
     expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "memory", usageOpen: false });
   });
 
+  it("a second link is a button before the first; a page showing the change skips the toast", async () => {
+    const { useViewsStore } = await import("./views");
+    useViewsStore.setState({ themesOpen: false });
+    const intent = {
+      kind: "notify" as const,
+      level: "info" as const,
+      title: "Ocean Dusk applied to dark",
+      body: "",
+      link: "theme-set:dark:nord",
+      linkLabel: "Undo",
+      secondaryLink: "theme-edit:ocean-dusk",
+      secondaryLinkLabel: "Edit",
+      unlessShowing: "themes",
+    };
+    applyIntent(intent);
+    const [title, opts] = toastInfo.mock.calls[0] as [string, { action: { label: string }; cancel: { label: string } }];
+    expect(title).toBe("Ocean Dusk applied to dark");
+    expect(opts.action.label).toBe("Undo");
+    expect(opts.cancel.label).toBe("Edit");
+    toastInfo.mockClear();
+    useViewsStore.setState({ themesOpen: true });
+    applyIntent(intent);
+    expect(toastInfo).not.toHaveBeenCalled();
+    useViewsStore.setState({ themesOpen: false });
+  });
+
   it.each([
     ["no link", undefined, undefined],
     ["a link this window does not know", "nowhere:at-all", { description: "b" }],

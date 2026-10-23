@@ -948,7 +948,14 @@ type UiIntent_Notify struct {
 	// the app memory's "Remembered: ..." and "Forgot: ..." toasts). Empty: no button.
 	Link string `protobuf:"bytes,4,opt,name=link,proto3" json:"link,omitempty"`
 	// The button's words ("Show in Settings"); empty: "Open".
-	LinkLabel     string `protobuf:"bytes,5,opt,name=link_label,json=linkLabel,proto3" json:"link_label,omitempty"`
+	LinkLabel string `protobuf:"bytes,5,opt,name=link_label,json=linkLabel,proto3" json:"link_label,omitempty"`
+	// A second button, before the first, in the same form ("theme-edit:<id>", "Edit"): a
+	// theme a thread applied offers Edit beside Undo. Empty: none.
+	SecondaryLink      string `protobuf:"bytes,6,opt,name=secondary_link,json=secondaryLink,proto3" json:"secondary_link,omitempty"`
+	SecondaryLinkLabel string `protobuf:"bytes,7,opt,name=secondary_link_label,json=secondaryLinkLabel,proto3" json:"secondary_link_label,omitempty"`
+	// A page id ("themes"): a window showing that page skips the notification, since the
+	// page already shows the change. Empty: every window shows it.
+	UnlessShowing string `protobuf:"bytes,8,opt,name=unless_showing,json=unlessShowing,proto3" json:"unless_showing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1018,6 +1025,27 @@ func (x *UiIntent_Notify) GetLinkLabel() string {
 	return ""
 }
 
+func (x *UiIntent_Notify) GetSecondaryLink() string {
+	if x != nil {
+		return x.SecondaryLink
+	}
+	return ""
+}
+
+func (x *UiIntent_Notify) GetSecondaryLinkLabel() string {
+	if x != nil {
+		return x.SecondaryLinkLabel
+	}
+	return ""
+}
+
+func (x *UiIntent_Notify) GetUnlessShowing() string {
+	if x != nil {
+		return x.UnlessShowing
+	}
+	return ""
+}
+
 var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
@@ -1031,7 +1059,7 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x16\n" +
 	"\x14PublishThemeResponse\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xc7\r\n" +
+	"\x13WatchIntentsRequest\"\xc7\x0e\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -1073,14 +1101,17 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x1a#\n" +
 	"\vOpenPalette\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xf6\x01\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xf6\x02\n" +
 	"\x06Notify\x12;\n" +
 	"\x05level\x18\x01 \x01(\x0e2%.codefoundry.v1.UiIntent.Notify.LevelR\x05level\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04body\x18\x03 \x01(\tR\x04body\x12\x12\n" +
 	"\x04link\x18\x04 \x01(\tR\x04link\x12\x1d\n" +
 	"\n" +
-	"link_label\x18\x05 \x01(\tR\tlinkLabel\"R\n" +
+	"link_label\x18\x05 \x01(\tR\tlinkLabel\x12%\n" +
+	"\x0esecondary_link\x18\x06 \x01(\tR\rsecondaryLink\x120\n" +
+	"\x14secondary_link_label\x18\a \x01(\tR\x12secondaryLinkLabel\x12%\n" +
+	"\x0eunless_showing\x18\b \x01(\tR\runlessShowing\"R\n" +
 	"\x05Level\x12\x15\n" +
 	"\x11LEVEL_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +

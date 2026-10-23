@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useColorScheme, useThemeSlots } from "@/lib/theme";
 import { fixSlotContrast, saveEdits, setSaveOpen, unpinSlot, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
+import { askForTheme } from "@/stores/themeCards";
 import { themeById } from "@/themes";
 import { MarkBadge } from "./ThemeInspector";
 import { ratioText, shortName } from "./model";
@@ -30,14 +31,21 @@ function SaveBody() {
   const slots = useThemeSlots();
   const [name, setName] = useState(draft?.name ?? "");
   const [apply, setApply] = useState(draft?.scheme === inUse);
+  const [pair, setPair] = useState(false);
   if (!draft || !analysis) return null;
+  // A theme with no pair yet can ask the model for one (theme.ask --pair) once it is saved.
+  const other = draft.scheme === "dark" ? "light" : "dark";
+  const canPair = !draft.pair;
   const isSlot = slots[draft.scheme] === draft.id;
   const from = draft.from ? (themeById.get(draft.from)?.name ?? draft.from) : "";
   // One line per failing slot, at its worst pair.
   const failing = [...analysis.failing.entries()].map(([slot, rows]) => ({ slot, worst: rows.reduce((a, b) => (b.ratio / b.required < a.ratio / a.required ? b : a)) }));
   const problems = failing.length + analysis.stale.length;
   const save = () => {
-    void saveEdits({ name, apply: apply && !isSlot });
+    const id = draft.id;
+    void saveEdits({ name, apply: apply && !isSlot }).then((ok) => {
+      if (ok && pair && canPair) void askForTheme("", id);
+    });
   };
   return (
     <Dialog
@@ -110,6 +118,13 @@ function SaveBody() {
             <Label className="flex items-center gap-2 text-body-sm font-normal">
               <Checkbox checked={apply} onCheckedChange={(v) => { setApply(v === true); }} data-testid="theme-save-apply" />
               Use as my {draft.scheme} theme now
+            </Label>
+          )}
+          {canPair && (
+            <Label className="flex items-center gap-2 text-body-sm font-normal">
+              <Checkbox checked={pair} onCheckedChange={(v) => { setPair(v === true); }} data-testid="theme-save-pair" />
+              Also make a {other} pair
+              <span className="text-caption text-cf-text-muted">(a thread makes it)</span>
             </Label>
           )}
           <div className="flex justify-end gap-2 pt-1">

@@ -132,6 +132,19 @@ func themeErr(arg string, err error) error {
 	return Failed(err)
 }
 
+// ThemeDeps are the theme.* commands' dependencies.
+type ThemeDeps struct {
+	// Settings holds the slots (appearance.theme_dark / theme_light). Required.
+	Settings SettingsBackend
+	// Themes is the user's theme files; nil: the catalog only.
+	Themes ThemeBackend
+	// Cards puts a theme card in the thread a theme.save runs from
+	// (docs/notes/theme-model-flow.md); nil: no card.
+	Cards ThemeCardShower
+	// Emitter shows the toast for a theme a thread applied; nil: none.
+	Emitter Emitter
+}
+
 // RegisterTheme registers the theme.* commands but theme.pick: list, set-dark and
 // set-light (the appearance.theme_dark / theme_light settings), and show, save, duplicate
 // and delete (the user's own themes, docs/notes/user-themes.md). The settings store
@@ -139,7 +152,8 @@ func themeErr(arg string, err error) error {
 // ids (the user's included, again at every call), so the palette offers a pick list and
 // the CLI refuses another scheme's theme before sending. Without themes (nil) only the
 // curated catalog is known and the user-theme verbs fail Unimplemented.
-func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
+func RegisterTheme(r *Registry, d ThemeDeps) error {
+	b, themes := d.Settings, d.Themes
 	values := func(ctx context.Context) (map[string]string, error) {
 		res, err := b.Get(ctx, connect.NewRequest(&v1.GetSettingsRequest{}))
 		if err != nil {
@@ -263,6 +277,11 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 				if by := themeCaller(uctx); by != "" {
 					f.CreatedBy = by
 				}
+				// The slot before the save: what a thread's card puts back on Undo.
+				before := ""
+				if vals, err := values(ctx); err == nil {
+					before = vals[themeSlotKey[f.Scheme]]
+				}
 				saved, err := themes.Save(f)
 				if err != nil {
 					return Result{}, themeErr(arg, err)
@@ -276,7 +295,17 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 					out.Applied = js.Key
 					lines = append(lines, "applied: "+msg)
 				}
-				return Result{Message: strings.Join(lines, "\n"), JSON: out}, nil
+				res := Result{Message: strings.Join(lines, "\n"), JSON: out}
+				if by := themeCaller(uctx); by != "" {
+					applied := a.Bool("apply") || before == saved.File.ID
+					var shown bool
+					res.Warnings, shown = showThemeCard(ctx, d, by, saved.File, applied, before)
+					if shown {
+						// The card checks every pair where the user sees it: nothing for the model to run.
+						res.Message = strings.Replace(res.Message, themeContrastLine(saved.File.ID), ThemeCardContrastLine, 1)
+					}
+				}
+				return res, nil
 			},
 		},
 		Command{
@@ -425,10 +454,18 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	}
 	// The daemon derives no colours (the rules are the GUI's, src/themes/slots.ts), so it
 	// cannot say which pairs fall short or which pins the base has moved; the editor does.
-	contrast := fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", f.ID)
+	contrast := themeContrastLine(f.ID)
 	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, contrast, "written to: " + s.Path}
 	return out, lines
 }
+
+// themeContrastLine is the save's contrast line from the user's terminal.
+func themeContrastLine(id string) string {
+	return fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", id)
+}
+
+// ThemeCardContrastLine replaces it when the save added a card to the calling thread.
+const ThemeCardContrastLine = "contrast: checked on the theme card this save added to your conversation, which the user sees (nothing to run)"
 
 // themeName is "Name (id)", or the id alone for a theme the set does not have.
 func themeName(s theme.Set, id string) string {

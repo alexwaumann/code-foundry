@@ -478,6 +478,26 @@ describe("turnCostLabel", () => {
   });
 });
 
+describe("theme cards (theme items)", () => {
+  it("stay in a folded turn, are no step, and break a live strip's run", () => {
+    const items = [user("u1"), tool("Bash"), item("theme", { id: "c" }), text("a"), end("e1")];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "theme:c", "final:a"]);
+    const live = [user("u1"), tool("Bash"), tool("Write"), item("theme", { id: "c" }), tool("Bash"), tool("Read", { toolStatus: "running" })];
+    expect(shape(buildRows(buildTurns(live), { fold: () => undefined, working: true, strips: true }))).toEqual([
+      "user:u1",
+      "live(u1,4)",
+      "strip(2)[tool:Bash tool:Write]",
+      "theme:c",
+      "strip(2)[tool:Bash tool:Read]",
+    ]);
+  });
+
+  it("saved between turns: no turn of their own, and the next message starts one", () => {
+    const items = [user("u1"), end("e1"), item("theme", { id: "c" }), user("u2"), text("b"), end("e2")];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "theme:c", "user:u2", "header(folded 0)", "final:b"]);
+  });
+});
+
 describe("inline pages (html items)", () => {
   it("stay in a folded turn as their row, marked folded; open when the turn is open; no step", () => {
     const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];

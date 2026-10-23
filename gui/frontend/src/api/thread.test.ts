@@ -3,6 +3,37 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { MessageOrigin, ThreadEventSchema, ThreadItemDelta_Field, ThreadItemSchema, ThreadRequestState, ToolCallStatus } from "@/gen/codefoundry/v1/thread_pb";
 import { toThreadEventView, toThreadItemView } from "./thread";
+import { themeById } from "@/themes";
+
+describe("toThreadItemView: theme cards", () => {
+  const nord = themeById.get("nord");
+  if (!nord) throw new Error("no nord");
+  const t = nord.base.terminal;
+  const file = {
+    id: "nord-warmer",
+    name: "Nord, warmer",
+    scheme: "dark",
+    from: "nord",
+    createdBy: "s-1",
+    base: { ...nord.base, link: "", terminal: { foreground: t.foreground, cursor: "", cursorText: "", selection: "", ansi: [...t.ansi] } },
+    overrides: { "--cf-sidebar-row-selected": "#3b4252" },
+  };
+  const v = (theme: object | undefined, applied: boolean, previous: string) =>
+    toThreadItemView(create(ThreadItemSchema, { id: "c", ordinal: 3n, payload: { case: "theme", value: { theme, applied, previous } } } as never));
+
+  it("maps the file as saved, applied and the Undo target", () => {
+    const got = v(file, true, "github-dark");
+    expect(got).toMatchObject({ kind: "theme", applied: true, previous: "github-dark" });
+    if (got?.kind !== "theme") throw new Error("not a theme item");
+    expect(got.theme).toMatchObject({ id: "nord-warmer", name: "Nord, warmer", scheme: "dark", from: "nord", createdBy: "s-1", overrides: { "--cf-sidebar-row-selected": "#3b4252" } });
+    expect(got.theme?.base.canvas).toBe(nord.base.canvas);
+  });
+
+  it("a file the GUI's rules refuse is null (the card is not drawn)", () => {
+    expect(v({ ...file, overrides: { "--cf-icon": "#ffffff" } }, false, "")).toMatchObject({ kind: "theme", theme: null, applied: false, previous: "" });
+    expect(v(undefined, false, "")).toMatchObject({ kind: "theme", theme: null });
+  });
+});
 
 describe("toThreadItemView", () => {
   it("maps every payload kind", () => {

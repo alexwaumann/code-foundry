@@ -58,13 +58,13 @@ func openTurn(items []Item) (start Item, last time.Time, ok bool) {
 }
 
 // startsTurn reports whether an item of kind k can be a turn's first: not an error, an
-// html item or a command output. Those three are what the daemon appends on its own,
-// outside a turn too: an html item a verb put in an idle thread (inline-html-2-fixes.md),
+// html or theme item or a command output. Those are what the daemon appends on its own,
+// outside a turn too: an html or theme item a verb put in an idle thread (inline-html-2-fixes.md),
 // an effort restart's "Set effort to …" and "Restarted Claude". Alone they are no turn,
 // so a process ending after them writes no "Interrupted" turn end; inside a turn they
 // follow its first message. A local command's output comes after the message that ran it.
 func startsTurn(k ItemKind) bool {
-	return k != KindError && k != KindHTML && k != KindCommandOutput
+	return k != KindError && k != KindHTML && k != KindTheme && k != KindCommandOutput
 }
 
 func latest(ts ...time.Time) time.Time {

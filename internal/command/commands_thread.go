@@ -69,6 +69,8 @@ type ThreadBackend interface {
 	ReseedBackend
 	// HTMLShower backs view.inline (commands_view_inline.go).
 	HTMLShower
+	// ThemeCardShower backs theme.save's card (commands_theme_card.go).
+	ThemeCardShower
 }
 
 var (
@@ -594,6 +596,16 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			body = "page: " + h.GetPath()
 			if h.GetTitle() != "" {
 				body += " (" + line(h.GetTitle()) + ")"
+			}
+		case it.GetTheme() != nil:
+			c := it.GetTheme()
+			t := c.GetTheme()
+			body = fmt.Sprintf("theme: %s (%s), %s", line(t.GetName()), t.GetId(), t.GetScheme())
+			if c.GetApplied() {
+				body += ", applied"
+				if c.GetPrevious() != "" {
+					body += " (undo: " + c.GetPrevious() + ")"
+				}
 			}
 		default:
 			body = "(unknown item " + it.GetId() + ")"

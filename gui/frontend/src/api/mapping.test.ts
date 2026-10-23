@@ -173,6 +173,23 @@ describe("ui intent mapping", () => {
       { kind: "notify", level: "info", title: "x", body: "", link: "settings:memory", linkLabel: "Show in Settings" },
     ],
     [{ case: "notify" as const, value: { title: "x", link: "settings:memory" } }, { kind: "notify", level: "info", title: "x", body: "", link: "settings:memory", linkLabel: "Open" }],
+    [
+      {
+        case: "notify" as const,
+        value: { title: "Ocean Dusk applied to dark", link: "theme-set:dark:nord", linkLabel: "Undo", secondaryLink: "theme-edit:ocean-dusk", secondaryLinkLabel: "Edit", unlessShowing: "themes" },
+      },
+      {
+        kind: "notify",
+        level: "info",
+        title: "Ocean Dusk applied to dark",
+        body: "",
+        link: "theme-set:dark:nord",
+        linkLabel: "Undo",
+        secondaryLink: "theme-edit:ocean-dusk",
+        secondaryLinkLabel: "Edit",
+        unlessShowing: "themes",
+      },
+    ],
     [{ case: "playAlertSound" as const, value: { volume: 15 } }, { kind: "playAlertSound", volume: 15 }],
     [{ case: "showAgentRun" as const, value: { threadId: "s1", runId: "a1" } }, { kind: "showAgentRun", threadId: "s1", runId: "a1" }],
   ])("maps %#", (intent, want) => {

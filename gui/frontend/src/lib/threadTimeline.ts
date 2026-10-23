@@ -76,6 +76,11 @@ export type WorkNode =
    */
   | { type: "html"; key: string; id: string; folded: boolean; foldChosen?: boolean }
   /**
+   * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): its
+   * card. Like a page it stays in a folded turn, is no step and breaks a strip's run.
+   */
+  | { type: "theme"; key: string; id: string }
+  /**
    * A run of work in the live turn collapsed into one row (stripRuns): its nodes in order
    * (thinking included), the latest step (never thinking) and the step count. Its row key
    * is its first node's, so when the turn ends that node's row takes the strip's place
@@ -198,6 +203,9 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
       case "html":
         out.push({ type: "html", key: it.id, id: it.id, folded: false });
         break;
+      case "theme":
+        out.push({ type: "theme", key: it.id, id: it.id });
+        break;
       case "user":
         // Only a steer reaches here (buildTurns keeps a turn's opening messages apart).
         out.push({ type: "steer", key: it.id, id: it.id });
@@ -229,9 +237,9 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes), steers and inline pages' rows stay visible in a folded turn. */
+/** Notes (errors, compactions, command output, system notes), steers, inline pages' rows and theme cards stay visible in a folded turn. */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html";
+  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
 }
 
 /**
@@ -241,7 +249,7 @@ function foldsAway(n: WorkNode): boolean {
  * a page shown while the thread is at its prompt arrives open (docs/notes/inline-html-2-fixes.md).
  */
 function isAside(t: { user: readonly string[]; items: readonly TimelineItem[] }): boolean {
-  return t.user.length === 0 && t.items.every((x) => x.kind === "commandOutput" || x.kind === "html");
+  return t.user.length === 0 && t.items.every((x) => x.kind === "commandOutput" || x.kind === "html" || x.kind === "theme");
 }
 
 /** The thread's items (top level, in order) as turns. */
@@ -350,7 +358,7 @@ export function defaultFolded(turn: TimelineTurn): boolean {
  */
 function isNoteTurn(t: TimelineTurn): boolean {
   if (t.user.length > 0 || t.end !== "" || t.body.length === 0) return false;
-  return (t.body.length === 1 && t.body[0]?.type === "system") || t.body.every((n) => n.type === "html");
+  return (t.body.length === 1 && t.body[0]?.type === "system") || t.body.every((n) => n.type === "html" || n.type === "theme");
 }
 
 /** The rows to lay out, top to bottom: per turn its user message(s), its header, its work (minus what the fold hides). */

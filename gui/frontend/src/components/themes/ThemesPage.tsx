@@ -33,6 +33,7 @@ import {
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
 import { useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
+import { AskTheModel } from "./AskTheModel";
 import { SaveThemeDialog } from "./editor/SaveThemeDialog";
 import { ThemeInspector } from "./editor/ThemeInspector";
 import { ThemeAa, ThemeStrip } from "./ThemeChip";
@@ -433,6 +434,7 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
       <p className="min-w-0 truncate text-caption" data-testid="themes-scheme-note">
         {schemeNote(pref, scheme, themeOf(slots[scheme], scheme).name)}
       </p>
+      <AskTheModel />
     </div>
   );
 }

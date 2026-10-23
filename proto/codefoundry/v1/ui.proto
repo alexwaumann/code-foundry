@@ -131,6 +131,13 @@ message UiIntent {
     string link = 4;
     // The button's words ("Show in Settings"); empty: "Open".
     string link_label = 5;
+    // A second button, before the first, in the same form ("theme-edit:<id>", "Edit"): a
+    // theme a thread applied offers Edit beside Undo. Empty: none.
+    string secondary_link = 6;
+    string secondary_link_label = 7;
+    // A page id ("themes"): a window showing that page skips the notification, since the
+    // page already shows the change. Empty: every window shows it.
+    string unless_showing = 8;
   }
 }
 
