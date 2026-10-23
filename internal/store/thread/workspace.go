@@ -40,15 +40,17 @@ func workspacePrompt(name string) string {
 // (docs/notes/agent-skills.md, control-4-capabilities.md). Then the routing a thread
 // needs when no skill fires, as on ordinary task-shaped prompts: where preferences,
 // cost, showing things, pull requests and slash commands go in this app
-// (docs/notes/control-7-skill-routing.md), and where thread new puts a thread, stated
-// without a recommendation: the model's call (docs/notes/thread-new-base-origin.md). Its last sentence holds the orchestration
-// rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
+// (docs/notes/control-7-skill-routing.md), how to write a path so its chip opens the
+// file (absolute or against the cwd, which the chip resolves against:
+// docs/notes/model-paths.md), and where thread new puts a thread, stated without a
+// recommendation: the model's call (docs/notes/thread-new-base-origin.md). Its last
+// sentence holds the orchestration rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
 	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
 	"cost: code-foundry usage.show; " +
 	"to show something: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
-	"a path in your reply is a clickable chip; a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown; " +
+	"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line; a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown; " +
 	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
 	"never tell the user to type /model or /cost; " +
