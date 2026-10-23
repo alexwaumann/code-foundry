@@ -69,6 +69,61 @@ func TestTeam(t *testing.T) {
 	}
 }
 
+// Working is a thread on a turn, starting, or waiting on child threads of its own; not
+// an idle one, whatever its task's state or its leftover reason.
+func TestWorking(t *testing.T) {
+	const (
+		connected, starting, closing, stopped = thread.StateConnected, thread.StateStarting, thread.StateClosing, thread.StateDisconnected
+		busy, idle, attention, unknown        = thread.StatusBusy, thread.StatusIdle, thread.StatusNeedsAttention, thread.StatusUnknown
+	)
+	tests := []struct {
+		name   string
+		st     thread.State
+		status thread.Status
+		reason string
+		want   bool
+	}{
+		{"on a turn", connected, busy, "working", true},
+		{"busy, state not known yet", thread.StateUnspecified, busy, "working", true},
+		{"starting", starting, unknown, "", true},
+		{"a lead waiting on its workers", connected, idle, "waiting on 2 child threads", true},
+		{"a stopped lead waiting on its workers", stopped, idle, "waiting on 1 child thread", true},
+		{"finished, reported done", connected, attention, "finished", false},
+		{"idle at its prompt", connected, idle, "at prompt", false},
+		{"stopped after its turn", stopped, idle, "at prompt", false},
+		{"a busy status left on a stopped thread", stopped, busy, "working", false},
+		{"closing", closing, busy, "working", false},
+		{"waiting alone: only a queued wake", connected, idle, "waiting", false},
+		{"waiting on no child thread", connected, idle, "waiting on 0 child threads", false},
+		{"a waiting reason on an attention status", connected, attention, "waiting on 2 child threads", false},
+		{"asking the user", connected, attention, "question: which flag?", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := working(tt.st, tt.status, tt.reason); got != tt.want {
+				t.Errorf("working(%v, %v, %q) = %v, want %v", tt.st, tt.status, tt.reason, got, tt.want)
+			}
+		})
+	}
+	idleWorker := &TaskThread{State: connected, Status: attention, StatusReason: "finished"}
+	if idleWorker.Working() || idleWorker.WaitsOnUser() {
+		t.Error("an idle worker works or waits")
+	}
+	if lead := (&TaskThread{State: connected, Status: attention, StatusReason: "finished", Team: Team{Working: 1, Total: 1}}); !lead.Working() {
+		t.Error("a lead whose team works does not work")
+	}
+	if archived := (&TaskThread{State: connected, Status: busy, Archived: true}); archived.Working() {
+		t.Error("an archived worker works")
+	}
+	if asks := (&TaskThread{State: connected, Status: idle, Team: Team{Waiting: 1, Total: 1}}); !asks.WaitsOnUser() || asks.Working() {
+		t.Error("a team member's question is not the worker's")
+	}
+	var none *TaskThread
+	if none.Working() || none.WaitsOnUser() {
+		t.Error("no worker works")
+	}
+}
+
 func TestTaskTeamPublished(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
