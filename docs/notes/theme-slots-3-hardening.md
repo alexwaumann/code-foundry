@@ -159,7 +159,46 @@ found none (the one template, `lib/utils.ts`, builds type-role names for tailwin
 
 ## Pixel comparison
 
-PIXELS
+Playwright WebKit, 1440×900 at 2×, against two mock daemons, all 22 themes, nine shots each
+(thread: permission, top, bash + diff, diff, answer; sidebar; Settings General and
+Appearance; the MCP panel). Compared twice: this branch against 2719b6fe (before the
+theme-slots series) and against main (d306ac42); the main pass isolates this PR. 196 of 198
+shots change against main (Graphite Dark's two Settings shots do not). Every region was traced
+to a slot change (a helper matched each region's colour pairs to the resolved slots of main
+and the branch, and the flagged ones were read from their crops). Per category, against main:
+
+| category | slots | themes | typical / max Δ (per channel /255) |
+| --- | --- | --- | --- |
+| wells and light code blocks lighter | surface-sunken, code-background, code-foreground | 21 | 6 / 24 |
+| selected and hovered sidebar rows a step stronger | sidebar-row-selected, sidebar-row-hover | 17 | 7 / 37 |
+| muted text, placeholders, row icons more contrast | text-muted, sidebar-muted-foreground, icon-muted, placeholder | 16 | 13 / 27 |
+| status text (sidebar line 2, chips, banners, thread tones) | the `-text` slots | 15 | 10 / 24 |
+| status fills, dots, chip tints and borders (light: brighter; some dark reds less lifted) | the fills and `-surface` | 11 | 23 / 253 (the attention badge's digit, white → black on the brighter amber, light themes) |
+| syntax steps on the code block; comments to muted (Dracula, Kanagawa, …) | syn-*, sh-* | 14 | 10 / 77 |
+| focus ring stepped to 3:1 | focus | 8 | 13 / 29 |
+| diff +/- tint and marker hue (the diff colour is now the status text) | diff-addition, diff-deletion | 15 | 10 / 24 |
+| links | link (info-text) | 9 | 11 / 15 |
+| inline code: body text → code foreground | code-foreground | 4 (Graphite ×2, Solarized ×2) | 24 / 37 |
+| secondary buttons, hover rows (Graphite Light's derived greys) | control, control-hover | 3 | 10 / 12 |
+| clock minute rollover between shots (noise) | — | 22 | — |
+
+The two regressions the pass found (the New thread icon on the accent button; the deleted
+line's striped marker drawn solid) are fixed and recaptured: the icon box is identical to
+main in all 22 themes and the marker is identical pixel for pixel. Maxima of 130-166 in the
+dark themes are glyph edges and the clock.
+
+Per theme (against main, dominant causes): Atom One Dark, Ayu Mirage, Catppuccin Mocha,
+Everforest, Kanagawa, Petros Dusk, Tokyo Night: sidebar rows and muted text; GitHub Dark,
+Rosé Pine: sidebar rows; Nord, Gruvbox Dark: muted text (Gruvbox also its red); Solarized
+Dark: sidebar rows, muted text, syntax, inline code; Dracula: diff and status reds, syntax
+and comments; Monokai Pro: wells, status text, syntax; Graphite Dark: wells and inline code;
+GitHub Light, Catppuccin Latte, Gruvbox Light, Rosé Pine Dawn, Atom One Light, Solarized
+Light: lighter wells and code blocks, then the sidebar rows, status text and fills; Graphite
+Light: sidebar rows, status text, its derived control greys.
+
+Against 2719b6fe the same, plus the differences the theme-slots-2 PR accepted (resting chip
+tints /15 → /10 on the MCP panel in every theme, Graphite Light's palette); the
+other-scheme preview text was not in these scenes.
 
 ## Left out
 
@@ -171,4 +210,11 @@ PIXELS
 
 ## Verified
 
-VERIFIED
+- `make check` green; `make gui-e2e` green apart from `workspaces.spec.ts`, which is flaky
+  on main too (2 of 16 repeated runs there, different tests); its runs pass here alone.
+- `pnpm run themes:check` on the probe's fixtures: both pass; the mislabelled file is
+  refused for its id, and with the id fixed, for the scheme.
+- The pixel passes above (all 22 themes, both baselines), with the regressions they found
+  fixed and recaptured.
+- `make gui-build`. The daemon must be restarted: `internal/theme` (the slot-set check and
+  the regenerated defaults) and the skills changed.
