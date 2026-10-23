@@ -610,7 +610,7 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	if f.Pinned() == 1 {
 		pinned = "pinned: 1 slot"
 	}
-	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path}
+	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path + " (change it with theme save, not in place: an edit there adds no card)"}
 	return out, lines
 }
 

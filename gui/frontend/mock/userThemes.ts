@@ -301,7 +301,7 @@ export class MockThemes {
   private lines(t: MockUserTheme, replaced: boolean, contrast: string[]): string[] {
     const pinned = Object.keys(t.overrides ?? {}).length;
     const from = t.from ? `from: ${themeById.get(t.from)?.name ?? t.from} (${t.from})` : "from: nothing (made from scratch)";
-    return [`${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`, from, `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`, ...contrast, `written to: ${DIR}/${t.id}.json`];
+    return [`${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`, from, `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`, ...contrast, `written to: ${DIR}/${t.id}.json (change it with theme save, not in place: an edit there adds no card)`];
   }
 
   /** The save's contrast lines: from the app's editor none is waited for, as the daemon. */
