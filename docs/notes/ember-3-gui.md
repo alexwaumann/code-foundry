@@ -232,3 +232,9 @@ as a subtask. Three work rows, three task links, one wake.
   force-clicks.
 * Ports 7811/9311 were taken by the sketch session's mock and vite; this PR's screenshots
   used 7841/9341.
+
+## Later: the reply fold (2026-10-23)
+
+Only a turn's last text is Ember's reply now; text between tool calls folds into the run,
+pages and theme cards show, and the reply is the thread's `TextRow` (citable, Copy answer)
+with the cite layer mounted. See `ember-reply-fold.md`.
