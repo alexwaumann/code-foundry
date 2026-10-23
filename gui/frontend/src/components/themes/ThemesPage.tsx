@@ -326,8 +326,9 @@ function EditBar() {
         <span className="font-medium" data-testid="themes-editing-name">
           {draft.name}
         </span>
-        {from && <span className="text-caption"> · from {from}</span>}
+        {/* "unsaved" before "from": in a narrow window the end of the line is cut. */}
         {dirty && <span className="text-caption"> · unsaved</span>}
+        {from && <span className="text-caption"> · from {from}</span>}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="sm" disabled={!dirty} onClick={revertEdits} data-testid="themes-revert">
