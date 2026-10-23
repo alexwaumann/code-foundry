@@ -237,6 +237,22 @@ func TestPrefixAndSystemPrompt(t *testing.T) {
 			t.Errorf("rules.md lacks %q", w)
 		}
 	}
+	// ember-rules-reply: the GUI folds every text but a turn's last into the work row, so
+	// the last text is the reply and must stand alone; view.inline shows a page; Ember
+	// edits files only for a piece the user explicitly tells it to do itself.
+	for _, w := range []string{"The user sees only your turn's last text", "the reply must stand alone",
+		"`code-foundry view.inline <path>`", "/cf/theme.css", "the text before a pending question is what shows",
+		"On your own initiative, never edit", "explicitly tells you to do a piece yourself", "say so in your reply"} {
+		if !strings.Contains(Rules(), w) {
+			t.Errorf("rules.md lacks %q", w)
+		}
+	}
+	if w := "Write nothing between tool calls"; strings.Contains(Rules(), w) {
+		t.Errorf("rules.md still has %q", w)
+	}
+	if w := "never edits files, builds or pushes itself"; strings.Contains(defaultSoul, w) {
+		t.Errorf("soul.md still has %q", w)
+	}
 	if big := SystemPrompt(Rules(), strings.Repeat("s", 60<<10)); len(big) > maxSystemPrompt || !strings.HasSuffix(big, "too long]") {
 		t.Errorf("a long soul: %d bytes", len(big))
 	}
