@@ -121,5 +121,14 @@ change, so no daemon restart.
 - e2e (WebKit): `theme-editor-fuzz.spec.ts` (16 tests, one per finding group, the four
   widths and the side panel), and the updated `theme-editor`, `user-themes`, `themes`,
   `theme-model-flow` and `settings` specs. The theme specs ran 24 times over with
-  `--repeat-each` after the double-click guard, with no failure.
-- The built app on an isolated `CODE_FOUNDRY_HOME`: see the PR body.
+  `--repeat-each` after the double-click guard, with no failure. Full suite: 559 passed, 32
+  skipped, 0 failed.
+- The built app (`make gui-build`) on an isolated `CODE_FOUNDRY_HOME`: `theme duplicate`
+  of Catppuccin Mocha and Latte, `theme edit` opening the editor in the Wails window, then
+  `theme save --file` of the open theme with a new canvas, surface and accent from the CLI:
+  the clean editor showed them at once (finding 1). The window resized to 900 and 1440 px,
+  dark and light: the strip list, the narrowed inspector, the edit bar wrapping at 900 with
+  Save on screen, the whole gallery at 1440, the first row focused on open (screenshots in
+  the PR body). The window takes no synthetic clicks here, so the rest ran in Playwright
+  WebKit. Afterwards the scheme and both slots went back to the defaults and the scratch
+  themes were deleted (the WebKit storage is shared with the installed app).
