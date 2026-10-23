@@ -67,8 +67,11 @@ end, through an `html-seen:<id>` mark and the node's `foldChosen`). Frontend onl
   loop in citations.spec). Before, unfolding the turn unpinned the list as a side effect.
 - `ember.spec.ts` "the board's sections…" fails when run between midnight and 2 AM: the
   mock's cancelled task is `ago(120)` minutes, which is then yesterday. Not touched.
-- `make check` hit `TestMisbehavingPlugins/flood` (heap during a flood) once; it passed on
-  rerun. No Go changed here.
+- `make check` hit two timing failures in `internal/store/plugin` under a machine load
+  near 24 (`TestMisbehavingPlugins/flood`, then `TestSurfaceLifecycle` "cached view: timed
+  out"); both passed on rerun. No Go changed here.
+- `tsc -b` (what `make check` runs) checks test files and caught an `it.each` table typed
+  `as const` with arrow functions (TS7024); `tsc --noEmit -p .` alone did not.
 - Screenshots are in the PR body (from the `cf/html-never-folds-shots` branch), taken with
   `SHOTS=<dir>` on `inline-html.spec.ts` against the mock.
 
