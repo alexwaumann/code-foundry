@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in: what it can do, which skill to read. Use when the user asks what you can do here, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme; states a preference or asks you to remember one; wants a PR; or before you act in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in: which skill to read. Use when the user asks what you can do, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme, or to change the app's colours; states a preference to remember; wants a PR; or before you act in the app."
 user-invocable: false
 ---
 
@@ -32,7 +32,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
 | A page, chart or HTML you make; a form, checklist or countdown "as a page" or "I can fill in" | an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) |
-| A colour theme for the app ("a warm dark theme", "make it calmer") | "Making a theme" below |
+| The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
@@ -60,12 +60,15 @@ It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline 
 
 ## Making a theme
 
-`code-foundry theme list` marks those in use; `theme show <id>` prints a file. Copy the closest
-with a new `id`, `name` and `"from": "<its id>"` (`pair` only for your own pair). Change base
-colours first; pin `overrides` only where a rule gets a slot wrong (help's reference/themes.md).
-Write it in `$CODE_FOUNDRY_PAGES`; `theme save --file <path> --apply` prints `contrast:`: fix
-each failing pair in the base first, pin only where that cannot, drop stale pins, save the `id`
-again (`theme check <id>` re-reads). Reply in a sentence or two; offer a next step.
+Every colour change is `code-foundry theme save --file <path> --apply` (a card with Undo); never
+edit the themes folder. Verbs: `theme list|show|save|check|edit|duplicate|delete|restore|set-dark|`
+`set-light|set-scheme|ask`. Copy the closest (`theme show <id>`) into `$CODE_FOUNDRY_PAGES` with a
+new `id`, `name` and `from` (the theme copied; `pair` only for your own). Change base colours first;
+pin `overrides` only where a rule is wrong ({{cf.themesRef}}). Body text keeps 7:1, status text
+4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text. Fix every
+pair the save's `contrast:` lists before you reply. A theme this thread did not make needs
+`--replace`, once the user asked to change it. A light theme while the app is dark changes nothing
+on screen: say so, offer `theme set-scheme light`, never switch unasked. Reply in a sentence or two.
 
 ## Good to know
 

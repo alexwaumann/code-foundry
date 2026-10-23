@@ -40,6 +40,7 @@ func placeholders(src Sources) map[string]string {
 		"provenance":    src.Provenance(),
 		"sdkPin":        SDKPin(src.Commit, src.SDKTag),
 		"example":       exampleDir(src.SkillsDir),
+		"themesRef":     themesReference(src.SkillsDir),
 		"facts":         codeList(src.Facts),
 		"reservedNames": codeList(pluginsdk.ReservedNames),
 		"reservedArgs":  codeList(pluginsdk.ReservedArgNames),
@@ -179,6 +180,16 @@ func exampleDir(skillsDir string) string {
 		return "<this skill's directory>/example"
 	}
 	return filepath.Join(skillsDir, Plugin, "example")
+}
+
+// themesReference is where the help skill's reference/themes.md (docs/THEMES.md) is
+// installed, for the entry skill's "Making a theme": a thread that has the path reads it
+// instead of searching the disk for it (theme-fuzz-daemon, model 9).
+func themesReference(skillsDir string) string {
+	if skillsDir == "" {
+		return "the code-foundry-help skill's reference/themes.md"
+	}
+	return filepath.Join(skillsDir, Help, "reference", "themes.md")
 }
 
 // exampleReferences are the minimal example's files, as the skill's example/.
