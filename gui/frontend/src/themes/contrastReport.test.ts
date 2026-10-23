@@ -97,6 +97,28 @@ describe("fixContrast", () => {
   it("is null for a slot that fails nothing", () => {
     expect(fixContrast(base, "--cf-text")).toBeNull();
   });
+
+  // A mid-grey hovered row under a dark theme: muted text needs 4.5:1 on it and on the dark
+  // panes; white falls short on the grey, and anything dark enough for the grey fails the panes.
+  const grey = pinned({ "--cf-control-hover": "#8a8a8a" });
+
+  it("leaves a slot alone when no lightness of it holds, and says on what", () => {
+    const fix = fixContrast(grey, "--cf-text-muted");
+    expect(fix).toEqual({ kind: "none", reason: "unreachable", against: "--cf-control-hover", required: 4.5 });
+  });
+
+  it("never pins a value that still fails, or one that leaves more pairs failing (pressing Fix again does not undo it)", () => {
+    const before = contrastReport(grey);
+    for (const slot of new Set(before.map((r) => r.slot))) {
+      const fix = fixContrast(grey, slot);
+      if (fix?.kind !== "pin") continue;
+      const fixed = { ...grey, overrides: { ...grey.overrides, [slot]: fix.value } };
+      const after = contrastReport(fixed);
+      expect(after.filter((r) => r.slot === slot), slot).toEqual([]);
+      expect(after.length, slot).toBeLessThan(before.length);
+      expect(fixContrast(fixed, slot), slot).toBeNull();
+    }
+  });
 });
 
 describe("SLOT_USES", () => {

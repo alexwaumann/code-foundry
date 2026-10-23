@@ -15,6 +15,10 @@ async function raw(key: string): Promise<string | undefined> {
   return ((await res.json()) as { raw: Record<string, string> }).raw[key];
 }
 
+async function mockThemes(): Promise<{ themes: { id: string }[]; calls: string[] }> {
+  return (await (await fetch(`${mockUrl}/__mock/themes`)).json()) as { themes: { id: string }[]; calls: string[] };
+}
+
 const yours = (page: Page) => page.getByTestId("themes-yours");
 const curated = (page: Page) => page.getByTestId("themes-curated");
 const option = (page: Page, name: string) => page.getByTestId("themes-list").getByRole("option", { name, exact: true });
@@ -63,6 +67,8 @@ test("a user theme previews and applies like a curated one", async ({ page }) =>
 });
 
 test("Customise copies a theme into Yours, previews the copy and edits it", async ({ page }) => {
+  // Wide enough for the full list beside the editor (its rows' second lines).
+  await page.setViewportSize({ width: 1600, height: 900 });
   await openThemes(page);
   const dracula = option(page, "Dracula");
   // Folded away until the row is hovered (still focusable).
@@ -79,11 +85,20 @@ test("Customise copies a theme into Yours, previews the copy and edits it", asyn
   await expect(scope(page)).toHaveAttribute("data-theme", "dracula-copy");
   // Previewed, not applied.
   expect(await raw("appearance.theme_dark")).toBeUndefined();
-  // A second copy gets the next id.
+  // Customise again: the first copy was never saved, so it goes before the next is made, which takes its id.
+  await option(page, "Dracula").hover();
+  await option(page, "Dracula").getByRole("button", { name: "Customise Dracula" }).click();
+  await expect.poll(async () => (await mockThemes()).calls.filter((c) => /^theme\.(duplicate|delete)/.test(c))).toEqual(["theme.duplicate dracula", "theme.delete dracula-copy", "theme.duplicate dracula"]);
+  await expect(scope(page)).toHaveAttribute("data-theme", "dracula-copy");
+  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Dracula copy", "Mocha, warmer", "Ocean Dusk"]);
+  // Saved once, a copy stays: the next Customise numbers past it.
+  await page.getByTestId("themes-save").click();
+  await page.getByTestId("theme-save-submit").click();
+  await expect(page.getByTestId("theme-save-dialog")).toHaveCount(0);
   await option(page, "Dracula").hover();
   await option(page, "Dracula").getByRole("button", { name: "Customise Dracula" }).click();
   await expect(scope(page)).toHaveAttribute("data-theme", "dracula-copy-2");
-  await expect(option(page, "Dracula copy 2")).toBeVisible();
+  await expect(yours(page).getByTestId("theme-name")).toHaveText(["Dracula copy", "Dracula copy 2", "Mocha, warmer", "Ocean Dusk"]);
 });
 
 test("Delete asks first; deleting the theme in use moves the slot to the theme it came from", async ({ page }) => {

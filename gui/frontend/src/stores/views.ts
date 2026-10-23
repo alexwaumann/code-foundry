@@ -21,7 +21,7 @@ import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
-import { afterLeavingEditor, editorDirty, leaveEditor, startEditing, stopEditing, useThemeEditorStore } from "./themeEditor";
+import { afterLeavingEditor, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
 
 interface ViewsState {
@@ -526,14 +526,14 @@ function editingThemes(): boolean {
 
 /**
  * Sets the page flags, then runs `after`. When that closes the Themes page while its editor
- * has unsaved edits, the confirm dialog asks first; on Cancel nothing changes.
+ * has unsaved edits, the confirm dialog asks first; on Cancel nothing changes (and `stay` runs).
  */
-function setPages(next: Partial<ViewsState>, after?: () => void): void {
+function setPages(next: Partial<ViewsState>, after?: () => void, stay?: () => void): void {
   const apply = () => {
     useViewsStore.setState(next);
     after?.();
   };
-  if (next.themesOpen === false && editingThemes()) afterLeavingEditor(apply);
+  if (next.themesOpen === false && editingThemes()) afterLeavingEditor(apply, stay);
   else apply();
 }
 
@@ -561,7 +561,9 @@ export async function openThemeEditor(id: string): Promise<boolean> {
   } else setPickerSlot(t.scheme);
   setPickerQuery("");
   previewTheme(id);
+  // The theme already open: a clean editor takes the file as it is now (a save since), a dirty one says it changed.
   if (editing !== id) startEditing(id);
+  else syncFromDisk();
   return true;
 }
 
@@ -639,8 +641,16 @@ export function setHelpTab(tab: HelpTab): void {
 
 /** Selecting something in the sidebar leaves the settings or usage page. */
 export function startViewSync(): () => void {
+  let restoring = false;
   const unsubUi = useUiStore.subscribe((s, prev) => {
-    if (s.selection !== prev.selection && pageOpen()) setPages({ settingsOpen: false, usageOpen: false, themesOpen: false });
+    if (restoring || s.selection === prev.selection || !pageOpen()) return;
+    // Cancel in the Themes editor's confirm: the page and its edits stay, and so does what was selected under it.
+    const back = () => {
+      restoring = true;
+      useUiStore.setState({ selection: prev.selection, history: prev.history, historyIndex: prev.historyIndex });
+      restoring = false;
+    };
+    setPages({ settingsOpen: false, usageOpen: false, themesOpen: false }, undefined, back);
   });
   // However the Themes page closes, its editor goes with it.
   const unsubViews = useViewsStore.subscribe((s, prev) => {

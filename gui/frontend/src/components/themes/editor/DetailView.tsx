@@ -118,6 +118,7 @@ export function SlotView({ name }: { name: string }) {
           label={shortName(name)}
           value={value}
           tint={TINT.test(derived) || TINT.test(value)}
+          autoFocus
           onChange={(hex) => {
             pinSlot(name, hex);
           }}
@@ -185,6 +186,7 @@ export function BaseView({ baseKey }: { baseKey: BaseKey }) {
           key={baseKey}
           label={meta.label}
           value={shown.length === 9 ? shown.slice(0, 7) : shown}
+          autoFocus
           onChange={(hex) => {
             setBaseColour(baseKey, hex);
           }}

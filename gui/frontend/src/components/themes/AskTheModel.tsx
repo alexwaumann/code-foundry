@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { askForTheme } from "@/stores/themeCards";
+import { editorDirty, leaveEditor } from "@/stores/themeEditor";
 
 /** The field's placeholder: what a description looks like. */
 export const ASK_PLACEHOLDER = "Describe a theme… warm dark, teal accent, quieter sidebar";
@@ -22,6 +23,8 @@ export function AskTheModel() {
     if (sending || !text.trim()) return;
     setSending(true);
     try {
+      // The thread opens in place of the page, and the model never sees the draft: unsaved edits are asked about first.
+      if (editorDirty() && !(await leaveEditor("The model does not see them: asking starts a thread and leaves the editor. Drop them?"))) return;
       if (await askForTheme(text)) {
         setText("");
         setOpen(false);

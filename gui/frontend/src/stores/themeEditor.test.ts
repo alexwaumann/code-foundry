@@ -2,22 +2,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
+const invokeCommand = vi.hoisted(() => vi.fn());
+vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), invokeCommand }));
 
 import { setUserThemes, themeById, type UserThemeFile } from "@/themes";
 import { answerConfirm, useConfirmStore } from "./confirm";
 import {
   analyse,
   baseValue,
+  draftRefusal,
   editorDirty,
   fixSlotContrast,
+  keepMine,
   leaveEditor,
+  markFreshCopy,
+  reloadFromDisk,
   pinSlot,
   resetSlotToDerived,
   revertEdits,
   saveEdits,
+  schemeRefusal,
   setBaseColour,
   startEditing,
   stopEditing,
+  syncFromDisk,
   unpinSlot,
   useThemeEditorStore,
   withBase,
@@ -47,6 +55,8 @@ const report = () => analyse(draft(), state().basis);
 
 beforeEach(() => {
   runCommandForResult.mockReset();
+  invokeCommand.mockReset();
+  invokeCommand.mockResolvedValue({ message: "", resultJson: "{}" });
   runCommandForResult.mockResolvedValue({ message: "", resultJson: "{}" });
   setUserThemes([OCEAN], false);
   stopEditing();
@@ -159,5 +169,101 @@ describe("the editor", () => {
     answerConfirm(true);
     expect(await left).toBe(true);
     expect(state().id).toBeNull();
+  });
+});
+
+describe("a newer file on disk", () => {
+  const onDisk = (edit: Partial<UserThemeFile["base"]>) => {
+    setUserThemes([{ ...OCEAN, base: { ...OCEAN.base, ...edit } }], false);
+  };
+
+  it("a clean editor reloads it, saved and draft, by itself", () => {
+    startEditing("ocean");
+    onDisk({ canvas: "#330000" });
+    expect(draft().base.canvas).toBe("#330000");
+    expect(state().saved?.base.canvas).toBe("#330000");
+    expect(editorDirty()).toBe(false);
+    expect(state().disk).toBeNull();
+  });
+
+  it("with unsaved edits it waits: Reload takes it, Keep mine keeps the draft and makes it what Revert goes to", () => {
+    startEditing("ocean");
+    setBaseColour("accent", "#ff00ff");
+    onDisk({ canvas: "#330000" });
+    expect(draft().base.canvas).toBe(gh.base.canvas);
+    expect(state().disk?.base.canvas).toBe("#330000");
+    keepMine();
+    expect(state().disk).toBeNull();
+    expect(draft().base.accent).toBe("#ff00ff");
+    expect(state().saved?.base.canvas).toBe("#330000");
+    revertEdits();
+    expect(draft().base).toMatchObject({ canvas: "#330000", accent: gh.base.accent });
+
+    setBaseColour("accent", "#00ff00");
+    onDisk({ canvas: "#440000" });
+    reloadFromDisk();
+    expect(draft().base).toMatchObject({ canvas: "#440000", accent: gh.base.accent });
+    expect(editorDirty()).toBe(false);
+  });
+
+  it("a file equal to the draft (this window's save, landing first) is the saved file; one equal to the saved file changes nothing", () => {
+    startEditing("ocean");
+    setBaseColour("accent", "#ff00ff");
+    onDisk({ accent: "#ff00ff" });
+    expect(editorDirty()).toBe(false);
+    expect(state().disk).toBeNull();
+    const before = state();
+    syncFromDisk();
+    expect(state()).toBe(before);
+  });
+});
+
+describe("a Customise copy", () => {
+  const COPY: UserThemeFile = { ...OCEAN, id: "ocean-copy", name: "Ocean copy", from: "ocean" };
+
+  beforeEach(() => {
+    setUserThemes([OCEAN, COPY], false);
+  });
+
+  it("closed without a save is deleted, without asking", async () => {
+    markFreshCopy("ocean-copy");
+    startEditing("ocean-copy");
+    expect(state().fresh).toBe(true);
+    expect(await leaveEditor()).toBe(true);
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalledWith("theme.delete", expect.anything(), { theme: "ocean-copy" }, undefined, { confirmed: true });
+    });
+  });
+
+  it("is kept once saved, or when the editor was opened on it some other way", async () => {
+    markFreshCopy("ocean-copy");
+    startEditing("ocean-copy");
+    setBaseColour("accent", "#ff00ff");
+    expect(await saveEdits({ name: "Ocean copy", apply: false })).toBe(true);
+    stopEditing();
+    startEditing("ocean-copy");
+    expect(state().fresh).toBe(false);
+    stopEditing();
+    await Promise.resolve();
+    expect(invokeCommand).not.toHaveBeenCalled();
+  });
+});
+
+describe("what theme.save would refuse", () => {
+  it("a surface its scheme cannot carry, in the editor's words", () => {
+    expect(draftRefusal(OCEAN)).toBeNull();
+    const light = { ...OCEAN, base: { ...OCEAN.base, surface: "#f0f0f0" } };
+    expect(draftRefusal(light)).toEqual({ kind: "scheme", message: schemeRefusal("dark", "#f0f0f0") });
+    expect(schemeRefusal("dark", "#f0f0f0")).toMatch(/^A dark theme needs a dark surface \(OKLab lightness at most 0\.45\); #f0f0f0 is 0\.9\d\. Darken the surface to save\.$/);
+    expect(schemeRefusal("light", "#202020")).toContain("Lighten the surface");
+    startEditing("ocean");
+    setBaseColour("surface", "#f0f0f0");
+    expect(report().refusal?.kind).toBe("scheme");
+  });
+
+  it("a name it does not take", () => {
+    expect(draftRefusal(OCEAN, "Ocean\twarm")).toEqual({ kind: "file", message: "name: no control characters" });
+    expect(draftRefusal(OCEAN, "x".repeat(81))?.message).toBe("name: at most 80 characters");
+    expect(draftRefusal(OCEAN, "x".repeat(80))).toBeNull();
   });
 });

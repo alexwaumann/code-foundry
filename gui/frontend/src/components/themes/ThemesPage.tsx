@@ -33,7 +33,9 @@ import {
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
 import { useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
+import { useWidth } from "@/lib/useWidth";
 import { AskTheModel } from "./AskTheModel";
+import { editorLayout } from "./editor/model";
 import { SaveThemeDialog } from "./editor/SaveThemeDialog";
 import { ThemeInspector } from "./editor/ThemeInspector";
 import { ThemeAa, ThemeStrip } from "./ThemeChip";
@@ -68,20 +70,31 @@ export function ThemesPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const editingId = useThemeEditorStore((s) => s.id);
-  // In the editor, Escape first goes back from a colour's view to the lists.
+  // In the editor, Escape first goes back from a colour's view to the lists, then leaves the editor.
   useEscapeCloses(closeOrBack);
+  const [bodyRef, bodyWidth] = useWidth(1200);
+  const layout = editorLayout(bodyWidth);
+  const listMode = editingId ? layout.list : "full";
 
   // Re-renders when the user's themes change; filterThemes reads them (a few dozen rows: no memo).
   useUserThemes();
+  const issues = useThemesStore((s) => s.issues);
   const list = filterThemes(slot, query);
   const yours = list.filter((t) => t.user);
   const curated = list.filter((t) => !t.user);
+  const shownIssues = filterIssues(issues, query);
   const total = filterThemes(slot, "").length;
   const shownId = previewedId({ slot, preview }, slots);
 
   useEffect(() => {
     listRef.current?.focus();
   }, []);
+  // Leaving the editor (×, Escape, Discard) hands the keyboard back to the list.
+  const wasEditing = useRef(editingId);
+  useEffect(() => {
+    if (wasEditing.current !== null && editingId === null) listRef.current?.focus();
+    wasEditing.current = editingId;
+  }, [editingId]);
   // Keep the previewed row in view as the arrows move it (jsdom has no scrollIntoView).
   useEffect(() => {
     const row = document.getElementById(`theme-option-${shownId}`);
@@ -89,7 +102,8 @@ export function ThemesPage() {
   }, [shownId]);
 
   const move = (delta: 1 | -1) => {
-    if (list.length === 0) return;
+    // In the editor the arrows stay put: moving to another theme would leave it (a row's click still does, asking first).
+    if (list.length === 0 || editingId) return;
     const i = list.findIndex((t) => t.id === shownId);
     const next = list[i < 0 ? 0 : Math.min(list.length - 1, Math.max(0, i + delta))];
     if (next) pickRow(next.id);
@@ -136,70 +150,99 @@ export function ThemesPage() {
         </Button>
       </PaneHeader>
       <ControlBar slot={slot} slots={slots} />
-      <div className="flex min-h-0 flex-1">
-        <div className={cn("flex shrink-0 flex-col border-r border-cf-divider", editingId ? "w-[240px]" : "w-[300px]")} data-testid="themes-list-column">
-          <div className="relative px-3 pt-3 pb-2">
-            <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-cf-text-muted" />
-            <Input
-              ref={searchRef}
-              type="search"
-              aria-label="Search themes"
-              placeholder={`Search ${String(total)} ${slot} themes`}
-              value={query}
-              onChange={(e) => {
-                setPickerQuery(e.target.value);
-              }}
-              className="h-8 pr-8 pl-7 text-body-sm"
-            />
-            {!query && (
-              <Kbd size="sm" className="absolute top-1/2 right-5 mt-0.5 -translate-y-1/2">
-                /
-              </Kbd>
+      <div ref={bodyRef} className="flex min-h-0 flex-1" data-testid="themes-body" data-list={listMode}>
+        {listMode !== "hidden" && (
+          <div className={cn("flex shrink-0 flex-col border-r border-cf-divider", listMode === "strip" ? "w-14" : editingId ? "w-[240px]" : "w-[300px]")} data-testid="themes-list-column">
+            {listMode === "full" && (
+              <div className="relative px-3 pt-3 pb-2">
+                <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-cf-text-muted" />
+                <Input
+                  ref={searchRef}
+                  type="search"
+                  aria-label="Search themes"
+                  placeholder={`Search ${String(total)} ${slot} themes`}
+                  value={query}
+                  onChange={(e) => {
+                    setPickerQuery(e.target.value);
+                  }}
+                  className="h-8 pr-8 pl-7 text-body-sm"
+                />
+                {!query && (
+                  <Kbd size="sm" className="absolute top-1/2 right-5 mt-0.5 -translate-y-1/2">
+                    /
+                  </Kbd>
+                )}
+              </div>
+            )}
+            <div
+              ref={listRef}
+              role="listbox"
+              tabIndex={0}
+              aria-label={`${slot === "dark" ? "Dark" : "Light"} themes`}
+              aria-activedescendant={list.some((t) => t.id === shownId) ? `theme-option-${shownId}` : undefined}
+              className={cn("min-h-0 flex-1 overflow-y-auto pb-2 outline-none", listMode === "strip" ? "px-1.5 pt-2" : "px-2")}
+              data-testid="themes-list"
+            >
+              {listMode === "strip" ? (
+                <>
+                  {yours.map((t) => (
+                    <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} strip />
+                  ))}
+                  {yours.length > 0 && curated.length > 0 && <div className="mx-1.5 my-1.5 border-t border-cf-divider" aria-hidden />}
+                  {curated.map((t) => (
+                    <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} strip />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {(yours.length > 0 || !query || shownIssues.length > 0) && (
+                    <ListSection label="Yours" count={yours.length} testId="themes-yours">
+                      {yours.map((t) => (
+                        <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
+                      ))}
+                      {yours.length === 0 && !query && <p className="px-2 pb-1 text-caption-sm">Customise a theme to make one of your own.</p>}
+                      <ThemeIssues issues={shownIssues} />
+                    </ListSection>
+                  )}
+                  {curated.length > 0 && (
+                    <ListSection label="Curated" count={curated.length} testId="themes-curated">
+                      {curated.map((t) => (
+                        <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
+                      ))}
+                    </ListSection>
+                  )}
+                  {list.length === 0 && shownIssues.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
+                </>
+              )}
+            </div>
+            {listMode === "full" && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cf-divider px-3 py-2 text-caption-sm" data-testid="themes-keys">
+                {editingId ? (
+                  // In the editor the list's keys do nothing: a click on a row leaves for it (asking first).
+                  <span className="flex items-center gap-1">
+                    <Kbd size="sm">esc</Kbd> close the editor
+                  </span>
+                ) : (
+                  <>
+                    <span className="flex items-center gap-1">
+                      <Kbd size="sm">↑</Kbd>
+                      <Kbd size="sm">↓</Kbd> preview
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Kbd size="sm">↵</Kbd> apply
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Kbd size="sm">esc</Kbd> close
+                    </span>
+                  </>
+                )}
+              </div>
             )}
           </div>
-          <div
-            ref={listRef}
-            role="listbox"
-            tabIndex={0}
-            aria-label={`${slot === "dark" ? "Dark" : "Light"} themes`}
-            aria-activedescendant={list.some((t) => t.id === shownId) ? `theme-option-${shownId}` : undefined}
-            className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 outline-none"
-            data-testid="themes-list"
-          >
-            {(yours.length > 0 || !query) && (
-              <ListSection label="Yours" count={yours.length} testId="themes-yours">
-                {yours.map((t) => (
-                  <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
-                ))}
-                {yours.length === 0 && <p className="px-2 pb-1 text-caption-sm">Customise a theme to make one of your own.</p>}
-                {!query && <ThemeIssues />}
-              </ListSection>
-            )}
-            {curated.length > 0 && (
-              <ListSection label="Curated" count={curated.length} testId="themes-curated">
-                {curated.map((t) => (
-                  <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
-                ))}
-              </ListSection>
-            )}
-            {list.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cf-divider px-3 py-2 text-caption-sm">
-            <span className="flex items-center gap-1">
-              <Kbd size="sm">↑</Kbd>
-              <Kbd size="sm">↓</Kbd> preview
-            </span>
-            <span className="flex items-center gap-1">
-              <Kbd size="sm">↵</Kbd> apply
-            </span>
-            <span className="flex items-center gap-1">
-              <Kbd size="sm">esc</Kbd> close
-            </span>
-          </div>
-        </div>
-        {editingId && <ThemeInspector />}
+        )}
+        {editingId && <ThemeInspector width={layout.inspector} />}
         <div className="flex min-w-0 flex-1 flex-col">
-          {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />}
+          {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={shownId !== slots[slot]} />}
           <PairHintLine slots={slots} />
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <GalleryScope shown={themeOf(shownId, slot)} />
@@ -211,9 +254,18 @@ export function ThemesPage() {
   );
 }
 
-/** Escape on the page: back from a colour's view in the editor, else close (which asks first when the editor has changes). */
+/** Escape on the page: back from a colour's view in the editor, then out of the editor (asking first when it has changes), then the page closes. */
 function closeOrBack(): void {
-  if (!editorBack()) closeThemes();
+  if (editorBack()) return;
+  if (useThemeEditorStore.getState().id !== null) void leaveEditor();
+  else closeThemes();
+}
+
+/** The files that did not load whose name or message has every word of the search. */
+function filterIssues<T extends { file: string; message: string }>(issues: readonly T[], query: string): readonly T[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return issues;
+  return issues.filter((is) => words.every((w) => `${is.file} ${is.message}`.toLowerCase().includes(w)));
 }
 
 /** A row picked (click, arrows): previews it; in the editor, on another theme, the editor closes first (asking when it has changes). */
@@ -256,29 +308,48 @@ function GalleryScope({ shown }: { shown: Theme }) {
 function EditBar() {
   const draft = useThemeEditorStore((s) => s.draft);
   const dirty = useThemeEditorStore((s) => editorDirty(s));
+  const saveOpen = useThemeEditorStore((s) => s.saveOpen);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  // The modal has no trigger of its own: closing it (Cancel, Escape, a save) puts the keyboard back on Save….
+  const wasOpen = useRef(saveOpen);
+  useEffect(() => {
+    if (wasOpen.current && !saveOpen) saveRef.current?.focus();
+    wasOpen.current = saveOpen;
+  }, [saveOpen]);
   if (!draft) return null;
   const from = draft.from ? (themeById.get(draft.from)?.name ?? draft.from) : "";
+  // Wraps rather than squeezes: in a narrow window the buttons go under the name, which keeps at least 8rem.
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-cf-divider px-4" data-testid="themes-edit-bar">
-      <span className="min-w-0 truncate text-body-sm">
+    <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-cf-divider px-4 py-1.5" data-testid="themes-edit-bar">
+      <span className="min-w-32 flex-1 truncate text-body-sm" data-testid="themes-edit-title">
         <span className="text-cf-text-muted">Editing </span>
         <span className="font-medium" data-testid="themes-editing-name">
           {draft.name}
         </span>
-        {from && <span className="text-caption"> · from {from}</span>}
+        {/* "unsaved" before "from": in a narrow window the end of the line is cut. */}
         {dirty && <span className="text-caption"> · unsaved</span>}
+        {from && <span className="text-caption"> · from {from}</span>}
       </span>
-      <Button variant="ghost" size="sm" className="ml-auto" disabled={!dirty} onClick={revertEdits} data-testid="themes-revert">
-        Revert
-      </Button>
-      <Button size="sm" onClick={() => { setSaveOpen(true); }} data-testid="themes-save">
-        Save…
-      </Button>
-      <Tip label="Close the editor">
-        <Button variant="ghost" size="icon-xs" aria-label="Close the editor" onClick={() => void leaveEditor()} data-testid="themes-edit-done">
-          <X />
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        <Button variant="ghost" size="sm" disabled={!dirty} onClick={revertEdits} data-testid="themes-revert">
+          Revert
         </Button>
-      </Tip>
+        <Button
+          ref={saveRef}
+          size="sm"
+          onClick={() => {
+            setSaveOpen(true);
+          }}
+          data-testid="themes-save"
+        >
+          Save…
+        </Button>
+        <Tip label="Close the editor">
+          <Button variant="ghost" size="icon-xs" aria-label="Close the editor" onClick={() => void leaveEditor()} data-testid="themes-edit-done">
+            <X />
+          </Button>
+        </Tip>
+      </span>
     </div>
   );
 }
@@ -295,9 +366,8 @@ function ListSection({ label, count, testId, children }: { label: string; count:
   );
 }
 
-/** The files in the themes directory that did not load, under the user's themes. */
-function ThemeIssues() {
-  const issues = useThemesStore((s) => s.issues);
+/** The files in the themes directory that did not load (those the search matches), under the user's themes. */
+function ThemeIssues({ issues }: { issues: readonly { file: string; message: string }[] }) {
   if (issues.length === 0) return null;
   return (
     <ul className="space-y-0.5 px-2 pb-1" data-testid="themes-issues">
@@ -332,6 +402,10 @@ function RowActions({ theme }: { theme: Theme }) {
       className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity group-hover/row:max-w-40 group-hover/row:opacity-100 focus-within:max-w-40 focus-within:opacity-100"
       onClick={stop}
       onDoubleClick={stop}
+      // One action per gesture: the second click of a double-click (a row may have moved under the pointer by then) does nothing.
+      onClickCapture={(e) => {
+        if (e.detail > 1) e.stopPropagation();
+      }}
       data-testid="theme-row-actions"
     >
       {theme.user && (
@@ -353,11 +427,36 @@ function RowActions({ theme }: { theme: Theme }) {
   );
 }
 
-function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: boolean; current: boolean }) {
+/**
+ * A row of the list. `strip`: the editor's narrow list (a small window), the Aa chip alone
+ * with the name in a tooltip; a click still leaves the editor for that theme.
+ */
+function ThemeRow({ theme, previewed, current, strip }: { theme: Theme; previewed: boolean; current: boolean; strip?: boolean }) {
   // The theme in the editor: its second line says so, with its pins (-1: not this row).
   const inEditor = useThemeEditorStore((s) => s.id !== null);
-  const editingPins = useThemeEditorStore((s) => (s.id === theme.id ?Object.keys(s.draft?.overrides ?? {}).length : -1));
+  const editingPins = useThemeEditorStore((s) => (s.id === theme.id ? Object.keys(s.draft?.overrides ?? {}).length : -1));
   const origin = editingPins >= 0 ? `editing · ${String(editingPins)} pinned` : theme.user ? originLine(theme) : "";
+  if (strip)
+    return (
+      <Tip label={editingPins >= 0 ? `${theme.name} · editing` : theme.name} side="right">
+        <div
+          id={`theme-option-${theme.id}`}
+          role="option"
+          aria-selected={previewed}
+          aria-label={theme.name}
+          aria-current={current || undefined}
+          data-theme-id={theme.id}
+          data-user={theme.user || undefined}
+          data-current={current || undefined}
+          className={cn("flex h-8 cursor-default items-center justify-center rounded-md select-none", previewed ? "bg-cf-control-hover" : "hover:bg-cf-control-hover/50")}
+          onClick={(e) => {
+            if (e.detail < 2) pickRow(theme.id);
+          }}
+        >
+          <ThemeAa theme={theme} />
+        </div>
+      </Tip>
+    );
   return (
     <div
       id={`theme-option-${theme.id}`}
@@ -374,8 +473,10 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
         origin && "py-1",
         previewed ? "bg-cf-control-hover text-cf-text" : "hover:bg-cf-control-hover/50",
       )}
-      onClick={() => {
-        pickRow(theme.id);
+      onClick={(e) => {
+        // The second click of a double-click is not a pick: the first one picked this row, and a
+        // Customise or the editor opening in between can move another row under the pointer.
+        if (e.detail < 2) pickRow(theme.id);
       }}
       onDoubleClick={() => {
         if (editingPins < 0 && useThemeEditorStore.getState().id === null) void applyPreview();

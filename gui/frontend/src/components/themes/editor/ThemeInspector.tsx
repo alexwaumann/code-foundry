@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { ChevronRight, Pin, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import { Tip } from "@/components/ui/tooltip";
 import {
   BASE_FALLBACK,
   baseValue,
+  keepMine,
+  reloadFromDisk,
   setBaseColour,
   setEditorFilter,
   setPinnedOnly,
@@ -19,6 +21,7 @@ import {
   useThemeEditorStore,
   type BaseKey,
   type EditorAnalysis,
+  type EditorView,
 } from "@/stores/themeEditor";
 import { SLOT_GROUPS, SLOTS, type Slot, type SlotGroup } from "@/themes/slots";
 import { SLOT_USES } from "@/themes/slotUses";
@@ -47,22 +50,84 @@ const BY_GROUP: readonly (readonly [SlotGroup, readonly Slot[]])[] = SLOT_GROUPS
  * colours, then every slot by group with its rule, value, pin, stale and contrast marks.
  * A row opens its colour's view (sketch E) in place of the lists.
  */
-export function ThemeInspector() {
+export function ThemeInspector({ width }: { width: number }) {
   const view = useThemeEditorStore((s) => s.view);
+  const editingId = useThemeEditorStore((s) => s.id);
   const analysis = useEditorAnalysis();
+  const lists = useRef<HTMLDivElement>(null);
+  // Focus follows the view: a colour's view focuses its hex field (ColourPicker autoFocus);
+  // back in the lists, the row that opened it; a new editor, its first row.
+  const last = useRef<EditorView | null>(null);
+  const lastId = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = last.current;
+    last.current = view;
+    const opened = lastId.current !== editingId;
+    lastId.current = editingId;
+    if (view.kind !== "list") return;
+    const key = prev && prev.kind !== "list" ? rowKey(prev) : opened ? "base:canvas" : null;
+    if (key) lists.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`)?.focus();
+  }, [view, editingId]);
   if (!analysis) return null;
   return (
-    <div className="flex w-[340px] shrink-0 flex-col border-r border-cf-divider" data-testid="theme-inspector" aria-label="Theme editor">
+    <div className="flex shrink-0 flex-col border-r border-cf-divider" style={{ width }} data-testid="theme-inspector" aria-label="Theme editor">
+      <DiskNotice />
       {view.kind === "slot" ? (
         <SlotView key={view.name} name={view.name} />
       ) : view.kind === "base" ? (
         <BaseView key={view.key} baseKey={view.key} />
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+        <div ref={lists} className="min-h-0 flex-1 overflow-y-auto pb-3" onKeyDown={rowKeys}>
           <BaseSection analysis={analysis} />
           <SlotsSection analysis={analysis} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A view's row in the lists (data-row-key): where focus goes back to. */
+function rowKey(v: EditorView): string | null {
+  return v.kind === "slot" ? `slot:${v.name}` : v.kind === "base" ? `base:${v.key}` : null;
+}
+
+/**
+ * ↑/↓ move between the lists' rows (base colours, group headers, slots), and ↓ from the
+ * filter goes to the first slot: the rows are buttons, which Tab skips in WebKit unless
+ * the user turned on "Press Tab to highlight each item".
+ */
+function rowKeys(e: ReactKeyboardEvent<HTMLDivElement>): void {
+  if ((e.key !== "ArrowDown" && e.key !== "ArrowUp") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target as HTMLElement;
+  const rows = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-row-key]")];
+  const at = rows.indexOf(t);
+  const inFilter = t.matches('[data-testid="editor-filter"]');
+  if (at < 0 && !inFilter) return;
+  e.preventDefault();
+  let next: HTMLElement | undefined;
+  if (!inFilter) next = rows[e.key === "ArrowDown" ? Math.min(rows.length - 1, at + 1) : Math.max(0, at - 1)];
+  else if (e.key === "ArrowDown") {
+    const after = rows.filter((r) => t.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING);
+    next = after.find((r) => r.dataset.rowKey?.startsWith("slot:")) ?? after[0];
+  }
+  next?.focus();
+}
+
+/** "Changed on disk": a newer file of the theme arrived while the draft has unsaved edits. */
+function DiskNotice() {
+  const disk = useThemeEditorStore((s) => s.disk !== null);
+  if (!disk) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 border-b border-cf-divider bg-cf-warning-surface px-3 py-1.5 text-caption text-cf-warning-text" role="status" data-testid="editor-disk-notice">
+      <span>Changed on disk</span>
+      <span aria-hidden>·</span>
+      <Button variant="link" size="xs" className="h-auto px-0 text-cf-warning-text" onClick={reloadFromDisk} data-testid="editor-disk-reload">
+        Reload
+      </Button>
+      <span aria-hidden>/</span>
+      <Button variant="link" size="xs" className="h-auto px-0 text-cf-warning-text" onClick={keepMine} data-testid="editor-disk-keep">
+        Keep mine
+      </Button>
     </div>
   );
 }
@@ -88,8 +153,13 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
     <section aria-label="Base colours" data-testid="editor-base">
       <SectionHeading heading="Base" note="what the theme supplies" />
       <div className="px-1.5">
+        {/* What the daemon would refuse: a surface its scheme cannot carry under the Surface row, anything else on top. */}
+        {analysis.refusal?.kind === "file" && <RefusalLine message={analysis.refusal.message} />}
         {(["canvas", "surface", "text", "accent"] as const).map((k) => (
-          <BaseRow key={k} baseKey={k} value={base[k]} />
+          <Fragment key={k}>
+            <BaseRow baseKey={k} value={base[k]} problem={k === "surface" && analysis.refusal?.kind === "scheme"} />
+            {k === "surface" && analysis.refusal?.kind === "scheme" && <RefusalLine message={analysis.refusal.message} />}
+          </Fragment>
         ))}
         <div className="flex min-h-9 items-center gap-1 rounded-md px-1.5" data-testid="editor-base-tones">
           {TONE_KEYS.map((k) => (
@@ -102,6 +172,7 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
                   showEditorView({ kind: "base", key: k });
                 }}
                 data-testid={`editor-base-${k}`}
+                data-row-key={`base:${k}`}
               >
                 <Swatch value={base[k]} className="size-5" />
               </button>
@@ -117,7 +188,7 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
           }}
         >
           <CollapsibleTrigger asChild>
-            <button type="button" className="group/t flex min-h-9 w-full items-center gap-2.5 rounded-md px-1.5 text-left outline-none hover:bg-cf-control-hover focus-visible:ring-[3px] focus-visible:ring-cf-focus/50" data-testid="editor-base-terminal">
+            <button type="button" className="group/t flex min-h-9 w-full items-center gap-2.5 rounded-md px-1.5 text-left outline-none hover:bg-cf-control-hover focus-visible:ring-[3px] focus-visible:ring-cf-focus/50" data-testid="editor-base-terminal" data-row-key="group:terminal-base">
               <Swatch value={base.terminal.foreground} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-sm">Terminal</span>
@@ -137,6 +208,7 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
                     type="button"
                     className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50"
                     aria-label={`ANSI ${String(n)} ${c}`}
+                    data-row-key={`base:${ansiKey(n)}`}
                     onClick={() => {
                       showEditorView({ kind: "base", key: ansiKey(n) });
                     }}
@@ -154,7 +226,7 @@ function BaseSection({ analysis }: { analysis: EditorAnalysis }) {
 }
 
 /** A base colour's row: swatch, name, what it paints (or what it falls back to), hex; an optional one can be cleared. */
-function BaseRow({ baseKey, value, fallback, indent }: { baseKey: BaseKey; value: string | undefined; fallback?: string; indent?: boolean }) {
+function BaseRow({ baseKey, value, fallback, indent, problem }: { baseKey: BaseKey; value: string | undefined; fallback?: string; indent?: boolean; problem?: boolean }) {
   const meta = baseMeta(baseKey);
   const absent = value === undefined;
   const hint = absent ? (BASE_FALLBACK[baseKey] ?? meta.hint) : meta.hint;
@@ -167,10 +239,15 @@ function BaseRow({ baseKey, value, fallback, indent }: { baseKey: BaseKey; value
           showEditorView({ kind: "base", key: baseKey });
         }}
         data-testid={`editor-base-${baseKey}`}
+        data-row-key={`base:${baseKey}`}
+        data-problem={problem || undefined}
       >
         <Swatch value={value ?? fallback} className={cn(absent && "opacity-60")} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-body-sm">{meta.label}</span>
+          <span className="flex items-center gap-1 text-body-sm">
+            {meta.label}
+            {problem && <MarkBadge tone="error">scheme</MarkBadge>}
+          </span>
           <span className="truncate text-caption-sm">{hint}</span>
         </span>
         <span className={cn("text-code text-cf-text-muted", absent && "opacity-60")}>{value ?? fallback}</span>
@@ -245,7 +322,7 @@ function SlotsSection({ analysis }: { analysis: EditorAnalysis }) {
           Pinned only
         </Toggle>
       </div>
-      {groups.length === 0 && <p className="px-3 py-2 text-caption">{pinnedOnly ? "No slot is pinned. Change a slot's colour to pin it." : `No slot matches “${filter}”.`}</p>}
+      {groups.length === 0 && <p className="px-3 py-2 text-caption">{emptyLine(pinnedOnly, filter, Object.keys(overrides ?? {}).length)}</p>}
       <div className="px-1.5">
         {groups.map(([g, slots]) => (
           <SlotGroupSection key={g} group={g} slots={slots} analysis={analysis} forceOpen={words.length > 0 || pinnedOnly} />
@@ -263,12 +340,13 @@ function SlotGroupSection({ group, slots, analysis, forceOpen }: { group: SlotGr
     <Collapsible
       open={open || forceOpen}
       onOpenChange={(o) => {
-        toggleEditorGroup(group, o);
+        // While a filter or Pinned only holds every group open, a click on its header changes nothing (on screen or stored).
+        if (!forceOpen) toggleEditorGroup(group, o);
       }}
       data-testid={`editor-group-${group}`}
     >
       <CollapsibleTrigger asChild>
-        <button type="button" className="group/g flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left outline-none hover:bg-cf-control-hover focus-visible:ring-[3px] focus-visible:ring-cf-focus/50">
+        <button type="button" className="group/g flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left outline-none hover:bg-cf-control-hover focus-visible:ring-[3px] focus-visible:ring-cf-focus/50" data-row-key={`group:${group}`}>
           <ChevronRight className="size-3 text-cf-icon-muted transition-transform group-aria-expanded/g:rotate-90" aria-hidden />
           <span className="text-overline">
             {GROUP_LABEL[group]} · {slots.length}
@@ -312,6 +390,7 @@ function SlotRow({ slot, analysis }: { slot: Slot; analysis: EditorAnalysis }) {
         showEditorView({ kind: "slot", name: slot.name });
       }}
       data-testid={`editor-slot-${shortName(slot.name)}`}
+      data-row-key={`slot:${slot.name}`}
       data-pinned={pinned || undefined}
       data-stale={stale ? true : undefined}
     >
@@ -332,4 +411,20 @@ function SlotRow({ slot, analysis }: { slot: Slot; analysis: EditorAnalysis }) {
       <span className="shrink-0 text-code text-cf-text-muted">{value}</span>
     </button>
   );
+}
+
+/** What the daemon would refuse in the draft (draftRefusal), where it applies: Save is held until it goes. */
+export function RefusalLine({ message }: { message: string }) {
+  return (
+    <p className="mx-1.5 mb-1 rounded-md bg-cf-error-surface px-2 py-1.5 text-caption text-cf-error-text" role="alert" data-testid="editor-refusal">
+      {message}
+    </p>
+  );
+}
+
+/** The slot list's line when no row is shown. */
+function emptyLine(pinnedOnly: boolean, filter: string, pins: number): string {
+  if (!pinnedOnly) return `No slot matches “${filter}”.`;
+  if (pins > 0 && filter.trim()) return `No pinned slot matches “${filter}”.`;
+  return "No slot is pinned. Change a slot's colour to pin it.";
 }

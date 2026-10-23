@@ -17,6 +17,10 @@ export function useEscapeCloses(close: () => void): void {
       if (useUiStore.getState().palette.open || useViewsStore.getState().helpOpen || useConfirmStore.getState().pending) return;
       const t = e.target;
       if (t instanceof HTMLElement && (t.matches('input, select, textarea, [role="combobox"]') || t.closest('[data-key-recorder], [data-radix-popper-content-wrapper], [role="dialog"]'))) return;
+      // Handled: a dialog that close() opens (the Themes editor's "Discard changes?") mounts its
+      // own Escape listener before this keystroke reaches the document, and Radix leaves a
+      // prevented Escape alone, so the same key does not dismiss it.
+      e.preventDefault();
       close();
     };
     // Capture phase: runs before Radix closes a dialog on the same Escape.
