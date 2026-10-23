@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { Check, Link2, Monitor, Moon, Search, Sun, X } from "lucide-react";
+import { Check, Link2, Monitor, Moon, Search, Sun, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { useColorScheme, useThemeSlots, type ThemePreference } from "@/lib/theme";
@@ -242,9 +243,9 @@ function originLine(theme: Theme): string {
 }
 
 /**
- * A row's actions, muted and shown on hover, on focus and on the previewed row: Customise
- * on every theme, Delete on the user's. The editor (a later step) adds Edit on the user's
- * rows here, beside Customise.
+ * A row's actions, muted, shown on hover and on keyboard focus (they stay focusable while
+ * folded away): Customise on every theme, Delete on the user's. The editor (a later step)
+ * adds Edit on the user's rows here, beside Customise.
  */
 function RowActions({ theme }: { theme: Theme }) {
   const stop = (e: ReactMouseEvent) => {
@@ -252,7 +253,7 @@ function RowActions({ theme }: { theme: Theme }) {
   };
   return (
     <span
-      className="hidden shrink-0 items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex group-aria-selected/row:flex"
+      className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity group-hover/row:max-w-40 group-hover/row:opacity-100 focus-within:max-w-40 focus-within:opacity-100"
       onClick={stop}
       onDoubleClick={stop}
       data-testid="theme-row-actions"
@@ -261,9 +262,11 @@ function RowActions({ theme }: { theme: Theme }) {
         Customise
       </Button>
       {theme.user && (
-        <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-error" onClick={() => void deleteTheme(theme.id)} aria-label={`Delete ${theme.name}`}>
-          Delete
-        </Button>
+        <Tip label="Delete">
+          <Button variant="ghost" size="icon-xs" className="text-cf-text-muted hover:text-cf-error" onClick={() => void deleteTheme(theme.id)} aria-label={`Delete ${theme.name}`}>
+            <Trash2 />
+          </Button>
+        </Tip>
       )}
     </span>
   );
@@ -305,7 +308,7 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
           </span>
         )}
       </span>
-      <ThemeStrip theme={theme} className="group-hover/row:hidden group-focus-within/row:hidden group-aria-selected/row:hidden" />
+      <ThemeStrip theme={theme} className="group-hover/row:hidden group-focus-within/row:hidden" />
       <RowActions theme={theme} />
       <span className="flex w-4 shrink-0 justify-center">
         {current && <Check className="size-3.5 text-cf-text" aria-hidden />}

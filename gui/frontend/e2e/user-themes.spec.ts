@@ -65,8 +65,10 @@ test("a user theme previews and applies like a curated one", async ({ page }) =>
 test("Customise copies a theme into Yours and previews the copy", async ({ page }) => {
   await openThemes(page);
   const dracula = option(page, "Dracula");
-  await expect(dracula.getByRole("button", { name: "Customise Dracula" })).toBeHidden();
+  // Folded away until the row is hovered (still focusable).
+  await expect(dracula.getByTestId("theme-row-actions")).toHaveCSS("opacity", "0");
   await dracula.hover();
+  await expect(dracula.getByTestId("theme-row-actions")).toHaveCSS("opacity", "1");
   await expect(dracula.getByRole("button", { name: "Delete Dracula" })).toHaveCount(0);
   await dracula.getByRole("button", { name: "Customise Dracula" }).click();
   await expect(yours(page).getByTestId("theme-name")).toHaveText(["Dracula copy", "Mocha, warmer", "Ocean Dusk"]);
