@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -237,5 +238,31 @@ func TestOlderFileGetsNotificationDefaults(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("rendered file lacks %q", want)
 		}
+	}
+}
+
+func TestThemeSlots(t *testing.T) {
+	tests := []struct {
+		name string
+		file string // "" = no file
+		want []string
+	}{
+		{"missing file", "", nil},
+		{"both slots, a gone theme included", "[appearance]\ntheme_dark = \"ocean-dusk\"\ntheme_light = \"gone-paper\"\n", []string{"ocean-dusk", "gone-paper"}},
+		{"one slot", "[appearance]\ntheme_light = \"paper\"\n", []string{"paper"}},
+		{"syntax error", "[appearance\n", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), FileName)
+			if tt.file != "" {
+				if err := os.WriteFile(path, []byte(tt.file), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := ThemeSlots(path); !slices.Equal(got, tt.want) {
+				t.Errorf("ThemeSlots = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

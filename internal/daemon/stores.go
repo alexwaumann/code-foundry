@@ -123,10 +123,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}()
 	// The user's themes are read before the settings, so a theme slot naming one of them
 	// is valid from the first snapshot (and Open logs no false "value ignored").
-	s.themes = usertheme.New(usertheme.Options{Dir: p.Themes(), Bus: s.bus, Log: log.With("store", "themes")})
+	// Past the file cap the themes the slots name are read first, from settings.toml as
+	// written (the store opens after this one).
+	settingsPath := filepath.Join(p.Home(), settings.FileName)
+	s.themes = usertheme.New(usertheme.Options{Dir: p.Themes(), Bus: s.bus, Log: log.With("store", "themes"),
+		InUse: func() []string { return settings.ThemeSlots(settingsPath) }})
 	s.themes.Load()
 	if s.settings, err = settings.Open(ctx, settings.Options{
-		Path: filepath.Join(p.Home(), settings.FileName), Bus: s.bus, Log: log.With("store", "settings"),
+		Path: settingsPath, Bus: s.bus, Log: log.With("store", "settings"),
 		BackdropsDir: p.Backdrops(), Themes: s.themes.Snapshot().Set(),
 	}); err != nil {
 		return nil, err
