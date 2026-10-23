@@ -13,8 +13,9 @@
  *   permission request annotates its tool call (pending: "waiting for you");
  * - every finished turn has a header under its user message, at the top of its work
  *   (duration, steps, its cost, model) that folds it; every finished turn, the latest
- *   included, folds by default: only the user message, the header, the final assistant text
- *   (the trailing text of the turn), notes and steers show. A turn that ends while the
+ *   included, folds by default: only the user message, the header, Claude's text (every
+ *   text row in its place, the final answer included), notes, steers and inline pages
+ *   show; the fold hides the work (tools, groups, Agent rows, thinking). A turn that ends while the
  *   user reads scrolled up stays open until the list is at the bottom again (`deferred`,
  *   docs/notes/thread-fold-4-pinned-fold.md). The running turn has the same
  *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
@@ -69,12 +70,11 @@ export type WorkNode =
   | { type: "system"; key: string; id: string }
   /**
    * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
-   * and, while open, its card with the page. It stays in a folded turn (its row; the card
-   * closes, `folded`), is no step, and breaks a strip's run (docs/notes/inline-html.md).
-   * `foldChosen`: the turn is folded because the user folded it, not by default (its end
-   * folding it): a card the reader saw open stays open through the default fold only.
+   * and, while open, its card with the page. The turn's fold never touches it: its row and
+   * card stay as they are, folded or not (only the row opens and closes the card). It is no
+   * step and breaks a strip's run (docs/notes/inline-html.md, thread-fold-5-text-and-html.md).
    */
-  | { type: "html"; key: string; id: string; folded: boolean; foldChosen?: boolean }
+  | { type: "html"; key: string; id: string }
   /**
    * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): its
    * card. Like a page it stays in a folded turn, is no step and breaks a strip's run.
@@ -201,7 +201,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         out.push({ type: "system", key: it.id, id: it.id });
         break;
       case "html":
-        out.push({ type: "html", key: it.id, id: it.id, folded: false });
+        out.push({ type: "html", key: it.id, id: it.id });
         break;
       case "theme":
         out.push({ type: "theme", key: it.id, id: it.id });
@@ -237,9 +237,15 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes), steers, inline pages' rows and theme cards stay visible in a folded turn. */
+/**
+ * What a folded turn hides: its work (tool, group, Agent and thinking rows, questions and
+ * permission requests). Claude's text (every text row, not only the final answer), notes
+ * (errors, compactions, command output, system notes), steers, inline pages (row and card,
+ * untouched by the fold) and theme cards stay visible in their place
+ * (docs/notes/thread-fold-5-text-and-html.md).
+ */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
+  return n.type !== "text" && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
 }
 
 /**
@@ -319,7 +325,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   return turns;
 }
 
-/** A turn's work rows: what folding it hides (a group or Agent row counts as one; steers and notes are not steps). */
+/** A turn's work rows: what folding it hides (a group or Agent row counts as one; text, steers, notes and pages are not steps). */
 function stepCount(body: readonly WorkNode[]): number {
   return body.filter(foldsAway).length;
 }
@@ -378,7 +384,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
     if (t === stripped) rows.push(...stripRuns(t.body));
-    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n.type === "html" && folded ? { ...n, folded, foldChosen: opts.fold(t.key) !== undefined } : n);
+    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
   });
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
   if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });

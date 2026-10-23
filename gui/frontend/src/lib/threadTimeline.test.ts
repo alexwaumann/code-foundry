@@ -32,8 +32,6 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return `note:${r.kind}`;
       case "strip":
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
-      case "html":
-        return `html:${r.id}${r.folded ? (r.foldChosen ? "(folded by user)" : "(folded)") : ""}`;
       default:
         return `${r.type}:${r.id}`;
     }
@@ -105,7 +103,7 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "tool:Read", "tool:Read+perm"]);
   });
 
-  it("folds every finished turn, the latest included, under its header; final text and notes stay", () => {
+  it("folds every finished turn, the latest included, under its header; every text and the notes stay", () => {
     const items = [
       user("u1"),
       item("thinking"),
@@ -126,15 +124,16 @@ describe("buildTurns / buildRows", () => {
     const turns = buildTurns(items);
     expect(turns.map((t) => t.key)).toEqual(["u1", "u2"]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "header(folded 5)", "note:error", "final:a1", "final:a2", "user:u2", "header(folded 1)", "final:b1"]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 4)", "text:mid", "note:error", "final:a1", "final:a2", "user:u2", "header(folded 1)", "final:b1"]);
     expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
     // Every finished turn's header counts its steps (open or folded) and carries its turn_end.
     expect(rows.flatMap((r) => (r.type === "header" ? [[r.key, r.id, r.turn, r.steps, r.folded]] : []))).toEqual([
-      ["h:u1", "e1", "u1", 5, true],
+      ["h:u1", "e1", "u1", 4, true],
       ["h:u2", "e2", "u2", 1, true],
     ]);
     // The answer's copy action sits on its first final text row and copies all of it.
     expect(rows.flatMap((r) => (r.type === "text" ? [[r.id, r.answer]] : []))).toEqual([
+      ["mid", ""],
       ["a1", "a1\na2"],
       ["a2", ""],
       ["b1", "b1"],
@@ -142,7 +141,8 @@ describe("buildTurns / buildRows", () => {
     // The user's choice wins both ways: the latest turn reopened, then an older one.
     expect(shape(buildRows(turns, { fold: (k) => (k === "u2" ? false : undefined), working: false }))).toEqual([
       "user:u1",
-      "header(folded 5)",
+      "header(folded 4)",
+      "text:mid",
       "note:error",
       "final:a1",
       "final:a2",
@@ -290,14 +290,24 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(turns, open))).toEqual(["user:u1", "header(folded 3)", "steer:s1", "steer:s2", "final:a"]);
   });
 
+  it("a folded turn keeps every text in its place under the header; text is no step (thread-fold-5-text-and-html)", () => {
+    const items = [user("u1"), text("t1"), tool("Bash"), text("t2"), tool("Edit"), text("t3"), end("e1")];
+    const rows = buildRows(buildTurns(items), open);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "text:t1", "text:t2", "final:t3"]);
+    expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["t3"]]);
+    // Folded by the reader: the same; unfolded: the work comes back between the texts.
+    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(shape(rows));
+    expect(shape(buildRows(buildTurns(items), expanded))).toEqual(["user:u1", "header", "text:t1", "tool:Bash", "text:t2", "tool:Edit", "final:t3"]);
+  });
+
   it("a steer followed by the final text: the text after it is the turn's answer", () => {
     const items = [user("u1"), text("mid"), tool("Bash"), user("s1"), text("a1"), item("thinking"), text("a2"), end("e1")];
     const rows = buildRows(buildTurns(items), open);
-    expect(shape(rows)).toEqual(["user:u1", "header(folded 3)", "steer:s1", "final:a1", "final:a2"]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "text:mid", "steer:s1", "final:a1", "final:a2"]);
     expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"]]);
     // A steer right before the turn_end does not make earlier text final.
     const late = buildRows(buildTurns([user("u1"), tool("Bash"), text("a"), user("s1"), end("e1")]), open);
-    expect(shape(late)).toEqual(["user:u1", "header(folded 2)", "steer:s1"]);
+    expect(shape(late)).toEqual(["user:u1", "header(folded 1)", "text:a", "steer:s1"]);
   });
 
   it("a message after a turn_end, a system note or a process that ended (an error) starts a turn", () => {
@@ -334,18 +344,18 @@ describe("live tool strip (stripRuns)", () => {
   const live = { fold: () => undefined, working: true, strips: true };
   const strips = (rows: readonly TimelineRow[]) => rows.filter((r): r is Extract<WorkNode, { type: "strip" }> => r.type === "strip");
 
-  // The live header's count is the turn's (text and thinking included); a strip's counts tools and groups only.
+  // The live header's count is the turn's (thinking included, text not); a strip's counts tools and groups only.
   it.each<[string, () => TimelineItem[], string[]]>([
     [
       "text breaks a run; each run of two steps or more is one strip",
       () => [user("u1"), tool("Bash"), tool("Edit"), text("a"), tool("Bash"), tool("Write"), tool("Bash")],
-      ["user:u1", "live(u1,6)", "strip(2)[tool:Bash tool:Edit]", "text:a", "strip(3)[tool:Bash tool:Write tool:Bash]"],
+      ["user:u1", "live(u1,5)", "strip(2)[tool:Bash tool:Edit]", "text:a", "strip(3)[tool:Bash tool:Write tool:Bash]"],
     ],
-    ["a run of one step is not stripped", () => [user("u1"), tool("Bash"), text("a"), tool("Edit")], ["user:u1", "live(u1,3)", "tool:Bash", "text:a", "tool:Edit"]],
+    ["a run of one step is not stripped", () => [user("u1"), tool("Bash"), text("a"), tool("Edit")], ["user:u1", "live(u1,2)", "tool:Bash", "text:a", "tool:Edit"]],
     [
       "thinking is absorbed into a run but is no step: one step and thinking stay rows",
       () => [user("u1"), item("thinking"), tool("Bash"), item("thinking"), text("a"), item("thinking"), tool("Bash"), tool("Edit"), item("thinking")],
-      ["user:u1", "live(u1,8)", "thinking(1)", "tool:Bash", "thinking(1)", "text:a", "strip(2)[thinking(1) tool:Bash tool:Edit thinking(1)]"],
+      ["user:u1", "live(u1,7)", "thinking(1)", "tool:Bash", "thinking(1)", "text:a", "strip(2)[thinking(1) tool:Bash tool:Edit thinking(1)]"],
     ],
     [
       "a group and an Agent count as one step each",
@@ -437,7 +447,7 @@ describe("live tool strip (stripRuns)", () => {
 
   it("finished turns, a turn without strips on, and the subagent's nested rows are unchanged", () => {
     const running = [user("u1"), tool("Bash"), tool("Edit"), text("a"), tool("Agent", { toolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" }), tool("Bash", { parentToolUseId: "tu-ag" }), tool("Bash")];
-    expect(shape(buildRows(buildTurns(running), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,5)", "tool:Bash", "tool:Edit", "text:a", "tool:Agent[tool:Bash tool:Bash]", "tool:Bash"]);
+    expect(shape(buildRows(buildTurns(running), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,4)", "tool:Bash", "tool:Edit", "text:a", "tool:Agent[tool:Bash tool:Bash]", "tool:Bash"]);
     const done = buildTurns([...running, text("b"), end("e1")]);
     for (const fold of [() => undefined, () => false]) {
       expect(buildRows(done, { fold, working: true, strips: true })).toEqual(buildRows(done, { fold, working: true }));
@@ -499,15 +509,19 @@ describe("theme cards (theme items)", () => {
 });
 
 describe("inline pages (html items)", () => {
-  it("stay in a folded turn as their row, marked folded; open when the turn is open; no step", () => {
+  it("stay in a folded turn as they are; no step", () => {
     const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:a"]);
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h", "final:a"]);
     expect(shape(buildRows(buildTurns(items), expanded))).toEqual(["user:u1", "header", "tool:Write", "html:h", "final:a"]);
   });
 
-  it("say whether the user folded their turn (the card then closes even if seen open)", () => {
-    const items = [user("u1"), item("html", { id: "h" }), text("a"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(["user:u1", "header(folded 0)", "html:h(folded by user)", "final:a"]);
+  it("are the same node whatever the turn's fold: by default at its end, by the reader, or unfolded (thread-fold-5-text-and-html)", () => {
+    const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
+    const node = (fold: () => boolean | undefined) => buildRows(buildTurns(items), { fold, working: false }).find((r) => r.type === "html");
+    const want = { type: "html", key: "h", id: "h" };
+    expect(node(() => undefined)).toEqual(want);
+    expect(node(() => true)).toEqual(want);
+    expect(node(() => false)).toEqual(want);
   });
 
   it("break a live strip's run and show on their own", () => {
@@ -518,7 +532,7 @@ describe("inline pages (html items)", () => {
 
   it("do not end the answer: text after a page is the final text", () => {
     const items = [user("u1"), text("before"), item("html", { id: "h" }), text("after"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:after"]);
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "text:before", "html:h", "final:after"]);
   });
 
   it("shown between turns: no turn, no header, never folded (inline-html-2-fixes)", () => {

@@ -109,11 +109,11 @@ for (const scheme of schemes) {
       await expect(bubble.locator('[data-tag-kind="skill"]')).toHaveText("/tdd");
       await expect(bubble).toContainText("with /tdd. Keep the fingerprint check-count based in /tmp.");
 
-      // Turn 1 is finished and not the latest: folded to its message, header and answer.
+      // Turn 1 is finished and not the latest: folded to its message, header and texts.
       const first = headers(page).first();
       await expect(first).toHaveAttribute("data-folded", "true");
       await expect(first).toContainText("Worked for 4m 08s");
-      await expect(first).toContainText("12 steps");
+      await expect(first).toContainText("9 steps");
       await expect(pane(page).getByTestId("thread-group")).toHaveCount(0);
       await expect(pane(page).locator('[data-testid="thread-text"][data-final]').first()).toContainText("Fixed: stale badge after a force-push");
       // The latest turn is open.
@@ -236,6 +236,8 @@ for (const scheme of schemes) {
     });
 
     test("the latest turn folds when it ends and keeps its header and answer in view; only the user's scroll unpins the list", async ({ page }) => {
+      // Tall enough for the folded turn, which keeps its texts (thread-fold-5-text-and-html).
+      await page.setViewportSize({ width: 1280, height: 1100 });
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
@@ -247,7 +249,7 @@ for (const scheme of schemes) {
       await mockPost("thread/finish");
       const header = headers(page).last();
       // The turn's own cost and the model that replied, from the daemon's turn_end.
-      await expect(header).toContainText(/Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).toContainText(/Worked for .*·9 steps·\$0\.04·Opus 4\.8/);
       // Folded the moment it ended, the latest turn too: its work rows are gone.
       await expect(header).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
@@ -305,7 +307,7 @@ for (const scheme of schemes) {
       });
       await mockPost("thread/finish");
       const header = headers(page).last();
-      await expect(header).toContainText(/^Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).toContainText(/^Worked for .*·9 steps·\$0\.04·Opus 4\.8/);
       await expect(header).not.toHaveAttribute("data-folded", "true");
       await expect(header.locator("button.fold")).toHaveAttribute("aria-expanded", "true");
       expect(await element.evaluate((el) => el.isConnected && !el.hasAttribute("data-live"))).toBe(true);
@@ -315,7 +317,9 @@ for (const scheme of schemes) {
       expect(await page.evaluate(() => (window as unknown as { foldedSeen: boolean }).foldedSeen)).toBe(false);
       await shot(page, `thread-open-on-end-${scheme}`);
 
-      // Jump to bottom pins the list again: the turn folds there, its header and answer in view.
+      // Jump to bottom pins the list again: the turn folds there, its header and answer in view
+      // (in a window tall enough for the folded turn, which keeps its texts).
+      await page.setViewportSize({ width: 1280, height: 1100 });
       await page.getByTestId("thread-jump-bottom").click();
       await expect(header).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
@@ -489,7 +493,9 @@ test("leaving a thread forgets how it was folded: back on it, every finished tur
   await expect(header).toContainText(/·\$0\.04·Opus 4\.8/);
   await expect(header).toHaveAttribute("data-folded", "true");
   await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-  // Unfolded again, the Edit row the user had opened is closed.
+  // Unfolded again, the Edit row the user had opened is closed. The folded turn keeps its
+  // texts, so its header sits above the viewport: the user's wheel brings it in.
+  await wheelUpTo(page, header);
   await header.locator("button.fold").click();
   await expect(header).not.toHaveAttribute("data-folded", "true");
   await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
@@ -539,14 +545,14 @@ for (const scheme of ["dark", "light"] as const) {
 
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
   // Tall enough for the whole folded thread: the list sits at the bottom (pinned) with the
-  // first turn's header (12 steps) on screen.
+  // first turn's header (9 steps) on screen.
   await page.setViewportSize({ width: 1280, height: 1100 });
   await openThread(page, "idle");
   const timeline = page.getByTestId("thread-timeline");
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
   const header = headers(page).first();
   await expect(header).toHaveAttribute("data-folded", "true");
-  await expect(header).toContainText("12 steps");
+  await expect(header).toContainText("9 steps");
   await page.waitForTimeout(200);
   const y = async () => Math.round((await header.boundingBox())?.y ?? -1);
   const before = await y();

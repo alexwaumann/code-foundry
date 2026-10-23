@@ -1,7 +1,6 @@
 import { CITE_EDGE, locateQuote, type CitationBody } from "@/lib/citation";
-import { buildTurns } from "@/lib/threadTimeline";
 import { getTimeline } from "@/stores/cite";
-import { getThreadItems, setTurnFolded, structOf, useThreadStore } from "@/stores/thread";
+import { useThreadStore } from "@/stores/thread";
 import { citeItemSelector, lineRects, plainText, type PlainText } from "./citeDom";
 
 /** The next animation frame. */
@@ -42,10 +41,10 @@ function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText, at: {
 }
 
 /**
- * Brings a citation's quote into view in the thread's timeline: unfolds the turn its
- * answer is in (in Ember's chat, the work row it folded into) when that row is folded
- * away, scrolls the row in, waits for it to render, finds the quote (lib/citation
- * locateQuote) and scrolls it to the middle. Resolves with
+ * Brings a citation's quote into view in the timeline: in Ember's chat, opens the work row
+ * its text folded into (a thread's folded turn still shows every text), scrolls the row
+ * in, waits for it to render, finds the quote (lib/citation locateQuote) and scrolls it to
+ * the middle. Resolves with
  * the quote's offsets in the answer's plain text, or null when the answer is not in
  * this thread, its row does not render, or the quote is no longer in it.
  */
@@ -53,14 +52,10 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
   if (!hasItem(threadId, cite.itemId)) return null;
   const tl = getTimeline(threadId);
   if (!tl) return null;
+  // A thread's fold never hides Claude's text (docs/notes/thread-fold-5-text-and-html.md);
+  // only Ember's chat folds a turn's earlier texts into a work row, which `unfold` opens.
   if (!tl.showRow(cite.itemId)) {
-    if (tl.unfold) {
-      if (!tl.unfold(cite.itemId)) return null;
-    } else {
-      const turn = buildTurns(getThreadItems(threadId).map(structOf)).find((t) => t.body.some((n) => n.type === "text" && n.id === cite.itemId));
-      if (!turn) return null;
-      setTurnFolded(threadId, turn.key, false);
-    }
+    if (!tl.unfold?.(cite.itemId)) return null;
     await frame();
     await frame();
     if (!tl.showRow(cite.itemId)) return null;
