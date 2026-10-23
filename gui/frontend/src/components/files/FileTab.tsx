@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { FileImage, FileQuestion, FileText, FileX, Folder, FolderSearch, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
 import { ago } from "@/components/pr/model";
@@ -11,6 +11,7 @@ import type { FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
 import { FileActions, FileHeader, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
+import { findMissing } from "./findMissing";
 import { fileIconOf, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
 import { HtmlPreview } from "./HtmlPreview";
 import { ImagePreview } from "./ImagePreview";
@@ -36,12 +37,27 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * header A. Text is code (line numbers, the line param marked and scrolled to); markdown
  * and HTML also render (Rendered | Source, remembered per kind); images show inline and
  * PDFs as their pages (an image or PDF too large to come back whole says so); other
- * binaries, folders and missing paths get a placeholder. Read again when the tab shows, on
+ * binaries, folders and missing paths get a placeholder; a missing path is first looked
+ * for once in the checkout (findMissing: a model's path written from a subfolder or cut
+ * short), and the file found is the tab's. Read again when the tab shows, on
  * Refresh, when the worktree changes and when the thread edits the file (useTabRead).
  */
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line } = target;
-  const read = useTabRead<FileReadView>(`${base}\u0000${path}`, (signal) => readFile(base, path, undefined, signal));
+  const key = `${base}\u0000${path}`;
+  // A path not found at base is looked for once in the checkout (findMissing); what that
+  // found (or null) is read from then on, so a refresh does not search again.
+  const found = useRef<{ key: string; path: string | null } | null>(null);
+  const read = useTabRead<FileReadView>(key, async (signal) => {
+    const tried = found.current?.key === key ? found.current : null;
+    const first = await readFile(base, tried?.path ?? path, undefined, signal);
+    if (tried || !first.notFound || !project) return first;
+    const alt = await findMissing(project, base, first.path || resolvePath(base, path), signal);
+    found.current = { key, path: alt };
+    if (alt === null) return first;
+    const second = await readFile(base, alt, undefined, signal);
+    return second.notFound ? first : second;
+  });
   const { reload } = read;
   const later = useDebounced(reload);
   const file = read.data;
