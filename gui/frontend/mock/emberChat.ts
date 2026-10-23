@@ -5,8 +5,9 @@
  * 0. The user asked for the flaky test; Ember started a worker (`ember task start`) and
  *    linked the task by an older title; the worker's wake, a branch check (`git -C $W …`)
  *    and `ember task done --branch`, a reply.
- * 1. The 0.20 release notes and a wails bump: the board, two reads, two workers started in
- *    one Bash call (prompts in heredocs), a reply with both task links.
+ * 1. The 0.20 release notes and a wails bump: the board, two reads, a note between tool
+ *    calls (folded into the run: only a turn's last text is the reply), two workers started
+ *    in one Bash call (prompts in heredocs), a reply with both task links.
  * 2. A wake from the blocked wails worker, a read, a short reply.
  * 3. A follow-up taken as a piece of the notes, the change sent to the notes worker.
  * 4. A progress wake from the notes API lead that Ember only thought about, then replied to
@@ -129,6 +130,8 @@ export function scriptEmberChat(s: EmberChatScript, now = Date.now()): void {
   bash("code-foundry ember board", "# Task board\n\nNothing in progress.", ago(90, 4));
   s.tool("Read", { file_path: `${CF}/docs/PLAN.md` }, { output: "# Plan\n…" }, { at: ago(90, 9), until: ago(90, 10) });
   s.tool("Read", { file_path: `${CF}/go.mod` }, { output: "module github.com/alexwaumann/code-foundry\n\ngo 1.26\n…" }, { at: ago(90, 12), until: ago(90, 13) });
+  // Text between tool calls: work, folded into the run (only the turn's last text is the reply).
+  text("The notes only touch docs/ and the bump only go.mod and the GUI, so both can start now.", ago(90, 15));
   bash(
     [
       "code-foundry ember task start \"Add release notes for 0.20\" --project code-foundry --model claude-opus-4-7[1m] --prompt - <<'EOF'",

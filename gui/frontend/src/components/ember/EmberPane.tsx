@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Eye, Loader2 } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { AgentsStrip } from "@/components/thread/AgentsStrip";
+import { CiteLayer } from "@/components/thread/cite/CiteLayer";
 import { useElementHeight, useThreadActivity } from "@/components/thread/activity";
 import { PathPlaceContext, ThreadContext } from "@/components/thread/context";
 import { ThreadComposer } from "@/components/thread/ThreadComposer";
@@ -115,7 +116,8 @@ function EmberPathPlace({ children }: { children: ReactNode }) {
  * Ember's chat in the content pane (docs/notes/ember-3-gui.md): its thread's Watch and
  * timeline machinery (ThreadPane's WatchedThread holds the stream), with its own header
  * (the flame, "Ember", the board's summary, Board and Show work) and rows (EmberTimeline),
- * and the thread composer. Holds the board stream (core) while shown.
+ * the thread composer and the cite layer. Intentionally not ThreadBody: features a thread
+ * gains are mirrored here by hand (docs/notes/ember-reply-fold.md). Holds the board stream (core) while shown.
  */
 export function EmberBody({ threadId }: { threadId: string }) {
   useEffect(() => holdEmberBoard("core"), []);
@@ -124,6 +126,7 @@ export function EmberBody({ threadId }: { threadId: string }) {
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useElementHeight(dockRef);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
     <ThreadContext.Provider value={ctx}>
@@ -138,7 +141,7 @@ export function EmberBody({ threadId }: { threadId: string }) {
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
           {loaded && catchingUp && (
             <div
               className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
@@ -162,6 +165,8 @@ export function EmberBody({ threadId }: { threadId: string }) {
             <AgentsStrip threadId={threadId} />
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={PLACEHOLDER} busyPlaceholder={BUSY_PLACEHOLDER} />
           </div>
+          {/* Ember's reply can be quoted into the composer, as a thread's answer can (docs/notes/citations.md). */}
+          <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
         </div>
       </section>
     </ThreadContext.Provider>

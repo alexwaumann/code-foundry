@@ -43,8 +43,9 @@ function scrollToQuote(threadId: string, pane: HTMLElement, pt: PlainText, at: {
 
 /**
  * Brings a citation's quote into view in the thread's timeline: unfolds the turn its
- * answer is in when that row is folded away, scrolls the row in, waits for it to render,
- * finds the quote (lib/citation locateQuote) and scrolls it to the middle. Resolves with
+ * answer is in (in Ember's chat, the work row it folded into) when that row is folded
+ * away, scrolls the row in, waits for it to render, finds the quote (lib/citation
+ * locateQuote) and scrolls it to the middle. Resolves with
  * the quote's offsets in the answer's plain text, or null when the answer is not in
  * this thread, its row does not render, or the quote is no longer in it.
  */
@@ -53,9 +54,13 @@ export async function revealQuote(threadId: string, pane: HTMLElement, cite: Cit
   const tl = getTimeline(threadId);
   if (!tl) return null;
   if (!tl.showRow(cite.itemId)) {
-    const turn = buildTurns(getThreadItems(threadId).map(structOf)).find((t) => t.body.some((n) => n.type === "text" && n.id === cite.itemId));
-    if (!turn) return null;
-    setTurnFolded(threadId, turn.key, false);
+    if (tl.unfold) {
+      if (!tl.unfold(cite.itemId)) return null;
+    } else {
+      const turn = buildTurns(getThreadItems(threadId).map(structOf)).find((t) => t.body.some((n) => n.type === "text" && n.id === cite.itemId));
+      if (!turn) return null;
+      setTurnFolded(threadId, turn.key, false);
+    }
     await frame();
     await frame();
     if (!tl.showRow(cite.itemId)) return null;

@@ -97,6 +97,8 @@ export function TimelineList<R extends ListRow>({
   renderRow,
   estimateRow = estimate,
   turns = false,
+  citable = turns,
+  unfold,
   inset = 40,
 }: {
   threadId: string;
@@ -105,6 +107,10 @@ export function TimelineList<R extends ListRow>({
   renderRow: (row: R) => ReactNode;
   estimateRow?: (row: R | undefined) => number;
   turns?: boolean;
+  /** The cite layer can bring its rows into view (stores/cite registerTimeline): the thread's own timeline (turns) and Ember's chat. */
+  citable?: boolean;
+  /** Opens what folds the item away (Ember's work row), for the cite layer; without it, the turn the item is in unfolds. */
+  unfold?: (rows: readonly R[], itemId: string) => boolean;
   /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
   inset?: number | undefined;
 }) {
@@ -150,14 +156,16 @@ export function TimelineList<R extends ListRow>({
   }, []);
 
   // The cite layer brings a quoted item's row into view (stores/cite.ts): the thread's
-  // own timeline only (its rows are the turns).
+  // own timeline (its rows are the turns) or Ember's chat, not a subagent's.
   const rowsRef = useRef(rows);
+  const unfoldRef = useRef(unfold);
   useLayoutEffect(() => {
     rowsRef.current = rows;
+    unfoldRef.current = unfold;
   });
   useEffect(() => {
     const el = scrollRef.current;
-    if (!turns || !el) return;
+    if (!citable || !el) return;
     return registerTimeline(threadId, {
       scroller: el,
       showRow: (key) => {
@@ -174,8 +182,9 @@ export function TimelineList<R extends ListRow>({
       unpin: () => {
         pinned.current = false;
       },
+      unfold: unfoldRef.current ? (itemId) => unfoldRef.current?.(rowsRef.current, itemId) ?? false : undefined,
     });
-  }, [threadId, turns, v]);
+  }, [threadId, citable, v]);
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
   // text streaming in, the composer growing), or the list's own (the bottom panel opening

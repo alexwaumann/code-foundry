@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, openStreams, resetMock } from "./fixtures";
+import { dragSelect, mockPost, mockUrl, openApp, openStreams, resetMock } from "./fixtures";
 
 /**
  * Ember in the GUI (docs/notes/ember-3-gui.md) over the mock's Ember (mock/ember.ts, its
@@ -13,6 +13,8 @@ import { mockPost, mockUrl, openApp, openStreams, resetMock } from "./fixtures";
 const emberRow = (page: Page) => page.getByTestId("sidebar-ember");
 const pane = (page: Page) => page.getByTestId("ember-pane");
 const board = (page: Page) => page.getByTestId("ember-board");
+/** Ember's replies: the thread's text rows, final (a text folded into a run is not). */
+const replies = (page: Page) => pane(page).locator('[data-testid="thread-text"][data-final]');
 
 async function enable(): Promise<void> {
   await mockPost("ember?enabled=true");
@@ -34,7 +36,7 @@ async function wheelTo(page: Page, target: Locator): Promise<void> {
 async function openChat(page: Page): Promise<void> {
   await emberRow(page).click();
   await expect(pane(page)).toBeVisible();
-  await expect(pane(page).getByTestId("ember-text").first()).toBeVisible();
+  await expect(replies(page).first()).toBeVisible();
 }
 
 test.beforeEach(async () => {
@@ -135,6 +137,57 @@ test("work folds into Worked for rows; one opens in place, Show work opens all",
   await expect.poll(async () => (await expanded()).every(Boolean)).toBe(true);
   await page.getByTestId("ember-show-work").click();
   await expect.poll(async () => (await expanded()).some(Boolean)).toBe(false);
+});
+
+test("only a turn's last text is the reply; text between tool calls folds into the run", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  const work = pane(page).getByTestId("ember-work");
+  const note = pane(page).getByTestId("thread-text").filter({ hasText: "both can start now" });
+  const reply = replies(page).filter({ hasText: "On it. Two pieces" });
+  await wheelTo(page, reply);
+  await expect(reply).toHaveCount(1);
+  await expect(note).toHaveCount(0);
+  // Its run opens to it, among the tool rows, not as a reply (no Copy answer).
+  await wheelTo(page, work.nth(2));
+  await work.nth(2).getByRole("button").click();
+  await expect(note).toHaveCount(1);
+  await expect(note).not.toHaveAttribute("data-final", "true");
+  await expect(note.getByTestId("thread-copy-answer")).toHaveCount(0);
+  await expect(reply.getByTestId("thread-copy-answer")).toHaveCount(1);
+  // Its task links still are pointer lines (the thread's text row, Ember's markdown).
+  await expect(reply.getByTestId("ember-task-link")).toHaveCount(2);
+});
+
+test("Ember's reply can be cited; Go to source opens the run a folded text is in", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  const chips = page.getByTestId("thread-composer").locator('[data-testid="prompt-tag"][data-tag-kind="cite"]');
+  const last = replies(page).last();
+  await expect(last).toContainText("the worker is still drafting");
+  await dragSelect(page, last, "the worker is still drafting");
+  await page.getByTestId("cite-button").click();
+  await expect(page.getByTestId("cite-comment")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(chips).toHaveText(["the worker is still…"]);
+  // A text folded into a run is citable once the run is open, and its chip opens the run again.
+  const work = pane(page).getByTestId("ember-work");
+  const run = work.nth(2);
+  await wheelTo(page, run);
+  await run.getByRole("button").click();
+  const note = pane(page).getByTestId("thread-text").filter({ hasText: "both can start now" });
+  await dragSelect(page, note, "both can start now");
+  await page.getByTestId("cite-button").click();
+  await page.keyboard.press("Enter");
+  await expect(chips).toHaveCount(2);
+  await run.getByRole("button").click();
+  await expect(note).toHaveCount(0);
+  await chips.nth(1).click();
+  await expect(page.getByTestId("cite-popover")).toBeVisible();
+  await expect(run).toHaveAttribute("data-expanded", "true");
+  await expect(note).toHaveCount(1);
 });
 
 test("a task link is a pointer line that opens the board at its task", async ({ page }) => {
@@ -282,7 +335,7 @@ test("paths in Ember's chat: an absolute one under a project is a chip; relative
   await enable();
   await openApp(page);
   await openChat(page);
-  const last = pane(page).getByTestId("ember-text").filter({ hasText: "The notes API team is under way" });
+  const last = replies(page).filter({ hasText: "The notes API team is under way" });
   await expect(last).toHaveCount(1);
   await expect(last.getByTestId("path-chip")).toHaveCount(1);
   await expect(last.getByTestId("path-plain")).toHaveText(["README.md"]);
