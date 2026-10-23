@@ -488,3 +488,42 @@ test("the board: labelled ages, a done piece's outcome and branch, no repeated t
   const lead = board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-lead"]');
   await expect(lead.getByTestId("ember-worker-meta")).toHaveText("Schema done; handlers in Notes API: validate POST /notes and Notes API: validate PUT /notes/:id");
 });
+
+// ---------- docs/notes/ember-fixes-3-board.md ----------
+
+test("an idle worker on a doing task is not working: it waits on Ember's check, or reads idle", async ({ page }) => {
+  await enable();
+  await openApp(page);
+  await openChat(page);
+  const status = emberRow(page).getByTestId("ember-row-status");
+  const header = page.getByTestId("ember-header-status");
+  // Only the lead's task left doing (the notes worker done too); then its team and the lead itself finish.
+  await mockPost("ember/task?id=t-1a2b3c4d&state=done");
+  await mockPost("thread/status?id=s-ember-notes&status=attention&reason=finished");
+  await expect(emberRow(page).getByTestId("ember-row-threads")).toHaveText("3 threads");
+  for (const id of ["s-ember-team-post", "s-ember-team-put", "s-ember-lead"]) await mockPost(`thread/status?id=${id}&status=attention&reason=finished`);
+  // The lead's task is still doing, but nothing works: no Working, no thread count, an idle flame.
+  await expect(status).toHaveText("Worker idle");
+  await expect(emberRow(page).getByTestId("ember-row-task")).toHaveText("Validate notes API input");
+  await expect(emberRow(page).getByTestId("ember-row-threads")).toHaveCount(0);
+  await expect(emberRow(page)).toHaveAttribute("data-flame", "idle");
+  await expect(header).toHaveText("1 blocked · 1 queued");
+  // The lead reports done: the task waits on Ember's check, on the row, the header, the link and the board.
+  await mockPost(`ember/report?id=s-ember-lead&status=done&summary=${encodeURIComponent("POST and PUT /notes validated; pushed cf/notes-validation")}`);
+  await expect(status).toHaveText("To check");
+  await expect(status).toHaveClass(/text-cf-success-text/);
+  await expect(emberRow(page)).toHaveAttribute("data-flame", "idle");
+  await expect(header).toHaveText("1 to check · 1 blocked · 1 queued");
+  await expect(header.locator('[data-dot="sky"]')).toHaveCount(0);
+  const link = pane(page).locator('[data-testid="ember-task-link"][data-task="t-4c5d6e7f"]');
+  await expect(link.getByTestId("ember-task-link-meta")).toContainText("worker reported done, waiting for Ember to check");
+  await page.getByTestId("ember-board-toggle").click();
+  const card = board(page).locator('[data-testid="ember-task"][data-task="t-4c5d6e7f"]');
+  await expect(card.getByTestId("ember-task-meta")).toHaveText("reported done");
+  await expect(card.getByTestId("ember-task-unclosed")).toHaveText("Worker reported done, waiting for Ember to check");
+  await expect(card.locator('[data-testid="ember-worker"][data-thread="s-ember-lead"] [data-dot]')).toHaveAttribute("data-dot", "done");
+  // Ember closes it: nothing waits on it any more.
+  await mockPost("ember/task?id=t-4c5d6e7f&state=done");
+  await expect(status).toHaveText("Blocked");
+  await expect(header).toHaveText("1 blocked · 1 queued");
+});

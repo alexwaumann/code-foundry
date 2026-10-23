@@ -177,6 +177,7 @@
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
  *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…][&title=…]
  *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
+ *   POST /__mock/ember/report?id=s-…&status=done|blocked|failed|progress[&summary=…]   (a worker's report, filed now)
  *   POST /__mock/ember/timer?minutes=…[&every=2m][&note=…]   ({ id }: a timer of Ember's thread; thread.unsubscribe cancels it)
  *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
  *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
@@ -196,7 +197,7 @@ import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
-import { ThreadFlagLevel, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadFlagLevel, ThreadReportStatus, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
@@ -702,7 +703,7 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
   }
 }
 
-/** Ember controls: POST /__mock/ember[/task|/task/add|/timer|/consolidating|/epoch]. */
+/** Ember controls: POST /__mock/ember[/task|/task/add|/report|/timer|/consolidating|/epoch]. */
 function emberControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const e = world.ember;
   const bool = (name: string): boolean => {
@@ -727,6 +728,12 @@ function emberControl(res: ServerResponse, action: string, q: URLSearchParams): 
         const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });
         json(res, 200, { id });
         return;
+      }
+      case "/report": {
+        const status = { done: ThreadReportStatus.DONE, blocked: ThreadReportStatus.BLOCKED, failed: ThreadReportStatus.FAILED, progress: ThreadReportStatus.PROGRESS }[q.get("status") ?? ""];
+        if (status === undefined) throw new CommandError("invalid", "status must be done, blocked, failed or progress");
+        e.setReport(q.get("id") ?? "", status, q.get("summary") ?? "");
+        break;
       }
       case "/timer": {
         const id = e.addTimer({ minutes: Number(q.get("minutes") ?? ""), every: q.get("every") ?? "", note: q.get("note") ?? "" });
@@ -979,7 +986,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     threadControl(res, thread[1], q);
     return;
   }
-  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/timer|\/consolidating|\/epoch|\/restart)$/.exec(path);
+  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/report|\/timer|\/consolidating|\/epoch|\/restart)$/.exec(path);
   if (req.method === "POST" && emberCtl) {
     emberControl(res, emberCtl[1] ?? "", q);
     return;

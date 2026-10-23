@@ -5,7 +5,7 @@ import type { EmberTaskView } from "@/api/ember";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { boardSections, cardMeta, cardProgress, timerRows, updatedAgo, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
+import { boardSections, cardMeta, cardProgress, timerRows, unclosed, unclosedWords, updatedAgo, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
 import type { StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
@@ -152,10 +152,16 @@ function BlockedOutcome({ text }: { text: string }) {
   );
 }
 
-/** A task's card: dot, title, "x of y" or its worker's status, a progress bar for a parent, a blocked task's outcome, its branch, its workers. */
+/**
+ * A task's card: dot, title, "x of y" or its worker's status, a progress bar for a parent,
+ * whether it waits on Ember alone ("Worker reported done, waiting for Ember to check"), a
+ * blocked task's outcome, its branch, its workers.
+ */
 function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focused: string | null }) {
   const t = card.task;
   const meta = cardMeta(card);
+  const check = unclosedWords(t, card.subtasks);
+  const checkTone = unclosed(t, card.subtasks) === "report" && t.thread?.reportStatus !== "done" ? TONE.amber : TONE.emerald;
   const progress = cardProgress(card);
   const rows = workerRows(card);
   return (
@@ -179,6 +185,11 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
         <div className="mt-2 mb-1.5 h-0.75 overflow-hidden rounded-full bg-cf-text/10" data-testid="ember-task-progress">
           <div className="h-full bg-cf-info" style={{ width: `${String(Math.round((progress.done / progress.total) * 100))}%` }} />
         </div>
+      )}
+      {check && (
+        <p className={cn("mt-0.5 truncate text-caption", checkTone)} data-testid="ember-task-unclosed">
+          {check}
+        </p>
       )}
       {t.state === "blocked" && t.outcome && <BlockedOutcome text={t.outcome} />}
       {(t.state === "done" || t.state === "cancelled") && t.outcome && (

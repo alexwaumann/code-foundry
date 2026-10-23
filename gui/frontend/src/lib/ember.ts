@@ -10,7 +10,7 @@ import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
 import { snoozeTimeShort } from "./snooze";
-import { isWaiting } from "./waiting";
+import { waitingCount } from "./waiting";
 import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 // ---------- the flame ----------
@@ -19,15 +19,18 @@ import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type Timeline
 export type FlameState = "idle" | "thinking" | "working" | "attention";
 
 /**
- * The flame's state for Ember's thread, the number of doing tasks and of workers waiting
- * on the user: needs attention (a prompt, a reply the user has not seen: the daemon's
- * finished-turn attention, cleared when the chat is open; or a worker's prompt, cleared
- * only by answering it) wins, then busy (thinking), then a doing task (working).
+ * The flame's state for Ember's thread, the number of worker threads working
+ * (workingThreads: on a turn, starting, or a lead waiting on its own running children)
+ * and of workers waiting on the user: needs attention (a prompt, a reply the user has not
+ * seen: the daemon's finished-turn attention, cleared when the chat is open; or a
+ * worker's prompt, cleared only by answering it) wins, then busy (thinking), then a
+ * working worker (working). A doing task whose worker is idle (it reported done and
+ * waits on Ember's check) leaves the flame idle.
  */
-export function flameState(t: { state: ThreadStateView; status: ThreadStatusView } | undefined, doing: number, waiting = 0): FlameState {
+export function flameState(t: { state: ThreadStateView; status: ThreadStatusView } | undefined, working: number, waiting = 0): FlameState {
   if (t?.status === "attention" || waiting > 0) return "attention";
   if (t && threadBadge(t) === "busy") return "thinking";
-  return doing > 0 ? "working" : "idle";
+  return working > 0 ? "working" : "idle";
 }
 
 // ---------- worker threads ----------
@@ -35,10 +38,16 @@ export function flameState(t: { state: ThreadStateView; status: ThreadStatusView
 /** A worker thread as the board's words read it: a task's thread or one of its team. */
 type WorkerLike = Pick<EmberTaskThreadView, "state" | "status" | "statusReason" | "reportStatus" | "reportSummary"> & { archived?: boolean; removed?: boolean };
 
-/** A task's worker is working: on a turn, or waiting on its own child threads (a lead whose workers run); not archived or removed. */
+/**
+ * A task's worker is working: on a turn, starting, or waiting on its own child threads
+ * (a lead whose workers run: "waiting on 2 child threads"); not archived or removed. A
+ * bare "waiting" (only a wake queued to it, which a failed start may hold) names no
+ * child and is not working; nor is an idle worker whose task is still doing. The
+ * daemon's rule is the same (internal/store/ember/team.go working).
+ */
 export function workerBusy(th: WorkerLike | null): boolean {
   if (th === null || th.archived === true || th.removed === true || th.status === "attention") return false;
-  return threadBadge(th) === "busy" || isWaiting(th);
+  return threadBadge(th) === "busy" || waitingCount(th) > 0;
 }
 
 /** A worker waits on the user: a pending permission request or question (the sidebar's "Needs input"). */
@@ -64,8 +73,10 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
   if (budget !== null) return { text: budget ? `Stopped at budget · ${budget}` : "Stopped at budget", tone: "amber" };
   switch (statusLine({ ...th, statusChangedAtMs: null }).kind) {
     case "working":
-    case "waiting":
       return { text: "Working", tone: "sky" };
+    case "waiting":
+      // A lead waiting on its children; a bare "waiting" names none (workerBusy).
+      return waitingCount(th) > 0 ? { text: "Working", tone: "sky" } : { text: "Idle", tone: "muted" };
     case "input":
     case "question":
     case "plan":
@@ -182,13 +193,18 @@ export function cardProgress(c: BoardCard): { done: number; total: number } | nu
   return { done: counted.filter((s) => s.state === "done").length, total: counted.length };
 }
 
-/** A card's right side: "x of y" for a parent, else its worker's status words (Needs input while one of a lead's team asks), else its state. */
+/**
+ * A card's right side: "x of y" for a parent, else "reported done" while the task waits
+ * on Ember's check, else its worker's status words (Needs input while one of a lead's
+ * team asks), else its state.
+ */
 export function cardMeta(c: BoardCard): Words {
   const p = cardProgress(c);
   if (p) return { text: `${String(p.done)} of ${String(p.total)}`, tone: "muted" };
   const t = c.task;
   if (t.state === "done" || t.state === "cancelled" || t.state === "todo") return { text: stateWords[t.state], tone: "muted" };
   if (t.state === "blocked") return { text: stateWords.blocked, tone: "amber" };
+  if (unclosed(t, c.subtasks) === "report" && t.thread?.reportStatus) return reportedWords(t.thread.reportStatus);
   if (t.thread) {
     const words = workerWords(t.thread);
     return t.thread.descendantsWaiting > 0 && words.tone !== "red" ? NEEDS_INPUT : words;
@@ -216,10 +232,15 @@ export interface WorkerRow {
   depth: number;
 }
 
-/** A worker row's dot: sky while it works, amber while it waits on the user, else the task's. */
+/**
+ * A worker row's dot: sky while it works, amber while it waits on the user; under a doing
+ * task an idle worker's dot says what it is (emerald once it reported done, a muted ring
+ * otherwise), not the task's sky; else the task's.
+ */
 function workerDot(th: WorkerLike, state: EmberTaskStateView): TaskDot {
   if (workerBusy(th)) return "doing";
   if (workerAsks(th)) return "blocked";
+  if (state === "doing") return th.reportStatus === "done" ? "done" : "open";
   return taskDot(state);
 }
 
@@ -411,24 +432,78 @@ export function blockedTasks(tasks: readonly EmberTaskView[]): number {
   return tasks.filter((t) => t.state === "blocked" && !parents.has(t.id) && !taskAsks(t)).length;
 }
 
+// ---------- unclosed: waiting on Ember alone ----------
+
+/**
+ * Why an open task waits on Ember and on nothing else (docs/notes/ember-fixes-3-board.md;
+ * the daemon's ember.Unclosed): "report", it is doing and its worker reported (done,
+ * failed or blocked) and is idle with its team (Ember checks the work, then closes or
+ * blocks it); "pieces", a parent whose pieces are all done or cancelled (Ember closes it);
+ * null otherwise. The board leaves out a report from before the task last changed, so a
+ * reopened task is not unclosed by its old report.
+ */
+export type Unclosed = "report" | "pieces" | null;
+
+export function unclosed(t: EmberTaskView, tasks: readonly EmberTaskView[]): Unclosed {
+  if (t.state !== "todo" && t.state !== "doing" && t.state !== "blocked") return null;
+  const pieces = tasks.filter((x) => x.parentId === t.id);
+  if (pieces.length > 0) return pieces.every((x) => x.state === "done" || x.state === "cancelled") ? "pieces" : null;
+  const th = t.thread;
+  if (t.state !== "doing" || !th || th.removed) return null;
+  if (th.reportStatus !== "done" && th.reportStatus !== "failed" && th.reportStatus !== "blocked") return null;
+  // An archived worker counts as idle: its report still waits on the check.
+  const live = { ...th, archived: false };
+  const teamWorks = th.descendantsWorking > 0 || th.descendants.some(workerBusy);
+  return workerBusy(live) || workerAsks(live) || teamWorks || th.descendantsWaiting > 0 ? null : "report";
+}
+
+/** A worker's report on a task that waits on Ember's check: "reported done" (emerald), "reported failed" (red), "reported blocked" (amber). */
+function reportedWords(status: "done" | "failed" | "blocked" | "progress"): Words {
+  return { text: `reported ${status}`, tone: status === "done" ? "emerald" : status === "failed" ? "red" : "amber" };
+}
+
+/** The board's sentence for a task that waits on Ember alone ("Worker reported done, waiting for Ember to check"); "" for any other. */
+export function unclosedWords(t: EmberTaskView, tasks: readonly EmberTaskView[]): string {
+  switch (unclosed(t, tasks)) {
+    case "report":
+      return `Worker reported ${t.thread?.reportStatus ?? "done"}, waiting for Ember to check`;
+    case "pieces":
+      return "All pieces closed, waiting for Ember to close it";
+    case null:
+      return "";
+  }
+}
+
+/** Tasks waiting on Ember alone (unclosed): the header's "N to check", the pinned row's To check. */
+export function unclosedTasks(tasks: readonly EmberTaskView[]): number {
+  return tasks.filter((t) => unclosed(t, tasks) !== null).length;
+}
+
+/** Whether a task's work goes on: its worker, a thread of its team or one of its doing pieces' works. */
+function taskWorks(t: EmberTaskView, tasks: readonly EmberTaskView[]): boolean {
+  return workingThreads([t, ...tasks.filter((x) => x.parentId === t.id && x.state === "doing")]) > 0;
+}
+
 /** The chat header's dot: amber while something waits on the user (a question, a blocked task), sky while workers run. */
 export type HeaderDot = "amber" | "sky" | "";
 
 /**
- * The chat header's summary, "1 needs you · 2 threads working · 1 blocked · 1 queued · 1
- * scheduled" (workers waiting on the user, working threads, blocked tasks, todo tasks and
- * Ember's pending timers), and its dot. With none of those, a doing task still says "1 in
- * progress" (a worker finished, Ember has not closed the task yet), so the header never
- * says less than the board; "" only when nothing is going on.
+ * The chat header's summary, "1 needs you · 2 threads working · 1 to check · 1 blocked ·
+ * 1 queued · 1 scheduled" (workers waiting on the user, working threads, tasks waiting on
+ * Ember alone, blocked tasks, todo tasks and Ember's pending timers), and its dot. With
+ * none of those, a doing task still says "1 in progress" (its worker is idle without a
+ * report), so the header never says less than the board; "" only when nothing goes on.
  */
 export function headerSummary(tasks: readonly EmberTaskView[], timers = 0): { text: string; dot: HeaderDot } {
   const waiting = waitingThreads(tasks);
   const working = workingThreads(tasks);
+  const toCheck = unclosedTasks(tasks);
   const blocked = blockedTasks(tasks);
-  const queued = tasks.filter((t) => t.state === "todo").length;
+  const queued = tasks.filter((t) => t.state === "todo" && unclosed(t, tasks) === null).length;
   const parts: string[] = [];
   if (waiting > 0) parts.push(`${String(waiting)} ${waiting === 1 ? "needs" : "need"} you`);
   if (working > 0) parts.push(`${String(working)} ${working === 1 ? "thread" : "threads"} working`);
+  if (toCheck > 0) parts.push(`${String(toCheck)} to check`);
   if (blocked > 0) parts.push(`${String(blocked)} blocked`);
   if (queued > 0) parts.push(`${String(queued)} queued`);
   if (timers > 0) parts.push(`${String(timers)} scheduled`);
@@ -457,13 +532,20 @@ export function waitingTitle(tasks: readonly EmberTaskView[]): string {
 
 /**
  * The pinned row's line 2: the task a waiting worker belongs to, else the first doing
- * task, else the first blocked one (a piece, not its rolled-up parent).
+ * task whose work goes on, else the first task waiting on Ember alone, else the first
+ * doing task, else the first blocked one (a piece, not its rolled-up parent). The order
+ * follows emberStatusWords', so the title is the task the status is about.
  */
 export function rowTitle(tasks: readonly EmberTaskView[]): string {
   const waiting = waitingTitle(tasks);
   if (waiting) return waiting;
-  const doing = firstDoingTitle(tasks);
-  if (doing) return doing;
+  const doing = tasks.filter((t) => t.state === "doing");
+  const works = doing.find((t) => t.parentId === "" && taskWorks(t, tasks)) ?? doing.find((t) => taskWorks(t, tasks));
+  if (works) return works.title;
+  const check = tasks.find((t) => t.parentId === "" && unclosed(t, tasks) !== null) ?? tasks.find((t) => unclosed(t, tasks) !== null);
+  if (check) return check.title;
+  const first = firstDoingTitle(tasks);
+  if (first) return first;
   const parents = new Set(tasks.filter((t) => t.state === "blocked" && t.parentId !== "").map((t) => t.parentId));
   return tasks.find((t) => t.state === "blocked" && !parents.has(t.id))?.title ?? "";
 }
@@ -471,8 +553,13 @@ export function rowTitle(tasks: readonly EmberTaskView[]): string {
 /** Ember's own thread, as the pinned row reads it. */
 type EmberThreadLike = { state: ThreadStateView; status: ThreadStatusView; statusReason: string; statusChangedAtMs: number | null };
 
-/** What else the board holds for the pinned row's words: workers waiting on the user (and their words), blocked tasks. */
+/** What else the board holds for the pinned row's words: worker threads working, tasks waiting on Ember alone, doing tasks, workers waiting on the user (and their words), blocked tasks. */
 export interface RowCounts {
+  /** Worker threads working (workingThreads). */
+  working: number;
+  /** Tasks waiting on Ember alone (unclosedTasks). */
+  toCheck?: number;
+  /** Doing tasks, whatever their workers do. */
   doing: number;
   waiting?: number;
   /** The waiting worker's words when one waits ("Stopped at budget"); Needs input otherwise. */
@@ -484,8 +571,10 @@ export interface RowCounts {
  * The pinned row's status: Ember's own prompt or error (a turn the app's restart cut reads
  * Interrupted, amber: the chat says what happened); else Needs input (or a budget stop's
  * words) while a worker waits on the user; else what Ember's own thread is doing
- * (Finished, Working); else Working while a task is doing; else Blocked while a task is
- * blocked (the row counts blocked tasks after Working), else Idle.
+ * (Finished, Working); else Working while a worker thread works; else To check while a
+ * task waits on Ember alone (its worker reported and is idle, or a parent's pieces all
+ * closed); else Worker idle while a task is doing with no one on it; else Blocked while
+ * a task is blocked (the row counts blocked tasks after the status), else Idle.
  */
 export function emberStatusWords(t: EmberThreadLike | undefined, c: RowCounts): Words {
   if (t && t.status === "error" && t.statusReason === "interrupted") return { text: "Interrupted", tone: "amber" };
@@ -493,7 +582,9 @@ export function emberStatusWords(t: EmberThreadLike | undefined, c: RowCounts): 
   if (own && (own.tone === "amber" || own.tone === "red")) return own;
   if ((c.waiting ?? 0) > 0) return c.waitingWords ?? NEEDS_INPUT;
   if (own && own.text !== "Idle") return own;
-  if (c.doing > 0) return { text: "Working", tone: "sky" };
+  if (c.working > 0) return { text: "Working", tone: "sky" };
+  if ((c.toCheck ?? 0) > 0) return { text: "To check", tone: "emerald" };
+  if (c.doing > 0) return { text: "Worker idle", tone: "muted" };
   return (c.blocked ?? 0) > 0 ? { text: "Blocked", tone: "amber" } : { text: "Idle", tone: "muted" };
 }
 
@@ -508,19 +599,24 @@ export function waitingWords(tasks: readonly EmberTaskView[]): Words | null {
 }
 
 /**
- * A task link's words after its title: "in progress · 3 pieces · 2 working" ("needs you"
- * in place of the state while one of its workers waits on the user: `waiting`); no parts
- * for a task the board does not have.
+ * A task link's words after its title: "in progress · 3 pieces · 2 working · 1 to check"
+ * ("needs you" in place of the state while one of its workers waits on the user:
+ * `waiting`; "worker reported done, waiting for Ember to check" or "all pieces closed,
+ * waiting for Ember to close it" while it waits on Ember alone); no parts for a task the
+ * board does not have.
  */
 export function linkMeta(tasks: readonly EmberTaskView[], id: string): { parts: string[]; waiting: boolean } {
   const t = tasks.find((x) => x.id === id);
   if (!t) return { parts: [], waiting: false };
   const subs = tasks.filter((x) => x.parentId === id);
   const waiting = (t.state === "doing" || t.state === "blocked") && [t, ...subs].some((x) => (x.state === "doing" || x.state === "blocked") && taskAsks(x));
-  const parts = [waiting ? "needs you" : linkWords[t.state]];
+  const own = unclosedWords(t, tasks);
+  const parts = [waiting ? "needs you" : own ? own.charAt(0).toLowerCase() + own.slice(1) : linkWords[t.state]];
   if (subs.length > 0) parts.push(`${String(subs.length)} ${subs.length === 1 ? "piece" : "pieces"}`);
   const working = workingThreads([t, ...subs]);
   if (working > 0) parts.push(`${String(working)} working`);
+  const toCheck = subs.filter((x) => unclosed(x, tasks) !== null).length;
+  if (toCheck > 0) parts.push(`${String(toCheck)} to check`);
   return { parts, waiting };
 }
 

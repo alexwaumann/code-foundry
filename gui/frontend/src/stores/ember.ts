@@ -18,6 +18,7 @@ import {
   headerSummary,
   linkMeta,
   rowTitle,
+  unclosedTasks,
   waitingThreads,
   waitingWords,
   workingThreads,
@@ -129,7 +130,7 @@ export function useEmberTasks(): readonly EmberTaskView[] {
   return useEmberStore((s) => s.board?.tasks ?? NO_TASKS);
 }
 
-/** How many tasks are doing (the flame's working state). */
+/** How many tasks are doing, whatever their workers do (the pinned row's "Worker idle"). */
 export function useDoingCount(): number {
   return useEmberStore((s) => s.board?.tasks.filter((t) => t.state === "doing").length ?? 0);
 }
@@ -171,9 +172,14 @@ export function useWaitingWords(): Words | null {
   return useMemo(() => (text ? { text, tone } : null), [text, tone]);
 }
 
-/** Worker threads working now (leads' teams included). */
+/** Worker threads working now (leads' teams included): the flame's working state, the row's Working and "N threads". */
 export function useWorkingThreads(): number {
   return useEmberStore((s) => workingThreads(s.board?.tasks ?? NO_TASKS));
+}
+
+/** Tasks waiting on Ember alone: a worker reported and is idle, or a parent's pieces all closed (the row's To check). */
+export function useToCheckCount(): number {
+  return useEmberStore((s) => unclosedTasks(s.board?.tasks ?? NO_TASKS));
 }
 
 /** Worker threads (leads' teams included) waiting on the user's answer: the row's Needs input, the bell's Ember. */
@@ -241,13 +247,17 @@ export function clearWorkRowChoices(threadId: string): void {
 
 // ---------- the flame ----------
 
-/** The flame's state for Ember's thread (lib/ember flameState): a primitive, so a view re-renders only when it changes. */
+/**
+ * The flame's state for Ember's thread (lib/ember flameState): working only while a
+ * worker thread works, not while a task is doing with its worker idle. A primitive, so a
+ * view re-renders only when it changes.
+ */
 export function useFlameState(threadId: string): FlameState {
-  const doing = useDoingCount();
+  const working = useWorkingThreads();
   const waiting = useWaitingThreads();
   const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
   const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");
-  return flameState(threadId ? { state, status } : undefined, doing, waiting);
+  return flameState(threadId ? { state, status } : undefined, working, waiting);
 }
 
 // ---------- attention ----------
