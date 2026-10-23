@@ -3,8 +3,11 @@
 Fixes for two fuzz reports on the user themes series (#328-#332): "files" (the theme files,
 store, verbs, settings and stylesheet) and "model" (the model making and changing themes,
 cards, toasts, Undo, the skill). A third report, on the editor (Themes page, inspector,
-`contrast.ts`, the views store), is another branch's. This one touches the Themes page
-in one place: the "not loaded" line gets Delete (files 6), which the report asked for there.
+`contrast.ts`, the views store), is another branch's (#333, merged first; this branch is
+rebased on it). This one touches its files in three places: the Themes page's "not loaded"
+line gets Delete (files 6), which the report asked for there, and the name refusal's new
+words ("no control or format characters", files 17) in `themeEditor.test.ts` and
+`theme-editor-fuzz.spec.ts`.
 
 ## Decisions
 
@@ -161,7 +164,7 @@ Model report (model.md):
   e2e (mock, WebKit): Undo hidden when the slot moves on and back, a refinement's Undo
   restoring the colours (and the earlier card's Undo returning), a deleted target's
   disabled Undo with its tooltip, the issues line's Delete with its confirmation;
-  `theme-model-flow.spec.ts` and `user-themes.spec.ts` pass whole.
+  `make gui-e2e` passes whole (561, after the rebase on #333).
 - Built daemon, CLI and app on a scratch `CODE_FOUNDRY_HOME`, no inherited `CLAUDE*` /
   `CODE_FOUNDRY_*` variables: every files finding from 1 to 15 run through the CLI (the
   scheme-change refusal, a refinement's kept version and `theme restore`, a tip-10 file

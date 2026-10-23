@@ -198,7 +198,7 @@ test("5: a light surface on a dark theme is refused in the editor, not by Save",
   await setBase(page, "surface", "#16232f");
   await page.getByTestId("themes-save").click();
   await dialog.getByTestId("theme-save-name").fill("Ocean\tDusk");
-  await expect(dialog.getByTestId("theme-save-refusal")).toHaveText("Cannot save: name: no control characters");
+  await expect(dialog.getByTestId("theme-save-refusal")).toHaveText("Cannot save: name: no control or format characters");
   await expect(dialog.getByTestId("theme-save-submit")).toBeDisabled();
   // A name another of yours has, and one past 80 characters, say so (nothing is cut).
   await dialog.getByTestId("theme-save-name").fill("Mocha, warmer");
