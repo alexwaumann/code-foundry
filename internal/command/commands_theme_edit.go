@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // ViewThemeEditPrefix is the ShowView name of the Themes page editing one of the user's
@@ -38,6 +39,12 @@ func RegisterThemeEdit(r *Registry, e Emitter, themes ThemeBackend) error {
 			"every change and the contrast checked as you go; Save writes the file. A curated theme is copied first (theme duplicate <id>).",
 		Category: "Settings",
 		Args: []ArgSpec{{Name: "theme", Type: Enum, EnumFunc: userIDs, Required: true, Positional: true,
+			EnumMiss: func(v string) error {
+				if f, ok := theme.Curated(v); ok {
+					return fmt.Errorf("%s (%q) is a curated theme; copy it first (theme duplicate %s) and edit the copy", f.Name, v, v)
+				}
+				return fmt.Errorf("no theme %q among yours (theme list marks them)", v)
+			},
 			Description: "One of your themes' ids (theme list marks them)"}},
 		Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
 			if themes == nil {

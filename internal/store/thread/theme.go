@@ -43,7 +43,7 @@ func (m *Manager) ShowTheme(ctx context.Context, id string, card ThemeCard) (Ite
 	}
 	card.File = f
 	switch {
-	case !card.Applied, card.Previous == f.ID && card.PreviousVersion == "":
+	case !card.Applied, card.Previous == f.ID && card.PreviousVersion == "" && !card.PreviousGone:
 		card.Previous, card.PreviousVersion, card.PreviousGone = "", "", false
 	case card.Previous != f.ID:
 		card.PreviousVersion = ""

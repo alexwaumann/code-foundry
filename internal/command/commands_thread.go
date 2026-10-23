@@ -603,8 +603,18 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			body = fmt.Sprintf("theme: %s (%s), %s", line(t.GetName()), t.GetId(), t.GetScheme())
 			if c.GetApplied() {
 				body += ", applied"
+				switch p := c.GetPrevious(); {
+				case p == "":
+				case p == t.GetId():
+					body += " (undo: its colours before"
+				default:
+					body += " (undo: " + p
+				}
 				if c.GetPrevious() != "" {
-					body += " (undo: " + c.GetPrevious() + ")"
+					if c.GetPreviousGone() {
+						body += ", no longer there"
+					}
+					body += ")"
 				}
 			}
 		default:

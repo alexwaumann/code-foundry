@@ -98,6 +98,7 @@ func TestShowThemeUndoTarget(t *testing.T) {
 		{name: "another theme", in: ThemeCard{Applied: true, Previous: "nord", PreviousVersion: "ignored", PreviousGone: true}, wantPrev: "nord", wantGone: true},
 		{name: "its own replaced version", in: ThemeCard{Applied: true, Previous: "ocean-dusk", PreviousVersion: "0123"}, wantPrev: "ocean-dusk", wantVer: "0123"},
 		{name: "its own id with no version", in: ThemeCard{Applied: true, Previous: "ocean-dusk"}},
+		{name: "its own version, not kept", in: ThemeCard{Applied: true, Previous: "ocean-dusk", PreviousGone: true}, wantPrev: "ocean-dusk", wantGone: true},
 		{name: "not applied", in: ThemeCard{Previous: "nord", PreviousVersion: "x", PreviousGone: true}},
 	}
 	for _, tt := range tests {

@@ -63,7 +63,7 @@ func TestThemeCommands(t *testing.T) {
 		wantErr  string   // substring of the error
 	}{
 		{name: "list marks the defaults", cmd: "theme.list",
-			wantMsg:  []string{"scheme: system (appearance.theme)", "dark themes (appearance.theme_dark):\n* github-dark ", "  dracula ", "light themes (appearance.theme_light):\n* github-light ", "your themes are files in " + env.dir},
+			wantMsg:  []string{"scheme: system (appearance.theme)", "dark themes (appearance.theme_dark):\n* github-dark ", "  dracula ", "light themes (appearance.theme_light):\n* github-light ", "change one of yours with theme edit <id>"},
 			wantJSON: `"scheme":"system","dark":"github-dark","light":"github-light"`},
 		{name: "set dark", cmd: "theme.set-dark", args: map[string]string{"theme": "dracula"},
 			wantMsg: []string{"dark theme = Dracula (dracula)"}, wantJSON: `{"key":"appearance.theme_dark","id":"dracula","name":"Dracula","scheme":"dark"}`},
@@ -72,12 +72,12 @@ func TestThemeCommands(t *testing.T) {
 		{name: "list follows", cmd: "theme.list", wantMsg: []string{"* dracula ", "* rose-pine-dawn ", "  github-dark "},
 			wantJSON: `{"id":"dracula","name":"Dracula","scheme":"dark","user":false,"selected":true}`},
 		{name: "light id in the dark slot", cmd: "theme.set-dark", args: map[string]string{"theme": "catppuccin-latte"},
-			wantErr: `argument "theme": want one of github-dark, catppuccin-mocha, graphite-dark`},
-		{name: "unknown id", cmd: "theme.set-light", args: map[string]string{"theme": "sepia"}, wantErr: `got "sepia"`},
+			wantErr: `argument "theme": Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "github-dark", "catppuccin-mocha"`},
+		{name: "unknown id", cmd: "theme.set-light", args: map[string]string{"theme": "sepia"}, wantErr: `unknown theme "sepia"; light themes are "github-light"`},
 		{name: "missing id", cmd: "theme.set-dark", wantErr: `missing required argument "theme"`},
 		{name: "show a curated theme", cmd: "theme.show", args: map[string]string{"theme": "nord"},
 			wantMsg: []string{"{\n  \"id\": \"nord\",\n  \"name\": \"Nord\",", `"ansi": [`}, wantJSON: `"id":"nord"`},
-		{name: "show an unknown theme", cmd: "theme.show", args: map[string]string{"theme": "sepia"}, wantErr: `got "sepia"`},
+		{name: "show an unknown theme", cmd: "theme.show", args: map[string]string{"theme": "sepia"}, wantErr: `no theme "sepia" (theme list prints the ids)`},
 		{name: "delete a curated theme", cmd: "theme.delete", args: map[string]string{"theme": "nord"}, wantErr: `"nord" is a curated theme`},
 	}
 	for _, tt := range tests {
@@ -108,7 +108,7 @@ func TestThemeCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := env.invoke(t, command.Context{}, "theme.set-dark", map[string]string{"theme": "nord"})
-	if err != nil || !strings.Contains(res.Message, "the scheme is light, so it shows after `code-foundry settings set appearance.theme dark`") {
+	if err != nil || !strings.Contains(res.Message, "the scheme is light, so nothing changes on screen until it is dark (theme set-scheme dark switches it)") {
 		t.Fatalf("message = %q, %v", res.Message, err)
 	}
 }
@@ -154,7 +154,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 		{name: "both", cmd: "theme.save", args: map[string]string{"file": path, "data": "{}"}, wantErr: "not both"},
 		{name: "a missing file", cmd: "theme.save", args: map[string]string{"file": path + ".nope"}, wantErr: "no such file"},
 		{name: "set the slot to the user theme", cmd: "theme.set-dark", args: map[string]string{"theme": "ocean-dusk"}, wantMsg: []string{"dark theme = Ocean Dusk (ocean-dusk)"}},
-		{name: "the light slot refuses it", cmd: "theme.set-light", args: map[string]string{"theme": "ocean-dusk"}, wantErr: `got "ocean-dusk"`},
+		{name: "the light slot refuses it", cmd: "theme.set-light", args: map[string]string{"theme": "ocean-dusk"}, wantErr: `Ocean Dusk ("ocean-dusk") is a dark theme`},
 		{name: "duplicate a curated theme from the GUI", uctx: gui, cmd: "theme.duplicate", args: map[string]string{"theme": "gruvbox-dark"},
 			wantMsg: []string{"saved Gruvbox Dark copy (gruvbox-dark-copy), a dark theme", "from: Gruvbox Dark (gruvbox-dark)", "pinned: 0 slots"}},
 		{name: "duplicate it again, named", cmd: "theme.duplicate", args: map[string]string{"theme": "gruvbox-dark", "name": "Gruvbox, warmer"},
@@ -165,7 +165,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 			wantMsg: []string{`"from": "catppuccin-mocha",`, `"--cf-accent": "#5fb3b3"`}},
 		{name: "delete the theme in use", cmd: "theme.delete", args: map[string]string{"theme": "ocean-dusk"},
 			wantMsg: []string{"deleted Ocean Dusk (ocean-dusk)", "now dark theme = Catppuccin Mocha (catppuccin-mocha)"}},
-		{name: "delete it again", cmd: "theme.delete", args: map[string]string{"theme": "ocean-dusk"}, wantErr: "no such theme"},
+		{name: "delete it again", cmd: "theme.delete", args: map[string]string{"theme": "ocean-dusk"}, wantErr: `no theme "ocean-dusk" among yours`},
 		{name: "delete one not in use", cmd: "theme.delete", args: map[string]string{"theme": "gruvbox-dark-copy"}, wantMsg: []string{"deleted Gruvbox Dark copy (gruvbox-dark-copy)"}},
 	}
 	for _, st := range steps {
@@ -191,7 +191,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 	if f, ok := snap.Get("ocean-dusk-copy"); !ok || f.CreatedBy != "" || f.From != "ocean-dusk" {
 		t.Errorf("copy = %+v, %v", f.Theme(), ok)
 	}
-	if f, ok := snap.Get("gruvbox-dark-copy-2"); !ok || f.Pair != "gruvbox-light" {
+	if f, ok := snap.Get("gruvbox-dark-copy-2"); !ok || f.Pair != "" { // a copy has no pair
 		t.Errorf("named copy = %+v", f.Theme())
 	}
 	// The delete moved the slot off the theme before removing it: no issue.
@@ -204,7 +204,7 @@ func TestThemeSaveDuplicateDelete(t *testing.T) {
 	}
 	env.themes.Load()
 	res, err := env.invoke(t, command.Context{}, "theme.list", nil)
-	if err != nil || !strings.Contains(res.Message, "not loaded (fix the file, or delete it):\n  broken.json: no name") {
+	if err != nil || !strings.Contains(res.Message, "not loaded (fix the file in " + env.dir + ", or remove it with theme delete --file <name>):\n  broken.json: no name") {
 		t.Errorf("list = %q, %v", res.Message, err)
 	}
 	if js, _ := json.Marshal(res.JSON); !strings.Contains(string(js), `"issues":[{"file":"broken.json","message":"no name"}]`) {
@@ -240,7 +240,7 @@ func TestThemeCommandsWithoutThemes(t *testing.T) {
 	if _, err := reg.Invoke(context.Background(), command.Context{}, "theme.show", map[string]string{"theme": "nord"}); connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Errorf("show = %v", err)
 	}
-	if res, err := reg.Invoke(context.Background(), command.Context{}, "theme.list", nil); err != nil || strings.Contains(res.Message, "your themes") {
+	if res, err := reg.Invoke(context.Background(), command.Context{}, "theme.list", nil); err != nil || strings.Contains(res.Message, "theme edit <id>") {
 		t.Errorf("list = %q, %v", res.Message, err)
 	}
 }
