@@ -228,7 +228,7 @@ export function PullRequestsNav() {
         useUiStore.getState().select({ kind: "view", name: "pullrequests" });
       }}
     >
-      <GitPullRequest className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
+      <GitPullRequest className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
       <span className="truncate">Pull Requests</span>
     </button>
   );

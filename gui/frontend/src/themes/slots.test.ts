@@ -58,8 +58,8 @@ describe("the slot set", () => {
     for (const n of SLOT_NAMES) expect(n).toMatch(/^--(?:cf-[a-z]+(?:-[a-z0-9]+)*|terminal-[a-z0-9-]+|syn-[a-z]+|sh-[a-z]+)$/);
   });
 
-  it("has 72 semantic slots, the 21 terminal colours and the 10 syntax colours, each in a known group", () => {
-    expect(SLOT_NAMES.filter((n) => n.startsWith("--cf-"))).toHaveLength(72);
+  it("has 71 semantic slots, the 21 terminal colours and the 10 syntax colours, each in a known group", () => {
+    expect(SLOT_NAMES.filter((n) => n.startsWith("--cf-"))).toHaveLength(71);
     expect(SLOT_NAMES.filter((n) => n.startsWith("--terminal-"))).toHaveLength(21);
     expect(SLOT_NAMES.filter((n) => /^--(syn|sh)-/.test(n))).toHaveLength(10);
     for (const s of SLOTS) expect(SLOT_GROUPS, s.name).toContain(s.group);
@@ -114,7 +114,6 @@ describe("rules", () => {
     expect(c("--cf-text-secondary")).toBeLessThan(c("--cf-text"));
     expect(c("--cf-text-secondary")).toBeGreaterThan(c("--cf-text-muted"));
     expect(v("--cf-placeholder")).toBe(v("--cf-text-muted"));
-    expect(v("--cf-icon")).toBe(v("--cf-text"));
     expect(v("--cf-icon-muted")).toBe(v("--cf-text-muted"));
   });
 

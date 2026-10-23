@@ -104,7 +104,7 @@ export function SidebarNewThread() {
       className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-body-sm font-medium has-[>svg]:px-2 [--wails-draggable:no-drag]"
       data-testid="sidebar-new-thread"
     >
-      <SquarePen aria-hidden className="size-4 text-cf-icon" />
+      <SquarePen aria-hidden className="size-4" />
       <span className="min-w-0 flex-1 truncate text-left">New thread</span>
       {chord && (
         <Kbd variant="inherit" data-testid="sidebar-new-thread-chord">

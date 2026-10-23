@@ -605,7 +605,7 @@ export function ProjectsNav() {
         useUiStore.getState().select({ kind: "view", name: "projects" });
       }}
     >
-      <FolderGit2 className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
+      <FolderGit2 className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
       <span className="truncate">Projects</span>
     </button>
   );

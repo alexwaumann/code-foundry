@@ -217,8 +217,7 @@ export const SLOTS: readonly Slot[] = [
   },
   { name: "--cf-text-secondary", group: "text", rule: "halfway between the text and the muted text, so never fainter than muted (blockquotes, dimmed rows)", derive: (c) => mix(c.get("--cf-text"), c.get("--cf-text-muted"), 0.5) },
   { name: "--cf-placeholder", group: "text", rule: "the muted text (an empty field's placeholder)", derive: (c) => c.get("--cf-text-muted") },
-  { name: "--cf-icon", group: "text", rule: "text (an icon beside a label, in the sidebar's navigation)", derive: (c) => c.get("--cf-text") },
-  { name: "--cf-icon-muted", group: "text", rule: "the muted text (a row's leading icon)", derive: (c) => c.get("--cf-text-muted") },
+  { name: "--cf-icon-muted", group: "text", rule: "the muted text (the sidebar's navigation and row icons)", derive: (c) => c.get("--cf-text-muted") },
 
   // Statuses: fills, then tints and text (link and the charts read them).
   ...TONES.map(statusFill),
@@ -357,9 +356,9 @@ export const SLOTS: readonly Slot[] = [
 
   // Diff: text colours from the status text, line tints as @pierre/diffs mixed them.
   { name: "--cf-diff-addition", group: "diff", rule: "success-text (+N, the A of a file's status, added bars)", derive: (c) => c.get("--cf-success-text") },
-  { name: "--cf-diff-addition-surface", group: "diff", rule: "diff-addition: the colour an added line is tinted toward (@pierre/diffs mixes 20% dark / 12% light of it into the pane), opaque", derive: (c) => c.get("--cf-diff-addition") },
+  { name: "--cf-diff-addition-surface", group: "diff", rule: "diff-addition: the colour the diff view builds added lines from (their 20% dark / 12% light tint, the bar, the + marker), opaque", derive: (c) => c.get("--cf-diff-addition") },
   { name: "--cf-diff-deletion", group: "diff", rule: "error-text (−N, the D of a file's status, deleted bars)", derive: (c) => c.get("--cf-error-text") },
-  { name: "--cf-diff-deletion-surface", group: "diff", rule: "diff-deletion: the colour a deleted line is tinted toward, opaque", derive: (c) => c.get("--cf-diff-deletion") },
+  { name: "--cf-diff-deletion-surface", group: "diff", rule: "diff-deletion: the colour the diff view builds deleted lines from (tint, striped marker, − marker), opaque", derive: (c) => c.get("--cf-diff-deletion") },
   { name: "--cf-diff-modified", group: "diff", rule: "warning-text (the M of a file's status)", derive: (c) => c.get("--cf-warning-text") },
 
   // Charts: six categorical colours from the status fills, then cyan.

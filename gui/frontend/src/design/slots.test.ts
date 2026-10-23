@@ -61,7 +61,7 @@ describe("theme tiers", () => {
   it("every --cf-* slot has a Tailwind utility (--color-cf-<slot>)", () => {
     const exposed = new Set([...code(indexCss).matchAll(/--color-(cf-[\w-]+):\s*var\(--cf-[\w-]+\)/g)].map((m) => `--${m[1] ?? ""}`));
     const cf = SLOT_NAMES.filter((n) => n.startsWith("--cf-"));
-    expect(cf).toHaveLength(72);
+    expect(cf).toHaveLength(71);
     expect(cf.filter((n) => !exposed.has(n))).toEqual([]);
   });
 

@@ -11,10 +11,4 @@
   --diffs-font-size: 12px;
   --diffs-line-height: 19px;
   --diffs-tab-size: 4;
-  /* Added and deleted lines are tinted toward the diff surface slots: the library mixes
-     20% dark / 12% light of them into the line (its default target is the +/- colour, which
-     the slots equal unless a theme overrides them). Opaque colours: a tint would be mixed
-     again and wash out. */
-  --diffs-bg-addition-override: var(--cf-diff-addition-surface);
-  --diffs-bg-deletion-override: var(--cf-diff-deletion-surface);
 }

@@ -26,9 +26,9 @@ which the help skill ships as `reference/themes.md`.
 ## 2. PublishTheme takes exactly the slots
 
 `theme.Frame.Check` now also requires the published names to be exactly `SlotNames()`
-(103: read from `frame-defaults.json`, which `pnpm run themes` regenerates with the rules,
+(102: read from `frame-defaults.json`, which `pnpm run themes` regenerates with the rules,
 so the set cannot drift from the GUI's). InvalidArgument lists what is missing and what is
-unknown ("missing 1 of the 103 slots: --cf-text; 1 unknown: --cf-lnik"); a refused publish
+unknown ("missing 1 of the 102 slots: --cf-text; 1 unknown: --cf-lnik"); a refused publish
 leaves the last good theme served (`Live.Publish` only swaps on success). Table tests in
 `internal/theme` and `internal/api`; the mock daemon mirrors the rule (`mockThemeProblem`).
 GUI and daemon always ship together, so no older GUI publishes a smaller set.
@@ -42,11 +42,11 @@ found 22 `--cf-*` slots nothing read. Now:
 | --- | --- |
 | `placeholder` | shadcn Input, Textarea and Command (`placeholder:text-cf-placeholder`), the composer's placeholder, `::placeholder` in the base layer |
 | `selection` | `::selection` in the base layer (fields keep shadcn's accent selection) |
-| `code-foreground` | `.cf-markdown code` (inline and blocks), the thread's code blocks and a note's `pre` (was `--syn-fg`, the same value) |
+| `code-foreground` | `.cf-markdown code` (inline and blocks), the thread's code blocks and a note's `pre` (blocks were `--syn-fg`, the same value; inline code was the body text, see below) |
 | `text-secondary` | `.cf-markdown` blockquotes (were the muted text) |
-| `icon`, `icon-muted` | the New thread icon; a sidebar row's pin, created-by, waiting and tooltip icons |
+| `icon-muted` | the sidebar's Pull Requests and Projects icons; a sidebar row's pin, created-by, waiting and tooltip icons |
 | `chrome` | the sidebar's title band (the sidebar itself already derived from it) |
-| `diff-addition-surface`, `-deletion-surface` | @pierre/diffs' added and deleted lines (`--diffs-bg-*-override` in code.css). The library uses the override as the colour it mixes into the line (20% dark / 12% light), so the slots are now that target: opaque, equal to `diff-addition` / `diff-deletion` by default (main's look), overridable apart from the +N/−N text. The first tries (a 12% alpha tint, then an opaque 20% mix) were mixed a second time and the lines went nearly flat; the pixel pass caught it |
+| `diff-addition-surface`, `-deletion-surface` | the diff view's base colours (`gitDecoration.added/deletedResourceForeground` in lib/codeTheme.ts): @pierre/diffs builds the line tints (20% dark / 12% light), the bars and the markers from them. Opaque, equal to `diff-addition` / `diff-deletion` by default (main's look), overridable apart from the +N/−N text in lists. Three earlier tries went through `--diffs-bg-*-override` in code.css and each broke something the pixel pass caught: a 12% alpha tint and an opaque 20% mix were mixed a second time (lines nearly flat), and the plain colour made the deleted line's striped gutter marker solid (the library draws it as `bg-deletion` 50% / base 50%, and the override replaces `bg-deletion`) |
 | `control-active` | shadcn Button's ghost and outline variants when pressed |
 | `accent-surface-foreground` | the composer's primary-member chip |
 | `update`, `update-surface`, `update-text` | the update chip's available and downloading states |
@@ -55,12 +55,16 @@ found 22 `--cf-*` slots nothing read. Now:
 | `error-foreground` | already live through shadcn's `--destructive-foreground` |
 | `warning-foreground` | already live (the sidebar's attention badge) |
 
-Removed: `--cf-sidebar-row-active` (nothing has a pressed state distinct from selected).
+Removed: `--cf-sidebar-row-active` (nothing has a pressed state distinct from selected) and
+`--cf-icon` (the text colour for icons: the sidebar's navigation icons are muted, and the
+first wiring, the New thread icon, sat on the accent-filled button and stopped matching its
+label, nearly invisible in Graphite, Petros Dusk, Catppuccin Mocha and Rosé Pine; that icon
+inherits the button's accent-foreground again).
 Kept for pages only (frames read every slot, and the page-writing skills name them):
 `success`, `info`, `highlight` and `update` `-foreground`, `chart-1` … `chart-6`.
 
 Added: `--cf-<tone>-text` for success, warning, error, info, highlight and update (item 4).
-**72 `--cf-*` slots** (67 + 6 − 1), 103 in all.
+**71 `--cf-*` slots** (67 + 6 − 2), 102 in all.
 
 The live-slot list is in docs/THEMES.md; `src/themes/liveSlots.test.ts` holds it to the
 code (every listed slot is read under src, no pages-only one is, the two lists partition
@@ -75,6 +79,13 @@ future import verb and the override editor use the same list. `contrast.test.ts`
 the 22 themes and on the probe's two base-only themes (`contrast.fixtures.json`, not the
 catalog). `pnpm run themes:check <file.json>` runs the same on a file. All pass.
 
+- **Inline code** now reads `code-foreground` (= `syn-fg`, the theme's terminal foreground
+  held at 4.5:1) instead of the body text. Where the two differ the contrast drops but stays
+  AA: Solarized Light and Dark 7:1 → 4.6:1, Graphite Dark #fafafa → #d8dadf, Graphite Light
+  #0a0a0a → #24292f. Not adjusted: the rule keeps code one colour (inline and blocks), and
+  Solarized's terminal foreground is its body colour by design; stepping code to 7:1 would
+  move every code block in those themes. A follow-up can raise the `code-foreground` floor
+  if it reads too light.
 - **Comments** are checked on the code block (`--cf-code-background` over the surface),
   which now resolves before the syntax colours: Dracula (2.59) and Kanagawa (2.98) fall
   back to the muted text, as the rule already did on the pane. The other syntax colours

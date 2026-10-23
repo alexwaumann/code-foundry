@@ -60,13 +60,15 @@ they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`,
 `--cf-code-background` (dark themes; light ones use an opaque well),
 and `--cf-<tone>-surface` for success, warning, error, info, highlight and update. Give
 every other slot an opaque colour. `--cf-diff-addition-surface` and
-`--cf-diff-deletion-surface` are the colours a diff's lines are tinted toward (the diff
-view mixes 20% dark / 12% light of them into the pane), not the line colour itself: the component names, the terminal (xterm needs opaque hex) and the syntax
+`--cf-diff-deletion-surface` are the colours the diff view builds its lines from (it mixes
+20% dark / 12% light of them into the pane, and draws the bars and markers in them), not
+the line colour itself; `--cf-diff-addition` / `-deletion` are the +N/−N text elsewhere.
+The component names, the terminal (xterm needs opaque hex) and the syntax
 colours are checked opaque.
 
 ## Slots
 
-103 in all: 72 `--cf-*` slots, 21 terminal colours (`--terminal-fg`, `-cursor`,
+102 in all: 71 `--cf-*` slots, 21 terminal colours (`--terminal-fg`, `-cursor`,
 `-cursor-accent`, `-selection`, `-selection-inactive`, `-ansi-0` … `-ansi-15`) and 10 syntax
 colours (`--syn-fg`, `-kw`, `-fn`, `-type`, `-str`, `-num`, `-com`, `--sh-cmd`, `-flag`,
 `-str`). The rule for each is in `slots.ts` (`SLOTS[].rule`). A slot exists only when two
@@ -88,7 +90,7 @@ app itself paints with, so an override shows in the app:
   `--cf-surface-overlay`, `--cf-surface-sunken`, `--cf-border`, `--cf-border-strong`,
   `--cf-divider`
 - Text: `--cf-text`, `--cf-text-muted`, `--cf-text-secondary`, `--cf-placeholder`,
-  `--cf-icon`, `--cf-icon-muted`, `--cf-link`
+  `--cf-icon-muted`, `--cf-link`
 - Interactive: `--cf-accent`, `--cf-accent-foreground`, `--cf-accent-surface`,
   `--cf-accent-surface-foreground`, `--cf-focus`, `--cf-input`, `--cf-control`,
   `--cf-control-hover`, `--cf-control-active`, `--cf-selection`

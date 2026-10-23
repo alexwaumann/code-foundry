@@ -52,9 +52,11 @@ export function codeThemeOf(theme: Theme): ThemeRegistration {
     colors: {
       "editor.background": hex(theme, "--cf-surface"),
       "editor.foreground": fg,
-      // Read by the library for the diff's tints and bars (getHighlighterThemeStyles).
-      "gitDecoration.addedResourceForeground": hex(theme, "--cf-diff-addition"),
-      "gitDecoration.deletedResourceForeground": hex(theme, "--cf-diff-deletion"),
+      // Read by the library as the diff's base colours (getHighlighterThemeStyles): it mixes
+      // the line tints, bars and markers (the striped deleted one) from them. The diff
+      // surface slots, which are the diff colours unless a theme overrides them.
+      "gitDecoration.addedResourceForeground": hex(theme, "--cf-diff-addition-surface"),
+      "gitDecoration.deletedResourceForeground": hex(theme, "--cf-diff-deletion-surface"),
       "gitDecoration.modifiedResourceForeground": hex(theme, "--cf-info"),
     },
     tokenColors: SCOPES.map(([v, scope, fontStyle]) => ({
