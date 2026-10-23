@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { dragSelect, invocations, mockPost, openApp, openTooltip, resetMock, row, textPoints } from "./fixtures";
 
 // Citations (docs/notes/citations.md): select text in one of Claude's answers, Cite,
