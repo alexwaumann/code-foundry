@@ -103,20 +103,7 @@ func themeSnapshotToProto(store ThemeStore, snap *usertheme.Snapshot) *v1.ThemeS
 		out.Curated = append(out.Curated, &v1.CuratedTheme{Id: t.ID, Name: t.Name, Scheme: t.Scheme, Pair: t.Pair})
 	}
 	for _, f := range snap.Themes {
-		b := f.Base
-		out.User = append(out.User, &v1.UserTheme{
-			Id: f.ID, Name: f.Name, Scheme: f.Scheme, Pair: f.Pair, From: f.From, CreatedBy: f.CreatedBy, Source: f.Source,
-			Base: &v1.ThemeBase{
-				Canvas: b.Canvas, Surface: b.Surface, Text: b.Text, Accent: b.Accent,
-				Success: b.Success, Warning: b.Warning, Error: b.Error, Info: b.Info, Highlight: b.Highlight, Link: b.Link,
-				Terminal: &v1.ThemeTerminal{
-					Foreground: b.Terminal.Foreground, Cursor: b.Terminal.Cursor, CursorText: b.Terminal.CursorText,
-					Selection: b.Terminal.Selection, Ansi: b.Terminal.ANSI,
-				},
-			},
-			Overrides: f.Overrides,
-			Path:      store.Path(f.ID),
-		})
+		out.User = append(out.User, theme.ToProto(f, store.Path(f.ID)))
 	}
 	for _, is := range snap.Issues {
 		out.Issues = append(out.Issues, &v1.ThemeFileIssue{File: is.File, Message: is.Message})

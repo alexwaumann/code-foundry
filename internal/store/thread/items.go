@@ -151,6 +151,8 @@ type Item struct {
 	Compaction  *Compaction
 	// HTML: an html item's page (html.go).
 	HTML *HTMLPage
+	// Theme: a theme item's card (theme.go).
+	Theme *ThemeCard
 }
 
 // ToolCall is a tool_call item's payload.
@@ -617,6 +619,11 @@ func cloneItem(it Item) Item {
 	if it.HTML != nil {
 		h := *it.HTML
 		it.HTML = &h
+	}
+	if it.Theme != nil {
+		c := *it.Theme
+		c.File = c.File.Clone()
+		it.Theme = &c
 	}
 	it.Attachments = slices.Clone(it.Attachments)
 	return it

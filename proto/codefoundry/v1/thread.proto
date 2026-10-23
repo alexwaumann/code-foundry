@@ -3,6 +3,7 @@ syntax = "proto3";
 package codefoundry.v1;
 
 import "codefoundry/v1/heartbeat.proto";
+import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
 import "codefoundry/v1/thread_subscriptions.proto";
 import "google/protobuf/timestamp.proto";
@@ -205,6 +206,11 @@ service ThreadService {
   // docs/notes/inline-html.md). The file must be a regular .html or .htm file under the
   // home directory (InvalidArgument otherwise, NotFound when missing).
   rpc ShowHtml(ShowThreadHtmlRequest) returns (ShowThreadHtmlResponse) {}
+  // ShowTheme puts a theme card in a thread's conversation: a `theme` item at the thread's
+  // current position, as ShowHtml places a page. code-foundry theme save adds one when it
+  // runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
+  // file (InvalidArgument otherwise); nothing is written to the themes directory.
+  rpc ShowTheme(ShowThreadThemeRequest) returns (ShowThreadThemeResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -244,6 +250,8 @@ message ThreadItem {
     NoteItem note = 20;
     // An HTML page shown inline (ThreadService.ShowHtml).
     HtmlItem html = 21;
+    // A theme the thread saved (ThreadService.ShowTheme).
+    ThemeItem theme = 22;
   }
 }
 
@@ -256,6 +264,19 @@ message HtmlItem {
   string title = 2;
   // The thread's cwd when the item was made: the base a relative path resolves against.
   string base_dir = 3;
+}
+
+// A theme the thread saved (code-foundry theme save from the thread;
+// docs/notes/theme-model-flow.md). The GUI draws a card from the file as it was saved, so a
+// later save of the same id (another card) leaves this one as it was.
+message ThemeItem {
+  // The file as saved: id, name, scheme, from, pair, base and pins (path is empty).
+  UserTheme theme = 1;
+  // The save changed what a slot shows: --apply, or a save of the theme a slot already has.
+  bool applied = 2;
+  // When applied: the theme the slot had before this thread first applied this one (Undo
+  // puts it back); empty when unknown, or when the slot already had this theme.
+  string previous = 3;
 }
 
 // What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,
@@ -905,6 +926,15 @@ message ShowThreadHtmlRequest {
 }
 
 message ShowThreadHtmlResponse {
+  ThreadItem item = 1;
+}
+
+message ShowThreadThemeRequest {
+  string thread_id = 1;
+  ThemeItem theme = 2;
+}
+
+message ShowThreadThemeResponse {
   ThreadItem item = 1;
 }
 

@@ -19,6 +19,7 @@ func TestOpenTurn(t *testing.T) {
 	errItem := func(id string) Item { return Item{ID: id, Kind: KindError} }
 	note := func(id string) Item { return Item{ID: id, Kind: KindNote} }
 	page := func(id string) Item { return Item{ID: id, Kind: KindHTML, HTML: &HTMLPage{Path: "p.html"}} }
+	card := func(id string) Item { return Item{ID: id, Kind: KindTheme, Theme: &ThemeCard{}} }
 	cmdOut := func(id string) Item { return Item{ID: id, Kind: KindCommandOutput, Text: "Set effort to high"} }
 	tests := []struct {
 		name  string
@@ -44,6 +45,8 @@ func TestOpenTurn(t *testing.T) {
 		{"an effort restart between turns", []Item{user("u"), end("e"), cmdOut("effort-1")}, ""},
 		{"a page, then a message", []Item{user("u"), end("e"), page("p"), user("u2"), tool("t")}, "u2"},
 		{"a page inside the turn", []Item{user("u"), tool("t"), page("p")}, "u"},
+		{"a theme card between turns", []Item{user("u"), end("e"), card("c")}, ""},
+		{"a theme card inside the turn", []Item{user("u"), tool("t"), card("c")}, "u"},
 		{"a page before Claude starts a turn itself", []Item{user("u"), end("e"), page("p"), text("w")}, "w"},
 	}
 	for _, tt := range tests {

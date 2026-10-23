@@ -64,6 +64,7 @@ func registryOverrides(s settings.Settings) command.Overrides {
 			"pr.ask":          {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
 			"pr.explain":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
 			"pr.fix.findings": {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"theme.ask":       {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
 		},
 	}
 }

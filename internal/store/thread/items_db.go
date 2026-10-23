@@ -28,6 +28,7 @@ type itemData struct {
 	Turn          *TurnEnd    `json:"turn,omitempty"`
 	Compaction    *Compaction `json:"compaction,omitempty"`
 	HTML          *HTMLPage   `json:"html,omitempty"`
+	Theme         *ThemeCard  `json:"theme,omitempty"`
 }
 
 // execer is a *sql.DB or a *sql.Tx.
@@ -57,7 +58,7 @@ func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item) e
 func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
 		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
-		NoteCreatedBy: it.NoteCreatedBy, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML})
+		NoteCreatedBy: it.NoteCreatedBy, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -101,7 +102,7 @@ func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error)
 		it.NoteCreatedBy, it.ResumeNote, it.SeedPrefix, it.MemoryNote = d.NoteCreatedBy, d.ResumeNote, d.SeedPrefix, d.MemoryNote
 		it.Queued, it.PlacedAfter = d.Queued, d.PlacedAfter
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
-		it.HTML = d.HTML
+		it.HTML, it.Theme = d.HTML, d.Theme
 		out = append(out, it)
 	}
 	if err := rows.Err(); err != nil {

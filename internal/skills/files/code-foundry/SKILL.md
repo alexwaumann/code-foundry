@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in: what it can do and which skill to read. Use when the user asks what you can do here, about its version, model, effort, usage or cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML or chart; states a preference or asks you to remember one; wants a PR; or before you act in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in: what it can do, which skill to read. Use when the user asks what you can do here, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme; states a preference or asks you to remember one; wants a PR; or before you act in the app."
 user-invocable: false
 ---
 
@@ -32,6 +32,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
 | A page, chart or HTML you make; a form, checklist or countdown "as a page" or "I can fill in" | an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) |
+| A colour theme for the app ("a warm dark theme", "make it calmer") | "Making a theme" below |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
@@ -56,6 +57,15 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
 It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline card.
 `view.inline` warns about what a page misses. More: code-foundry-help.
+
+## Making a theme
+
+`code-foundry theme list` marks the themes in use; `theme show <id>` prints one's file. Copy
+the closest, with a new `id`, `name` and `"from": "<its id>"`; change base colours first, and
+pin `overrides` only where a rule gets a slot wrong (code-foundry-help's reference/themes.md).
+Write it in `$CODE_FOUNDRY_PAGES`, `theme save --file <path> --apply` (the app switches; a
+card with Undo shows here), say what changed in a sentence or two and offer the next step
+(warmer, cooler, a light pair). Refine by saving the same `id` again, without asking first.
 
 ## Good to know
 

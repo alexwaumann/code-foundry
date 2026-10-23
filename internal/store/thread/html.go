@@ -85,11 +85,7 @@ func (e pageNotFound) Is(target error) bool { return target == ErrNotFound }
 // runner's goroutine while it runs (inside the running turn: the model calls it from a
 // tool), else straight onto the stopped thread's log.
 func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, error) {
-	for {
-		live, closing, reserved, s, err := m.lifecycle(id)
-		if err != nil {
-			return Item{}, err
-		}
+	return m.verbItem(ctx, id, func(s Thread) (Item, error) {
 		cwd := s.WorktreePath
 		if cwd == "" {
 			cwd = m.opts.Home
@@ -98,13 +94,32 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, e
 		if err != nil {
 			return Item{}, err
 		}
+		return Item{Kind: KindHTML, HTML: page}, nil
+	})
+}
+
+// verbItem appends the item a verb adds to a thread's conversation (an html page, a
+// theme card: the daemon's, not Claude's), which build makes from the thread's record. On
+// the runner's goroutine while it runs, so it lands inside the running turn after the
+// tool call that made it; else straight onto the stopped thread's log. The item's id is
+// "<kind>-…"; finishVerbItem completes it against the log either way.
+func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (Item, error)) (Item, error) {
+	for {
+		live, closing, reserved, s, err := m.lifecycle(id)
+		if err != nil {
+			return Item{}, err
+		}
+		it, err := build(s)
+		if err != nil {
+			return Item{}, err
+		}
 		switch {
 		case live != nil:
-			it, err := live.call(ctx, threadCmd{html: page})
+			got, err := live.call(ctx, threadCmd{verb: &it})
 			if errors.Is(err, errProcessGone) {
 				continue
 			}
-			return it, err
+			return got, err
 		case closing != nil:
 			if err := waitDone(ctx, closing); err != nil {
 				return Item{}, err
@@ -123,11 +138,23 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, e
 			return Item{}, err
 		}
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
-		return w.add(Item{ID: "html-" + itemSuffix(), Kind: KindHTML, HTML: page}), nil
+		it.ID = string(it.Kind) + "-" + itemSuffix()
+		finishVerbItem(log, &it)
+		return w.add(it), nil
 	}
 }
 
-// onShowHTML is ShowHTML on the runner's goroutine.
-func (r *runner) onShowHTML(p *HTMLPage) Item {
-	return r.st.proj.w.add(Item{ID: r.st.proj.nextID("html"), Kind: KindHTML, HTML: p})
+// onVerbItem is verbItem on the runner's goroutine.
+func (r *runner) onVerbItem(it Item) Item {
+	it.ID = r.st.proj.nextID(string(it.Kind))
+	finishVerbItem(r.st.proj.w.log, &it)
+	return r.st.proj.w.add(it)
+}
+
+// finishVerbItem completes a verb's item against the thread's log just before it is
+// added: a theme card takes its Undo target from an earlier card (theme.go).
+func finishVerbItem(log *threadLog, it *Item) {
+	if it.Kind == KindTheme {
+		inheritPrevious(log, it.Theme)
+	}
 }

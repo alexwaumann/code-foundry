@@ -13,6 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // threadWatchBuffer is the per-stream backlog of thread events. Text deltas of every
@@ -356,6 +357,10 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 	case thread.KindHTML:
 		if h := it.HTML; h != nil {
 			p.Payload = &v1.ThreadItem_Html{Html: &v1.HtmlItem{Path: h.Path, Title: h.Title, BaseDir: h.BaseDir}}
+		}
+	case thread.KindTheme:
+		if c := it.Theme; c != nil {
+			p.Payload = &v1.ThreadItem_Theme{Theme: &v1.ThemeItem{Theme: theme.ToProto(c.File, ""), Applied: c.Applied, Previous: c.Previous}}
 		}
 	}
 	return p

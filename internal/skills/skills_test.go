@@ -132,8 +132,9 @@ func TestRender(t *testing.T) {
 		// the references were read late or not at all, so those rules earn their place.
 		{skills.Orchestrate, "false", 600, 138},
 		// The entry skill (control-4-capabilities): what the app is, the one rule and the
-		// routing table; what exists is daemon.capabilities, not a list in the file.
-		{skills.Entry, "false", 400, 70},
+		// routing table; what exists is daemon.capabilities, not a list in the file. 80, up
+		// from 70, for "Making a theme" (theme-model-flow): the theme flow has no other skill.
+		{skills.Entry, "false", 400, 80},
 		// Its routing and the app's description moved to the entry skill (control-4);
 		// the cap came down from 120 with them.
 		{skills.Help, "", 400, 105},   // both: no invocation keys
@@ -293,7 +294,7 @@ func TestRender(t *testing.T) {
 	}
 	// Its description names the words of the prompts that loaded no skill.
 	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML or chart", "preference", "remember", "PR"} {
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR"} {
 		if !strings.Contains(entryDesc, w) {
 			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}

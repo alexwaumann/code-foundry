@@ -611,6 +611,10 @@ type Store interface {
 	// be an absolute path to a regular .html or .htm file under home
 	// (ErrInvalidArgument; ErrNotFound when missing).
 	ShowHTML(ctx context.Context, id, path, title string) (Item, error)
+	// ShowTheme puts a theme card in the conversation (theme.go), where ShowHTML puts a
+	// page: the file as the thread saved it (ErrInvalidArgument when it does not
+	// validate), whether the save applied it, and the slot's theme before.
+	ShowTheme(ctx context.Context, id string, card ThemeCard) (Item, error)
 
 	// Wake subscriptions (subscriptions.go, docs/notes/agents-4-wake.md).
 

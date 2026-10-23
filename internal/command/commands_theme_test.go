@@ -41,7 +41,7 @@ func newThemeEnv(t *testing.T) themeEnv {
 	themes.Load()
 	themes.OnChange(func(s *usertheme.Snapshot) { store.SetThemes(s.Set()) })
 	reg := command.NewRegistry()
-	if err := command.RegisterTheme(reg, api.NewSettings(store), themes); err != nil {
+	if err := command.RegisterTheme(reg, command.ThemeDeps{Settings: api.NewSettings(store), Themes: themes}); err != nil {
 		t.Fatal(err)
 	}
 	return themeEnv{reg: reg, settings: store, themes: themes, dir: dir}
@@ -234,7 +234,7 @@ func TestThemeCommandsWithoutThemes(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	reg := command.NewRegistry()
-	if err := command.RegisterTheme(reg, api.NewSettings(store), nil); err != nil {
+	if err := command.RegisterTheme(reg, command.ThemeDeps{Settings: api.NewSettings(store)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reg.Invoke(context.Background(), command.Context{}, "theme.show", map[string]string{"theme": "nord"}); connect.CodeOf(err) != connect.CodeUnimplemented {
