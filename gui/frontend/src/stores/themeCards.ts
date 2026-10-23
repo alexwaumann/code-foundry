@@ -6,6 +6,7 @@
  */
 import type { ThemeScheme } from "@/themes";
 import { runCommandForResult } from "./commands";
+import { getUiContext } from "./context";
 import { editTheme } from "./themePicker";
 
 /** Puts a scheme's slot back on `id`. False when the command failed (it toasts why). */
@@ -20,11 +21,16 @@ export function editSavedTheme(id: string): Promise<boolean> {
 
 /**
  * Starts a thread that makes the theme described (theme.ask); the daemon focuses it. With
- * `pair`, the thread makes the other scheme's pair of that theme. False when it failed.
+ * `pair`, the thread makes the other scheme's pair of that theme. Asked from the Themes page
+ * (its active view is "themes"), so the model's first message says where the user is. False
+ * when it failed.
  */
 export async function askForTheme(description: string, pair?: string): Promise<boolean> {
   const args: Record<string, string> = {};
   if (description.trim()) args.description = description.trim();
   if (pair) args.pair = pair;
-  return (await runCommandForResult("theme.ask", args, { quiet: true })) !== null;
+  return (await runCommandForResult("theme.ask", args, { quiet: true, ctx: { ...getUiContext(), activeView: THEMES_VIEW } })) !== null;
 }
+
+/** The Themes page as a command's active view (the daemon's command.ViewThemes). */
+export const THEMES_VIEW = "themes";

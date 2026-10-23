@@ -1,0 +1,145 @@
+import { expect, test, type Page } from "@playwright/test";
+import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+
+/**
+ * Asking the model for a theme (docs/notes/theme-model-flow.md). The mock's scripted thread
+ * in its "theme" state (mock/thread.ts) made and applied the seeded Ocean Dusk (dark, from
+ * Catppuccin Mocha, one pin) and shows its card, Undo back to Catppuccin Mocha; the dark
+ * slot is on Ocean Dusk. POST /__mock/themes/card is theme save run from a thread (the card
+ * and the toast). SHOTS=<dir> saves screenshots of the card, the toast and the popover in
+ * both schemes.
+ */
+
+test.beforeEach(async () => {
+  await resetMock();
+});
+
+async function raw(key: string): Promise<string | undefined> {
+  const res = await fetch(`${mockUrl}/__mock/settings`);
+  return ((await res.json()) as { raw: Record<string, string> }).raw[key];
+}
+
+const shots = process.env.SHOTS;
+async function shot(page: Page, name: string, target: () => ReturnType<Page["getByTestId"]>): Promise<void> {
+  if (!shots) return;
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.waitForTimeout(300);
+    await target().screenshot({ path: `${shots}/${name}-${scheme}.png` });
+  }
+  await page.emulateMedia({ colorScheme: null });
+}
+
+const card = (page: Page) => page.getByTestId("thread-theme-card");
+const toastOf = (page: Page, title: string) => page.locator("[data-sonner-toast]").filter({ hasText: title });
+
+async function openThemes(page: Page) {
+  await page.keyboard.press("Meta+Comma");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("choose-theme-dark").click();
+  await expect(page.getByTestId("themes-page")).toBeVisible();
+}
+
+test("the theme card shows the saved theme; Undo puts the slot back and turns into Undone; Edit opens the editor", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await mockPost("thread?state=theme");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  await expect(card(page)).toBeVisible();
+  await expect(card(page).getByTestId("thread-theme-name")).toHaveText("Ocean Dusk");
+  await expect(card(page)).toContainText("dark · from Catppuccin Mocha");
+  await expect(card(page).getByTestId("thread-theme-applied")).toHaveText("applied");
+  await expect(card(page).getByTestId("thread-theme-swatches").locator("span")).toHaveCount(9);
+  // The canvas swatch is the file's canvas, not the window's.
+  await expect(card(page).getByTestId("thread-theme-swatches").locator("span").first()).toHaveCSS("background-color", "rgb(11, 20, 28)");
+  await expect(card(page).getByTestId("thread-theme-summary")).toHaveText(/^1 pinned · (contrast ok|\d+ contrast issues?)$/);
+  // The card stays when its turn is folded (every finished turn is).
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "ocean-dusk");
+  await shot(page, "theme-card", () => page.getByTestId("thread-pane"));
+
+  const undo = card(page).getByTestId("thread-theme-undo");
+  await expect(undo).toHaveText("Undo");
+  await undo.click();
+  await expect.poll(() => raw("appearance.theme_dark")).toBe("catppuccin-mocha");
+  await expect(undo).toHaveText("Undone");
+  await expect(undo).toBeDisabled();
+  await expect(invocations()).resolves.toContainEqual(expect.objectContaining({ name: "theme.set-dark", args: { theme: "catppuccin-mocha" } }));
+
+  await card(page).getByTestId("thread-theme-edit").click();
+  await expect(page.getByTestId("theme-inspector")).toBeVisible();
+  await expect(page.getByTestId("themes-editing-name")).toHaveText("Ocean Dusk");
+});
+
+test("a theme a thread applies shows a toast with Edit and Undo, except over the Themes page", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
+  const toast = toastOf(page, "Ocean Dusk applied to dark");
+  await expect(toast).toBeVisible();
+  await expect(toast.getByRole("button")).toHaveText(["Edit", "Undo"]);
+  await expect.poll(() => raw("appearance.theme_dark")).toBe("ocean-dusk");
+  await shot(page, "theme-toast", () => toast);
+  await toast.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => raw("appearance.theme_dark")).toBe("github-dark");
+  await expect(toast).toHaveCount(0);
+
+  // The thread got its card (s-1 is the selected thread).
+  await expect(card(page)).toHaveCount(1);
+  await expect(card(page).getByTestId("thread-theme-undo")).toHaveText("Undone");
+
+  // Over the Themes page, which shows the change already: no toast.
+  await openThemes(page);
+  await mockPost("themes/card?thread=s-1&theme=ocean-dusk&apply=true");
+  await expect.poll(() => raw("appearance.theme_dark")).toBe("ocean-dusk");
+  await page.waitForTimeout(400);
+  await expect(toastOf(page, "Ocean Dusk applied to dark")).toHaveCount(0);
+
+  // A save the slot does not show (not applied) toasts nothing either, anywhere.
+  await page.keyboard.press("Escape");
+  await mockPost("themes/card?thread=s-1&theme=latte-softer");
+  await page.waitForTimeout(400);
+  await expect(toastOf(page, "Latte, softer")).toHaveCount(0);
+});
+
+test("Ask the model starts a no-project thread with the description and opens it", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openApp(page);
+  await openThemes(page);
+  await page.getByTestId("themes-ask").click();
+  const pop = page.getByTestId("themes-ask-popover");
+  await expect(pop).toBeVisible();
+  const input = pop.getByTestId("themes-ask-input");
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute("placeholder", "Describe a theme… warm dark, teal accent, quieter sidebar");
+  await expect(pop.getByTestId("themes-ask-send")).toBeDisabled();
+  await input.fill("a dark theme that feels like a tide pool at night, teal accent, quieter sidebar than Mocha");
+  await shot(page, "theme-ask", () => page.getByTestId("themes-page"));
+  await input.press("Enter");
+  await expect(pop).toHaveCount(0);
+  await expect(page.getByTestId("themes-page")).toHaveCount(0);
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  const ask = (await invocations()).find((i) => i.name === "theme.ask");
+  expect(ask?.args).toEqual({ description: "a dark theme that feels like a tide pool at night, teal accent, quieter sidebar than Mocha" });
+  expect(ask?.context?.activeView).toBe("themes");
+});
+
+test("the save modal's Also make a light pair asks the model for the pair after saving", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openApp(page);
+  await openThemes(page);
+  const ocean = page.getByTestId("themes-list").getByRole("option", { name: "Ocean Dusk", exact: true });
+  await ocean.hover();
+  await ocean.getByRole("button", { name: "Edit Ocean Dusk" }).click();
+  await expect(page.getByTestId("theme-inspector")).toBeVisible();
+  await page.getByTestId("themes-save").click();
+  const dialog = page.getByTestId("theme-save-dialog");
+  const pair = dialog.getByTestId("theme-save-pair");
+  await expect(pair).toBeVisible();
+  await expect(dialog).toContainText("Also make a light pair");
+  await pair.click();
+  await dialog.getByTestId("theme-save-submit").click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "theme.ask")?.args).toEqual({ pair: "ocean-dusk" });
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+});

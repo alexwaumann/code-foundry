@@ -3564,7 +3564,7 @@ export class World {
           }
           if (!ask) throw new CommandError("invalid", 'argument "description": describe the theme (or give --pair)');
           const v = this.settings.values();
-          const where = ctx?.activeView ? "The user is on the Themes page" : "The user wants a colour theme for Code Foundry";
+          const where = ctx?.activeView === "themes" ? "The user is on the Themes page" : "The user wants a colour theme for Code Foundry";
           const prompt = `${where}; the current dark theme is ${v["appearance.theme_dark"] ?? ""} and light theme is ${v["appearance.theme_light"] ?? ""}. Make the theme they describe, save it with \`code-foundry theme save --data - --apply\`, and keep refining it in this thread (the code-foundry skill: Making a theme).\n\n${ask}`;
           return this.newHomeThread(undefined, { prompt, permission: "auto" });
         },

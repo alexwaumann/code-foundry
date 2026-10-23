@@ -136,7 +136,8 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 				t, _ := s.ByID(theme.Default(scheme))
 				return t
 			}
-			prompt := ThemeAskPrompt(uctx.ActiveView != "", slot(theme.SchemeDark), slot(theme.SchemeLight), ask)
+			// The Themes page's Ask the model and its save modal send the page as the view.
+			prompt := ThemeAskPrompt(uctx.ActiveView == ViewThemes, slot(theme.SchemeDark), slot(theme.SchemeLight), ask)
 			created, err := d.Thread.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
 				NoProject: true, Model: a.String("model"), Effort: a.String("effort"),
 				PermissionMode: threadPermissionModes[a.String("permission")], InitialPrompt: prompt,
