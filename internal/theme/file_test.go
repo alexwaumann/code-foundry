@@ -3,6 +3,8 @@ package theme
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -45,7 +47,11 @@ func TestParseFile(t *testing.T) {
 		{name: "a created_by", edit: func(m map[string]any) { m["created_by"] = "s-5f963f4547cc" }},
 		{name: "no source", edit: func(m map[string]any) { delete(m, "source") }},
 		{name: "not JSON", raw: "{", want: "not JSON"},
-		{name: "an array", raw: "[]", want: "want a JSON object"},
+		{name: "an array", raw: "[]", want: "want a JSON object, got an array"},
+		{name: "a byte order mark", raw: "\xef\xbb\xbf" + string(validJSON(t, nil))},
+		{name: "ids are trimmed", edit: func(m map[string]any) { m["id"], m["from"] = "ocean-dusk ", " github-dark" }},
+		{name: "a zero-width name", edit: func(m map[string]any) { m["name"] = "​​" }, want: "no control or format characters"},
+		{name: "a direction override", edit: func(m map[string]any) { m["name"] = "Ocean ‮ksud" }, want: "no control or format characters"},
 		{name: "empty", raw: "", want: "empty file"},
 		{name: "two values", raw: string(validJSON(t, nil)) + "{}", want: "more than one JSON value"},
 		{name: "unknown field", edit: func(m map[string]any) { m["description"] = "x" }, want: `unknown field "description"`},
@@ -154,5 +160,57 @@ func TestReadHeader(t *testing.T) {
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("ReadHeader(%s) = %+v, %v; want %+v, %v", tt.data, got, ok, tt.want, tt.ok)
 		}
+	}
+}
+
+// TestParseStored: a file an older release accepted still loads (theme-fuzz-daemon,
+// files 3): pins that are not slots are dropped and a scheme the surface contradicts is
+// the surface's, each with a note; ParseFile refuses all of them.
+func TestParseStored(t *testing.T) {
+	pins := func(o map[string]any) func(m map[string]any) { return func(m map[string]any) { m["overrides"] = o } }
+	tests := []struct {
+		name      string
+		edit      func(m map[string]any)
+		wantErr   string
+		scheme    string
+		overrides map[string]string
+		notes     []string
+	}{
+		{name: "retired slots", edit: pins(map[string]any{"--cf-icon": "#112233", "--cf-sidebar-row-active": "#223344", "--cf-accent": "#5fb3b3"}),
+			scheme: "dark", overrides: map[string]string{"--cf-accent": "#5fb3b3"},
+			notes: []string{"dropped the pin --cf-icon: the app no longer has that slot", "dropped the pin --cf-sidebar-row-active: the app no longer has that slot"}},
+		{name: "only retired: no overrides left", edit: pins(map[string]any{"--cf-icon": "#112233"}), scheme: "dark",
+			notes: []string{"dropped the pin --cf-icon: the app no longer has that slot"}},
+		{name: "not slots", edit: pins(map[string]any{"--cf-primary": "#112233", "--cf-txet": "#112233", "--card": "#112233", "--cf-text": "#eeeeee"}),
+			scheme: "dark", overrides: map[string]string{"--cf-text": "#eeeeee"},
+			notes: []string{"dropped the pin --card: not a slot", "dropped the pin --cf-primary: not a slot", "dropped the pin --cf-txet: not a slot"}},
+		{name: "light surface on a dark theme", edit: func(m map[string]any) { base(m)["surface"] = "#f5ecd9" }, scheme: "light",
+			overrides: map[string]string{"--cf-accent": "#5fb3b3"}, notes: []string{"read as a light theme: its surface #f5ecd9 is light"}},
+		{name: "dark surface on a light theme", edit: func(m map[string]any) { m["scheme"] = "light" }, scheme: "dark",
+			overrides: map[string]string{"--cf-accent": "#5fb3b3"}, notes: []string{"read as a dark theme: its surface #0d1117 is dark"}},
+		{name: "a mid grey is still refused", edit: func(m map[string]any) { base(m)["surface"] = "#888888" }, wantErr: "too light for a dark scheme"},
+		{name: "a bad pin value is still refused", edit: pins(map[string]any{"--cf-text": "red"}), wantErr: "is not #rrggbb"},
+		{name: "nothing to forgive", scheme: "dark", overrides: map[string]string{"--cf-accent": "#5fb3b3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := validJSON(t, tt.edit)
+			f, notes, err := ParseStored(data)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f.Scheme != tt.scheme || !maps.Equal(f.Overrides, tt.overrides) || (tt.overrides == nil) != (f.Overrides == nil) || !slices.Equal(notes, tt.notes) {
+				t.Errorf("scheme %q overrides %v notes %q", f.Scheme, f.Overrides, notes)
+			}
+			if _, err := ParseFile(data); (err == nil) != (len(tt.notes) == 0) {
+				t.Errorf("ParseFile err = %v, notes %q", err, tt.notes)
+			}
+		})
 	}
 }

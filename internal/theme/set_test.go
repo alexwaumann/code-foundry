@@ -74,6 +74,16 @@ func TestSet(t *testing.T) {
 		{"gone-loop-a", SchemeDark, ""},
 		{"sepia", SchemeDark, ""},      // never a user theme
 		{"ocean-dusk", SchemeDark, ""}, // not gone
+		// A user theme of the other scheme (its scheme changed under the slot) falls back
+		// along its from too: Ocean Dusk came from Mocha, so a light slot on it shows none
+		// (Mocha is dark), and the dark slot on Beta is fine.
+		{"ocean-dusk", SchemeLight, ""},
+		{"amber-noon", SchemeDark, ""}, // no from
+		{"nord", SchemeLight, ""},      // curated: not a user theme
+	}
+	flipped := NewSet([]Theme{{ID: "paper", Name: "Paper", Scheme: SchemeLight, From: "catppuccin-mocha"}}, nil)
+	if got := flipped.Fallback("paper", SchemeDark); got != "catppuccin-mocha" {
+		t.Errorf("Fallback of a theme now light, on the dark slot = %q, want its from", got)
 	}
 	for _, f := range fallbacks {
 		if got := s.Fallback(f.id, f.scheme); got != f.want {

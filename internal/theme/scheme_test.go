@@ -48,31 +48,3 @@ func TestIsSlot(t *testing.T) {
 		}
 	}
 }
-
-func TestParseStoredDropsRetiredSlots(t *testing.T) {
-	data := validJSON(t, func(m map[string]any) {
-		m["overrides"] = map[string]any{"--cf-icon": "#112233", "--cf-sidebar-row-active": "#223344", "--cf-accent": "#5fb3b3"}
-	})
-	if _, err := ParseFile(data); err == nil {
-		t.Fatal("ParseFile took a retired slot")
-	}
-	f, dropped, err := ParseStored(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(dropped) != 2 || dropped[0] != "--cf-icon" || dropped[1] != "--cf-sidebar-row-active" {
-		t.Errorf("dropped = %v", dropped)
-	}
-	if len(f.Overrides) != 1 || f.Overrides["--cf-accent"] != "#5fb3b3" {
-		t.Errorf("overrides = %v", f.Overrides)
-	}
-	// Only retired ones: no overrides left at all.
-	f, _, err = ParseStored(validJSON(t, func(m map[string]any) { m["overrides"] = map[string]any{"--cf-icon": "#112233"} }))
-	if err != nil || f.Overrides != nil {
-		t.Errorf("overrides = %v, err %v", f.Overrides, err)
-	}
-	// An unknown (not retired) slot is refused either way.
-	if _, _, err := ParseStored(validJSON(t, func(m map[string]any) { m["overrides"] = map[string]any{"--cf-txet": "#112233"} })); err == nil {
-		t.Error("ParseStored took an unknown slot")
-	}
-}
