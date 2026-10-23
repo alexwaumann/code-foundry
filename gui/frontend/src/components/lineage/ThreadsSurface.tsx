@@ -8,10 +8,11 @@ import { useNow } from "@/lib/clock";
 import { capIds, lineageStatusTones, lineageStatusWords, lineageTail, relatedCount, type LineageStatus } from "@/lib/lineage";
 import type { StatusTone } from "@/lib/statusLine";
 import { shortAge } from "@/lib/thread";
-import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel, threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { useChildIds, useCreator, useLineageCounts, useLineageStatus, useSiblingIds, useSidebarShown } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
+import { useModelChoices } from "@/stores/settings";
 import { setThreadSidebar } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -87,6 +88,39 @@ function Place({ id }: { id: string }) {
   );
 }
 
+/**
+ * " · Sonnet 5 · high": the model's short label (the sidebar tooltip's, "Default" when
+ * unset) and the effort word, after the place on line 2. It never shrinks: the place
+ * truncates instead (the words are short; a cut "hi…" says nothing). An effort change not applied yet
+ * (effortPending) is italic and its tooltip says when it applies, as the composer does.
+ */
+function ModelWords({ id, working }: { id: string; working: boolean }) {
+  const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
+  const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
+  const pending = useThreadsStore((s) => s.byId[id]?.effortPending ?? false);
+  const models = useModelChoices();
+  return (
+    <span className="shrink-0 pl-1 whitespace-nowrap" data-testid="lineage-model">
+      <span className="opacity-60">·</span> {modelLabel(model, models)}
+      {effort && (
+        <>
+          {" "}
+          <span className="opacity-60">·</span>{" "}
+          {pending ? (
+            <Tip label={working ? `Effort changes to ${effort} after this turn` : `Switching to ${effort} effort…`}>
+              <span className="italic" data-testid="lineage-effort" data-pending="true">
+                {effort}
+              </span>
+            </Tip>
+          ) : (
+            <span data-testid="lineage-effort">{effort}</span>
+          )}
+        </>
+      )}
+    </span>
+  );
+}
+
 /** Time since the thread was created ("41m", "3h"), on the shared 30 s clock. */
 function Age({ id, className }: { id: string; className?: string }) {
   const at = useThreadsStore((s) => s.byId[id]?.createdAtMs ?? null);
@@ -100,8 +134,8 @@ function Age({ id, className }: { id: string; className?: string }) {
 }
 
 /**
- * One related thread: status mark, name and its status word; "project @ branch" and its
- * age; its brief as a muted quote (two lines at most). A row opens its thread like a
+ * One related thread: status mark, name and its status word; "project @ branch", its model
+ * and effort, and its age; its brief as a muted quote (two lines at most). A row opens its thread like a
  * sidebar click; the current thread's row is highlighted and not clickable.
  */
 function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: boolean }) {
@@ -133,6 +167,7 @@ function LineageRow({ id, me, actions }: { id: string; me?: boolean; actions?: b
       </div>
       <div className={cn("flex min-w-0 items-center pl-5 text-caption", archived && "opacity-60")} data-testid="lineage-meta">
         <Place id={id} />
+        <ModelWords id={id} working={status === "working"} />
         <Age id={id} className={toggle ? "group-hover/row:invisible group-has-[:focus-visible]/row:invisible" : undefined} />
       </div>
       {brief && (

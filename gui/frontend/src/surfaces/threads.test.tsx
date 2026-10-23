@@ -26,6 +26,9 @@ function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
   return {
     id,
     name: `name ${id}`,
+    model: "claude-sonnet-5[1m]",
+    effort: "high",
+    effortPending: false,
     projectId: "web",
     worktreePath: "/src/web",
     workspaceId: "",
@@ -184,6 +187,40 @@ describe("Threads surface", () => {
     expect(rowOf("me").tagName).toBe("LI");
     expect(rowOf("me").textContent).toContain("this thread");
     expect(rowOf("s1").tagName).toBe("BUTTON");
+  });
+
+  it("every row's line 2 names the model and effort after the place, before the age; a pending effort is italic and says when", () => {
+    useSettingsStore.setState({ modelChoices: [{ value: "claude-sonnet-5[1m]", label: "Sonnet 5" }, { value: "claude-opus-4-8[1m]", label: "Opus 4.8" }] });
+    setThreads(
+      sketch().map((x) =>
+        x.id === "c1" ? { ...x, model: "claude-opus-4-8[1m]", effort: "xhigh" }
+        : x.id === "s1" ? { ...x, effort: "low", effortPending: true }
+        : x.id === "s2" ? { ...x, effort: "medium", effortPending: true }
+        : x.id === "s3" ? { ...x, model: "", effort: "" }
+        : x.id === "p" ? { ...x, model: "claude-opus-5-7" }
+        : x,
+      ),
+    );
+    open();
+    expect(rows().map((r) => [r.getAttribute("data-thread"), within(r, "lineage-model")?.textContent])).toEqual([
+      ["p", "· claude-opus-5-7 · high"],
+      ["me", "· Sonnet 5 · high"],
+      ["s1", "· Sonnet 5 · low"],
+      ["s2", "· Sonnet 5 · medium"],
+      ["s3", "· Default"],
+      ["c1", "· Opus 4.8 · xhigh"],
+    ]);
+    const meta = [...(within(rowOf("c1"), "lineage-meta")?.children ?? [])].map((e) => e.getAttribute("data-testid"));
+    expect(meta).toEqual(["lineage-place", "lineage-model", "lineage-age"]);
+    // Line 1 keeps the name and the status word: no model there.
+    expect(within(rowOf("p"), "lineage-name")?.parentElement?.parentElement?.textContent).toBe("Fix login redirectWorking");
+    const effort = (id: string) => within(rowOf(id), "lineage-effort") as HTMLElement;
+    expect(effort("me").dataset.pending).toBeUndefined();
+    expect(effort("me").className).not.toContain("italic");
+    expect(effort("s1").dataset.pending).toBe("true");
+    expect(effort("s1").className).toContain("italic");
+    expect(effort("s2").dataset.pending).toBe("true");
+    useSettingsStore.setState({ modelChoices: null });
   });
 
   it("a row opens its thread like a sidebar click", () => {
