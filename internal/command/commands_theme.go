@@ -205,7 +205,7 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 		Command{
 			Name:         "theme.list",
 			Title:        "List Themes",
-			Description:  "Print every colour theme by scheme, yours first (with the theme each was copied from), marking the dark and light themes in use.",
+			Description:  "Print every colour theme by scheme, yours first, marking the ones in use. Yours show the theme each was copied from.",
 			Category:     "Settings",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -221,7 +221,7 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 		Command{
 			Name:         "theme.show",
 			Title:        "Show Theme File",
-			Description:  "Print a theme's file as JSON (a curated theme or one of yours): the format theme save reads.",
+			Description:  "Print a theme's file (curated or yours) as JSON. It is the format theme save reads.",
 			Category:     "Settings",
 			NoKeybinding: true,
 			Args:         []ArgSpec{withDescription(anyTheme, "A theme id (theme list prints them)")},
@@ -239,7 +239,7 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 		Command{
 			Name:  "theme.save",
 			Title: "Save Theme File",
-			Description: "Validate a theme file and save it as one of your themes (replacing yours with the same id; a curated id is refused). " +
+			Description: "Save a theme file as one of your themes. It replaces yours with the same id; a curated id is refused. " +
 				"From a thread, the file records the thread as created_by. --apply also makes it the dark or light theme, per its scheme.",
 			Category:     "Settings",
 			NoKeybinding: true,
@@ -285,8 +285,8 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 		Command{
 			Name:  "theme.duplicate",
 			Title: "Duplicate Theme",
-			Description: "Copy a theme (curated or yours) into your themes under a new id (<id>-copy, then -2, ...), recording the theme it came from, " +
-				"so you can change it. Print its file with theme show and save the changed file with theme save.",
+			Description: "Copy a theme into your themes, to change it. The copy's id is <id>-copy (then -2, ...) and it records the theme it came from; " +
+				"print its file with theme show and save the changed file with theme save.",
 			Category: "Settings",
 			Args: []ArgSpec{
 				withDescription(anyTheme, "The theme to copy (theme list prints the ids)"),
@@ -307,7 +307,7 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 		Command{
 			Name:         "theme.delete",
 			Title:        "Delete Theme",
-			Description:  "Delete one of your themes (its file in the themes directory). A slot that used it shows the theme it was copied from, else the default.",
+			Description:  "Delete one of your themes. A slot that used it shows the theme it was copied from, else the default.",
 			Category:     "Settings",
 			Args:         []ArgSpec{{Name: "theme", Type: String, Required: true, Positional: true, Description: "One of your themes' ids (theme list marks them)"}},
 			Confirm:      "Delete the theme {theme}? Its file in the themes directory is removed.",
