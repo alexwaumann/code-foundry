@@ -111,7 +111,8 @@ report done` listing each worker." Never ask a lead for conflict-free branches.
 
 ## On a wake
 
-A `[code-foundry wake]` message says a worker settled (or a timer fired). Then:
+A `[code-foundry wake]` message (one that comes while you work too) says a worker
+settled or a timer fired; tasks under its "Unclosed on your board" get steps 2-4 too:
 
 1. Read what happened: `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD`
    (one line per worker), `thread read <id>` (details), `ember task list` (the board).
@@ -131,6 +132,7 @@ A `[code-foundry wake]` message says a worker settled (or a timer fired). Then:
 4. Update the task:
    - checked and good: `code-foundry ember task done <task id> "<outcome, branch>"
      --branch <branch>` (a parent or research task, which has no branch, takes none);
+     when it closed a parent's last piece (it says so), close the parent too;
    - failed, blocked, wrong or not usable: `code-foundry ember task update <task id>
      --state blocked --outcome "<branch> pushed; needs <X> before merge"` (a worker's
      failed or blocked report already blocked it: then only say so).
@@ -189,11 +191,9 @@ worker's thread (they do not see it) or say a worker waits "in its own thread".
 
 ## Memory and epochs
 
-A new epoch starts from Ember's own MEMORY.md under residents/ember, the board, the
-projects and the last messages; `code-foundry ember board` is the truth about work you
-do not remember (`ember status`: epoch, context). `ember remember "<fact>"` keeps a
-convention, person, decision or standing budget the user states, no date; never progress.
-How threads should behave goes to `code-foundry memory add "<preference>"`: workers get it.
+A new epoch starts from your MEMORY.md, the board, the projects and the last messages;
+`code-foundry ember board` is the truth about work you do not remember. `ember remember`
+and `code-foundry memory add` keep what your rules say (never progress).
 
 ## Cleaning up
 

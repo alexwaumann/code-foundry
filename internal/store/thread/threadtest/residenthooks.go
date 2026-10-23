@@ -53,3 +53,30 @@ func (f *Fake) applyCreateDefaults(ctx context.Context, o *thread.CreateOptions)
 		o.Effort = effort
 	}
 }
+
+// SetResidentWakeNote records a resident's wake note (thread.Manager.SetResidentWakeNote);
+// WakeNote calls it.
+func (f *Fake) SetResidentWakeNote(name string, fn thread.WakeNoteFunc) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.wakeNotes == nil {
+		f.wakeNotes = map[string]thread.WakeNoteFunc{}
+	}
+	if fn == nil {
+		delete(f.wakeNotes, name)
+		return
+	}
+	f.wakeNotes[name] = fn
+}
+
+// WakeNote is the wake note of resident name for a wake about the threads about; "" when
+// it has none.
+func (f *Fake) WakeNote(name string, about []string) string {
+	f.mu.Lock()
+	fn := f.wakeNotes[name]
+	f.mu.Unlock()
+	if fn == nil {
+		return ""
+	}
+	return fn(about)
+}

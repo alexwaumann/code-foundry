@@ -46,9 +46,11 @@ type Fake struct {
 	requests map[string]string
 	// removed are Remove's tombstones, by id.
 	removed map[string]thread.RemovedThread
-	// createDefaults and residentTools are the resident hooks (residenthooks.go).
+	// createDefaults, residentTools and wakeNotes are the resident hooks
+	// (residenthooks.go).
 	createDefaults thread.CreateDefaultsFunc
 	residentTools  map[string]thread.ResidentTools
+	wakeNotes      map[string]thread.WakeNoteFunc
 }
 
 var _ thread.Store = (*Fake)(nil)

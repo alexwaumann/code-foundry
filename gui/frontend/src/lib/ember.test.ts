@@ -24,6 +24,9 @@ import {
   timerRows,
   toggleModel,
   turnEndAfter,
+  unclosed,
+  unclosedTasks,
+  unclosedWords,
   updatedAgo,
   waitingThreads,
   waitingTitle,
@@ -70,16 +73,16 @@ function task(id: string, over: Partial<EmberTaskView> = {}): EmberTaskView {
 
 describe("flameState", () => {
   it.each([
-    ["no thread, nothing doing", undefined, 0, "idle"],
-    ["no thread, a task doing", undefined, 1, "working"],
+    ["no thread, no worker working", undefined, 0, "idle"],
+    ["no thread, a worker working", undefined, 1, "working"],
     ["idle at its prompt", { state: "disconnected", status: "idle" }, 0, "idle"],
-    ["idle with a task doing", { state: "disconnected", status: "idle" }, 2, "working"],
+    ["idle with workers working", { state: "disconnected", status: "idle" }, 2, "working"],
     ["busy", { state: "connected", status: "busy" }, 2, "thinking"],
     ["starting", { state: "starting", status: "idle" }, 0, "thinking"],
     ["a reply not seen", { state: "disconnected", status: "attention" }, 1, "attention"],
     ["a prompt while busy", { state: "connected", status: "attention" }, 0, "attention"],
-  ] as const)("%s", (_n, t, doing, want) => {
-    expect(flameState(t, doing)).toBe(want);
+  ] as const)("%s", (_n, t, working, want) => {
+    expect(flameState(t, working)).toBe(want);
   });
 
   it("burns for the user while a worker waits on an answer, even while Ember thinks", () => {
@@ -443,9 +446,9 @@ describe("the board", () => {
     expect(linkMeta(all, "t-p")).toEqual({ parts: ["in progress", "3 pieces", "2 working"], waiting: false });
     expect(linkMeta(all, "t-n").parts).toEqual(["up next"]);
     expect(linkMeta(all, "t-gone").parts).toEqual([]);
-    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { doing: 1 })).toEqual({ text: "Working", tone: "sky" });
-    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { doing: 0 })).toEqual({ text: "Idle", tone: "muted" });
-    expect(emberStatusWords({ state: "connected", status: "attention", statusReason: "permission: Bash", statusChangedAtMs: null }, { doing: 0 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { working: 1, doing: 1 })).toEqual({ text: "Working", tone: "sky" });
+    expect(emberStatusWords({ state: "disconnected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null }, { working: 0, doing: 0 })).toEqual({ text: "Idle", tone: "muted" });
+    expect(emberStatusWords({ state: "connected", status: "attention", statusReason: "permission: Bash", statusChangedAtMs: null }, { working: 0, doing: 0 })).toEqual({ text: "Needs input", tone: "amber" });
   });
 
   it("says needs you on a link while one of its workers waits on the user", () => {
@@ -572,13 +575,13 @@ describe("a lead's team", () => {
 
   it("says Needs input on the pinned row while a worker waits, under Ember's own prompt or error", () => {
     const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
-    expect(emberStatusWords(idle, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
-    expect(emberStatusWords({ ...idle, status: "error", statusReason: "crashed" }, { doing: 1, waiting: 1 }).tone).toBe("red");
-    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { doing: 1, waiting: 0 })).toEqual({ text: "Finished", tone: "emerald" });
+    expect(emberStatusWords(idle, { working: 1, doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { working: 1, doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { working: 1, doing: 1, waiting: 1 })).toEqual({ text: "Needs input", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "error", statusReason: "crashed" }, { working: 1, doing: 1, waiting: 1 }).tone).toBe("red");
+    expect(emberStatusWords({ ...idle, status: "attention", statusReason: "finished" }, { working: 1, doing: 1, waiting: 0 })).toEqual({ text: "Finished", tone: "emerald" });
     // A budget stop says so, with the amount when the reason has one.
-    expect(emberStatusWords(idle, { doing: 1, waiting: 1, waitingWords: { text: "Stopped at budget", tone: "amber" } })).toEqual({ text: "Stopped at budget", tone: "amber" });
+    expect(emberStatusWords(idle, { working: 1, doing: 1, waiting: 1, waitingWords: { text: "Stopped at budget", tone: "amber" } })).toEqual({ text: "Stopped at budget", tone: "amber" });
   });
 
   it("names the waiting worker's task on the row, +N for more", () => {
@@ -620,11 +623,11 @@ describe("blocked tasks, timers and budget stops", () => {
 
   it("reads Blocked on the row below Ember's own words and a doing task's Working", () => {
     const idle = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
-    expect(emberStatusWords(idle, { doing: 0, blocked: 1 })).toEqual({ text: "Blocked", tone: "amber" });
-    expect(emberStatusWords(idle, { doing: 2, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
-    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { doing: 0, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
+    expect(emberStatusWords(idle, { working: 0, doing: 0, blocked: 1 })).toEqual({ text: "Blocked", tone: "amber" });
+    expect(emberStatusWords(idle, { working: 2, doing: 2, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
+    expect(emberStatusWords({ ...idle, state: "connected", status: "busy", statusReason: "working" }, { working: 0, doing: 0, blocked: 1 })).toEqual({ text: "Working", tone: "sky" });
     // A turn the app's restart cut: amber, not a bare red Error.
-    expect(emberStatusWords({ ...idle, status: "error", statusReason: "interrupted" }, { doing: 0 })).toEqual({ text: "Interrupted", tone: "amber" });
+    expect(emberStatusWords({ ...idle, status: "error", statusReason: "interrupted" }, { working: 0, doing: 0 })).toEqual({ text: "Interrupted", tone: "amber" });
   });
 
   it.each([
@@ -641,6 +644,73 @@ describe("blocked tasks, timers and budget stops", () => {
   it("is no budget stop for another reason", () => {
     expect(budgetStop(thread({ status: "attention", statusReason: "question: budget?" }))).toBeNull();
     expect(budgetStop(thread({ status: "busy", statusReason: "budget reached" }))).toBeNull();
+  });
+});
+
+describe("idle workers and tasks waiting on Ember", () => {
+  const ember = { state: "disconnected" as const, status: "idle" as const, statusReason: "at prompt", statusChangedAtMs: null };
+  const reported = (over: Partial<EmberTaskThreadView> = {}) =>
+    thread({ id: "s-r", state: "connected", status: "attention", statusReason: "finished", reportStatus: "done", reportSummary: "pushed cf/notes", reportAtMs: NOW - MIN, ...over });
+  const toCheck = task("t-r", { title: "Notes field", state: "doing", threadId: "s-r", thread: reported() });
+  const idleNoReport = task("t-i", { title: "Idle worker", state: "doing", threadId: "s-i", thread: thread({ id: "s-i", state: "disconnected", status: "idle", statusReason: "at prompt" }) });
+  const busy = task("t-w", { title: "Busy worker", state: "doing", threadId: "s-w", thread: thread() });
+
+  // What the flame and the row derive from a board: the threads working, the tasks waiting on Ember alone, the row's words and title.
+  it.each([
+    ["a worker on a turn", [busy], 1, 0, "working", "Working", "Busy worker"],
+    ["a worker that reported done and is idle", [toCheck], 0, 1, "idle", "To check", "Notes field"],
+    ["the same, its process stopped", [task("t-r", { ...toCheck, thread: reported({ state: "disconnected" }) })], 0, 1, "idle", "To check", "Notes field"],
+    ["a stale bare waiting reason", [task("t-r", { ...toCheck, thread: reported({ status: "idle", statusReason: "waiting" }) })], 0, 1, "idle", "To check", "Notes field"],
+    ["a worker idle without a report", [idleNoReport], 0, 0, "idle", "Worker idle", "Idle worker"],
+    ["a lead waiting on its running children", [task("t-l", { title: "Lead", state: "doing", threadId: "s-l", thread: thread({ id: "s-l", status: "idle", statusReason: "waiting on 2 child threads", descendantsWorking: 2, descendantsTotal: 2 }) })], 3, 0, "working", "Working", "Lead"],
+    ["a reported worker whose team still works", [task("t-l", { title: "Lead", state: "doing", threadId: "s-l", thread: reported({ id: "s-l", descendantsWorking: 1, descendantsTotal: 1 }) })], 1, 0, "working", "Working", "Lead"],
+    ["one working, one to check: Working names the working one", [toCheck, busy], 1, 1, "working", "Working", "Busy worker"],
+    ["a parent whose pieces all closed", [task("t-p", { title: "Two pieces", state: "doing" }), task("t-p1", { state: "done", parentId: "t-p" }), task("t-p2", { state: "cancelled", parentId: "t-p" })], 0, 1, "idle", "To check", "Two pieces"],
+  ] as const)("%s", (_n, tasks, working, check, flame, words, title) => {
+    expect(workingThreads(tasks)).toBe(working);
+    expect(unclosedTasks(tasks)).toBe(check);
+    expect(flameState(ember, workingThreads(tasks), waitingThreads(tasks))).toBe(flame);
+    const doing = tasks.filter((t) => t.state === "doing").length;
+    expect(emberStatusWords(ember, { working, toCheck: check, doing }).text).toBe(words);
+    expect(rowTitle(tasks)).toBe(title);
+  });
+
+  it.each([
+    ["reported done, idle", toCheck, "report"],
+    ["reported failed, still doing", task("t-r", { ...toCheck, thread: reported({ reportStatus: "failed" }) }), "report"],
+    ["archived after its report", task("t-r", { ...toCheck, thread: reported({ archived: true }) }), "report"],
+    ["busy again after its report", task("t-r", { ...toCheck, thread: reported({ status: "busy", statusReason: "working" }) }), null],
+    ["asking the user after its report", task("t-r", { ...toCheck, thread: reported({ statusReason: "question: which flag?" }) }), null],
+    ["a team member asking", task("t-r", { ...toCheck, thread: reported({ descendantsWaiting: 1, descendantsTotal: 1 }) }), null],
+    ["a progress report", task("t-r", { ...toCheck, thread: reported({ reportStatus: "progress" }) }), null],
+    ["no report (or a stale one: the daemon leaves it out)", idleNoReport, null],
+    ["removed", task("t-r", { ...toCheck, thread: reported({ removed: true }) }), null],
+    ["blocked", task("t-r", { ...toCheck, state: "blocked" }), null],
+    ["done", task("t-r", { ...toCheck, state: "done" }), null],
+  ] as const)("unclosed: %s", (_n, t, want) => {
+    expect(unclosed(t, [t])).toBe(want);
+  });
+
+  it("words the card, its worker row, the header and a link", () => {
+    const [card] = boardSections([toCheck], NOW).inProgress;
+    expect(card && cardMeta(card)).toEqual({ text: "reported done", tone: "emerald" });
+    expect(unclosedWords(toCheck, [toCheck])).toBe("Worker reported done, waiting for Ember to check");
+    // The worker's row: an emerald dot, not the doing task's sky.
+    expect((card ? workerRows(card) : []).map((r) => [r.dot, r.meta.text])).toEqual([["done", "pushed cf/notes"]]);
+    const [idleCard] = boardSections([idleNoReport], NOW).inProgress;
+    expect((idleCard ? workerRows(idleCard) : []).map((r) => r.dot)).toEqual(["open"]);
+    expect(headerSummary([toCheck, busy])).toEqual({ text: "1 thread working · 1 to check", dot: "sky" });
+    expect(headerSummary([toCheck])).toEqual({ text: "1 to check", dot: "" });
+    expect(linkMeta([toCheck], "t-r").parts).toEqual(["worker reported done, waiting for Ember to check"]);
+    const parent = task("t-p", { title: "Two pieces", state: "doing" });
+    const piece = task("t-p1", { ...toCheck, id: "t-p1", parentId: "t-p" });
+    expect(linkMeta([parent, piece, task("t-p2", { state: "done", parentId: "t-p" })], "t-p").parts).toEqual(["in progress", "2 pieces", "1 to check"]);
+    expect(linkMeta([parent, task("t-p2", { state: "done", parentId: "t-p" })], "t-p").parts).toEqual(["all pieces closed, waiting for Ember to close it", "1 piece"]);
+  });
+
+  it("reads a bare waiting reason as idle, a lead's as working", () => {
+    expect(workerWords(thread({ status: "idle", statusReason: "waiting" }))).toEqual({ text: "Idle", tone: "muted" });
+    expect(workerWords(thread({ status: "idle", statusReason: "waiting on 1 child thread" }))).toEqual({ text: "Working", tone: "sky" });
   });
 });
 

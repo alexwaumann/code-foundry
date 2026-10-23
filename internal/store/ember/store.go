@@ -35,6 +35,7 @@ type Threads interface {
 	Subscriptions(ctx context.Context, subscriber string) ([]thread.Subscription, error)
 	SetCreateDefaults(fn thread.CreateDefaultsFunc)
 	SetResidentTools(name string, t thread.ResidentTools)
+	SetResidentWakeNote(name string, fn thread.WakeNoteFunc)
 }
 
 // Config is what the Ember store reads from the ember.* settings (and one threads.*
@@ -220,6 +221,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	s.mu.Unlock()
 	opts.Threads.SetResidentTools(Name, Tools)
 	opts.Threads.SetCreateDefaults(s.workerDefaults)
+	opts.Threads.SetResidentWakeNote(Name, s.wakeNote)
 	threadSub := bus.Subscribe[thread.Event](opts.Bus, 256)
 	subsSub := bus.Subscribe[thread.SubscriptionsChanged](opts.Bus, 64)
 	s.applySettings(ctx)
@@ -235,6 +237,7 @@ func (s *Store) Close() {
 	s.cancel()
 	s.wg.Wait()
 	s.opts.Threads.SetCreateDefaults(nil)
+	s.opts.Threads.SetResidentWakeNote(Name, nil)
 }
 
 // Snapshot returns the current snapshot. Never nil.
@@ -581,22 +584,8 @@ func (s *Store) publish() {
 // publishLocked builds the snapshot (tasks with their workers' progress, the status)
 // and publishes it when it differs from the last one.
 func (s *Store) publishLocked(threads *thread.Snapshot) {
-	out := &Snapshot{Tasks: make([]Task, len(s.tasks)), Timers: slices.Clone(s.timers)}
-	var teams *teamIndex
-	for i, t := range s.tasks {
-		if t.ThreadID != "" {
-			t.Thread = taskThread(threads, t.ThreadID)
-			if staleReport(t) {
-				t.Thread.Report = thread.Report{}
-			}
-			if t.State.Open() && !t.Thread.Removed {
-				if teams == nil {
-					teams = newTeamIndex(threads)
-				}
-				t.Thread.Team = teams.team(t.ThreadID)
-			}
-		}
-		out.Tasks[i] = t
+	out := &Snapshot{Tasks: s.derivedTasksLocked(threads), Timers: slices.Clone(s.timers)}
+	for _, t := range out.Tasks {
 		switch t.State {
 		case StateTodo:
 			out.Status.Counts.Todo++
@@ -627,6 +616,30 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 	}
 	s.snap.Store(out)
 	bus.Publish(s.opts.Bus, Changed{Snapshot: out})
+}
+
+// derivedTasksLocked are the tasks in board order with their workers' progress from
+// threads: each worker's state and report (none when stale), and an open task's team
+// (s.mu held).
+func (s *Store) derivedTasksLocked(threads *thread.Snapshot) []Task {
+	out := make([]Task, len(s.tasks))
+	var teams *teamIndex
+	for i, t := range s.tasks {
+		if t.ThreadID != "" {
+			t.Thread = taskThread(threads, t.ThreadID)
+			if staleReport(t) {
+				t.Thread.Report = thread.Report{}
+			}
+			if t.State.Open() && !t.Thread.Removed {
+				if teams == nil {
+					teams = newTeamIndex(threads)
+				}
+				t.Thread.Team = teams.team(t.ThreadID)
+			}
+		}
+		out[i] = t
+	}
+	return out
 }
 
 // staleReport reports whether t's worker report describes an earlier run: t is doing

@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -20,7 +21,14 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 	stateArg := ArgSpec{Name: "state", Type: Enum, Enum: ember.StateNames, Description: "todo, doing, blocked, done or cancelled"}
 	threadArg := ArgSpec{Name: "thread", Type: String, ID: ThreadID, Description: "The worker thread that owns the task"}
 	one := func(t ember.Task, verb string) Result {
-		return Result{Message: verb + " " + emberTaskLine(t, d.Now()), JSON: emberTaskView(t, d.Now())}
+		snap := d.Ember.Snapshot()
+		msg := verb + " " + emberTaskLine(t, snap.Tasks, d.Now())
+		if p, ok := snap.ParentToClose(t.ID); ok && !t.State.Open() {
+			// The last piece closed: the parent waits on Ember alone (ember.Unclosed).
+			msg += "\nevery piece of " + p.ID + " " + strconv.Quote(p.Title) + " is closed now: check them together, then close it " +
+				"(code-foundry ember task done " + p.ID + " \"<outcome>\")"
+		}
+		return Result{Message: msg, JSON: emberTaskView(t, snap.Tasks, d.Now())}
 	}
 	update := func(ctx context.Context, id, verb string, u ember.TaskUpdate) (Result, error) {
 		t, err := d.Ember.UpdateTask(ctx, id, u)
@@ -151,7 +159,8 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 					}
 					return Result{Message: msg, JSON: []EmberTaskView{}}, nil
 				}
-				return Result{Message: formatEmberTasks(list, d.Now()), JSON: emberTaskViews(list, d.Now())}, nil
+				all := d.Ember.Snapshot().Tasks
+				return Result{Message: formatEmberTasks(list, all, d.Now()), JSON: emberTaskViews(list, all, d.Now())}, nil
 			},
 		},
 		Command{
@@ -167,7 +176,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 				if !ok {
 					return Result{}, emberErr("id", fmt.Errorf("%w: no task %s", ember.ErrNotFound, a.String("id")))
 				}
-				return Result{Message: formatEmberTask(t, snap.Tasks, d.Now()), JSON: emberTaskView(t, d.Now())}, nil
+				return Result{Message: formatEmberTask(t, snap.Tasks, d.Now()), JSON: emberTaskView(t, snap.Tasks, d.Now())}, nil
 			},
 		},
 	)
@@ -187,6 +196,9 @@ type EmberTaskView struct {
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 	DoneAt    *time.Time `json:"doneAt,omitempty"`
+	// Unclosed says why the task waits on Ember alone (ember.UnclosedWords): its worker
+	// reported and is idle, or every piece of it is closed; "" when it does not.
+	Unclosed string `json:"unclosed,omitempty"`
 	// Thread is the worker's progress, derived now.
 	Thread *EmberTaskThreadView `json:"thread,omitempty"`
 }
@@ -204,18 +216,21 @@ type EmberTaskThreadView struct {
 	Removed       bool       `json:"removed,omitempty"`
 }
 
-func emberTaskViews(ts []ember.Task, now time.Time) []EmberTaskView {
+// emberTaskViews are ts in the JSON; all is the whole board (a parent's pieces).
+func emberTaskViews(ts, all []ember.Task, now time.Time) []EmberTaskView {
 	out := make([]EmberTaskView, len(ts))
 	for i, t := range ts {
-		out[i] = emberTaskView(t, now)
+		out[i] = emberTaskView(t, all, now)
 	}
 	return out
 }
 
-func emberTaskView(t ember.Task, now time.Time) EmberTaskView {
+// emberTaskView is t in the JSON; all is the whole board (a parent's pieces).
+func emberTaskView(t ember.Task, all []ember.Task, now time.Time) EmberTaskView {
 	v := EmberTaskView{
 		ID: t.ID, Title: t.Title, Detail: t.Detail, State: t.State.String(), ParentID: t.ParentID, ThreadID: t.ThreadID,
 		Outcome: t.Outcome, Branch: t.Branch, Position: t.Position, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
+		Unclosed: ember.UnclosedWords(t, all),
 	}
 	if !t.DoneAt.IsZero() {
 		at := t.DoneAt
@@ -235,10 +250,13 @@ func emberTaskView(t ember.Task, now time.Time) EmberTaskView {
 	return v
 }
 
-// emberTaskLine is one task in a sentence: "t-… [doing] Title · worker … · branch … —
-// outcome".
-func emberTaskLine(t ember.Task, now time.Time) string {
+// emberTaskLine is one task in a sentence: "t-… [doing] Title · unclosed: … · worker … ·
+// branch … — outcome".
+func emberTaskLine(t ember.Task, all []ember.Task, now time.Time) string {
 	line := fmt.Sprintf("%s [%s] %s", t.ID, t.State, t.Title)
+	if w := ember.UnclosedWords(t, all); w != "" {
+		line += " · " + w
+	}
 	if t.Thread != nil {
 		line += " · " + ember.ThreadProgress(t.Thread, now)
 	}
@@ -251,9 +269,9 @@ func emberTaskLine(t ember.Task, now time.Time) string {
 	return line
 }
 
-// formatEmberTasks is one line per task: id, state, title (a subtask indented), and
-// its worker's progress and branch.
-func formatEmberTasks(ts []ember.Task, now time.Time) string {
+// formatEmberTasks is one line per task: id, state, title (a subtask indented), whether
+// it waits on Ember alone, and its worker's progress and branch; all is the whole board.
+func formatEmberTasks(ts, all []ember.Task, now time.Time) string {
 	var b strings.Builder
 	w := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
 	for _, t := range ts {
@@ -264,6 +282,9 @@ func formatEmberTasks(ts []ember.Task, now time.Time) string {
 		worker := "-"
 		if t.Thread != nil {
 			worker = ember.ThreadProgress(t.Thread, now)
+		}
+		if w := ember.UnclosedWords(t, all); w != "" {
+			worker = w + " · " + worker
 		}
 		if t.Branch != "" {
 			worker += " · branch " + t.Branch
@@ -297,6 +318,9 @@ func formatEmberTask(t ember.Task, all []ember.Task, now time.Time) string {
 		fmt.Fprintf(&b, ", done %s", t.DoneAt.Local().Format("Jan 2 15:04"))
 	}
 	b.WriteString("\n")
+	if w := ember.UnclosedWords(t, all); w != "" {
+		fmt.Fprintf(&b, "%s\n", w)
+	}
 	if t.Thread != nil {
 		fmt.Fprintf(&b, "worker: %s\n", ember.ThreadProgress(t.Thread, now))
 		if t.Thread.Name != "" {

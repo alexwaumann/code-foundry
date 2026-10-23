@@ -264,7 +264,7 @@ func (m *Manager) drain(subscriber string) {
 			m.deliverThreadWakes(subscriber, m.collectBatch(subscriber, d))
 			continue
 		}
-		msg := d.msg(m.ctx)
+		msg := m.withWakeNote(subscriber, d.msg(m.ctx), nil)
 		if _, err := m.Send(m.ctx, subscriber, msg); err != nil {
 			m.log.Warn("wake not delivered", "thread", subscriber, "subscription", d.sub, "err", err)
 			continue

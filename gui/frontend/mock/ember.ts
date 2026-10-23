@@ -6,8 +6,8 @@
  * the world's thread when it exists, else from its fixture here; an unknown id reads as
  * removed. Ember's timers (EmberBoard.timers) are none after a reset; /__mock/ember/timer adds
  * one and thread.unsubscribe <id> cancels it. Controls: POST /__mock/ember[?enabled=],
- * /__mock/ember/task, /__mock/ember/task/add, /__mock/ember/timer, /__mock/ember/consolidating,
- * /__mock/ember/epoch; GET /__mock/ember (server.ts).
+ * /__mock/ember/task, /__mock/ember/task/add, /__mock/ember/report, /__mock/ember/timer,
+ * /__mock/ember/consolidating, /__mock/ember/epoch; GET /__mock/ember (server.ts).
  */
 import { randomBytes } from "node:crypto";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -155,7 +155,7 @@ function seedTasks(): MockTask[] {
     t({ id: "t-5e6f7a8b", title: "Link each note to its PR", state: EmberTaskState.TODO, parentId: "t-1a2b3c4d", position: 2 }, 28),
     t({ id: "t-9c0d1e2f", title: "Bump wails to v3.1", state: EmberTaskState.BLOCKED, threadId: "s-ember-wails", outcome: "wails v3.1 needs Go 1.27; the toolchain here is 1.26", position: 3, updatedAt: ago(40) }, 90),
     t({ id: "t-3a4b5c6d", title: "Fix the flaky TestSendSpawnFailure", state: EmberTaskState.DONE, threadId: "s-ember-flaky", outcome: "Raised the spawn timeout to 5s under -race; PR #251 merged", branch: "cf/spawn-timeout-race", position: 4, updatedAt: today, doneAt: today }, 200),
-    t({ id: "t-7e8f9a0b", title: "Rename the agents panel to Runs", state: EmberTaskState.CANCELLED, outcome: "Alex kept the name", position: 5, updatedAt: ago(120) }, 240),
+    t({ id: "t-7e8f9a0b", title: "Rename the agents panel to Runs", state: EmberTaskState.CANCELLED, outcome: "Alex kept the name", position: 5, updatedAt: today }, 240),
     t({ id: "t-4c5d6e7f", title: "Validate notes API input", state: EmberTaskState.DOING, threadId: "s-ember-lead", position: 6, updatedAt: ago(20) }, 20),
   ];
 }
@@ -178,9 +178,15 @@ export interface EmberDeps {
 /** How many of a team the board lists (the daemon's MaxTeamList). */
 const TEAM_LIST = 10;
 
-/** A team member is working: on a turn, starting, or waiting on its own child threads (internal/store/ember/team.go). */
+/**
+ * A team member is working (internal/store/ember/team.go working): on a turn while its
+ * process runs, starting, or waiting on child threads of its own ("waiting on 2 child
+ * threads"; a bare "waiting" names none).
+ */
 function teamWorking(t: EmberThreadView): boolean {
-  return t.status === ThreadStatus.BUSY || t.state === ThreadState.STARTING || (t.status === ThreadStatus.IDLE && /^waiting( on |$)/.test(t.statusReason));
+  if (t.state === ThreadState.STARTING) return true;
+  if (t.status === ThreadStatus.IDLE) return /^waiting on [1-9]/.test(t.statusReason);
+  return t.status === ThreadStatus.BUSY && t.state !== ThreadState.DISCONNECTED && t.state !== ThreadState.CLOSING;
 }
 
 /** A team member waits on the user: a pending permission request or question while its process runs. */
@@ -192,6 +198,8 @@ export class MockEmber {
   private tasks: MockTask[] = [];
   private timers: MockTimer[] = [];
   private workers = new Map<string, EmberWorkerFixture>();
+  /** Reports set by /__mock/ember/report, over a fixture's own: thread id -> report. */
+  private reports = new Map<string, NonNullable<EmberWorkerFixture["report"]>>();
   epoch = 2;
   epochStartedAt = ago(180);
   contextTokens = 182_000;
@@ -207,6 +215,7 @@ export class MockEmber {
     this.tasks = seedTasks();
     this.timers = [];
     this.workers = new Map(emberWorkers().map((w) => [w.id, w]));
+    this.reports = new Map();
     this.epoch = 2;
     this.epochStartedAt = ago(180);
     this.contextTokens = 182_000;
@@ -323,7 +332,7 @@ export class MockEmber {
     const fixture = this.workers.get(id);
     const live = this.deps.thread(id) ?? fixture;
     if (!live) return { id, name: "", removed: true };
-    const report = fixture?.report;
+    const report = this.reportOf(id);
     return {
       id,
       name: live.name,
@@ -353,7 +362,7 @@ export class MockEmber {
           if (teamAsks(t)) out.descendantsWaiting++;
           else if (teamWorking(t)) out.descendantsWorking++;
           if (out.descendants.length < TEAM_LIST) {
-            const report = this.workers.get(kid)?.report;
+            const report = this.reportOf(kid);
             out.descendants.push({
               id: kid, name: t.name, state: t.state, status: t.status, statusReason: t.statusReason, lastActivityAt: timestampFromDate(t.lastActivityAt), depth,
               ...(report ? { reportStatus: report.status, reportSummary: report.summary } : {}),
@@ -365,6 +374,18 @@ export class MockEmber {
     };
     walk(root, 1);
     return out;
+  }
+
+  /** A thread's report: the one /__mock/ember/report set, else its fixture's. */
+  private reportOf(id: string): EmberWorkerFixture["report"] {
+    return this.reports.get(id) ?? this.workers.get(id)?.report ?? null;
+  }
+
+  /** POST /__mock/ember/report: a worker's report (thread report), filed now. */
+  setReport(id: string, status: ThreadReportStatus, summary: string): void {
+    if (!this.deps.thread(id) && !this.workers.has(id)) throw new CommandError("notfound", `thread ${id} not found`);
+    this.reports.set(id, { status, summary, at: new Date() });
+    this.changed();
   }
 
   private task(id: string): MockTask {

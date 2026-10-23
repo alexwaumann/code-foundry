@@ -239,6 +239,11 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 	} else {
 		msg = batchWake(parts)
 	}
+	about := make([]string, len(parts))
+	for i, p := range parts {
+		about[i] = p.t.ID
+	}
+	msg = m.withWakeNote(subscriber, msg, about)
 	if _, err := m.Send(ctx, subscriber, msg); err != nil {
 		m.log.Warn("wake not delivered", "thread", subscriber, "subscriptions", subs, "err", err)
 		return

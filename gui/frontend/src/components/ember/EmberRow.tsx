@@ -13,6 +13,7 @@ import {
   usePendingTimers,
   useRowTitle,
   useShownEmberThreadId,
+  useToCheckCount,
   useWaitingThreads,
   useWaitingWords,
   useWorkingThreads,
@@ -40,10 +41,13 @@ function useEmberSelected(threadId: string): boolean {
 /**
  * "<Status> · <task> · N threads · N blocked · N scheduled", the status in the thread rows'
  * colours: Needs input (or a budget stop's words) while a worker waits on the user, naming
- * that worker's task; Blocked while a task is blocked and nothing else goes on.
+ * that worker's task; Working only while a worker thread works; To check while a task
+ * waits on Ember alone (its worker reported and is idle); Worker idle while a task is
+ * doing with no one on it; Blocked while a task is blocked and nothing else goes on.
  */
 function EmberLine({ threadId }: { threadId: string }) {
   const doing = useDoingCount();
+  const toCheck = useToCheckCount();
   const t = useThreadsStore(
     useShallow((s) => {
       const x = s.byId[threadId];
@@ -54,9 +58,9 @@ function EmberLine({ threadId }: { threadId: string }) {
   const waitingWords = useWaitingWords();
   const blocked = useBlockedCount();
   const timers = usePendingTimers();
-  const words = emberStatusWords(t, { doing, waiting, waitingWords, blocked });
-  const title = useRowTitle();
   const working = useWorkingThreads();
+  const words = emberStatusWords(t, { working, toCheck, doing, waiting, waitingWords, blocked });
+  const title = useRowTitle();
   return (
     <span className="min-w-0 truncate text-caption-sm" data-testid="ember-row-line">
       <span className={TONE[words.tone]} data-testid="ember-row-status">
