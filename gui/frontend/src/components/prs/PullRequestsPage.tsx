@@ -99,7 +99,7 @@ function PrTable({ section, title, rows, empty, viewer }: { section: Section; ti
 
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
-    <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-cf-warning/40 bg-cf-warning-surface text-cf-warning" : "text-cf-text-muted")} role="status">
+    <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-cf-warning/40 bg-cf-warning-surface text-cf-warning-text" : "text-cf-text-muted")} role="status">
       {children}
     </p>
   );
@@ -228,7 +228,7 @@ export function PullRequestsNav() {
         useUiStore.getState().select({ kind: "view", name: "pullrequests" });
       }}
     >
-      <GitPullRequest className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
+      <GitPullRequest className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
       <span className="truncate">Pull Requests</span>
     </button>
   );

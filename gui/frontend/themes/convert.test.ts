@@ -44,7 +44,7 @@ describe("generated files", () => {
       "catppuccin-mocha": ["--syn-kw", "--syn-num"],
       "catppuccin-latte": ["--syn-kw", "--syn-num"],
       "graphite-dark": ["--cf-accent-foreground", "--cf-focus", "--cf-sidebar-row-selected", "--terminal-selection-inactive"],
-      "graphite-light": ["--cf-control", "--cf-control-hover", "--cf-focus", "--cf-input", "--cf-sidebar-row-selected", "--cf-surface-sunken", "--cf-text-muted"],
+      "graphite-light": ["--cf-focus", "--cf-input", "--cf-sidebar-row-selected", "--cf-text-muted"],
     });
   });
 

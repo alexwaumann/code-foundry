@@ -28,13 +28,13 @@ function RegistryRow({ name, className }: { name: string; className?: string | u
         </p>
       )}
       {r.error && (
-        <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning" role="alert" data-testid="skill-registry-error">
+        <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning-text" role="alert" data-testid="skill-registry-error">
           <TriangleAlert className="mt-px size-3 shrink-0" aria-hidden />
           <span className="min-w-0 break-words">Could not read or update it: {r.error}</span>
         </p>
       )}
       {r.issues.map((i) => (
-        <p key={i} className="text-caption-sm break-words text-cf-warning" data-testid="skill-registry-issue">
+        <p key={i} className="text-caption-sm break-words text-cf-warning-text" data-testid="skill-registry-issue">
           {i}
         </p>
       ))}
@@ -56,12 +56,12 @@ export function RegistriesSection() {
   return (
     <SectionCard id="registries" heading="Registries" description="The marketplaces Claude Code has. Refresh in Browse updates them, as the hourly check does.">
       {error && (
-        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="skill-registries-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-error-text" role="alert" data-testid="skill-registries-error">
           Cannot read the marketplaces: {error}
         </p>
       )}
       {listError && (
-        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning" role="alert" data-testid="skill-registries-list-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning-text" role="alert" data-testid="skill-registries-list-error">
           claude plugin marketplace list failed, so these are the last ones read: {listError}
         </p>
       )}

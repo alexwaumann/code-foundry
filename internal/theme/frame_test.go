@@ -2,6 +2,7 @@ package theme
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +33,36 @@ func frame(vars map[string]string) Frame {
 	return Frame{ID: "my-theme", Scheme: SchemeLight, Vars: vars}
 }
 
+// full is every slot (GitHub Light's values) with patch applied: a publishable set.
+func full(patch map[string]string) map[string]string {
+	v := DefaultFrame(SchemeLight).Vars
+	maps.Copy(v, patch)
+	return v
+}
+
+// without is full() minus the named slots.
+func without(names ...string) map[string]string {
+	v := full(nil)
+	for _, n := range names {
+		delete(v, n)
+	}
+	return v
+}
+
+func TestSlotNames(t *testing.T) {
+	names := SlotNames()
+	if len(names) != 102 {
+		t.Errorf("%d slot names, want 102 (71 --cf-*, 21 terminal, 10 syntax)", len(names))
+	}
+	if light := DefaultFrame(SchemeLight); len(light.Vars) != len(names) {
+		t.Errorf("the light default has %d vars, the dark %d", len(light.Vars), len(names))
+	}
+	names[0] = "changed"
+	if SlotNames()[0] == "changed" {
+		t.Error("SlotNames shares its slice")
+	}
+}
+
 func TestFrameCheck(t *testing.T) {
 	many := map[string]string{}
 	for i := range maxVars + 1 {
@@ -42,18 +73,24 @@ func TestFrameCheck(t *testing.T) {
 		f       Frame
 		wantErr string
 	}{
-		{"ok", frame(map[string]string{"--cf-text": "#112233", "--cf-accent-surface": "#11223344", "--terminal-ansi-0": "#000000", "--syn-kw": "#AABBCC", "--sh-cmd": "#010203"}), ""},
+		{"ok", frame(full(map[string]string{"--cf-text": "#112233", "--cf-accent-surface": "#11223344", "--terminal-ansi-0": "#000000", "--syn-kw": "#AABBCC", "--sh-cmd": "#010203"})), ""},
 		{"empty id", Frame{Scheme: SchemeDark, Vars: map[string]string{"--cf-text": "#000000"}}, "theme id"},
 		{"id with a quote", Frame{ID: `a"b`, Scheme: SchemeDark, Vars: map[string]string{"--cf-text": "#000000"}}, "theme id"},
 		{"upper-case id", Frame{ID: "GitHub", Scheme: SchemeDark, Vars: map[string]string{"--cf-text": "#000000"}}, "theme id"},
 		{"bad scheme", Frame{ID: "x", Scheme: "auto", Vars: map[string]string{"--cf-text": "#000000"}}, "unknown scheme"},
 		{"no vars", frame(nil), "no vars"},
 		{"too many", frame(many), "at most"},
-		{"component name", frame(map[string]string{"--card": "#000000"}), "want --cf-*"},
-		{"injected name", frame(map[string]string{"--cf-x;}body{": "#000000"}), "want --cf-*"},
-		{"named colour", frame(map[string]string{"--cf-text": "red"}), "not #rrggbb"},
-		{"injected value", frame(map[string]string{"--cf-text": "#000000;}*{x:y"}), "not #rrggbb"},
-		{"short hex", frame(map[string]string{"--cf-text": "#000"}), "not #rrggbb"},
+		{"component name", frame(full(map[string]string{"--card": "#000000"})), "want --cf-*"},
+		{"injected name", frame(full(map[string]string{"--cf-x;}body{": "#000000"})), "want --cf-*"},
+		{"named colour", frame(full(map[string]string{"--cf-text": "red"})), "not #rrggbb"},
+		{"injected value", frame(full(map[string]string{"--cf-text": "#000000;}*{x:y"})), "not #rrggbb"},
+		{"short hex", frame(full(map[string]string{"--cf-text": "#000"})), "not #rrggbb"},
+		{"one slot missing", frame(without("--cf-text")), "missing 1 of the 102 slots: --cf-text"},
+		{"two missing, named in order", frame(without("--syn-kw", "--cf-accent")), "missing 2 of the 102 slots: --cf-accent, --syn-kw"},
+		{"a partial set", frame(map[string]string{"--cf-text": "#000000"}), "missing 101 of the 102 slots"},
+		{"a misspelt slot", frame(full(map[string]string{"--cf-txet": "#000000"})), "1 unknown: --cf-txet"},
+		{"a retired slot", frame(full(map[string]string{"--cf-sidebar-row-active": "#000000"})), "1 unknown: --cf-sidebar-row-active"},
+		{"missing and unknown", frame(func() map[string]string { v := without("--cf-link"); v["--cf-lnik"] = "#000000"; return v }()), "missing 1 of the 102 slots: --cf-link; 1 unknown: --cf-lnik"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,7 +116,7 @@ func TestLivePublish(t *testing.T) {
 	if _, ok := l.Current(); ok {
 		t.Fatal("a refused frame became current")
 	}
-	vars := map[string]string{"--cf-text": "#112233"}
+	vars := full(map[string]string{"--cf-text": "#112233"})
 	if err := l.Publish(frame(vars)); err != nil {
 		t.Fatal(err)
 	}
@@ -92,8 +129,15 @@ func TestLivePublish(t *testing.T) {
 	if again, _ := l.Current(); again.Vars["--cf-text"] != "#112233" {
 		t.Fatal("Current's map is shared")
 	}
+	// A partial set is refused and the last good theme stays served.
+	if err := l.Publish(Frame{ID: "partial", Scheme: SchemeDark, Vars: map[string]string{"--cf-text": "#445566"}}); err == nil {
+		t.Fatal("published a partial set")
+	}
+	if got, _ := l.Current(); got.ID != "my-theme" || got.Vars["--cf-text"] != "#112233" {
+		t.Fatalf("after a refused publish: %s %s", got.ID, got.Vars["--cf-text"])
+	}
 	// Last writer wins.
-	if err := l.Publish(Frame{ID: "other", Scheme: SchemeDark, Vars: map[string]string{"--cf-text": "#445566"}}); err != nil {
+	if err := l.Publish(Frame{ID: "other", Scheme: SchemeDark, Vars: full(map[string]string{"--cf-text": "#445566"})}); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := l.Current(); got.ID != "other" {
@@ -103,9 +147,9 @@ func TestLivePublish(t *testing.T) {
 
 func TestFrameHandler(t *testing.T) {
 	published := NewLive()
-	if err := published.Publish(Frame{ID: "rose-pine-dawn", Scheme: SchemeLight, Vars: map[string]string{
+	if err := published.Publish(Frame{ID: "rose-pine-dawn", Scheme: SchemeLight, Vars: full(map[string]string{
 		"--cf-text": "#575279", "--cf-surface-raised": "#faf4ed", "--cf-accent": "#907aa9", "--cf-success-surface": "#6d8f891a",
-	}}); err != nil {
+	})}); err != nil {
 		t.Fatal(err)
 	}
 	fresh := NewLive()

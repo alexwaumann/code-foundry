@@ -20,7 +20,7 @@ type View =
 type Clone = { state: "idle" } | { state: "running"; lines: CloneProgressView[] } | { state: "failed"; lines: CloneProgressView[]; error: string };
 
 function Badge({ children, tone = "muted" }: { children: string; tone?: "muted" | "amber" }) {
-  const cls = tone === "amber" ? "border-cf-warning/40 text-cf-warning" : "border-cf-border text-cf-text-muted";
+  const cls = tone === "amber" ? "border-cf-warning/40 text-cf-warning-text" : "border-cf-border text-cf-text-muted";
   return <span className={`shrink-0 rounded-sm border px-1.5 py-px text-overline ${cls}`}>{children}</span>;
 }
 
@@ -156,14 +156,14 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
           Clones into <span className="font-mono text-cf-text" data-testid="add-project-clone-dest">{tildify(repo.clonePath)}</span>
         </span>
         {repo.clonePathExists && (
-          <span className="text-caption text-cf-warning" data-testid="add-project-clone-exists">
+          <span className="text-caption text-cf-warning-text" data-testid="add-project-clone-exists">
             That folder already exists, so it cannot be cloned there. Add the existing folder instead.
           </span>
         )}
       </div>
       {clone.state !== "idle" && <ProgressLog lines={clone.lines} />}
       {clone.state === "failed" && (
-        <p className="text-caption whitespace-pre-wrap text-cf-error" role="alert" data-testid="add-project-clone-error">
+        <p className="text-caption whitespace-pre-wrap text-cf-error-text" role="alert" data-testid="add-project-clone-error">
           {clone.error}
         </p>
       )}
@@ -280,7 +280,7 @@ export function GitHubTab({ active }: { active: boolean }) {
         </Button>
       </form>
       {inputError && (
-        <p className="text-caption text-cf-error" role="alert" data-testid="add-project-github-error">
+        <p className="text-caption text-cf-error-text" role="alert" data-testid="add-project-github-error">
           {inputError}
         </p>
       )}

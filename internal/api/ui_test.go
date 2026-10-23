@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -70,6 +71,13 @@ func TestUIEmitFanOut(t *testing.T) {
 	}
 }
 
+// themeVars is every slot (GitHub Dark's values) with patch applied.
+func themeVars(patch map[string]string) map[string]string {
+	v := theme.DefaultFrame(theme.SchemeDark).Vars
+	maps.Copy(v, patch)
+	return v
+}
+
 func TestUIPublishTheme(t *testing.T) {
 	live := theme.NewLive()
 	mux := http.NewServeMux()
@@ -85,9 +93,11 @@ func TestUIPublishTheme(t *testing.T) {
 		req      *v1.PublishThemeRequest
 		wantCode connect.Code // 0: ok
 	}{
-		{"ok", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: map[string]string{"--cf-text": "#d8dee9", "--cf-accent-surface": "#88c0d01a"}}, 0},
-		{"bad scheme", &v1.PublishThemeRequest{Id: "nord", Scheme: "dim", Vars: map[string]string{"--cf-text": "#d8dee9"}}, connect.CodeInvalidArgument},
-		{"bad value", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: map[string]string{"--cf-text": "url(x)"}}, connect.CodeInvalidArgument},
+		{"ok", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: themeVars(map[string]string{"--cf-text": "#d8dee9", "--cf-accent-surface": "#88c0d01a"})}, 0},
+		{"bad scheme", &v1.PublishThemeRequest{Id: "nord", Scheme: "dim", Vars: themeVars(nil)}, connect.CodeInvalidArgument},
+		{"bad value", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: themeVars(map[string]string{"--cf-text": "url(x)"})}, connect.CodeInvalidArgument},
+		{"partial set", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: map[string]string{"--cf-text": "#d8dee9"}}, connect.CodeInvalidArgument},
+		{"unknown slot", &v1.PublishThemeRequest{Id: "nord", Scheme: "dark", Vars: themeVars(map[string]string{"--cf-txet": "#d8dee9"})}, connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

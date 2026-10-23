@@ -26,10 +26,10 @@ import { Flame } from "./Flame";
 /** The sidebar's status colours (SidebarRow toneClasses). */
 const TONE: Readonly<Record<StatusTone, string>> = {
   muted: "",
-  sky: "text-cf-info",
-  amber: "text-cf-warning",
-  emerald: "text-cf-success",
-  red: "text-cf-error",
+  sky: "text-cf-info-text",
+  amber: "text-cf-warning-text",
+  emerald: "text-cf-success-text",
+  red: "text-cf-error-text",
 };
 
 /** Whether the selection shows Ember's chat (its thread, or the Ember view). */

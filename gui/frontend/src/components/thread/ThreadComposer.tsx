@@ -92,7 +92,7 @@ function SnoozedUntil({ until }: { until: number }) {
 function SnoozeEnded({ at }: { at: number | null }) {
   const now = useNow(30_000);
   return (
-    <span className="text-cf-warning" data-testid="thread-snooze-ended">
+    <span className="text-cf-warning-text" data-testid="thread-snooze-ended">
       {statusText({ kind: "snoozeEnded", detail: "", at }, now)}
     </span>
   );
@@ -485,12 +485,12 @@ export function ThreadComposer({
         {(error ?? notice) && (
           <div className="col-span-2 flex flex-col gap-1 px-4 pb-2 text-body">
             {error && (
-              <p role="alert" className="text-cf-error" data-testid="thread-composer-error">
+              <p role="alert" className="text-cf-error-text" data-testid="thread-composer-error">
                 {error}
               </p>
             )}
             {notice && (
-              <p role="status" className="text-cf-warning">
+              <p role="status" className="text-cf-warning-text">
                 {notice}
               </p>
             )}

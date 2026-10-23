@@ -445,7 +445,11 @@ function routes(router: ConnectRouter): void {
     watchIntents: (_req, ctx) => tracked("UiService/WatchIntents", world.intents.subscribe(ctx.signal)),
     emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
     publishTheme: (req) => {
-      publishMockTheme({ id: req.id, scheme: req.scheme, vars: req.vars });
+      try {
+        publishMockTheme({ id: req.id, scheme: req.scheme, vars: req.vars });
+      } catch (err) {
+        throw new ConnectError(err instanceof Error ? err.message : String(err), Code.InvalidArgument);
+      }
       return {};
     },
   });

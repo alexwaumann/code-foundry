@@ -35,9 +35,9 @@ function StateNotice({ tone, heading, children, action, testId }: { tone: "atten
       data-testid={testId}
     >
       <div className="flex min-w-0 items-start gap-2">
-        <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone === "error" ? "text-cf-error" : tone === "attention" ? "text-cf-warning" : "text-cf-text-muted")} aria-hidden />
+        <Icon className={cn("mt-0.5 size-3.5 shrink-0", tone === "error" ? "text-cf-error-text" : tone === "attention" ? "text-cf-warning-text" : "text-cf-text-muted")} aria-hidden />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className={cn("text-body-sm font-semibold", tone === "error" ? "text-cf-error" : tone === "attention" ? "text-cf-warning" : "")}>{heading}</p>
+          <p className={cn("text-body-sm font-semibold", tone === "error" ? "text-cf-error-text" : tone === "attention" ? "text-cf-warning-text" : "")}>{heading}</p>
           {children && <div className="text-caption-sm break-words">{children}</div>}
         </div>
       </div>

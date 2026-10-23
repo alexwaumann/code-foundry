@@ -20,9 +20,9 @@ function useThreadId(): string {
 }
 
 const STATUS_TONE: Readonly<Record<AgentStatusView, string>> = {
-  running: "text-cf-info",
-  done: "text-cf-success",
-  failed: "text-cf-error",
+  running: "text-cf-info-text",
+  done: "text-cf-success-text",
+  failed: "text-cf-error-text",
   unknown: "text-cf-text-muted",
 };
 
@@ -37,7 +37,7 @@ function Header({ threadId }: { threadId: string }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="agents-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Bot className="size-4 shrink-0 text-cf-info" aria-hidden />
+        <Bot className="size-4 shrink-0 text-cf-info-text" aria-hidden />
         <span className="min-w-0 truncate">Agents</span>
         {c && c.total > 0 && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="agents-count">
@@ -110,7 +110,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       {viewing && <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-cf-info" aria-hidden />}
       <div className="flex min-w-0 items-center gap-2 text-body-sm">
         {running ? (
-          <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-info" aria-label="Running" />
+          <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-info-text" aria-label="Running" />
         ) : (
           <span className={cn("size-2 shrink-0 rounded-full", DOT[run.status as Exclude<AgentStatusView, "running">])} aria-hidden />
         )}
@@ -120,7 +120,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
           </span>
         </Tip>
         {viewing && (
-          <span className="shrink-0 rounded-sm border border-cf-info/50 px-1 text-caption-sm text-cf-info" data-testid="agent-viewing">
+          <span className="shrink-0 rounded-sm border border-cf-info/50 px-1 text-caption-sm text-cf-info-text" data-testid="agent-viewing">
             viewing
           </span>
         )}
@@ -150,7 +150,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       ) : run.status === "failed" ? (
         run.error && (
           <Tip label={run.error} whenTruncated maxLines={5}>
-            <div className="ml-5 line-clamp-2 text-body-sm break-words text-cf-error" data-testid="agent-error">
+            <div className="ml-5 line-clamp-2 text-body-sm break-words text-cf-error-text" data-testid="agent-error">
               {run.error}
             </div>
           </Tip>

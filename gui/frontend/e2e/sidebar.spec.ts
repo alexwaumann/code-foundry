@@ -366,14 +366,14 @@ test("status kinds: each thread's second line says its status in words and colou
   ]);
 
   const want: [string, string, string, RegExp][] = [
-    ["s-k-approval", "input", "Needs input · Bash", /text-cf-warning/],
-    ["s-k-question", "question", "Asked a question", /text-cf-warning/],
-    ["s-k-plan", "plan", "Plan ready for review", /text-cf-warning/],
-    ["s-k-finished", "finished", "Finished 12 min ago", /text-cf-success/],
-    ["s-k-error", "error", "Error · model_not_found", /text-cf-error/],
-    ["s-k-busy", "working", "Working", /text-cf-info/],
-    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-cf-error/],
-    ["s-k-asked-before-restart", "question", "Asked a question", /text-cf-warning/],
+    ["s-k-approval", "input", "Needs input · Bash", /text-cf-warning-text/],
+    ["s-k-question", "question", "Asked a question", /text-cf-warning-text/],
+    ["s-k-plan", "plan", "Plan ready for review", /text-cf-warning-text/],
+    ["s-k-finished", "finished", "Finished 12 min ago", /text-cf-success-text/],
+    ["s-k-error", "error", "Error · model_not_found", /text-cf-error-text/],
+    ["s-k-busy", "working", "Working", /text-cf-info-text/],
+    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-cf-error-text/],
+    ["s-k-asked-before-restart", "question", "Asked a question", /text-cf-warning-text/],
   ];
   for (const [id, kind, text, tone] of want) {
     const r = row(page, `s:${id}`);
@@ -388,7 +388,7 @@ test("status kinds: each thread's second line says its status in words and colou
   await expect(idle.getByTestId("row-status")).toHaveCount(0);
   await expect(idle.getByTestId("row-place")).toHaveText("code-foundry @ main");
   await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveCount(0);
-  await expect(row(page, "s:s-k-approval").getByTestId("thread-name")).not.toHaveClass(/text-cf-warning/);
+  await expect(row(page, "s:s-k-approval").getByTestId("thread-name")).not.toHaveClass(/text-cf-warning-text/);
   // No row is dimmed (whether Claude runs never shows); the name is never coloured by status.
   for (const id of ["s-k-interrupted", "s-k-asked-before-restart", "s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("thread-body"), id).toHaveCSS("opacity", "1");
   // No status icon in thread rows.
@@ -594,7 +594,7 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
   const status = tip.getByTestId("tip-status");
   await expect(status).toHaveText(`Needs input · ${long}`);
   await expect(status).toHaveAttribute("data-tone", "amber");
-  await expect(status).toHaveClass(/text-cf-warning/);
+  await expect(status).toHaveClass(/text-cf-warning-text/);
   const line2 = await approval.getByTestId("row-place").locator("span.truncate").evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(line2).toBe(true);
   // Wrapped over several lines inside the 260px tooltip, between the name and the project.
@@ -615,7 +615,7 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
     await expect(tip, id).toHaveAttribute("data-thread-id", id);
     await expect(tip.getByTestId("tip-status"), id).toHaveText(text);
     await expect(tip.getByTestId("tip-status"), id).toHaveAttribute("data-tone", tone);
-    await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-cf-warning/ : /text-cf-error/);
+    await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-cf-warning-text/ : /text-cf-error-text/);
   }
 
   // Finished, working and idle threads: no status row; the rest of the tooltip is unchanged.

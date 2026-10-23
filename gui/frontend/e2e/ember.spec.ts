@@ -255,7 +255,7 @@ test("a worker waiting on the user: Needs input on the row, Ember in the bell un
   // A lead's worker asks a question.
   await mockPost(`thread/status?id=s-ember-team-put&status=attention&reason=${encodeURIComponent("question: 404 or 422 for a bad id?")}`);
   await expect(status).toHaveText("Needs input");
-  await expect(status).toHaveClass(/text-cf-warning/);
+  await expect(status).toHaveClass(/text-cf-warning-text/);
   await expect(emberRow(page)).toHaveAttribute("data-flame", "attention");
   await expect(bell).toHaveAttribute("data-count", "2");
   if (process.env.SHOTS) await page.getByTestId("sidebar-body").screenshot({ path: `${process.env.SHOTS}/ember-row-needs-input.png` });
@@ -355,7 +355,7 @@ test("the header and the row count blocked tasks and workers waiting on the user
   // A task link whose worker waits says so, amber.
   const link = pane(page).locator('[data-testid="ember-task-link"][data-task="t-4c5d6e7f"]');
   await expect(link.getByTestId("ember-task-link-meta")).toContainText("· needs you");
-  await expect(link.getByTestId("ember-task-link-meta")).toHaveClass(/text-cf-warning/);
+  await expect(link.getByTestId("ember-task-link-meta")).toHaveClass(/text-cf-warning-text/);
   // A timer Ember set counts too.
   await mockPost(`ember/timer?minutes=30&note=${encodeURIComponent("check the notes draft")}`);
   await expect(header).toHaveText("2 need you · 2 threads working · 1 blocked · 1 queued · 1 scheduled");
@@ -403,7 +403,7 @@ test("a restart that cut Ember's turn: a line in the chat, Interrupted on the ro
   await expect(line).toHaveCount(1);
   await expect(line).toHaveText(/^Code Foundry restarted at \S.* while Ember was working$/);
   await expect(status).toHaveText("Interrupted");
-  await expect(status).toHaveClass(/text-cf-warning/);
+  await expect(status).toHaveClass(/text-cf-warning-text/);
   // The cut run still has its row, before the line.
   await expect(pane(page).getByTestId("ember-work").last().getByTestId("ember-work-summary")).toHaveText("started 1 worker");
   // The restart notice wakes Ember; it picks the request up; the line stays where the cut was.

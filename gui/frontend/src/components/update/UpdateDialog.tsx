@@ -124,7 +124,7 @@ function BusyThreads() {
   if (ids.length === 0) return null;
   return (
     <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-cf-divider px-3 py-2 text-left text-body-sm" data-testid="update-busy-threads">
-      <div className="mb-1 flex items-center gap-[7px] font-medium text-cf-warning" data-testid="update-busy-heading">
+      <div className="mb-1 flex items-center gap-[7px] font-medium text-cf-warning-text" data-testid="update-busy-heading">
         <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
         {busyHeading(ids.length)}
       </div>
@@ -138,7 +138,7 @@ function BusyThreads() {
 function Failure({ reason }: { reason: string }) {
   return (
     <div className="mt-3.5 flex gap-[9px] rounded-lg bg-cf-error-surface px-3 py-2.5 text-left text-body-sm">
-      <TriangleAlert className="mt-px size-3.5 shrink-0 text-cf-error" aria-hidden />
+      <TriangleAlert className="mt-px size-3.5 shrink-0 text-cf-error-text" aria-hidden />
       <div className="min-w-0">
         {failureHeadline(reason)}
         <pre className="mt-[3px] max-h-32 overflow-auto text-caption-sm font-mono break-words whitespace-pre-wrap select-text" data-testid="update-failure">
@@ -196,12 +196,12 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       )}
       {v.variant === "restarting" && <Progress className="mt-4 h-1" aria-label="Restarting" data-testid="update-progress-bar" />}
       {checkError && (
-        <p className="mt-3 text-caption-sm text-cf-warning" data-testid="update-check-error">
+        <p className="mt-3 text-caption-sm text-cf-warning-text" data-testid="update-check-error">
           Last check failed: {checkError}
         </p>
       )}
       {error && (
-        <p className="mt-3 text-caption-sm break-words text-cf-error" data-testid="update-error">
+        <p className="mt-3 text-caption-sm break-words text-cf-error-text" data-testid="update-error">
           {error}
         </p>
       )}

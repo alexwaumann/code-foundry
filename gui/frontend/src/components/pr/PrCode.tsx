@@ -27,7 +27,7 @@ const LINE_HEIGHT = 19;
 /** The file header's height (FileHeader h-9), for the same reason. */
 const HEADER_H = 36;
 
-const statusColor: Record<PrDiffFile["status"], string> = { A: "text-cf-diff-addition", M: "text-cf-diff-modified", D: "text-cf-diff-deletion", R: "text-cf-info" };
+const statusColor: Record<PrDiffFile["status"], string> = { A: "text-cf-diff-addition", M: "text-cf-diff-modified", D: "text-cf-diff-deletion", R: "text-cf-info-text" };
 
 const styleOptions: readonly { value: DiffStyle; label: string }[] = [
   { value: "unified", label: "Unified" },
@@ -112,7 +112,7 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
 /** A warning under the strip, with the way to the whole diff on GitHub. */
 function Notice({ children, url, testId }: { children: ReactNode; url: string; testId: string }) {
   return (
-    <div className="mx-4 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning" role="status" data-testid={testId}>
+    <div className="mx-4 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning-text" role="status" data-testid={testId}>
       <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 break-words">{children}</span>
       <button
@@ -344,7 +344,7 @@ export function PrCode({ prRef, tabKey, url }: { prRef: PrRef; tabKey: string; u
       );
     } else if (error) {
       body = (
-        <p className="px-4 py-3 text-caption text-cf-error" role="alert" data-testid="pr-code-error">
+        <p className="px-4 py-3 text-caption text-cf-error-text" role="alert" data-testid="pr-code-error">
           Cannot load the diff: {error}
         </p>
       );
@@ -366,7 +366,7 @@ export function PrCode({ prRef, tabKey, url }: { prRef: PrRef; tabKey: string; u
           </Notice>
         )}
         {error && (
-          <p className="shrink-0 px-4 pt-2 text-caption text-cf-error" data-testid="pr-code-refresh-error">
+          <p className="shrink-0 px-4 pt-2 text-caption text-cf-error-text" data-testid="pr-code-refresh-error">
             Could not refresh: {error}
           </p>
         )}

@@ -72,7 +72,7 @@ export function FailureLine({ itemKey }: { itemKey: string }) {
   const f = useSkillFailure(itemKey);
   if (!f) return null;
   return (
-    <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-error" role="alert" data-testid="skill-failure" data-action={f.action}>
+    <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-error-text" role="alert" data-testid="skill-failure" data-action={f.action}>
       <span className="min-w-0 flex-1 break-words">{f.message}</span>
       <Button
         variant="ghost"
@@ -91,7 +91,7 @@ export function FailureLine({ itemKey }: { itemKey: string }) {
 }
 
 /** The amber-outlined main action of a row (no filled buttons), as the plugin page's. */
-export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40";
+export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface hover:text-cf-warning-text dark:border-cf-warning/40";
 
 /** A muted ghost action. */
 export const quietAction = "text-cf-text-muted hover:text-cf-text";

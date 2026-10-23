@@ -234,15 +234,12 @@
     },
     "pair": "graphite-dark",
     "upstream": "Code Foundry's original light theme (index.css :root before theme-slots-1)",
-    "why": "The pre-engine neutral theme, hand-picked rather than derived (Tailwind's neutral greys), so its base is literal and the slots where the rules land elsewhere are overrides: muted text (the rule gives #4d4d4d), the paler control and sunken greys, the grey focus ring, the field border (the same grey as its borders) and the selected sidebar row.",
+    "why": "The pre-engine neutral theme, hand-picked rather than derived (Tailwind's neutral greys), so its base is literal and the slots where the rules land elsewhere are overrides: muted text (the rule gives #4d4d4d; #6d6d6d stepped to 4.5:1 on a hovered row), the grey focus ring (#a1a1a1 stepped to 3:1 on the sheet), the field border (the same grey as its borders) and the selected sidebar row (#e1e1e1 stepped to 1.25:1 on the sidebar). Its control and sunken greys are the rules' (theme-slots-3: the three steps no longer collapse into #f5f5f5).",
     "overrides": {
-      "--cf-text-muted": "#6d6d6d",
-      "--cf-surface-sunken": "#f5f5f5",
-      "--cf-control": "#f5f5f5",
-      "--cf-control-hover": "#f5f5f5",
-      "--cf-focus": "#a1a1a1",
+      "--cf-text-muted": "#6a6a6a",
+      "--cf-focus": "#8a8a8a",
       "--cf-input": "#e5e5e5",
-      "--cf-sidebar-row-selected": "#e1e1e1"
+      "--cf-sidebar-row-selected": "#d7d7d7"
     }
   },
   "gruvbox-light": {

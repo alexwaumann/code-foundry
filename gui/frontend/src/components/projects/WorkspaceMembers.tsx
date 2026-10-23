@@ -56,13 +56,13 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
   return (
     <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-body" tip={member.path}>
       <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-project={member.projectId} data-current={at === "current" || undefined}>
-        <FolderGit2 className="size-3.5 shrink-0 text-cf-info/90" aria-hidden />
+        <FolderGit2 className="size-3.5 shrink-0 text-cf-info-text/90" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>
         {at && (
           <Tip label={at === "current" ? "The thread runs in this worktree" : "The thread moves here once it is idle at its prompt"}>
-            <span className={cn("shrink-0 rounded-sm px-1 text-caption-sm font-medium", at === "current" ? "bg-cf-success-surface text-cf-success" : "bg-cf-warning-surface text-cf-warning")} data-testid="member-at">
+            <span className={cn("shrink-0 rounded-sm px-1 text-caption-sm font-medium", at === "current" ? "bg-cf-success-surface text-cf-success-text" : "bg-cf-warning-surface text-cf-warning-text")} data-testid="member-at">
               {at === "current" ? "here" : "queued"}
             </span>
           </Tip>
@@ -101,7 +101,7 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
   return (
     <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full items-center gap-2 rounded-md px-2 text-body" tip={member.path}>
       <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-project={member.projectId}>
-        <FolderGit2 className="size-3.5 shrink-0 text-cf-info/90" aria-hidden />
+        <FolderGit2 className="size-3.5 shrink-0 text-cf-info-text/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>

@@ -32,7 +32,7 @@ const (
 	FrameJSONPath = FramePrefix + "theme.json"
 )
 
-// maxVars bounds a published theme: the GUI resolves 98 slots.
+// maxVars bounds a published theme before its names are compared with SlotNames.
 const maxVars = 512
 
 //go:embed frame.css
@@ -49,6 +49,15 @@ type Frame struct {
 }
 
 var frameDefaults = parseFrameDefaults(frameDefaultsJSON)
+
+// slotNames is every slot the GUI resolves, sorted: the names a published theme must carry,
+// no more and no fewer. Read from the defaults, which are resolved by the same rules
+// (gui/frontend/src/themes/slots.ts) and regenerated with them, so the set never drifts
+// from the GUI's; GUI and daemon always ship together.
+var slotNames = slices.Sorted(maps.Keys(frameDefaults[SchemeDark].Vars))
+
+// SlotNames returns every slot name a published theme carries, sorted.
+func SlotNames() []string { return slices.Clone(slotNames) }
 
 // parseFrameDefaults reads the embedded defaults. A malformed file is a build defect
 // TestFrameDefaults catches, so it yields empty frames rather than a panic.
@@ -77,8 +86,10 @@ var (
 
 // Check reports why f cannot be published: an id that is not lowercase letters, digits
 // and dashes, a scheme other than dark or light, no vars or too many, a name outside the
-// slot families or a value that is not #rrggbb / #rrggbbaa. The names and values go into a
-// stylesheet verbatim, so nothing else is let through.
+// slot families or a value that is not #rrggbb / #rrggbbaa, or a set of names other than
+// exactly SlotNames (a missing slot would leave a var() undefined in every page; an
+// unknown one is a misspelling). The names and values go into a stylesheet verbatim, so
+// nothing else is let through.
 func (f Frame) Check() error {
 	switch {
 	case !frameIDRe.MatchString(f.ID):
@@ -98,6 +109,32 @@ func (f Frame) Check() error {
 			return fmt.Errorf("var %s: %q is not #rrggbb or #rrggbbaa", name, v)
 		}
 	}
+	return checkSlotSet(f.Vars)
+}
+
+// checkSlotSet reports the names vars lacks and the ones it has that are not slots.
+func checkSlotSet(vars map[string]string) error {
+	var missing, unknown []string
+	for _, name := range slotNames {
+		if _, ok := vars[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(vars)) {
+		if _, ok := slices.BinarySearch(slotNames, name); !ok {
+			unknown = append(unknown, name)
+		}
+	}
+	var parts []string
+	if len(missing) > 0 {
+		parts = append(parts, fmt.Sprintf("missing %d of the %d slots: %s", len(missing), len(slotNames), strings.Join(missing, ", ")))
+	}
+	if len(unknown) > 0 {
+		parts = append(parts, fmt.Sprintf("%d unknown: %s", len(unknown), strings.Join(unknown, ", ")))
+	}
+	if len(parts) > 0 {
+		return fmt.Errorf("a theme publishes every slot the GUI resolves, exactly: %s", strings.Join(parts, "; "))
+	}
 	return nil
 }
 
@@ -112,7 +149,8 @@ type Live struct {
 // NewLive returns a Live with nothing published: it serves the defaults.
 func NewLive() *Live { return &Live{} }
 
-// Publish checks f and makes it the current theme.
+// Publish checks f and makes it the current theme. A refused frame changes nothing: the
+// last good theme (or the defaults) stays served.
 func (l *Live) Publish(f Frame) error {
 	if err := f.Check(); err != nil {
 		return err

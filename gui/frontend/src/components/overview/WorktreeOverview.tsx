@@ -33,9 +33,9 @@ const LOG_ROW_H = 24;
 const MAX_ROWS = 10;
 
 const toneText: Record<FactTone, string> = {
-  success: "text-cf-success",
-  warning: "text-cf-warning",
-  destructive: "text-cf-error",
+  success: "text-cf-success-text",
+  warning: "text-cf-warning-text",
+  destructive: "text-cf-error-text",
   muted: "text-cf-text-muted",
 };
 
@@ -74,7 +74,7 @@ function OperationStrip({ st }: { st: GitStatusView }) {
   if (!op) return null;
   return (
     <div className="flex h-9 items-center gap-2 rounded-lg border border-cf-error/45 bg-cf-error-surface px-2.5 text-body-sm" data-testid="worktree-operation" data-operation={st.operation}>
-      <TriangleAlert className="size-3.5 shrink-0 text-cf-error" aria-hidden />
+      <TriangleAlert className="size-3.5 shrink-0 text-cf-error-text" aria-hidden />
       <span className="min-w-0 truncate">
         <span className="font-semibold">{op.title}</span>
         {op.conflicts && <span> · {op.conflicts}</span>}
@@ -165,7 +165,7 @@ function FileLine({ row }: { row: FileRow }) {
         <span className="max-w-full shrink-0 truncate" data-testid="file-name">
           {row.name}
         </span>
-        {row.conflict && <span className="ml-1.5 shrink-0 text-caption-sm text-cf-error">conflict</span>}
+        {row.conflict && <span className="ml-1.5 shrink-0 text-caption-sm text-cf-error-text">conflict</span>}
       </span>
       <span className="text-right text-cf-diff-addition tabular-nums" data-testid="file-added">
         {row.added > 0 ? `+${String(row.added)}` : row.binary && row.deleted === 0 ? <span className="text-cf-text-muted">bin</span> : ""}
@@ -184,7 +184,7 @@ function LogLine({ e }: { e: LogEntryView }) {
       tip={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
       className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-1.5 text-body-sm @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
     >
-      <span className="font-mono text-cf-warning/80">{e.shortSha}</span>
+      <span className="font-mono text-cf-warning-text/80">{e.shortSha}</span>
       <span className="truncate">{e.subject}</span>
       <Age ms={e.authoredAtMs} className="text-right" />
       <span className="truncate text-cf-text-muted @max-[420px]:hidden">{e.authorName}</span>
@@ -218,7 +218,7 @@ function Changes({ detail, error, rows, base }: { detail: WorktreeDetailView | n
         )}
         {detail?.error && (
           <Tip label={detail.error}>
-            <span className="shrink-0 text-caption text-cf-error">refresh failed</span>
+            <span className="shrink-0 text-caption text-cf-error-text">refresh failed</span>
           </Tip>
         )}
         {base && (
@@ -393,7 +393,7 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
         <Facts st={st} remotes={project.remotes} />
         {st.error && (
           <Tip label={st.error} align="start">
-            <span className="self-start text-caption text-cf-error" data-testid="status-error">
+            <span className="self-start text-caption text-cf-error-text" data-testid="status-error">
               git status failed
             </span>
           </Tip>
@@ -422,7 +422,7 @@ export function WorktreePanelView({ projectId, path }: { projectId: string; path
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3">
         <header className="-mx-4 flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pb-2 @max-[340px]:-mx-3 @max-[340px]:px-3" data-testid="worktree-surface-header">
           <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-            {noGit ? <Folder className="size-4 shrink-0 text-cf-text-muted" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-cf-highlight" aria-hidden />}
+            {noGit ? <Folder className="size-4 shrink-0 text-cf-text-muted" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-cf-highlight-text" aria-hidden />}
             <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
               {project?.name ?? projectId}
               {noGit ? (

@@ -80,7 +80,7 @@ function PublishBody({ projectId }: { projectId: string }) {
         />
       </div>
       {nameError && (
-        <p className="text-caption text-cf-error" data-testid="publish-name-error">
+        <p className="text-caption text-cf-error-text" data-testid="publish-name-error">
           {nameError}
         </p>
       )}

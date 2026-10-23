@@ -10,7 +10,7 @@ import { PillView } from "../parts";
 import { emptyBrowse, entryAction, entryPill, progressWords, REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
 
 /** The amber-outlined main action of a row (no filled buttons). */
-export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:border-cf-warning/40";
+export const mainAction = "bg-transparent dark:bg-transparent border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface hover:text-cf-warning-text dark:border-cf-warning/40";
 
 /** An install in progress, or the last one's failure (the daemon's words, with a dismiss ×), under a row. */
 function Progress({ name }: { name: string }) {
@@ -18,7 +18,7 @@ function Progress({ name }: { name: string }) {
   if (!p) return null;
   const failed = p.phase === "failed";
   return (
-    <p className={cn("flex min-w-0 items-center gap-1.5 text-caption-sm", failed ? "break-words text-cf-error" : "text-cf-text-muted")} data-testid="registry-progress" data-phase={p.phase} role={failed ? "alert" : "status"}>
+    <p className={cn("flex min-w-0 items-center gap-1.5 text-caption-sm", failed ? "break-words text-cf-error-text" : "text-cf-text-muted")} data-testid="registry-progress" data-phase={p.phase} role={failed ? "alert" : "status"}>
       {!failed && <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />}
       <span className="min-w-0">{progressWords(p)}</span>
       {failed && (
@@ -103,7 +103,7 @@ function RegistryNotices() {
             <span className="ml-auto shrink-0 text-caption-sm">{registryLine(r)}</span>
           </div>
           {r.error && (
-            <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning" role="alert">
+            <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning-text" role="alert">
               <TriangleAlert className="mt-px size-3 shrink-0" aria-hidden />
               <span className="min-w-0 break-words">
                 {registryErrorWords(r.error)}
@@ -112,7 +112,7 @@ function RegistryNotices() {
             </p>
           )}
           {r.issues.map((i) => (
-            <p key={i} className="text-caption-sm break-words text-cf-warning">
+            <p key={i} className="text-caption-sm break-words text-cf-warning-text">
               {i}
             </p>
           ))}
@@ -147,7 +147,7 @@ export function BrowseSection() {
         </Button>
       </div>
       {error && (
-        <p className="border-t border-cf-border px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="registry-error">
+        <p className="border-t border-cf-border px-4 py-3 text-caption break-words text-cf-error-text" role="alert" data-testid="registry-error">
           {error}
         </p>
       )}

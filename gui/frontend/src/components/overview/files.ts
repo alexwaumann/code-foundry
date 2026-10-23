@@ -52,9 +52,9 @@ export const statusColor: Readonly<Record<string, string>> = {
   A: "text-cf-diff-addition",
   M: "text-cf-diff-modified",
   D: "text-cf-diff-deletion",
-  R: "text-cf-info",
-  C: "text-cf-info",
-  T: "text-cf-info",
-  U: "text-cf-error",
+  R: "text-cf-info-text",
+  C: "text-cf-info-text",
+  T: "text-cf-info-text",
+  U: "text-cf-error-text",
   "?": "text-cf-text-muted",
 };

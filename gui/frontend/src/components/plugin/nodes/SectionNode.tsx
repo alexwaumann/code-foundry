@@ -19,7 +19,7 @@ export function SectionNode({ node, data }: NodeProps<"section">) {
   const toggled = useCollapsed(toggleKey);
   const collapsible = data.collapsible ?? false;
   const collapsed = collapsible && (toggled ?? data.collapsed ?? false);
-  const titleClass = cn("min-w-0 truncate text-overline", data.tone === "attention" && "text-cf-warning", data.tone === "error" && "text-cf-error");
+  const titleClass = cn("min-w-0 truncate text-overline", data.tone === "attention" && "text-cf-warning-text", data.tone === "error" && "text-cf-error-text");
   const hasHead = Boolean(data.title) || data.meta !== undefined || data.pill !== undefined || (data.actions?.length ?? 0) > 0 || collapsible;
   const label = (
     <>

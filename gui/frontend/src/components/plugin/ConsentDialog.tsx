@@ -35,7 +35,7 @@ export function ConsentDialog() {
             <DialogTitle data-testid="consent-title">{title}</DialogTitle>
             <DialogDescription className="break-words">{rest || "It asks for no permissions."}</DialogDescription>
             {regrant && (
-              <p className="text-caption text-cf-warning" data-testid="consent-grew">
+              <p className="text-caption text-cf-warning-text" data-testid="consent-grew">
                 It now asks for more than you allowed before.
               </p>
             )}

@@ -68,7 +68,7 @@ function RunStatus({ run }: { run: AgentRunView }) {
   const ms = running ? agentElapsedMs(run, now) : null;
   const text = running ? (ms === null ? "Running" : `Running · ${fmtElapsed(ms)}`) : agentStatusText(run, now);
   const Icon = running ? LoaderCircle : run.status === "failed" ? CircleX : run.status === "done" ? CircleCheck : null;
-  const tone = running ? "text-cf-info" : run.status === "failed" ? "text-cf-error" : run.status === "done" ? "text-cf-success" : "text-cf-text-muted";
+  const tone = running ? "text-cf-info-text" : run.status === "failed" ? "text-cf-error-text" : run.status === "done" ? "text-cf-success-text" : "text-cf-text-muted";
   return (
     <span className={cn("flex shrink-0 items-center gap-1.5 text-caption whitespace-nowrap tabular-nums", tone)} data-testid="subagent-status" data-status={run.status}>
       {Icon && <Icon className={cn("size-3.5 shrink-0", running && "animate-spin")} aria-hidden />}
@@ -112,13 +112,13 @@ function SubagentHeader({ threadId, run }: { threadId: string; run: AgentRunView
           {parent}
         </UpLink>
         <ChevronRight className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
-        <Bot className="size-3.5 shrink-0 text-cf-info" aria-hidden />
+        <Bot className="size-3.5 shrink-0 text-cf-info-text" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="subagent-name">
           {agentName(run)}
         </span>
       </span>
       <Tip label="A subagent takes its instructions from its parent thread">
-        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded-md border border-cf-warning/50 px-1.5 text-caption-sm font-medium text-cf-warning" data-testid="subagent-readonly">
+        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded-md border border-cf-warning/50 px-1.5 text-caption-sm font-medium text-cf-warning-text" data-testid="subagent-readonly">
           <Lock className="size-3" aria-hidden />
           Read-only
         </span>

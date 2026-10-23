@@ -1,0 +1,46 @@
+[
+  {
+    "id": "zz-warm-paper",
+    "name": "ZZ Warm Paper",
+    "scheme": "light",
+    "source": "synthetic base-only probe (warm paper light)",
+    "base": {
+      "canvas": "#e8dcc4",
+      "surface": "#f5ecd9",
+      "text": "#4a3b2a",
+      "accent": "#c0622f",
+      "success": "#6b8e23",
+      "warning": "#d4a017",
+      "error": "#c0392b",
+      "info": "#3a7ca5",
+      "highlight": "#8e5ba8",
+      "terminal": {
+        "foreground": "#4a3b2a",
+        "ansi": ["#f5ecd9", "#c0392b", "#6b8e23", "#d4a017", "#3a7ca5", "#8e5ba8", "#2a9d8f", "#d9ccb0",
+                 "#a8977a", "#e05a47", "#88a83a", "#e8b830", "#5a9cc5", "#ae7bc8", "#4abdaf", "#4a3b2a"]
+      }
+    }
+  },
+  {
+    "id": "zz-deep-blue",
+    "name": "ZZ Deep Blue",
+    "scheme": "dark",
+    "source": "synthetic base-only probe (deep blue dark)",
+    "base": {
+      "canvas": "#040a1c",
+      "surface": "#0a1532",
+      "text": "#b8c6ee",
+      "accent": "#3d6bff",
+      "success": "#2fbf71",
+      "warning": "#f0b429",
+      "error": "#ff4d6d",
+      "info": "#4ea8ff",
+      "highlight": "#a78bfa",
+      "terminal": {
+        "foreground": "#b8c6ee",
+        "ansi": ["#0a1532", "#ff4d6d", "#2fbf71", "#f0b429", "#4ea8ff", "#a78bfa", "#38d6e8", "#b8c6ee",
+                 "#24345e", "#ff7088", "#55d68f", "#ffc94d", "#7cc0ff", "#c2abff", "#6ce3f0", "#e6ecff"]
+      }
+    }
+  }
+]

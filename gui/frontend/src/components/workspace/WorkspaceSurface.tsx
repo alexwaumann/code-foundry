@@ -31,7 +31,7 @@ function Header({ workspaceId }: { workspaceId: string }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="workspace-surface-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Layers className="size-4 shrink-0 text-cf-highlight/90" aria-hidden />
+        <Layers className="size-4 shrink-0 text-cf-highlight-text/90" aria-hidden />
         <span className="min-w-0 truncate" data-testid="workspace-surface-name">
           {name}
         </span>

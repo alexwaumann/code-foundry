@@ -38,9 +38,9 @@ const DOT: Record<McpServerStatusView, string> = {
 };
 
 const PILL: Record<McpServerStatusView, string> = {
-  connected: "bg-cf-success-surface text-cf-success",
-  failed: "bg-cf-error-surface text-cf-error",
-  "needs-auth": "bg-cf-warning-surface text-cf-warning",
+  connected: "bg-cf-success-surface text-cf-success-text",
+  failed: "bg-cf-error-surface text-cf-error-text",
+  "needs-auth": "bg-cf-warning-surface text-cf-warning-text",
   pending: "bg-cf-surface-sunken text-cf-text-muted",
   disabled: "bg-cf-surface-sunken text-cf-text-muted",
   unknown: "bg-cf-surface-sunken text-cf-text-muted",
@@ -77,7 +77,7 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header" data-stale={stale || undefined}>
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
-        <Plug className="size-4 shrink-0 text-cf-warning" aria-hidden />
+        <Plug className="size-4 shrink-0 text-cf-warning-text" aria-hidden />
         <span className="min-w-0 truncate">MCP servers</span>
         {h && (
           <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="mcp-count">
@@ -85,7 +85,7 @@ function Header({ threadId, stale }: { threadId: string; stale: boolean }) {
           </span>
         )}
       </h2>
-      <span className={cn("flex min-h-6 min-w-0 items-center gap-1.5 text-caption", stale && "text-cf-warning")} data-testid="mcp-checked-line">
+      <span className={cn("flex min-h-6 min-w-0 items-center gap-1.5 text-caption", stale && "text-cf-warning-text")} data-testid="mcp-checked-line">
         <Clock className="size-3.5 shrink-0" aria-hidden />
         {h ? <CheckedText checkedAtMs={h.checkedAtMs} trigger={h.trigger} server={h.server} stale={stale} /> : <span className="min-w-0 truncate">Not checked yet</span>}
         {stale ? (
@@ -122,7 +122,7 @@ function HintIcon({ hint }: { hint: ToolHint }) {
   const label = TOOL_HINT_LABEL[hint];
   return (
     <Tip label={label} data-testid="mcp-hint-tooltip">
-      <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-cf-error")} data-testid="mcp-hint" data-hint={hint}>
+      <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-cf-error-text")} data-testid="mcp-hint" data-hint={hint}>
         <Icon className="size-3" aria-hidden />
       </span>
     </Tip>
@@ -208,11 +208,11 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
         </div>
       )}
       {server.error ? (
-        <div className="text-caption-sm font-mono break-words text-cf-error" data-testid="mcp-error">
+        <div className="text-caption-sm font-mono break-words text-cf-error-text" data-testid="mcp-error">
           {server.error}
         </div>
       ) : server.status === "needs-auth" ? (
-        <div className="text-caption text-cf-warning" data-testid="mcp-login-hint">
+        <div className="text-caption text-cf-warning-text" data-testid="mcp-login-hint">
           {MCP_LOGIN_HINT}
         </div>
       ) : null}
@@ -224,7 +224,7 @@ function ServerCard({ threadId, name, stale }: { threadId: string; name: string;
               className={cn(
                 "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-body-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-60",
                 attention
-                  ? "border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface"
+                  ? "border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface"
                   : "border-transparent text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text dark:hover:bg-cf-control-hover/50",
               )}
               disabled={reconnecting}

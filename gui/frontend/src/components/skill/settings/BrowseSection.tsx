@@ -221,12 +221,12 @@ function StatusLine() {
         <span className="min-w-0 truncate">{total === null ? "Searching…" : resultsWords(total, shown)}</span>
       </div>
       {error && (
-        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-error" role="alert" data-testid="skill-search-error">
+        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-error-text" role="alert" data-testid="skill-search-error">
           The search failed: {error}
         </p>
       )}
       {refreshError && (
-        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-warning" role="alert" data-testid="skill-refresh-error">
+        <p className="border-t border-cf-border px-4 py-2.5 text-caption break-words text-cf-warning-text" role="alert" data-testid="skill-refresh-error">
           The refresh failed, so this is the last read: {refreshError}
         </p>
       )}

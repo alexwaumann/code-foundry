@@ -247,7 +247,7 @@ export function TaskPointer({ id, name }: { id: string; name: string }) {
           {title}
         </span>
         {meta && (
-          <span className={cn("shrink-0 truncate", waiting && "text-cf-warning")} data-testid="ember-task-link-meta">
+          <span className={cn("shrink-0 truncate", waiting && "text-cf-warning-text")} data-testid="ember-task-link-meta">
             · {meta}
           </span>
         )}

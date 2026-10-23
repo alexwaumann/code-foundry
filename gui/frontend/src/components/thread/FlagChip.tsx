@@ -23,8 +23,8 @@ export function FlagChip({ id }: { id: string }) {
   const surface = useFlagSurfaceKind(flag?.plugin ?? "", id);
   if (!flag) return null;
   const Icon = flag.level === "error" ? OctagonX : CircleAlert;
-  const tone = flag.level === "error" ? "text-cf-error" : "text-cf-warning";
-  const hoverTone = flag.level === "error" ? "hover:text-cf-error" : "hover:text-cf-warning";
+  const tone = flag.level === "error" ? "text-cf-error-text" : "text-cf-warning-text";
+  const hoverTone = flag.level === "error" ? "hover:text-cf-error-text" : "hover:text-cf-warning-text";
   const words = (
     <>
       <Icon className="size-3 shrink-0" aria-hidden />

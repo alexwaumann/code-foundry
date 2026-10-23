@@ -10,8 +10,8 @@ import type { Status, Tone } from "@/api/plugin";
 export const toneText: Record<Tone, string> = {
   "": "",
   muted: "text-cf-text-muted",
-  attention: "text-cf-warning",
-  error: "text-cf-error",
+  attention: "text-cf-warning-text",
+  error: "text-cf-error-text",
   ok: "",
 };
 
@@ -19,9 +19,9 @@ export const toneText: Record<Tone, string> = {
 export const tonePill: Record<Tone, string> = {
   "": "bg-cf-surface-sunken text-cf-text-muted",
   muted: "bg-cf-surface-sunken text-cf-text-muted",
-  attention: "bg-cf-warning-surface text-cf-warning",
-  error: "bg-cf-error-surface text-cf-error",
-  ok: "bg-cf-success-surface text-cf-success",
+  attention: "bg-cf-warning-surface text-cf-warning-text",
+  error: "bg-cf-error-surface text-cf-error-text",
+  ok: "bg-cf-success-surface text-cf-success-text",
 };
 
 /** A card's or notice's border per tone. */
@@ -51,9 +51,9 @@ export const statusDot: Record<Status, string> = {
 /** A status as an icon (chips, step lists) with its colour. */
 export const statusIcon: Record<Status, { icon: LucideIcon; className: string }> = {
   "": { icon: CircleDashed, className: "text-cf-text-muted" },
-  ok: { icon: CircleCheck, className: "text-cf-success" },
-  failed: { icon: CircleX, className: "text-cf-error" },
-  attention: { icon: TriangleAlert, className: "text-cf-warning" },
+  ok: { icon: CircleCheck, className: "text-cf-success-text" },
+  failed: { icon: CircleX, className: "text-cf-error-text" },
+  attention: { icon: TriangleAlert, className: "text-cf-warning-text" },
   running: { icon: LoaderCircle, className: "animate-spin text-cf-text-muted motion-reduce:animate-none" },
   pending: { icon: CircleDashed, className: "text-cf-text-muted" },
   skipped: { icon: CircleSlash, className: "text-cf-text-muted" },

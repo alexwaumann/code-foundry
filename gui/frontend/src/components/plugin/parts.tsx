@@ -93,7 +93,7 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
   if (!glyph) return null;
   if (glyph.icon) {
     const tone = glyph.tone ?? "";
-    return <PluginIcon name={glyph.icon} className={cn("size-3.5 shrink-0", tone === "ok" ? "text-cf-success" : tone ? toneText[tone] : "text-cf-text-muted", className)} />;
+    return <PluginIcon name={glyph.icon} className={cn("size-3.5 shrink-0", tone === "ok" ? "text-cf-success-text" : tone ? toneText[tone] : "text-cf-text-muted", className)} />;
   }
   const status = glyph.status ?? "";
   if (style === "icon" || status === "running") {
@@ -115,8 +115,8 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
 const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
   muted: "text-cf-text-muted hover:text-cf-text",
   outline: "border border-cf-border text-cf-text",
-  attention: "border border-cf-warning/40 text-cf-warning hover:bg-cf-warning-surface hover:text-cf-warning dark:hover:bg-cf-warning-surface",
-  destructive: "text-cf-text-muted hover:bg-cf-error-surface hover:text-cf-error focus-visible:text-cf-error dark:hover:bg-cf-error-surface",
+  attention: "border border-cf-warning/40 text-cf-warning-text hover:bg-cf-warning-surface hover:text-cf-warning-text dark:hover:bg-cf-warning-surface",
+  destructive: "text-cf-text-muted hover:bg-cf-error-surface hover:text-cf-error-text focus-visible:text-cf-error-text dark:hover:bg-cf-error-surface",
   link: "h-auto px-0 text-link hover:bg-transparent hover:underline has-[>svg]:px-0 dark:hover:bg-transparent",
 };
 

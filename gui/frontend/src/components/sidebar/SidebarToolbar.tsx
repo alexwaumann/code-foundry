@@ -33,7 +33,7 @@ function NotificationsButton() {
         aria-disabled={count === 0 || undefined}
         data-testid="sidebar-notifications"
         data-count={count}
-        className={cn("relative", count > 0 ? "text-cf-warning hover:text-cf-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
+        className={cn("relative", count > 0 ? "text-cf-warning-text hover:text-cf-warning-text" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
         onMouseDown={(e) => {
           e.preventDefault();
         }}

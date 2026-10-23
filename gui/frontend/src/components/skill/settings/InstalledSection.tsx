@@ -117,9 +117,9 @@ function InstalledRow({ itemKey, className, onConfirm }: { itemKey: string; clas
           {r.by ? `${source ? " · " : ""}by ${r.by}` : ""}
         </p>
         {r.description && <p className="line-clamp-2 text-caption">{r.description}</p>}
-        {r.state === "missing" && <p className="text-caption-sm text-cf-error">Its directory is gone. Reinstall puts it back; Uninstall forgets it.</p>}
+        {r.state === "missing" && <p className="text-caption-sm text-cf-error-text">Its directory is gone. Reinstall puts it back; Uninstall forgets it.</p>}
         {r.update && r.state !== "missing" && (
-          <p className="text-caption-sm text-cf-warning" data-testid="skill-update-available">
+          <p className="text-caption-sm text-cf-warning-text" data-testid="skill-update-available">
             {r.update.version} is available.
           </p>
         )}
@@ -164,12 +164,12 @@ export function InstalledSection({ onConfirm }: { onConfirm: (a: ConfirmAction, 
   return (
     <SectionCard id="installed" heading="Installed" description="Claude Code plugins, and skills in ~/.claude/skills. Claude Code loads what is enabled in every new thread.">
       {error && (
-        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-error" role="alert" data-testid="skill-installed-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-error-text" role="alert" data-testid="skill-installed-error">
           Cannot read what is installed: {error}
         </p>
       )}
       {pluginsError && (
-        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning" role="alert" data-testid="skill-plugins-error">
+        <p className="border-b border-cf-border px-4 py-3 text-caption break-words text-cf-warning-text" role="alert" data-testid="skill-plugins-error">
           claude plugin list failed, so the plugins are the last list read: {pluginsError}
         </p>
       )}

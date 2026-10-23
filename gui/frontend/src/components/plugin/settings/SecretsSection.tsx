@@ -33,7 +33,7 @@ export function SecretsList({ name }: { name: string }) {
   return (
     <div className="flex min-w-0 flex-col rounded-md border border-cf-border px-3 py-1.5" data-testid="plugin-secrets">
       {entry?.error ? (
-        <p className="py-0.5 text-caption-sm break-words text-cf-error" role="alert" data-testid="plugin-secrets-error">
+        <p className="py-0.5 text-caption-sm break-words text-cf-error-text" role="alert" data-testid="plugin-secrets-error">
           {entry.error}
         </p>
       ) : list === null ? (
@@ -52,7 +52,7 @@ export function SecretsList({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="icon-xs"
-              className="ml-auto text-cf-text-muted hover:text-cf-error"
+              className="ml-auto text-cf-text-muted hover:text-cf-error-text"
               aria-label={`Delete secret ${s.key}`}
               disabled={deleting !== null}
               onClick={() => {

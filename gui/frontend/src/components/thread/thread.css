@@ -5,15 +5,14 @@
  * (src/terminal/theme.ts), mono text the bundled JetBrains Mono.
  */
 .cf-thread {
-  /* Status tones from the theme tokens (index.css). Light darkens them a step (15% black
-     turns the default 600s into about the 700s), so 11-12px status text clears 4.5:1 on
-     the pane (the 600s are about 3:1 for amber and 3.8:1 for emerald). */
-  --t-sky: color-mix(in oklab, var(--cf-info) 85%, black);
-  --t-amber: color-mix(in oklab, var(--cf-warning) 85%, black);
-  --t-emerald: color-mix(in oklab, var(--cf-success) 85%, black);
-  --t-red: var(--cf-error);
-  /* A diff's +N / -N and added / deleted text: the diff slots, darkened in light like the tones. */
-  --t-add: color-mix(in oklab, var(--cf-diff-addition) 85%, black);
+  /* Status tones: the status text slots (src/themes/slots.ts), 4.5:1 on the pane, the
+     sheet and the tone's own tint in either scheme. */
+  --t-sky: var(--cf-info-text);
+  --t-amber: var(--cf-warning-text);
+  --t-emerald: var(--cf-success-text);
+  --t-red: var(--cf-error-text);
+  /* A diff's +N / -N and added / deleted text: the diff slots (status text, 4.5:1). */
+  --t-add: var(--cf-diff-addition);
   --t-del: var(--cf-diff-deletion);
   /* User messages (variant B): the bubble is its slot (--cf-message-surface, the accent at
      8% light / 14.5% dark) with a hairline a step stronger than it. Hovers stay a text tint. */
@@ -25,10 +24,6 @@
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .dark .cf-thread:not(:where(.light *)) {
-  --t-sky: var(--cf-info);
-  --t-amber: var(--cf-warning);
-  --t-emerald: var(--cf-success);
-  --t-add: var(--cf-diff-addition);
   --t-bubble-border: color-mix(in oklab, var(--cf-accent) 15.5%, transparent);
   --t-hover: color-mix(in oklab, var(--cf-text) 5%, transparent);
 }
@@ -84,7 +79,7 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .cf-markdown pre {
   line-height: 1.5;
   tab-size: 4;
-  color: var(--syn-fg);
+  color: var(--cf-code-foreground);
 }
 .cf-thread .cf-markdown th {
   font-weight: 600;
@@ -495,6 +490,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .u .bubble {
   background: var(--cf-message-surface);
+  color: var(--cf-message-foreground);
   border: 1px solid var(--t-bubble-border);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -702,7 +698,7 @@ html[data-thread-width="full"] .cf-thread {
   font-family: var(--t-mono);
   font-size: 12px;
   line-height: 1.55;
-  color: var(--syn-fg);
+  color: var(--cf-code-foreground);
   white-space: pre;
   overflow-x: auto;
 }

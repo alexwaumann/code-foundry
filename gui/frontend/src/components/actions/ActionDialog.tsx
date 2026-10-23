@@ -210,7 +210,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
         </div>
       </div>
       {(error !== null || gone) && (
-        <p className="mt-3 text-caption text-cf-error" role="alert" data-testid="action-error">
+        <p className="mt-3 text-caption text-cf-error-text" role="alert" data-testid="action-error">
           {gone ? "This action was deleted." : error}
         </p>
       )}
@@ -251,7 +251,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
               size="sm"
               variant="ghost"
               disabled={busy}
-              className="-ml-1.5 text-cf-error hover:text-cf-error"
+              className="-ml-1.5 text-cf-error-text hover:text-cf-error-text"
               data-testid="action-delete"
               ref={deleteRef}
               onClick={() => {

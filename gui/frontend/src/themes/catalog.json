@@ -756,13 +756,10 @@
       }
     },
     "overrides": {
-      "--cf-text-muted": "#6d6d6d",
-      "--cf-surface-sunken": "#f5f5f5",
-      "--cf-control": "#f5f5f5",
-      "--cf-control-hover": "#f5f5f5",
-      "--cf-focus": "#a1a1a1",
+      "--cf-text-muted": "#6a6a6a",
+      "--cf-focus": "#8a8a8a",
       "--cf-input": "#e5e5e5",
-      "--cf-sidebar-row-selected": "#e1e1e1"
+      "--cf-sidebar-row-selected": "#d7d7d7"
     }
   },
   {

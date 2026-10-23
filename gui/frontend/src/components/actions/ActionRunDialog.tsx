@@ -42,7 +42,7 @@ function RunOutput({ runId }: { runId: string }) {
     );
   if (load.phase === "error")
     return (
-      <p className="mt-3 text-body text-cf-error" role="alert">
+      <p className="mt-3 text-body text-cf-error-text" role="alert">
         {load.message}
       </p>
     );
@@ -55,8 +55,8 @@ function RunOutput({ runId }: { runId: string }) {
       {/* One line: only the path gives way, its directory first (a middle ellipsis), so the
           branch folder at its end stays readable. */}
       <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-caption whitespace-nowrap" data-testid="action-run-meta">
-        <CircleX className="size-3.5 shrink-0 text-cf-error" aria-hidden />
-        <span className="shrink-0 text-cf-error">Exited with code {run.exitCode}</span>
+        <CircleX className="size-3.5 shrink-0 text-cf-error-text" aria-hidden />
+        <span className="shrink-0 text-cf-error-text">Exited with code {run.exitCode}</span>
         {took && (
           <span aria-hidden className="shrink-0 opacity-50">
             ·

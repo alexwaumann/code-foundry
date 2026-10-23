@@ -196,3 +196,109 @@ export function scanStylesheet(fileName: string, css: string): ColourHit[] {
   for (const m of src.matchAll(/@apply[^;]*;/g)) hits.push(...colourHits(m[0], (o) => lineAt(m.index + o), lines, ["utility"]));
   return hits.sort((a, b) => a.line - b.line);
 }
+
+// ---------------------------------------------------------------- literals
+
+export interface Literal {
+  /** The literal as written, quotes included (a template's head, middle or tail span). */
+  raw: string;
+  /** Offset of raw in the source. */
+  start: number;
+  /** 1-based line of raw's start. */
+  line: number;
+  /** Whether it names a property (`{ "--card": … }`): a declaration, not a use. */
+  key: boolean;
+  /**
+   * What the literal is the value of, when that names a place a colour goes: the JSX
+   * attribute (`fill` in `fill="white"`), the property (`color` in `{ color: "white" }`) or
+   * the called method (`setProperty`). Undefined elsewhere.
+   */
+  owner?: string;
+}
+
+function ownerOf(node: ts.Node): string | undefined {
+  const p = node.parent;
+  if (ts.isJsxAttribute(p)) return p.name.getText();
+  if (ts.isPropertyAssignment(p) && p.initializer === node) return ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) ? p.name.text : undefined;
+  if (ts.isCallExpression(p) && p.arguments.includes(node as ts.Expression)) {
+    const callee = p.expression;
+    return ts.isPropertyAccessExpression(callee) ? callee.name.text : ts.isIdentifier(callee) ? callee.text : undefined;
+  }
+  return undefined;
+}
+
+/** Every string and template literal in a TS/TSX source (JSX attribute values included), in source order. */
+export function stringLiterals(fileName: string, source: string): Literal[] {
+  const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
+  const out: Literal[] = [];
+  const visit = (node: ts.Node): void => {
+    if (STRING_KINDS.has(node.kind)) {
+      const start = node.getStart(sf);
+      const owner = ownerOf(node);
+      out.push({ raw: source.slice(start, node.end), start, line: sf.getLineAndCharacterOfPosition(start).line + 1, key: ts.isPropertyAssignment(node.parent) && node.parent.name === node, ...(owner ? { owner } : {}) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+// ---------------------------------------------------------------- slot names
+
+/**
+ * The slot-name guard (docs/notes/theme-slots-3-hardening.md): a `cf-*` colour utility
+ * (`bg-cf-surface-raised`, `hover:text-cf-warning-text/80`) must name a slot, and a
+ * `var(--cf-*)` a slot or a custom property a stylesheet under src declares (`--cf-zoom`,
+ * Ember's `--cf-flame-*`). A misspelt or retired slot (`text-cf-sucess`,
+ * `bg-cf-sidebar-row-active`) resolves to nothing and paints the inherited colour.
+ */
+export const SLOT_REF_PATTERNS = {
+  utility: new RegExp(String.raw`(?<![\w-])${COLOUR_PROPS}-(cf-[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w-])`, "g"),
+  variable: /var\(\s*(--cf-[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w-])/g,
+} as const;
+
+export interface SlotRefHit {
+  kind: keyof typeof SLOT_REF_PATTERNS;
+  /** The name it reads, `--cf-…`. */
+  name: string;
+  match: string;
+  line: number;
+  text: string;
+}
+
+/** The `--cf-*` custom properties a stylesheet declares (`--cf-zoom: 1`), outside comments. */
+export function declaredCfProperties(css: string): string[] {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...src.matchAll(/(?<![\w-])(--cf-[a-z0-9]+(?:-[a-z0-9]+)*)\s*:/g)].map((m) => m[1] ?? "");
+}
+
+function slotRefs(raw: string, lineAt: (offset: number) => number, lines: readonly string[], known: (name: string, kind: SlotRefHit["kind"]) => boolean): SlotRefHit[] {
+  const hits: SlotRefHit[] = [];
+  for (const kind of ["utility", "variable"] as const) {
+    for (const m of raw.matchAll(SLOT_REF_PATTERNS[kind])) {
+      const name = kind === "utility" ? `--${m[1] ?? ""}` : (m[1] ?? "");
+      if (known(name, kind)) continue;
+      const line = lineAt(m.index);
+      hits.push({ kind, name, match: m[0], line: line + 1, text: (lines[line] ?? "").trim() });
+    }
+  }
+  return hits;
+}
+
+/**
+ * Every `cf-*` utility and `var(--cf-*)` in a source's literals (or, for a `.css` file, the
+ * whole stylesheet outside comments) that names no slot. `known` says whether a name is a
+ * slot (utilities) or a slot or a declared property (var()).
+ */
+export function scanSlotRefs(fileName: string, source: string, known: (name: string, kind: SlotRefHit["kind"]) => boolean): SlotRefHit[] {
+  const lines = source.split("\n");
+  if (fileName.endsWith(".css")) {
+    const src = source.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+    return slotRefs(src, (o) => src.slice(0, o).split("\n").length - 1, lines, known).sort((a, b) => a.line - b.line);
+  }
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  return stringLiterals(fileName, source)
+    .flatMap((l) => slotRefs(l.raw, (o) => sf.getLineAndCharacterOfPosition(l.start + o).line, lines, known))
+    .sort((a, b) => a.line - b.line);
+}

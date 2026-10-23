@@ -39,7 +39,7 @@ export function ConfirmSkillDialog({ action, row, onClose }: { action: ConfirmAc
             autoFocus
             className={cn(
               "bg-transparent dark:bg-transparent",
-              destructive && "border-cf-error/40 text-cf-error hover:bg-cf-error-surface hover:text-cf-error dark:border-cf-error/40",
+              destructive && "border-cf-error/40 text-cf-error-text hover:bg-cf-error-surface hover:text-cf-error-text dark:border-cf-error/40",
             )}
             onClick={() => {
               onClose();

@@ -143,7 +143,7 @@ function SnoozeBody({ threadId }: { threadId: string }) {
             data-testid="snooze-time"
           />
         </div>
-        <span className={cn("shrink-0 text-caption tabular-nums", untilMs !== null && !ready ? "text-cf-error" : "text-cf-text-muted")} data-testid="snooze-summary">
+        <span className={cn("shrink-0 text-caption tabular-nums", untilMs !== null && !ready ? "text-cf-error-text" : "text-cf-text-muted")} data-testid="snooze-summary">
           {untilMs !== null && !ready ? "In the past" : formatDay(day, now)}
         </span>
       </div>

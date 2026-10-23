@@ -35,9 +35,9 @@ export function ActionTabStatusMark({ id }: { id: string }) {
   const status = useTabStatus(id);
   if (status === "stopping") return <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-text-muted" aria-label="Stopping" data-status="stopping" data-testid="action-tab-status" />;
   if (status === "stopped") return <CircleStop className="size-3 shrink-0 text-cf-text-muted" aria-label="Stopped" data-status="stopped" data-testid="action-tab-status" />;
-  if (status === "running") return <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-info" aria-label="Running" data-status="running" data-testid="action-tab-status" />;
-  if (status === "ok") return <CircleCheck className="size-3 shrink-0 text-cf-success" aria-label="Exited with code 0" data-status="ok" data-testid="action-tab-status" />;
-  return <CircleX className="size-3 shrink-0 text-cf-error" aria-label="Failed" data-status="failed" data-testid="action-tab-status" />;
+  if (status === "running") return <LoaderCircle className="size-3 shrink-0 animate-spin text-cf-info-text" aria-label="Running" data-status="running" data-testid="action-tab-status" />;
+  if (status === "ok") return <CircleCheck className="size-3 shrink-0 text-cf-success-text" aria-label="Exited with code 0" data-status="ok" data-testid="action-tab-status" />;
+  return <CircleX className="size-3 shrink-0 text-cf-error-text" aria-label="Failed" data-status="failed" data-testid="action-tab-status" />;
 }
 
 /** The run's command line (the run's, else the terminal's argv), as a primitive. */
@@ -112,7 +112,7 @@ export function ActionStatusLine({ id }: { id: string }) {
     >
       {status === "running" || status === "stopping" ? (
         <>
-          <LoaderCircle className={cn("size-3.5 animate-spin", status === "running" ? "text-cf-info" : "text-cf-text-muted")} aria-hidden />
+          <LoaderCircle className={cn("size-3.5 animate-spin", status === "running" ? "text-cf-info-text" : "text-cf-text-muted")} aria-hidden />
           <span className="text-cf-text" data-testid="action-status-label">
             {status === "running" ? "Running" : "Stopping…"}
           </span>
@@ -137,13 +137,13 @@ export function ActionStatusLine({ id }: { id: string }) {
       ) : (
         <>
           {failed ? (
-            <CircleX className="size-3.5 text-cf-error" aria-hidden />
+            <CircleX className="size-3.5 text-cf-error-text" aria-hidden />
           ) : status === "stopped" ? (
             <CircleStop className="size-3.5" aria-hidden />
           ) : (
-            <CircleCheck className="size-3.5 text-cf-success" aria-hidden />
+            <CircleCheck className="size-3.5 text-cf-success-text" aria-hidden />
           )}
-          <span className={failed ? "text-cf-error" : "text-cf-text"} data-testid="action-status-label">
+          <span className={failed ? "text-cf-error-text" : "text-cf-text"} data-testid="action-status-label">
             {status === "stopped" ? "Stopped" : `Exited with code ${String(exitCode)}`}
           </span>
           {started !== null && finished !== null && (

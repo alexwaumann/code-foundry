@@ -1,4 +1,7 @@
 import { useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import { isOutdatedDaemon } from "@/api/errors";
+import { errorMessage, isUnreachable } from "@/api/stream";
 import { publishTheme, type PublishedTheme } from "@/api/ui";
 import { useHealthStore } from "@/stores/health";
 import { DEFAULT_DARK, DEFAULT_LIGHT, subscribeUserThemes, themeById, type Theme } from "@/themes";
@@ -284,10 +287,27 @@ function onDaemonConnect(cb: () => void): () => void {
  * Keeps the daemon's copy of the theme current (UiService.PublishTheme): on start, on
  * every (re)connect and after every change of the active theme, debounced so a burst (the
  * Themes page's arrow keys) sends once. With several windows the last writer wins: the
- * theme is one per user. A failure is dropped: the next connect publishes again, and a
- * daemon older than the RPC serves the default theme.
+ * theme is one per user. Every failure is logged; the next connect publishes again. A
+ * refusal (the daemon's InvalidArgument: a theme it cannot serve) is also a toast, once
+ * per run (reportPublishFailure); an unreachable daemon or one older than the RPC is not,
+ * since it serves its last theme or the defaults and the reconnect retries.
  */
 const publishedListeners = new Set<() => void>();
+
+let publishFailureShown = false;
+
+/** Logs a failed publish and, the first time one is refused this run, says so in a toast. */
+export function reportPublishFailure(err: unknown): void {
+  console.warn("theme publish", err);
+  if (publishFailureShown || isUnreachable(err) || isOutdatedDaemon(err)) return;
+  publishFailureShown = true;
+  toast.error("Theme could not be published to pages", { description: `${errorMessage(err)}. Pages keep the last theme the daemon had.` });
+}
+
+/** Lets the next refusal toast again (tests). */
+export function resetPublishFailureForTest(): void {
+  publishFailureShown = false;
+}
 
 /**
  * Calls `cb` each time the daemon has the theme (a PublishTheme answered), so
@@ -309,8 +329,9 @@ export function startThemePublish(publish: (t: PublishedTheme) => Promise<void> 
       () => {
         for (const cb of [...publishedListeners]) cb();
       },
-      () => {
-        // Retried on the next connect (onConnect); an older daemon has nothing to serve it from.
+      (err: unknown) => {
+        // Retried on the next connect (onConnect).
+        reportPublishFailure(err);
       },
     );
   };

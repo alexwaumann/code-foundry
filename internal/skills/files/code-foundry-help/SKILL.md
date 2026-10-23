@@ -89,7 +89,7 @@ checklist you make (asked "as a page", or one they can fill in) is an `.html` fi
 folder): show it inline with `code-foundry view.inline <path>`
 (`--panel` also opens it beside the thread). Have it link
 `<link rel="stylesheet" href="/cf/theme.css">` and paint with its `--cf-*` variables
-(the code-foundry skill names them; also status triples, sidebar, diff, charts) or the
+(the code-foundry skill names them; every slot and what it paints: reference/themes.md) or the
 type-role classes (`text-title`, `text-body`…), never fixed colours or
 `prefers-color-scheme`. To follow a theme switch live, set each var of the
 message `{type: "cf:theme", id, scheme, vars}` on `<html>`, then reply
