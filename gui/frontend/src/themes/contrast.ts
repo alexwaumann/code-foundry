@@ -101,14 +101,28 @@ export function pinBasis(theme: EditableTheme): Record<string, string> {
   return Object.fromEntries(Object.keys(theme.overrides ?? {}).map((slot) => [slot, derivedValue(theme, slot)]));
 }
 
+/** What Fix does for a failing slot (fixContrast). */
+export type ContrastFix =
+  | { readonly kind: "unpin" }
+  | { readonly kind: "pin"; readonly value: string }
+  /**
+   * Nothing, and the slot is left alone: no lightness of its colour holds every pair it is
+   * drawn in (`unreachable`; the first failing pair is on `against`, which needs
+   * `required`), or the one that does leaves more pairs failing in the theme than before
+   * (`worse`: the slots derived from it fall with it).
+   */
+  | { readonly kind: "none"; readonly reason: "unreachable" | "worse"; readonly against: string; readonly required: number };
+
 /**
  * The save modal's Fix for a slot with a failing pair: if the slot is pinned and its
  * derived value passes every pair it is drawn in, the pin goes (`unpin`); otherwise the
  * guard step the rules use runs on its current value (lightness stepped away from the
- * failing pair's background, hue and chroma kept, until every pair it is drawn in holds)
- * and the result is pinned (`pin`). null when the slot fails no pair.
+ * failing pair's background, hue and chroma kept, until every pair it is drawn in holds,
+ * then the other way if that runs out) and the result is pinned (`pin`). It never pins a
+ * value that still fails, or one that leaves the theme with as many failing pairs as before
+ * or more (`none`). null when the slot fails no pair.
  */
-export function fixContrast(theme: EditableTheme, slot: string): { readonly kind: "unpin" } | { readonly kind: "pin"; readonly value: string } | null {
+export function fixContrast(theme: EditableTheme, slot: string): ContrastFix | null {
   const pairs = CONTRAST_PAIRS.filter((p) => p.fg === slot);
   const slots = resolveSlots(theme);
   const failing = pairs.find((p) => pairRatio(slots, p) < p.min);
@@ -133,6 +147,11 @@ export function fixContrast(theme: EditableTheme, slot: string): { readonly kind
   };
   let value = step(away);
   if (!passes(value)) value = step(-away);
+  const none = (reason: "unreachable" | "worse"): ContrastFix => ({ kind: "none", reason, against: failing.bg, required: failing.min });
+  if (!passes(value)) return none("unreachable");
   if (alpha < 1) value += Math.round(alpha * 255).toString(16).padStart(2, "0");
+  // A pin feeds the rules after it (text-muted derives from text): count the whole theme.
+  const after = contrastFailures(resolveSlots({ ...theme, overrides: { ...theme.overrides, [slot]: value } })).length;
+  if (after >= contrastFailures(slots).length) return none("worse");
   return { kind: "pin", value };
 }

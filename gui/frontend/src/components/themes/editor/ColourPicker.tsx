@@ -3,10 +3,8 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { alphaOf, fromOklch, oklchRgb, parseHex, toHex, toOklch } from "@/themes/color";
+import { C_MAX, maxChroma, parseHexInput } from "./model";
 import { CHECKER } from "./Swatch";
-
-/** The plane's chroma axis: 0 to about the most any sRGB colour reaches. */
-const C_MAX = 0.37;
 /** The plane and the strips are drawn at this many pixels and stretched (they are smooth). */
 const PLANE_W = 180;
 const PLANE_H = 90;
@@ -53,7 +51,8 @@ function paint(canvas: HTMLCanvasElement | null, w: number, h: number, px: (x: n
  * the plane (Shift: ten times); Escape calls onEscape. Every change calls onChange with
  * the new hex; the hue survives a grey (chroma 0) because it is kept here.
  */
-export function ColourPicker({ value, onChange, onEscape, label, tint }: { value: string; onChange: (hex: string) => void; onEscape?: () => void; label: string; tint?: boolean }) {
+export function ColourPicker({ value, onChange, onEscape, label, tint, autoFocus }: { value: string; onChange: (hex: string) => void; onEscape?: () => void; label: string; tint?: boolean; autoFocus?: boolean }) {
+  const [hexInvalid, setHexInvalid] = useState(false);
   const [lch, setLch] = useState<Lch>(() => {
     const [l, c, h] = toOklch(value);
     return { l, c, h };
@@ -68,7 +67,9 @@ export function ColourPicker({ value, onChange, onEscape, label, tint }: { value
     setLch((cur) => ({ l, c, h: c < 0.002 ? cur.h : h }));
   }, [value]);
 
-  const emit = (next: Lch, a = alpha) => {
+  // Chroma is held to what sRGB has at this lightness and hue, so the fields say what the hex is.
+  const emit = (want: Lch, a = alpha) => {
+    const next = { ...want, c: Math.min(want.c, maxChroma(want.l, want.h)) };
     setLch(next);
     const hex = hexOf(next, a);
     emitted.current = hex;
@@ -154,12 +155,17 @@ export function ColourPicker({ value, onChange, onEscape, label, tint }: { value
         </Strip>
       )}
       <div className="flex gap-1.5">
-        <HexField value={value} tint={tint} onCommit={onChange} onNudge={(d) => { emit({ ...lch, l: clamp(lch.l + d, 0, 1) }); }} onEscape={onEscape} label={label} />
+        <HexField value={value} tint={tint} autoFocus={autoFocus} onInvalid={setHexInvalid} onCommit={onChange} onNudge={(d) => { emit({ ...lch, l: clamp(lch.l + d, 0, 1) }); }} onEscape={onEscape} label={label} />
         <NumField label="L" name={`${label} lightness`} value={lch.l * 100} digits={0} step={1} min={0} max={100} onCommit={(v) => { emit({ ...lch, l: v / 100 }); }} onEscape={onEscape} />
         <NumField label="C" name={`${label} chroma`} value={lch.c} digits={3} step={0.005} min={0} max={C_MAX} onCommit={(v) => { emit({ ...lch, c: v }); }} onEscape={onEscape} />
-        <NumField label="H" name={`${label} hue`} value={lch.h} digits={0} step={1} min={0} max={360} onCommit={(v) => { emit({ ...lch, h: v }); }} onEscape={onEscape} />
+        <NumField label="H" name={`${label} hue`} value={lch.h} digits={0} step={1} min={0} max={360} wrap onCommit={(v) => { emit({ ...lch, h: v }); }} onEscape={onEscape} />
         {tint && <NumField label="A" name={`${label} alpha`} value={alpha * 100} digits={0} step={1} min={0} max={100} onCommit={(v) => { emit(lch, v / 100); }} onEscape={onEscape} />}
       </div>
+      {hexInvalid && (
+        <p className="text-caption-sm text-cf-error-text" role="alert" data-testid="colour-hex-invalid">
+          Use #rrggbb{tint ? " or #rrggbbaa" : ""} (or #rgb).
+        </p>
+      )}
     </div>
   );
 }
@@ -211,49 +217,72 @@ function nudge(e: ReactKeyboardEvent<HTMLInputElement>, step: number, apply: (d:
   return false;
 }
 
-/** The hex field: commits on Enter or blur when it is #rrggbb (or #rrggbbaa for a tint); arrows nudge the lightness. */
-function HexField({ value, tint, onCommit, onNudge, onEscape, label }: { value: string; tint?: boolean; onCommit: (hex: string) => void; onNudge: (d: number) => void; onEscape?: () => void; label: string }) {
+/**
+ * The hex field: commits on Enter or blur (parseHexInput); arrows nudge the lightness. A
+ * value it cannot take is marked on Enter (and the picker says what it takes); an empty
+ * one, or a bad one on blur, goes back to the colour.
+ */
+function HexField({ value, tint, autoFocus, onCommit, onInvalid, onNudge, onEscape, label }: { value: string; tint?: boolean; autoFocus?: boolean; onCommit: (hex: string) => void; onInvalid: (bad: boolean) => void; onNudge: (d: number) => void; onEscape?: () => void; label: string }) {
   // What is being typed; null shows the value.
   const [text, setText] = useState<string | null>(null);
-  const commit = () => {
+  const [bad, setBad] = useState(false);
+  const mark = (b: boolean) => {
+    setBad(b);
+    onInvalid(b);
+  };
+  const commit = (leaving: boolean) => {
     if (text === null) return;
-    const t = text.trim().toLowerCase();
-    const hex = t.startsWith("#") ? t : `#${t}`;
+    const hex = parseHexInput(text, tint);
+    if (hex === null && !leaving && text.trim()) {
+      mark(true);
+      return;
+    }
     setText(null);
-    if ((/^#[0-9a-f]{6}$/.test(hex) || (tint && /^#[0-9a-f]{8}$/.test(hex))) && hex !== value) onCommit(hex);
+    mark(false);
+    if (hex !== null && hex !== value) onCommit(hex);
   };
   return (
     <Input
       aria-label={`${label} hex`}
+      aria-invalid={bad || undefined}
       value={text ?? value}
       spellCheck={false}
+      autoFocus={autoFocus}
       className={cn(fieldClass, "w-24 shrink-0")}
-      onBlur={commit}
+      onBlur={() => {
+        commit(true);
+      }}
       onChange={(e) => {
         setText(e.target.value);
+        if (bad) mark(false);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          commit();
+          commit(false);
           return;
         }
-        if (nudge(e, 0.01, onNudge, onEscape)) setText(null);
+        if (nudge(e, 0.01, onNudge, onEscape)) {
+          setText(null);
+          mark(false);
+        }
       }}
       data-testid="colour-hex"
     />
   );
 }
 
-/** A number field (L, C, H, A): commits on Enter or blur, clamped; arrows step it at once. */
-function NumField({ label, name, value, digits, step, min, max, onCommit, onEscape }: { label: string; name: string; value: number; digits: number; step: number; min: number; max: number; onCommit: (v: number) => void; onEscape?: () => void }) {
+/** A number field (L, C, H, A): commits on Enter or blur, clamped (the hue wraps); an empty one goes back; arrows step it at once. */
+function NumField({ label, name, value, digits, step, min, max, wrap, onCommit, onEscape }: { label: string; name: string; value: number; digits: number; step: number; min: number; max: number; wrap?: boolean; onCommit: (v: number) => void; onEscape?: () => void }) {
   const shown = digits === 0 ? String(Math.round(value)) : value.toFixed(digits).replace(/^0\./, ".");
   const [text, setText] = useState<string | null>(null);
+  const fit = (v: number) => (wrap ? ((v % max) + max) % max : clamp(v, min, max));
   const commit = () => {
     if (text === null) return;
-    const v = Number(text);
+    // Number("") is 0: an emptied field would turn the colour black.
+    const v = text.trim() ? Number(text) : NaN;
     setText(null);
-    if (Number.isFinite(v)) onCommit(clamp(v, min, max));
+    if (Number.isFinite(v)) onCommit(fit(v));
   };
   return (
     <label className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-cf-input px-1.5 focus-within:border-cf-focus">
@@ -275,7 +304,7 @@ function NumField({ label, name, value, digits, step, min, max, onCommit, onEsca
             commit();
             return;
           }
-          if (nudge(e, step, (d) => { onCommit(clamp(value + d, min, max)); }, onEscape)) setText(null);
+          if (nudge(e, step, (d) => { onCommit(fit(value + d)); }, onEscape)) setText(null);
         }}
       />
     </label>

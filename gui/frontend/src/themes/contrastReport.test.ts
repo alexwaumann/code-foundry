@@ -97,6 +97,27 @@ describe("fixContrast", () => {
   it("is null for a slot that fails nothing", () => {
     expect(fixContrast(base, "--cf-text")).toBeNull();
   });
+
+  // A mid-grey surface (still dark): no text colour reaches 7:1 on it.
+  const grey: EditableTheme = { ...base, base: { ...base.base, surface: "#6b6b6b" } };
+
+  it("leaves a slot alone when no lightness of it holds, and says on what", () => {
+    const fix = fixContrast(grey, "--cf-text");
+    expect(fix).toEqual({ kind: "none", reason: "unreachable", against: "--cf-surface", required: 7 });
+  });
+
+  it("never pins a value that still fails, or one that leaves more pairs failing (pressing Fix again does not undo it)", () => {
+    const before = contrastReport(grey);
+    for (const slot of new Set(before.map((r) => r.slot))) {
+      const fix = fixContrast(grey, slot);
+      if (fix?.kind !== "pin") continue;
+      const fixed = { ...grey, overrides: { ...grey.overrides, [slot]: fix.value } };
+      const after = contrastReport(fixed);
+      expect(after.filter((r) => r.slot === slot), slot).toEqual([]);
+      expect(after.length, slot).toBeLessThan(before.length);
+      expect(fixContrast(fixed, slot), slot).toBeNull();
+    }
+  });
 });
 
 describe("SLOT_USES", () => {

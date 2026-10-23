@@ -11,11 +11,15 @@
  */
 import { toast } from "sonner";
 import { create } from "zustand";
+import { invokeCommand } from "@/api/command";
+import { themeSlots } from "@/lib/theme";
+import { lightness } from "@/themes/color";
 import { contrastReport, derivedValue, fixContrast, pinBasis, staleOverrides, withoutPin, type ContrastEntry, type StalePin } from "@/themes/contrast";
-import { SLOT_GROUPS, themeFileJson, type SlotGroup, type ThemeBase } from "@/themes/slots";
-import { themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
+import { parseThemeFile, SCHEME_LIGHTNESS, schemeProblem, SLOT_GROUPS, themeFileJson, type SlotGroup, type ThemeBase, type ThemeScheme } from "@/themes/slots";
+import { subscribeUserThemes, themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
 import { runCommandForResult } from "./commands";
 import { requestConfirm } from "./confirm";
+import { getUiContext } from "./context";
 
 /** A base colour: the nine, the optional link, and the terminal's (`terminal.ansi.<n>` for ANSI n). */
 export type BaseKey =
@@ -106,11 +110,19 @@ interface ThemeEditorState {
   open: Readonly<Record<string, boolean>>;
   saveOpen: boolean;
   saving: boolean;
+  /**
+   * A newer file of this theme (a thread's save, the CLI, another window) that arrived
+   * while the draft had unsaved edits: the inspector's "Changed on disk" line, until
+   * Reload or Keep mine. A clean editor reloads by itself (syncFromDisk).
+   */
+  disk: UserThemeFile | null;
+  /** The copy Customise just made, never saved: leaving the editor deletes it (discardCopy). */
+  fresh: boolean;
 }
 
 const OPEN_GROUPS = (): Record<string, boolean> => Object.fromEntries(SLOT_GROUPS.map((g) => [g, g !== "terminal" && g !== "syntax"]));
 
-const closed = (): ThemeEditorState => ({ id: null, saved: null, draft: null, basis: {}, view: { kind: "list" }, filter: "", pinnedOnly: false, open: OPEN_GROUPS(), saveOpen: false, saving: false });
+const closed = (): ThemeEditorState => ({ id: null, saved: null, draft: null, basis: {}, view: { kind: "list" }, filter: "", pinnedOnly: false, open: OPEN_GROUPS(), saveOpen: false, saving: false, disk: null, fresh: false });
 
 export const useThemeEditorStore = create<ThemeEditorState>()(closed);
 
@@ -130,21 +142,90 @@ function fileOf(t: Theme): UserThemeFile {
   };
 }
 
+/** Copies Customise has made and is about to open (markFreshCopy); startEditing takes the mark. */
+const freshCopies = new Set<string>();
+
+/** Customise: the copy `id` is about to open in this window's editor; leaving it unsaved deletes it. */
+export function markFreshCopy(id: string): void {
+  freshCopies.add(id);
+}
+
+let unsubDisk: (() => void) | null = null;
+
 /** Starts editing one of the user's themes (theme.edit's view). False for an unknown or curated id. */
 export function startEditing(id: string): boolean {
   const t = themeById.get(id);
   if (!t?.user) return false;
   const file = fileOf(t);
-  useThemeEditorStore.setState({ ...closed(), id, saved: file, draft: file, basis: pinBasis(file) });
+  const fresh = freshCopies.delete(id);
+  useThemeEditorStore.setState({ ...closed(), id, saved: file, draft: file, basis: pinBasis(file), fresh });
+  // Later saves of the file (a thread, the CLI, another window) reach the open editor.
+  unsubDisk?.();
+  unsubDisk = subscribeUserThemes(syncFromDisk);
   return true;
 }
 
-/** Ends edit mode, dropping the draft. */
-export function stopEditing(): void {
-  if (useThemeEditorStore.getState().id !== null) useThemeEditorStore.setState(closed());
+/**
+ * Ends edit mode, dropping the draft. A copy Customise made that was never saved is
+ * deleted (`keepCopy`: it is already gone, or the caller deletes it).
+ */
+export function stopEditing(opts: { keepCopy?: boolean } = {}): void {
+  const s = useThemeEditorStore.getState();
+  if (s.id === null) return;
+  unsubDisk?.();
+  unsubDisk = null;
+  useThemeEditorStore.setState(closed());
+  if (s.fresh && !opts.keepCopy) void discardCopy(s.id);
+}
+
+/**
+ * Deletes an unsaved Customise copy as the editor closes on it, without asking (the user
+ * never saved it). Kept when a slot uses it by now, or when it is gone already.
+ */
+async function discardCopy(id: string): Promise<void> {
+  const slots = themeSlots();
+  if (slots.dark === id || slots.light === id || !themeById.get(id)?.user) return;
+  try {
+    await invokeCommand("theme.delete", getUiContext(), { theme: id }, undefined, { confirmed: true });
+  } catch (err) {
+    console.warn(`theme editor: the unsaved copy ${id} was not deleted`, err);
+  }
 }
 
 const fileKey = (f: UserThemeFile | null) => (f ? JSON.stringify(themeFileJson(f)) : "");
+
+/**
+ * The open theme's file changed in the user's themes (an event): the same as the draft, it
+ * is now the saved file; a clean editor reloads it (saved and draft, the pins' basis
+ * taken again); with unsaved edits it waits in `disk` for Reload or Keep mine. A file
+ * that went away leaves the editor on its draft (Save writes it again).
+ */
+export function syncFromDisk(): void {
+  const s = useThemeEditorStore.getState();
+  if (s.id === null) return;
+  const t = themeById.get(s.id);
+  if (!t?.user) return;
+  const file = fileOf(t);
+  const key = fileKey(file);
+  if (key === fileKey(s.saved)) {
+    if (s.disk) useThemeEditorStore.setState({ disk: null });
+    return;
+  }
+  // Someone else wrote it (or this window's Save landed): a copy that has a file of its own now.
+  if (key === fileKey(s.draft)) useThemeEditorStore.setState({ saved: file, disk: null, fresh: false });
+  else if (!editorDirty(s)) useThemeEditorStore.setState({ saved: file, draft: file, basis: pinBasis(file), disk: null, fresh: false });
+  else useThemeEditorStore.setState({ disk: file, fresh: false });
+}
+
+/** "Changed on disk · Reload": the newer file replaces the draft. */
+export function reloadFromDisk(): void {
+  useThemeEditorStore.setState((s) => (s.disk ? { saved: s.disk, draft: s.disk, basis: pinBasis(s.disk), disk: null } : s));
+}
+
+/** "Changed on disk · Keep mine": the draft stays (Save overwrites the newer file); Revert goes back to the newer file. */
+export function keepMine(): void {
+  useThemeEditorStore.setState((s) => (s.disk ? { saved: s.disk, disk: null } : s));
+}
 
 /** The draft differs from the saved file. */
 export function editorDirty(s: Pick<ThemeEditorState, "draft" | "saved"> = useThemeEditorStore.getState()): boolean {
@@ -153,28 +234,29 @@ export function editorDirty(s: Pick<ThemeEditorState, "draft" | "saved"> = useTh
 
 /**
  * Leaves edit mode: at once when nothing changed, else after the confirm dialog. Resolves
- * whether the editor is closed now.
+ * whether the editor is closed now. `why` replaces the question's second sentence.
  */
-export async function leaveEditor(): Promise<boolean> {
+export async function leaveEditor(why = "Leave the editor and drop them?"): Promise<boolean> {
   const s = useThemeEditorStore.getState();
   if (s.id === null) return true;
   if (editorDirty(s)) {
     const name = s.draft?.name ?? s.id;
-    const yes = await requestConfirm({ title: "Discard changes?", message: `${name} has changes that are not saved. Leave the editor and drop them?`, confirmLabel: "Discard" });
+    const yes = await requestConfirm({ title: "Discard changes?", message: `${name} has changes that are not saved. ${why}`, confirmLabel: "Discard" });
     if (!yes) return false;
   }
   stopEditing();
   return true;
 }
 
-/** Runs next once the editor is closed (asking first when it has changes); nothing when the user stays. */
-export function afterLeavingEditor(next: () => void): void {
+/** Runs next once the editor is closed (asking first when it has changes); stay when the user stays. */
+export function afterLeavingEditor(next: () => void, stay?: () => void): void {
   if (useThemeEditorStore.getState().id === null) {
     next();
     return;
   }
   void leaveEditor().then((ok) => {
     if (ok) next();
+    else stay?.();
   });
 }
 
@@ -224,19 +306,21 @@ export function resetSlotToDerived(name: string): void {
   );
 }
 
-/** The save modal's Fix for a failing slot (fixContrast): unpins it, or pins the stepped value. */
+/** The save modal's Fix for a failing slot (fixContrast): unpins it, or pins the stepped value; a slot no value mends is left alone. */
 export function fixSlotContrast(name: string): void {
   const d = useThemeEditorStore.getState().draft;
   if (!d) return;
   const fix = fixContrast(d, name);
-  if (!fix) return;
-  if (fix.kind === "unpin") unpinSlot(name);
-  else pinSlot(name, fix.value);
+  if (fix?.kind === "unpin") unpinSlot(name);
+  else if (fix?.kind === "pin") pinSlot(name, fix.value);
 }
 
-/** Revert: back to the saved file. */
+/** Revert: back to the saved file (or to the newer one on disk, when one is waiting). */
 export function revertEdits(): void {
-  useThemeEditorStore.setState((s) => (s.saved ? { draft: s.saved, basis: pinBasis(s.saved), view: { kind: "list" } } : s));
+  useThemeEditorStore.setState((s) => {
+    const to = s.disk ?? s.saved;
+    return to ? { saved: to, draft: to, basis: pinBasis(to), disk: null, view: { kind: "list" } } : s;
+  });
 }
 
 export function showEditorView(view: EditorView): void {
@@ -281,7 +365,7 @@ export async function saveEdits(opts: { name: string; apply: boolean }): Promise
   const file: UserThemeFile = { ...s.draft, name };
   useThemeEditorStore.setState({ saving: true });
   const res = await runCommandForResult("theme.save", { data: JSON.stringify(themeFileJson(file)), ...(opts.apply ? { apply: "true" } : {}) }, { quiet: true });
-  useThemeEditorStore.setState((cur) => (res && cur.id === file.id ? { saving: false, saveOpen: false, saved: file, draft: file } : { saving: false }));
+  useThemeEditorStore.setState((cur) => (res && cur.id === file.id ? { saving: false, saveOpen: false, saved: file, draft: file, disk: null, fresh: false } : { saving: false }));
   if (res) toast.success(opts.apply ? `Saved ${name} and made it your ${file.scheme} theme` : `Saved ${name}`);
   return res !== null;
 }
@@ -298,6 +382,40 @@ export interface EditorAnalysis {
   readonly stale: readonly StalePin[];
   readonly staleBySlot: ReadonlyMap<string, StalePin>;
   readonly pinned: number;
+  /** Why the daemon would refuse the draft (draftRefusal), or null: Save is held while it stands. */
+  readonly refusal: Refusal | null;
+}
+
+/** A rule of the file format the draft breaks; `scheme` is its surface against its scheme. */
+export interface Refusal {
+  readonly kind: "scheme" | "file";
+  readonly message: string;
+}
+
+/** The editor's words for a surface its scheme cannot carry (the rule is schemeProblem's; the editor has no scheme control). */
+export function schemeRefusal(scheme: ThemeScheme, surface: string): string | null {
+  if (!schemeProblem(scheme, surface)) return null;
+  const L = lightness(surface).toFixed(2);
+  return scheme === "dark"
+    ? `A dark theme needs a dark surface (OKLab lightness at most ${String(SCHEME_LIGHTNESS.darkMax)}); ${surface} is ${L}. Darken the surface to save.`
+    : `A light theme needs a light surface (OKLab lightness at least ${String(SCHEME_LIGHTNESS.lightMin)}); ${surface} is ${L}. Lighten the surface to save.`;
+}
+
+/**
+ * What theme.save would refuse in the draft (with `name` for the one being typed): the
+ * file rules the daemon runs (parseThemeFile in user mode is the GUI's copy of them), so
+ * the editor says it first. null when the file reads.
+ */
+export function draftRefusal(draft: UserThemeFile, name = draft.name): Refusal | null {
+  try {
+    parseThemeFile(themeFileJson({ ...draft, name }), { user: true });
+    return null;
+  } catch (err) {
+    const scheme = schemeRefusal(draft.scheme, draft.base.surface);
+    if (scheme) return { kind: "scheme", message: scheme };
+    const message = err instanceof Error ? err.message : String(err);
+    return { kind: "file", message: message.startsWith(`${draft.id}: `) ? message.slice(draft.id.length + 2) : message };
+  }
 }
 
 let memo: { draft: UserThemeFile; basis: Readonly<Record<string, string>>; analysis: EditorAnalysis } | null = null;
@@ -311,7 +429,7 @@ export function analyse(draft: UserThemeFile, basis: Readonly<Record<string, str
   const failing = new Map<string, ContrastEntry[]>();
   for (const r of report) failing.set(r.slot, [...(failing.get(r.slot) ?? []), r]);
   const stale = staleOverrides(draft, basis);
-  const analysis: EditorAnalysis = { theme, slots, report, failing, stale, staleBySlot: new Map(stale.map((p) => [p.slot, p])), pinned: Object.keys(draft.overrides ?? {}).length };
+  const analysis: EditorAnalysis = { theme, slots, report, failing, stale, staleBySlot: new Map(stale.map((p) => [p.slot, p])), pinned: Object.keys(draft.overrides ?? {}).length, refusal: draftRefusal(draft) };
   memo = { draft, basis, analysis };
   return analysis;
 }

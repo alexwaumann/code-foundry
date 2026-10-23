@@ -11,7 +11,7 @@ import { create } from "zustand";
 import { effectiveScheme, themeSlots, type ColorScheme, type ThemePreference } from "@/lib/theme";
 import { subscribeUserThemes, themeById, themesFor } from "@/themes";
 import { runCommandForResult } from "./commands";
-import { leaveEditor, stopEditing, useThemeEditorStore } from "./themeEditor";
+import { leaveEditor, markFreshCopy, stopEditing, useThemeEditorStore } from "./themeEditor";
 
 export type ThemeSlot = ColorScheme;
 
@@ -69,7 +69,8 @@ export function resetPreview(): void {
 
 /** The theme the gallery shows: the preview, else the slot's applied theme. */
 export function previewedId(s: Pick<ThemePickerState, "slot" | "preview">, slots: { light: string; dark: string }): string {
-  return s.preview ?? slots[s.slot];
+  // A previewed theme that went away (deleted, or an unsaved Customise copy dropped) shows the slot again.
+  return s.preview !== null && themeById.has(s.preview) ? s.preview : slots[s.slot];
 }
 
 /** The control bar's line on what the scheme does now. */
@@ -161,21 +162,33 @@ function copiedId(resultJson: string): string | null {
   }
 }
 
+/** A Customise is being made (customiseTheme). */
+let customising = false;
+
 /**
  * Customise: copies the theme into the user's own (theme.duplicate: "<id>-copy", from the
  * original), previews the copy and opens the editor on it (theme.edit). Applying it is
  * Save's "Use as my … theme now", or the usual Apply once the editor is closed.
  */
 export async function customiseTheme(id: string): Promise<string | null> {
-  if (!(await leaveEditor())) return null;
-  const res = await runCommandForResult("theme.duplicate", { theme: id }, { quiet: true });
-  const copy = res ? copiedId(res.resultJson) : null;
-  if (!copy) return null;
-  if (!(await whenTheme(copy))) return null;
-  useThemePickerStore.setState({ query: "" });
-  previewTheme(copy);
-  await editTheme(copy);
-  return copy;
+  // One copy per gesture: a second click (a double-click) while one is being made does nothing.
+  if (customising) return null;
+  customising = true;
+  try {
+    if (!(await leaveEditor())) return null;
+    const res = await runCommandForResult("theme.duplicate", { theme: id }, { quiet: true });
+    const copy = res ? copiedId(res.resultJson) : null;
+    if (!copy) return null;
+    if (!(await whenTheme(copy))) return null;
+    useThemePickerStore.setState({ query: "" });
+    previewTheme(copy);
+    // Closed without a save, the copy goes again (stopEditing).
+    markFreshCopy(copy);
+    await editTheme(copy);
+    return copy;
+  } finally {
+    customising = false;
+  }
 }
 
 /** Edit (a user row) and Customise: theme.edit, whose ShowView opens the editor (stores/views.ts openThemeEditor). */
@@ -192,7 +205,7 @@ export async function deleteTheme(id: string): Promise<boolean> {
   const name = themeById.get(id)?.name ?? id;
   const res = await runCommandForResult("theme.delete", { theme: id }, { quiet: true });
   if (!res) return false;
-  if (useThemeEditorStore.getState().id === id) stopEditing();
+  if (useThemeEditorStore.getState().id === id) stopEditing({ keepCopy: true });
   useThemePickerStore.setState((s) => (s.preview === id ? { preview: null } : s));
   toast.success(`Deleted ${name}`, { description: movedSlots(res.resultJson) });
   return true;
