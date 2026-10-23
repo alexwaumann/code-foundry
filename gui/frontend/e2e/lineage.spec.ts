@@ -171,6 +171,18 @@ test.describe("lineage", () => {
     await expect(lineageRow(page, C)).toHaveAttribute("data-me", "true");
     await expect(lineageRow(page, C)).toContainText("this thread");
     await expect(lineageRow(page, "s-l-spike")).toHaveAttribute("data-status", "archived");
+    // Line 2: the place, the model's short label and the effort, the age (docs/notes/threads-tab-model.md).
+    await expect(surface(page).getByTestId("lineage-row").getByTestId("lineage-model")).toHaveText([
+      "· Opus 4.8 · high",
+      "· Sonnet 5 · high",
+      "· Haiku 5.5 · medium",
+      "· Sonnet 5 · low",
+      "· Opus 4.7 · xhigh",
+      "· Haiku 4.5 · medium",
+      "· Sonnet 4.6 · low",
+      "· Haiku 5.5 · low",
+    ]);
+    expect(await lineageRow(page, "s-l-grand").getByTestId("lineage-meta").locator(":scope > *").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")))).toEqual(["lineage-place", "lineage-model", "lineage-age"]);
 
     await surface(page).getByTestId("lineage-more").click();
     expect(await sectionIds(page, "siblings")).toEqual(["s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"]);
@@ -179,6 +191,25 @@ test.describe("lineage", () => {
     await lineageRow(page, "s-l-cookie").click();
     await expect(header(page).getByTestId("thread-title")).toHaveText("Audit session cookie flags");
     await expect(row(page, "s:s-l-cookie")).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("Threads tab: a child's effort change waiting on its turn is italic and its tooltip says when", async ({ page }) => {
+    await openApp(page);
+    await open(page, P);
+    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
+    await expectThreadsTab(page, P);
+    const effort = lineageRow(page, "s-l-e2e").getByTestId("lineage-effort");
+    await expect(effort).toHaveText("medium");
+    await expect(effort).not.toHaveAttribute("data-pending");
+    const res = await fetch(`${mockUrl}/codefoundry.v1.ThreadService/SetEffort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+      body: JSON.stringify({ threadId: "s-l-e2e", effort: "high" }),
+    });
+    expect(res.ok, await res.clone().text()).toBe(true);
+    await expect(effort).toHaveText("high");
+    await expect(effort).toHaveAttribute("data-pending", "true");
+    await expectTooltip(page, effort, "Effort changes to high after this turn");
   });
 
   test("Threads tab on the creator, H opens it; a thread with no lineage does not list it and the palette toasts (docs/notes/panel-polish.md)", async ({ page }) => {
@@ -455,5 +486,11 @@ for (const scheme of ["dark", "light"] as const) {
     await expectThreadsTab(page, C);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/lineage-mock-${scheme}.png` });
+    // The creator's tab: its children's model words (docs/notes/threads-tab-model.md), the panel only.
+    await open(page, P);
+    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
+    await expectThreadsTab(page, P);
+    await page.mouse.move(0, 0);
+    await page.getByTestId("side-panel").screenshot({ path: `${String(shots)}/threads-tab-model-${scheme}.png` });
   });
 }

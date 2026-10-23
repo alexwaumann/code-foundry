@@ -1167,19 +1167,20 @@ export class World {
     const PN = "Fix login redirect";
     const C = "s-l-child";
     const CN = "Add retry to login redirect";
+    // Models and efforts vary, for the Threads tab's model words (docs/notes/threads-tab-model.md); Haiku 4.5 at medium otherwise.
     type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
     const specs: Spec[] = [
-      { id: P, name: PN, status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },
-      { id: C, name: CN, createdBy: P, createdByName: PN, brief: "Add retry to the login redirect, keep the PR small", status: A, statusReason: "finished", state: D, min: 18, worktreePath: `${CFW}/fix-resize`, labels: ["auth"] },
-      { id: "s-l-e2e", name: "Update redirect e2e tests", createdBy: P, createdByName: PN, brief: "Cover the new retry path in the redirect e2e suite", status: ThreadStatus.BUSY, statusReason: "working", min: 17 },
-      { id: "s-l-cookie", name: "Audit session cookie flags", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, projectId: "repo-gp", worktreePath: GP },
-      { id: "s-l-allow", name: "Bump redirect allowlist", createdBy: P, createdByName: PN, brief: "Add staging.acme.dev to the redirect allowlist and its test", status: A, statusReason: "error: overloaded", state: D, min: 14 },
+      { id: P, name: PN, model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },
+      { id: C, name: CN, model: "claude-sonnet-5[1m]", effort: "high", createdBy: P, createdByName: PN, brief: "Add retry to the login redirect, keep the PR small", status: A, statusReason: "finished", state: D, min: 18, worktreePath: `${CFW}/fix-resize`, labels: ["auth"] },
+      { id: "s-l-e2e", name: "Update redirect e2e tests", model: "claude-haiku-5-5[1m]", createdBy: P, createdByName: PN, brief: "Cover the new retry path in the redirect e2e suite", status: ThreadStatus.BUSY, statusReason: "working", min: 17 },
+      { id: "s-l-cookie", name: "Audit session cookie flags", model: "claude-sonnet-5[1m]", effort: "low", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, projectId: "repo-gp", worktreePath: GP },
+      { id: "s-l-allow", name: "Bump redirect allowlist", model: "claude-opus-4-7[1m]", effort: "xhigh", createdBy: P, createdByName: PN, brief: "Add staging.acme.dev to the redirect allowlist and its test", status: A, statusReason: "error: overloaded", state: D, min: 14 },
       { id: "s-l-spike", name: "Old redirect spike", createdBy: P, createdByName: PN, status: A, statusReason: "finished", state: D, min: 13, archivedAt: ago(5) },
       // Handed to the user (thread.sidebar --shown=true): shown in the sidebar whatever the setting, and kept when P is archived.
-      { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12, inSidebar: true },
-      { id: "s-l-metrics", name: "Check redirect metrics", createdBy: P, createdByName: PN, state: D, min: 11 },
+      { id: "s-l-logs", name: "Tidy redirect logging", model: "claude-sonnet-4-6[1m]", effort: "low", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12, inSidebar: true },
+      { id: "s-l-metrics", name: "Check redirect metrics", model: "claude-haiku-5-5[1m]", createdBy: P, createdByName: PN, state: D, min: 11 },
       // Its creator was renamed since (the recorded name differs): the GUI shows the current one.
-      { id: "s-l-grand", name: "Write retry backoff tests", createdBy: C, createdByName: `${CN} (old)`, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
+      { id: "s-l-grand", name: "Write retry backoff tests", model: "claude-haiku-5-5[1m]", effort: "low", createdBy: C, createdByName: `${CN} (old)`, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
     ];
     const out: string[] = [];
     for (const { min, ...o } of specs) {
