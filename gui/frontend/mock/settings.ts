@@ -320,6 +320,8 @@ export class MockSettings {
   raw: Record<string, string> = initialRaw();
   revision = 1;
   loadError = "";
+  /** The user's themes of a scheme (world.ts wires mock/userThemes.ts): the theme slots list them first. */
+  userThemes?: (scheme: "dark" | "light") => { id: string; name: string }[];
   /** Whether the backdrops folder has an image (world.ts wires mock/backdrops.ts); unset: only "" is missing. */
   backdropExists?: (name: string) => boolean;
   private readonly startup: Record<string, string>;
@@ -350,7 +352,15 @@ export class MockSettings {
       title: c.title.startsWith(`${c.category}: `) ? c.title.slice(c.category.length + 2) : c.title,
       description: c.description, defaultValue: normalize(c.keybindings[0] ?? "") ?? "", placeholder: c.name,
     }));
-    return [...staticFields, ...kb];
+    return [...staticFields.map((f) => this.withUserThemes(f)), ...kb];
+  }
+
+  /** A theme slot's field with the user's themes first, as the daemon's withThemes. */
+  private withUserThemes(f: FieldInit): FieldInit {
+    const scheme = f.key === "appearance.theme_dark" ? "dark" : f.key === "appearance.theme_light" ? "light" : null;
+    const user = scheme && this.userThemes ? this.userThemes(scheme) : [];
+    if (user.length === 0) return f;
+    return { ...f, enumValues: [...user.map((t) => t.id), ...(f.enumValues ?? [])], enumLabels: [...user.map((t) => t.name), ...(f.enumLabels ?? [])] };
   }
 
   /** staticPages with one keybindings section per category that has a bindable command. */
@@ -367,7 +377,11 @@ export class MockSettings {
   /** Effective values (defaults included). */
   values(): Record<string, string> {
     const out: Record<string, string> = {};
-    for (const f of this.fields()) out[f.key] = this.raw[f.key] ?? f.defaultValue;
+    for (const f of this.fields()) {
+      const v = this.raw[f.key] ?? f.defaultValue;
+      // A theme slot naming a theme that is gone shows the default, as the daemon does.
+      out[f.key] = f.key.startsWith("appearance.theme_") && !(f.enumValues ?? []).includes(v) ? f.defaultValue : v;
+    }
     return out;
   }
 

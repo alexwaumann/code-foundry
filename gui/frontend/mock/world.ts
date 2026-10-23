@@ -31,6 +31,7 @@ import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
 import { MockMemory } from "./memory";
+import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
@@ -749,6 +750,12 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.MEMORY, event: { event: { case: "memory", value: v } } }),
     emit: (i) => this.emit(i),
   });
+  /** The user's themes (mock/userThemes.ts); the EventService theme source. */
+  readonly themes = new MockThemes({
+    publish: (v) => this.events.publish({ source: EventSource.THEME, event: { event: { case: "theme", value: v } } }),
+    slot: (scheme) => this.settings.values()[`appearance.theme_${scheme}`] ?? "",
+    setSlot: (scheme, id) => this.settings.update({ [`appearance.theme_${scheme}`]: id }),
+  });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => this.restartCost(),
@@ -793,6 +800,8 @@ export class World {
   private nextId = 1;
 
   constructor() {
+    // Like the daemon: the theme slots list the user's themes first (store/usertheme).
+    this.settings.userThemes = (scheme) => this.themes.choices(scheme);
     this.reset();
   }
 
@@ -820,6 +829,7 @@ export class World {
     this.plugins.reset();
     this.skills.reset();
     this.memory.reset();
+    this.themes.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
@@ -2679,6 +2689,7 @@ export class World {
       ...this.plugins.commands(),
       ...this.skills.commands(),
       ...this.memory.commands(),
+      ...this.themes.commands(),
       {
         cmd: {
           name: "terminal.new",
@@ -3477,7 +3488,13 @@ export class World {
         run: () => {
           const v = this.settings.values();
           return (["dark", "light"] as const)
-            .map((s) => `${s} themes:\n` + themesFor(s).map((t) => `${t.id === v[`appearance.theme_${s}`] ? "*" : " "} ${t.id}  ${t.name}`).join("\n"))
+            .map(
+              (s) =>
+                `${s} themes:\n` +
+                [...this.themes.choices(s).map((t) => ({ ...t, yours: true })), ...themesFor(s).map((t) => ({ id: t.id, name: t.name, yours: false }))]
+                  .map((t) => `${t.id === v[`appearance.theme_${s}`] ? "*" : " "} ${t.id}  ${t.name}${t.yours ? "  [yours]" : ""}`)
+                  .join("\n"),
+            )
             .join("\n\n");
         },
       },
@@ -3488,7 +3505,7 @@ export class World {
           category: "Settings",
           description: `Choose the theme used when the scheme is ${scheme}.`,
           keybindings: [],
-          args: [{ name: "theme", type: ArgType.ENUM, required: true, description: `A ${scheme} theme id`, enumValues: themesFor(scheme).map((t) => t.id) }],
+          args: [{ name: "theme", type: ArgType.ENUM, required: true, description: `A ${scheme} theme id`, enumValues: [...this.themes.choices(scheme).map((t) => t.id), ...themesFor(scheme).map((t) => t.id)] }],
         },
         when: always,
         run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
