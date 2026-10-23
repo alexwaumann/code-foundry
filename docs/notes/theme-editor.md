@@ -128,7 +128,12 @@ editor. Deleting the theme being edited closes the editor without asking.
 - `ratioText` rounds down (two decimals under 2:1), so a 4.48 never prints as "4.5:1" and
   1.27 against a 1.25 floor does not print as "1.2:1".
 - A theme file edited on disk while the editor is open is not merged: the editor keeps its
-  draft and Revert goes back to what it opened or last saved.
+  draft and Revert goes back to what it opened or last saved. Seen live: saving from one
+  window repainted another window on the theme, whose open editor kept the older draft.
+- Beside a 240 px list and the 340 px inspector, a 1440 px window leaves the gallery about
+  580 px, and its three columns collapsed into one-letter-wide text at 1200 px. The gallery
+  is held at 640 px and its pane scrolls sideways instead. Hiding the list under a container
+  width was tried and dropped (the list is how the editor is left for another theme).
 
 ## Left out
 
@@ -148,6 +153,15 @@ editor. Deleting the theme being edited closes the editor without asking.
   stale after a base change, slot view and Reset to derived, Pinned only, save with "use
   now" and a rename, revert; Customise and the leave confirm; a contrast failure and Fix),
   `user-themes.spec.ts` (Customise now opens the editor), `themes.spec.ts`.
-- The built app on an isolated `CODE_FOUNDRY_HOME`: CLI `theme edit` and the GUI editor end
-  to end (shots in the PR body). The daemon must be restarted: `theme.edit`, the stricter
-  `ParseFile` and the save output are daemon code.
+- The built app (`make gui-build`) on an isolated `CODE_FOUNDRY_HOME`: `theme save` of a
+  hand-made Ocean Dusk (the contrast line printed), `theme save` refusing `--cf-icon` and a
+  light scheme on a dark surface (exit 2, the GUI's words), `theme edit nord` refused, `theme
+  edit ocean-dusk` and `theme edit <latte copy>` opening the editor in the Wails window (dark
+  and light). The window takes no synthetic clicks here (no accessibility permission), so
+  the slot view and the Save modal were driven by Playwright WebKit running the same
+  frontend against the same isolated daemon: a canvas change, the stale pin, Save and apply,
+  after which the file on disk had the new canvas, `theme_dark = "ocean-dusk"` was in
+  settings.toml and the Wails window repainted in Ocean Dusk. Scratch themes deleted and the
+  slots put back afterwards.
+- The daemon must be restarted: `theme.edit`, the stricter `ParseFile` and the save output
+  are daemon code.

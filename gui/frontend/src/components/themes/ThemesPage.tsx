@@ -136,7 +136,7 @@ export function ThemesPage() {
       </PaneHeader>
       <ControlBar slot={slot} slots={slots} />
       <div className="flex min-h-0 flex-1">
-        <div className={cn("flex shrink-0 flex-col border-r border-cf-divider", editingId ? "w-[240px]" : "w-[300px]")}>
+        <div className={cn("flex shrink-0 flex-col border-r border-cf-divider", editingId ? "w-[240px]" : "w-[300px]")} data-testid="themes-list-column">
           <div className="relative px-3 pt-3 pb-2">
             <Search className="pointer-events-none absolute top-1/2 left-5 mt-0.5 size-3.5 -translate-y-1/2 text-cf-text-muted" />
             <Input
@@ -200,7 +200,7 @@ export function ThemesPage() {
         <div className="flex min-w-0 flex-1 flex-col">
           {editingId ? <EditBar /> : <PreviewBar slot={slot} shown={themeOf(shownId, slot)} current={themeOf(slots[slot], slot)} previewing={preview !== null} />}
           <PairHintLine slots={slots} />
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-auto p-4">
             <GalleryScope shown={themeOf(shownId, slot)} />
           </div>
         </div>
@@ -233,7 +233,8 @@ function pickRow(id: string): void {
  */
 function GalleryScope({ shown }: { shown: Theme }) {
   const analysis = useEditorAnalysis();
-  // inert: a picture of the app, so Tab and clicks stay in the page (and no popover opens
+  // At least 640px wide (the gallery's three columns): beside the editor in a narrow window it
+  // scrolls sideways rather than squeezing. inert: a picture of the app, so Tab and clicks stay in the page (and no popover opens
   // into the window's theme through a portal).
   const gallery = useMemo(
     () => (
@@ -244,7 +245,7 @@ function GalleryScope({ shown }: { shown: Theme }) {
     [],
   );
   return (
-    <ThemeScope theme={analysis?.theme ?? shown} className="rounded-xl border border-cf-divider">
+    <ThemeScope theme={analysis?.theme ?? shown} className="min-w-[640px] rounded-xl border border-cf-divider">
       {gallery}
     </ThemeScope>
   );
