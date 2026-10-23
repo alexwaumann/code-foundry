@@ -8,6 +8,11 @@ import { TimelineRowView } from "./rows";
 
 const { openFileInPanel } = vi.hoisted(() => ({ openFileInPanel: vi.fn<(target: string, file: object) => boolean>(() => true) }));
 vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
+// An inline page's card asks the daemon for a grant; here it stays loading (no frame).
+vi.mock("@/components/files/previewGrant", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/files/previewGrant")>()),
+  usePreviewGrant: () => ({ preview: null, error: null, loading: true, retry: () => undefined }),
+}));
 
 afterEach(() => {
   cleanup();
@@ -352,6 +357,44 @@ describe("a finished turn with nothing to fold", () => {
     vi.setSystemTime(1 + 3_400);
     const c = show([hi], { working: true });
     expect(c.querySelector('[data-testid="thread-working"]')?.textContent).toBe("Working·3s");
+  });
+});
+
+describe("an inline page (docs/notes/inline-html-3-never-folds.md)", () => {
+  const turn: ThreadItemView[] = [
+    { ...base, id: "u", ordinal: 1, kind: "user", text: "show it", attachments: [], composerText: "" },
+    { ...base, id: "t1", ordinal: 2, kind: "tool", toolUseId: "t1", name: "Write", inputJson: '{"file_path":"/w/docs/hello.html"}', status: "done", output: "", isError: false, resultJson: "" },
+    { ...base, id: "h", ordinal: 3, kind: "html", path: "docs/hello.html", title: "Hello", baseDir: "/w" },
+    { ...base, id: "a", ordinal: 4, kind: "text", text: "shown" },
+    turnEndItem(),
+  ];
+  const card = (c: HTMLElement) => c.querySelector('[data-testid="thread-html-card"]');
+  const row = (c: HTMLElement) => c.querySelector<HTMLButtonElement>('[data-testid="thread-html-row"]');
+
+  it.each([
+    ["folds by default at its end", () => undefined],
+    ["the reader folded", () => true],
+    ["the reader unfolded", () => false],
+  ] as const)("a finished turn %s: the row is there and the card open, with no folded word", (_, fold) => {
+    const c = show(turn, { fold });
+    expect(row(c)?.getAttribute("aria-expanded")).toBe("true");
+    expect(row(c)?.textContent).toBe("Showed hello.html docsHello");
+    expect(card(c)).not.toBeNull();
+    expect(c.querySelectorAll('[data-testid="thread-turn-header"][data-folded]')).toHaveLength(fold() === false ? 0 : 1);
+  });
+
+  it("only its row closes the card, and the choice holds across the turn's fold", () => {
+    const c = show(turn);
+    const r = row(c);
+    if (!r) throw new Error("no row");
+    fireEvent.click(r);
+    expect(card(c)).toBeNull();
+    expect(r.getAttribute("aria-expanded")).toBe("false");
+    cleanup();
+    // Same thread, the turn now unfolded by the reader: still closed.
+    const again = show(turn, { fold: () => false });
+    expect(card(again)).toBeNull();
+    expect(row(again)?.textContent).not.toContain("folded");
   });
 });
 

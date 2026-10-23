@@ -69,12 +69,11 @@ export type WorkNode =
   | { type: "system"; key: string; id: string }
   /**
    * An HTML page the model showed inline (code-foundry view.inline): its "Showed <file>" row
-   * and, while open, its card with the page. It stays in a folded turn (its row; the card
-   * closes, `folded`), is no step, and breaks a strip's run (docs/notes/inline-html.md).
-   * `foldChosen`: the turn is folded because the user folded it, not by default (its end
-   * folding it): a card the reader saw open stays open through the default fold only.
+   * and, while open, its card with the page. The turn's fold never touches it: its row and
+   * card stay as they are, folded or not (only the row opens and closes the card). It is no
+   * step and breaks a strip's run (docs/notes/inline-html.md, inline-html-3-never-folds.md).
    */
-  | { type: "html"; key: string; id: string; folded: boolean; foldChosen?: boolean }
+  | { type: "html"; key: string; id: string }
   /**
    * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): its
    * card. Like a page it stays in a folded turn, is no step and breaks a strip's run.
@@ -201,7 +200,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         out.push({ type: "system", key: it.id, id: it.id });
         break;
       case "html":
-        out.push({ type: "html", key: it.id, id: it.id, folded: false });
+        out.push({ type: "html", key: it.id, id: it.id });
         break;
       case "theme":
         out.push({ type: "theme", key: it.id, id: it.id });
@@ -237,7 +236,7 @@ function markFinal(body: WorkNode[], ended: boolean): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes), steers, inline pages' rows and theme cards stay visible in a folded turn. */
+/** Notes (errors, compactions, command output, system notes), steers, inline pages (row and card, untouched by the fold) and theme cards stay visible in a folded turn. */
 function foldsAway(n: WorkNode): boolean {
   return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer" && n.type !== "html" && n.type !== "theme";
 }
@@ -378,7 +377,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
       rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
     if (t === stripped) rows.push(...stripRuns(t.body));
-    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n.type === "html" && folded ? { ...n, folded, foldChosen: opts.fold(t.key) !== undefined } : n);
+    else for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
   });
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
   if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });

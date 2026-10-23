@@ -32,8 +32,6 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return `note:${r.kind}`;
       case "strip":
         return `strip(${String(r.steps)})[${shape(r.nodes).join(" ")}]`;
-      case "html":
-        return `html:${r.id}${r.folded ? (r.foldChosen ? "(folded by user)" : "(folded)") : ""}`;
       default:
         return `${r.type}:${r.id}`;
     }
@@ -499,15 +497,19 @@ describe("theme cards (theme items)", () => {
 });
 
 describe("inline pages (html items)", () => {
-  it("stay in a folded turn as their row, marked folded; open when the turn is open; no step", () => {
+  it("stay in a folded turn as they are; no step", () => {
     const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:a"]);
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h", "final:a"]);
     expect(shape(buildRows(buildTurns(items), expanded))).toEqual(["user:u1", "header", "tool:Write", "html:h", "final:a"]);
   });
 
-  it("say whether the user folded their turn (the card then closes even if seen open)", () => {
-    const items = [user("u1"), item("html", { id: "h" }), text("a"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: false }))).toEqual(["user:u1", "header(folded 0)", "html:h(folded by user)", "final:a"]);
+  it("are the same node whatever the turn's fold: by default at its end, by the reader, or unfolded (inline-html-3-never-folds)", () => {
+    const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
+    const node = (fold: () => boolean | undefined) => buildRows(buildTurns(items), { fold, working: false }).find((r) => r.type === "html");
+    const want = { type: "html", key: "h", id: "h" };
+    expect(node(() => undefined)).toEqual(want);
+    expect(node(() => true)).toEqual(want);
+    expect(node(() => false)).toEqual(want);
   });
 
   it("break a live strip's run and show on their own", () => {
@@ -518,7 +520,7 @@ describe("inline pages (html items)", () => {
 
   it("do not end the answer: text after a page is the final text", () => {
     const items = [user("u1"), text("before"), item("html", { id: "h" }), text("after"), end("e1")];
-    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h(folded)", "final:after"]);
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 1)", "html:h", "final:after"]);
   });
 
   it("shown between turns: no turn, no header, never folded (inline-html-2-fixes)", () => {

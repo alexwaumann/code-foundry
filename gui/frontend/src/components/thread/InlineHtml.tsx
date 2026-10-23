@@ -25,9 +25,9 @@ import { useThreadCtx } from "./context";
  * while open, a card: a strip (the path, then open in the side panel, expand, source and
  * save as artifact) over the page in the same sandboxed frame as the File tab's preview
  * (HtmlFrame). The page may ask for its height (`{ type: "cf:resize", height }`); the card
- * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default; in a
- * folded turn the row stays and the card closes (the reader may open it there). A closed
- * card and a row scrolled away (the timeline is virtualized) hold no frame.
+ * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
+ * the turn's fold never closes it: only its row does (docs/notes/inline-html-3-never-folds.md).
+ * A closed card and a row scrolled away (the timeline is virtualized) hold no frame.
  */
 
 /** The thread's scrolling timeline around an element (the pane the height cap is a share of). */
@@ -39,17 +39,10 @@ function timelineOf(el: Element | null): HTMLElement | null {
 export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode, { type: "html" }> }) {
   const { threadId } = useThreadCtx();
   const item = useThreadItem(threadId, node.id);
-  // The reader's choice holds per fold state: folding the turn closes the card, unfolding opens it.
-  // A card the reader saw open (it arrived live, or its turn was open) stays open when its turn
-  // folds by default at its end, so a page shown while they watch does not vanish as the turn
-  // ends; folding the turn themselves, or leaving the thread (which forgets this), closes it.
-  const key = `html:${node.id}:${node.folded ? "folded" : "open"}`;
-  const seenKey = `html-seen:${node.id}`;
-  const seen = useRowExpanded(threadId, seenKey, false);
-  const open = useRowExpanded(threadId, key, !node.folded || (seen && !node.foldChosen));
-  useEffect(() => {
-    if (!node.folded && !seen) setRowExpanded(threadId, seenKey, true);
-  }, [threadId, seenKey, node.folded, seen]);
+  // Open until the reader closes it with its row; the turn's fold never changes it. Leaving
+  // the thread forgets the choice, so the card is open again on return.
+  const key = `html:${node.id}`;
+  const open = useRowExpanded(threadId, key, true);
   const page = useMemo(() => (item?.kind === "html" ? inlinePage(item) : null), [item]);
   if (!page) return null;
   return (
@@ -75,7 +68,7 @@ export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode,
             </>
           )}
         </span>
-        {node.folded && !open ? <span className="meta">folded</span> : page.title && <span className="meta max-w-72 truncate">{page.title}</span>}
+        {page.title && <span className="meta max-w-72 truncate">{page.title}</span>}
         <ChevronRight className="chev" aria-hidden />
       </button>
       {open && <HtmlCard threadId={threadId} page={page} />}
