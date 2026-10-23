@@ -5,8 +5,8 @@
  *
  *   pnpm run themes:check path/to/theme.json [more.json …]
  *
- * Exits 1 when a file is refused or a pair falls short. Nothing is installed: loading user
- * theme files is not built yet.
+ * Exits 1 when a file is refused or a pair falls short. A file is read as a user theme (the
+ * daemon's rules: `source` optional, `from` and `created_by` checked); nothing is installed.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -20,7 +20,7 @@ export function checkThemeJson(json: unknown): { ok: boolean; lines: string[] } 
   let ok = true;
   for (const entry of Array.isArray(json) ? json : [json]) {
     try {
-      const theme = parseThemeFile(entry);
+      const theme = parseThemeFile(entry, { user: true });
       const failures = contrastFailures(resolveSlots(theme));
       ok &&= failures.length === 0;
       lines.push(`${theme.id} (${theme.scheme}): ${failures.length === 0 ? "every pair reads" : `${String(failures.length)} pairs fall short`}`);

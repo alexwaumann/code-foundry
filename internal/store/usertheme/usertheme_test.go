@@ -236,6 +236,37 @@ func TestInvalidFileCountsAsGone(t *testing.T) {
 	}
 }
 
+// A file written before a slot was retired still loads, without the pin; it is not
+// rewritten, and saving it leaves the pin out.
+func TestRetiredSlotPinIsDropped(t *testing.T) {
+	s, dir := newStore(t)
+	f := userFile(t, "warm", "Warm", "github-dark")
+	f.Overrides = map[string]string{"--cf-icon": "#112233", "--cf-accent": "#5fb3b3"}
+	data := string(f.Marshal())
+	write(t, filepath.Join(dir, "warm.json"), data)
+	snap := s.Load()
+	if len(snap.Issues) != 0 || len(snap.Themes) != 1 {
+		t.Fatalf("themes %v, issues %+v", ids(snap.Themes), snap.Issues)
+	}
+	if got := snap.Themes[0].Overrides; len(got) != 1 || got["--cf-accent"] != "#5fb3b3" {
+		t.Errorf("overrides = %v", got)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "warm.json")); string(b) != data {
+		t.Error("the file was rewritten by a read")
+	}
+	if _, err := s.Save(snap.Themes[0]); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "warm.json")); strings.Contains(string(b), "--cf-icon") {
+		t.Errorf("saved with the retired pin:\n%s", b)
+	}
+	// A save that names it is refused.
+	f.ID = "warm-2"
+	if _, err := s.Save(f); !errors.Is(err, theme.ErrInvalid) || !strings.Contains(err.Error(), "was removed") {
+		t.Errorf("save with --cf-icon: %v", err)
+	}
+}
+
 func TestWatch(t *testing.T) {
 	s, dir := newStore(t)
 	b := bus.New()

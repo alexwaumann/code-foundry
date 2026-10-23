@@ -276,9 +276,6 @@ func RegisterTheme(r *Registry, b SettingsBackend, themes ThemeBackend) error {
 					out.Applied = js.Key
 					lines = append(lines, "applied: "+msg)
 				}
-				// TODO(user-themes PR 3): a contrast line (the GUI's contrastReport in
-				// src/themes/contrast.ts); the daemon derives no colours, so the report has
-				// to come from the GUI or a port of its rules.
 				return Result{Message: strings.Join(lines, "\n"), JSON: out}, nil
 			},
 		},
@@ -426,7 +423,10 @@ func themeSaved(s usertheme.Saved, set theme.Set) (ThemeSaved, []string) {
 	if f.Pinned() == 1 {
 		pinned = "pinned: 1 slot"
 	}
-	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, "written to: " + s.Path}
+	// The daemon derives no colours (the rules are the GUI's, src/themes/slots.ts), so it
+	// cannot say which pairs fall short or which pins the base has moved; the editor does.
+	contrast := fmt.Sprintf("contrast: checked in the editor (theme edit %s shows failing pairs and stale pins)", f.ID)
+	lines := []string{fmt.Sprintf("%s %s (%s), a %s theme", verb, f.Name, f.ID, f.Scheme), from, pinned, contrast, "written to: " + s.Path}
 	return out, lines
 }
 

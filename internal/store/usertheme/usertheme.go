@@ -384,7 +384,9 @@ func readFile(path string) (theme.File, theme.Header, error) {
 	if h.ID == "" {
 		h.ID = stem
 	}
-	f, err := theme.ParseFile(data)
+	// A pin of a slot the app has since removed is dropped from what loads (the file is
+	// not rewritten; its next save leaves the pin out).
+	f, _, err := theme.ParseStored(data)
 	switch {
 	case err != nil:
 		return theme.File{}, h, errors.New(strings.TrimPrefix(err.Error(), theme.ErrInvalid.Error()+": "))

@@ -472,11 +472,14 @@ const ANY_HEX = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/;
 const BASE_COLOURS = ["canvas", "surface", "text", "accent", "success", "warning", "error", "info", "highlight"] as const;
 
 /**
- * A theme id: lowercase letters, digits and dashes, starting with a letter or digit, at
- * most 64 characters. The daemon's PublishTheme refuses anything else
- * (internal/theme/frame.go frameIDRe), so a file is held to the same rule.
+ * A theme id: lowercase letters and digits in words joined by single dashes, at most 64
+ * characters. The daemon's theme files take nothing else (internal/theme/file.go
+ * idPattern), and PublishTheme's looser rule (frame.go frameIDRe) takes all of these.
  */
-export const THEME_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export const THEME_ID = /^(?=.{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** A thread id as a user theme's created_by records it (file.go threadPattern). */
+const THREAD_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * The OKLab lightness a surface needs for its scheme. Past these the text cannot reach 7:1
@@ -511,27 +514,68 @@ function opaque(v: unknown, where: string): string {
   return hex;
 }
 
+/** The keys a theme file may have at each level (the daemon refuses any other: theme.ParseFile). */
+const FILE_KEYS = new Set(["id", "name", "scheme", "pair", "from", "created_by", "source", "base", "overrides"]);
+const BASE_KEYS = new Set<string>([...BASE_COLOURS, "link", "terminal"]);
+const TERMINAL_KEYS = new Set(["foreground", "cursor", "cursorText", "selection", "ansi"]);
+
+/** Slots the app had and removed (theme-slots-3-hardening.md), with what to pin instead (internal/theme/file.go retiredSlots). */
+export const RETIRED_SLOTS: Readonly<Record<string, string>> = {
+  "--cf-icon": "icons take their label's colour, or pin --cf-icon-muted",
+  "--cf-sidebar-row-active": "pin --cf-sidebar-row-selected",
+};
+
+function onlyKeys(o: Record<string, unknown>, keys: ReadonlySet<string>, where: string): void {
+  for (const k of Object.keys(o)) if (!keys.has(k)) throw new Error(`${where}: unknown field ${JSON.stringify(k)}`);
+}
+
+/** A user theme file as parseThemeFile reads it: the file plus where it came from. */
+export interface ParsedThemeFile extends ThemeFile {
+  /** The theme it was copied from, when the file says. */
+  readonly from?: string;
+  /** The thread that wrote it, when the file says. */
+  readonly createdBy?: string;
+}
+
 /**
- * A theme file (JSON) checked and normalised (lowercase hex). Throws with the first
- * problem: an id outside THEME_ID, a missing or malformed base colour, a scheme other than
- * light/dark or one its surface cannot carry (schemeProblem), or an override of a name
- * that is not a slot.
+ * A theme file (JSON) checked and normalised (lowercase hex, trimmed name). Throws with
+ * the first problem: an unknown field, an id outside THEME_ID, a missing or malformed base
+ * colour, a scheme other than light/dark or one its surface cannot carry (schemeProblem),
+ * or an override of a name that is not a slot (a retired one says what replaced it).
+ *
+ * The daemon's theme.ParseFile (internal/theme/file.go) holds a user theme file to the same
+ * rules, so a file one takes the other does. `{ user: true }` reads one of those: `source`
+ * is optional and `from` / `created_by` are checked; the curated catalog needs a source.
  */
-export function parseThemeFile(json: unknown): ThemeFile {
+export function parseThemeFile(json: unknown, opts: { user?: boolean } = {}): ParsedThemeFile {
   if (!isRecord(json)) throw new Error("theme: not an object");
   const str = (k: string) => {
     const v = json[k];
-    if (typeof v !== "string" || !v) throw new Error(`theme: no ${k}`);
-    return v;
+    const s = typeof v === "string" ? v.trim() : "";
+    if (!s) throw new Error(`theme: no ${k}`);
+    return s;
+  };
+  const optStr = (k: string, where: string) => {
+    const v = json[k];
+    if (v === undefined) return "";
+    if (typeof v !== "string") throw new Error(`${where}: ${k} is not a string`);
+    return v.trim();
   };
   const id = str("id");
-  if (!THEME_ID.test(id)) throw new Error(`theme id ${JSON.stringify(id)}: use lowercase letters, digits and dashes (at most 64), e.g. "warm-paper"`);
+  if (!THEME_ID.test(id)) throw new Error(`theme id ${JSON.stringify(id)}: use lowercase letters and digits, words joined by single dashes (at most 64), e.g. "warm-paper"`);
+  onlyKeys(json, FILE_KEYS, id);
+  const name = str("name");
+  if (Array.from(name).length > 80) throw new Error(`${id}: name: at most 80 characters`);
+  // eslint-disable-next-line no-control-regex -- the daemon refuses control characters in a name
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(name)) throw new Error(`${id}: name: no control characters`);
   const scheme = json.scheme;
   if (scheme !== "light" && scheme !== "dark") throw new Error(`${id}: scheme must be light or dark`);
   const b = json.base;
   if (!isRecord(b)) throw new Error(`${id}: no base`);
+  onlyKeys(b, BASE_KEYS, `${id}: base`);
   const t = b.terminal;
   if (!isRecord(t)) throw new Error(`${id}: no base.terminal`);
+  onlyKeys(t, TERMINAL_KEYS, `${id}: base.terminal`);
   if (!Array.isArray(t.ansi) || t.ansi.length !== 16) throw new Error(`${id}: base.terminal.ansi needs 16 colours`);
   const optional = (v: unknown, where: string) => (v === undefined ? undefined : opaque(v, where));
   const colours = Object.fromEntries(BASE_COLOURS.map((k) => [k, opaque(b[k], `${id}: base.${k}`)])) as Record<(typeof BASE_COLOURS)[number], string>;
@@ -553,19 +597,70 @@ export function parseThemeFile(json: unknown): ThemeFile {
   const problem = schemeProblem(scheme, base.surface);
   if (problem) throw new Error(`${id}: ${problem}`);
   let overrides: Record<string, string> | undefined;
-  if (json.overrides !== undefined) {
+  if (json.overrides !== undefined && json.overrides !== null) {
     if (!isRecord(json.overrides)) throw new Error(`${id}: overrides is not an object`);
     overrides = {};
-    for (const [k, v] of Object.entries(json.overrides)) {
+    const entries = Object.entries(json.overrides);
+    if (entries.length > 256) throw new Error(`${id}: overrides: at most 256`);
+    for (const [key, v] of entries) {
+      const k = key.trim();
+      const retired = RETIRED_SLOTS[k];
+      if (retired) throw new Error(`${id}: ${k} was removed from the app; ${retired}`);
       if (!isSlot(k)) throw new Error(`${id}: ${k} is not a slot`);
       const hex = typeof v === "string" ? v.trim().toLowerCase() : "";
       if (!ANY_HEX.test(hex)) throw new Error(`${id}: ${k} is not #rrggbb or #rrggbbaa`);
       overrides[k] = hex;
     }
   }
-  const pair = json.pair;
-  if (pair !== undefined && typeof pair !== "string") throw new Error(`${id}: pair is not a string`);
-  return { id, name: str("name"), scheme, ...(pair ? { pair } : {}), source: str("source"), base, ...(overrides && Object.keys(overrides).length ? { overrides } : {}) };
+  const pair = optStr("pair", id);
+  if (pair && !THEME_ID.test(pair)) throw new Error(`${id}: pair ${JSON.stringify(pair)} is not a theme id`);
+  const source = opts.user ? optStr("source", id) : str("source");
+  if (Array.from(source).length > 500) throw new Error(`${id}: source: at most 500 characters`);
+  const from = opts.user ? optStr("from", id) : "";
+  if (from && !THEME_ID.test(from)) throw new Error(`${id}: from ${JSON.stringify(from)} is not a theme id`);
+  if (from === id) throw new Error(`${id}: from: a theme cannot be copied from itself`);
+  const createdBy = opts.user ? optStr("created_by", id) : "";
+  if (createdBy && !THREAD_ID.test(createdBy)) throw new Error(`${id}: created_by ${JSON.stringify(createdBy)} is not a thread id`);
+  return {
+    id,
+    name,
+    scheme,
+    ...(pair ? { pair } : {}),
+    source,
+    base,
+    ...(overrides && Object.keys(overrides).length ? { overrides } : {}),
+    ...(from ? { from } : {}),
+    ...(createdBy ? { createdBy } : {}),
+  };
+}
+
+/**
+ * A theme as the daemon's file format writes it (theme.File's JSON: `created_by`, no
+ * empty optional fields), for theme.save's `--data`. ParseFile there refuses any other key.
+ */
+export function themeFileJson(t: ThemeFile & { readonly from?: string; readonly createdBy?: string }): Record<string, unknown> {
+  const { terminal } = t.base;
+  return {
+    id: t.id,
+    name: t.name,
+    scheme: t.scheme,
+    ...(t.pair ? { pair: t.pair } : {}),
+    ...(t.from ? { from: t.from } : {}),
+    ...(t.createdBy ? { created_by: t.createdBy } : {}),
+    ...(t.source ? { source: t.source } : {}),
+    base: {
+      ...Object.fromEntries(BASE_COLOURS.map((k) => [k, t.base[k]])),
+      ...(t.base.link ? { link: t.base.link } : {}),
+      terminal: {
+        foreground: terminal.foreground,
+        ...(terminal.cursor ? { cursor: terminal.cursor } : {}),
+        ...(terminal.cursorText ? { cursorText: terminal.cursorText } : {}),
+        ...(terminal.selection ? { selection: terminal.selection } : {}),
+        ansi: [...terminal.ansi],
+      },
+    },
+    ...(t.overrides && Object.keys(t.overrides).length ? { overrides: { ...t.overrides } } : {}),
+  };
 }
 
 /** `#rrggbb` lowercase (for literal inputs written in other forms). */

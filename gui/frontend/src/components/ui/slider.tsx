@@ -3,8 +3,10 @@ import { Slider as SliderPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 /**
- * shadcn's Slider (new-york). One addition: `thumbLabel` names the thumbs (the role=slider
- * elements), since an aria-label on the root does not reach them.
+ * shadcn's Slider (new-york). Additions: `thumbLabel` names the thumbs (the role=slider
+ * elements), since an aria-label on the root does not reach them; `trackClassName` and
+ * `rangeClassName` restyle the track and its filled part (the theme editor's hue and alpha
+ * strips draw their own gradient under a transparent track).
  */
 function Slider({
   className,
@@ -13,8 +15,10 @@ function Slider({
   min = 0,
   max = 100,
   thumbLabel,
+  trackClassName,
+  rangeClassName,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root> & { thumbLabel?: string }) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & { thumbLabel?: string; trackClassName?: string; rangeClassName?: string }) {
   const _values = React.useMemo(
     () => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
     [value, defaultValue, min, max]
@@ -35,11 +39,11 @@ function Slider({
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+        className={cn("relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5", trackClassName)}
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
+          className={cn("absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full", rangeClassName)}
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (

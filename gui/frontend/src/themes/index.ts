@@ -9,7 +9,7 @@
  * applies the active theme's slots to <html> as CSS variables.
  */
 import catalog from "./catalog.json";
-import { componentValues, resolveSlots, type ThemeFile, type ThemeScheme } from "./slots";
+import { componentValues, parseThemeFile, resolveSlots, themeFileJson, type ThemeFile, type ThemeScheme } from "./slots";
 
 export type { ThemeBase, ThemeFile, ThemeScheme } from "./slots";
 
@@ -133,17 +133,31 @@ export function setUserThemes(files: readonly UserThemeFile[], persist = true): 
   for (const l of [...listeners]) l();
 }
 
-/** The user themes the last launch knew (USER_THEMES_STORAGE_KEY); anything unusable is dropped. */
+/**
+ * A user theme file (the daemon's JSON: `created_by`, optional `source`) read by the same
+ * rules as the catalog's (parseThemeFile in user mode, which the daemon's theme.ParseFile
+ * mirrors), with its path; null, and a console warning, for one those rules refuse.
+ */
+export function readUserThemeFile(json: unknown, path: string): UserThemeFile | null {
+  try {
+    const { from = "", createdBy = "", ...file } = parseThemeFile(json, { user: true });
+    return { ...file, from, createdBy, path };
+  } catch (err) {
+    console.warn("user theme refused", err);
+    return null;
+  }
+}
+
+/** The user themes the last launch knew (USER_THEMES_STORAGE_KEY), read again by the file rules; anything they refuse is dropped. */
 function storedUserThemes(): UserThemeFile[] {
   try {
     const v: unknown = JSON.parse(localStorage.getItem(USER_THEMES_STORAGE_KEY) ?? "[]");
     if (!Array.isArray(v)) return [];
-    return v.filter((f): f is UserThemeFile => {
-      if (typeof f !== "object" || f === null) return false;
-      const o = f as Record<string, unknown>;
-      const base = o.base as Record<string, unknown> | undefined;
-      const term = base?.terminal as Record<string, unknown> | undefined;
-      return typeof o.id === "string" && typeof o.name === "string" && (o.scheme === "dark" || o.scheme === "light") && typeof o.from === "string" && Array.isArray(term?.ansi);
+    return v.flatMap((f: unknown) => {
+      if (typeof f !== "object" || f === null) return [];
+      const { path, ...t } = f as UserThemeFile;
+      const read = readUserThemeFile(themeFileJson(t), typeof path === "string" ? path : "");
+      return read ? [read] : [];
     });
   } catch {
     return [];

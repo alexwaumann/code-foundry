@@ -171,6 +171,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
 		command.RegisterTheme(r, d.Settings, d.Themes),
 		command.RegisterThemePick(r, d.Emitter),
+		command.RegisterThemeEdit(r, d.Emitter, d.Themes),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, command.ViewDeps{
 			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, Diffs: d.FileDiffs,

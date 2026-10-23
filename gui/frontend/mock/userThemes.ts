@@ -13,6 +13,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import type { ThemeEventSchema, ThemeSnapshotSchema } from "../src/gen/codefoundry/v1/theme_pb";
 import { themeById, themes as curated, type ThemeBase, type ThemeFile, type ThemeScheme } from "../src/themes";
+import { parseThemeFile } from "../src/themes/slots";
 import { CommandError } from "./errors";
 import type { SkillCommand } from "./skills";
 
@@ -71,10 +72,7 @@ function seed(): MockUserTheme[] {
 
 const SEED_ISSUES = [{ file: "draft.json", message: 'base.accent: "#5fb3" is not #rrggbb' }];
 
-const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const HEX = /^#[0-9a-f]{6}$/;
-
-/** The daemon's theme.ParseFile, enough for the mock: the shape, the ids and the colours. */
+/** The daemon's theme.ParseFile: the GUI's parseThemeFile in user mode, which it mirrors. */
 function parse(text: string): MockUserTheme {
   let v: unknown;
   try {
@@ -82,36 +80,12 @@ function parse(text: string): MockUserTheme {
   } catch {
     throw new CommandError("invalid", "the theme does not validate: not JSON");
   }
-  const bad = (m: string) => new CommandError("invalid", `the theme does not validate: ${m}`);
-  if (typeof v !== "object" || v === null || Array.isArray(v)) throw bad("want a JSON object");
-  const o = v as Record<string, unknown>;
-  const str = (k: string) => {
-    const x = o[k];
-    return typeof x === "string" ? x.trim() : "";
-  };
-  const id = str("id");
-  if (!id) throw bad("no id");
-  if (!ID.test(id)) throw bad(`id "${id}": use lowercase letters, digits and dashes (at most 64)`);
-  if (!str("name")) throw bad("no name");
-  const scheme = str("scheme");
-  if (scheme !== "dark" && scheme !== "light") throw bad(`scheme "${scheme}": must be dark or light`);
-  const base = o.base as ThemeBase | undefined;
-  for (const k of ["canvas", "surface", "text", "accent", "success", "warning", "error", "info", "highlight"] as const) {
-    const c = typeof base?.[k] === "string" ? base[k].toLowerCase() : "";
-    if (!HEX.test(c)) throw bad(c ? `base.${k}: "${c}" is not #rrggbb` : `base.${k}: missing`);
+  try {
+    const { from = "", createdBy = "", ...file } = parseThemeFile(v, { user: true });
+    return { ...file, from, createdBy };
+  } catch (err) {
+    throw new CommandError("invalid", `the theme does not validate: ${err instanceof Error ? err.message : String(err)}`);
   }
-  const ansi: unknown = (base?.terminal as { ansi?: unknown } | undefined)?.ansi;
-  if (!base || !Array.isArray(ansi) || ansi.length !== 16) throw bad("base.terminal.ansi: want 16 colours");
-  return {
-    id,
-    name: str("name"),
-    scheme,
-    source: str("source"),
-    base,
-    ...(o.overrides && typeof o.overrides === "object" ? { overrides: o.overrides as Record<string, string> } : {}),
-    from: str("from"),
-    createdBy: str("created_by"),
-  };
 }
 
 /** The file as the daemon writes it (theme.File's JSON names). */
@@ -216,7 +190,18 @@ export class MockThemes {
   private lines(t: MockUserTheme, replaced: boolean): string[] {
     const pinned = Object.keys(t.overrides ?? {}).length;
     const from = t.from ? `from: ${themeById.get(t.from)?.name ?? t.from} (${t.from})` : "from: nothing (made from scratch)";
-    return [`${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`, from, `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`, `written to: ${DIR}/${t.id}.json`];
+    return [
+      `${replaced ? "replaced" : "saved"} ${t.name} (${t.id}), a ${t.scheme} theme`,
+      from,
+      `pinned: ${String(pinned)} ${pinned === 1 ? "slot" : "slots"}`,
+      `contrast: checked in the editor (theme edit ${t.id} shows failing pairs and stale pins)`,
+      `written to: ${DIR}/${t.id}.json`,
+    ];
+  }
+
+  /** Whether id is one of the user's themes (theme.edit's check). */
+  isUser(id: string): boolean {
+    return this.user.some((u) => u.id === id);
   }
 
   private savedJson(t: MockUserTheme, replaced: boolean, applied = ""): string {

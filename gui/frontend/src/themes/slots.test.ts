@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contrast, flatten, lightness, mix, over, parseHex, shiftL } from "./color";
-import { COMPONENT_ALIASES, componentValues, parseThemeFile, resolveSlots, schemeProblem, SLOT_GROUPS, SLOT_NAMES, SLOTS, textOn, type ThemeBase, type ThemeScheme } from "./slots";
+import { COMPONENT_ALIASES, componentValues, parseThemeFile, resolveSlots, schemeProblem, SLOT_GROUPS, SLOT_NAMES, SLOTS, textOn, themeFileJson, type ThemeBase, type ThemeScheme } from "./slots";
 
 // The derivation rules (docs/notes/theme-slots-1-engine.md has the table), on synthetic
 // bases so each rule's branch is visible. contrast.test.ts checks the curated themes.
@@ -347,10 +347,20 @@ describe("parseThemeFile", () => {
     ["a bad ANSI colour", { ...file, base: { ...DARK, terminal: { foreground: "#ffffff", ansi: [...ANSI.slice(1), "red"] } } }, /ansi\[15\]/],
     ["an override of a component name", { ...file, overrides: { "--card": "#ffffff" } }, /--card is not a slot/],
     ["an override that is not hex", { ...file, overrides: { "--cf-text": "oklch(0.5 0 0)" } }, /--cf-text is not #rrggbb or #rrggbbaa/],
-    ["an override of a retired slot", { ...file, overrides: { "--cf-sidebar-row-active": "#ffffff" } }, /--cf-sidebar-row-active is not a slot/],
-    ["an id with capitals and a space", { ...file, id: "Warm Paper" }, /theme id "Warm Paper": use lowercase letters, digits and dashes/],
+    ["an override of a retired slot", { ...file, overrides: { "--cf-sidebar-row-active": "#ffffff" } }, /--cf-sidebar-row-active was removed from the app; pin --cf-sidebar-row-selected/],
+    ["an override of --cf-icon", { ...file, overrides: { "--cf-icon": "#ffffff" } }, /--cf-icon was removed/],
+    ["an override of a misspelt slot", { ...file, overrides: { "--cf-txet": "#ffffff" } }, /--cf-txet is not a slot/],
+    ["an id with capitals and a space", { ...file, id: "Warm Paper" }, /theme id "Warm Paper": use lowercase letters and digits/],
     ["an id with an underscore", { ...file, id: "warm_paper" }, /theme id "warm_paper"/],
     ["an id starting with a dash", { ...file, id: "-x" }, /theme id "-x"/],
+    ["an id ending with a dash", { ...file, id: "x-" }, /theme id "x-"/],
+    ["an id with a double dash", { ...file, id: "warm--paper" }, /theme id "warm--paper"/],
+    ["an unknown field", { ...file, description: "x" }, /x: unknown field "description"/],
+    ["an unknown base field", { ...file, base: { ...DARK, acent: "#000000" } }, /base: unknown field "acent"/],
+    ["a pair that is not an id", { ...file, pair: "GitHub Light" }, /pair "GitHub Light" is not a theme id/],
+    ["a name of 81 characters", { ...file, name: "n".repeat(81) }, /name: at most 80/],
+    ["a blank name", { ...file, name: "  " }, /no name/],
+    ["no source (a curated file)", { ...file, source: undefined }, /no source/],
     ["a 65-character id", { ...file, id: "a".repeat(65) }, /theme id/],
     ["dark on a light surface", { ...file, base: LIGHT }, /scheme is "dark" but base.surface #ffffff has OKLab lightness 1.00, a light surface .*set "scheme": "light"/],
     ["light on a dark surface", { ...file, scheme: "light" }, /scheme is "light" but base.surface #1e1e2e .*a dark surface .*set "scheme": "dark"/],
@@ -361,6 +371,22 @@ describe("parseThemeFile", () => {
 
   it("takes a 64-character id of letters, digits and dashes", () => {
     expect(parseThemeFile({ ...file, id: `a1-${"b".repeat(61)}` }).id).toHaveLength(64);
+  });
+
+  it("reads a user theme file: source optional, from and created_by checked, the -text slots pinnable", () => {
+    const user = { id: "ocean", name: " Ocean ", scheme: "dark", from: "github-dark", created_by: "s-5f96", base: DARK, overrides: { "--cf-warning-text": "#E3B341" } };
+    expect(parseThemeFile(user, { user: true })).toEqual({ id: "ocean", name: "Ocean", scheme: "dark", source: "", base: DARK, overrides: { "--cf-warning-text": "#e3b341" }, from: "github-dark", createdBy: "s-5f96" });
+    expect(() => parseThemeFile({ ...user, from: "ocean" }, { user: true })).toThrow(/cannot be copied from itself/);
+    expect(() => parseThemeFile({ ...user, from: "Git Hub" }, { user: true })).toThrow(/from "Git Hub" is not a theme id/);
+    expect(() => parseThemeFile({ ...user, created_by: "a b" }, { user: true })).toThrow(/not a thread id/);
+    expect(() => parseThemeFile({ ...user, createdBy: "s-1" }, { user: true })).toThrow(/unknown field "createdBy"/);
+  });
+
+  it("themeFileJson writes what parseThemeFile reads back", () => {
+    const t = parseThemeFile({ id: "ocean", name: "Ocean", scheme: "dark", from: "github-dark", base: { ...DARK, link: "#58a6ff" }, overrides: { "--cf-focus": "#aabbcc80" } }, { user: true });
+    const json = themeFileJson(t);
+    expect(Object.keys(json)).toEqual(["id", "name", "scheme", "from", "base", "overrides"]);
+    expect(parseThemeFile(JSON.parse(JSON.stringify(json)), { user: true })).toEqual(t);
   });
 
   it.each([

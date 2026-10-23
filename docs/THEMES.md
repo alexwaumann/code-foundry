@@ -2,9 +2,10 @@
 
 How a Code Foundry colour theme is written, what each colour does and how to check one. The
 app resolves every colour from a small base by rules (`gui/frontend/src/themes/slots.ts`);
-pages the model writes get the same colours from `/cf/theme.css`. Loading your own theme
-files is not built yet: today this describes the curated themes and what a future import
-will accept.
+pages the model writes get the same colours from `/cf/theme.css`. Your own themes are files
+in the themes directory (`theme save`, `theme show`, `theme duplicate`; `theme edit` opens
+one in the Themes page's editor), read by the same rules as the curated ones: the GUI and
+the daemon refuse the same files.
 
 ## A theme file
 
@@ -29,15 +30,16 @@ will accept.
 }
 ```
 
-- **Required**: `id`, `name`, `scheme`, `source`, and `base` with `canvas`, `surface`, `text`,
+- **Required**: `id`, `name`, `scheme`, `source` (optional in your own themes, which may
+  also have `from` and `created_by`), and `base` with `canvas`, `surface`, `text`,
   `accent`, `success`, `warning`, `error`, `info`, `highlight` and `terminal.foreground` and
   `terminal.ansi`. **Optional**: `pair` (the theme of the other scheme it belongs with),
   `base.link` (the info colour's text when absent), `terminal.cursor` (the foreground),
   `terminal.cursorText` (ignored under 3:1 on the cursor), `terminal.selection` (the
   foreground at 20% over the surface; replaced under 3:1 against the foreground) and
-  `overrides`.
-- **id**: lowercase letters, digits and dashes, starting with a letter or digit, at most 64
-  characters (`^[a-z0-9][a-z0-9-]{0,63}$`). The daemon refuses any other id.
+  `overrides`. Any other field is refused.
+- **id**: lowercase letters and digits, words joined by single dashes, at most 64
+  characters (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). The daemon refuses any other id.
 - **Colours** in `base` are `#rrggbb` (any case; stored lowercase).
 - **ANSI order**, 16 colours: black, red, green, yellow, blue, magenta, cyan, white, then the
   bright eight in the same order. The syntax colours start from them (keywords ANSI 5 dark /
@@ -53,7 +55,9 @@ will accept.
 `overrides` sets individual slots (below) to final values: applied as is, with no
 contrast guard, and every slot derived after it follows (override `--cf-surface` and the
 sunken, border and control mixes move with it). Use them only for what the rules cannot
-say; check the file afterwards.
+say; check the file afterwards. A key must be one of the slots below: a misspelt or
+removed one (`--cf-icon`, `--cf-sidebar-row-active`) refuses the file. The Themes page's
+editor calls an override a pin.
 
 Values are `#rrggbb`, or `#rrggbbaa` for the slots that are tints and composite over what
 they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`,

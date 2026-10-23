@@ -1,8 +1,8 @@
 /**
  * The readability floor of a theme (docs/THEMES.md): every pair of resolved slots that sits
  * one on the other somewhere in the app, and the WCAG contrast it must reach. contrast.test.ts
- * holds the curated themes and two base-only fixtures to it; a future theme import and the
- * Settings override editor check a file with the same list (contrastFailures). Pure: no DOM.
+ * holds the curated themes and two base-only fixtures to it; the Themes page's editor reports on
+ * a theme with the same list (contrast.ts builds on contrastFailures). Pure: no DOM.
  *
  * A tint (`#rrggbbaa`) is checked as painted: flattened over `over` (a slot name) first.
  * 4.5 is text, 3 is large text, comments and non-text marks (fills, focus rings, chart
@@ -66,18 +66,33 @@ export interface ContrastFailure {
   readonly label: string;
 }
 
-/** The pairs `slots` (a resolved slot map) falls short on; empty when it reads everywhere. */
-export function contrastFailures(slots: Readonly<Record<string, string>>, pairs: readonly ContrastPair[] = CONTRAST_PAIRS): ContrastFailure[] {
+/** `fg on bg (over X)`: a pair in words. */
+export const pairLabel = (pair: ContrastPair): string => `${pair.fg} on ${pair.bg}${pair.over ? ` over ${pair.over}` : ""}`;
+
+/** A pair's background as painted: bg flattened over `over` when it is a tint. */
+export function pairBackground(slots: Readonly<Record<string, string>>, pair: ContrastPair): string {
   const get = (k: string) => {
     const v = slots[k];
     if (v === undefined) throw new Error(`no ${k}`);
     return v;
   };
+  return pair.over ? flatten(get(pair.bg), get(pair.over)) : get(pair.bg);
+}
+
+/** The WCAG ratio of one pair on resolved slots (fg flattened over the painted background). */
+export function pairRatio(slots: Readonly<Record<string, string>>, pair: ContrastPair): number {
+  const bg = pairBackground(slots, pair);
+  const fg = slots[pair.fg];
+  if (fg === undefined) throw new Error(`no ${pair.fg}`);
+  return contrast(flatten(fg, bg), bg);
+}
+
+/** The pairs `slots` (a resolved slot map) falls short on; empty when it reads everywhere. */
+export function contrastFailures(slots: Readonly<Record<string, string>>, pairs: readonly ContrastPair[] = CONTRAST_PAIRS): ContrastFailure[] {
   const out: ContrastFailure[] = [];
   for (const pair of pairs) {
-    const bg = pair.over ? flatten(get(pair.bg), get(pair.over)) : get(pair.bg);
-    const ratio = contrast(flatten(get(pair.fg), bg), bg);
-    if (ratio < pair.min) out.push({ pair, ratio, label: `${pair.fg} on ${pair.bg}${pair.over ? ` over ${pair.over}` : ""}` });
+    const ratio = pairRatio(slots, pair);
+    if (ratio < pair.min) out.push({ pair, ratio, label: pairLabel(pair) });
   }
   return out;
 }

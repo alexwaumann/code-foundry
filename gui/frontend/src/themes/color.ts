@@ -91,6 +91,28 @@ export function hue(hex: string): number {
   return h < 0 ? h + 360 : h;
 }
 
+/** OKLCH of a colour: lightness 0..1, chroma (0 to about 0.37 in sRGB), hue in degrees 0..360. */
+export function toOklch(hex: string): readonly [number, number, number] {
+  return [lightness(hex), chroma(hex), hue(hex)];
+}
+
+const labOf = (L: number, C: number, H: number): Lab => [L, C * Math.cos((H * Math.PI) / 180), C * Math.sin((H * Math.PI) / 180)];
+
+/** OKLCH to hex, chroma reduced (lightness and hue kept) until it fits sRGB, as fromLab does. */
+export function fromOklch(L: number, C: number, H: number): string {
+  return fromLab(labOf(L, Math.max(0, C), H));
+}
+
+/** OKLCH as gamma-encoded sRGB 0..1, or null when it is outside sRGB (the editor's plane leaves those pixels empty). */
+export function oklchRgb(L: number, C: number, H: number): Rgb | null {
+  const lin = labToLinear(labOf(L, C, H));
+  if (!inGamut(lin)) return null;
+  return lin.map((c) => delin(clamp01(c))) as unknown as Rgb;
+}
+
+/** The alpha of a `#rrggbbaa` colour (1 for `#rrggbb`). */
+export const alphaOf = (hex: string): number => parseHex(hex).alpha;
+
 /** `color-mix(in oklab, a, b t)`: t = 0 is a, 1 is b. */
 export function mix(a: string, b: string, t: number): string {
   const A = toLab(a);

@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { effectiveScheme, themeSlots, type ColorScheme, type ThemePreference } from "@/lib/theme";
 import { subscribeUserThemes, themeById, themesFor } from "@/themes";
 import { runCommandForResult } from "./commands";
+import { leaveEditor, stopEditing, useThemeEditorStore } from "./themeEditor";
 
 export type ThemeSlot = ColorScheme;
 
@@ -162,17 +163,24 @@ function copiedId(resultJson: string): string | null {
 
 /**
  * Customise: copies the theme into the user's own (theme.duplicate: "<id>-copy", from the
- * original), then previews the copy. Applying it is the usual Apply. PR 3's editor opens
- * on the copy from here.
+ * original), previews the copy and opens the editor on it (theme.edit). Applying it is
+ * Save's "Use as my … theme now", or the usual Apply once the editor is closed.
  */
 export async function customiseTheme(id: string): Promise<string | null> {
+  if (!(await leaveEditor())) return null;
   const res = await runCommandForResult("theme.duplicate", { theme: id }, { quiet: true });
   const copy = res ? copiedId(res.resultJson) : null;
   if (!copy) return null;
   if (!(await whenTheme(copy))) return null;
   useThemePickerStore.setState({ query: "" });
   previewTheme(copy);
+  await editTheme(copy);
   return copy;
+}
+
+/** Edit (a user row) and Customise: theme.edit, whose ShowView opens the editor (stores/views.ts openThemeEditor). */
+export async function editTheme(id: string): Promise<boolean> {
+  return (await runCommandForResult("theme.edit", { theme: id }, { quiet: true })) !== null;
 }
 
 /**
@@ -184,6 +192,7 @@ export async function deleteTheme(id: string): Promise<boolean> {
   const name = themeById.get(id)?.name ?? id;
   const res = await runCommandForResult("theme.delete", { theme: id }, { quiet: true });
   if (!res) return false;
+  if (useThemeEditorStore.getState().id === id) stopEditing();
   useThemePickerStore.setState((s) => (s.preview === id ? { preview: null } : s));
   toast.success(`Deleted ${name}`, { description: movedSlots(res.resultJson) });
   return true;
