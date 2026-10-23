@@ -90,10 +90,10 @@ func TestShowThemeUndoTarget(t *testing.T) {
 	s := e.connected(CreateOptions{NoProject: true})
 	f := oceanDusk(t)
 	tests := []struct {
-		name                 string
-		in                   ThemeCard
-		wantPrev, wantVer    string
-		wantGone             bool
+		name              string
+		in                ThemeCard
+		wantPrev, wantVer string
+		wantGone          bool
 	}{
 		{name: "another theme", in: ThemeCard{Applied: true, Previous: "nord", PreviousVersion: "ignored", PreviousGone: true}, wantPrev: "nord", wantGone: true},
 		{name: "its own replaced version", in: ThemeCard{Applied: true, Previous: "ocean-dusk", PreviousVersion: "0123"}, wantPrev: "ocean-dusk", wantVer: "0123"},
@@ -113,4 +113,3 @@ func TestShowThemeUndoTarget(t *testing.T) {
 		})
 	}
 }
-
