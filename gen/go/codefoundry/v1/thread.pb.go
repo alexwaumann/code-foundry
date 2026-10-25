@@ -4672,8 +4672,13 @@ type ShowThreadHtmlRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// Absolute (the CLI resolves a relative path against its own directory).
-	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Title         string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Path  string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// A second card even when this page's card is still live (see reused).
+	Again bool `protobuf:"varint,4,opt,name=again,proto3" json:"again,omitempty"`
+	// The page also opens in the side panel (view.inline --panel): a card of it anywhere
+	// in the thread is reused, not only one since the last user message.
+	Panel         bool `protobuf:"varint,5,opt,name=panel,proto3" json:"panel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4729,9 +4734,30 @@ func (x *ShowThreadHtmlRequest) GetTitle() string {
 	return ""
 }
 
+func (x *ShowThreadHtmlRequest) GetAgain() bool {
+	if x != nil {
+		return x.Again
+	}
+	return false
+}
+
+func (x *ShowThreadHtmlRequest) GetPanel() bool {
+	if x != nil {
+		return x.Panel
+	}
+	return false
+}
+
 type ShowThreadHtmlResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Item          *ThreadItem            `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Item  *ThreadItem            `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	// The page was already shown in this thread since its last user message (with panel,
+	// at all), so no card was added: item is that card (its title updated when one was
+	// given). The GUI reloads a page's card when its file changes.
+	Reused bool `protobuf:"varint,2,opt,name=reused,proto3" json:"reused,omitempty"`
+	// When a card was added: an older card of the same page in the thread (shown before
+	// the last user message), which reloaded with the edit too; "" when none.
+	EarlierItemId string `protobuf:"bytes,3,opt,name=earlier_item_id,json=earlierItemId,proto3" json:"earlier_item_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4771,6 +4797,20 @@ func (x *ShowThreadHtmlResponse) GetItem() *ThreadItem {
 		return x.Item
 	}
 	return nil
+}
+
+func (x *ShowThreadHtmlResponse) GetReused() bool {
+	if x != nil {
+		return x.Reused
+	}
+	return false
+}
+
+func (x *ShowThreadHtmlResponse) GetEarlierItemId() string {
+	if x != nil {
+		return x.EarlierItemId
+	}
+	return ""
 }
 
 type ShowThreadThemeRequest struct {
@@ -5593,13 +5633,17 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x19ThreadSlashCommandsChange\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x10\n" +
 	"\x03seq\x18\x02 \x01(\x04R\x03seq\x128\n" +
-	"\bcommands\x18\x03 \x03(\v2\x1c.codefoundry.v1.SlashCommandR\bcommands\"^\n" +
+	"\bcommands\x18\x03 \x03(\v2\x1c.codefoundry.v1.SlashCommandR\bcommands\"\x8a\x01\n" +
 	"\x15ShowThreadHtmlRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\"H\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x14\n" +
+	"\x05again\x18\x04 \x01(\bR\x05again\x12\x14\n" +
+	"\x05panel\x18\x05 \x01(\bR\x05panel\"\x88\x01\n" +
 	"\x16ShowThreadHtmlResponse\x12.\n" +
-	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\"f\n" +
+	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\x12\x16\n" +
+	"\x06reused\x18\x02 \x01(\bR\x06reused\x12&\n" +
+	"\x0fearlier_item_id\x18\x03 \x01(\tR\rearlierItemId\"f\n" +
 	"\x16ShowThreadThemeRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12/\n" +
 	"\x05theme\x18\x02 \x01(\v2\x19.codefoundry.v1.ThemeItemR\x05theme\"I\n" +

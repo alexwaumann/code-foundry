@@ -43,16 +43,25 @@ var Renderings = []Rendering{
 		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink), or load the bridge, which does it."},
 	{"bridge", "A page shown with view.inline can call Code Foundry: <script src=\"/cf/bridge.js\"></script> gives window.cf. " +
 		"await cf.ready, then cf.thread is {id, name} and cf.theme {id, scheme, vars}. " +
-		"cf.run(verb, {arg: value}) runs a command as your thread's CLI would (the same verbs and args, values as strings) and " +
-		"resolves {text, json}. A verb that changes anything (all but reads such as thread get, settings get, pr checks) runs only " +
-		"from a click or key press in the page, and a confirmation still asks the user. It rejects with {code, message}, code one of " +
-		strings.Join(bridge.ErrorCodes, ", ") + ". " +
-		"cf.on(source, fn) calls fn(event) for each daemon event and returns an unsubscribe; sources: " +
-		strings.Join(bridge.Sources, ", ") + " (thread: this thread's status and pending requests, not its items). " +
+		"cf.run(verb, {arg: value}) runs a command as your thread's CLI would (the same verbs and args; values are strings, numbers " +
+		"or booleans, sent as strings) and resolves {text, json}, json being what the verb prints with --json (enum names such as " +
+		"THREAD_STATUS_IDLE, ISO times, zero fields left out). A verb that changes anything (all but reads such as thread get, " +
+		"settings get, pr checks) runs only from a click or key press in the page, within 5 seconds of it, so " +
+		"a quick read awaited first still counts. The app's own dialog asks the user where a confirmation is needed (never pass yes). " +
+		"It rejects with {code, message}, code one of " + strings.Join(bridge.ErrorCodes, ", ") + " (unavailable: an unknown verb, " +
+		"or a source the app does not hold now; invalid: a wrong or missing arg). " +
+		"cf.on(source, fn) calls fn with the source's current snapshot first (when it has one), then with the whole new snapshot " +
+		"after each change, and returns an unsubscribe. Snapshots are the app's view models, not --json's shape: lower-case values " +
+		"(idle), times as epoch ms in fields ending in AtMs. Sources: " + strings.Join(bridge.Sources, ", ") +
+		" (thread: this thread's status and pending requests, not its items; ui: notices as they happen, no snapshot; ember: only " +
+		"while Ember's board is open in the app, else the subscription is refused with unavailable and a message to show the user); " +
+		"the code-foundry-pages skill's reference/sources.md lists every field. " +
 		"cf.onTheme(fn) hears theme changes (the script applies them and acks); the card follows the page's height by itself " +
-		"(cf.resize() forces it). cf.storage(prefix) is localStorage under this thread's keys: storage persists across reloads and " +
-		"restarts and is shared by every page (raw localStorage too). A page runs only while it is on screen, so no background " +
-		"work: that is a plugin. Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead."},
+		"(cf.resize() forces it). cf.storage(prefix) is this thread's page storage, kept by Code Foundry (256 KiB): it persists across " +
+		"reloads and app restarts, every page of the thread shares it (one prefix each) and the same page in another thread starts empty; " +
+		"get/keys answer at once, set/remove/clear return a Promise; raw localStorage lasts only until the app quits. " +
+		"A page runs only while it is on screen, so no background " +
+		"work: a wake (thread subscribe) or a plugin. Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead."},
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
 		"Undo (back to what the slot showed just before: another theme, or the colours the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
 		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +

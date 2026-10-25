@@ -296,9 +296,12 @@ func (s *Store) pollFailed(ctx context.Context, cfg Config, err error, retryNow 
 func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, idle bool) {
 	s.applyViewer(ctx, res)
 	snap := s.Snapshot()
+	// The dashboard as the last poll left it, without merges shown early
+	// (pr_merged_overlay.go): the baseline of this poll's diffs.
+	prevDash := s.mergedShown.basis(snap.Dashboard)
 
 	// 1. Pull requests: everything the lists reference, resolved to details.
-	known := knownPullRequests(snap, &s.branches)
+	known := knownPullRequests(prevDash, &s.branches)
 	var fps []prFingerprint
 	seen := map[string]bool{}
 	add := func(list []prFingerprint) {
@@ -405,7 +408,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	// rollup in its fingerprints), so a pull request in several is compared as the
 	// first holds it.
 	var openLists, branchLists, mergedLists []prList
-	newDash := snap.Dashboard
+	newDash := prevDash
 	newDash.FetchedAt, newDash.Disabled = now, !cfg.Dashboards
 	switch {
 	case !cfg.Dashboards:
@@ -433,22 +436,22 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		// has no baseline.
 		dashList := func(name string, prev, next []PullRequest) prList {
 			return prList{prev: prev, next: next, checks: name != sectionMerged, reviewRequested: name == sectionReview,
-				baseline: !snap.Dashboard.Disabled && prev != nil}
+				baseline: !prevDash.Disabled && prev != nil}
 		}
 		for _, l := range []struct {
 			name       string
 			prev, next []PullRequest
 		}{
-			{sectionAuthored, snap.Dashboard.Authored, newDash.Authored},
-			{sectionReview, snap.Dashboard.ReviewRequested, newDash.ReviewRequested},
-			{sectionReviewed, snap.Dashboard.Reviewed, newDash.Reviewed},
+			{sectionAuthored, prevDash.Authored, newDash.Authored},
+			{sectionReview, prevDash.ReviewRequested, newDash.ReviewRequested},
+			{sectionReviewed, prevDash.Reviewed, newDash.Reviewed},
 		} {
 			if res.Sections[l.name].Err == nil {
 				openLists = append(openLists, dashList(l.name, l.prev, l.next))
 			}
 		}
 		if res.Sections[sectionMerged].Err == nil {
-			mergedLists = append(mergedLists, dashList(sectionMerged, snap.Dashboard.RecentlyMerged, newDash.RecentlyMerged))
+			mergedLists = append(mergedLists, dashList(sectionMerged, prevDash.RecentlyMerged, newDash.RecentlyMerged))
 		}
 	}
 	newDash.LastError = strings.Join(dashErrs, "; ")
@@ -459,12 +462,12 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	// poll brings them (this one already did when it carried stats). The first poll
 	// has no previous list to compare with.
 	if plan.stats == nil && len(plan.sections) > 0 && res.Sections[sectionMerged].Err == nil &&
-		!snap.Dashboard.FetchedAt.IsZero() && !snap.Dashboard.Disabled {
-		if p, ok := mergeObserved(snap.Dashboard.RecentlyMerged, newDash.RecentlyMerged, login, monthWindows(now, 1)[0]); ok {
+		!prevDash.FetchedAt.IsZero() && !prevDash.Disabled {
+		if p, ok := mergeObserved(prevDash.RecentlyMerged, newDash.RecentlyMerged, login, monthWindows(now, 1)[0]); ok {
 			s.statsDueNow("merge observed", "pr", fmt.Sprintf("%s#%d", p.Repo, p.Number))
 		}
 	}
-	dashChanged := !sameDashboard(snap.Dashboard, newDash)
+	var dashChanged bool
 
 	type branchUpdate struct {
 		k  branchKey
@@ -495,7 +498,10 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 
 	var repoChanged []string
 	s.updateSnapshot(func(n *Snapshot) {
-		n.Dashboard = newDash
+		// Under the snapshot's lock, so a merge shown meanwhile is not lost.
+		shown := s.mergedShown.apply(newDash, now)
+		dashChanged = !sameDashboard(n.Dashboard, shown)
+		n.Dashboard = shown
 		n.Poll = PollState{FetchedAt: now, LastError: pollErr}
 		for slug, ci := range cis {
 			r := n.Repos[slug]
@@ -612,10 +618,10 @@ func canonicalSlug(slug string, rr repoResult) *string {
 	return &canon
 }
 
-// knownPullRequests indexes the pull requests the published state already holds, by
+// knownPullRequests indexes the pull requests d and the branch lists already hold, by
 // node id: the poll's diff baseline. Rebuilding it per poll keeps no second copy of the
 // state to drift.
-func knownPullRequests(snap *Snapshot, b *branchStates) map[string]PullRequest {
+func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 	out := map[string]PullRequest{}
 	addAll := func(prs []PullRequest) {
 		for _, p := range prs {
@@ -624,7 +630,6 @@ func knownPullRequests(snap *Snapshot, b *branchStates) map[string]PullRequest {
 			}
 		}
 	}
-	d := snap.Dashboard
 	addAll(d.RecentlyMerged)
 	addAll(d.Reviewed)
 	addAll(d.ReviewRequested)

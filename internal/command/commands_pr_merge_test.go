@@ -103,7 +103,7 @@ func TestPullRequestMerge(t *testing.T) {
 
 func TestPullRequestMergeConfirmMessage(t *testing.T) {
 	pr := func(base, head string, fork bool) *v1.PullRequestDetail {
-		return &v1.PullRequestDetail{PullRequest: &v1.PullRequest{Number: 142, BaseRef: base, HeadRef: head, IsCrossRepository: fork,
+		return &v1.PullRequestDetail{PullRequest: &v1.PullRequest{Number: 142, Title: "Sidebar polish", BaseRef: base, HeadRef: head, IsCrossRepository: fork,
 			HeadSha: "e2e0142e2e0142e2e0142e2e0142e2e0142e2e01"}, CommitCount: 3, DefaultBranch: "main"}
 	}
 	shown := "e2e0142e2e0142e2e0142e2e0142e2e0142e2e01"
@@ -115,25 +115,32 @@ func TestPullRequestMergeConfirmMessage(t *testing.T) {
 		want   string
 	}{
 		{name: "squash, head shown", detail: pr("main", "feat/sidebar", false), args: map[string]string{"method": "squash", "head-sha": shown},
-			want: "Merge #142 into main with squash?"},
+			want: "Merge #142 “Sidebar polish” into main in o/r with squash?"},
 		{name: "no head-sha: names the commits that merge", detail: pr("main", "feat/sidebar", false), args: map[string]string{"method": "squash"},
-			want: "Merge #142 (3 commits, head e2e0142) into main with squash?"},
+			want: "Merge #142 “Sidebar polish” (3 commits, head e2e0142) into main in o/r with squash?"},
 		{name: "merge commit, deleting the branch", detail: pr("main", "feat/sidebar", false),
 			args: map[string]string{"method": "merge", "delete-branch": "true", "head-sha": shown},
-			want: "Merge #142 into main with a merge commit? Branch origin/feat/sidebar is deleted afterwards."},
+			want: "Merge #142 “Sidebar polish” into main in o/r with a merge commit? Branch origin/feat/sidebar is deleted afterwards."},
 		{name: "a fork's branch is not mentioned", detail: pr("develop", "patch-1", true),
 			args: map[string]string{"method": "rebase", "delete-branch": "true", "head-sha": shown},
-			want: "Merge #142 into develop with rebase?"},
+			want: "Merge #142 “Sidebar polish” into develop in o/r with rebase?"},
 		{name: "the default branch is not mentioned", detail: pr("release", "main", false),
 			args: map[string]string{"method": "squash", "delete-branch": "true", "head-sha": shown},
-			want: "Merge #142 into release with squash?"},
+			want: "Merge #142 “Sidebar polish” into release in o/r with squash?"},
 		{name: "the base branch is not mentioned", detail: pr("release", "release", false),
 			args: map[string]string{"method": "squash", "delete-branch": "true", "head-sha": shown},
-			want: "Merge #142 into release with squash?"},
+			want: "Merge #142 “Sidebar polish” into release in o/r with squash?"},
 		{name: "one commit", detail: func() *v1.PullRequestDetail { d := pr("main", "x", false); d.CommitCount = 1; return d }(),
-			args: map[string]string{"method": "squash"}, want: "Merge #142 (1 commit, head e2e0142) into main with squash?"},
+			args: map[string]string{"method": "squash"}, want: "Merge #142 “Sidebar polish” (1 commit, head e2e0142) into main in o/r with squash?"},
+		{name: "no title: none quoted", detail: func() *v1.PullRequestDetail { d := pr("main", "x", false); d.PullRequest.Title = ""; return d }(),
+			args: map[string]string{"method": "squash", "head-sha": shown}, want: "Merge #142 into main in o/r with squash?"},
+		{name: "a long title is cut", detail: func() *v1.PullRequestDetail {
+			d := pr("main", "x", false)
+			d.PullRequest.Title = strings.Repeat("a", 79) + "bc"
+			return d
+		}(), args: map[string]string{"method": "squash", "head-sha": shown}, want: "Merge #142 “" + strings.Repeat("a", 79) + "…” into main in o/r with squash?"},
 		{name: "detail unreadable: the static message", err: connect.NewError(connect.CodeUnavailable, errors.New("offline")),
-			args: map[string]string{"method": "squash"}, want: "Merge #142 with squash?"},
+			args: map[string]string{"method": "squash"}, want: "Merge #142 in o/r with squash?"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

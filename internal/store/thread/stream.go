@@ -142,6 +142,8 @@ type threadCmd struct {
 	reseed    *seed   // Reseed (reseed.go)
 	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
 	verb      *Item   // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
+	// reuse, with verb, may answer with an item already in the log instead.
+	reuse     func(itemWriter) (Item, bool)
 	requestID string
 	decision  Decision
 	reply     chan threadReply
@@ -741,7 +743,7 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 	case cmd.wakeLimit:
 		rep.item = r.onWakeLimit()
 	case cmd.verb != nil:
-		rep.item = r.onVerbItem(*cmd.verb)
+		rep.item = r.onVerbItem(*cmd.verb, cmd.reuse)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}

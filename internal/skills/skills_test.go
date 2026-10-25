@@ -298,14 +298,17 @@ func TestRender(t *testing.T) {
 		"(/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-help/reference/themes.md)",
 		"Body text keeps 7:1, status text\n4.5:1: for less contrast move `surface` and `canvas` toward the text, never the text",
 		"Fix every\npair the save's `contrast:` lists before you reply", "needs\n`--replace`, once the user asked",
-		"offer `theme set-scheme light`, never switch unasked"} {
+		"offer `theme set-scheme light`, never switch unasked",
+		// Reminders and schedules are wakes, never the session's cron (bridge-fix-c-daemon).
+		"To be told or reminded later, or something done on a schedule", "`code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`",
+		"never Claude Code's cron or a background `--watch`"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}
 	}
 	// Its description names the words of the prompts that loaded no skill.
 	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR"} {
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder"} {
 		if !strings.Contains(entryDesc, w) {
 			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}

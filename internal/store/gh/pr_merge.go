@@ -124,6 +124,8 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	// poll soon, with the current month's stats.
 	if res.Merged {
 		s.statsDueNow("merged", "pr", k.String())
+		// The searches trail the merge: show it now (pr_merged_overlay.go).
+		s.markMerged(k)
 	}
 	s.pollSoon()
 	return res, nil

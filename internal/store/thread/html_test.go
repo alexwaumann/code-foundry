@@ -3,10 +3,14 @@ package thread
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 func TestHTMLPage(t *testing.T) {
@@ -82,18 +86,21 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := e.connected(CreateOptions{NoProject: true})
-	live, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Hello")
+	res, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Hello", ShowHTMLOptions{})
+	live := res.Item
 	if err != nil {
 		t.Fatal(err)
 	}
 	if live.Kind != KindHTML || live.HTML == nil || live.HTML.Path != "hello.html" || live.HTML.BaseDir != e.home || live.HTML.Title != "Hello" {
 		t.Fatalf("live item = %+v (html %+v)", live, live.HTML)
 	}
-	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), ""); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
+	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), "", ShowHTMLOptions{}); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
 		t.Fatalf("missing file: err = %v, want ErrNotFound saying no file at the path", err)
 	}
 	e.restart()
-	stopped, err := e.m.ShowHTML(e.ctx(), s.ID, page, "")
+	// again: a second card on purpose (the first is still live: no user message since).
+	res, err = e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
+	stopped := res.Item
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +121,7 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 	if len(got) != 2 || got[0].ID != live.ID || got[1].ID != stopped.ID || got[0].HTML.Title != "Hello" || got[1].HTML.Path != "hello.html" {
 		t.Fatalf("reloaded html items = %+v", got)
 	}
-	if _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, ""); err == nil {
+	if _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, "", ShowHTMLOptions{}); err == nil {
 		t.Fatal("unknown thread: no error")
 	}
 }
@@ -160,7 +167,8 @@ func TestPageOutsideATurnEndsNoTurn(t *testing.T) {
 			if err := os.WriteFile(page, []byte("<p>hi</p>"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			it, err := e.m.ShowHTML(e.ctx(), s.ID, page, "")
+			res, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
+			it := res.Item
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -181,6 +189,94 @@ func TestPageOutsideATurnEndsNoTurn(t *testing.T) {
 			}
 			if results != tt.turns || len(items) == 0 || items[len(items)-1].ID != it.ID {
 				t.Errorf("want %d result turn ends and the page last:\n%s", tt.turns, describeItems(items))
+			}
+		})
+	}
+}
+
+// shownHTML: the card of a page shown since the last message the user sent (a queued
+// one does not count), matched by the path it shows whether stored relative or not.
+func TestLiveHTML(t *testing.T) {
+	page := func(id, path, base string) Item {
+		return Item{ID: id, Kind: KindHTML, HTML: &HTMLPage{Path: path, BaseDir: base}}
+	}
+	user := func(id string, queued bool) Item { return Item{ID: id, Kind: KindUserMessage, Queued: queued} }
+	text := Item{ID: "a-1", Kind: KindAssistantText}
+	tests := []struct {
+		name     string
+		items    []Item
+		anywhere bool
+		want     string // the item id, "" for none
+	}{
+		{"same turn, relative path", []Item{user("u-1", false), page("html-1", "pages/p.html", "/h/w"), text}, false, "html-1"},
+		{"same turn, absolute path", []Item{user("u-1", false), page("html-1", "/h/w/pages/p.html", "/elsewhere")}, false, "html-1"},
+		{"the newest of two", []Item{page("html-1", "pages/p.html", "/h/w"), page("html-2", "pages/p.html", "/h/w")}, false, "html-2"},
+		{"no user message at all", []Item{page("html-1", "pages/p.html", "/h/w")}, false, "html-1"},
+		{"a user message since", []Item{page("html-1", "pages/p.html", "/h/w"), user("u-2", false), text}, false, ""},
+		{"a queued message since does not count", []Item{page("html-1", "pages/p.html", "/h/w"), user("u-2", true)}, false, "html-1"},
+		{"another page", []Item{user("u-1", false), page("html-1", "pages/q.html", "/h/w")}, false, ""},
+		{"same name, other folder", []Item{page("html-1", "p.html", "/h/w")}, false, ""},
+		{"anywhere: a user message since", []Item{page("html-1", "pages/p.html", "/h/w"), user("u-2", false), text}, true, "html-1"},
+		{"anywhere: never shown", []Item{user("u-1", false), page("html-1", "pages/q.html", "/h/w")}, true, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := newThreadLog("s", bus.New(), time.Now, tt.items)
+			got, ok := log.shownHTML("/h/w/pages/p.html", tt.anywhere)
+			if ok != (tt.want != "") || got.ID != tt.want {
+				t.Errorf("shownHTML = %q, %t; want %q", got.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+// ShowHTML of a page still live adds no card: it returns that card, renamed when a new
+// title is given; again adds one anyway.
+func TestShowHTMLReusesTheLiveCard(t *testing.T) {
+	e := newEnv(t)
+	if err := os.MkdirAll(e.home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	page := filepath.Join(e.home, "p.html")
+	if err := os.WriteFile(page, []byte("<p>hi</p>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, live := range []bool{true, false} {
+		t.Run(fmt.Sprintf("live %t", live), func(t *testing.T) {
+			var s Thread
+			if live {
+				s = e.connected(CreateOptions{NoProject: true})
+			} else {
+				s = e.create(CreateOptions{NoProject: true})
+			}
+			first, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Tracker", ShowHTMLOptions{})
+			if err != nil || first.Reused || first.Earlier != "" {
+				t.Fatalf("first: %+v, err %v", first, err)
+			}
+			again, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
+			if err != nil || !again.Reused || again.Item.ID != first.Item.ID || again.Item.HTML.Title != "Tracker" {
+				t.Fatalf("second: %+v err %v; want the first card, title kept", again, err)
+			}
+			renamed, err := e.m.ShowHTML(e.ctx(), s.ID, page, "PR tracker", ShowHTMLOptions{})
+			if err != nil || !renamed.Reused || renamed.Item.ID != first.Item.ID || renamed.Item.HTML.Title != "PR tracker" || renamed.Item.HTML.Path != "p.html" {
+				t.Fatalf("renamed: %+v err %v", renamed, err)
+			}
+			extra, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
+			if err != nil || extra.Reused || extra.Item.ID == first.Item.ID || extra.Earlier != first.Item.ID {
+				t.Fatalf("again: %+v err %v; want a new card naming the first", extra, err)
+			}
+			snap, err := e.m.Items(e.ctx(), s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n := 0
+			for _, it := range snap.Items {
+				if it.Kind == KindHTML {
+					n++
+				}
+			}
+			if n != 2 {
+				t.Errorf("%d html items, want 2", n)
 			}
 		})
 	}

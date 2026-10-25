@@ -34,6 +34,9 @@ type InlineResult struct {
 	Path string `json:"path"`
 	// Panel is the --panel result: the File tab's ShowView (view.panel.file's result).
 	Panel *PanelResult `json:"panel,omitempty"`
+	// Reused is set when the page's card was still live (shown since the thread's last
+	// user message, or ever with --panel), so no card was added: Item is that card.
+	Reused bool `json:"reused,omitempty"`
 	// Warnings say what the page misses to look and fit right (pageWarnings); the CLI
 	// prints them as warning lines too.
 	Warnings []string `json:"warnings,omitempty"`
@@ -48,22 +51,83 @@ const (
 	WarnNoResize = "page does not post cf:resize, so its card keeps the default height; on load, post " +
 		`{type: "cf:resize", height: document.body.scrollHeight} to parent`
 	// WarnNoBridge: the page calls window.cf without the script that defines it
-	// (docs/notes/bridge-3-skill.md).
+	// (docs/notes/bridge-3-skill.md). It replaces WarnNoResize: the script sizes the card.
 	WarnNoBridge = "page uses cf.* but does not load /cf/bridge.js, so window.cf is undefined; add " +
 		`<script src="/cf/bridge.js"></script> before your own scripts`
+	// The bridge's misuses a test round found (docs/notes/bridge-fix-c-daemon.md).
+	WarnPolling = "page runs cf.run on a timer (setInterval or setTimeout): use cf.on(source, fn) for live data " +
+		"(thread-list, thread, gh, settings, …) and re-run a read only inside its callback"
+	WarnConfirm = "page calls confirm(): the app asks the user in its own dialog before a verb that needs it " +
+		"(merging a PR, archiving a busy thread); remove it"
+	WarnReservedArg = "page passes yes or force to cf.run: leave them out; the app's dialog asks the user when a " +
+		"verb needs it (yes is refused)"
+	// WarnShownBefore takes the earlier card's item id.
+	WarnShownBefore = "this page was already shown in this thread (%s), and that card reloaded with your edit: " +
+		"this second card runs the page again; after an edit, do not run view.inline for the same file"
 )
 
-// bridgeCall is how a page uses the bridge's window.cf.
-var bridgeCall = regexp.MustCompile(`\bcf\.(run|on|ready|storage|thread)\b`)
+var (
+	// bridgeCall is how a page uses the bridge's window.cf.
+	bridgeCall = regexp.MustCompile(`\bcf\.(run|on|ready|storage|thread)\b`)
+	// confirmCall is window.confirm, called bare or through window.
+	confirmCall = regexp.MustCompile(`(?:^|[^\w.$]|window\.)confirm\s*\(`)
+	// reservedArg is yes or force as a key of a cf.run args object.
+	reservedArg = regexp.MustCompile(`cf\.run\(\s*[^,)]+,\s*\{(?:[^}]*?[,\s])?(?:"(?:yes|force)"|'(?:yes|force)'|yes|force)\s*:`)
+	// timerCall is the start of a setInterval or setTimeout call.
+	timerCall = regexp.MustCompile(`\bset(Interval|Timeout)\s*\(`)
+)
 
 // pageReadMax is how much of a page pageWarnings reads.
 const pageReadMax = 256 << 10
 
+// timerReach is how far after a setTimeout pageWarnings looks for a cf.run in its
+// callback.
+const timerReach = 400
+
+// pageCheck is one thing a page may miss or get wrong: warn, when it says so for the
+// page's text (with hasBridge: whether it loads /cf/bridge.js).
+type pageCheck struct {
+	warning string
+	warn    func(text string, hasBridge bool) bool
+}
+
+// pageChecks are pageWarnings' checks, in the order the warnings print. Plain text
+// tests: a page that names them only in a comment passes, or warns, which is fine for a
+// hint.
+var pageChecks = []pageCheck{
+	{WarnNoThemeCSS, func(text string, _ bool) bool { return !strings.Contains(text, "/cf/theme.css") }},
+	// The bridge posts cf:resize itself; a page that uses cf.* without it gets
+	// WarnNoBridge instead, which fixes both (hand-written resize code is what the
+	// bridge replaced).
+	{WarnNoResize, func(text string, hasBridge bool) bool {
+		return !hasBridge && !strings.Contains(text, "cf:resize") && !bridgeCall.MatchString(text)
+	}},
+	{WarnNoBridge, func(text string, hasBridge bool) bool { return !hasBridge && bridgeCall.MatchString(text) }},
+	{WarnPolling, pollsCfRun},
+	{WarnConfirm, func(text string, _ bool) bool { return confirmCall.MatchString(text) }},
+	{WarnReservedArg, func(text string, _ bool) bool { return reservedArg.MatchString(text) }},
+}
+
+// pollsCfRun reports whether a page re-runs cf.run on a timer: any setInterval in a page
+// that calls cf.run, or a setTimeout whose callback (the next timerReach bytes) does.
+func pollsCfRun(text string, _ bool) bool {
+	if !strings.Contains(text, "cf.run(") {
+		return false
+	}
+	for _, m := range timerCall.FindAllStringSubmatchIndex(text, -1) {
+		if text[m[2]:m[3]] == "Interval" {
+			return true
+		}
+		if end := min(len(text), m[1]+timerReach); strings.Contains(text[m[1]:end], "cf.run(") {
+			return true
+		}
+	}
+	return false
+}
+
 // pageWarnings reads the page shown (through Files, as view.panel.file's check does) and
-// says what it misses: the theme stylesheet, the resize message (which the bridge script
-// posts itself), the bridge script when it uses window.cf. A plain substring test:
-// a page that names them only in a comment passes, which is fine for a hint. Nothing when
-// the page cannot be read (it was shown; the GUI says what is wrong).
+// says what it misses or gets wrong (pageChecks). Nothing when the page cannot be read
+// (it was shown; the GUI says what is wrong).
 func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string {
 	if d.Files == nil {
 		return nil
@@ -73,17 +137,12 @@ func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string 
 		return nil
 	}
 	text := string(res.Msg.GetContents())
-	var out []string
-	if !strings.Contains(text, "/cf/theme.css") {
-		out = append(out, WarnNoThemeCSS)
-	}
-	// The bridge posts cf:resize itself.
 	hasBridge := strings.Contains(text, bridge.Path)
-	if !hasBridge && !strings.Contains(text, "cf:resize") {
-		out = append(out, WarnNoResize)
-	}
-	if !hasBridge && bridgeCall.MatchString(text) {
-		out = append(out, WarnNoBridge)
+	var out []string
+	for _, c := range pageChecks {
+		if c.warn(text, hasBridge) {
+			out = append(out, c.warning)
+		}
 	}
 	return out
 }
@@ -104,6 +163,7 @@ func (d ViewDeps) inlineCommand() Command {
 				Description: "The .html or .htm file, under the home directory"},
 			{Name: "title", Type: String, Description: "Shown on its row"},
 			{Name: "panel", Type: Bool, Description: "Also open it in the thread's side panel"},
+			{Name: "again", Type: Bool, Description: "A second card though one is live (if the user asked)"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread to show it in (default: yours)"},
 		},
@@ -125,14 +185,25 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		id = nonEmptyStr(res.Msg.GetThread().GetId(), id)
 		name = nonEmptyStr(res.Msg.GetThread().GetName(), id)
 	}
-	res, err := d.Inline.ShowHtml(ctx, connect.NewRequest(&v1.ShowThreadHtmlRequest{ThreadId: id, Path: a.Path("path"), Title: a.String("title")}))
+	res, err := d.Inline.ShowHtml(ctx, connect.NewRequest(&v1.ShowThreadHtmlRequest{ThreadId: id, Path: a.Path("path"), Title: a.String("title"),
+		Again: a.Bool("again"), Panel: a.Bool("panel")}))
 	if err != nil {
 		return Result{}, err
 	}
 	it := res.Msg.GetItem()
-	out := InlineResult{Thread: id, Item: it.GetId(), Path: nonEmptyStr(it.GetHtml().GetPath(), a.Path("path"))}
+	out := InlineResult{Thread: id, Item: it.GetId(), Path: nonEmptyStr(it.GetHtml().GetPath(), a.Path("path")), Reused: res.Msg.GetReused()}
 	out.Warnings = d.pageWarnings(ctx, it.GetHtml().GetBaseDir(), a.Path("path"))
+	if e := res.Msg.GetEarlierItemId(); e != "" && !a.Bool("again") {
+		// Shown in an earlier turn: that card reloaded with the edit too, and both run the
+		// page now (docs/notes/bridge-fix-c-daemon.md).
+		out.Warnings = append(out.Warnings, fmt.Sprintf(WarnShownBefore, e))
+	}
 	msg := fmt.Sprintf("shown %s in thread %s", out.Path, name)
+	if out.Reused {
+		// The edit already reloaded that card (docs/notes/bridge-fix-c-daemon.md).
+		msg = fmt.Sprintf("updated the page already shown in thread %s (%s): its card reloads after every edit, so the user sees "+
+			"the change there and no card was added; run view.inline only for a new file", name, out.Path)
+	}
 	if a.Bool("panel") {
 		pr, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, d.fileCheck)
 		if err != nil {
@@ -140,9 +211,15 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		}
 		if p, ok := pr.JSON.(PanelResult); ok {
 			out.Panel = &p
-			if p.Windows == 0 {
+			switch {
+			case out.Reused && p.Windows == 0:
+				msg = fmt.Sprintf("%s is already shown inline in thread %s, so no card was added; not opened in its side panel (%s)",
+					out.Path, name, NoWindowMessage)
+			case out.Reused:
+				msg = fmt.Sprintf("opened %s in thread %s's side panel; it was shown inline before, so no card was added", out.Path, name)
+			case p.Windows == 0:
 				msg += " (" + NoWindowMessage + ")"
-			} else {
+			default:
 				msg += " and in its side panel"
 			}
 		}

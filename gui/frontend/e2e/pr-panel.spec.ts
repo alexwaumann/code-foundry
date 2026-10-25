@@ -840,7 +840,7 @@ test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the 
 
   await page.getByTestId("pr-merge-method-squash").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Merge #142 into main with squash? Branch origin/feat/sidebar is deleted afterwards.");
+  await expect(dialog).toContainText(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with squash? Branch origin/feat/sidebar is deleted afterwards.`);
   await page.getByTestId("confirm-ok").click();
   // With the head the panel shows: the daemon refuses if GitHub's moved since.
   const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true", "head-sha": HEAD_142 };
@@ -883,7 +883,7 @@ test("the merge button: draft, read-only and merged pull requests; unchecking th
   await expect(page.getByTestId("pr-merge-delete-branch")).toHaveAttribute("aria-checked", "false");
   await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
   await page.getByTestId("pr-merge-method-merge").click();
-  await expect(page.getByTestId("confirm-dialog")).toContainText("Merge #142 into main with a merge commit?");
+  await expect(page.getByTestId("confirm-dialog")).toContainText(`Merge #142 “feat(gui): virtualized sidebar tree with thread rows” into main in ${SLUG} with a merge commit?`);
   await expect(page.getByTestId("confirm-dialog")).not.toContainText("deleted afterwards");
   await page.getByTestId("confirm-cancel").click();
   // The dialog hands focus back as it unmounts: a menu opened before that would close.
@@ -928,7 +928,7 @@ test("#146 from a fork: the branch cannot be deleted, and a merge asking anyway 
   const args = { "repo-slug": SLUG, number: "146", method: "squash", "delete-branch": "true", "head-sha": HEAD_146 };
   await page.evaluate(`import("/src/stores/commands.ts").then((m) => { void m.runCommandForResult("pr.merge", ${JSON.stringify(args)}); })`);
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Merge #146 into main with squash?");
+  await expect(dialog).toContainText(`Merge #146 “fix(cli): typo in --help” into main in ${SLUG} with squash?`);
   await expect(dialog).not.toContainText("deleted afterwards");
   await page.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("pr-state")).toHaveText("Merged");
