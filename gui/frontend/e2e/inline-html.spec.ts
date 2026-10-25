@@ -45,7 +45,7 @@ test("an inline page renders in its card, follows cf:resize, and its frame runs 
   const frame = card.getByTestId("thread-html-frame");
   await expect(frame).toBeVisible();
   await expect(frame).toHaveAttribute("sandbox", /allow-scripts/);
-  await expect(frame).not.toHaveAttribute("sandbox", /allow-same-origin/);
+  await expect(frame).toHaveAttribute("sandbox", /allow-same-origin/);
   const doc = card.frameLocator('[data-testid="thread-html-frame"]');
   await expect(doc.locator("#hello")).toHaveText("Hello");
   await doc.locator("#wave").click();

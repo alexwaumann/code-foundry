@@ -69,7 +69,7 @@ export function parsePageMessage(data: unknown): PageMessage | null {
     return { kind: "on", id, source: m.source };
   }
   if (typeof m.verb !== "string" || m.verb.trim() === "") return { kind: "bad", id, message: "cf:run needs a verb" };
-  const raw = m.args ?? {};
+  const raw: unknown = m.args ?? {};
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { kind: "bad", id, message: "cf:run args must be an object of strings" };
   const args: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {

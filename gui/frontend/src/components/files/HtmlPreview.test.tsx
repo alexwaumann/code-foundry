@@ -27,7 +27,9 @@ describe("HtmlPreview", () => {
     expect(frame.getAttribute("src")).toBe("http://127.0.0.1:1/preview/g/docs/a.html");
     expect(frame.getAttribute("sandbox")).toBe(HTML_PREVIEW_SANDBOX);
     expect(frame.hasAttribute("srcdoc")).toBe(false);
-    expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-same-origin");
+    // Same-origin for the page's storage: its origin is the daemon's pages listener (docs/notes/bridge-2-gui.md).
+    expect(HTML_PREVIEW_SANDBOX).toContain("allow-same-origin");
+    expect(frame.getAttribute("allow")).toBe("clipboard-write");
     expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-top-navigation");
     expect(screen.getByTestId("file-html-footer").textContent).toContain("loads files under ~/proj");
   });

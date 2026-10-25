@@ -91,7 +91,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
 
   const listed = (): Promise<readonly CommandView[]> => {
     if (threadId === null) return Promise.resolve([]);
-    commands ??= listCommands(getUiContext({ kind: "thread", id: threadId }), { includeUnavailable: true }).catch((err: unknown) => {
+    const id = threadId;
+    commands ??= Promise.resolve()
+      .then(() => listCommands(getUiContext({ kind: "thread", id }), { includeUnavailable: true }))
+      .catch((err: unknown) => {
       // Asked again by the next ready or run.
       commands = null;
       throw err;
@@ -141,21 +144,21 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       post(forDoc, errorResult(id, NO_THREAD));
       return;
     }
-    const spec = await listed().then(
-      (cmds) => cmds.find((c) => c.name === verb),
-      () => undefined,
-    );
-    const callArgs = spec ? fillThreadArgs(args, spec.args, threadId) : args;
-    let declined = false;
+    const asked = { declined: false };
     try {
+      const spec = await listed().then(
+        (cmds) => cmds.find((c) => c.name === verb),
+        () => undefined,
+      );
+      const callArgs = spec ? fillThreadArgs(args, spec.args, threadId) : args;
       const res = await invokeConfirmed(verb, callArgs, getUiContext({ kind: "thread", id: threadId }), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
         around: async (ask) => {
           const yes = await queued(forDoc, ask);
-          if (!yes) declined = true;
+          if (!yes) asked.declined = true;
           return yes;
         },
       });
-      if (declined) post(forDoc, errorResult(id, { code: "declined", message: "the user declined" }, res));
+      if (asked.declined) post(forDoc, errorResult(id, { code: "declined", message: "the user declined" }, res));
       else post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
     } catch (err) {
       post(forDoc, errorResult(id, bridgeErrorOf(err)));
