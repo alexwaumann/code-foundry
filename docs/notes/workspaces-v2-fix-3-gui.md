@@ -4,9 +4,10 @@ Status: done on branch `cf/workspaces-v2-fix-gui` (off `main` after #349-#356). 
 findings of a GUI fuzz round over the Projects page's workspace cards, New workspace, Also
 in, the removed Workspace surface and the Add Project scan. Two other fixers ran in
 parallel: `cf/workspaces-v2-fix-workspace` (the workspace store) and
-`cf/workspaces-v2-fix-threads` (the thread store). PR 3 (`cf/workspaces-v2-composer`, not
-merged) owns the composer, the sidebar, `HeaderActions.tsx` and `lib/threadRow.ts`; none
-of them is touched here.
+`cf/workspaces-v2-fix-threads` (the thread store). PR 3 (`cf/workspaces-v2-composer`)
+owns the composer, the sidebar, `HeaderActions.tsx` and `lib/threadRow.ts`; none of them is
+touched here. PR 3 merged (#357) while this was built; the branch is rebased on it, and the
+card's name order reuses its `lib/projectSet.ts byName`.
 
 ## Per finding
 
@@ -22,8 +23,7 @@ of them is touched here.
    (`WorkspaceNameEditor.test.tsx`) and e2e (`workspace-cards.spec.ts`, rename test).
 3. **Removing a synthetic workspace under running threads.** Skipped: the daemon side
    (refuse while threads run in the folder) is `cf/workspaces-v2-fix-workspace`'s; the
-   sidebar badge and line 2 are PR 3's. The header's location chip is PR 3's
-   `threadRowModel` too.
+   sidebar badge, line 2 and the header's location chip are PR 3's (`threadRowModel`).
 4. **The star on a project named "workspace".** `setWorkspacePrimary`,
    `addWorkspaceProject` and `removeWorkspaceProject` send the project's id, never its name
    (the daemon reads "workspace" in any case as the folder; ids never collide). New
@@ -114,7 +114,8 @@ of them is touched here.
   `selectionFolder`/`folderTab`, `pruneCollapsedWorkspaces`.
 * `make gui-e2e`: `workspace-cards.spec.ts` (7 new tests: findings 4, 6, 7, 9, 10, 13, 14;
   the rename test extended for 2; set primary, add/remove and Edit instructions updated)
-  and `addproject-workspace.spec.ts` (Escape back, the cursor on the new card).
+  and `addproject-workspace.spec.ts` (Escape back, the cursor on the new card). The whole
+  suite on the rebased branch: 602 passed.
 * Live app (isolated home, scratch `~/cfv2-fix-c/product` with six repos, a root
   `CLAUDE.md` and 11 skills, added with `project add-workspace`; a Haiku 5.5 medium thread
   started in the workspace's folder): the card listed api, billing, docs-site, mobile, web,
