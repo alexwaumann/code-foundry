@@ -89,7 +89,7 @@ async function samples(): Promise<Record<string, unknown>> {
     plugin: [toPluginView(create(PluginSchema, { commands: [{}], surfaces: [{}] }))],
     terminal: [toTerminalView(create(TerminalSchema))],
     project: [toProjectView(create(ProjectSchema, { worktrees: [create(WorktreeSchema, { status: create(GitStatusSchema) })] }))],
-    workspace: [toWorkspaceView(create(WorkspaceSchema, { members: [{}] }))],
+    workspace: [toWorkspaceView(create(WorkspaceSchema, { members: [""] }))],
     settings: toSettingsSnapshotView(create(SettingsSnapshotSchema, { issues: [create(SettingIssueSchema)] })),
     update: toUpdateStatusView(create(UpdateStatusSchema)),
     ember: toEmberBoardView(create(EmberBoardSchema, { status: { counts: {} }, tasks: [{ thread: {} }], timers: [{}] })),
