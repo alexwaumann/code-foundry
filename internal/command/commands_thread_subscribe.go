@@ -407,8 +407,9 @@ func threadUnsubscribe(b ThreadBackend) Command {
 
 func threadSubscriptions(b ThreadBackend) Command {
 	return Command{
-		Name:  "thread.subscriptions",
-		Title: "List Thread Wake Subscriptions",
+		Name:     "thread.subscriptions",
+		ReadOnly: true,
+		Title:    "List Thread Wake Subscriptions",
 		Description: "List a thread's wake subscriptions (default: the thread this runs in; all for every thread) " +
 			"with their targets' status and how often they fired.",
 		Category:     "Thread",

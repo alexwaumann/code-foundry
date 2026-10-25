@@ -59,8 +59,9 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		"permissions you were shown; enabling refuses if the plugin asks for anything else by then (--yes alone consents to what it asks)"}
 	return r.RegisterAll(
 		Command{
-			Name:  "plugin.list",
-			Title: "List Plugins",
+			Name:     "plugin.list",
+			ReadOnly: true,
+			Title:    "List Plugins",
 			Description: "List the plugins in ~/.code-foundry/plugins: version, state (disabled, starting, running, crashed, " +
 				"failed), whether enabling needs consent, their commands, and their surfaces with whether each is " +
 				"available in the context (--context-thread, --context-project).",
@@ -143,8 +144,9 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		Command{
-			Name:  "plugin.logs",
-			Title: "Show Plugin Log",
+			Name:     "plugin.logs",
+			ReadOnly: true,
+			Title:    "Show Plugin Log",
 			Description: "Print the end of a plugin's log: its stderr, its log messages and the daemon's lines about it " +
 				"(starts, exits, refused calls), and the log file's path. --follow keeps printing (CLI).",
 			Category:     "Plugin",
@@ -204,6 +206,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:         "plugin.secrets.list",
+			ReadOnly:     true,
 			Title:        "List Plugin Secrets",
 			Description:  "List the names of the secrets a plugin keeps in the Keychain (service code-foundry-plugin), never their values.",
 			Category:     "Plugin",

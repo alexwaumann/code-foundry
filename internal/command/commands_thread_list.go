@@ -46,8 +46,9 @@ type ThreadListDeps struct {
 // RegisterThreadList registers thread.list.
 func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 	return r.Register(Command{
-		Name:  "thread.list",
-		Title: "List Threads",
+		Name:     "thread.list",
+		ReadOnly: true,
+		Title:    "List Threads",
 		Description: "List threads: one line each, " +
 			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` if a thread created it; " +
 			"`(you)` marks your own.",

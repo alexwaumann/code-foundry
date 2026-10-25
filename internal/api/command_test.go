@@ -71,7 +71,7 @@ func newTestRegistry(t *testing.T) *command.Registry {
 			},
 		},
 		command.Command{
-			Name: "fake.register", Title: "Fake Register", Category: "Fake",
+			Name: "fake.register", Title: "Fake Register", Category: "Fake", ReadOnly: true,
 			Args: []command.ArgSpec{{Name: "path", Type: command.Path, Required: true},
 				{Name: "project", Type: command.String, Context: command.ContextProject, Description: "Project (default: all)"}},
 			Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
@@ -109,6 +109,9 @@ func TestCommandList(t *testing.T) {
 		t.Fatalf("commands = %v, want fake.register, terminal.kill", cmds)
 	}
 	kill := cmds[1]
+	if !cmds[0].GetReadOnly() || kill.GetReadOnly() {
+		t.Errorf("read_only: fake.register %v, terminal.kill %v; want true, false", cmds[0].GetReadOnly(), kill.GetReadOnly())
+	}
 	if !kill.GetAvailable() || kill.GetCategory() != "Terminal" || kill.GetKeybindings()[0] != "cmd+shift+w" {
 		t.Fatalf("terminal.kill = %v", kill)
 	}

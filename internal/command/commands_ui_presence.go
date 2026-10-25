@@ -57,8 +57,9 @@ var presenceWords = map[presence.Kind]string{
 // something in its own side panel (control-7-skill-routing).
 func RegisterPresence(r *Registry, d PresenceDeps) error {
 	return r.Register(Command{
-		Name:  "ui.presence",
-		Title: "Show App Presence",
+		Name:     "ui.presence",
+		ReadOnly: true,
+		Title:    "Show App Presence",
 		Description: "Report whether the user is looking at the app (attended: a visible window has focus), " +
 			"how many windows are open, and whether one shows a thread (viewed; default: the thread this runs in).",
 		Category:     "View",

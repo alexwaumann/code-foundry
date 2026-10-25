@@ -130,8 +130,9 @@ type CapabilityRow struct {
 // never stale (docs/notes/control-4-capabilities.md).
 func RegisterCapabilities(r *Registry, d CapabilitiesDeps) error {
 	return r.Register(Command{
-		Name:  "daemon.capabilities",
-		Title: "Show Capabilities",
+		Name:     "daemon.capabilities",
+		ReadOnly: true,
+		Title:    "Show Capabilities",
 		Description: "List what Code Foundry can do, one line per group (build, commands, pages, panel, rendering, " +
 			"skills, plugins, settings, memory, presence); --group <name> shows one group in detail.",
 		Category:     "Daemon",

@@ -39,8 +39,9 @@ type SlashCommandJSON struct {
 // RegisterSlash registers thread.commands.
 func RegisterSlash(r *Registry, b SlashBackend) error {
 	return r.Register(Command{
-		Name:  "thread.commands",
-		Title: "Show Thread Slash Commands",
+		Name:     "thread.commands",
+		ReadOnly: true,
+		Title:    "Show Thread Slash Commands",
 		Description: "Print the slash commands a running thread offers: Claude's own list (skills, user and project commands, " +
 			"plugin skills and built-ins), minus the ones the app replaces or that mean nothing outside Claude's terminal.",
 		Category:     "Thread",

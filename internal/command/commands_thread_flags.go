@@ -81,8 +81,9 @@ func flagsLine(s *v1.Thread) string {
 func threadFlagsCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:  "thread.flags",
-		Title: "Show Thread Flags",
+		Name:     "thread.flags",
+		ReadOnly: true,
+		Title:    "Show Thread Flags",
 		Description: "List the flags plugins raised on a thread: plugin, level (attention or error), reason, when, and whether " +
 			"opening the thread clears it. A flagged thread counts as needing attention.",
 		Category:     "Thread",
