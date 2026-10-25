@@ -67,8 +67,12 @@ type Options struct {
 	Paths   paths.Paths
 	Version version.Info
 	// Dev also logs text at debug level to Stderr.
-	Dev    bool
-	Stderr io.Writer
+	Dev bool
+	// DevOrigins are the loopback origins (canonical, ParseDevOrigins) whose pages may
+	// call the API: the dev frontend in a browser. `daemon --dev` sets them; nil allows
+	// none, only the Wails webview.
+	DevOrigins []string
+	Stderr     io.Writer
 	// LockWait is how long to wait for the lock while the daemon holding it does not
 	// answer (it is still shutting down): auto-started daemons (daemon --wait-lock).
 	// Zero fails at once with ErrAlreadyRunning.
@@ -375,7 +379,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		theme.FramePrefix: theme.FrameHandler(liveTheme),
 		bridge.Path:       bridge.Handler(),
 	}
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, mux)))
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux)))
 	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", pagesHandler(pageRoutes)))
 
 	errc := make(chan error, 3)
@@ -385,7 +389,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 
 	log.Info("daemon started",
 		"pid", os.Getpid(), "version", opts.Version.Version, "commit", opts.Version.Commit,
-		"socket", p.Socket(), "port", port, "pages_port", pagesPort, "home", p.Home())
+		"socket", p.Socket(), "port", port, "pages_port", pagesPort, "home", p.Home(), "dev_origins", opts.DevOrigins)
 	// Up: the wakes the last stop owes its orchestrators (interrupted children, a
 	// restart notice) can start their threads now (docs/notes/orch-restart-wakes.md).
 	st.thread.DeliverRestartWakes()

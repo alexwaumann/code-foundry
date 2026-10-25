@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -128,7 +129,7 @@ func TestWriteFileAtomicPerms(t *testing.T) {
 
 func TestLoopbackHandlerServesNoPageRoutes(t *testing.T) {
 	rest := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	h := loopbackHandler("secret", []string{"/preview/", "/cf/", "/cf/bridge.js"}, 4242, rest)
+	h := loopbackHandler("secret", []string{"/preview/", "/cf/", "/cf/bridge.js"}, 4242, nil, rest)
 	tests := []struct {
 		name, path, auth string
 		want             int
@@ -193,58 +194,71 @@ func TestPagesHandlerServesOnlyPageRoutes(t *testing.T) {
 
 func TestRequireBearerAndCORS(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
-	// Through loopbackHandler, so the test covers CORS being mounted on the API side.
-	h := loopbackHandler("secret", []string{"/preview/"}, 9300, ok)
+	// Through loopbackHandler, so the test covers CORS being mounted on the API side. The
+	// pages port is 9300; dev is `daemon --dev` with the dev frontend on 9245 and the
+	// pages port listed by mistake.
+	devOrigins, err := ParseDevOrigins("9245, 9300, https://[::1]:5173")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prod := loopbackHandler("secret", []string{"/preview/"}, 9300, nil, ok)
+	dev := loopbackHandler("secret", []string{"/preview/"}, 9300, devOrigins, ok)
+	preflight := func(origin string) map[string]string {
+		return map[string]string{"Origin": origin, "Access-Control-Request-Method": "POST"}
+	}
+	withToken := func(origin string) map[string]string {
+		return map[string]string{"Authorization": "Bearer secret", "Origin": origin}
+	}
 	tests := []struct {
 		name       string
+		dev        bool
 		method     string
 		header     map[string]string
 		wantStatus int
 		wantACAO   string
 	}{
-		{"no token", http.MethodPost, nil, http.StatusUnauthorized, ""},
-		{"wrong token", http.MethodPost, map[string]string{"Authorization": "Bearer nope"}, http.StatusUnauthorized, ""},
-		{"wrong scheme", http.MethodPost, map[string]string{"Authorization": "Basic secret"}, http.StatusUnauthorized, ""},
-		{"right token", http.MethodPost, map[string]string{"Authorization": "Bearer secret"}, http.StatusTeapot, ""},
-		{"right token with origin", http.MethodPost,
-			map[string]string{"Authorization": "Bearer secret", "Origin": "wails://localhost"}, http.StatusTeapot, "wails://localhost"},
-		{"wrong token with origin", http.MethodPost,
-			map[string]string{"Origin": "wails://localhost"}, http.StatusUnauthorized, "wails://localhost"},
-		{"wails3 dev origin", http.MethodPost,
-			map[string]string{"Authorization": "Bearer secret", "Origin": "wails://localhost:9245"}, http.StatusTeapot, "wails://localhost:9245"},
-		{"dev browser origin", http.MethodPost,
-			map[string]string{"Authorization": "Bearer secret", "Origin": "http://127.0.0.1:9245"}, http.StatusTeapot, "http://127.0.0.1:9245"},
-		{"preflight skips auth", http.MethodOptions,
-			map[string]string{"Origin": "http://localhost:9245", "Access-Control-Request-Method": "POST"}, http.StatusNoContent, "http://localhost:9245"},
-		{"bare OPTIONS needs auth", http.MethodOptions, nil, http.StatusUnauthorized, ""},
-		// An opaque-origin page (the HTML preview's sandboxed frame) is never let in,
-		// even holding the token.
-		{"null origin preflight", http.MethodOptions,
-			map[string]string{"Origin": "null", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"null origin with token", http.MethodPost,
-			map[string]string{"Authorization": "Bearer secret", "Origin": "null"}, http.StatusTeapot, ""},
-		{"web origin preflight", http.MethodOptions,
-			map[string]string{"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"localhost lookalike", http.MethodOptions,
-			map[string]string{"Origin": "http://localhost.evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"wails scheme, other host", http.MethodOptions,
-			map[string]string{"Origin": "wails://evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"file origin", http.MethodOptions,
-			map[string]string{"Origin": "file://", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		// The pages origin (a same-origin page frame), under any loopback name, is never let
-		// in either (docs/notes/bridge-1-daemon.md).
-		{"pages origin preflight", http.MethodOptions,
-			map[string]string{"Origin": "http://127.0.0.1:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"pages origin with token", http.MethodPost,
-			map[string]string{"Authorization": "Bearer secret", "Origin": "http://127.0.0.1:9300"}, http.StatusTeapot, ""},
-		{"pages port as localhost", http.MethodOptions,
-			map[string]string{"Origin": "http://localhost:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"pages port as ::1", http.MethodOptions,
-			map[string]string{"Origin": "http://[::1]:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"pages port over https", http.MethodOptions,
-			map[string]string{"Origin": "https://127.0.0.1:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
-		{"another loopback port is the dev frontend", http.MethodOptions,
-			map[string]string{"Origin": "http://127.0.0.1:9301", "Access-Control-Request-Method": "POST"}, http.StatusNoContent, "http://127.0.0.1:9301"},
+		{"no token", false, http.MethodPost, nil, http.StatusUnauthorized, ""},
+		{"wrong token", false, http.MethodPost, map[string]string{"Authorization": "Bearer nope"}, http.StatusUnauthorized, ""},
+		{"wrong scheme", false, http.MethodPost, map[string]string{"Authorization": "Basic secret"}, http.StatusUnauthorized, ""},
+		{"right token", false, http.MethodPost, map[string]string{"Authorization": "Bearer secret"}, http.StatusTeapot, ""},
+		{"bare OPTIONS needs auth", false, http.MethodOptions, nil, http.StatusUnauthorized, ""},
+		// The Wails webview, always.
+		{"wails", false, http.MethodPost, withToken("wails://localhost"), http.StatusTeapot, "wails://localhost"},
+		{"wails without token", false, http.MethodPost, map[string]string{"Origin": "wails://localhost"}, http.StatusUnauthorized, "wails://localhost"},
+		{"wails3 dev", false, http.MethodPost, withToken("wails://localhost:9245"), http.StatusTeapot, "wails://localhost:9245"},
+		{"wails preflight skips auth", false, http.MethodOptions, preflight("wails://localhost"), http.StatusNoContent, "wails://localhost"},
+		{"wails in dev mode", true, http.MethodPost, withToken("wails://localhost"), http.StatusTeapot, "wails://localhost"},
+		{"wails scheme, other host", true, http.MethodOptions, preflight("wails://evil.example"), http.StatusUnauthorized, ""},
+		// No loopback origin outside dev mode: the dev frontend's, this daemon's pages
+		// origin, another daemon's pages origin (docs/notes/bridge-fix-crosshome.md).
+		{"dev frontend without --dev", false, http.MethodOptions, preflight("http://127.0.0.1:9245"), http.StatusUnauthorized, ""},
+		{"dev frontend without --dev, token", false, http.MethodPost, withToken("http://localhost:9245"), http.StatusTeapot, ""},
+		{"pages origin", false, http.MethodOptions, preflight("http://127.0.0.1:9300"), http.StatusUnauthorized, ""},
+		{"another daemon's pages origin", false, http.MethodOptions, preflight("http://127.0.0.1:57191"), http.StatusUnauthorized, ""},
+		{"another daemon's pages origin, token", false, http.MethodPost, withToken("http://127.0.0.1:57191"), http.StatusTeapot, ""},
+		{"arbitrary loopback port", false, http.MethodOptions, preflight("http://localhost:3000"), http.StatusUnauthorized, ""},
+		// Dev mode: the listed origins only.
+		{"dev frontend", true, http.MethodPost, withToken("http://127.0.0.1:9245"), http.StatusTeapot, "http://127.0.0.1:9245"},
+		{"dev frontend as localhost", true, http.MethodOptions, preflight("http://localhost:9245"), http.StatusNoContent, "http://localhost:9245"},
+		{"dev frontend as ::1, not listed", true, http.MethodOptions, preflight("http://[::1]:9245"), http.StatusUnauthorized, ""},
+		{"dev frontend over https, not listed", true, http.MethodOptions, preflight("https://127.0.0.1:9245"), http.StatusUnauthorized, ""},
+		{"a listed origin", true, http.MethodOptions, preflight("https://[::1]:5173"), http.StatusNoContent, "https://[::1]:5173"},
+		{"arbitrary loopback port in dev", true, http.MethodOptions, preflight("http://127.0.0.1:9301"), http.StatusUnauthorized, ""},
+		{"another daemon's pages origin in dev", true, http.MethodOptions, preflight("http://127.0.0.1:57191"), http.StatusUnauthorized, ""},
+		// The pages origin, under any loopback name, never, even when listed.
+		{"pages origin in dev", true, http.MethodOptions, preflight("http://127.0.0.1:9300"), http.StatusUnauthorized, ""},
+		{"pages origin in dev, token", true, http.MethodPost, withToken("http://127.0.0.1:9300"), http.StatusTeapot, ""},
+		{"pages port as localhost in dev", true, http.MethodOptions, preflight("http://localhost:9300"), http.StatusUnauthorized, ""},
+		{"pages port as ::1 in dev", true, http.MethodOptions, preflight("http://[::1]:9300"), http.StatusUnauthorized, ""},
+		{"pages port over https in dev", true, http.MethodOptions, preflight("https://127.0.0.1:9300"), http.StatusUnauthorized, ""},
+		// An opaque-origin page and the web, never.
+		{"null origin preflight", true, http.MethodOptions, preflight("null"), http.StatusUnauthorized, ""},
+		{"null origin with token", true, http.MethodPost, withToken("null"), http.StatusTeapot, ""},
+		{"null origin, prod", false, http.MethodOptions, preflight("null"), http.StatusUnauthorized, ""},
+		{"web origin", true, http.MethodOptions, preflight("https://evil.example"), http.StatusUnauthorized, ""},
+		{"localhost lookalike", true, http.MethodOptions, preflight("http://localhost.evil.example:9245"), http.StatusUnauthorized, ""},
+		{"file origin", true, http.MethodOptions, preflight("file://"), http.StatusUnauthorized, ""},
+		{"origin with a path", true, http.MethodOptions, preflight("http://127.0.0.1:9245/x"), http.StatusUnauthorized, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -253,12 +267,51 @@ func TestRequireBearerAndCORS(t *testing.T) {
 				req.Header.Set(k, v)
 			}
 			rec := httptest.NewRecorder()
+			h := prod
+			if tt.dev {
+				h = dev
+			}
 			h.ServeHTTP(rec, req)
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 			if got := rec.Header().Get("Access-Control-Allow-Origin"); got != tt.wantACAO {
 				t.Errorf("ACAO = %q, want %q", got, tt.wantACAO)
+			}
+		})
+	}
+}
+
+func TestParseDevOrigins(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    []string
+		wantErr bool
+	}{
+		{"9245", []string{"http://127.0.0.1:9245", "http://localhost:9245"}, false},
+		{" 9245 , 9247 ", []string{"http://127.0.0.1:9245", "http://localhost:9245", "http://127.0.0.1:9247", "http://localhost:9247"}, false},
+		{"http://LOCALHOST:5173", []string{"http://localhost:5173"}, false},
+		{"https://127.0.0.1", []string{"https://127.0.0.1:443"}, false},
+		{"http://[::1]:8080/", []string{"http://[::1]:8080"}, false},
+		{"", nil, true},
+		{",", nil, true},
+		{"0", nil, true},
+		{"70000", nil, true},
+		{"https://example.com:9245", nil, true},
+		{"http://192.168.1.2:9245", nil, true},
+		{"wails://localhost", nil, true},
+		{"null", nil, true},
+		{"http://127.0.0.1:9245/app", nil, true},
+		{"http://u@127.0.0.1:9245", nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := ParseDevOrigins(tt.in)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}

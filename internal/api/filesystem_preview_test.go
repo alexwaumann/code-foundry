@@ -37,6 +37,8 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	for _, f := range []string{
 		"proj/docs/index.html", "proj-wt/site/page.html", "loose/mock.html", "report.html",
 		".code-foundry/daemon.token", ".code-foundry/worktrees/proj/wt/index.html", ".ssh/page.html",
+		// Other daemons' homes (test daemons beside this one), found by their markers.
+		"cf-1/daemon.token", "cf-1/page.html", "dev/cf-4/pages.port", "dev/page.html",
 	} {
 		p := filepath.Join(root, f)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -89,6 +91,8 @@ func TestFilesystemPreviewFile(t *testing.T) {
 		{name: "the daemon token", path: "~/.code-foundry/daemon.token", code: connect.CodeInvalidArgument},
 		{name: "symlink in a project to the daemon token", path: filepath.Join(proj, "docs/token.html"), code: connect.CodeInvalidArgument},
 		{name: "in ~/.ssh", path: "~/.ssh/page.html", code: connect.CodeInvalidArgument},
+		{name: "in another daemon's home", path: "~/cf-1/page.html", code: connect.CodeInvalidArgument},
+		{name: "beside another daemon's home: the file alone", path: "~/dev/page.html", scope: filepath.Join(root, "dev/page.html"), rel: "page.html", single: true},
 		{name: "missing", path: filepath.Join(proj, "docs/nope.html"), code: connect.CodeNotFound},
 		{name: "directory", path: filepath.Join(proj, "docs"), code: connect.CodeInvalidArgument},
 		{name: "outside home", path: "/etc/hosts", code: connect.CodeInvalidArgument},

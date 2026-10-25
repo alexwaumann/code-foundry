@@ -15,7 +15,8 @@ import (
 
 func runDaemon(ctx context.Context, cl *cli, args []string) error {
 	fs := cl.newFlagSet("daemon")
-	dev := fs.Bool("dev", false, "also log human-readable text at debug level to stderr")
+	dev := fs.Bool("dev", false, "also log human-readable text at debug level to stderr, and let the dev frontend in a browser call the API "+
+		"from the loopback origins in $"+daemon.EnvDevOrigins+" (ports or origins, comma separated; default port "+daemon.DefaultDevOrigins+")")
 	waitLock := fs.Duration(strings.TrimPrefix(client.FlagWaitLock, "--"), 0,
 		"wait up to this long for a previous daemon that no longer answers to release its lock (auto-start)")
 	if err := cl.parseFlags(fs, args); err != nil {
@@ -32,7 +33,22 @@ func runDaemon(ctx context.Context, cl *cli, args []string) error {
 			_ = os.Setenv(paths.EnvBin, exe)
 		}
 	}
-	err = daemon.Run(ctx, daemon.Options{Paths: p, Version: version.Get(), Dev: *dev, Stderr: os.Stderr, LockWait: *waitLock})
+	// Loopback origins only in dev mode: any other would also let another daemon's pages
+	// call this API (docs/notes/bridge-fix-crosshome.md).
+	var devOrigins []string
+	list := os.Getenv(daemon.EnvDevOrigins)
+	switch {
+	case *dev:
+		if list == "" {
+			list = daemon.DefaultDevOrigins
+		}
+		if devOrigins, err = daemon.ParseDevOrigins(list); err != nil {
+			return err
+		}
+	case list != "":
+		_, _ = fmt.Fprintf(cl.stderr, "code-foundry: %s is ignored without --dev\n", daemon.EnvDevOrigins)
+	}
+	err = daemon.Run(ctx, daemon.Options{Paths: p, Version: version.Get(), Dev: *dev, DevOrigins: devOrigins, Stderr: os.Stderr, LockWait: *waitLock})
 	if errors.Is(err, daemon.ErrAlreadyRunning) {
 		// A distinct status: the client that started us names the lock's holder.
 		_, _ = fmt.Fprintf(cl.stderr, "code-foundry: %v (%s)\n", err, p.Home())
