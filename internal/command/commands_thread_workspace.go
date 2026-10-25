@@ -19,14 +19,13 @@ type WorkspaceRefBackend interface {
 // next start (docs/notes/workspaces-v2-3-composer.md).
 func threadWorkspaceCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.workspace",
-		Title: "Set Thread Workspace",
-		Description: "Make a thread reference a workspace (its instructions and skills reach the thread), or no workspace. " +
-			"Its projects do not change; it applies from the thread's next start.",
-		Category: "Thread",
+		Name:        "thread.workspace",
+		Title:       "Set Thread Workspace",
+		Description: "Make a thread reference a workspace (its instructions and skills), or none; its projects stay. Applies from its next start.",
+		Category:    "Thread",
 		Args: []ArgSpec{
 			positional(idArg),
-			{Name: "workspace", Type: String, Description: "Workspace id or name; empty clears the reference"},
+			{Name: "workspace", Type: String, Description: "Workspace id or name; empty clears it"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
