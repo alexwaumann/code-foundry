@@ -46,7 +46,7 @@ var Renderings = []Rendering{
 		"cf.run(verb, {arg: value}) runs a command as your thread's CLI would (the same verbs and args; values are strings, numbers " +
 		"or booleans, sent as strings) and resolves {text, json}, json being what the verb prints with --json (enum names such as " +
 		"THREAD_STATUS_IDLE, ISO times, zero fields left out). A verb that changes anything (all but reads such as thread get, " +
-		"settings get, pr checks) runs only from a click or key press in the page: WebKit's user activation lasts a few seconds, so " +
+		"settings get, pr checks) runs only from a click or key press in the page, within 5 seconds of it, so " +
 		"a quick read awaited first still counts. The app's own dialog asks the user where a confirmation is needed (never pass yes). " +
 		"It rejects with {code, message}, code one of " + strings.Join(bridge.ErrorCodes, ", ") + " (unavailable: an unknown verb, " +
 		"or a source the app does not hold now; invalid: a wrong or missing arg). " +

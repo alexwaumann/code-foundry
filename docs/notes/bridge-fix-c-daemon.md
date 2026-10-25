@@ -52,9 +52,10 @@ host half of 14, the panel half of 17). The tester's numbers are used below.
   and the cache use the dashboard as the poll left it, not the overlay: the merge is still
   announced when the poll sees it. Applied inside `updateSnapshot`, so a merge shown while
   a poll publishes is not lost. The skill: on success update that row from the result.
-- **9, the gesture rule.** "The click counts for a few seconds (WebKit's user activation,
-  about 5): a quick read awaited first is fine, anything slow first (a wait, a timer)
-  loses it." Same in the rendering capability.
+- **9, the gesture rule.** "The press, click or key counts for 5 seconds: a quick read
+  awaited first is fine, anything slower first (a long wait, a timer) loses it." Same in
+  the rendering capability. Worded after the rebase on #346, whose bridge.js counts a
+  trusted press in the last 5 s even when WebKit's user activation says inactive.
 - **10.** `unavailable`: no such verb, the page is not shown in its thread, or (from
   `cf.on`) a source the app does not hold now; `invalid`: a wrong or missing arg.
 - **11.** The rendering capability's bridge line: values may be strings, numbers or

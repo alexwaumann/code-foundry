@@ -72,8 +72,8 @@ The bridge follows theme switches and sizes the card: no `cf:theme` or `cf:resiz
   thread.list, usage.show, pr.checks, settings.get…).
 - **Every other verb runs only from a click or key press in the page.** Call `cf.run`
   inside the button's `click` (or a form's `submit`) handler; never on load, from a timer
-  or from `cf.on`. The click counts for a few seconds (WebKit's user activation, about 5):
-  a quick read awaited first is fine, anything slow first (a wait, a timer) loses it. For
+  or from `cf.on`. The press, click or key counts for 5 seconds: a quick read awaited
+  first is fine, anything slower first (a long wait, a timer) loses it. For
   several, start them all in the handler: `await Promise.all(items.map((x) => cf.run(…)))`.
   A slider acts on `change`, not `input`.
 - **The app asks the user** before a verb that needs it (merging a PR, archiving a busy

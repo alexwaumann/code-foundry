@@ -98,7 +98,7 @@ func TestRenderPagesSkill(t *testing.T) {
 		`<link rel="stylesheet" href="/cf/theme.css">`, `<script src="/cf/bridge.js"></script>`, "await cf.ready", "`--cf-*` variables",
 		"no framework", "no build step", "`--json`",
 		// The gesture rule, confirmations, own thread.
-		"runs only from a click or key press in the page", "WebKit's user activation, about 5", "`await Promise.all(items.map(", "on `change`, not `input`",
+		"runs only from a click or key press in the page", "counts for 5 seconds", "`await Promise.all(items.map(", "on `change`, not `input`",
 		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
 		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
