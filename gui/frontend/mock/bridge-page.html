@@ -29,6 +29,7 @@ input { background: var(--cf-surface); color: var(--cf-text); border: 1px solid 
   <span class="k">thread.new</span><span><input id="task" value="Reply with OK only." size="22"> <button id="start">Start</button> <span id="start-out" class="out"></span></span>
   <span class="k">two questions</span><span><button id="twice">Restart s-1 twice (1 s timeout)</button> <span id="twice-out" class="out"></span></span>
   <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <button id="misspelt">Misspelt arg</button> <button id="typo">cf.on("threads")</button> <span id="error-out" class="out"></span></span>
+  <span class="k">cf.fetch</span><span><button id="fetch">Fetch issues</button> <button id="fetch-token">Bad token</button> <button id="fetch-local">Fetch loopback</button> <span id="fetch-out" class="out"></span></span>
   <span class="k">thread-list</span><span class="out"><span id="rows">–</span> threads · <span id="events">0</span> events</span>
 </div>
 <script>
@@ -103,6 +104,12 @@ $("twice").addEventListener("click", () => {
   const one = (n) => cf.run("thread.restart", { id: "s-1" }, { timeout: 1000 }).then((r) => n + " ok", (e) => n + " " + e.code);
   show($("twice-out"), Promise.all([one(1), one(2)]).then((r) => ({ text: r.join(", ") })));
 });
+// cf.fetch: the daemon makes the request (the mock's fake upstream, mock/proxyFetch.ts).
+const issues = (auth) =>
+  cf.fetch("https://upstream.test/issues", { headers: { Authorization: auth } }).then((r) => ({ text: r.status + " " + (r.ok ? r.json().length + " issues" : r.json().error) }));
+$("fetch").addEventListener("click", () => show($("fetch-out"), issues("Bearer good")));
+$("fetch-token").addEventListener("click", () => show($("fetch-out"), issues("Bearer bad")));
+$("fetch-local").addEventListener("click", () => show($("fetch-out"), cf.fetch("http://127.0.0.1:7788/__mock/settings")));
 const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
 addEventListener("load", ask);
 new ResizeObserver(ask).observe(document.body);

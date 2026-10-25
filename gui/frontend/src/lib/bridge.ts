@@ -15,13 +15,17 @@
  * - `{ type: "cf:bye" }`: the document goes (pagehide); its calls and subscriptions stop
  * - `{ type: "cf:store", id, key, value }`, value a JSON text or null to remove
  *   (docs/notes/bridge-fix-storage.md)
- * - `{ type: "cf:cancel", id }`: the page gave up on a run (its timeout)
+ * - `{ type: "cf:cancel", id }`: the page gave up on a run or a fetch (its timeout)
+ * - `{ type: "cf:fetch", id, url, method, headers, body, timeout }`: an HTTP request the
+ *   daemon makes (ThreadService.ProxyFetch), headers an object of strings, body a string,
+ *   timeout ms; counted with the runs (docs/notes/bridge-fetch.md)
  * (`cf:resize` and `cf:theme:ack` predate the bridge: components/files/previewGrant.ts.)
  *
  * Host → page:
  * - `{ type: "cf:ready", cf: 1, thread: { id, name } | null, theme, readOnly, sources, storage }`
  * - `{ type: "cf:result", id, ok: true, result: { text, json } }`, or
- *   `{ type: "cf:result", id, ok: false, error: { code, message } }`
+ *   `{ type: "cf:result", id, ok: false, error: { code, message } }`; a fetch's ok result
+ *   is `{ status, statusText, headers, body, url }`, whatever the status
  * - `{ type: "cf:event", id, source, event }`
  * - `{ type: "cf:pending", id, reason: "confirm" }`: the run waits on the user (its confirm
  *   dialog is open or queued), so the page stops its clock; `{ type: "cf:resume", id }`
@@ -63,6 +67,7 @@ export type PageMessage =
   | { kind: "bye" }
   | { kind: "store"; id: CallId; key: string; value: string | null }
   | { kind: "cancel"; id: CallId }
+  | { kind: "fetch"; id: CallId; url: string; method: string; headers: Record<string, string>; body: string; timeout: number }
   | { kind: "bad"; id: CallId; call: string; message: string };
 
 function callId(v: unknown): CallId | null {
@@ -75,7 +80,16 @@ function callId(v: unknown): CallId | null {
  * What one page may hold at the host at once, and the largest message it hears
  * (docs/notes/bridge-fix-frames.md). The page script queues runs past `runs` itself.
  */
-export const BRIDGE_LIMITS = { runs: 32, subscriptions: 16, messageChars: 256 * 1024 } as const;
+export const BRIDGE_LIMITS = {
+  runs: 32,
+  subscriptions: 16,
+  messageChars: 256 * 1024,
+  /** A cf:fetch's url, method, headers and body: a 1 MiB body and some. */
+  fetchChars: 1024 * 1024 + 64 * 1024,
+  /** cf.fetch's timeout when the page gives none, and the longest it may ask for. */
+  fetchTimeoutMs: 30_000,
+  fetchMaxTimeoutMs: 120_000,
+} as const;
 
 /** The fragment key of a frame's nonce. */
 const NONCE_KEY = "cf";
@@ -132,9 +146,10 @@ export function parsePageMessage(data: unknown): PageMessage | null {
   if (m.type === "cf:hello") return { kind: "hello" };
   if (m.type === "cf:bye") return { kind: "bye" };
   if (messageChars(m) > BRIDGE_LIMITS.messageChars) return null;
-  if (m.type !== "cf:run" && m.type !== "cf:on" && m.type !== "cf:off" && m.type !== "cf:store" && m.type !== "cf:cancel") return null;
+  if (m.type !== "cf:run" && m.type !== "cf:on" && m.type !== "cf:off" && m.type !== "cf:store" && m.type !== "cf:cancel" && m.type !== "cf:fetch") return null;
   const id = callId(m.id);
   if (id === null) return null;
+  if (m.type === "cf:fetch") return parseFetch(id, m);
   if (m.type === "cf:off") return { kind: "off", id };
   if (m.type === "cf:cancel") return { kind: "cancel", id };
   if (m.type === "cf:store") {
@@ -156,6 +171,38 @@ export function parsePageMessage(data: unknown): PageMessage | null {
     args[k] = v;
   }
   return { kind: "run", id, verb, args };
+}
+
+/** A cf:fetch, or null past BRIDGE_LIMITS.fetchChars (ignored, as any message too large). */
+function parseFetch(id: CallId, m: Record<string, unknown>): PageMessage | null {
+  const bad = (message: string): PageMessage => ({ kind: "bad", id, call: "cf.fetch", message });
+  if (typeof m.url !== "string" || m.url === "") return bad("cf:fetch needs a url");
+  const method = m.method === undefined ? "GET" : m.method;
+  if (typeof method !== "string") return bad("cf:fetch method must be a string");
+  const body = m.body ?? "";
+  if (typeof body !== "string") return bad("cf:fetch body must be a string");
+  const raw: unknown = m.headers ?? {};
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return bad("cf:fetch headers must be an object of strings");
+  const headers: Record<string, string> = {};
+  let n = m.url.length + method.length + body.length;
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v !== "string") return bad(`cf:fetch header ${k} must be a string`);
+    headers[k] = v;
+    n += k.length + v.length;
+  }
+  if (n > BRIDGE_LIMITS.fetchChars) return null;
+  const t = m.timeout;
+  const timeout = typeof t === "number" && Number.isFinite(t) && t > 0 ? Math.min(Math.round(t), BRIDGE_LIMITS.fetchMaxTimeoutMs) : BRIDGE_LIMITS.fetchTimeoutMs;
+  return { kind: "fetch", id, url: m.url, method, headers, body, timeout };
+}
+
+/** The host of a fetch's URL, for what the error strip names ("cf.fetch api.example.com"); never its path or query. */
+export function fetchCall(url: string): string {
+  try {
+    return `cf.fetch ${new URL(url).host}`;
+  } catch {
+    return "cf.fetch";
+  }
 }
 
 /** Where a page's calls run: its thread, and the checkout that thread works in (its cwd). */
@@ -252,12 +299,26 @@ export interface StorageMessage {
   values: Record<string, string>;
 }
 
+/** A fetch's answer as the page gets it: the daemon's, whatever the status. */
+export interface FetchResult {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  url: string;
+}
+
 export type ResultMessage =
   | { type: "cf:result"; id: CallId; ok: true; result: { text: string; json: unknown } }
+  | { type: "cf:result"; id: CallId; ok: true; result: FetchResult }
   | { type: "cf:result"; id: CallId; ok: false; error: BridgeError; result?: { text: string; json: unknown } };
 
 export function okResult(id: CallId, res: { message: string; resultJson: string }): ResultMessage {
   return { type: "cf:result", id, ok: true, result: { text: res.message, json: resultJson(res.resultJson) } };
+}
+
+export function fetchResult(id: CallId, res: FetchResult): ResultMessage {
+  return { type: "cf:result", id, ok: true, result: { status: res.status, statusText: res.statusText, headers: { ...res.headers }, body: res.body, url: res.url } };
 }
 
 /** A failed call; `declined` carries what a declined second stage already did, when it did something. */
