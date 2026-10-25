@@ -42,7 +42,7 @@ test("a page in a thread is ready with its thread, the read-only verbs and the s
   await expect(doc(page).locator("#thread")).not.toHaveText("…");
   await expect(body).toHaveAttribute("data-sources", /thread-list/);
   expect(Number(await body.getAttribute("data-readonly"))).toBeGreaterThan(0);
-  // The page keeps its storage: same-origin frames.
+  // cf.storage, read from the daemon in cf:ready.
   await expect(doc(page).locator("#visits")).toHaveText("1");
 });
 
@@ -106,6 +106,60 @@ test("a subscription delivers the snapshot, then every change; closing the card 
   await mockPost(`threads?project=repo-cf&count=2&status=idle&prefix=After`);
   await page.waitForTimeout(400);
   expect((await bridgeCounters(page)).posts).toBe(posts);
+});
+
+test("a call waiting on the app's confirm dialog, open or queued, does not time out", async ({ page }) => {
+  await openBridgeThread(page);
+  const restarts = async () => (await invocations()).filter((i) => i.name === "thread.restart").map((i) => i.confirmed);
+  // One click, two questions, each call with a 1 s timeout.
+  await doc(page).locator("#twice").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(1500);
+  await dialog.getByTestId("confirm-ok").click();
+  await expect.poll(restarts).toEqual([false, false, true]);
+  // The second waited behind the first for longer than its timeout, then opens.
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(1500);
+  await expect(doc(page).locator("#twice-out")).toHaveText("");
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(doc(page).locator("#twice-out")).toHaveText("1 ok, 2 ok");
+  expect(await restarts()).toEqual([false, false, true, true]);
+});
+
+test("a page that goes while its question is open takes the question with it, and the command never runs", async ({ page }) => {
+  await openBridgeThread(page);
+  await doc(page).locator("#archive").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toBeVisible();
+  // The page reloads itself (the app's dialog is modal, so the user cannot close the card now).
+  await doc(page).locator("body").evaluate(() => {
+    location.reload();
+  });
+  await expect(dialog).toHaveCount(0);
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(400);
+  expect((await invocations()).filter((i) => i.name === "thread.archive").map((i) => i.confirmed)).toEqual([false]);
+});
+
+test("cf.on with a source that is not one throws in the page", async ({ page }) => {
+  await openBridgeThread(page);
+  await doc(page).locator("#typo").click();
+  await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: cf\.on: no source threads; the sources are thread-list, thread, /);
+});
+
+test("storage is the daemon's: a fresh browser profile reads what the page stored", async ({ page, browser }) => {
+  await openBridgeThread(page);
+  await expect(doc(page).locator("#visits")).toHaveText("1");
+  // A new context has no localStorage of the old one, as a relaunched app's frame has none.
+  const fresh = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  try {
+    const again = await fresh.newPage();
+    await openBridgeThread(again);
+    await expect(doc(again).locator("#visits")).toHaveText("2");
+  } finally {
+    await fresh.close();
+  }
 });
 
 test("storage survives a reload; a theme switch reaches the page without one", async ({ page }) => {

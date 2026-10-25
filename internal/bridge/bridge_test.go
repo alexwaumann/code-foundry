@@ -66,6 +66,7 @@ func TestScriptNamesTheContract(t *testing.T) {
 	want := []string{
 		`"cf:run"`, `"cf:on"`, `"cf:off"`, `"cf:resize"`, `"cf:theme:ack"`, `"cf:hello"`,
 		`"cf:ready"`, `"cf:result"`, `"cf:event"`, `"cf:theme"`,
+		`"cf:store"`, `"cf:storage"`, `"cf:cancel"`, `"cf:pending"`, `"cf:resume"`,
 		"var VERSION = 1;", "navigator.userActivation", "ResizeObserver", `"*"`,
 	}
 	for _, code := range ErrorCodes {
@@ -80,5 +81,17 @@ func TestScriptNamesTheContract(t *testing.T) {
 	}
 	if Version != 1 {
 		t.Errorf("Version %d; bridge.js says 1", Version)
+	}
+}
+
+// The script's own list of sources (what cf.on checks before cf:ready) is Sources.
+func TestScriptSources(t *testing.T) {
+	quoted := make([]string, len(Sources))
+	for i, s := range Sources {
+		quoted[i] = `"` + s + `"`
+	}
+	want := "var SOURCES = [" + strings.Join(quoted, ", ") + "];"
+	if !strings.Contains(string(Script()), want) {
+		t.Errorf("bridge.js does not contain %s", want)
 	}
 }

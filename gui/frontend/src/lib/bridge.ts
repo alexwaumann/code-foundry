@@ -7,13 +7,21 @@
  * - `{ type: "cf:run", id, verb, args }`, args an object of strings
  * - `{ type: "cf:on", id, source }`, `{ type: "cf:off", id }`
  * - `{ type: "cf:hello" }`
+ * - `{ type: "cf:store", id, key, value }`, value a JSON text or null to remove
+ *   (docs/notes/bridge-fix-storage.md)
+ * - `{ type: "cf:cancel", id }`: the page gave up on a run (its timeout)
  * (`cf:resize` and `cf:theme:ack` predate the bridge: components/files/previewGrant.ts.)
  *
  * Host → page:
- * - `{ type: "cf:ready", cf: 1, thread: { id, name } | null, theme, readOnly, sources }`
+ * - `{ type: "cf:ready", cf: 1, thread: { id, name } | null, theme, readOnly, sources, storage }`
  * - `{ type: "cf:result", id, ok: true, result: { text, json } }`, or
  *   `{ type: "cf:result", id, ok: false, error: { code, message } }`
  * - `{ type: "cf:event", id, source, event }`
+ * - `{ type: "cf:pending", id, reason: "confirm" }`: the run waits on the user (its confirm
+ *   dialog is open or queued), so the page stops its clock; `{ type: "cf:resume", id }`
+ *   once answered yes
+ * - `{ type: "cf:storage", values }`: the thread's whole page storage, after another frame
+ *   of the thread wrote or a write was refused
  */
 import type { ArgSpecView } from "@/api/command";
 import type { PublishedTheme } from "@/api/ui";
@@ -46,6 +54,8 @@ export type PageMessage =
   | { kind: "on"; id: CallId; source: string }
   | { kind: "off"; id: CallId }
   | { kind: "hello" }
+  | { kind: "store"; id: CallId; key: string; value: string | null }
+  | { kind: "cancel"; id: CallId }
   | { kind: "bad"; id: CallId; call: string; message: string };
 
 function callId(v: unknown): CallId | null {
@@ -60,10 +70,16 @@ export function parsePageMessage(data: unknown): PageMessage | null {
   const m = data as Record<string, unknown>;
   if (m.cf !== 1 || typeof m.type !== "string") return null;
   if (m.type === "cf:hello") return { kind: "hello" };
-  if (m.type !== "cf:run" && m.type !== "cf:on" && m.type !== "cf:off") return null;
+  if (m.type !== "cf:run" && m.type !== "cf:on" && m.type !== "cf:off" && m.type !== "cf:store" && m.type !== "cf:cancel") return null;
   const id = callId(m.id);
   if (id === null) return null;
   if (m.type === "cf:off") return { kind: "off", id };
+  if (m.type === "cf:cancel") return { kind: "cancel", id };
+  if (m.type === "cf:store") {
+    if (typeof m.key !== "string" || m.key === "") return { kind: "bad", id, call: "cf.storage", message: "cf:store needs a key" };
+    if (m.value !== null && typeof m.value !== "string") return { kind: "bad", id, call: "cf.storage", message: "cf:store value must be JSON text or null" };
+    return { kind: "store", id, key: m.key, value: m.value };
+  }
   if (m.type === "cf:on") {
     if (typeof m.source !== "string" || m.source === "") return { kind: "bad", id, call: "cf.on", message: "cf:on needs a source" };
     return { kind: "on", id, source: m.source };
@@ -134,10 +150,44 @@ export interface ReadyMessage {
   theme: PublishedTheme;
   readOnly: string[];
   sources: string[];
+  /** The thread's page storage: key → the value's JSON text. */
+  storage: Record<string, string>;
 }
 
-export function readyMessage(thread: { id: string; name: string } | null, theme: PublishedTheme, readOnly: readonly string[]): ReadyMessage {
-  return { type: "cf:ready", cf: 1, thread, theme, readOnly: thread ? [...readOnly].sort() : [], sources: thread ? [...BRIDGE_SOURCES] : [] };
+export function readyMessage(
+  thread: { id: string; name: string } | null,
+  theme: PublishedTheme,
+  readOnly: readonly string[],
+  storage: Readonly<Record<string, string>> = {},
+): ReadyMessage {
+  return {
+    type: "cf:ready",
+    cf: 1,
+    thread,
+    theme,
+    readOnly: thread ? [...readOnly].sort() : [],
+    sources: thread ? [...BRIDGE_SOURCES] : [],
+    storage: thread ? { ...storage } : {},
+  };
+}
+
+/** A run waits on the user: its confirm dialog is open, or queued behind another. */
+export interface PendingMessage {
+  type: "cf:pending";
+  id: CallId;
+  reason: "confirm";
+}
+
+/** The user answered a run's confirmation yes: its clock runs again. */
+export interface ResumeMessage {
+  type: "cf:resume";
+  id: CallId;
+}
+
+/** The thread's whole page storage, for a frame whose copy may be behind. */
+export interface StorageMessage {
+  type: "cf:storage";
+  values: Record<string, string>;
 }
 
 export type ResultMessage =

@@ -26,16 +26,21 @@ input { background: var(--cf-surface); color: var(--cf-text); border: 1px solid 
   <span class="k">thread.list</span><span><button id="list">Read</button> <span id="list-out" class="out"></span></span>
   <span class="k">ui.notify</span><span><button id="notify" class="primary">Send a toast</button> <span id="notify-out" class="out"></span></span>
   <span class="k">thread.archive</span><span><button id="archive">Archive this thread</button> <span id="archive-out" class="out"></span></span>
-  <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <button id="misspelt">Misspelt arg</button> <span id="error-out" class="out"></span></span>
   <span class="k">thread.new</span><span><input id="task" value="Reply with OK only." size="22"> <button id="start">Start</button> <span id="start-out" class="out"></span></span>
+  <span class="k">two questions</span><span><button id="twice">Restart s-1 twice (1 s timeout)</button> <span id="twice-out" class="out"></span></span>
+  <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <button id="misspelt">Misspelt arg</button> <button id="typo">cf.on("threads")</button> <span id="error-out" class="out"></span></span>
   <span class="k">thread-list</span><span class="out"><span id="rows">–</span> threads · <span id="events">0</span> events</span>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-// Storage persists across reloads (allow-same-origin).
-const visits = Number(localStorage.getItem("cf-bridge-visits") || "0") + 1;
-localStorage.setItem("cf-bridge-visits", String(visits));
-$("visits").textContent = String(visits);
+// cf.storage is the daemon's: it outlives reloads and app restarts.
+cf.ready.then(() => {
+  if (!cf.thread) return;
+  const s = cf.storage();
+  const visits = (s.get("visits") || 0) + 1;
+  s.set("visits", visits);
+  $("visits").textContent = String(visits);
+});
 const show = (el, p) =>
   p.then(
     (r) => { el.className = "out ok"; el.textContent = r.json ? JSON.stringify(r.json).slice(0, 80) : r.text || "ok"; },
@@ -77,6 +82,20 @@ $("start").addEventListener("click", () =>
     }),
   ),
 );
+$("typo").addEventListener("click", () => {
+  try {
+    cf.on("threads", () => {});
+  } catch (e) {
+    $("error-out").className = "out err";
+    $("error-out").textContent = e.code + ": " + e.message;
+  }
+});
+// Two questions from one click (the mock's busy s-1, restarted twice), each with a 1 s
+// timeout: neither times out while the user reads.
+$("twice").addEventListener("click", () => {
+  const one = (n) => cf.run("thread.restart", { id: "s-1" }, { timeout: 1000 }).then((r) => n + " ok", (e) => n + " " + e.code);
+  show($("twice-out"), Promise.all([one(1), one(2)]).then((r) => ({ text: r.join(", ") })));
+});
 const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
 addEventListener("load", ask);
 new ResizeObserver(ask).observe(document.body);

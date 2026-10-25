@@ -13,6 +13,11 @@ describe("parsePageMessage", () => {
     { name: "a subscription without a source", data: { cf: 1, type: "cf:on", id: "s1" }, want: { kind: "bad", id: "s1", call: "cf.on", message: "cf:on needs a source" } },
     { name: "an off", data: { cf: 1, type: "cf:off", id: "s1" }, want: { kind: "off", id: "s1" } },
     { name: "a hello", data: { cf: 1, type: "cf:hello" }, want: { kind: "hello" } },
+    { name: "a store", data: { cf: 1, type: "cf:store", id: "w1", key: "todo:items", value: "[1,2]" }, want: { kind: "store", id: "w1", key: "todo:items", value: "[1,2]" } },
+    { name: "a removal", data: { cf: 1, type: "cf:store", id: "w1", key: "k", value: null }, want: { kind: "store", id: "w1", key: "k", value: null } },
+    { name: "a store without a key", data: { cf: 1, type: "cf:store", id: "w1", value: "1" }, want: { kind: "bad", id: "w1", call: "cf.storage", message: "cf:store needs a key" } },
+    { name: "a store of a value that is not text", data: { cf: 1, type: "cf:store", id: "w1", key: "k", value: 1 }, want: { kind: "bad", id: "w1", call: "cf.storage", message: "cf:store value must be JSON text or null" } },
+    { name: "a cancel", data: { cf: 1, type: "cf:cancel", id: "r1" }, want: { kind: "cancel", id: "r1" } },
     { name: "no cf marker", data: { type: "cf:run", id: "r", verb: "x" }, want: null },
     { name: "another version", data: { cf: 2, type: "cf:run", id: "r", verb: "x" }, want: null },
     { name: "no id", data: { cf: 1, type: "cf:run", verb: "x" }, want: null },
@@ -53,20 +58,22 @@ describe("fillPageArgs", () => {
 describe("replies", () => {
   it("ready names the thread, its read-only verbs (sorted) and every source", () => {
     const theme = { id: "github-dark", scheme: "dark" as const, vars: { "--cf-text": "#ffffff" } };
-    expect(readyMessage({ id: "t", name: "Fix" }, theme, ["thread.list", "action.list"])).toEqual({
+    expect(readyMessage({ id: "t", name: "Fix" }, theme, ["thread.list", "action.list"], { n: "3" })).toEqual({
       type: "cf:ready",
       cf: 1,
       thread: { id: "t", name: "Fix" },
       theme,
       readOnly: ["action.list", "thread.list"],
       sources: [...BRIDGE_SOURCES],
+      storage: { n: "3" },
     });
   });
   it("ready without a thread offers nothing", () => {
-    const m = readyMessage(null, { id: "x", scheme: "light", vars: {} }, ["thread.list"]);
+    const m = readyMessage(null, { id: "x", scheme: "light", vars: {} }, ["thread.list"], { n: "3" });
     expect(m.thread).toBeNull();
     expect(m.readOnly).toEqual([]);
     expect(m.sources).toEqual([]);
+    expect(m.storage).toEqual({});
   });
   it("a result carries the text and the parsed JSON", () => {
     expect(okResult("r", { message: "done", resultJson: '{"a":1}' })).toEqual({ type: "cf:result", id: "r", ok: true, result: { text: "done", json: { a: 1 } } });

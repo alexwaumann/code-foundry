@@ -222,6 +222,7 @@ import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
 import { ageMcp, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
+import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
@@ -511,6 +512,9 @@ function routes(router: ConnectRouter): void {
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
     // code-foundry view.inline's RPC (docs/notes/inline-html.md).
     showHtml: (req) => guard(() => ({ item: world.logs.showHtml(req.threadId, req.path, req.title) })),
+    // What a thread's pages keep with cf.storage (mock/pageStorage.ts).
+    pageStorage: (req) => guard(() => (world.thread(req.threadId), { values: pageStorageOf(req.threadId) })),
+    setPageStorage: (req) => guard(() => (world.thread(req.threadId), { values: setPageStorage(req.threadId, req.key, req.value) })),
     interrupt: (req) => guard(() => (world.logs.finish(req.threadId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {
@@ -1402,6 +1406,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       resetProjects();
       resetCompletion();
       mockFiles.reset();
+      resetPageStorage();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {
