@@ -54,6 +54,12 @@ with a `workspaces-v2-<n>-*.md` note.
   repository one level down becomes a project, then a rooted workspace named after the
   folder), the dialog's Add as workspace / Add as project choice) on
   `cf/workspaces-v2-scan`: `docs/notes/workspaces-v2-6-scan.md`.
+* Fuzz fix 1, workspace store (fuzz round B's findings but the help skill's: roots never
+  home or in a project, `workspace.set-root`, names never ids and NFC, unregistered
+  projects leave workspaces, a synthetic workspace a thread runs in is not removed, a
+  missing cwd named, `thread checkouts` prints a rooted workspace's root, no instructions
+  block inside the root, the scan lists only children Register takes) on
+  `cf/workspaces-v2-fix-workspace`: `docs/notes/workspaces-v2-fix-1-workspace.md`.
 
 ### Multi-repo workspaces: the five steps are built
 

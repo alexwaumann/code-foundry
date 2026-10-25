@@ -246,7 +246,11 @@ func describeWorkspace(w *v1.Workspace, name func(string) string) string {
 	}
 	if p := w.GetDefaultPrimary(); p != "" {
 		if p != "workspace" {
-			p = name(p)
+			if n := name(p); strings.EqualFold(n, "workspace") {
+				p = "project " + n + " (" + p + ")" // not the keyword
+			} else {
+				p = n
+			}
 		}
 		s += ", starts in " + p
 	}
