@@ -6,6 +6,7 @@
  */
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
+import { byName } from "./projectSet";
 
 /** The default primary that runs new threads in the workspace's own folder. */
 export const PRIMARY_WORKSPACE = "workspace";
@@ -101,9 +102,7 @@ function live(t: Pick<ThreadView, "status" | "state">): boolean {
 
 /** Member project ids in display order: by name, case-insensitive (an unregistered one by its id), id as the tiebreak. The stored order stays by id. */
 export function membersByName(ids: readonly string[], nameOf: (id: string) => string | undefined): string[] {
-  const named = ids.map((id) => ({ id, name: nameOf(id) ?? id }));
-  named.sort((a, b) => compareByName(a.name, a.id, b.name, b.id));
-  return named.map((m) => m.id);
+  return byName(ids, (id) => nameOf(id) ?? id);
 }
 
 /** Project display order: name, case-insensitive, then id. */
