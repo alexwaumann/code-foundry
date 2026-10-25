@@ -22,18 +22,18 @@ func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.run-in",
 		Title: "Run Thread In…",
-		Description: "Move a workspace thread to another member worktree of its workspace. " +
+		Description: "Move a thread to another of its checkouts (thread checkouts lists them): that project becomes the one it runs in. " +
 			"A thread moves once it is idle at its prompt (at once when Claude is not running for it).",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
-			{Name: "project", Type: String, Positional: true, Description: "Member project (id or name)"},
-			{Name: "worktree", Type: Path, Description: "Member worktree path"},
+			{Name: "project", Type: String, Positional: true, Description: "One of the thread's projects (id or name)"},
+			{Name: "worktree", Type: Path, Description: "One of the thread's checkout paths"},
 		},
 		When: hasWorkspaceThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			if a.String("project") == "" && a.Path("worktree") == "" {
-				return Result{}, InvalidArg("project", "name the member: a project or a worktree path")
+				return Result{}, InvalidArg("project", "name the checkout: a project or a checkout path")
 			}
 			res, err := b.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{
 				Id: a.String("id"), ProjectId: a.String("project"), WorktreePath: a.Path("worktree"),

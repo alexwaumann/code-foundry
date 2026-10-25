@@ -136,8 +136,8 @@ type Thread struct {
 	// without a project. Persisted (threads.project_ids). Copy on write.
 	ProjectIDs   []string
 	WorktreePath string // the cwd
-	Name            string
-	AutoNamed       bool
+	Name         string
+	AutoNamed    bool
 	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
 	// namer still replaces it; a rename or the namer's title clears it. Persisted.
 	NameProvisional bool

@@ -176,7 +176,8 @@ type placedThread struct {
 	projectID, path, baseRef, branch string
 	createdWorktree                  bool
 	workspaceID                      string
-	// name, namerCalled, late: as createdWorktree's (newworktree.go).
+	// name is the namer's title when it arrived within SlugTimeout; namerCalled: the
+	// namer was started for this thread; late delivers its answer when it was late.
 	name        string
 	namerCalled bool
 	late        <-chan namingResult

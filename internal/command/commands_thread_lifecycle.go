@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -66,7 +67,7 @@ func canStartThread(c Context) bool {
 // noProjectAlone refuses thread.new's no-project with any arg that places the thread
 // in a project or workspace.
 func noProjectAlone(a Args) error {
-	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base", "base-from-origin", "branch"} {
+	for _, name := range []string{"project", "worktree", "workspace", "projects", "like", "new-branch", "new-worktree", "base", "base-from-origin", "branch"} {
 		if a.String(name) != "" || a.Bool(name) {
 			return InvalidArg(name, "no-project starts a thread without a project; it does not take %s", name)
 		}
@@ -94,15 +95,17 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Name:  "thread.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
-				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and projects it gets a new workspace. " +
-				"With no-project it belongs to no project and runs in your home directory.",
+				"With projects it also works in the others (thread checkouts lists them). Inside a thread it copies that thread's projects, branch and mode unless told otherwise. " +
+				"With workspace it runs in one of that workspace's member worktrees. With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name (with workspace or projects: the member the thread runs in)"},
+				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name: the one the thread runs in (with projects, like or inside a thread: which of the set)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
-				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a worktree on the same new branch in each; project picks the member the thread runs in (default: the first)"},
+				{Name: "projects", Type: String, Description: "Comma-separated projects (id, name, or path) the thread works in, each in its own checkout, or with new-worktree in a worktree on one new branch (project:base gives that one its own base); project picks the one it runs in (default: the first). Inside a thread or with like: narrows the copied set"},
+				{Name: "like", Type: String, ID: ThreadID, Description: "Thread id to copy the projects, branch, workspace, primary and mode from (New thread on this branch)"},
+				{Name: "new-branch", Type: Bool, Description: "With like (or inside a thread): a new branch for the same projects, in new worktrees, named as new-worktree's"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
@@ -135,7 +138,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					if err := noProjectAlone(a); err != nil {
 						return Result{}, err
 					}
-				} else if a.String("project") == "" && a.Path("worktree") == "" && ws == "" && len(projects) == 0 {
+				} else if a.String("project") == "" && a.Path("worktree") == "" && ws == "" && len(projects) == 0 && a.String("like") == "" {
 					unplaced = true
 				}
 				req := &v1.CreateThreadRequest{
@@ -182,21 +185,25 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if err != nil {
 					return Result{}, err
 				}
+				req.ProjectIds, req.LikeThreadId, req.NewBranch = projects, a.String("like"), a.Bool("new-branch")
+				newBranch := a.Bool("new-worktree") || req.NewBranch
 				switch {
-				case len(projects) > 0 && !a.Bool("new-worktree"):
-					return Result{}, InvalidArg("projects", "only applies with new-worktree (a new workspace); for an existing one use workspace")
-				case ws != "" && a.Bool("new-worktree"):
-					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with projects")
-				case len(projects) > 0:
-					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base"), Branch: a.String("branch"), BaseFromOrigin: fromOrigin}
-				case a.Bool("new-worktree"):
+				case ws != "" && (newBranch || len(projects) > 0 || req.LikeThreadId != ""):
+					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member worktree; it takes no new-worktree, new-branch, projects or like")
+				case req.NewBranch && a.Given("new-worktree") && !a.Bool("new-worktree"):
+					return Result{}, InvalidArg("new-branch", "a new branch is made in new worktrees; it does not go with new-worktree=false")
+				case newBranch:
 					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base"), Branch: a.String("branch"), BaseFromOrigin: fromOrigin}
 				case a.String("base") != "":
-					return Result{}, InvalidArg("base", "only applies with new-worktree")
+					return Result{}, InvalidArg("base", "only applies with new-worktree or new-branch")
 				case fromOrigin != nil:
-					return Result{}, InvalidArg("base-from-origin", "only applies with new-worktree")
+					return Result{}, InvalidArg("base-from-origin", "only applies with new-worktree or new-branch")
 				case a.String("branch") != "":
-					return Result{}, InvalidArg("branch", "only applies with new-worktree")
+					return Result{}, InvalidArg("branch", "only applies with new-worktree or new-branch")
+				case a.Given("new-worktree"):
+					// --new-worktree=false: each project's own checkout, also when the copied
+					// thread (like, or the creating one) works in worktrees.
+					req.CheckoutMode = true
 				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
@@ -210,14 +217,19 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				focusCreated(e, a, s.GetId())
 				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
+				if n := len(s.GetProjectIds()); n > 1 {
+					msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(s.GetProjectIds(), ", "))
+				}
 				if s.GetWorkspaceId() != "" {
 					msg += " (workspace " + s.GetWorkspaceId() + ")"
 				}
 				if req.GetNoProject() {
 					msg += " (no project)"
 				}
-				if s.GetCreatedWorktree() {
+				if s.GetCreatedWorktree() && req.NewWorktree != nil {
 					msg += " (new worktree from " + s.GetBaseRef() + ")"
+				} else if s.GetCreatedWorktree() {
+					msg += " (worktrees on " + s.GetBranch() + ")"
 				}
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
@@ -225,7 +237,8 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if req.InSidebar != nil {
 					msg += "; " + map[bool]string{true: "shown in", false: "hidden from"}[req.GetInSidebar()] + " the sidebar"
 				}
-				return Result{Message: msg, JSON: s}, nil
+				// Collision hints, never a refusal: printed on stderr.
+				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil
 			},
 		},
 		Command{
@@ -309,6 +322,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 		},
 		threadRunIn(b, idArg),
+		threadCheckouts(b),
 		threadPin(b, idArg),
 		threadArchive(b, idArg),
 		threadSnooze(b, idArg),

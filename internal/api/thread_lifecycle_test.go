@@ -165,7 +165,7 @@ func TestThreadCreateNoProject(t *testing.T) {
 func TestThreadRunIn(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()
-	fake.Put(thread.Thread{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s-1", WorkspaceID: "w-1", ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: "/wt/web", State: thread.StateConnected})
 	fake.Put(thread.Thread{ID: "s-2", WorktreePath: "/src/app", State: thread.StateConnected})
 	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-1", ProjectId: "api"}))
 	if err != nil {
@@ -175,7 +175,7 @@ func TestThreadRunIn(t *testing.T) {
 		t.Errorf("RunIn = %v", s)
 	}
 	if _, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-2", ProjectId: "api"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("RunIn on a project thread = %v", err)
+		t.Errorf("RunIn on a thread without a project = %v", err)
 	}
 }
 

@@ -470,6 +470,9 @@ func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread
 		if len(s.Projects()) == 0 {
 			return fmt.Errorf("%w: thread %s has no project to run in", thread.ErrFailedPrecondition, id)
 		}
+		if t.ProjectID != "" && !slices.Contains(s.Projects(), t.ProjectID) {
+			return fmt.Errorf("%w: project %s is not one of thread %s's projects", thread.ErrFailedPrecondition, t.ProjectID, id)
+		}
 		path := t.WorktreePath
 		if path == "" {
 			path = "/worktrees/" + t.ProjectID

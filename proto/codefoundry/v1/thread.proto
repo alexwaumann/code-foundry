@@ -43,13 +43,19 @@ service ThreadService {
   rpc Reconnect(ReconnectThreadRequest) returns (ReconnectThreadResponse) {}
   // Remove forgets a thread. Stops its Claude first if it runs.
   rpc Remove(RemoveThreadRequest) returns (RemoveThreadResponse) {}
-  // RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-  // A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-  // target until then) and the row's worktree_path and project_id change when Claude
-  // accepts it. A disconnected thread's row
-  // changes at once; the next reconnect resumes there. Refused for a project thread or
-  // a target that is not a member.
+  // RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
+  // becomes the primary. A live thread gets set_cwd once it is idle
+  // (pending_worktree_path shows the queued target until then) and the row's
+  // worktree_path and project_id change when Claude accepts it. A disconnected thread's
+  // row changes at once; the next start resumes there. Refused for a thread without a
+  // project and for a target that is not one of its checkouts.
   rpc RunIn(RunInThreadRequest) returns (RunInThreadResponse) {}
+  // Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
+  // cwd, the deepest winning) and lists one checkout per project in its set: the primary
+  // at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
+  // folder the folder; otherwise each member's own checkout. See
+  // docs/notes/workspaces-v2-1-threads.md.
+  rpc Checkouts(ThreadCheckoutsRequest) returns (ThreadCheckoutsResponse) {}
   // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
   // the GUI's thread list. Persisted; any state.
   rpc Pin(PinThreadRequest) returns (PinThreadResponse) {}

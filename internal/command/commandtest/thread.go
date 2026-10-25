@@ -34,8 +34,11 @@ type Thread struct {
 	// ListSubscriptions returns and Unsubscribe removes from (thread_subscriptions.go).
 	Fired, Existed bool
 	Subscriptions  []*v1.ThreadSubscription
-	// Reused is Create's answer flag (a repeated request_id).
+	// Reused is Create's answer flag (a repeated request_id); Hints its collision hints.
 	Reused bool
+	Hints  []string
+	// CheckoutsResp is Checkouts' answer (nil: an empty one for the requested thread).
+	CheckoutsResp *v1.ThreadCheckoutsResponse
 	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
 	// request has again.
 	PageShown bool
@@ -83,7 +86,24 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	if m.GetNoProject() {
 		out.WorktreePath = "/home"
 	}
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out, Reused: s.Reused}), nil
+	ids := slices.Clone(m.GetProjectIds())
+	if out.ProjectId != "" {
+		ids = append(ids, out.ProjectId)
+	}
+	slices.Sort(ids)
+	out.ProjectIds = slices.Compact(ids)
+	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out, Reused: s.Reused, Hints: s.Hints}), nil
+}
+
+// Checkouts returns CheckoutsResp (an empty answer for the requested thread when nil).
+func (s *Thread) Checkouts(_ context.Context, r *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if s.CheckoutsResp != nil {
+		return connect.NewResponse(s.CheckoutsResp), nil
+	}
+	return connect.NewResponse(&v1.ThreadCheckoutsResponse{Thread: &v1.Thread{Id: r.Msg.GetId()}}), nil
 }
 
 // Fork returns thread "s2" with ParentId set.

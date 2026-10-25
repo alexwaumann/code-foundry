@@ -101,6 +101,9 @@ type stores struct {
 	// stopProjectActivity stops the glue that tells project which worktrees have live
 	// threads and when a thread edited files (projectactivity.go).
 	stopProjectActivity func()
+	// archived removes an archived thread's derived worktrees nobody else has, in the
+	// background (cleanup_archived.go); stopped after thread, before project.
+	archived *archiveCleaner
 	// stopBranchLinks stops the glue that links each thread to the pull requests on its
 	// branches, from the GitHub store's cached lists (linked_prs_branch.go).
 	stopBranchLinks func()
@@ -248,6 +251,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.memory.Load()
 	// Hand edits reach the Settings page within a moment (docs/notes/memory-fixes-2.md).
 	s.memory.Watch(ctx)
+	s.archived = &archiveCleaner{
+		log: log.With("store", "thread"), projects: s.project,
+		checkouts:  func(t thread.Thread) []thread.Checkout { return s.thread.CheckoutsOf(t) },
+		threads:    func() *thread.Snapshot { return s.thread.Snapshot() },
+		terminals:  func() []terminal.Terminal { return s.terminal.List(context.Background()) },
+		workspaces: func() *workspace.Snapshot { return s.workspace.Snapshot() },
+	}
+	s.archived.ctx, s.archived.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	threadLog := log.With("store", "thread")
 	if s.thread, err = thread.New(ctx, thread.Options{
 		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
@@ -282,6 +293,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// their pull requests in its poll (wake_pr.go).
 		PullRequest:       pullRequestForWake(s.gh),
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
+		// An archived thread's derived worktrees nobody else has go (cleanup_archived.go).
+		Archived: s.archived.archived,
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
@@ -408,6 +421,9 @@ func (s *stores) close() error {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		errs = append(errs, s.thread.Shutdown(closeCtx))
 		cancel()
+	}
+	if s.archived != nil {
+		s.archived.stop()
 	}
 	if s.terminal != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

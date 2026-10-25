@@ -93,8 +93,30 @@ func threadBranches(th thread.Thread, projects *project.Snapshot, workspaces *wo
 		}
 		return out
 	}
-	if th.ProjectID != "" {
-		add(th.ProjectID, th.WorktreePath, th.Branch)
+	// Every member of the thread's set (docs/notes/workspaces-v2-1-threads.md): the
+	// primary's worktree, in worktree mode each other one's on the thread's branch, else
+	// each other one's own checkout.
+	for _, pid := range th.Projects() {
+		switch {
+		case pid == th.ProjectID:
+			add(pid, th.WorktreePath, th.Branch)
+		case th.CreatedWorktree && th.Branch != "":
+			path := ""
+			if r, ok := projects.Project(pid); ok {
+				i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Branch == th.Branch && !w.Detached })
+				if i >= 0 {
+					path = r.Worktrees[i].Path
+				}
+			}
+			add(pid, path, th.Branch)
+		default:
+			if r, ok := projects.Project(pid); ok {
+				i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.IsMain })
+				if i >= 0 {
+					add(pid, r.Worktrees[i].Path, "")
+				}
+			}
+		}
 	}
 	return out
 }
