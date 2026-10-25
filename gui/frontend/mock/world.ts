@@ -2766,7 +2766,7 @@ export class World {
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
-            { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)" },
+            { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
             {
               name: "sidebar",
               type: ArgType.BOOL,
