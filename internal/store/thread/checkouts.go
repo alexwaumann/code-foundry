@@ -232,9 +232,14 @@ type ThreadCheckouts struct {
 	Thread    Thread
 	Checkouts []Checkout
 	// WorkspaceID, WorkspaceName and WorkspaceDir are the thread's workspace reference:
-	// its id, name and managed dir; empty without one (the name and dir also when it is
-	// gone).
+	// its id, name and folder (Workspace.Dir: a rooted workspace's root, where its files
+	// are written and read, else its managed dir); empty without one (the name and dir
+	// also when it is gone). WorkspaceDirMissing: the root is not a folder now.
+	// WorkspaceStrays are real files in a rooted workspace's managed dir where a link
+	// goes (workspace.Strays).
 	WorkspaceID, WorkspaceName, WorkspaceDir string
+	WorkspaceDirMissing                      bool
+	WorkspaceStrays                          []string
 	// Current is the index in Checkouts of the checkout holding the ref's cwd (the
 	// deepest), else of the primary; -1 when neither.
 	Current int
@@ -264,7 +269,9 @@ func (m *Manager) Checkouts(_ context.Context, ref CheckoutsRef) (ThreadCheckout
 	}
 	out := ThreadCheckouts{Thread: t, Checkouts: m.checkouts(t), WorkspaceID: t.WorkspaceID, Current: -1}
 	if w, ok := m.workspaceOf(t); ok {
-		out.WorkspaceName, out.WorkspaceDir = w.Name, w.ManagedDir
+		out.WorkspaceName, out.WorkspaceDir = w.Name, w.Dir()
+		out.WorkspaceDirMissing = w.RootPath != "" && !isDir(w.RootPath)
+		out.WorkspaceStrays = workspace.Strays(w)
 	}
 	depth := -1
 	for i, c := range out.Checkouts {
@@ -368,7 +375,27 @@ func (m *Manager) CheckoutHints(t Thread) []string {
 		}
 		hints = append(hints, at+" is also open in "+holderLabel(other))
 	}
-	return hints
+	return append(hints, m.outsideWorkspaceHint(t, mine)...)
+}
+
+// outsideWorkspaceHint is one line when t references a workspace and some of its
+// projects are not members (thread new --workspace with --projects naming others): it
+// is allowed, and those projects get the workspace's instructions too.
+func (m *Manager) outsideWorkspaceHint(t Thread, cos []Checkout) []string {
+	w, ok := m.workspaceOf(t)
+	if !ok {
+		return nil
+	}
+	var names []string
+	for _, c := range cos {
+		if !w.Member(c.ProjectID) {
+			names = append(names, cmp.Or(c.ProjectName, c.ProjectID))
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return []string{strings.Join(names, ", ") + " not in workspace " + w.Name + "; the thread still gets its instructions and skills"}
 }
 
 // otherHolder is a thread other than id, not archived, with a checkout at path.

@@ -283,7 +283,7 @@ func TestSendSpawnFailure(t *testing.T) {
 			name:     "worktree gone",
 			breakIt:  func(e *env, _ Thread) { mustRename(e.t, e.home, e.home+".gone") },
 			fixIt:    func(e *env, _ Thread) { mustRename(e.t, e.home+".gone", e.home) },
-			wantText: "Claude did not start: failed precondition: worktree ",
+			wantText: "Claude did not start: failed precondition: working directory ",
 		},
 		{
 			name:     "claude missing",

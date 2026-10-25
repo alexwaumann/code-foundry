@@ -32,11 +32,16 @@ type Options struct {
 	// Dir holds the managed dirs, one per workspace id (paths.Workspaces:
 	// <config home>/workspaces).
 	Dir string
-	// Home, when set, is the folder every root path must be inside (the user's home).
+	// Home, when set, is the folder every root path must be inside (the user's home),
+	// and never a root itself.
 	Home string
-	Bus  *bus.Bus     // default: a private bus
-	Log  *slog.Logger // default: slog.Default()
-	Now  func() time.Time
+	// InUse, when set, refuses Remove of a synthetic workspace (whose managed dir goes)
+	// while a thread runs there; the daemon wires it to the thread store, which this
+	// store never looks at. The error names the threads.
+	InUse func(Workspace) error
+	Bus   *bus.Bus     // default: a private bus
+	Log   *slog.Logger // default: slog.Default()
+	Now   func() time.Time
 }
 
 // Manager is the Store backed by SQLite.
@@ -130,12 +135,35 @@ func (m *Manager) resolveMembers(refs []string) ([]string, error) {
 }
 
 // cleanRoot validates a root path: absolute, an existing folder, inside Options.Home
-// when set; returned cleaned with symlinks resolved.
+// when set but not Home itself, and neither a registered project's checkout or worktree
+// nor inside one (a thread whose primary is the workspace would run in that project's
+// checkout without being one of its threads); returned cleaned with symlinks resolved.
 func (m *Manager) cleanRoot(root string) (string, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
 		return "", nil
 	}
+	root, err := m.rootFolder(root)
+	if err != nil {
+		return "", err
+	}
+	for _, r := range m.opts.Projects.Snapshot().Projects {
+		paths := []string{r.Path}
+		for _, w := range r.Worktrees {
+			paths = append(paths, w.Path)
+		}
+		for _, p := range paths {
+			if p != "" && Within(root, p) {
+				return "", fmt.Errorf("%w: root %s is inside project %s (%s); add the project with projects instead",
+					ErrInvalidArgument, root, r.Name, p)
+			}
+		}
+	}
+	return root, nil
+}
+
+// rootFolder is cleanRoot's check of the folder itself.
+func (m *Manager) rootFolder(root string) (string, error) {
 	if !filepath.IsAbs(root) {
 		return "", fmt.Errorf("%w: root %q must be an absolute path", ErrInvalidArgument, root)
 	}
@@ -144,18 +172,36 @@ func (m *Manager) cleanRoot(root string) (string, error) {
 		return "", fmt.Errorf("%w: root %s is not a folder", ErrInvalidArgument, root)
 	}
 	root = realPath(root)
-	if m.opts.Home != "" && !fsx.Within(realPath(m.opts.Home), root) {
-		return "", fmt.Errorf("%w: root %s is outside your home directory", ErrInvalidArgument, root)
+	if m.opts.Home != "" {
+		home := realPath(m.opts.Home)
+		switch {
+		case !fsx.Within(home, root):
+			return "", fmt.Errorf("%w: root %s is outside your home directory", ErrInvalidArgument, root)
+		case root == home:
+			return "", fmt.Errorf("%w: your home directory cannot be a workspace's root (its .claude is your own Claude config); pick a folder inside it", ErrInvalidArgument)
+		}
 	}
 	return root, nil
 }
 
-// primaryOf resolves a default primary ref for w: PrimaryWorkspace or a member.
+// primaryOf resolves a default primary ref for w: a member, or PrimaryWorkspace. A
+// registered project whose id or name is "workspace" wins over the keyword (IsKeyword).
 func (m *Manager) primaryOf(w Workspace, ref string) (string, error) {
-	if strings.EqualFold(strings.TrimSpace(ref), PrimaryWorkspace) {
+	snap := m.opts.Projects.Snapshot()
+	if IsKeyword(snap, ref) {
 		return PrimaryWorkspace, nil
 	}
-	return memberRef(w, m.opts.Projects.Snapshot(), ref)
+	return memberRef(w, snap, ref)
+}
+
+// fallbackPrimary is where new threads of w start once its default primary is gone:
+// the first member left of a synthetic workspace (its managed dir holds no code), else
+// PrimaryWorkspace.
+func fallbackPrimary(w Workspace) string {
+	if w.Synthetic() && len(w.Members) > 0 {
+		return w.Members[0]
+	}
+	return PrimaryWorkspace
 }
 
 // Create implements Store.
@@ -245,12 +291,57 @@ func (m *Manager) RemoveProject(ctx context.Context, ref, projectRef string) (Wo
 		if err != nil {
 			return err
 		}
-		w.Members = slices.DeleteFunc(w.Members, func(id string) bool { return id == pid })
-		if w.DefaultPrimary == pid {
-			w.DefaultPrimary = PrimaryWorkspace
-		}
-		m.log.Info("workspace project removed", "workspace", w.ID, "project", pid)
+		dropMember(w, pid)
+		m.log.Info("workspace project removed", "workspace", w.ID, "project", pid, "default_primary", w.DefaultPrimary)
 		return nil
+	})
+}
+
+// dropMember removes pid from w's members; a default primary that was pid moves
+// (fallbackPrimary).
+func dropMember(w *Workspace, pid string) {
+	w.Members = slices.DeleteFunc(w.Members, func(id string) bool { return id == pid })
+	if w.DefaultPrimary == pid {
+		w.DefaultPrimary = fallbackPrimary(*w)
+	}
+}
+
+// ProjectRemoved implements Store.
+func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) error {
+	var errs []error
+	for _, w := range m.Snapshot().Workspaces {
+		if !w.Member(projectID) {
+			continue
+		}
+		_, err := m.update(ctx, w.ID, func(w *Workspace) error {
+			if !w.Member(projectID) {
+				return nil
+			}
+			dropMember(w, projectID)
+			m.log.Info("unregistered project dropped from workspace", "workspace", w.ID, "project", projectID, "default_primary", w.DefaultPrimary)
+			return nil
+		})
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
+// SetRoot implements Store.
+func (m *Manager) SetRoot(ctx context.Context, ref, root string) (Workspace, error) {
+	if strings.TrimSpace(root) == "" {
+		return Workspace{}, fmt.Errorf("%w: a root folder is required", ErrInvalidArgument)
+	}
+	clean, err := m.cleanRoot(root)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return m.update(ctx, ref, func(w *Workspace) error {
+		if w.Synthetic() {
+			return fmt.Errorf("%w: workspace %s has no root (its folder is %s); a root is set when it is created", ErrFailedPrecondition, w.Name, w.ManagedDir)
+		}
+		m.log.Info("workspace root changed", "workspace", w.ID, "from", w.RootPath, "to", clean)
+		w.RootPath = clean
+		return ensureDir(m.log, *w)
 	})
 }
 
@@ -288,6 +379,11 @@ func (m *Manager) Remove(ctx context.Context, ref string) error {
 	w, err := ResolveWorkspace(m.Snapshot(), ref)
 	if err != nil {
 		return err
+	}
+	if w.Synthetic() && m.opts.InUse != nil {
+		if err := m.opts.InUse(w); err != nil {
+			return fmt.Errorf("%w: workspace %s: %w", ErrFailedPrecondition, w.Name, err)
+		}
 	}
 	if err := deleteWorkspace(context.WithoutCancel(ctx), m.opts.DB, w.ID); err != nil {
 		return err

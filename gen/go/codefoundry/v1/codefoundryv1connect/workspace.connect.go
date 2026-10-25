@@ -48,6 +48,9 @@ const (
 	// WorkspaceServiceSetDefaultPrimaryProcedure is the fully-qualified name of the WorkspaceService's
 	// SetDefaultPrimary RPC.
 	WorkspaceServiceSetDefaultPrimaryProcedure = "/codefoundry.v1.WorkspaceService/SetDefaultPrimary"
+	// WorkspaceServiceSetRootProcedure is the fully-qualified name of the WorkspaceService's SetRoot
+	// RPC.
+	WorkspaceServiceSetRootProcedure = "/codefoundry.v1.WorkspaceService/SetRoot"
 	// WorkspaceServiceRemoveProcedure is the fully-qualified name of the WorkspaceService's Remove RPC.
 	WorkspaceServiceRemoveProcedure = "/codefoundry.v1.WorkspaceService/Remove"
 	// WorkspaceServiceWatchProcedure is the fully-qualified name of the WorkspaceService's Watch RPC.
@@ -63,20 +66,28 @@ type WorkspaceServiceClient interface {
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
 	// AddProject adds a member project.
 	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
-	// RemoveProject drops a member project (nothing on disk changes). The default primary
-	// moves to "workspace" when it was the removed project.
+	// RemoveProject drops a member project (nothing on disk changes). The default primary,
+	// when it was the removed project, moves to the first member left of a synthetic
+	// workspace, else to "workspace". The daemon does the same for a project that is
+	// unregistered.
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
 	// Rename renames a workspace (names are unique, case-insensitively).
 	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
 	// SetDefaultPrimary sets where new threads in the workspace start: a member project id,
 	// or "workspace" (the managed dir, or the root of a rooted workspace).
 	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
+	// SetRoot points a rooted workspace at another folder (moved or renamed), validated
+	// as Create's root_path; the managed dir's links are made again. A synthetic
+	// workspace is FailedPrecondition.
+	SetRoot(context.Context, *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error)
 	// Remove forgets a workspace. A synthetic one's managed dir is deleted with its
-	// instructions and skills; a rooted one loses only the symlinks (the root is the
+	// instructions and skills (FailedPrecondition, naming them, while a thread that is
+	// not archived runs in it); a rooted one loses only the symlinks (the root is the
 	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
+	// snapshot. Subscribing reads every workspace's folder again first (instructions,
+	// skills, links), so hand edits show without a spawn.
 	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest]) (*connect.ServerStreamForClient[v1.WorkspaceEvent], error)
 }
 
@@ -127,6 +138,12 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("SetDefaultPrimary")),
 			connect.WithClientOptions(opts...),
 		),
+		setRoot: connect.NewClient[v1.SetWorkspaceRootRequest, v1.SetWorkspaceRootResponse](
+			httpClient,
+			baseURL+WorkspaceServiceSetRootProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("SetRoot")),
+			connect.WithClientOptions(opts...),
+		),
 		remove: connect.NewClient[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse](
 			httpClient,
 			baseURL+WorkspaceServiceRemoveProcedure,
@@ -150,6 +167,7 @@ type workspaceServiceClient struct {
 	removeProject     *connect.Client[v1.RemoveWorkspaceProjectRequest, v1.RemoveWorkspaceProjectResponse]
 	rename            *connect.Client[v1.RenameWorkspaceRequest, v1.RenameWorkspaceResponse]
 	setDefaultPrimary *connect.Client[v1.SetWorkspaceDefaultPrimaryRequest, v1.SetWorkspaceDefaultPrimaryResponse]
+	setRoot           *connect.Client[v1.SetWorkspaceRootRequest, v1.SetWorkspaceRootResponse]
 	remove            *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
 	watch             *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
 }
@@ -184,6 +202,11 @@ func (c *workspaceServiceClient) SetDefaultPrimary(ctx context.Context, req *con
 	return c.setDefaultPrimary.CallUnary(ctx, req)
 }
 
+// SetRoot calls codefoundry.v1.WorkspaceService.SetRoot.
+func (c *workspaceServiceClient) SetRoot(ctx context.Context, req *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error) {
+	return c.setRoot.CallUnary(ctx, req)
+}
+
 // Remove calls codefoundry.v1.WorkspaceService.Remove.
 func (c *workspaceServiceClient) Remove(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
 	return c.remove.CallUnary(ctx, req)
@@ -203,20 +226,28 @@ type WorkspaceServiceHandler interface {
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
 	// AddProject adds a member project.
 	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
-	// RemoveProject drops a member project (nothing on disk changes). The default primary
-	// moves to "workspace" when it was the removed project.
+	// RemoveProject drops a member project (nothing on disk changes). The default primary,
+	// when it was the removed project, moves to the first member left of a synthetic
+	// workspace, else to "workspace". The daemon does the same for a project that is
+	// unregistered.
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
 	// Rename renames a workspace (names are unique, case-insensitively).
 	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
 	// SetDefaultPrimary sets where new threads in the workspace start: a member project id,
 	// or "workspace" (the managed dir, or the root of a rooted workspace).
 	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
+	// SetRoot points a rooted workspace at another folder (moved or renamed), validated
+	// as Create's root_path; the managed dir's links are made again. A synthetic
+	// workspace is FailedPrecondition.
+	SetRoot(context.Context, *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error)
 	// Remove forgets a workspace. A synthetic one's managed dir is deleted with its
-	// instructions and skills; a rooted one loses only the symlinks (the root is the
+	// instructions and skills (FailedPrecondition, naming them, while a thread that is
+	// not archived runs in it); a rooted one loses only the symlinks (the root is the
 	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
+	// snapshot. Subscribing reads every workspace's folder again first (instructions,
+	// skills, links), so hand edits show without a spawn.
 	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest], *connect.ServerStream[v1.WorkspaceEvent]) error
 }
 
@@ -263,6 +294,12 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("SetDefaultPrimary")),
 		connect.WithHandlerOptions(opts...),
 	)
+	workspaceServiceSetRootHandler := connect.NewUnaryHandler(
+		WorkspaceServiceSetRootProcedure,
+		svc.SetRoot,
+		connect.WithSchema(workspaceServiceMethods.ByName("SetRoot")),
+		connect.WithHandlerOptions(opts...),
+	)
 	workspaceServiceRemoveHandler := connect.NewUnaryHandler(
 		WorkspaceServiceRemoveProcedure,
 		svc.Remove,
@@ -289,6 +326,8 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceRenameHandler.ServeHTTP(w, r)
 		case WorkspaceServiceSetDefaultPrimaryProcedure:
 			workspaceServiceSetDefaultPrimaryHandler.ServeHTTP(w, r)
+		case WorkspaceServiceSetRootProcedure:
+			workspaceServiceSetRootHandler.ServeHTTP(w, r)
 		case WorkspaceServiceRemoveProcedure:
 			workspaceServiceRemoveHandler.ServeHTTP(w, r)
 		case WorkspaceServiceWatchProcedure:
@@ -324,6 +363,10 @@ func (UnimplementedWorkspaceServiceHandler) Rename(context.Context, *connect.Req
 
 func (UnimplementedWorkspaceServiceHandler) SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.SetDefaultPrimary is not implemented"))
+}
+
+func (UnimplementedWorkspaceServiceHandler) SetRoot(context.Context, *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.SetRoot is not implemented"))
 }
 
 func (UnimplementedWorkspaceServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {

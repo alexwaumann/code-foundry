@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/workspace.proto.
  */
 export const file_codefoundry_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIuEBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdtZW1iZXJzGAYgAygJEhEKCXJvb3RfcGF0aBgHIAEoCRIXCg9kZWZhdWx0X3ByaW1hcnkYCCABKAkSEwoLbWFuYWdlZF9kaXIYCSABKAkSFAoMaW5zdHJ1Y3Rpb25zGAogASgJEg4KBnNraWxscxgLIAMoCUoECAMQBEoECAQQBVIGYnJhbmNoIhcKFUxpc3RXb3Jrc3BhY2VzUmVxdWVzdCJHChZMaXN0V29ya3NwYWNlc1Jlc3BvbnNlEi0KCndvcmtzcGFjZXMYASADKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UilAEKFkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSDAoEbmFtZRgBIAEoCRIPCgdtZW1iZXJzGAYgAygJEhEKCXJvb3RfcGF0aBgHIAEoCRIXCg9kZWZhdWx0X3ByaW1hcnkYCCABKAlKBAgCEANKBAgDEARKBAgEEAVKBAgFEAZSBmJyYW5jaFIIYmFzZV9yZWZSBWZldGNoIkcKF0NyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJoChpBZGRXb3Jrc3BhY2VQcm9qZWN0UmVxdWVzdBIRCgl3b3Jrc3BhY2UYASABKAkSDwoHcHJvamVjdBgDIAEoCUoECAIQA0oECAQQBUoECAUQBlIDY3dkUghiYXNlX3JlZlIFZmV0Y2giSwobQWRkV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJwCh1SZW1vdmVXb3Jrc3BhY2VQcm9qZWN0UmVxdWVzdBIRCgl3b3Jrc3BhY2UYASABKAkSDwoHcHJvamVjdBgDIAEoCUoECAIQA0oECAQQBUoECAUQBlIDY3dkUgVmb3JjZVINZGVsZXRlX2JyYW5jaCJOCh5SZW1vdmVXb3Jrc3BhY2VQcm9qZWN0UmVzcG9uc2USLAoJd29ya3NwYWNlGAEgASgLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlIjkKFlJlbmFtZVdvcmtzcGFjZVJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgwKBG5hbWUYAiABKAkiRwoXUmVuYW1lV29ya3NwYWNlUmVzcG9uc2USLAoJd29ya3NwYWNlGAEgASgLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlIk8KIVNldFdvcmtzcGFjZURlZmF1bHRQcmltYXJ5UmVxdWVzdBIRCgl3b3Jrc3BhY2UYASABKAkSFwoPZGVmYXVsdF9wcmltYXJ5GAIgASgJIlIKIlNldFdvcmtzcGFjZURlZmF1bHRQcmltYXJ5UmVzcG9uc2USLAoJd29ya3NwYWNlGAEgASgLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlIk0KFlJlbW92ZVdvcmtzcGFjZVJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJSgQIAhADSgQIAxAEUgVmb3JjZVINZGVsZXRlX2JyYW5jaCIZChdSZW1vdmVXb3Jrc3BhY2VSZXNwb25zZSIYChZXYXRjaFdvcmtzcGFjZXNSZXF1ZXN0IpQBCg5Xb3Jrc3BhY2VFdmVudBI1CghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZVNuYXBzaG90SAASLAoHdXBkYXRlZBgCIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUgAEhQKCnJlbW92ZWRfaWQYAyABKAlIAEIHCgVldmVudCJCChFXb3Jrc3BhY2VTbmFwc2hvdBItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlMrAGChBXb3Jrc3BhY2VTZXJ2aWNlElcKBExpc3QSJS5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1Jlc3BvbnNlIgASWwoGQ3JlYXRlEiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgASZwoKQWRkUHJvamVjdBIqLmNvZGVmb3VuZHJ5LnYxLkFkZFdvcmtzcGFjZVByb2plY3RSZXF1ZXN0GisuY29kZWZvdW5kcnkudjEuQWRkV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgAScAoNUmVtb3ZlUHJvamVjdBItLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVByb2plY3RSZXF1ZXN0Gi4uY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgASWwoGUmVuYW1lEiYuY29kZWZvdW5kcnkudjEuUmVuYW1lV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbmFtZVdvcmtzcGFjZVJlc3BvbnNlIgASfAoRU2V0RGVmYXVsdFByaW1hcnkSMS5jb2RlZm91bmRyeS52MS5TZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlcXVlc3QaMi5jb2RlZm91bmRyeS52MS5TZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlc3BvbnNlIgASWwoGUmVtb3ZlEiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIgASUwoFV2F0Y2gSJi5jb2RlZm91bmRyeS52MS5XYXRjaFdvcmtzcGFjZXNSZXF1ZXN0Gh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnQiADABQsYBChJjb20uY29kZWZvdW5kcnkudjFCDldvcmtzcGFjZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIvcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdtZW1iZXJzGAYgAygJEhEKCXJvb3RfcGF0aBgHIAEoCRIXCg9kZWZhdWx0X3ByaW1hcnkYCCABKAkSEwoLbWFuYWdlZF9kaXIYCSABKAkSFAoMaW5zdHJ1Y3Rpb25zGAogASgJEg4KBnNraWxscxgLIAMoCRIUCgxyb290X21pc3NpbmcYDCABKAhKBAgDEARKBAgEEAVSBmJyYW5jaCIXChVMaXN0V29ya3NwYWNlc1JlcXVlc3QiRwoWTGlzdFdvcmtzcGFjZXNSZXNwb25zZRItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlIpQBChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0EgwKBG5hbWUYASABKAkSDwoHbWVtYmVycxgGIAMoCRIRCglyb290X3BhdGgYByABKAkSFwoPZGVmYXVsdF9wcmltYXJ5GAggASgJSgQIAhADSgQIAxAESgQIBBAFSgQIBRAGUgZicmFuY2hSCGJhc2VfcmVmUgVmZXRjaCJHChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UiaAoaQWRkV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEg8KB3Byb2plY3QYAyABKAlKBAgCEANKBAgEEAVKBAgFEAZSA2N3ZFIIYmFzZV9yZWZSBWZldGNoIksKG0FkZFdvcmtzcGFjZVByb2plY3RSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UicAodUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEg8KB3Byb2plY3QYAyABKAlKBAgCEANKBAgEEAVKBAgFEAZSA2N3ZFIFZm9yY2VSDWRlbGV0ZV9icmFuY2giTgoeUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSI5ChZSZW5hbWVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRIMCgRuYW1lGAIgASgJIkcKF1JlbmFtZVdvcmtzcGFjZVJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJPCiFTZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEhcKD2RlZmF1bHRfcHJpbWFyeRgCIAEoCSJSCiJTZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSI/ChdTZXRXb3Jrc3BhY2VSb290UmVxdWVzdBIRCgl3b3Jrc3BhY2UYASABKAkSEQoJcm9vdF9wYXRoGAIgASgJIkgKGFNldFdvcmtzcGFjZVJvb3RSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UiTQoWUmVtb3ZlV29ya3NwYWNlUmVxdWVzdBIRCgl3b3Jrc3BhY2UYASABKAlKBAgCEANKBAgDEARSBWZvcmNlUg1kZWxldGVfYnJhbmNoIhkKF1JlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIhgKFldhdGNoV29ya3NwYWNlc1JlcXVlc3QilAEKDldvcmtzcGFjZUV2ZW50EjUKCHNuYXBzaG90GAEgASgLMiEuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlU25hcHNob3RIABIsCgd1cGRhdGVkGAIgASgLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlSAASFAoKcmVtb3ZlZF9pZBgDIAEoCUgAQgcKBWV2ZW50IkIKEVdvcmtzcGFjZVNuYXBzaG90Ei0KCndvcmtzcGFjZXMYASADKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UykAcKEFdvcmtzcGFjZVNlcnZpY2USVwoETGlzdBIlLmNvZGVmb3VuZHJ5LnYxLkxpc3RXb3Jrc3BhY2VzUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2UiABJbCgZDcmVhdGUSJi5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3NwYWNlUmVzcG9uc2UiABJnCgpBZGRQcm9qZWN0EiouY29kZWZvdW5kcnkudjEuQWRkV29ya3NwYWNlUHJvamVjdFJlcXVlc3QaKy5jb2RlZm91bmRyeS52MS5BZGRXb3Jrc3BhY2VQcm9qZWN0UmVzcG9uc2UiABJwCg1SZW1vdmVQcm9qZWN0Ei0uY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlcXVlc3QaLi5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3Jrc3BhY2VQcm9qZWN0UmVzcG9uc2UiABJbCgZSZW5hbWUSJi5jb2RlZm91bmRyeS52MS5SZW5hbWVXb3Jrc3BhY2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUmVuYW1lV29ya3NwYWNlUmVzcG9uc2UiABJ8ChFTZXREZWZhdWx0UHJpbWFyeRIxLmNvZGVmb3VuZHJ5LnYxLlNldFdvcmtzcGFjZURlZmF1bHRQcmltYXJ5UmVxdWVzdBoyLmNvZGVmb3VuZHJ5LnYxLlNldFdvcmtzcGFjZURlZmF1bHRQcmltYXJ5UmVzcG9uc2UiABJeCgdTZXRSb290EicuY29kZWZvdW5kcnkudjEuU2V0V29ya3NwYWNlUm9vdFJlcXVlc3QaKC5jb2RlZm91bmRyeS52MS5TZXRXb3Jrc3BhY2VSb290UmVzcG9uc2UiABJbCgZSZW1vdmUSJi5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3Jrc3BhY2VSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVzcG9uc2UiABJTCgVXYXRjaBImLmNvZGVmb3VuZHJ5LnYxLldhdGNoV29ya3NwYWNlc1JlcXVlc3QaHi5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VFdmVudCIAMAFCxgEKEmNvbS5jb2RlZm91bmRyeS52MUIOV29ya3NwYWNlUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Workspace
@@ -46,7 +46,8 @@ export type Workspace = Message<"codefoundry.v1.Workspace"> & {
 
   /**
    * A real folder the workspace came from (its CLAUDE.md, AGENTS.md and .claude are
-   * symlinked into the managed dir); empty for a synthetic workspace.
+   * symlinked into the managed dir); empty for a synthetic workspace. Under home, never
+   * home itself, and never in a registered project's checkout or worktree.
    *
    * @generated from field: string root_path = 7;
    */
@@ -70,23 +71,30 @@ export type Workspace = Message<"codefoundry.v1.Workspace"> & {
   managedDir: string;
 
   /**
-   * The workspace's instructions file: CLAUDE.md, else AGENTS.md, in the managed dir (a
-   * rooted workspace's: the file the link points to, under root_path). Empty when there
-   * is neither. Read from disk when the store builds the snapshot entry, at every
-   * EnsureDirs (start, a spawn of a thread that references it) and when such a thread
-   * ends a turn.
+   * The workspace's instructions file: CLAUDE.md, else AGENTS.md (the first that is a
+   * regular file), in root_path when set, else in the managed dir. Empty when there is
+   * neither. Read from disk when the store builds the snapshot entry, at every
+   * EnsureDirs (start, a spawn of a thread that references it), when such a thread ends
+   * a turn and when a client subscribes to Watch.
    *
    * @generated from field: string instructions = 10;
    */
   instructions: string;
 
   /**
-   * The skills in <managed dir>/.claude/skills: the names of its folders that hold a
-   * SKILL.md, sorted. Read like instructions.
+   * The skills in .claude/skills of the same folder: the names of its folders that hold
+   * a SKILL.md, sorted. Read like instructions.
    *
    * @generated from field: repeated string skills = 11;
    */
   skills: string[];
+
+  /**
+   * root_path is set and is not a folder now (moved or renamed): SetRoot repairs it.
+   *
+   * @generated from field: bool root_missing = 12;
+   */
+  rootMissing: boolean;
 };
 
 /**
@@ -354,6 +362,49 @@ export const SetWorkspaceDefaultPrimaryResponseSchema: GenMessage<SetWorkspaceDe
   messageDesc(file_codefoundry_v1_workspace, 12);
 
 /**
+ * @generated from message codefoundry.v1.SetWorkspaceRootRequest
+ */
+export type SetWorkspaceRootRequest = Message<"codefoundry.v1.SetWorkspaceRootRequest"> & {
+  /**
+   * Workspace id or name.
+   *
+   * @generated from field: string workspace = 1;
+   */
+  workspace: string;
+
+  /**
+   * The folder it lives in now: absolute, under home.
+   *
+   * @generated from field: string root_path = 2;
+   */
+  rootPath: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetWorkspaceRootRequest.
+ * Use `create(SetWorkspaceRootRequestSchema)` to create a new message.
+ */
+export const SetWorkspaceRootRequestSchema: GenMessage<SetWorkspaceRootRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 13);
+
+/**
+ * @generated from message codefoundry.v1.SetWorkspaceRootResponse
+ */
+export type SetWorkspaceRootResponse = Message<"codefoundry.v1.SetWorkspaceRootResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.Workspace workspace = 1;
+   */
+  workspace?: Workspace | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetWorkspaceRootResponse.
+ * Use `create(SetWorkspaceRootResponseSchema)` to create a new message.
+ */
+export const SetWorkspaceRootResponseSchema: GenMessage<SetWorkspaceRootResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 14);
+
+/**
  * @generated from message codefoundry.v1.RemoveWorkspaceRequest
  */
 export type RemoveWorkspaceRequest = Message<"codefoundry.v1.RemoveWorkspaceRequest"> & {
@@ -370,7 +421,7 @@ export type RemoveWorkspaceRequest = Message<"codefoundry.v1.RemoveWorkspaceRequ
  * Use `create(RemoveWorkspaceRequestSchema)` to create a new message.
  */
 export const RemoveWorkspaceRequestSchema: GenMessage<RemoveWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 13);
+  messageDesc(file_codefoundry_v1_workspace, 15);
 
 /**
  * @generated from message codefoundry.v1.RemoveWorkspaceResponse
@@ -383,7 +434,7 @@ export type RemoveWorkspaceResponse = Message<"codefoundry.v1.RemoveWorkspaceRes
  * Use `create(RemoveWorkspaceResponseSchema)` to create a new message.
  */
 export const RemoveWorkspaceResponseSchema: GenMessage<RemoveWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 14);
+  messageDesc(file_codefoundry_v1_workspace, 16);
 
 /**
  * @generated from message codefoundry.v1.WatchWorkspacesRequest
@@ -396,7 +447,7 @@ export type WatchWorkspacesRequest = Message<"codefoundry.v1.WatchWorkspacesRequ
  * Use `create(WatchWorkspacesRequestSchema)` to create a new message.
  */
 export const WatchWorkspacesRequestSchema: GenMessage<WatchWorkspacesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 15);
+  messageDesc(file_codefoundry_v1_workspace, 17);
 
 /**
  * @generated from message codefoundry.v1.WorkspaceEvent
@@ -431,7 +482,7 @@ export type WorkspaceEvent = Message<"codefoundry.v1.WorkspaceEvent"> & {
  * Use `create(WorkspaceEventSchema)` to create a new message.
  */
 export const WorkspaceEventSchema: GenMessage<WorkspaceEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 16);
+  messageDesc(file_codefoundry_v1_workspace, 18);
 
 /**
  * @generated from message codefoundry.v1.WorkspaceSnapshot
@@ -448,7 +499,7 @@ export type WorkspaceSnapshot = Message<"codefoundry.v1.WorkspaceSnapshot"> & {
  * Use `create(WorkspaceSnapshotSchema)` to create a new message.
  */
 export const WorkspaceSnapshotSchema: GenMessage<WorkspaceSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 17);
+  messageDesc(file_codefoundry_v1_workspace, 19);
 
 /**
  * WorkspaceService manages workspaces: saved sets of projects with a place for the
@@ -492,8 +543,10 @@ export const WorkspaceService: GenService<{
     output: typeof AddWorkspaceProjectResponseSchema;
   },
   /**
-   * RemoveProject drops a member project (nothing on disk changes). The default primary
-   * moves to "workspace" when it was the removed project.
+   * RemoveProject drops a member project (nothing on disk changes). The default primary,
+   * when it was the removed project, moves to the first member left of a synthetic
+   * workspace, else to "workspace". The daemon does the same for a project that is
+   * unregistered.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.RemoveProject
    */
@@ -524,8 +577,21 @@ export const WorkspaceService: GenService<{
     output: typeof SetWorkspaceDefaultPrimaryResponseSchema;
   },
   /**
+   * SetRoot points a rooted workspace at another folder (moved or renamed), validated
+   * as Create's root_path; the managed dir's links are made again. A synthetic
+   * workspace is FailedPrecondition.
+   *
+   * @generated from rpc codefoundry.v1.WorkspaceService.SetRoot
+   */
+  setRoot: {
+    methodKind: "unary";
+    input: typeof SetWorkspaceRootRequestSchema;
+    output: typeof SetWorkspaceRootResponseSchema;
+  },
+  /**
    * Remove forgets a workspace. A synthetic one's managed dir is deleted with its
-   * instructions and skills; a rooted one loses only the symlinks (the root is the
+   * instructions and skills (FailedPrecondition, naming them, while a thread that is
+   * not archived runs in it); a rooted one loses only the symlinks (the root is the
    * user's). Threads that reference it keep running without it.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Remove
@@ -537,7 +603,8 @@ export const WorkspaceService: GenService<{
   },
   /**
    * Watch sends a snapshot, then every change. A client that falls behind gets a new
-   * snapshot.
+   * snapshot. Subscribing reads every workspace's folder again first (instructions,
+   * skills, links), so hand edits show without a spawn.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Watch
    */

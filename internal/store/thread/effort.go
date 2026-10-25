@@ -177,10 +177,16 @@ func (r *runner) respawn() {
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
 	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
-	proc, err := claudestream.Start(claudestream.Spec{
-		Argv: argv, Env: env, Dir: r.cwd,
-		Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},
-	})
+	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a derived worktree
+	// is made again at the next start (a message), as a cleanup's is.
+	var proc *claudestream.Process
+	err := r.m.ensureCwd(context.Background(), s)
+	if err == nil {
+		proc, err = claudestream.Start(claudestream.Spec{
+			Argv: argv, Env: env, Dir: r.cwd,
+			Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},
+		})
+	}
 	if err != nil {
 		msg := "Claude did not restart for the effort change: " + err.Error()
 		if st.userRestart {

@@ -884,6 +884,9 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	if err := m.requireCheckouts(s); err != nil {
 		return err
 	}
+	if err := m.ensureCwd(ctx, s); err != nil {
+		return err // not exec's ENOENT, which reads as a missing claude (cwd.go)
+	}
 
 	if !m.opts.DisablePreTrust {
 		if changed, err := trustWorktree(m.opts.Paths.Config, s.WorktreePath); err != nil {
@@ -1273,7 +1276,7 @@ func (m *Manager) projectByRef(snap *project.Snapshot, ref string) (project.Proj
 	case errors.Is(err, workspace.ErrInvalidArgument):
 		return project.Project{}, fmt.Errorf("%w: project %q: %v", ErrInvalidArgument, ref, err)
 	default:
-		return project.Project{}, fmt.Errorf("%w: project %s", ErrNotFound, ref)
+		return project.Project{}, classified{kind: ErrNotFound, err: fmt.Errorf("project %s is not registered", ref)}
 	}
 }
 

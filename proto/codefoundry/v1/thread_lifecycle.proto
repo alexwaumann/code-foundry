@@ -917,9 +917,14 @@ message ThreadCheckoutsResponse {
   // one (the name also when the workspace is gone).
   string workspace_id = 3;
   string workspace_name = 4;
-  // The workspace's managed dir (Workspace.managed_dir): its CLAUDE.md, AGENTS.md and
-  // .claude/skills, or links to a rooted workspace's.
+  // Where the workspace's CLAUDE.md, AGENTS.md and .claude/skills are written and read:
+  // a rooted workspace's root_path, else its managed dir (Workspace.managed_dir).
   string workspace_dir = 5;
+  // workspace_dir is a rooted workspace's root and it is not a folder now.
+  bool workspace_dir_missing = 6;
+  // Real files or folders in a rooted workspace's managed dir where a link to the
+  // root's goes: not what the workspace's threads follow (the root's are).
+  repeated string workspace_strays = 7;
 }
 
 message PinThreadRequest {

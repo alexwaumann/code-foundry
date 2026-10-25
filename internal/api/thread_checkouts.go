@@ -21,6 +21,7 @@ func (h *Thread) Checkouts(ctx context.Context, req *connect.Request[v1.ThreadCh
 func checkoutsToProto(tc thread.ThreadCheckouts) *v1.ThreadCheckoutsResponse {
 	res := &v1.ThreadCheckoutsResponse{
 		Thread: threadToProto(tc.Thread), WorkspaceId: tc.WorkspaceID, WorkspaceName: tc.WorkspaceName, WorkspaceDir: tc.WorkspaceDir,
+		WorkspaceDirMissing: tc.WorkspaceDirMissing, WorkspaceStrays: tc.WorkspaceStrays,
 		Checkouts: make([]*v1.ThreadCheckout, len(tc.Checkouts)),
 	}
 	for i, c := range tc.Checkouts {
