@@ -371,3 +371,18 @@ test("a run id already in flight is refused, and a page's cancel or reload abort
     { args: { id: "s-2" }, aborted: true },
   ]);
 });
+
+test("the lightbox's copy of a page has its thread's bridge, under a nonce of its own", async ({ page }) => {
+  await openBridgeThread(page);
+  const cardNonce = await doc(page).locator("body").evaluate(NONCE);
+  await card(page).getByTestId("thread-html-expand").click();
+  const box = page.getByTestId("thread-html-lightbox");
+  const inner = box.frameLocator('[data-testid="thread-html-lightbox-frame"]');
+  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
+  await expect(inner.locator("#thread")).not.toHaveText("no thread");
+  const boxNonce = await inner.locator("body").evaluate(NONCE);
+  expect(boxNonce).toMatch(/^[0-9a-f]{32}$/);
+  expect(boxNonce).not.toBe(cardNonce);
+  await inner.locator("#notify").click();
+  await expect(inner.locator("#notify-out")).toHaveText("ok");
+});
