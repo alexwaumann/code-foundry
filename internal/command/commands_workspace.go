@@ -20,6 +20,7 @@ type WorkspaceBackend interface {
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
 	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
 	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
+	SetRoot(context.Context, *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 }
 
@@ -29,8 +30,10 @@ var (
 )
 
 // RegisterWorkspace registers workspace.new, workspace.list, workspace.add-project,
-// workspace.remove-project, workspace.rename, workspace.set-primary and workspace.remove
-// (docs/notes/workspaces-v2-2-workspaces.md). A workspace is a saved set of projects
+// workspace.remove-project, workspace.rename, workspace.set-primary, workspace.set-root
+// and workspace.remove (docs/notes/workspaces-v2-2-workspaces.md,
+// workspaces-v2-fix-1-workspace.md). Messages name projects (the registry's project
+// names), not ids. A workspace is a saved set of projects
 // with a managed dir for the instructions and skills that span them; it has no branch
 // and no worktrees (a thread's project set and branch decide those).
 func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
@@ -57,7 +60,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Workspace name"},
 				{Name: "projects", Type: String, Description: "Comma-separated projects (id, name, or absolute path)"},
 				{Name: "root", Type: Path, Description: "A folder the workspace comes from (its CLAUDE.md, AGENTS.md and .claude reach its threads)"},
-				{Name: "primary", Type: String, Description: "Where new threads start: a project, or workspace (its folder) (default: workspace with root, else the first project)"},
+				{Name: "primary", Type: String, Description: "Where new threads start: a project, or workspace (its folder; a project named workspace wins) (default: workspace with root, else the first project)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				req := &v1.CreateWorkspaceRequest{Name: a.String("name"), Members: splitList(a.String("projects")),
@@ -70,7 +73,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 					return Result{}, err
 				}
 				w := res.Msg.GetWorkspace()
-				return Result{Message: "created workspace " + describeWorkspace(w), JSON: w}, nil
+				return Result{Message: "created workspace " + describeWorkspace(w, r.projectNamer(ctx)), JSON: w}, nil
 			},
 		},
 		Command{
@@ -90,8 +93,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 					return Result{Message: "no workspaces", JSON: res.Msg}, nil
 				}
 				lines := make([]string, len(ws))
+				name := r.projectNamer(ctx)
 				for i, w := range ws {
-					lines[i] = describeWorkspace(w)
+					lines[i] = describeWorkspace(w, name)
 				}
 				return Result{Message: strings.Join(lines, "\n"), JSON: res.Msg}, nil
 			},
@@ -102,7 +106,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Description: "Add a project to a workspace. Nothing on disk changes.",
 			Category:    "Workspace",
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or absolute path"},
+				{Name: "project", Type: String, Required: true, Positional: true, ID: ProjectID, Description: "Project id, name, or absolute path"},
 				wsArg,
 			},
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
@@ -114,7 +118,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "added " + a.String("project") + " to workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+				name := r.projectNamer(ctx)
+				return Result{Message: "added " + name(a.String("project")) + " to workspace " + describeWorkspace(res.Msg.GetWorkspace(), name), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
@@ -135,7 +140,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "removed " + a.String("project") + " from workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+				name := r.projectNamer(ctx)
+				return Result{Message: "removed " + name(a.String("project")) + " from workspace " + describeWorkspace(res.Msg.GetWorkspace(), name), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
@@ -156,13 +162,13 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "renamed workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+				return Result{Message: "renamed workspace " + describeWorkspace(res.Msg.GetWorkspace(), r.projectNamer(ctx)), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
 			Name:        "workspace.set-primary",
 			Title:       "Set Workspace Default Primary",
-			Description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder).",
+			Description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder). A project named workspace wins over the keyword.",
 			Category:    "Workspace",
 			Args: []ArgSpec{
 				{Name: "primary", Type: String, Required: true, Positional: true, Description: "A project of the workspace (id or name), or workspace"},
@@ -177,7 +183,28 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+				return Result{Message: "workspace " + describeWorkspace(res.Msg.GetWorkspace(), r.projectNamer(ctx)), JSON: res.Msg.GetWorkspace()}, nil
+			},
+		},
+		Command{
+			Name:        "workspace.set-root",
+			Title:       "Set Workspace Root",
+			Description: "Point a workspace with a root at the folder it moved to; its links are made again.",
+			Category:    "Workspace",
+			Args: []ArgSpec{
+				{Name: "root", Type: Path, Required: true, Positional: true, Description: "The folder, under home"},
+				wsArg,
+			},
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				w, err := ws(c, a)
+				if err != nil {
+					return Result{}, err
+				}
+				res, err := b.SetRoot(ctx, connect.NewRequest(&v1.SetWorkspaceRootRequest{Workspace: w, RootPath: a.Path("root")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: "workspace " + describeWorkspace(res.Msg.GetWorkspace(), r.projectNamer(ctx)), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
@@ -205,8 +232,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 	)
 }
 
-// describeWorkspace is "shop (w-…): 2 projects (api, web), starts in api, folder /…".
-func describeWorkspace(w *v1.Workspace) string {
+// describeWorkspace is "shop (w-…): 2 projects (api, web), starts in api, folder /…",
+// project ids named through name.
+func describeWorkspace(w *v1.Workspace, name func(string) string) string {
 	n := len(w.GetMembers())
 	noun := "projects"
 	if n == 1 {
@@ -214,13 +242,19 @@ func describeWorkspace(w *v1.Workspace) string {
 	}
 	s := fmt.Sprintf("%s (%s): %d %s", w.GetName(), w.GetId(), n, noun)
 	if n > 0 {
-		s += " (" + strings.Join(w.GetMembers(), ", ") + ")"
+		s += " (" + strings.Join(mapNames(w.GetMembers(), name), ", ") + ")"
 	}
 	if p := w.GetDefaultPrimary(); p != "" {
+		if p != "workspace" {
+			p = name(p)
+		}
 		s += ", starts in " + p
 	}
 	if r := w.GetRootPath(); r != "" {
 		s += ", root " + r
+		if w.GetRootMissing() {
+			s += " (missing: workspace set-root)"
+		}
 	}
 	return s + ", folder " + w.GetManagedDir()
 }

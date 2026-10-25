@@ -55,19 +55,20 @@ func RegisterProjectAddWorkspace(r *Registry, projects FolderBackend, workspaces
 		Title: "Add Folder as Workspace",
 		Description: "Add a folder of git repositories: every repository directly inside it becomes a project (ones already added are reused), " +
 			"and a workspace named after the folder holds them, with the folder as its root (its CLAUDE.md, AGENTS.md and .claude reach " +
-			"the workspace's threads, which start there). Refuses a folder that is a git repository or has none inside.",
+			"the workspace's threads, which start there); when a workspace has that root already, the projects it lacks join it. " +
+			"Refuses a folder that is a git repository, has none inside, or is inside a project.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "folder", Type: Path, Required: true, Positional: true,
 				Description: "A folder under home whose immediate subfolders are git repositories"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			return addFolderAsWorkspace(ctx, projects, workspaces, a.Path("folder"))
+			return addFolderAsWorkspace(ctx, projects, workspaces, a.Path("folder"), r.projectNamer(ctx))
 		},
 	})
 }
 
-func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspaces WorkspaceBackend, folder string) (Result, error) {
+func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspaces WorkspaceBackend, folder string, name func(string) string) (Result, error) {
 	ins, err := projects.InspectFolder(ctx, connect.NewRequest(&v1.InspectFolderRequest{Path: folder}))
 	if err != nil {
 		return Result{}, err
@@ -77,19 +78,25 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 		return Result{}, connect.NewError(connect.CodeFailedPrecondition,
 			fmt.Errorf("%s is a git repository: add it as a project (`code-foundry project add %s`)", dir, dir))
 	}
-	children := ins.Msg.GetChildRepos()
-	if len(children) == 0 {
-		return Result{}, connect.NewError(connect.CodeFailedPrecondition,
-			fmt.Errorf("no git repositories directly inside %s: add it as a project (`code-foundry project add %s`)", dir, dir))
-	}
-
 	list, err := projects.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 	if err != nil {
 		return Result{}, err
 	}
-	known := map[string]*v1.Project{}
+	known := map[string]*v1.Project{} // by path
+	knownIDs := map[string]bool{}
 	for _, p := range list.Msg.GetProjects() {
 		known[p.GetPath()] = p
+		knownIDs[p.GetId()] = true
+		// The inspection lists no children then (the workspace store refuses such a root).
+		if p.GetPath() != "" && (dir == p.GetPath() || strings.HasPrefix(dir, strings.TrimSuffix(p.GetPath(), "/")+"/")) {
+			return Result{}, connect.NewError(connect.CodeFailedPrecondition,
+				fmt.Errorf("%s is inside project %s (%s), so it cannot be a workspace's root", dir, p.GetName(), p.GetPath()))
+		}
+	}
+	children := ins.Msg.GetChildRepos()
+	if len(children) == 0 {
+		return Result{}, connect.NewError(connect.CodeFailedPrecondition,
+			fmt.Errorf("no git repositories directly inside %s: add it as a project (`code-foundry project add %s`)", dir, dir))
 	}
 
 	// Every child is added (or found); a child that fails does not stop the others, and
@@ -119,8 +126,12 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 	}
 	wg.Wait()
 
+	// Added or reused by the project's id: a linked worktree child registers (or finds)
+	// its repository, which another child may be; each project is named once.
 	var ids, added, reused, failed []string
 	var firstErr error
+	names := map[string]string{} // the children's projects, before the registry's list
+	named := func(id string) string { return cmp.Or(names[id], name(id)) }
 	for i, c := range children {
 		if errs[i] != nil {
 			failed = append(failed, c.GetName()+": "+connectMessage(errs[i]))
@@ -128,14 +139,15 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 			continue
 		}
 		p := got[i]
-		if known[c.GetPath()] != nil {
+		if slices.Contains(ids, p.GetId()) {
+			continue
+		}
+		ids = append(ids, p.GetId())
+		names[p.GetId()] = p.GetName()
+		if knownIDs[p.GetId()] {
 			reused = append(reused, p.GetName())
 		} else {
 			added = append(added, p.GetName())
-		}
-		// A linked worktree registers its repository, which another child may be.
-		if !slices.Contains(ids, p.GetId()) {
-			ids = append(ids, p.GetId())
 		}
 	}
 	if len(failed) > 0 {
@@ -155,22 +167,52 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 	taken := map[string]bool{}
 	for _, w := range wsList.Msg.GetWorkspaces() {
 		taken[strings.ToLower(w.GetName())] = true
+		if w.GetRootPath() == dir {
+			return addToRootedWorkspace(ctx, workspaces, w, ids, added, named)
+		}
 	}
-	name := freeWorkspaceName(filepath.Base(dir), func(n string) bool { return taken[strings.ToLower(n)] })
+	wsName := freeWorkspaceName(filepath.Base(dir), func(n string) bool { return taken[strings.ToLower(n)] })
+	// No default primary: the store's for a rooted workspace is its root (a member named
+	// "workspace" would win over the keyword).
 	res, err := workspaces.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{
-		Name: name, Members: ids, RootPath: dir, DefaultPrimary: "workspace",
+		Name: wsName, Members: ids, RootPath: dir,
 	}))
 	if err != nil {
 		slog.WarnContext(ctx, "project.add-workspace: the workspace was not made; the projects stay", "folder", dir, "added", added, "err", err)
 		return Result{}, err
 	}
 	w := res.Msg.GetWorkspace()
-	msg := "created workspace " + describeWorkspace(w)
+	msg := "created workspace " + describeWorkspace(w, named)
 	switch {
 	case len(reused) > 0 && len(added) == 0:
 		msg += "; every project was already added"
 	case len(reused) > 0:
 		msg += fmt.Sprintf("; added %s, %d already added (%s)", plural(len(added), "project"), len(reused), strings.Join(reused, ", "))
+	}
+	return Result{Message: msg, JSON: w}, nil
+}
+
+// addToRootedWorkspace is add-workspace of a folder a workspace already has as its root:
+// the projects it lacks join it (no second workspace for the same folder).
+func addToRootedWorkspace(ctx context.Context, workspaces WorkspaceBackend, w *v1.Workspace, ids, added []string, name func(string) string) (Result, error) {
+	var joined []string
+	for _, id := range ids {
+		if slices.Contains(w.GetMembers(), id) {
+			continue
+		}
+		res, err := workspaces.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{Workspace: w.GetId(), Project: id}))
+		if err != nil {
+			return Result{}, err
+		}
+		w = res.Msg.GetWorkspace()
+		joined = append(joined, name(id))
+	}
+	msg := "workspace " + describeWorkspace(w, name) + " already has this folder as its root and every repository inside"
+	if len(joined) > 0 {
+		msg = "added " + strings.Join(joined, ", ") + " to workspace " + describeWorkspace(w, name) + ", which already has this folder as its root"
+	}
+	if len(added) > 0 {
+		msg += "; new projects: " + strings.Join(added, ", ")
 	}
 	return Result{Message: msg, JSON: w}, nil
 }

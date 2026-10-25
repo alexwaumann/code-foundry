@@ -59,7 +59,7 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 	}
 	fmt.Fprintf(&b, "thread %s: %s\n", threadLabel(t), mode)
 	if len(m.GetCheckouts()) == 0 {
-		b.WriteString("no projects (the thread runs in " + t.GetWorktreePath() + ")")
+		b.WriteString("no projects (the thread runs in " + t.GetWorktreePath() + ")\n")
 	} else {
 		tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(tw, "PROJECT\tPATH\tBRANCH\tINSTRUCTIONS")
@@ -99,10 +99,16 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 			name = ws + " (gone)"
 		}
 		dir := m.GetWorkspaceDir()
-		if dir == "" {
+		switch {
+		case dir == "":
 			dir = "-"
+		case m.GetWorkspaceDirMissing():
+			dir += " (missing)"
 		}
 		fmt.Fprintf(&b, "WORKSPACE %s  %s\n", name, dir)
+		for _, p := range m.GetWorkspaceStrays() {
+			fmt.Fprintf(&b, "%s is a real file; the workspace's root has the one Claude loads\n", p)
+		}
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
