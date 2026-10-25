@@ -119,7 +119,7 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
 
 test("a workspace row selects its members and the reference; Workspace as the primary; fresh copies", async ({ page }) => {
   await freshCopyByDefault();
-  await mockPost("workspace?saved=1&name=shop&projects=repo-cf,repo-dot&primary=repo-dot");
+  await mockPost("workspace?name=shop&projects=repo-cf,repo-dot&primary=repo-dot");
   await openApp(page);
   await composeIn(page, 2);
   const list = await openSetPicker(page);
@@ -221,7 +221,7 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
 });
 
 test("Save as workspace refuses a taken name in place", async ({ page }) => {
-  await mockPost("workspace?saved=1&name=taken&projects=repo-dot");
+  await mockPost("workspace?name=taken&projects=repo-dot");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
   await row(page, `t:${t.id}`).click();
@@ -234,7 +234,7 @@ test("Save as workspace refuses a taken name in place", async ({ page }) => {
 });
 
 test("New thread on this branch: the row menu opens the composer prefilled; only the prompt and primary change", async ({ page }) => {
-  await mockPost("workspace?saved=1&name=shop&projects=repo-cf,repo-gp");
+  await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&branch=feat/parser&name=Parser")) as ThreadSummary;
   await openApp(page);
   await expect(row(page, `t:${t.id}`).getByTestId("row-project")).toHaveText("shop");
@@ -308,7 +308,7 @@ test("New thread on this branch from the header menu and the palette; Escape goe
 });
 
 test("a workspace removed while its composer is open says so", async ({ page }) => {
-  await mockPost("workspace?saved=1&name=login&projects=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.getByTestId("palette").locator('[data-workspace="w-000000000001"]').click();

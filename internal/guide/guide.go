@@ -112,10 +112,12 @@ func InPluginNamespace(c *v1.Command) bool {
 var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 
 // leftOut are commands the guide does not list because it has no room for them (it must
-// stay under 29,000 bytes): pr.checks, which plugins use more than agents, and
+// stay under 29,000 bytes): pr.checks, which plugins use more than agents,
 // thread.restart, which is the user's (a thread's header offers it when a plugin's
-// environment changed) (`code-foundry commands` and `help <command>` show them).
-var leftOut = []string{"pr.checks", "thread.restart"}
+// environment changed), and the GUI's thread.new-like ("New thread on this branch":
+// agents use `thread new --like`) and thread.workspace (Save as workspace)
+// (`code-foundry commands` and `help <command>` show them).
+var leftOut = []string{"pr.checks", "thread.restart", "thread.new-like", "thread.workspace"}
 
 // LeftOut reports whether the guide leaves c out: the plugin namespace, the Skills
 // marketplace (skill.*: the user's settings, not an agent's work; docs/notes/

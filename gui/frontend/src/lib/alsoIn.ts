@@ -39,8 +39,8 @@ const SEP = "\u0000";
  * list, no call.
  */
 export function checkoutsKey(t: Pick<ThreadView, "id" | "worktreePath" | "branch" | "projectIds"> | undefined, worktrees: readonly string[]): string | null {
-  if (!t || (t.projectIds?.length ?? 0) < 2) return null;
-  return [t.id, t.worktreePath, t.branch ?? "", (t.projectIds ?? []).join(","), worktrees.join(",")].join(SEP);
+  if (!t || t.projectIds.length < 2) return null;
+  return [t.id, t.worktreePath, t.branch, t.projectIds.join(","), worktrees.join(",")].join(SEP);
 }
 
 /** The thread id a checkouts key names. */
