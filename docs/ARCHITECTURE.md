@@ -177,7 +177,9 @@ Services (v1):
   (`docs/notes/thread-lifecycle.md`). Create takes a project set (`project_ids`), can
   copy another thread's placement (`like_thread_id`, `new_branch`; a creating thread's
   is copied the same way) and answers collision hints; Checkouts lists a thread's
-  checkouts (`docs/notes/workspaces-v2-1-threads.md`). Create can
+  checkouts (`docs/notes/workspaces-v2-1-threads.md`); SetWorkspace sets or clears a
+  thread's workspace reference (`thread.workspace`, the GUI's Save as workspace:
+  `docs/notes/workspaces-v2-3-composer.md`). Create can
   make the worktrees first (`new_worktree`), reference a workspace (`workspace_id`: its
   members are the set, its folder may be the cwd), or start without a project in the
   home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No
@@ -710,7 +712,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   pinned under it the collapsible footers Working, Snoozed (single-line rows with the
   time left, soonest wake first) and Archived (single-line rows with their age), each
   counting its threads; each thread row says its status in words on its second line (or
-  project and branch) with a hover tooltip; a status row at its foot; see
+  project and branch; a thread of several projects names its workspace, else "N
+  projects", and its branch: `docs/notes/workspaces-v2-3-composer.md`) with a hover
+  tooltip; a status row at its foot; see
   `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md`,
   `docs/notes/sidebar-working-section.md`, `docs/notes/archive-threads-2-sidebar.md` and
   `docs/notes/snooze-threads-2-sidebar.md`; a thread another thread created is hidden
@@ -724,8 +728,13 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   name edited in place, root, projects with where new threads start, add and remove, its
   instructions file opening as a File tab, its skills, Edit instructions starting or
   steering a thread in the workspace's folder, Reveal in Finder, Remove; a New workspace
-  dialog: `docs/notes/workspaces-v2-4-projects-page.md`), or the composer; a worktree's overview is a side panel tab, not a page; a shell is never
-  selected), command palette overlay. Under the content pane, a thread and the Projects
+  dialog: `docs/notes/workspaces-v2-4-projects-page.md`), or the composer: a project set
+  picked in the heading (a workspace row selects its members and the reference, projects
+  toggle), chips by project id, Work in, a Runs in picker for the primary (a project or
+  the workspace's folder), collision hints under the chips, and "New thread on this
+  branch" (`thread.new-like`) prefilled from a thread so only the prompt is typed:
+  `docs/notes/workspaces-v2-3-composer.md`; a worktree's overview is a side panel tab, not
+  a page; a shell is never selected), command palette overlay. Under the content pane, a thread and the Projects
   page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
   empty one starts a shell, and a panel hides when its last shell goes:
   `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner

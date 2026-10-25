@@ -125,11 +125,11 @@ test("by title; typing on to a number nothing has closes the card without a word
   await expect(value(page)).toHaveAttribute("data-value", "#14");
 });
 
-test("Also in: both repositories' pull requests, the repository as the hint", async ({ page }) => {
+test("a second project: both repositories' pull requests, the repository as the hint", async ({ page }) => {
   await openApp(page);
   await compose(page);
-  await page.getByTestId("composer-also-in").click();
-  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("#12");

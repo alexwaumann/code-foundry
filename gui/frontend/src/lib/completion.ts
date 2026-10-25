@@ -8,7 +8,6 @@
  */
 import type { FileMatchView, SkillSourceView, SkillView } from "@/api/filesystem";
 import type { SlashCommandView } from "@/api/slashCommands";
-import type { WorktreeChoice } from "./compose";
 import type { PromptTag } from "./prompt";
 
 /** The characters that start a completion. */
@@ -248,30 +247,30 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
   });
 }
 
-/** What the skill sources depend on: the draft's projects and where its thread would run. */
-export interface SkillSourceInput {
-  target: "project" | "workspace";
-  /** The draft's projects in member order (lib/compose draftMembers). */
+/**
+ * What the skill and file sources depend on: the draft's (or thread's) projects and the
+ * checkout each is read from.
+ */
+export interface CheckoutSourceInput {
+  /** The projects, the primary first (where the thread runs). */
   projectIds: readonly string[];
-  /** The resolved worktree choice. */
-  worktree: WorktreeChoice;
-  /** A workspace's members and their worktrees. */
-  wsMembers: readonly { projectId: string; worktreePath: string }[];
+  /** The checkout of each project the thread will see; a project without one is read from its main worktree (path left out). */
+  paths?: Readonly<Record<string, string>>;
 }
 
+/** Back-compat names: the skills' and the files' inputs are the same now. */
+export type SkillSourceInput = CheckoutSourceInput;
+export type FileSourceInput = CheckoutSourceInput;
+
 /**
- * The checkouts to read project skills from, in member order: a workspace's member
- * worktrees; a lone project's chosen existing worktree; else each project's main
- * worktree (path left out). The daemon adds the user's.
+ * The checkouts to read project skills from, in the given order: each project's checkout
+ * when it is known (a chosen existing worktree, a thread's checkouts), else its main
+ * worktree (path left out; a new worktree starts from it). The daemon adds the user's.
  */
-export function skillSources(input: SkillSourceInput): SkillSourceView[] {
+export function skillSources(input: CheckoutSourceInput): SkillSourceView[] {
   return input.projectIds.map((projectId) => {
-    if (input.target === "workspace") {
-      const path = input.wsMembers.find((m) => m.projectId === projectId)?.worktreePath;
-      return path ? { projectId, path } : { projectId };
-    }
-    if (input.projectIds.length === 1 && input.worktree.kind === "existing") return { projectId, path: input.worktree.path };
-    return { projectId };
+    const path = input.paths?.[projectId];
+    return path ? { projectId, path } : { projectId };
   });
 }
 
@@ -282,33 +281,8 @@ export function skillSourcesKey(sources: readonly SkillSourceView[]): string {
 
 // ---- files -----------------------------------------------------------------------------
 
-/** What the file sources depend on: like skills', but a workspace's mode matters. */
-export interface FileSourceInput {
-  target: "project" | "workspace";
-  /** The draft's projects in member order (lib/compose draftMembers). */
-  projectIds: readonly string[];
-  /** The resolved worktree choice ("members": a workspace's own worktrees). */
-  worktree: WorktreeChoice;
-  /** A workspace's members and their worktrees. */
-  wsMembers: readonly { projectId: string; worktreePath: string }[];
-}
-
-/**
- * The checkouts "@" searches, in member order: where the thread will find the files. A
- * workspace in "Workspace worktrees" mode: each member's worktree; a lone project's chosen
- * existing worktree; else (new worktrees, a project with "Also in" projects) each
- * project's main worktree (path left out), which the new worktrees start from.
- */
-export function fileSources(input: FileSourceInput): SkillSourceView[] {
-  return input.projectIds.map((projectId) => {
-    if (input.target === "workspace") {
-      const path = input.worktree.kind === "members" ? input.wsMembers.find((m) => m.projectId === projectId)?.worktreePath : undefined;
-      return path ? { projectId, path } : { projectId };
-    }
-    if (input.projectIds.length === 1 && input.worktree.kind === "existing") return { projectId, path: input.worktree.path };
-    return { projectId };
-  });
-}
+/** The checkouts "@" searches: where the thread will find the files (skillSources' rule). */
+export const fileSources = skillSources;
 
 /** A stable key for a file source list (the files cache's key). */
 export const fileSourcesKey = skillSourcesKey;

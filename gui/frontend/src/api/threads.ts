@@ -62,15 +62,23 @@ export interface ThreadView {
   permissionMode: PermissionModeView;
   /** Ref the thread's worktree branch was created from ("" unless createdWorktree). */
   baseRef: string;
-  /** thread.new made the worktree for this thread. */
-  createdWorktree: boolean;
-  /** Thread.project_ids: the project set, sorted by id (the primary is projectId); empty for a no-project thread. Absent in older fixtures. */
-  projectIds?: readonly string[];
-  /** Thread.branch: a worktree-mode thread's branch; "" in checkout mode. Absent in older fixtures. */
-  branch?: string;
   /**
-   * The workspace that owns the thread; "" for a project thread (owned by projectId).
-   * projectId/worktreePath are where it runs either way.
+   * Worktree mode: every git project of the set works in its worktree on `branch`
+   * (thread.new made them, or shares them with threads on the same branch). False: each
+   * project's own checkout.
+   */
+  createdWorktree: boolean;
+  /** The branch of a worktree-mode thread; "" in checkout mode (the checkout's branch shows instead). */
+  branch: string;
+  /**
+   * The project set, sorted by id, projectId (the primary) included; one entry for a
+   * single-project thread, none without a project (docs/notes/workspaces-v2-1-threads.md).
+   */
+  projectIds: string[];
+  /**
+   * The workspace the thread references (its instructions and skills); "" for none.
+   * Independent of projectIds. A thread whose primary is the workspace's folder has an
+   * empty projectId.
    */
   workspaceId: string;
   /**
@@ -374,8 +382,8 @@ export function toThreadView(s: Thread): ThreadView {
     permissionMode: permissionMap[s.permissionMode],
     baseRef: s.baseRef,
     createdWorktree: s.createdWorktree,
-    projectIds: [...s.projectIds],
     branch: s.branch,
+    projectIds: [...s.projectIds],
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,

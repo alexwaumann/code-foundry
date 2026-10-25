@@ -212,28 +212,19 @@ describe("files store", () => {
     expect(entry(R1)?.searching).toBe(false);
   });
 
-  describe("the checkout searched per worktree mode", () => {
-    const wsMembers = [
-      { projectId: "r1", worktreePath: "/h/w/r1" },
-      { projectId: "r2", worktreePath: "/h/w/r2" },
-    ];
+  describe("the checkout searched per project", () => {
     it.each<[string, FileSourceInput, Omit<FileSearchRequest, "query" | "limit">[]]>([
-      ["a project, new worktree: the main checkout", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
+      ["a project, new worktree: the main checkout", { projectIds: ["r1"] }, [{ projectId: "r1" }]],
+      ["a project, existing worktree: that worktree", { projectIds: ["r1"], paths: { r1: "/h/r1-wt" } }, [{ projectId: "r1", path: "/h/r1-wt" }]],
+      ["a set: each main checkout", { projectIds: ["r1", "r3"] }, [{ projectId: "r1" }, { projectId: "r3" }]],
       [
-        "a project, existing worktree: that worktree",
-        { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] },
-        [{ projectId: "r1", path: "/h/r1-wt" }],
-      ],
-      ["a project with Also in: each main checkout", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
-      [
-        "a workspace, Workspace worktrees: each member's worktree",
-        { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "members" }, wsMembers },
+        "a thread's checkouts: each one",
+        { projectIds: ["r1", "r2"], paths: { r1: "/h/w/r1", r2: "/h/w/r2" } },
         [
           { projectId: "r1", path: "/h/w/r1" },
           { projectId: "r2", path: "/h/w/r2" },
         ],
       ],
-      ["a workspace, new worktree: each main checkout", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers }, [{ projectId: "r1" }, { projectId: "r2" }]],
     ])("%s", async (_name, input, want) => {
       const { fn, calls } = deferred();
       requestFiles(fileSources(input), "q", fn);

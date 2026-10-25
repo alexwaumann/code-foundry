@@ -75,6 +75,14 @@ service ThreadService {
   // shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
   // thread the user created (always shown). Persisted; any state.
   rpc SetSidebar(SetThreadSidebarRequest) returns (SetThreadSidebarResponse) {}
+  // SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
+  // the workspace whose instructions and skills reach the thread); workspace is an id or
+  // a name, "" clears it. The project set does not change. Persisted; any state; it
+  // applies from the thread's next spawn (a live process keeps what it started with).
+  // NOT_FOUND for an unknown workspace; FAILED_PRECONDITION to clear or change the
+  // reference of a thread whose primary is its workspace's folder (empty project_id with
+  // a workspace_id), whose cwd is that folder.
+  rpc SetWorkspace(SetThreadWorkspaceRequest) returns (SetThreadWorkspaceResponse) {}
   // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
   // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
   // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze

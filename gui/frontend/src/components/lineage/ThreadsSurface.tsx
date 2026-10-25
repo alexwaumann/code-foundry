@@ -1,23 +1,21 @@
 import { useState, type ReactNode } from "react";
 import { CornerDownRight, Eye, EyeOff, LoaderCircle, Network } from "lucide-react";
-import { useShallow } from "zustand/react/shallow";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { useThreadPlace } from "@/components/thread/useThreadPlace";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { capIds, lineageStatusTones, lineageStatusWords, lineageTail, relatedCount, type LineageStatus } from "@/lib/lineage";
 import type { StatusTone } from "@/lib/statusLine";
 import { shortAge } from "@/lib/thread";
-import { modelLabel, threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { useChildIds, useCreator, useLineageCounts, useLineageStatus, useSiblingIds, useSidebarShown } from "@/stores/lineage";
-import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices } from "@/stores/settings";
 import { setThreadSidebar } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
-const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The sidebar's status colours (SidebarRow toneClasses). */
 const TONE: Readonly<Record<StatusTone, string>> = {
@@ -56,24 +54,17 @@ function StatusMark({ status }: { status: LineageStatus }) {
   );
 }
 
-/** "project @ branch" (mono branch), the sidebar's place; "No project" or the No git badge without git. */
+/**
+ * "project @ branch" (mono branch), the sidebar's place: for several projects "<workspace
+ * name> @ <branch>" or "<N projects> @ <branch>" (components/thread/useThreadPlace); "No
+ * project" or the No git badge without git.
+ */
 function Place({ id }: { id: string }) {
-  const where = useThreadsStore(
-    useShallow((st) => {
-      const x = st.byId[id];
-      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
-    }),
-  );
-  const m = useProjectsStore(
-    useShallow((st) => {
-      const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject };
-    }),
-  );
+  const m = useThreadPlace(id);
   return (
-    <span className="min-w-0 truncate" data-testid="lineage-place">
-      {m.project}
-      {m.noProject ? null : m.noGit ? (
+    <span className="min-w-0 truncate" data-testid="lineage-place" data-set={m.set !== null || undefined}>
+      {m.set ?? m.project}
+      {m.noProject || (m.set !== null && !m.branch) ? null : m.noGit ? (
         <>
           {" "}
           <NoGitBadge className="align-[1px]" tip={false} />

@@ -87,6 +87,8 @@ export interface UiContextView {
 export interface InvokeResultView {
   message: string;
   resultJson: string;
+  /** Notes about the result the CLI prints as "warning: " lines (thread.new's collision hints); absent when none. */
+  warnings?: string[];
 }
 
 const argTypeMap: Record<ArgType, ArgTypeView> = {
@@ -177,5 +179,5 @@ export async function invokeCommand(
 ): Promise<InvokeResultView> {
   const c = await conn.client(CommandService);
   const res = await c.invoke({ name, context: toUiContext(ctx), args, confirmed: opts.confirmed ?? false }, { signal: opts.signal });
-  return { message: res.message, resultJson: res.resultJson };
+  return { message: res.message, resultJson: res.resultJson, ...(res.warnings.length > 0 ? { warnings: [...res.warnings] } : {}) };
 }

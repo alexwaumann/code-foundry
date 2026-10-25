@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { freshCopyByDefault, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { freshCopyByDefault, invocations, openApp, resetMock, row } from "./fixtures";
+
+/**
+ * The composer heading's set picker (docs/notes/workspaces-v2-3-composer.md): a
+ * multi-select over the project rows; "No project" moves the draft. The project set itself
+ * (chips, primary, workspaces) is project-sets.spec.ts.
+ */
 
 test.beforeEach(async () => {
   await resetMock();
@@ -21,27 +27,20 @@ const chips = (page: Page) => page.getByTestId("composer-member");
 /** The prompt as the draft stores it. */
 const prompt = (page: Page) => page.getByTestId("composer-prompt");
 
-async function addAlsoIn(page: Page, name: string): Promise<void> {
-  await page.getByTestId("composer-also-in").click();
-  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: name }).click();
-}
-
-test("switch the project from the heading: the draft moves, Also in is swapped, the thread starts there", async ({ page }) => {
+test("the heading's picker: centred under the name, the set checked; toggles keep the draft and send the set", async ({ page }) => {
   await freshCopyByDefault();
   await openApp(page);
   await compose(page, 1);
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
-  await expect(trigger(page)).toHaveAccessibleName("Change project");
+  await expect(trigger(page)).toHaveAccessibleName("Change projects");
   await expect(trigger(page)).toHaveAttribute("aria-haspopup", "dialog");
   await page.keyboard.type("Port the login form");
   await page.getByTestId("composer-model").click();
   await page.getByTestId("composer-model-list").getByRole("option", { name: "Haiku 4.5", exact: true }).click();
-  await addAlsoIn(page, "ghostty-playground");
-  await expect(chips(page)).toHaveCount(2);
 
   await trigger(page).click();
   await expect(list(page)).toBeVisible();
-  await expect(page.getByPlaceholder("Switch project…")).toBeFocused();
+  await expect(page.getByPlaceholder("Add or remove projects…")).toBeFocused();
   // Centred under the name, just below it; the dotted underline is the name's own border.
   const name = page.getByTestId("composer-project-name");
   await expect(name).toHaveCSS("border-bottom-style", "dotted");
@@ -58,72 +57,42 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await expect(list(page).locator("[data-project]")).toHaveCount(5);
   await expect(list(page).locator('[data-slot="command-shortcut"]')).toHaveCount(0);
   await expect(list(page).getByTestId("project-source").first()).toHaveText("alexwaumann/code-foundry · ~/src/code-foundry");
-  // The current project is checked and highlighted.
-  const current = list(page).locator('[data-project="repo-cf"]');
-  await expect(current).toHaveAttribute("data-current", "true");
-  await expect(current).toHaveAttribute("data-selected", "true");
-  await expect(current.getByTestId("picker-current")).toBeVisible();
+  // The set is checked.
+  await expect(list(page).locator('[data-project="repo-cf"]')).toHaveAttribute("data-current", "true");
+  await expect(list(page).locator('[data-project="repo-cf"]').getByTestId("picker-current")).toBeVisible();
   await expect(list(page).locator("[data-current]")).toHaveCount(1);
 
+  // Enter toggles a project in and keeps the list open.
   await page.keyboard.type("ghostty");
   await page.keyboard.press("Enter");
+  await expect(list(page)).toBeVisible();
+  // The filter shows ghostty-playground alone: checked now.
+  await expect(list(page).locator('[data-project="repo-gp"]')).toHaveAttribute("data-current", "true");
+  await page.keyboard.press("Escape");
   await expect(list(page)).toHaveCount(0);
-  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await expect(trigger(page)).toBeFocused();
+  await expect(heading(page)).toHaveText("What should we build in 2 projects?");
   await expect(prompt(page)).toHaveAttribute("data-value", "Port the login form");
   await expect(page.getByTestId("composer-model")).toHaveText("Haiku 4.5");
-  // ghostty-playground was swapped out of Also in; code-foundry is not demoted to it.
-  await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-also-in")).toHaveText("Also in…");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
+  await expect(chips(page)).toHaveCount(2);
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copies");
 
+  // code-foundry out again: ghostty-playground alone, the draft is the same one.
+  await trigger(page).click();
+  await list(page).locator('[data-project="repo-cf"]').click();
+  await page.keyboard.press("Escape");
+  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
+  await expect(chips(page)).toHaveCount(0);
+  await page.getByTestId("composer-input").click();
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args ?? {};
   expect(args).toMatchObject({ project: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
   expect(args.projects).toBeUndefined();
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-
-  // The draft moved: code-foundry's composer starts empty.
+  // The draft was code-foundry's composer's: it is clear now.
   await compose(page, 1);
   await expect(prompt(page)).toHaveAttribute("data-value", "");
-});
-
-test("switch to a workspace and back to a project", async ({ page }) => {
-  await freshCopyByDefault();
-  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
-  await openApp(page);
-  await compose(page, 3);
-  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await page.keyboard.type("Share the session cookie");
-  await addAlsoIn(page, "sketches");
-  await expect(chips(page)).toHaveCount(2);
-
-  await trigger(page).click();
-  await expect(list(page).locator("[cmdk-group-heading]")).toHaveText(["Workspaces", "Projects"]);
-  const ws = list(page).locator('[data-workspace="w-000000000001"]');
-  await expect(ws.getByTestId("workspace-detail")).toHaveText("cf/login · code-foundry, ghostty-playground");
-  await ws.click();
-
-  await expect(heading(page)).toHaveText("What should we build in login?");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
-  await expect(prompt(page)).toHaveAttribute("data-value", "Share the session cookie");
-  // The workspace's members, not the old Also in.
-  await expect(chips(page)).toHaveCount(2);
-  await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
-  await expect(chips(page).nth(1)).toHaveAttribute("data-project", "repo-gp");
-  await expect(page.getByTestId("composer-also-in")).toHaveCount(0);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Workspace worktrees");
-
-  // The workspace composer has the trigger too; the workspace row is the current one.
-  await expect(trigger(page)).toHaveText("login");
-  await trigger(page).click();
-  await expect(list(page).locator("[data-current]")).toHaveAttribute("data-workspace", "w-000000000001");
-  await list(page).locator('[data-project="repo-dot"]').click();
-  await expect(heading(page)).toHaveText("What should we build in dotfiles?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Share the session cookie");
-  await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 });
 
 test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it back to the trigger", async ({ page }) => {
@@ -131,67 +100,55 @@ test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc close
   await compose(page, 1);
   await page.keyboard.type("Keep me");
 
-  // Prompt ← Also in… ← the project name.
+  // Prompt ← Add project ← the heading's name.
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByTestId("composer-also-in")).toBeFocused();
+  await expect(page.getByTestId("composer-add-project")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(trigger(page)).toBeFocused();
 
   await page.keyboard.press("Enter");
-  await expect(page.getByPlaceholder("Switch project…")).toBeFocused();
+  await expect(page.getByPlaceholder("Add or remove projects…")).toBeFocused();
   await page.keyboard.type("dot");
   await page.keyboard.press("Escape");
   await expect(list(page)).toHaveCount(0);
   await expect(trigger(page)).toBeFocused();
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
 
-  // Space opens it too, unfiltered again; picking the current project just closes.
+  // Space opens it too, unfiltered again.
   await page.keyboard.press("Space");
-  await expect(page.getByPlaceholder("Switch project…")).toHaveValue("");
-  await expect(list(page).locator('[data-project="repo-cf"]')).toHaveAttribute("data-selected", "true");
-  await page.keyboard.press("Enter");
-  await expect(list(page)).toHaveCount(0);
+  await expect(page.getByPlaceholder("Add or remove projects…")).toHaveValue("");
+  await page.keyboard.press("Escape");
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(prompt(page)).toHaveAttribute("data-value", "Keep me");
 });
 
-test("switching onto a project with its own draft asks before replacing it", async ({ page }) => {
+test("No project moves the draft, and a project row moves it back", async ({ page }) => {
   await openApp(page);
-  await compose(page, 3);
-  await page.keyboard.type("Older idea");
-  await row(page, "s:s-1").click();
   await compose(page, 1);
-  await page.keyboard.type("Newer idea");
-
+  await page.keyboard.type("Plan the week");
   await trigger(page).click();
-  await list(page).locator('[data-project="repo-gp"]').click();
-  const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Replace the draft in ghostty-playground?");
-  await expect(dialog).toContainText("It has unsent text or attachments.");
-  await expect(page.getByTestId("confirm-ok")).toHaveText("Replace");
-  await page.getByTestId("confirm-cancel").click();
-  await expect(dialog).toHaveCount(0);
-  await expect(heading(page)).toHaveText("What should we build in code-foundry?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Newer idea");
+  await list(page).getByTestId("picker-no-project").click();
+  await expect(list(page)).toHaveCount(0);
+  await expect(heading(page)).toHaveText("What should we build with No project?");
+  await expect(prompt(page)).toHaveAttribute("data-value", "Plan the week");
   await expect(page.getByTestId("composer-input")).toBeFocused();
 
   await trigger(page).click();
+  await expect(list(page).getByTestId("picker-no-project")).toHaveAttribute("data-current", "true");
   await list(page).locator('[data-project="repo-gp"]').click();
-  await page.getByTestId("confirm-ok").click();
+  await expect(list(page)).toHaveCount(0);
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  await expect(prompt(page)).toHaveAttribute("data-value", "Newer idea");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await expect(prompt(page)).toHaveAttribute("data-value", "Plan the week");
   await row(page, "s:s-1").click();
   await compose(page, 1);
   await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
 
-test("switching away drops the old project's skill tags after a confirm; the rest stays", async ({ page }) => {
+test("taking a project out drops its skill tags after a confirm; the rest stays", async ({ page }) => {
   await openApp(page);
   await compose(page, 1);
-  await addAlsoIn(page, "sketches");
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await page.getByTestId("composer-input").click();
   // code-foundry's /deploy, sketches' /deploy (second in the card), the user's /commit.
   await page.keyboard.type("/deploy");
@@ -205,30 +162,19 @@ test("switching away drops the old project's skill tags after a confirm; the res
   const SK = "[/deploy](cf-skill://repo-sk/deploy)";
   const USER = "[/commit](cf-skill://~/commit)";
   await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
-  // The caret at the start of the line: a cancelled switch leaves it there.
-  await page.keyboard.press("Meta+ArrowLeft");
 
   const dialog = page.getByTestId("confirm-dialog");
-  await trigger(page).click();
-  await page.keyboard.type("ghostty");
-  await page.keyboard.press("Enter");
-  await expect(dialog).toContainText("Switch to ghostty-playground?");
+  await page.getByRole("button", { name: "Remove code-foundry" }).click();
+  await expect(dialog).toContainText("Remove code-foundry from the thread?");
   await expect(dialog).toContainText("1 reference to code-foundry in your text will be removed.");
   await page.getByTestId("confirm-cancel").click();
-  await expect(heading(page)).toHaveText("What should we build in code-foundry?");
   await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
   await expect(chips(page)).toHaveCount(2);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
-  await page.keyboard.type("go ");
-  await expect(prompt(page)).toHaveAttribute("data-value", `go ${CF} ${SK} ${USER} `);
 
-  await trigger(page).click();
-  await page.keyboard.type("ghostty");
-  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Remove code-foundry" }).click();
   await page.getByTestId("confirm-ok").click();
-  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
-  // sketches stays an Also in project, so its tag stays; the user's skill always does.
-  await expect(prompt(page)).toHaveAttribute("data-value", `go ${SK} ${USER}`);
+  await expect(heading(page)).toHaveText("What should we build in sketches?");
+  // sketches stays, so its tag stays; the user's skill always does.
+  await expect(prompt(page)).toHaveAttribute("data-value", `${SK} ${USER}`);
   await expect(page.getByTestId("prompt-tag")).toHaveText(["/deploy", "/commit"]);
-  await expect(chips(page)).toHaveCount(2);
 });

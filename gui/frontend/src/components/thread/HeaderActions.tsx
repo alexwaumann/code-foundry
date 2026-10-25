@@ -14,6 +14,7 @@ import { useSidebarShown } from "@/stores/lineage";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { ThreadMenu } from "./ThreadMenu";
 
 /**
  * The thread's only linked pull request: its state icon and "#number" in the state's
@@ -61,7 +62,7 @@ function LinkedPrs({ threadId }: { threadId: string }) {
   return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} className="text-cf-text-muted" data-testid="pane-linked-prs" />;
 }
 
-/** The owning workspace by name, opening its surface (view.panel.workspace); only listed for a workspace thread. */
+/** The referenced workspace by name, opening its surface (view.panel.workspace); only for a thread that references one. */
 function WorkspaceChip({ threadId }: { threadId: string }) {
   const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
   // A workspace the slice does not know (older daemon, or just removed) shows its id, like the sidebar badge.
@@ -103,7 +104,7 @@ function SidebarButton({ threadId }: { threadId: string }) {
 
 /**
  * The thread header's right side: the workspace, the linked pull requests, then the
- * thread's and window's commands, run against the current selection (this thread) exactly
+ * thread's commands (its "More" menu among them: ThreadMenu) and the window's, run against the current selection (this thread) exactly
  * as the palette runs them. Each command button hides when the daemon does not list it as
  * available.
  */
@@ -115,6 +116,7 @@ export function HeaderActions({ threadId }: { threadId: string }) {
       <SnoozeButton threadId={threadId} />
       <SidebarButton threadId={threadId} />
       <ArchiveButton threadId={threadId} />
+      <ThreadMenu threadId={threadId} />
       <ThreadActionsMenu threadId={threadId} />
       <BottomToggle />
       <PanelToggle />

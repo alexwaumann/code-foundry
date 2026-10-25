@@ -37,7 +37,7 @@ export function useAlsoIn(path: string): AlsoInRow[] {
   const thread = useThreadsStore(
     useShallow((s) => {
       const t = threadId ? s.byId[threadId] : undefined;
-      return t ? { id: t.id, worktreePath: t.worktreePath, branch: t.branch ?? "", projectIds: (t.projectIds ?? []).join(",") } : null;
+      return t ? { id: t.id, worktreePath: t.worktreePath, branch: t.branch, projectIds: t.projectIds.join(",") } : null;
     }),
   );
   const idsKey = thread?.projectIds ?? "";

@@ -65,6 +65,8 @@ type ThreadBackend interface {
 	RestartBackend
 	// SidebarBackend backs thread.sidebar (commands_thread_sidebar.go).
 	SidebarBackend
+	// WorkspaceRefBackend backs thread.workspace (commands_thread_workspace.go).
+	WorkspaceRefBackend
 	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
 	ReseedBackend
 	// HTMLShower backs view.inline (commands_view_inline.go).

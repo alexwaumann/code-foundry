@@ -18,6 +18,8 @@ export type GitOpsEventInit = MessageInitShape<typeof GitOpsEventSchema>;
 export interface InvokeOut {
   message: string;
   resultJson: string;
+  /** InvokeCommandResponse.warnings (thread.new's collision hints). */
+  warnings?: string[];
 }
 
 interface Wt {

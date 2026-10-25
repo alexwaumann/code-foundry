@@ -81,6 +81,11 @@
  *                                                 (a workspace: a saved project set; nothing on disk changes)
  *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b]
  *                                                 (what a thread wrote in the workspace's folder; "" clears)
+ *   POST /__mock/set-thread?projects=repo-sk,repo-wr[&project=…|workspace][&workspace=…][&branch=feat/x][&name=…]
+ *                                                 (a thread over a project set; a branch: worktree mode, none: in place)
+ *   thread.new --like and thread.new-like copy a thread's set, branch, workspace and mode; thread.new's
+ *   sets and thread.new-like return the collision hints as warnings (mock/projectSets.ts);
+ *   thread.workspace sets a thread's workspace reference.
  *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login]
  *                                                 (a worktree-mode thread over several projects, its worktrees made)
  *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
@@ -873,6 +878,7 @@ function threadSummary(id: string): Record<string, unknown> {
     workspaceId: s.workspaceId,
     projectIds: world.projectIdsOf(s),
     branch: s.branch,
+    createdWorktree: s.createdWorktree,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
     archivedAt: s.archivedAt?.toISOString() ?? null,
@@ -1121,6 +1127,20 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       try {
         const t = world.setThreadProjectIds(q.get("id") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean));
         json(res, 200, threadSummary(t.id));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/set-thread":
+      try {
+        const s = world.addSetThread({
+          projects: (q.get("projects") ?? "").split(",").filter(Boolean),
+          project: q.get("project") ?? "",
+          workspace: q.get("workspace") ?? "",
+          branch: q.get("branch") ?? "",
+          name: q.get("name") ?? "set thread",
+        });
+        json(res, 200, threadSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

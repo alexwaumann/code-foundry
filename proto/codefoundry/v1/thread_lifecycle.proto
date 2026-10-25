@@ -951,6 +951,16 @@ message SetThreadSidebarResponse {
   Thread thread = 1;
 }
 
+message SetThreadWorkspaceRequest {
+  string id = 1;
+  // Workspace id or name the thread references from now on; "" clears the reference.
+  string workspace = 2;
+}
+
+message SetThreadWorkspaceResponse {
+  Thread thread = 1;
+}
+
 message SnoozeThreadRequest {
   string id = 1;
   // When the thread wakes; must be in the future. Unset unsnoozes.

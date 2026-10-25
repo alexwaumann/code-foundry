@@ -22,7 +22,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"skill.browse",
 		"terminal.list", "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
-		"thread.agent.open", "thread.agents", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond",
+		"thread.agent.open", "thread.agents", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.new-like", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
 		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",

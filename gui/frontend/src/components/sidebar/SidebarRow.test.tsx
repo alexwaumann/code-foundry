@@ -13,7 +13,7 @@ import { useUiStore } from "@/stores/ui";
 import { SidebarRow } from "./SidebarRow";
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", projectIds: ["cf"], branch: "", createdWorktree: false, pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
   useProjectsStore.setState({

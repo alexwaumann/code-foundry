@@ -39,6 +39,7 @@ import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as Scr
 import { contextFields, recordResult, type MockContext } from "./context";
 import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 import { panelItemCommands } from "./panelItemVerbs";
+import { createHints, type SetThread } from "./projectSets";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -2367,6 +2368,7 @@ export class World {
    */
   private async newThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
     if (args["no-project"] === "true") return this.newHomeThread(ctx, args);
+    if (args.like) return this.newLikeThread(args.like, args);
     if (args.workspace || args.projects) return this.newWorkspaceThread(args);
     // Like the daemon: from a thread (its CLI, or a page it shows) with no placement, where that thread runs.
     const caller = !args.project && !args.worktree && ctx?.activeView === "" && ctx.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
@@ -2520,8 +2522,116 @@ export class World {
       firstMessage: first,
     });
     if (args.focus !== "false") this.focusThread(s.id);
-    return { message: `created thread ${s.id} in ${cwd}${ws ? ` (workspace ${ws.name})` : ""}`, resultJson: JSON.stringify({ id: s.id, worktreePath: cwd, workspaceId: ws?.id ?? "" }) };
+    const warnings = this.hintsFor(s);
+    return {
+      message: `created thread ${s.id} in ${cwd}${ws ? ` (workspace ${ws.name})` : ""}`,
+      resultJson: JSON.stringify({ id: s.id, worktreePath: cwd, workspaceId: ws?.id ?? "" }),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   }
+
+  /** A thread's set as the hints read it (mock/projectSets.ts). */
+  private setThread(s: MockThread): SetThread {
+    return { id: s.id, name: s.name, projectId: s.projectId, projectIds: this.projectIdsOf(s), worktreePath: s.worktreePath, createdWorktree: s.createdWorktree, branch: s.branch, archivedAt: s.archivedAt };
+  }
+
+  /** The daemon's collision hints for a thread just made (CreateThreadResponse.hints). */
+  private hintsFor(s: MockThread): string[] {
+    return createHints(this.setThread(s), [...this.threads.values()].map((t) => this.setThread(t)), this.projects.values());
+  }
+
+  /**
+   * Test control: a connected, idle thread over a project set, made at once: `projects`
+   * (refs), `project` the primary (default the first; `workspace`: the workspace's folder),
+   * `workspace` a reference, `branch` (worktree mode: a worktree on it in every git project,
+   * reused when there is one; "": each project's own checkout). POST /__mock/set-thread.
+   */
+  addSetThread(o: { projects: string[]; project: string; workspace: string; branch: string; name: string }): MockThread {
+    const ws = o.workspace ? this.workspaceRef(o.workspace) : undefined;
+    const set = o.projects.map((r) => this.projectRef(r).id);
+    const inFolder = o.project === "workspace";
+    const primary = inFolder ? "" : o.project ? this.projectRef(o.project).id : (set[0] ?? "");
+    const pathOf = (id: string): string => {
+      const p = this.projectRef(id);
+      if (!o.branch || p.git === false) return this.mainPathOf(id);
+      return p.worktrees.find((w) => w.branch === o.branch)?.path ?? this.addWorktree(p, o.branch, p.remotes.length > 0 ? `origin/${p.defaultBranch}` : p.defaultBranch).path;
+    };
+    const paths = set.map(pathOf);
+    const path = inFolder && ws ? this.workspaceDirOf(ws) : (paths[set.indexOf(primary)] ?? "");
+    const s = this.addThread({
+      id: `s-set-${String(this.nextId++)}`,
+      projectId: primary,
+      worktreePath: path,
+      name: o.name,
+      model: "claude-4.5-haiku[1m]",
+      effort: "",
+      workspaceId: ws?.id ?? "",
+      projectIds: set,
+      createdWorktree: o.branch !== "",
+      branch: o.branch,
+      createdAt: new Date(),
+    });
+    this.publishThread(s);
+    return s;
+  }
+
+  /** thread.workspace: the reference set or cleared (""); a thread in its workspace's folder keeps it. */
+  setThreadWorkspace(s: MockThread, ref: string): string {
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    const id = ref.trim() ? this.workspaceRef(ref.trim()).id : "";
+    if (id === s.workspaceId) return `thread ${label} ${id ? `references workspace ${id}` : "references no workspace"}`;
+    if (!s.projectId && s.workspaceId) throw new CommandError("unavailable", `thread ${label} runs in its workspace's folder; its workspace cannot change`);
+    s.workspaceId = id;
+    this.publishThread(s);
+    return `thread ${label} ${id ? `now references workspace ${id}` : "references no workspace"}; it applies from the thread's next start`;
+  }
+
+  /**
+   * thread.new-like (and thread.new --like): the source thread's set, branch, primary,
+   * workspace reference and mode; `project` picks another primary of the set (or
+   * `workspace`). A worktree-mode member whose worktree is gone gets it again.
+   */
+  private async newLikeThread(srcId: string, args: Record<string, string>): Promise<InvokeOut> {
+    const src = this.threads.get(srcId);
+    if (!src) throw new CommandError("notfound", `thread ${srcId} not found`);
+    const set = this.projectIdsOf(src);
+    const ws = src.workspaceId ? this.workspaces.get(src.workspaceId) : undefined;
+    const inFolder = args.project === "workspace" || (!args.project && !src.projectId && ws !== undefined);
+    if (inFolder && !ws) throw new CommandError("invalid", `thread ${src.id} has no workspace to run in`);
+    const primary = inFolder ? "" : args.project ? this.projectRef(args.project).id : src.projectId;
+    if (!inFolder && !set.includes(primary)) throw new CommandError("invalid", `project ${primary} is not one of thread ${src.id}'s projects (${set.join(", ")})`);
+    const prompt = args.prompt ?? "";
+    const permission = args.permission ?? "";
+    const gen = this.generation;
+    await sleep(150);
+    if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
+    if (prompt.includes("FAIL")) throw new CommandError("unavailable", 'start claude: exec: "claude": executable file not found in $PATH');
+    const worktreeMode = src.createdWorktree && src.branch !== "";
+    const placeOf = (): string => {
+      if (inFolder && ws) return this.workspaceDirOf(ws);
+      if (primary === src.projectId) return src.worktreePath;
+      const p = this.projectRef(primary);
+      return worktreeMode && p.git !== false ? (p.worktrees.find((w) => w.branch === src.branch)?.path ?? this.addWorktree(p, src.branch, src.baseRef || p.defaultBranch).path) : this.mainPathOf(primary);
+    };
+    const path = placeOf();
+    const s = this.createThread(primary, path, args.model || src.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+      name: args.name ?? "",
+      autoNamed: !args.name,
+      nameIn: args.name ? 0 : 2,
+      pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
+      permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
+      baseRef: src.baseRef,
+      createdWorktree: worktreeMode,
+      branch: worktreeMode ? src.branch : "",
+      projectIds: set,
+      workspaceId: src.workspaceId,
+      firstMessage: firstMessageOf(args),
+    });
+    if (args.focus !== "false") this.focusThread(s.id);
+    const warnings = this.hintsFor(s);
+    return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path, projectIds: this.projectIdsOf(s) }), ...(warnings.length > 0 ? { warnings } : {}) };
+  }
+
 
   /**
    * ThreadService.StageAttachment: keeps the bytes' size, the page hint and a PDF's bytes,
@@ -2999,7 +3109,8 @@ export class World {
             { name: "project", type: ArgType.STRING, required: false, description: "Project id" },
             { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
-            { name: "projects", type: ArgType.STRING, required: false, description: "With new-worktree: projects for a new workspace (project[:base], comma-separated)" },
+            { name: "projects", type: ArgType.STRING, required: false, description: "Comma-separated projects it works in (project:base with new-worktree); it runs in the first unless project" },
+            { name: "like", type: ArgType.STRING, required: false, description: "Thread to copy projects, branch and mode from" },
             { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "claude-opus-4-8[1m]" },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
@@ -3132,6 +3243,47 @@ export class World {
           const ws = this.addWorkspace(args.name ?? "", (args.projects ?? "").split(",").map((r) => r.trim()).filter(Boolean), { root: args.root ?? "", primary: args.primary ?? "" });
           return Promise.resolve({ message: `created workspace ${ws.name} (${ws.id})`, resultJson: JSON.stringify({ id: ws.id, name: ws.name, members: ws.members, defaultPrimary: ws.defaultPrimary }) });
         },
+      },
+      {
+        cmd: {
+          name: "thread.workspace",
+          title: "Set Thread Workspace",
+          category: "Thread",
+          description: "Set the workspace a thread references (its instructions and skills), or clear it; it applies from the thread's next start.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name; empty clears the reference" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = this.thread(args.id || (ctx?.activeThreadId ?? ""));
+          return this.setThreadWorkspace(s, args.workspace ?? "");
+        },
+      },
+      {
+        cmd: {
+          name: "thread.new-like",
+          title: "New thread on this branch",
+          category: "Thread",
+          description: "Start a new thread with this thread's projects, branch, primary, workspace and mode (thread new --like); only the prompt is new.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "The thread to copy (default: the active thread)" },
+            { name: "project", type: ArgType.STRING, required: false, description: "Where it runs: one of the thread's projects, or workspace" },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES },
+            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] },
+            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
+            { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
+            { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
+            { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
+            { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args),
       },
       {
         cmd: {
@@ -3968,6 +4120,8 @@ export class World {
     let whenCtx = args.worktree ? ({ ...ctx, activeWorktreePath: args.worktree } as UiContext) : ctx;
     // A terminal command's --id stands in for the context's terminal the same way.
     if (name.startsWith("terminal.") && args.id) whenCtx = { ...whenCtx, activeTerminalId: args.id } as UiContext;
+    // And a thread command's --id for the context's thread (thread.new-like from the composer).
+    if (name.startsWith("thread.") && args.id && this.threads.has(args.id)) whenCtx = { ...whenCtx, activeThreadId: args.id } as UiContext;
     if (!entry.when(whenCtx)) throw new CommandError("unavailable", `${name} is not available here`);
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);

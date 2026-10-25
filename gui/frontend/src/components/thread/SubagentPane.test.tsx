@@ -97,7 +97,7 @@ const cmd = (name: string, o: Partial<CommandView> = {}) => ({ name, title: name
 
 beforeEach(() => {
   runCommand.mockClear();
-  useThreadsStore.setState({ byId: { s1: { id: "s1", name: "Agents panel", projectId: "", worktreePath: "/w", workspaceId: "", model: "claude-opus-4-8", state: "connected", status: "idle", linkedPullRequests: [] } as unknown as ThreadView }, order: ["s1"] });
+  useThreadsStore.setState({ byId: { s1: { id: "s1", name: "Agents panel", projectId: "", worktreePath: "/w", workspaceId: "", projectIds: [], branch: "", model: "claude-opus-4-8", state: "connected", status: "idle", linkedPullRequests: [] } as unknown as ThreadView }, order: ["s1"] });
   useUiStore.setState({ selection: { kind: "thread", id: "s1" }, windowWidth: 1400, promptFocusSeq: 0, palette: { ...useUiStore.getState().palette, open: false } });
   useCommandsStore.setState({ commands: [cmd("thread.agent.up", { keybindings: ["escape"] }), cmd("thread.agent.open"), cmd("view.panel.toggle"), cmd("view.bottom.toggle"), cmd("thread.archive"), cmd("thread.rename")] });
   useSubagentViewStore.setState({ viewing: null, focusSeq: 0 });

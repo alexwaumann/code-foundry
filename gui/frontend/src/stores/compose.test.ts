@@ -3,22 +3,24 @@ import type { ProjectView } from "@/api/project";
 import { HOME_KEY } from "@/lib/compose";
 import { tagToken } from "@/lib/prompt";
 import { pdfSummary } from "@/lib/pdf";
+import type { ThreadView } from "@/api/threads";
 import {
-  addAlsoIn,
   addAttachments,
   clearDraft,
+  composeLike,
   composeNoProject,
   composeSelection,
   composeTarget,
   draftPlace,
+  draftSet,
   emptyDraft,
-  emptyWorkspaceDraft,
   getDraft,
+  pickDraftWorkspace,
   projectWorktree,
-  removeAlsoIn,
   setPrimary,
   settlePdf,
   switchDraftTarget,
+  toggleDraftProject,
   updateDraft,
   useComposeStore,
   type DraftAttachment,
@@ -26,6 +28,7 @@ import {
 import { answerConfirm, useConfirmStore } from "./confirm";
 import { useProjectsStore } from "./projects";
 import { useSettingsStore } from "./settings";
+import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 
@@ -38,35 +41,82 @@ afterEach(() => {
 });
 
 describe("compose drafts", () => {
-  it("a project draft starts with the project's default (null), a workspace draft in its worktrees", () => {
-    expect(emptyDraft.worktree).toBeNull();
-    expect(getDraft("repo-cf")).toBe(emptyDraft);
-    expect(getDraft("ws:w-1")).toBe(emptyWorkspaceDraft);
-    expect(getDraft("ws:w-1").worktree).toEqual({ kind: "members" });
-    updateDraft("ws:w-1", { text: "hi" });
-    expect(getDraft("ws:w-1")).toMatchObject({ text: "hi", worktree: { kind: "members" } });
+  const project = (id: string): ProjectView => ({ id, path: `/src/${id}`, name: id.replace("repo-", ""), defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
+  const cf = { kind: "project", projectId: "repo-cf" } as const;
+  const login = { kind: "workspace", workspaceId: "w-1" } as const;
+  const sk = (projectId: string) => tagToken({ tagKind: "skill", name: "deploy", projectId });
+
+  beforeEach(() => {
+    useProjectsStore.setState({ byId: { "repo-cf": project("repo-cf"), "repo-gp": project("repo-gp"), "repo-sk": project("repo-sk") }, order: ["repo-cf", "repo-gp", "repo-sk"] });
+    useWorkspacesStore.setState({
+      byId: { "w-1": { id: "w-1", name: "login", branch: "", members: [{ projectId: "repo-gp", worktreePath: "" }, { projectId: "repo-sk", worktreePath: "" }], defaultPrimary: "repo-sk", createdAtMs: null } },
+      order: ["w-1"],
+      loaded: true,
+    });
   });
 
-  it("Also in: added once, removed again; removing the primary hands it back to the project", () => {
-    addAlsoIn("repo-cf", "repo-gp");
-    addAlsoIn("repo-cf", "repo-gp");
-    addAlsoIn("repo-cf", "repo-sk");
-    expect(getDraft("repo-cf").alsoIn).toEqual(["repo-gp", "repo-sk"]);
+  it("every draft starts with the target's set and the setting's mode (nulls)", () => {
+    expect(emptyDraft).toMatchObject({ worktree: null, projects: null, workspace: null, primary: null });
+    expect(getDraft("ws:w-1")).toBe(emptyDraft);
+    expect(draftSet(cf, getDraft("repo-cf"))).toEqual({ projectIds: ["repo-cf"], picked: ["repo-cf"], workspaceId: "", primary: "repo-cf", isSet: false });
+    expect(draftSet(login, getDraft("ws:w-1"))).toEqual({ projectIds: ["repo-gp", "repo-sk"], picked: ["repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk", isSet: true });
+  });
+
+  it("projects toggle in pick order; the set is sorted; the first picked is the default primary", async () => {
+    await toggleDraftProject(cf, "repo-sk");
+    await toggleDraftProject(cf, "repo-gp");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp", "repo-sk"], picked: ["repo-cf", "repo-sk", "repo-gp"], primary: "repo-cf", isSet: true });
+    await toggleDraftProject(cf, "repo-cf");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], primary: "repo-sk" });
+  });
+
+  it("the last project of a set without a workspace stays", async () => {
+    await expect(toggleDraftProject(cf, "repo-cf")).resolves.toBe(false);
+    expect(draftSet(cf, getDraft("repo-cf")).projectIds).toEqual(["repo-cf"]);
+  });
+
+  it("removing the primary hands it back to the default and resets the base", async () => {
+    await toggleDraftProject(cf, "repo-gp");
     setPrimary("repo-cf", "repo-gp");
     updateDraft("repo-cf", { base: "origin/dev" });
-    removeAlsoIn("repo-cf", "repo-sk");
-    expect(getDraft("repo-cf")).toMatchObject({ alsoIn: ["repo-gp"], primary: "repo-gp", base: "origin/dev" });
-    removeAlsoIn("repo-cf", "repo-gp");
-    expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], primary: null, base: null });
+    await toggleDraftProject(cf, "repo-gp");
+    expect(getDraft("repo-cf")).toMatchObject({ projects: ["repo-cf"], primary: null, base: null });
   });
 
-  it("removing an Also in project removes its skill and file tags, nothing else", () => {
-    const sk = (projectId: string) => tagToken({ tagKind: "skill", name: "deploy", projectId });
+  it("removing a project with tags in the text: after a confirm, its tags go and nothing else", async () => {
     const file = tagToken({ tagKind: "file", projectId: "repo-gp", path: "src/a.ts" });
-    addAlsoIn("repo-cf", "repo-gp");
+    await toggleDraftProject(cf, "repo-gp");
     updateDraft("repo-cf", { text: `Use ${sk("repo-gp")} and ${sk("repo-cf")} on ${file} then ${sk("")} ` });
-    removeAlsoIn("repo-cf", "repo-gp");
-    expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
+    const cancelled = toggleDraftProject(cf, "repo-gp");
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).toMatchObject({ title: "Remove gp from the thread?", message: "2 references to gp in your text will be removed." });
+    });
+    answerConfirm(false);
+    await expect(cancelled).resolves.toBe(false);
+    expect(draftSet(cf, getDraft("repo-cf")).projectIds).toEqual(["repo-cf", "repo-gp"]);
+    const removed = toggleDraftProject(cf, "repo-gp");
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    answerConfirm(true);
+    await expect(removed).resolves.toBe(true);
+    expect(getDraft("repo-cf")).toMatchObject({ projects: ["repo-cf"], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
+  });
+
+  it("a workspace row: its members become the set and it the reference (its default primary); again: the reference goes", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk", isSet: true });
+    setPrimary("repo-cf", "workspace");
+    expect(draftSet(cf, getDraft("repo-cf")).primary).toBe("workspace");
+    await pickDraftWorkspace(cf, "w-1");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "", primary: "repo-gp" });
+  });
+
+  it("a workspace target's projects toggle like any set's", async () => {
+    await toggleDraftProject(login, "repo-cf");
+    expect(draftSet(login, getDraft("ws:w-1"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk" });
+    await toggleDraftProject(login, "repo-sk");
+    expect(draftSet(login, getDraft("ws:w-1"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp"], primary: "repo-gp" });
   });
 
   it("a new primary resets the base (its refs differ)", () => {
@@ -149,11 +199,43 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
     expect(place("repo-cf")).toEqual({ kind: "new" });
   });
 
-  it("workspace drafts ignore the setting and the memory", () => {
+  it("a set follows the setting in either mode; a pick of the draft wins", () => {
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "", members: [{ projectId: "repo-gp", worktreePath: "" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
+    const target = { kind: "project", projectId: "repo-cf" } as const;
+    updateDraft("repo-cf", { projects: ["repo-cf", "repo-gp"] });
     setting("current");
-    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ projectId: "repo-gp", worktreePath: "/wt/gp" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
-    expect(getDraft("ws:w-1").worktree).toEqual({ kind: "members" });
-    expect(draftPlace({ kind: "workspace", workspaceId: "w-1" }, getDraft("ws:w-1"))).toMatchObject({ kind: "workspace", worktreePath: "/wt/gp" });
+    expect(draftPlace(target, getDraft("repo-cf"))).toEqual({ kind: "set", projectIds: ["repo-cf", "repo-gp"], primary: "repo-cf", workspaceId: "", newWorktree: false, base: "" });
+    setting("new");
+    expect(draftPlace(target, getDraft("repo-cf"))).toMatchObject({ kind: "set", newWorktree: true });
+    updateDraft("repo-cf", { worktree: { kind: "current" } });
+    expect(draftPlace(target, getDraft("repo-cf"))).toMatchObject({ kind: "set", newWorktree: false });
+    expect(draftPlace({ kind: "workspace", workspaceId: "w-1" }, getDraft("ws:w-1"))).toEqual({ kind: "set", projectIds: ["repo-gp"], primary: "repo-gp", workspaceId: "w-1", newWorktree: true, base: "" });
+  });
+});
+
+describe("New thread on this branch", () => {
+  beforeEach(() => {
+    useThreadsStore.setState({ byId: { "s-1": { id: "s-1", projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], branch: "feat/x", createdWorktree: true, workspaceId: "" } as ThreadView }, order: ["s-1"], loaded: true });
+  });
+  afterEach(() => {
+    useThreadsStore.setState({ byId: {}, order: [], loaded: false });
+  });
+
+  it("composeLike selects the like composer with the thread's primary for the context", async () => {
+    expect(composeLike("s-gone")).toBe(false);
+    expect(composeLike("s-1")).toBe(true);
+    await Promise.resolve();
+    const sel = useUiStore.getState().selection;
+    expect(sel).toEqual({ kind: "compose", projectId: "repo-gp", likeThreadId: "s-1" });
+    if (sel.kind !== "compose") throw new Error("not a composer");
+    expect(composeTarget(sel)).toEqual({ kind: "like", threadId: "s-1" });
+  });
+
+  it("the place is the thread itself; another primary only when picked", () => {
+    const target = { kind: "like", threadId: "s-1" } as const;
+    expect(draftPlace(target, getDraft("like:s-1"))).toEqual({ kind: "like", threadId: "s-1", primary: "" });
+    setPrimary("like:s-1", "repo-cf");
+    expect(draftPlace(target, getDraft("like:s-1"))).toEqual({ kind: "like", threadId: "s-1", primary: "repo-cf" });
   });
 });
 
@@ -169,16 +251,16 @@ describe("switchDraftTarget", () => {
     revoke.mockClear();
     URL.revokeObjectURL = revoke;
     useProjectsStore.setState({ byId: { "repo-cf": project("repo-cf"), "repo-gp": project("repo-gp"), "repo-sk": project("repo-sk") }, order: ["repo-cf", "repo-gp", "repo-sk"] });
-    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ projectId: "repo-gp", worktreePath: "/wt/gp" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "", members: [{ projectId: "repo-gp", worktreePath: "" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
     useUiStore.setState({ selection: { kind: "compose", projectId: "repo-cf" } });
   });
 
   it("moves the draft (images kept, not revoked), deletes the old key, shows the new composer focused", async () => {
-    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", alsoIn: ["repo-gp", "repo-sk"], base: "origin/dev" });
+    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", projects: ["repo-cf", "repo-sk"], base: "origin/dev" });
     const seq = useUiStore.getState().composerFocusSeq;
     await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
-    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", alsoIn: ["repo-sk"], base: null, worktree: null });
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", projects: null, base: null, worktree: null });
     expect(getDraft("repo-gp").attachments.map((a) => a.url)).toEqual(["blob:a1"]);
     expect(revoke).not.toHaveBeenCalled();
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp" });
@@ -186,9 +268,9 @@ describe("switchDraftTarget", () => {
   });
 
   it("to a workspace: selects it with its first member for the context", async () => {
-    updateDraft("repo-cf", { text: "hi", alsoIn: ["repo-sk"] });
+    updateDraft("repo-cf", { text: "hi", projects: ["repo-cf", "repo-sk"] });
     await switchDraftTarget(cf, login);
-    expect(getDraft("ws:w-1")).toMatchObject({ text: "hi", alsoIn: [], worktree: { kind: "members" } });
+    expect(getDraft("ws:w-1")).toMatchObject({ text: "hi", projects: null, workspace: null });
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp", workspaceId: "w-1" });
   });
 
@@ -240,9 +322,9 @@ describe("switchDraftTarget", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp" });
   });
 
-  it("to a workspace: Also in tags go too; its members' tags stay", async () => {
+  it("to a workspace: its members' tags stay, the others go", async () => {
     const sk = (projectId: string) => tagToken({ tagKind: "skill", name: "deploy", projectId });
-    updateDraft("repo-cf", { text: `${sk("repo-sk")} ${sk("repo-cf")} ${sk("repo-gp")}`, alsoIn: ["repo-sk", "repo-gp"] });
+    updateDraft("repo-cf", { text: `${sk("repo-sk")} ${sk("repo-cf")} ${sk("repo-gp")}`, projects: ["repo-cf", "repo-sk", "repo-gp"] });
     const p = switchDraftTarget(cf, login);
     expect(useConfirmStore.getState().pending).toMatchObject({ title: "Switch to login?", message: "2 references to sk and cf in your text will be removed." });
     answerConfirm(true);
@@ -251,14 +333,21 @@ describe("switchDraftTarget", () => {
   });
 
   it("to no project: the home draft, selected without a project; and back to a project", async () => {
-    updateDraft("repo-cf", { text: "hi", alsoIn: ["repo-gp"], model: "haiku" });
+    updateDraft("repo-cf", { text: "hi", projects: ["repo-cf", "repo-gp"], model: "haiku" });
     await expect(switchDraftTarget(cf, { kind: "home" })).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
-    expect(getDraft(HOME_KEY)).toMatchObject({ text: "hi", alsoIn: [], model: "haiku" });
+    expect(getDraft(HOME_KEY)).toMatchObject({ text: "hi", projects: null, model: "haiku" });
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "", noProject: true });
     await expect(switchDraftTarget({ kind: "home" }, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts[HOME_KEY]).toBeUndefined();
     expect(getDraft("repo-gp")).toMatchObject({ text: "hi", worktree: null });
+  });
+
+  it("from no project, a project row moves the draft (toggleDraftProject)", async () => {
+    updateDraft(HOME_KEY, { text: "hi" });
+    await expect(toggleDraftProject({ kind: "home" }, "repo-gp")).resolves.toBe(true);
+    expect(getDraft("repo-gp").text).toBe("hi");
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp" });
   });
 
   it("to no project with project tags: removed only after the confirm, which names No project", async () => {
@@ -274,8 +363,8 @@ describe("switchDraftTarget", () => {
   });
 
   it("no dropped tags: no tag confirm", async () => {
-    const sk = tagToken({ tagKind: "skill", name: "deploy", projectId: "repo-sk" });
-    updateDraft("repo-cf", { text: `${sk} now`, alsoIn: ["repo-sk"] });
+    const sk = tagToken({ tagKind: "skill", name: "deploy", projectId: "repo-gp" });
+    updateDraft("repo-cf", { text: `${sk} now` });
     await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
     expect(useConfirmStore.getState().pending).toBeNull();
     expect(getDraft("repo-gp").text).toBe(`${sk} now`);

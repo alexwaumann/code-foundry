@@ -37,6 +37,10 @@ with a `workspaces-v2-<n>-*.md` note.
   links, the managed dir and the workspace's instructions at every spawn, `thread new
   --workspace`, `workspace new/list/add-project/remove-project/rename/set-primary/remove`,
   migration 0048) on `cf/workspaces-v2-workspaces`: `docs/notes/workspaces-v2-2-workspaces.md`.
+* PR 3 (GUI: the composer's project set with chips by id, the Runs in primary picker and
+  collision hints; Save as workspace with `ThreadService.SetWorkspace` / `thread.workspace`;
+  sidebar and Threads tab line 2 for multi-project threads; "New thread on this branch",
+  `thread.new-like`) on `cf/workspaces-v2-composer`: `docs/notes/workspaces-v2-3-composer.md`.
 * PR 4 (GUI: Projects page workspace cards and New workspace dialog, `Workspace.instructions`
   and `.skills` read from the managed dir, `workspace.reveal`, the remove confirm by kind, the
   Worktree tab's Also in list over `ThreadService.Checkouts`; the Workspace surface and

@@ -5,6 +5,7 @@ import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
+import { useWorkspacesStore } from "@/stores/workspaces";
 import { ThreadTitle } from "./ThreadParts";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
@@ -13,7 +14,7 @@ vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/ke
 const cmd = (name: string): CommandView => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "Fix the stale PR badge", projectId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
+  ({ id: "s-1", name: "Fix the stale PR badge", projectId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", projectIds: ["cf"], branch: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
 
 type Worktree = { path: string; branch: string; head: string; isMain?: boolean };
 function project(name: string, worktrees: Worktree[], git = true) {
@@ -115,6 +116,20 @@ describe("ThreadTitle", () => {
     expect(location().querySelector("svg.lucide-house")).not.toBeNull();
     expect(screen.queryByTestId("thread-branch")).toBeNull();
     expect(screen.queryByTestId("thread-worktree-chip")).toBeNull();
+  });
+
+  it("a thread in its workspace's folder: the workspace's name, its branch only in worktree mode; never the folder's id", () => {
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "shop", members: ["cf", "api"] } as never }, order: ["w-1"] });
+    const ws = { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", workspaceId: "w-1", projectIds: ["api", "cf"] };
+    useThreadsStore.setState({ byId: { "s-1": thread(ws) } });
+    render(<ThreadTitle id="s-1" />);
+    expect(screen.getByTestId("thread-project").textContent).toBe("shop");
+    expect(screen.queryByTestId("thread-branch")).toBeNull();
+    cleanup();
+    useThreadsStore.setState({ byId: { "s-1": thread({ ...ws, createdWorktree: true, branch: "feat/x" }) } });
+    render(<ThreadTitle id="s-1" />);
+    expect(location().textContent).toBe("shop@feat/x");
+    expect(location().querySelector("svg.lucide-layers")).not.toBeNull();
   });
 
   it("an unnamed thread shows its id", () => {
