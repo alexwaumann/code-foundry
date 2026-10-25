@@ -311,7 +311,7 @@ func TestRender(t *testing.T) {
 	}
 	// Its description names the words of the prompts that loaded no skill.
 	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running"} {
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running", "their work"} {
 		if !strings.Contains(entryDesc, w) {
 			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}
