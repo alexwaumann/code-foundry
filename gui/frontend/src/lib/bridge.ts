@@ -46,7 +46,7 @@ export type PageMessage =
   | { kind: "on"; id: CallId; source: string }
   | { kind: "off"; id: CallId }
   | { kind: "hello" }
-  | { kind: "bad"; id: CallId; message: string };
+  | { kind: "bad"; id: CallId; call: string; message: string };
 
 function callId(v: unknown): CallId | null {
   if (typeof v === "string" && v !== "") return v;
@@ -65,28 +65,50 @@ export function parsePageMessage(data: unknown): PageMessage | null {
   if (id === null) return null;
   if (m.type === "cf:off") return { kind: "off", id };
   if (m.type === "cf:on") {
-    if (typeof m.source !== "string" || m.source === "") return { kind: "bad", id, message: "cf:on needs a source" };
+    if (typeof m.source !== "string" || m.source === "") return { kind: "bad", id, call: "cf.on", message: "cf:on needs a source" };
     return { kind: "on", id, source: m.source };
   }
-  if (typeof m.verb !== "string" || m.verb.trim() === "") return { kind: "bad", id, message: "cf:run needs a verb" };
+  if (typeof m.verb !== "string" || m.verb.trim() === "") return { kind: "bad", id, call: "cf.run", message: "cf:run needs a verb" };
+  const verb = m.verb.trim();
   const raw: unknown = m.args ?? {};
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { kind: "bad", id, message: "cf:run args must be an object of strings" };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { kind: "bad", id, call: verb, message: "cf:run args must be an object of strings" };
   const args: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {
-    if (typeof v !== "string") return { kind: "bad", id, message: `cf:run arg ${k} must be a string` };
+    if (typeof v !== "string") return { kind: "bad", id, call: verb, message: `cf:run arg ${k} must be a string` };
     args[k] = v;
   }
-  return { kind: "run", id, verb: m.verb.trim(), args };
+  return { kind: "run", id, verb, args };
 }
 
+/** Where a page's calls run: its thread, and the checkout that thread works in (its cwd). */
+export interface PagePlace {
+  threadId: string;
+  /** The thread's worktree path ($HOME for a thread without a project); "" when unknown. */
+  cwd: string;
+}
+
+/** The arg a verb that starts a thread moves every window with (`--focus`, default true). */
+const FOCUS_ARG = "focus";
+
 /**
- * The args the CLI inside the thread would send: every arg that defaults to
- * `$CODE_FOUNDRY_THREAD` (ArgSpec.default_to_thread_env) gets the thread's id when the
- * page did not pass it. An explicit "" stays, as `--flag=` opts out on the CLI.
+ * The args the CLI inside the thread would send, for every arg the page did not pass:
+ * - one that defaults to `$CODE_FOUNDRY_THREAD` (ArgSpec.default_to_thread_env) gets the
+ *   thread's id;
+ * - one that defaults to the CLI's working directory (default_to_cwd) gets the thread's
+ *   checkout, where its CLI runs;
+ * - and one deviation: a verb whose `focus` defaults to true (one that starts a thread and
+ *   moves every window to it) gets "false", so a page never takes the user's view, nor
+ *   unmounts itself mid-handler, unless it passes `focus: true` (docs/notes/bridge-fix-c-gui.md).
+ * An explicit "" stays, as `--flag=` opts out on the CLI.
  */
-export function fillThreadArgs(args: Readonly<Record<string, string>>, specs: readonly ArgSpecView[], threadId: string): Record<string, string> {
+export function fillPageArgs(args: Readonly<Record<string, string>>, specs: readonly ArgSpecView[], place: PagePlace): Record<string, string> {
   const out = { ...args };
-  for (const a of specs) if (a.defaultToThreadEnv && !(a.name in out)) out[a.name] = threadId;
+  for (const a of specs) {
+    if (a.name in out) continue;
+    if (a.defaultToThreadEnv) out[a.name] = place.threadId;
+    else if (a.defaultToCwd && place.cwd) out[a.name] = place.cwd;
+    else if (a.name === FOCUS_ARG && a.type === "bool" && a.defaultValue === "true") out[a.name] = "false";
+  }
   return out;
 }
 

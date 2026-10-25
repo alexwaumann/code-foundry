@@ -2,7 +2,7 @@
  * The host side of the bridge (docs/notes/bridge-2-gui.md): one per mounted HtmlFrame. A
  * page shown in a thread asks through `/cf/bridge.js`; this answers. `cf:run` becomes
  * CommandService.Invoke with the context and args the CLI inside the owning thread would
- * send (pageContext, fillThreadArgs); `cf:on` forwards one of the GUI's own slices (stores/bridgeSources.ts),
+ * send (pageContext, fillPageArgs); `cf:on` forwards one of the GUI's own slices (stores/bridgeSources.ts),
  * so a page never talks to the API and never opens a stream. The message shapes are
  * lib/bridge.ts's.
  *
@@ -15,18 +15,20 @@ import { listCommands, type CommandView, type UiContextView } from "@/api/comman
 import { bridgeErrorOf } from "@/api/bridge";
 import {
   errorResult,
-  fillThreadArgs,
+  fillPageArgs,
   isBridgeSource,
   jsonSafe,
   NO_THREAD,
   okResult,
   parsePageMessage,
   readyMessage,
+  type BridgeError,
   type CallId,
   type EventMessage,
   type ReadyMessage,
   type ResultMessage,
 } from "@/lib/bridge";
+import { REPORTED_CODES, type PageError } from "@/lib/pageErrors";
 import { publishedTheme } from "@/lib/theme";
 import { bridgeSources } from "./bridgeSources";
 import { invokeConfirmed } from "./commands";
@@ -77,6 +79,11 @@ export interface BridgeFrame {
   pageName: string;
   /** Posts to the frame's window. */
   post: (msg: HostMessage) => void;
+  /**
+   * Hears each error the page is answered with whose code the strip reports
+   * (lib/pageErrors.ts REPORTED_CODES), for the current document only.
+   */
+  onError?: (e: Omit<PageError, "count">) => void;
 }
 
 export function createBridgeHost(frame: BridgeFrame): BridgeHost {
@@ -97,6 +104,13 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     frame.post(msg);
   };
   if (dev) dev.hosts++;
+
+  /** Answers a call with an error, and reports it when the strip shows such errors. */
+  const fail = (forDoc: number, id: CallId, call: string, error: BridgeError, declined?: { message: string; resultJson: string } | null) => {
+    if (disposed || forDoc !== doc) return;
+    post(forDoc, errorResult(id, error, declined));
+    if (REPORTED_CODES.has(error.code)) frame.onError?.({ call, code: error.code, message: error.message, atMs: Date.now() });
+  };
 
   const listed = (): Promise<readonly CommandView[]> => {
     if (threadId === null) return Promise.resolve([]);
@@ -150,7 +164,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
 
   const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>) => {
     if (threadId === null) {
-      post(forDoc, errorResult(id, NO_THREAD));
+      fail(forDoc, id, verb, NO_THREAD);
       return;
     }
     const asked = { declined: false };
@@ -159,7 +173,8 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
         (cmds) => cmds.find((c) => c.name === verb),
         () => undefined,
       );
-      const callArgs = spec ? fillThreadArgs(args, spec.args, threadId) : args;
+      const cwd = useThreadsStore.getState().byId[threadId]?.worktreePath ?? "";
+      const callArgs = spec ? fillPageArgs(args, spec.args, { threadId, cwd }) : args;
       const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
         around: async (ask) => {
           const yes = await queued(forDoc, ask);
@@ -167,10 +182,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
           return yes;
         },
       });
-      if (asked.declined) post(forDoc, errorResult(id, { code: "declined", message: "the user declined" }, res));
+      if (asked.declined) fail(forDoc, id, verb, { code: "declined", message: "the user declined" }, res);
       else post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
     } catch (err) {
-      post(forDoc, errorResult(id, bridgeErrorOf(err)));
+      fail(forDoc, id, verb, bridgeErrorOf(err));
     }
   };
 
@@ -183,16 +198,22 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   };
 
   const on = (forDoc: number, id: CallId, source: string) => {
+    const call = `cf.on("${source}")`;
     if (threadId === null) {
-      post(forDoc, errorResult(id, NO_THREAD));
+      fail(forDoc, id, call, NO_THREAD);
       return;
     }
     if (!isBridgeSource(source)) {
-      post(forDoc, errorResult(id, { code: "invalid", message: `no source ${source}` }));
+      fail(forDoc, id, call, { code: "invalid", message: `no source ${source}` });
       return;
     }
     unsubscribe(id);
     const spec = bridgeSources[source];
+    const why = spec.unavailable?.() ?? null;
+    if (why !== null) {
+      fail(forDoc, id, call, { code: "unavailable", message: why });
+      return;
+    }
     const send = (event: unknown) => {
       post(forDoc, { type: "cf:event", id, source, event: jsonSafe(event) });
     };
@@ -250,7 +271,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
           unsubscribe(m.id);
           return;
         case "bad":
-          post(forDoc, errorResult(m.id, { code: "invalid", message: m.message }));
+          fail(forDoc, m.id, m.call, { code: "invalid", message: m.message });
           return;
       }
     },

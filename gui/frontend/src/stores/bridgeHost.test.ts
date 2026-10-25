@@ -19,12 +19,19 @@ vi.mock("@/api/command", async (orig) => ({
   confirmationOf: (err: unknown) => (err instanceof NeedsConfirm ? err.confirm : null),
 }));
 const { createBridgeHost, BRIDGE_DEBOUNCE_MS } = await import("./bridgeHost");
+const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
 const cmd = (name: string, over: Partial<CommandView> = {}): CommandView => ({ name, title: name, description: "", category: "Thread", args: [], keybindings: [], available: true, ...over });
 const commands = [
   cmd("thread.list", { readOnly: true }),
   cmd("ui.notify"),
-  cmd("thread.new", { args: [{ name: "created-by", type: "string", required: false, description: "", enumValues: [], defaultValue: "", defaultToThreadEnv: true }] }),
+  cmd("thread.new", {
+    args: [
+      { name: "created-by", type: "string", required: false, description: "", enumValues: [], defaultValue: "", defaultToThreadEnv: true },
+      { name: "focus", type: "bool", required: false, description: "", enumValues: [], defaultValue: "true" },
+    ],
+  }),
+  cmd("workspace.members", { args: [{ name: "cwd", type: "path", required: false, description: "", enumValues: [], defaultValue: "", defaultToCwd: true }] }),
   cmd("thread.archive", { requiresConfirmation: true }),
 ];
 const archiveConfirm = new NeedsConfirm({ command: "thread.archive", title: "Archive or Unarchive Thread", message: "Archive thread Fix? It is working." });
@@ -33,8 +40,9 @@ const thread = (id: string, name: string): ThreadView => ({ id, name, projectId:
 
 function host(threadId: string | null = "t-1") {
   const posts: Record<string, unknown>[] = [];
-  const h = createBridgeHost({ threadId, pageName: "page.html", post: (m) => posts.push(m as unknown as Record<string, unknown>) });
-  return { h, posts };
+  const errors: { call: string; code: string; message: string }[] = [];
+  const h = createBridgeHost({ threadId, pageName: "page.html", post: (m) => posts.push(m as unknown as Record<string, unknown>), onError: (e) => errors.push(e) });
+  return { h, posts, errors };
 }
 
 const run = (id: string, verb: string, args: Record<string, string> = {}) => ({ cf: 1, type: "cf:run", id, verb, args });
@@ -70,7 +78,48 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts.find((p) => p.type === "cf:result")).toEqual({ type: "cf:result", id: "r1", ok: true, result: { text: "started", json: { id: "t-2" } } });
     });
-    expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "t-1" }), { prompt: "hi", "created-by": "t-1" });
+    // focus=false: a page's thread.new does not move the view (unless the page passes focus).
+    expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "t-1" }), { prompt: "hi", "created-by": "t-1", focus: "false" });
+  });
+
+  it("sends the thread's checkout for an arg that defaults to the CLI's cwd", async () => {
+    invokeCommand.mockResolvedValue({ message: "", resultJson: "" });
+    useThreadsStore.setState({ byId: { "t-1": { ...thread("t-1", "Fix"), worktreePath: "/wt/app" } } });
+    const { h, posts } = host();
+    h.receive(run("r1", "workspace.members"));
+    await vi.waitFor(() => {
+      expect(posts.find((p) => p.type === "cf:result")).toMatchObject({ ok: true });
+    });
+    expect(invokeCommand).toHaveBeenCalledWith("workspace.members", expect.anything(), { cwd: "/wt/app" });
+  });
+
+  it("reports the errors the strip counts, not a decline", async () => {
+    invokeCommand.mockRejectedValueOnce(new ConnectError('unknown argument "headSha"', Code.InvalidArgument));
+    const { h, posts, errors } = host();
+    h.receive(run("r1", "ui.notify", { headSha: "x" }));
+    h.receive({ cf: 1, type: "cf:on", id: "s1", source: "nope" });
+    await vi.waitFor(() => {
+      expect(errors).toHaveLength(2);
+    });
+    expect(errors[0]).toMatchObject({ call: 'cf.on("nope")', code: "invalid", message: "no source nope" });
+    expect(errors[1]).toMatchObject({ call: "ui.notify", code: "invalid" });
+    invokeCommand.mockRejectedValueOnce(archiveConfirm);
+    h.receive(run("a", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    answerConfirm(false);
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ id: "a", error: { code: "declined" } });
+    });
+    expect(errors).toHaveLength(2);
+  });
+
+  it("refuses ember while nothing on screen holds the board", () => {
+    const { h, posts, errors } = host();
+    h.receive({ cf: 1, type: "cf:on", id: "e1", source: "ember" });
+    expect(posts).toEqual([{ type: "cf:result", id: "e1", ok: false, error: { code: "unavailable", message: EMBER_OFF_SCREEN } }]);
+    expect(errors).toHaveLength(1);
   });
 
   it("maps the daemon's errors", async () => {
