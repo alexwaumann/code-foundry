@@ -90,16 +90,27 @@ type ShowHTMLOptions struct {
 	Panel bool
 }
 
+// ShowHTMLResult is what ShowHTML did.
+type ShowHTMLResult struct {
+	// Item is the card added, or the one reused.
+	Item Item
+	// Reused: the page's card was still live, so none was added.
+	Reused bool
+	// Earlier is, when a card was added, the id of an older card of the same page (shown
+	// before the user's last message); "" when none.
+	Earlier string
+}
+
 // ShowHTML implements Store: it appends an html item for path to thread id, on the
 // runner's goroutine while it runs (inside the running turn: the model calls it from a
 // tool), else straight onto the stopped thread's log. Unless o.Again, a page already
 // shown since the thread's last user message (with o.Panel, at all) is not shown twice:
-// that card (shownHTML) is returned with reused set, its title changed when title is
+// that card (shownHTML) is the result's, with Reused set, its title changed when title is
 // given, and the GUI has already reloaded it for the edit
 // (docs/notes/bridge-fix-c-daemon.md).
-func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (Item, bool, error) {
+func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (ShowHTMLResult, error) {
 	var abs string
-	reused := false
+	var res ShowHTMLResult
 	it, err := m.verbItem(ctx, id, func(s Thread) (Item, error) {
 		cwd := s.WorktreePath
 		if cwd == "" {
@@ -112,14 +123,14 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHT
 		abs = filepath.Clean(path)
 		return Item{Kind: KindHTML, HTML: page}, nil
 	}, func(w itemWriter) (Item, bool) {
-		if o.Again {
-			return Item{}, false
-		}
 		prev, ok := w.log.shownHTML(abs, o.Panel)
-		if !ok {
+		if !ok || o.Again {
+			if older, ok := w.log.shownHTML(abs, true); ok {
+				res.Earlier = older.ID
+			}
 			return Item{}, false
 		}
-		reused = true
+		res.Reused = true
 		if t := strings.TrimSpace(title); t != "" && t != prev.HTML.Title {
 			if got, ok := w.change(prev.ID, func(it *Item) { it.HTML = &HTMLPage{Path: it.HTML.Path, Title: t, BaseDir: it.HTML.BaseDir} }); ok {
 				return got, true
@@ -127,7 +138,8 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHT
 		}
 		return prev, true
 	})
-	return it, reused, err
+	res.Item = it
+	return res, err
 }
 
 // shownHTML is the newest html item showing the page at abs since the last message the

@@ -955,6 +955,9 @@ message ShowThreadHtmlResponse {
   // at all), so no card was added: item is that card (its title updated when one was
   // given). The GUI reloads a page's card when its file changes.
   bool reused = 2;
+  // When a card was added: an older card of the same page in the thread (shown before
+  // the last user message), which reloaded with the edit too; "" when none.
+  string earlier_item_id = 3;
 }
 
 message ShowThreadThemeRequest {

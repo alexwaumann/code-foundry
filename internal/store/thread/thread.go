@@ -614,9 +614,9 @@ type Store interface {
 	// the thread's current position, inside the running turn when one is live. path must
 	// be an absolute path to a regular .html or .htm file under home
 	// (ErrInvalidArgument; ErrNotFound when missing). A page shown since the thread's
-	// last user message is not added twice (ShowHTMLOptions): reused, and the item is
+	// last user message is not added twice (ShowHTMLOptions): Reused, and the item is
 	// that card's.
-	ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (item Item, reused bool, err error)
+	ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (ShowHTMLResult, error)
 	// ShowTheme puts a theme card in the conversation (theme.go), where ShowHTML puts a
 	// page: the file as the thread saved it (ErrInvalidArgument when it does not
 	// validate), whether the save applied it, and the slot's theme before.

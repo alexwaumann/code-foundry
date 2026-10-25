@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -26,6 +27,7 @@ func TestViewInline(t *testing.T) {
 		args      map[string]string
 		contents  string // the page's ("" for good)
 		shown     bool   // the page's card is still live (commandtest.Thread.PageShown)
+		earlier   string // an older card of the page (commandtest.Thread.PageEarlier)
 		windows   int
 		wantReq   *v1.ShowThreadHtmlRequest
 		wantMsg   string
@@ -92,14 +94,23 @@ func TestViewInline(t *testing.T) {
 			wantMsg:  "shown docs/page.html in thread Usage week"},
 		{name: "a page still live: no second card", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1, shown: true,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
-			wantMsg: "updated the page already shown in thread Usage week (docs/page.html): its card reloads after every edit, so no card was added; " +
-				"run view.inline only for a new file (--again adds a second card)"},
+			wantMsg: "updated the page already shown in thread Usage week (docs/page.html): its card reloads after every edit, so the user sees " +
+				"the change there and no card was added; run view.inline only for a new file"},
 		{name: "--again: a second card", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "again": "true"}, windows: 1, shown: true,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Again: true},
 			wantMsg: "shown docs/page.html in thread Usage week"},
 		{name: "--panel on a page shown before: the panel only", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 1, shown: true,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
 			wantMsg: "opened docs/page.html in thread Usage week's side panel; it was shown inline before, so no card was added", wantPanel: true},
+		{name: "shown in an earlier turn: a card, and a warning", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1, earlier: "html-0",
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg: "shown docs/page.html in thread Usage week", wantWarn: []string{fmt.Sprintf(command.WarnShownBefore, "html-0")}},
+		{name: "--again: a second card on purpose, no warning", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "again": "true"}, windows: 1, earlier: "html-0",
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Again: true},
+			wantMsg: "shown docs/page.html in thread Usage week"},
+		{name: "--panel on a page shown before, no window", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 0, shown: true,
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
+			wantMsg: "docs/page.html is already shown inline in thread Usage week, so no card was added; not opened in its side panel (" + command.NoWindowMessage + ")", wantPanel: true},
 		{name: "the CLI outside a thread", uctx: command.Context{}, args: map[string]string{"path": "/wt/docs/page.html"}, argErr: "thread"},
 		{name: "the caller's thread", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
@@ -117,7 +128,7 @@ func TestViewInline(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			th := &commandtest.Thread{Current: named, PageShown: tt.shown}
+			th := &commandtest.Thread{Current: named, PageShown: tt.shown, PageEarlier: tt.earlier}
 			contents := tt.contents
 			if contents == "" {
 				contents = good

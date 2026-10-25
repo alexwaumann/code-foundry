@@ -61,6 +61,9 @@ const (
 		"(merging a PR, archiving a busy thread); remove it"
 	WarnReservedArg = "page passes yes or force to cf.run: leave them out; the app's dialog asks the user when a " +
 		"verb needs it (yes is refused)"
+	// WarnShownBefore takes the earlier card's item id.
+	WarnShownBefore = "this page was already shown in this thread (%s), and that card reloaded with your edit: " +
+		"this second card runs the page again; after an edit, do not run view.inline for the same file"
 )
 
 var (
@@ -160,7 +163,7 @@ func (d ViewDeps) inlineCommand() Command {
 				Description: "The .html or .htm file, under the home directory"},
 			{Name: "title", Type: String, Description: "Shown on its row"},
 			{Name: "panel", Type: Bool, Description: "Also open it in the thread's side panel (no inline card when the page was shown in the thread before)"},
-			{Name: "again", Type: Bool, Description: "A second card even when this page's card is still live; without it, a page shown since the user's last message is not shown twice (its card reloads after every edit)"},
+			{Name: "again", Type: Bool, Description: "A second copy of a page whose card is still live, only when the user asked for two; without it, a page shown since the user's last message is not shown twice (its card reloads after every edit)"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread to show it in (default: yours)"},
 		},
@@ -190,11 +193,16 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 	it := res.Msg.GetItem()
 	out := InlineResult{Thread: id, Item: it.GetId(), Path: nonEmptyStr(it.GetHtml().GetPath(), a.Path("path")), Reused: res.Msg.GetReused()}
 	out.Warnings = d.pageWarnings(ctx, it.GetHtml().GetBaseDir(), a.Path("path"))
+	if e := res.Msg.GetEarlierItemId(); e != "" && !a.Bool("again") {
+		// Shown in an earlier turn: that card reloaded with the edit too, and both run the
+		// page now (docs/notes/bridge-fix-c-daemon.md).
+		out.Warnings = append(out.Warnings, fmt.Sprintf(WarnShownBefore, e))
+	}
 	msg := fmt.Sprintf("shown %s in thread %s", out.Path, name)
 	if out.Reused {
 		// The edit already reloaded that card (docs/notes/bridge-fix-c-daemon.md).
-		msg = fmt.Sprintf("updated the page already shown in thread %s (%s): its card reloads after every edit, so no card was added; "+
-			"run view.inline only for a new file (--again adds a second card)", name, out.Path)
+		msg = fmt.Sprintf("updated the page already shown in thread %s (%s): its card reloads after every edit, so the user sees "+
+			"the change there and no card was added; run view.inline only for a new file", name, out.Path)
 	}
 	if a.Bool("panel") {
 		pr, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, d.fileCheck)
@@ -204,10 +212,13 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		if p, ok := pr.JSON.(PanelResult); ok {
 			out.Panel = &p
 			switch {
-			case p.Windows == 0:
-				msg += " (" + NoWindowMessage + ")"
+			case out.Reused && p.Windows == 0:
+				msg = fmt.Sprintf("%s is already shown inline in thread %s, so no card was added; not opened in its side panel (%s)",
+					out.Path, name, NoWindowMessage)
 			case out.Reused:
 				msg = fmt.Sprintf("opened %s in thread %s's side panel; it was shown inline before, so no card was added", out.Path, name)
+			case p.Windows == 0:
+				msg += " (" + NoWindowMessage + ")"
 			default:
 				msg += " and in its side panel"
 			}

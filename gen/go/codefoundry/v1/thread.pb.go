@@ -4754,7 +4754,10 @@ type ShowThreadHtmlResponse struct {
 	// The page was already shown in this thread since its last user message (with panel,
 	// at all), so no card was added: item is that card (its title updated when one was
 	// given). The GUI reloads a page's card when its file changes.
-	Reused        bool `protobuf:"varint,2,opt,name=reused,proto3" json:"reused,omitempty"`
+	Reused bool `protobuf:"varint,2,opt,name=reused,proto3" json:"reused,omitempty"`
+	// When a card was added: an older card of the same page in the thread (shown before
+	// the last user message), which reloaded with the edit too; "" when none.
+	EarlierItemId string `protobuf:"bytes,3,opt,name=earlier_item_id,json=earlierItemId,proto3" json:"earlier_item_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4801,6 +4804,13 @@ func (x *ShowThreadHtmlResponse) GetReused() bool {
 		return x.Reused
 	}
 	return false
+}
+
+func (x *ShowThreadHtmlResponse) GetEarlierItemId() string {
+	if x != nil {
+		return x.EarlierItemId
+	}
+	return ""
 }
 
 type ShowThreadThemeRequest struct {
@@ -5629,10 +5639,11 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x14\n" +
 	"\x05again\x18\x04 \x01(\bR\x05again\x12\x14\n" +
-	"\x05panel\x18\x05 \x01(\bR\x05panel\"`\n" +
+	"\x05panel\x18\x05 \x01(\bR\x05panel\"\x88\x01\n" +
 	"\x16ShowThreadHtmlResponse\x12.\n" +
 	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\x12\x16\n" +
-	"\x06reused\x18\x02 \x01(\bR\x06reused\"f\n" +
+	"\x06reused\x18\x02 \x01(\bR\x06reused\x12&\n" +
+	"\x0fearlier_item_id\x18\x03 \x01(\tR\rearlierItemId\"f\n" +
 	"\x16ShowThreadThemeRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12/\n" +
 	"\x05theme\x18\x02 \x01(\v2\x19.codefoundry.v1.ThemeItemR\x05theme\"I\n" +

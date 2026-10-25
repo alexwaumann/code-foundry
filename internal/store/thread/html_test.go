@@ -86,19 +86,21 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := e.connected(CreateOptions{NoProject: true})
-	live, _, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Hello", ShowHTMLOptions{})
+	res, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Hello", ShowHTMLOptions{})
+	live := res.Item
 	if err != nil {
 		t.Fatal(err)
 	}
 	if live.Kind != KindHTML || live.HTML == nil || live.HTML.Path != "hello.html" || live.HTML.BaseDir != e.home || live.HTML.Title != "Hello" {
 		t.Fatalf("live item = %+v (html %+v)", live, live.HTML)
 	}
-	if _, _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), "", ShowHTMLOptions{}); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
+	if _, err := e.m.ShowHTML(e.ctx(), s.ID, filepath.Join(e.home, "nope.html"), "", ShowHTMLOptions{}); !errors.Is(err, ErrNotFound) || strings.Contains(err.Error(), "thread") || !strings.HasPrefix(err.Error(), "no file at ") {
 		t.Fatalf("missing file: err = %v, want ErrNotFound saying no file at the path", err)
 	}
 	e.restart()
 	// again: a second card on purpose (the first is still live: no user message since).
-	stopped, _, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
+	res, err = e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
+	stopped := res.Item
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +121,7 @@ func TestShowHTMLLiveStoppedAndRestart(t *testing.T) {
 	if len(got) != 2 || got[0].ID != live.ID || got[1].ID != stopped.ID || got[0].HTML.Title != "Hello" || got[1].HTML.Path != "hello.html" {
 		t.Fatalf("reloaded html items = %+v", got)
 	}
-	if _, _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, "", ShowHTMLOptions{}); err == nil {
+	if _, err := e.m.ShowHTML(e.ctx(), "s-000000000000", page, "", ShowHTMLOptions{}); err == nil {
 		t.Fatal("unknown thread: no error")
 	}
 }
@@ -165,7 +167,8 @@ func TestPageOutsideATurnEndsNoTurn(t *testing.T) {
 			if err := os.WriteFile(page, []byte("<p>hi</p>"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			it, _, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
+			res, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
+			it := res.Item
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,21 +249,21 @@ func TestShowHTMLReusesTheLiveCard(t *testing.T) {
 			} else {
 				s = e.create(CreateOptions{NoProject: true})
 			}
-			first, reused, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Tracker", ShowHTMLOptions{})
-			if err != nil || reused {
-				t.Fatalf("first: reused %t, err %v", reused, err)
+			first, err := e.m.ShowHTML(e.ctx(), s.ID, page, "Tracker", ShowHTMLOptions{})
+			if err != nil || first.Reused || first.Earlier != "" {
+				t.Fatalf("first: %+v, err %v", first, err)
 			}
-			again, reused, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
-			if err != nil || !reused || again.ID != first.ID || again.HTML.Title != "Tracker" {
-				t.Fatalf("second: %+v reused %t err %v; want the first card, title kept", again, reused, err)
+			again, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{})
+			if err != nil || !again.Reused || again.Item.ID != first.Item.ID || again.Item.HTML.Title != "Tracker" {
+				t.Fatalf("second: %+v err %v; want the first card, title kept", again, err)
 			}
-			renamed, reused, err := e.m.ShowHTML(e.ctx(), s.ID, page, "PR tracker", ShowHTMLOptions{})
-			if err != nil || !reused || renamed.ID != first.ID || renamed.HTML.Title != "PR tracker" || renamed.HTML.Path != "p.html" {
-				t.Fatalf("renamed: %+v reused %t err %v", renamed, reused, err)
+			renamed, err := e.m.ShowHTML(e.ctx(), s.ID, page, "PR tracker", ShowHTMLOptions{})
+			if err != nil || !renamed.Reused || renamed.Item.ID != first.Item.ID || renamed.Item.HTML.Title != "PR tracker" || renamed.Item.HTML.Path != "p.html" {
+				t.Fatalf("renamed: %+v err %v", renamed, err)
 			}
-			extra, reused, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
-			if err != nil || reused || extra.ID == first.ID {
-				t.Fatalf("again: %+v reused %t err %v; want a new card", extra, reused, err)
+			extra, err := e.m.ShowHTML(e.ctx(), s.ID, page, "", ShowHTMLOptions{Again: true})
+			if err != nil || extra.Reused || extra.Item.ID == first.Item.ID || extra.Earlier != first.Item.ID {
+				t.Fatalf("again: %+v err %v; want a new card naming the first", extra, err)
 			}
 			snap, err := e.m.Items(e.ctx(), s.ID)
 			if err != nil {

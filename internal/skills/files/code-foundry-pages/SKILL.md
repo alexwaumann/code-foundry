@@ -149,7 +149,7 @@ Plain `localStorage` is cleared when the app quits, so keep nothing there.
 
 Run `code-foundry view.inline <path> --title "<what it is>"` once per file; fix every
 warning it prints by editing the file in place: the card shown reloads by itself, so never
-run view.inline for that file again (`--panel` opens it beside the thread). Reply in two or
-three sentences: what it shows, what each button does, that the app asks before merging or
-archiving; for "track" or "watch", that it updates only while shown (offer a wake). You
-have not clicked anything: never say it worked.
+run view.inline for that file again, not even for "show me" after an edit (`--panel` opens
+it beside the thread). Reply in two or three sentences: what it shows, what each button
+does, that the app asks before merging or archiving; for "track" or "watch", that it
+updates only while shown (offer a wake). You have not clicked anything: never say it worked.
