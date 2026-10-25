@@ -213,6 +213,7 @@ import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
 import { publishMockTheme, themeRoute } from "./theme";
+import { bridgeRoute } from "./bridge";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
@@ -1464,9 +1465,10 @@ const server = createServer((req, res) => {
     res.end("404 page not found\n");
     return;
   }
-  // The frame stylesheet needs no credential, like the daemon's (internal/theme/frame.go).
+  // The frame stylesheet and the bridge script need no credential, like the daemon's
+  // (internal/theme/frame.go, internal/bridge).
   if (url.pathname.startsWith("/cf/")) {
-    const r = themeRoute(url.pathname);
+    const r = bridgeRoute(url.pathname) ?? themeRoute(url.pathname);
     res.writeHead(r ? 200 : 404, { "Content-Type": r?.type ?? "text/plain", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Access-Control-Allow-Origin": "*" });
     res.end(r?.body ?? "404 page not found\n");
     return;
