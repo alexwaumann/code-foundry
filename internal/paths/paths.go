@@ -158,6 +158,12 @@ func (p Paths) Tmp() string { return filepath.Join(p.home, "tmp") }
 // may serve it (internal/preview floor.go), unlike the rest of the config home.
 func (p Paths) Pages() string { return filepath.Join(p.home, "pages") }
 
+// PageStorage holds one directory per thread, named by its id, with what that thread's
+// pages keep through the bridge's cf.storage (internal/store/thread pagestorage.go).
+// Removed with the thread. Not under Pages: the preview route serves that, and a page's
+// stored values (an API token) are not a page's to fetch as a file.
+func (p Paths) PageStorage() string { return filepath.Join(p.home, "page-storage") }
+
 // Residents holds each resident thread's own directory, its cwd: <Residents>/<name>
 // (internal/store/thread resident.go).
 func (p Paths) Residents() string { return filepath.Join(p.home, "residents") }

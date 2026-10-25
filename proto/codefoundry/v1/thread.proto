@@ -211,6 +211,15 @@ service ThreadService {
   // runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
   // file (InvalidArgument otherwise); nothing is written to the themes directory.
   rpc ShowTheme(ShowThreadThemeRequest) returns (ShowThreadThemeResponse) {}
+  // PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
+  // GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
+  // the daemon, one file per thread, because WebKit keeps a page frame's own
+  // localStorage for the session only. NotFound for an unknown thread.
+  rpc PageStorage(PageStorageRequest) returns (PageStorageResponse) {}
+  // SetPageStorage sets or removes one key of a thread's page storage and returns the
+  // storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
+  // not JSON, or a storage that would grow over 256 KiB (nothing is written then).
+  rpc SetPageStorage(SetPageStorageRequest) returns (SetPageStorageResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -946,6 +955,27 @@ message ShowThreadThemeRequest {
 
 message ShowThreadThemeResponse {
   ThreadItem item = 1;
+}
+
+message PageStorageRequest {
+  string thread_id = 1;
+}
+
+message PageStorageResponse {
+  // Key → the value's JSON text, as the page stored it.
+  map<string, string> values = 1;
+}
+
+message SetPageStorageRequest {
+  string thread_id = 1;
+  string key = 2;
+  // The value's JSON text; unset removes the key.
+  optional string value = 3;
+}
+
+message SetPageStorageResponse {
+  // The thread's page storage after the change.
+  map<string, string> values = 1;
 }
 
 message SlashCommandsRequest {

@@ -619,6 +619,13 @@ type Store interface {
 	// page: the file as the thread saved it (ErrInvalidArgument when it does not
 	// validate), whether the save applied it, and the slot's theme before.
 	ShowTheme(ctx context.Context, id string, card ThemeCard) (Item, error)
+	// PageStorage returns what the thread's pages keep with the bridge's cf.storage
+	// (pagestorage.go): key → the value's JSON text.
+	PageStorage(ctx context.Context, id string) (map[string]string, error)
+	// SetPageStorage sets one key of the thread's page storage to a value's JSON text,
+	// or removes it (value nil), and returns the storage after. ErrInvalidArgument for a
+	// bad key or value, or when the storage would grow over PageStorageMax.
+	SetPageStorage(ctx context.Context, id, key string, value *string) (map[string]string, error)
 
 	// Wake subscriptions (subscriptions.go, docs/notes/agents-4-wake.md).
 

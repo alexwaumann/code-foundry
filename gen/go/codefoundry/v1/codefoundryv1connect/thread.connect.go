@@ -121,6 +121,12 @@ const (
 	ThreadServiceShowHtmlProcedure = "/codefoundry.v1.ThreadService/ShowHtml"
 	// ThreadServiceShowThemeProcedure is the fully-qualified name of the ThreadService's ShowTheme RPC.
 	ThreadServiceShowThemeProcedure = "/codefoundry.v1.ThreadService/ShowTheme"
+	// ThreadServicePageStorageProcedure is the fully-qualified name of the ThreadService's PageStorage
+	// RPC.
+	ThreadServicePageStorageProcedure = "/codefoundry.v1.ThreadService/PageStorage"
+	// ThreadServiceSetPageStorageProcedure is the fully-qualified name of the ThreadService's
+	// SetPageStorage RPC.
+	ThreadServiceSetPageStorageProcedure = "/codefoundry.v1.ThreadService/SetPageStorage"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -319,6 +325,15 @@ type ThreadServiceClient interface {
 	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
 	// file (InvalidArgument otherwise); nothing is written to the themes directory.
 	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
+	// PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
+	// GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
+	// the daemon, one file per thread, because WebKit keeps a page frame's own
+	// localStorage for the session only. NotFound for an unknown thread.
+	PageStorage(context.Context, *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error)
+	// SetPageStorage sets or removes one key of a thread's page storage and returns the
+	// storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
+	// not JSON, or a storage that would grow over 256 KiB (nothing is written then).
+	SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -566,6 +581,18 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
 			connect.WithClientOptions(opts...),
 		),
+		pageStorage: connect.NewClient[v1.PageStorageRequest, v1.PageStorageResponse](
+			httpClient,
+			baseURL+ThreadServicePageStorageProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("PageStorage")),
+			connect.WithClientOptions(opts...),
+		),
+		setPageStorage: connect.NewClient[v1.SetPageStorageRequest, v1.SetPageStorageResponse](
+			httpClient,
+			baseURL+ThreadServiceSetPageStorageProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SetPageStorage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -610,6 +637,8 @@ type threadServiceClient struct {
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
 	showHtml          *connect.Client[v1.ShowThreadHtmlRequest, v1.ShowThreadHtmlResponse]
 	showTheme         *connect.Client[v1.ShowThreadThemeRequest, v1.ShowThreadThemeResponse]
+	pageStorage       *connect.Client[v1.PageStorageRequest, v1.PageStorageResponse]
+	setPageStorage    *connect.Client[v1.SetPageStorageRequest, v1.SetPageStorageResponse]
 }
 
 // Create calls codefoundry.v1.ThreadService.Create.
@@ -805,6 +834,16 @@ func (c *threadServiceClient) ShowHtml(ctx context.Context, req *connect.Request
 // ShowTheme calls codefoundry.v1.ThreadService.ShowTheme.
 func (c *threadServiceClient) ShowTheme(ctx context.Context, req *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
 	return c.showTheme.CallUnary(ctx, req)
+}
+
+// PageStorage calls codefoundry.v1.ThreadService.PageStorage.
+func (c *threadServiceClient) PageStorage(ctx context.Context, req *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error) {
+	return c.pageStorage.CallUnary(ctx, req)
+}
+
+// SetPageStorage calls codefoundry.v1.ThreadService.SetPageStorage.
+func (c *threadServiceClient) SetPageStorage(ctx context.Context, req *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error) {
+	return c.setPageStorage.CallUnary(ctx, req)
 }
 
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
@@ -1003,6 +1042,15 @@ type ThreadServiceHandler interface {
 	// runs from the thread (docs/notes/theme-model-flow.md). The theme must be a valid theme
 	// file (InvalidArgument otherwise); nothing is written to the themes directory.
 	ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error)
+	// PageStorage returns what the thread's pages keep with the bridge's cf.storage: the
+	// GUI host hands it to a page as it loads (docs/notes/bridge-fix-storage.md). Kept by
+	// the daemon, one file per thread, because WebKit keeps a page frame's own
+	// localStorage for the session only. NotFound for an unknown thread.
+	PageStorage(context.Context, *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error)
+	// SetPageStorage sets or removes one key of a thread's page storage and returns the
+	// storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
+	// not JSON, or a storage that would grow over 256 KiB (nothing is written then).
+	SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1246,6 +1294,18 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ShowTheme")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServicePageStorageHandler := connect.NewUnaryHandler(
+		ThreadServicePageStorageProcedure,
+		svc.PageStorage,
+		connect.WithSchema(threadServiceMethods.ByName("PageStorage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceSetPageStorageHandler := connect.NewUnaryHandler(
+		ThreadServiceSetPageStorageProcedure,
+		svc.SetPageStorage,
+		connect.WithSchema(threadServiceMethods.ByName("SetPageStorage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceCreateProcedure:
@@ -1326,6 +1386,10 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceShowHtmlHandler.ServeHTTP(w, r)
 		case ThreadServiceShowThemeProcedure:
 			threadServiceShowThemeHandler.ServeHTTP(w, r)
+		case ThreadServicePageStorageProcedure:
+			threadServicePageStorageHandler.ServeHTTP(w, r)
+		case ThreadServiceSetPageStorageProcedure:
+			threadServiceSetPageStorageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1489,4 +1553,12 @@ func (UnimplementedThreadServiceHandler) ShowHtml(context.Context, *connect.Requ
 
 func (UnimplementedThreadServiceHandler) ShowTheme(context.Context, *connect.Request[v1.ShowThreadThemeRequest]) (*connect.Response[v1.ShowThreadThemeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ShowTheme is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) PageStorage(context.Context, *connect.Request[v1.PageStorageRequest]) (*connect.Response[v1.PageStorageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.PageStorage is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetPageStorage is not implemented"))
 }

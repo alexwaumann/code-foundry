@@ -99,6 +99,11 @@ type Options struct {
 	// as paths.EnvPages and --add-dir, removed with the thread and, for threads that
 	// are gone, at New. Empty: none.
 	PagesRoot string
+	// PageStorageRoot is the directory each thread's page storage is kept under, one
+	// directory per thread id (paths.PageStorage; pagestorage.go): what its pages keep
+	// with cf.storage, removed with the thread and, for threads that are gone, at New.
+	// Empty: the thread's pages cannot store anything.
+	PageStorageRoot string
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a thread reaches it without the Unix socket. Every process also
@@ -309,6 +314,8 @@ type Manager struct {
 	reqs requests
 	// removed are the tombstones of removed threads (tombstones.go).
 	removed tombstones
+	// pageStore serializes reads and writes of the threads' page storage (pagestorage.go).
+	pageStore sync.Mutex
 	// spawnExtras is what every spawn adds (spawnextras.go); nil: nothing.
 	spawnExtras atomic.Pointer[SpawnExtrasFunc]
 	// createDefaults picks the model and effort of threads some threads create
