@@ -28,6 +28,8 @@ import { useThreadsStore } from "./threads";
 
 export const THREAD_COMMANDS = {
   create: "thread.new",
+  newLike: "thread.new-like",
+  setWorkspace: "thread.workspace",
   rename: "thread.rename",
   remove: "thread.remove",
   fork: "thread.fork",

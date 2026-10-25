@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { modelLabel, threadRowModel, type ProjectLookup, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel, threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useMadeByThread } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
@@ -19,6 +19,7 @@ import { renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
+import { useThreadPlace, useThreadPlaceInput } from "@/components/thread/useThreadPlace";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
@@ -80,46 +81,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
   );
 }
 
-const NO_PROJECTS: ProjectLookup = { byId: {} };
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
-
-/** The badge of the workspace that owns the thread; nothing for a project thread. */
-function WorkspaceBadge({ id }: { id: string }) {
-  const s = useThreadsStore(
-    useShallow((st) => {
-      const x = st.byId[id];
-      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
-    }),
-  );
-  const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_PROJECTS, st).workspace);
-  if (workspace === null) return null;
-  return (
-    // The workspace surface it opened is gone (workspaces v2); the composer PR reshapes the row.
-    <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text" data-testid="row-workspace">
-      <Layers className="size-2.5 shrink-0" aria-hidden />
-      <span className="truncate">{workspace}</span>
-    </span>
-  );
-}
-
-/** The project, branch and queued move of a thread, each from a narrow selector over threadRowModel. */
-function useThreadPlace(id: string) {
-  const s = useThreadsStore(
-    useShallow((st) => {
-      const x = st.byId[id];
-      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: x?.pendingWorktreePath ?? "" };
-    }),
-  );
-  // Each selector returns a primitive, so a row only re-renders when its own project,
-  // branch, workspace or move changes.
-  const ws = useWorkspacesStore((st) => (s.workspaceId ? st.byId[s.workspaceId] : undefined));
-  const project = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
-  const branch = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
-  const noGit = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
-  const noProject = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
-  const movingTo = useProjectsStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
-  return { project, branch, noGit, noProject, movingTo };
-}
 
 /** Status text colours: the theme's status tokens (index.css), sky info, amber warning, emerald success, red destructive. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
@@ -163,7 +125,7 @@ function AgentsRunning({ id, more }: { id: string; more: boolean }) {
 function ThreadLine({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const badge = useThreadsStore((st) => threadBadge(st.byId[id]));
-  const { project, branch, noGit, noProject, movingTo } = useThreadPlace(id);
+  const { project, branch, noGit, noProject, movingTo, set } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
     <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
@@ -184,10 +146,10 @@ function ThreadLine({ id }: { id: string }) {
           {showsPlace(line.kind) && (
             <>
               {status && <span aria-hidden> · </span>}
-              <span data-testid="row-project" data-no-project={noProject || undefined}>
-                {project}
+              <span data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
+                {set ?? project}
               </span>
-              {noProject ? null : noGit ? (
+              {noProject || (set !== null && !branch) ? null : noGit ? (
                 <>
                   {" "}
                   <NoGitBadge className="align-[1px]" tip={false} />
@@ -252,7 +214,6 @@ function ThreadLabel({ id }: { id: string }) {
             </span>
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
               <LinkedPrsBadge id={id} />
-              <WorkspaceBadge id={id} />
               {pinned && <Pin className="size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
             </span>
           </>
@@ -354,9 +315,25 @@ function TipMoving({ id }: { id: string }) {
 }
 
 /**
+ * The projects of a multi-project thread, by name in id order, with its workspace's name
+ * as the chip (none without one): the row's line 2 only says "N projects".
+ */
+function TipSet({ id }: { id: string }) {
+  const ids = useThreadsStore(useShallow((s) => s.byId[id]?.projectIds ?? []));
+  const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
+  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? p)));
+  const workspace = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : null));
+  return (
+    <TipRow icon={<TipIcon icon={Layers} />} chip={workspace} testId="tip-set">
+      {names.join(", ")}
+    </TipRow>
+  );
+}
+
+/**
  * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
  * time instead; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
- * branch (git only) and model. Mounted only while open.
+ * the projects of a multi-project thread (TipSet), branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
@@ -364,16 +341,11 @@ function ThreadTipBody({ id }: { id: string }) {
   const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
-  const where = useThreadsStore(
-    useShallow((st) => {
-      const x = st.byId[id];
-      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
-    }),
-  );
+  const where = useThreadPlaceInput(id);
   const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree, multi: r.set !== null };
     }),
   );
   return (
@@ -388,7 +360,8 @@ function ThreadTipBody({ id }: { id: string }) {
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
-      {!m.noGit && !m.noProject && (
+      {m.multi && <TipSet id={id} />}
+      {!m.noGit && !m.noProject && m.branch !== "" && (
         <TipRow icon={<TipIcon icon={GitBranch} />} chip={m.worktree ? "worktree" : null} testId="tip-branch">
           <span className="font-mono">{m.branch}</span>
         </TipRow>

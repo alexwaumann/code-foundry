@@ -3,37 +3,55 @@ import { ProjectRowGroups } from "./ProjectRows";
 import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { draftKey, type ComposeTarget } from "@/lib/compose";
-import { switchDraftTarget } from "@/stores/compose";
+import { draftKey, HOME_KEY, type ComposeTarget } from "@/lib/compose";
+import { pickDraftWorkspace, switchDraftTarget, toggleDraftProject } from "@/stores/compose";
 import { useUiStore } from "@/stores/ui";
 
 /**
- * The composer heading's project or workspace name, as a button that switches the
- * composer to another one and moves the draft along (stores/compose switchDraftTarget).
- * A dotted underline only; a composer Tab stop before the member chips. The popover
- * lists the same rows as cmd+N's picker (ProjectRows; "No project" last) without the
- * cmd+1..9 hints, the current target checked and highlighted first.
+ * The composer heading's name (the workspace's, the project's, or "N projects") as a
+ * button that opens the project set picker: a multi-select over the same rows as cmd+N's
+ * picker (ProjectRows; "No project" last). A workspace row makes its members the set and
+ * the thread's reference (picked again, it drops the reference); a project row toggles
+ * that project; both keep the popover open, and the rows of the set are checked. "No
+ * project" moves the draft to the no-project composer (stores/compose switchDraftTarget)
+ * and closes; on the no-project composer any row moves it to that target. A dotted
+ * underline only; a composer Tab stop before the chips.
  *
- * Esc closes it and focus returns to the name; after a pick the prompt has focus (the
- * new composer's, or this one's when nothing moved: the same target, or a cancelled
- * replace).
+ * Esc closes it and focus returns to the name; after a move the prompt has focus.
  */
-export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTarget; name: string; disabled: boolean }) {
+export function ProjectSwitcher({
+  target,
+  name,
+  set,
+  disabled,
+}: {
+  target: ComposeTarget;
+  name: string;
+  /** The draft's set: its rows are checked. */
+  set: { projectIds: readonly string[]; workspaceId: string };
+  disabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   // Controlled so every opening starts unfiltered.
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  // A pick moves focus to the prompt; the popover must not hand it back to the trigger.
-  const picked = useRef(false);
+  // A move focuses the new composer's prompt; the popover must not hand focus back to the trigger.
+  const moved = useRef(false);
   const { workspaces, projects, loaded } = useProjectRows();
-  const current = draftKey(target);
+  const home = target.kind === "home";
 
-  const pick = (to: ComposeTarget) => {
-    picked.current = true;
+  const move = (to: ComposeTarget) => {
+    moved.current = true;
     setOpen(false);
-    void switchDraftTarget(target, to).then((moved) => {
-      if (!moved) useUiStore.getState().focusComposer();
+    void switchDraftTarget(target, to).then((ok) => {
+      if (!ok) useUiStore.getState().focusComposer();
     });
+  };
+  const checked = (value: string) => {
+    if (home) return value === HOME_KEY;
+    if (value === HOME_KEY) return false;
+    if (set.workspaceId && value === draftKey({ kind: "workspace", workspaceId: set.workspaceId })) return true;
+    return set.projectIds.includes(value);
   };
 
   return (
@@ -42,7 +60,7 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
       onOpenChange={(o) => {
         if (o) {
           setQuery("");
-          picked.current = false;
+          moved.current = false;
         }
         setOpen(o);
       }}
@@ -51,7 +69,7 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
         <button
           type="button"
           disabled={disabled}
-          aria-label="Change project"
+          aria-label="Change projects"
           aria-haspopup="dialog"
           data-compose-stop
           data-testid="composer-project-trigger"
@@ -81,27 +99,30 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
           inputRef.current?.focus();
         }}
         onCloseAutoFocus={(e) => {
-          if (picked.current) e.preventDefault();
+          if (moved.current) e.preventDefault();
         }}
       >
-        <Command loop defaultValue={current} label="Switch project" className="rounded-lg outline-hidden">
-          <CommandInput ref={inputRef} placeholder="Switch project…" aria-label="Switch project" value={query} onValueChange={setQuery} />
+        <Command loop label="Projects of the thread" className="rounded-lg outline-hidden">
+          <CommandInput ref={inputRef} placeholder="Add or remove projects…" aria-label="Filter projects" value={query} onValueChange={setQuery} />
           <CommandList className="max-h-80">
             <CommandEmpty>{loaded ? "No matching projects." : "Loading projects…"}</CommandEmpty>
             <ProjectRowGroups
               workspaces={workspaces}
               projects={projects}
-              current={current}
+              checked={checked}
               onPickProject={(projectId) => {
-                pick({ kind: "project", projectId });
+                if (home) move({ kind: "project", projectId });
+                else void toggleDraftProject(target, projectId);
               }}
               onPickWorkspace={(workspaceId) => {
-                pick({ kind: "workspace", workspaceId });
+                if (home) move({ kind: "workspace", workspaceId });
+                else void pickDraftWorkspace(target, workspaceId);
               }}
               onPickNoProject={
                 loaded
                   ? () => {
-                      pick({ kind: "home" });
+                      if (home) setOpen(false);
+                      else move({ kind: "home" });
                     }
                   : undefined
               }

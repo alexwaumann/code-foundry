@@ -18,9 +18,10 @@ export type Selection =
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
    * workspaceId for a workspace, projectId then being a member's (for the command context),
-   * or with noProject for a thread without a project (projectId "").
+   * or with noProject for a thread without a project (projectId ""), or with likeThreadId
+   * for "New thread on this branch" (that thread's set; projectId its primary).
    */
-  | { kind: "compose"; projectId: string; workspaceId?: string; noProject?: boolean }
+  | { kind: "compose"; projectId: string; workspaceId?: string; noProject?: boolean; likeThreadId?: string }
   /** A top-level page that is not a sidebar row (see components/prs). */
   | { kind: "view"; name: string };
 
@@ -298,7 +299,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "thread":
       return a.id === (b as typeof a).id;
     case "compose":
-      return a.projectId === (b as typeof a).projectId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject);
+      return a.projectId === (b as typeof a).projectId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject) && a.likeThreadId === (b as typeof a).likeThreadId;
     case "view":
       return a.name === (b as typeof a).name;
   }
@@ -316,6 +317,10 @@ function gone(sel: Selection): boolean {
       return threads.loaded && !(sel.id in threads.byId);
     }
     case "compose": {
+      if (sel.likeThreadId) {
+        const threads = useThreadsStore.getState();
+        return threads.loaded && !(sel.likeThreadId in threads.byId);
+      }
       if (sel.workspaceId) {
         const workspaces = useWorkspacesStore.getState();
         return workspaces.loaded && !(sel.workspaceId in workspaces.byId);

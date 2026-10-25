@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
@@ -10,6 +9,7 @@ import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/com
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
 import { attachLabel, useHostFiles } from "@/components/compose/useHostFiles";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
+import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource, type CompletionSource } from "@/components/compose/useCompletion";
 import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/compose/useRefSources";
 import { Tip } from "@/components/ui/tooltip";
@@ -28,7 +28,6 @@ import { useSlashCommands } from "@/stores/thread";
 import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
-import { useWorkspacesStore } from "@/stores/workspaces";
 import { ColdCacheNote } from "./ColdCacheNote";
 import { RetryNote } from "./RetryNote";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
@@ -51,35 +50,20 @@ function hasFocusWithin(el: HTMLElement | null): boolean {
   return !!el && el.contains(document.activeElement);
 }
 const EFFORT_GROUPS = [{ options: EFFORT_CHOICES.map((c) => ({ value: c.value, label: c.label })) }];
-const SEP = "\u0001";
 
 /**
- * The thread's projects for "/" and "@": its workspace's members, else its project at its
- * worktree; none without a project (only the user's skills, and no "@").
+ * The thread's projects for "/" and "@": its set, the primary first, each read from the
+ * checkout the thread has there (useThreadCheckouts); none without a project (only the
+ * user's skills, and no "@").
  */
 function useThreadSources(threadId: string) {
   const noProject = useNoProjectThread(threadId);
-  const projectId = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
-  const worktreePath = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const memberKeys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId + SEP + m.worktreePath) : [])));
+  const { projectIds, paths } = useThreadCheckouts(threadId);
   return useMemo(() => {
     if (noProject) return { noProject, projectIds: [], skills: [], files: [] };
-    const wsMembers = memberKeys.map((k) => {
-      const [r = "", p = ""] = k.split(SEP);
-      return { projectId: r, worktreePath: p };
-    });
-    const workspace = wsMembers.length > 0;
-    // The thread's own project first: where it runs.
-    const projectIds = workspace ? [projectId, ...wsMembers.map((m) => m.projectId).filter((r) => r !== projectId)] : [projectId];
-    const input = { target: workspace ? ("workspace" as const) : ("project" as const), projectIds, wsMembers };
-    return {
-      noProject,
-      projectIds,
-      skills: skillSources({ ...input, worktree: { kind: "existing", path: worktreePath } }),
-      files: fileSources({ ...input, worktree: workspace ? { kind: "members" } : { kind: "existing", path: worktreePath } }),
-    };
-  }, [noProject, projectId, worktreePath, memberKeys]);
+    const input = { projectIds, paths };
+    return { noProject, projectIds, skills: skillSources(input), files: fileSources(input) };
+  }, [noProject, projectIds, paths]);
 }
 
 /** "Snoozed until Thu 9:00 AM" for a snoozed thread, on the shared 30 s clock. */

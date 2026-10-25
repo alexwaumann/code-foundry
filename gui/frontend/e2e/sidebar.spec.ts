@@ -102,15 +102,15 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(list(page).locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
-  // A workspace thread: its cwd's project and branch, and the workspace badge.
+  // A thread of a workspace's projects: the workspace's name and the branch, no badge.
   const d = row(page, `s:${driver}`);
   await expect(d.getByTestId("thread-name")).toHaveText("driver");
-  await expect(d.getByTestId("row-project")).toHaveText("ghostty-playground");
+  await expect(d.getByTestId("row-project")).toHaveText("login");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
-  await expect(d.getByTestId("row-workspace")).toHaveText("login");
+  await expect(d.getByTestId("row-workspace")).toHaveCount(0);
   // No model on the row any more.
   await expect(d).not.toContainText("Haiku");
-  // A project thread: no badge.
+  // A single-project thread: its project.
   const s1 = row(page, "s:s-1");
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(s1.getByTestId("row-branch")).toHaveText("main");
@@ -165,7 +165,9 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   await d.click({ button: "right" });
   await page.getByTestId("menu-run-in").click();
   const members = page.getByTestId("menu-run-in-members");
-  await expect(members.locator("[data-member]")).toHaveCount(2);
+  // The workspace's folder, then the thread's projects by id.
+  await expect(members.locator("[data-member]")).toHaveCount(3);
+  await expect(members.locator('[data-member="workspace"]')).toContainText("Workspace");
   await expect(members.locator('[data-member="repo-gp"]')).toContainText("runs here");
   await expect(members.locator('[data-member="repo-gp"]')).toHaveAttribute("data-disabled", "");
   await members.locator('[data-member="repo-cf"]').click();
@@ -176,9 +178,8 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   // Queued until the thread is idle at its prompt (the mock: ~2s), then the row's worktree changes.
   await expect(d.getByTestId("row-moving")).toHaveText("moving to code-foundry…");
   await expect(d.getByTestId("row-moving")).toHaveCount(0, { timeout: 8000 });
-  await expect(d.getByTestId("row-project")).toHaveText("code-foundry");
+  await expect(d.getByTestId("row-project")).toHaveText("login");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
-  await expect(d.getByTestId("row-workspace")).toHaveText("login");
   expect(await thread(driver)).toMatchObject({ projectId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
 });
 

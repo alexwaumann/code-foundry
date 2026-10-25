@@ -170,13 +170,13 @@ test("navigating the card with arrows searches nothing more; re-opening with the
   expect(await searches()).toEqual(before);
 });
 
-test("Also in: files grouped by project, the primary first; tooltips name the project; removing the project removes its file tag after a confirm", async ({ page }) => {
+test("a second project: files grouped by project, the primary first; tooltips name the project; removing the project removes its file tag after a confirm", async ({ page }) => {
   await setFiles("repo-cf", ["internal/api/thread.go", "README.md"]);
   await setFiles("repo-sk", ["internal/api/thread.go", "sketch.md"]);
   await openApp(page);
   await compose(page);
-  await page.getByTestId("composer-also-in").click();
-  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
 
   await page.getByTestId("composer-input").click();
@@ -203,7 +203,8 @@ test("Also in: files grouped by project, the primary first; tooltips name the pr
   await page.mouse.move(0, 0);
 
   // Sketches as the primary: its group comes first.
-  await page.getByTestId("composer-member").filter({ hasText: "sketches" }).getByRole("button", { name: /^sketches/ }).click();
+  await page.getByTestId("composer-primary").click();
+  await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await expect(page.getByTestId("composer-member").filter({ hasText: "sketches" })).toHaveAttribute("data-primary", "true");
   await page.getByTestId("composer-input").click();
   await page.keyboard.press("End");
@@ -217,7 +218,7 @@ test("Also in: files grouped by project, the primary first; tooltips name the pr
   const dialog = page.getByTestId("confirm-dialog");
   await page.getByRole("button", { name: "Remove sketches" }).click();
   await expect(dialog).toContainText("Remove sketches from the thread?");
-  await expect(dialog).toContainText("1 reference in your text will be removed.");
+  await expect(dialog).toContainText("1 reference to sketches in your text will be removed.");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(tags(page)).toHaveCount(2);
   await page.getByRole("button", { name: "Remove sketches" }).click();

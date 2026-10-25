@@ -61,6 +61,7 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
       case "agentRuns":
         return sameAgentRuns(a[k], b[k]);
       case "labels":
+      case "projectIds":
         return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((l, i) => l === b[k][i]));
       case "projectIds": {
         const x = a[k] ?? [];

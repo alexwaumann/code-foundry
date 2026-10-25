@@ -20,6 +20,7 @@ const { HeaderActions } = await import("./HeaderActions");
 const { useCommandsStore } = await import("@/stores/commands");
 const { pullRequestDetailResource } = await import("@/stores/gh");
 const { useThreadsStore } = await import("@/stores/threads");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
 const { useActionsStore } = await import("@/stores/actions");
@@ -27,7 +28,7 @@ const { useSettingsStore } = await import("@/stores/settings");
 
 const cmd = (name: string, title = name): CommandView => ({ name, title, description: "", category: "", args: [], keybindings: [], available: true });
 const link = (number: number): LinkedPullRequestView => ({ slug: "o/web", number, url: `https://github.com/o/web/pull/${String(number)}`, linkedAt: null });
-const thread = (o: Partial<ThreadView>) => ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
+const thread = (o: Partial<ThreadView>) => ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 const detail = (o: Partial<PullRequestView>): PullRequestDetailView => ({ pullRequest: { repoSlug: "o/web", number: 78, title: "x", state: "open", draft: false, ...o }, lastError: "" }) as PullRequestDetailView;
 
 beforeEach(() => {
@@ -36,6 +37,8 @@ beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.snooze", "Snooze or Unsnooze Thread"), cmd("thread.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
   useWorkspacesStore.setState({ byId: {} });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+  // A project the thread runs in, so it has one (its More menu shows).
+  useProjectsStore.setState({ byId: { web: { id: "web", name: "web", git: true, worktrees: [{ path: "/src/web", branch: "main", head: "a", isMain: true }] } as never }, order: ["web"] });
 });
 
 afterEach(() => {
@@ -55,14 +58,14 @@ describe("HeaderActions", () => {
     useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("thread.rename"), cmd("thread.fork"), cmd("thread.close")] });
     setThread({});
     render(<HeaderActions threadId="s-1" />);
-    expect(order()).toEqual(["pane-snooze", "thread.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
   });
 
   it("a workspace thread: the workspace chip by name first, opening view.panel.workspace", () => {
     useWorkspacesStore.setState({ byId: { w1: { name: "release-channels", members: [] } as never } });
     setThread({ workspaceId: "w1", linkedPullRequests: [link(1), link(2), link(3)] });
     render(<HeaderActions threadId="s-1" />);
-    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "pane-snooze", "thread.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
     const ws = screen.getByTestId("pane-workspace");
     expect(ws.textContent).toBe("release-channels");
     expect(ws.getAttribute("title")).toBeNull();
@@ -123,7 +126,7 @@ describe("HeaderActions", () => {
     useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "thread.snooze") });
     setThread({});
     render(<HeaderActions threadId="s-1" />);
-    expect(order()).toEqual(["thread.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
   });
 
   it.each([
@@ -132,11 +135,14 @@ describe("HeaderActions", () => {
     ["action.run not listed: none", "web", false, false],
   ])("%s", (_name, projectId, listed, shown) => {
     if (listed) useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("action.run", "Run Action")] });
-    setThread({ projectId });
+    // A thread without a project runs in the home directory, in no project's worktree.
+    setThread(projectId ? { projectId } : { projectId, worktreePath: "/Users/dev", projectIds: [] });
     render(<HeaderActions threadId="s-1" />);
+    // The More menu (ThreadMenu) is there for every thread with a project.
+    const more = projectId ? ["pane-thread-menu"] : [];
     const want = shown
-      ? ["pane-snooze", "thread.archive", "pane-actions-menu", "bottom-toggle", "panel-toggle"]
-      : ["pane-snooze", "thread.archive", "bottom-toggle", "panel-toggle"];
+      ? ["pane-snooze", "thread.archive", "pane-actions-menu", ...more, "bottom-toggle", "panel-toggle"]
+      : ["pane-snooze", "thread.archive", ...more, "bottom-toggle", "panel-toggle"];
     expect(order()).toEqual(want);
   });
 
@@ -205,7 +211,7 @@ describe("HeaderActions", () => {
     useSettingsStore.setState({ snapshot: { values: { "threads.show_created_threads": String(showCreated) }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
     setThread(o);
     render(<HeaderActions threadId="s-1" />);
-    expect(order()).toEqual(["pane-snooze", "pane-sidebar", "thread.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-snooze", "pane-sidebar", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
     const b = screen.getByRole("button", { name: title });
     expect(tooltipText(b)).toBe(title);
     expect(b.querySelector("svg")?.getAttribute("class")).toContain(icon);

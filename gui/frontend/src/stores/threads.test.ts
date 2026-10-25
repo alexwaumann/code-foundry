@@ -32,6 +32,8 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     permissionMode: "auto",
     baseRef: "",
     createdWorktree: false,
+    branch: "",
+    projectIds: [],
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,

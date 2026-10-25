@@ -41,7 +41,7 @@ export function NoProjectBadge({ className }: { className?: string }) {
 /** cmdk value of a workspace row: its target's draftKey (project rows use the project id). */
 const workspaceValue = (workspaceId: string) => draftKey({ kind: "workspace", workspaceId });
 
-/** The check on the row of the picker's current target. */
+/** The check on a row the picker has picked (the current target, or a project or workspace of the composer's set). */
 function CurrentMark() {
   return <Check aria-label="Current" className="ml-auto size-3.5 shrink-0 text-cf-text-muted" data-testid="picker-current" />;
 }
@@ -79,14 +79,13 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
 
 function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
-  const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
   const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
   // Member project names, in member order (projects the store does not know show their id).
   const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r)));
   return (
     <CommandItem
       value={workspaceValue(id)}
-      keywords={[name, branch, ...projects]}
+      keywords={[name, ...projects]}
       onSelect={() => {
         onPick(id);
       }}
@@ -101,7 +100,7 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
         <span className="truncate text-caption" data-testid="workspace-detail">
-          {branch} · {projects.join(", ")}
+          {projects.length === 0 ? "no projects" : projects.join(", ")}
         </span>
       </span>
       {current && <CurrentMark />}
@@ -137,7 +136,7 @@ export function ProjectRowGroups({
   projects,
   soloHeading,
   shortcuts = false,
-  current,
+  checked = () => false,
   onPickProject,
   onPickWorkspace,
   onPickNoProject,
@@ -147,8 +146,8 @@ export function ProjectRowGroups({
   soloHeading?: string;
   /** cmd+1..9 hints on the first nine projects (the picker handles the keys). */
   shortcuts?: boolean;
-  /** draftKey of the target whose row gets a check. */
-  current?: string;
+  /** Whether a row (its cmdk value: a draftKey) gets a check: the current target, or what the composer's set has. */
+  checked?: (value: string) => boolean;
   onPickProject: (id: string) => void;
   onPickWorkspace: (id: string) => void;
   onPickNoProject?: () => void;
@@ -158,14 +157,14 @@ export function ProjectRowGroups({
       {workspaces.length > 0 && (
         <CommandGroup heading="Workspaces">
           {workspaces.map((id) => (
-            <WorkspaceRow key={id} id={id} current={current === workspaceValue(id)} onPick={onPickWorkspace} />
+            <WorkspaceRow key={id} id={id} current={checked(workspaceValue(id))} onPick={onPickWorkspace} />
           ))}
         </CommandGroup>
       )}
       {projects.length > 0 && (
         <CommandGroup heading={workspaces.length > 0 ? "Projects" : soloHeading}>
           {projects.map((id, i) => (
-            <ProjectRow key={id} id={id} index={shortcuts ? i : undefined} current={current === id} onPick={onPickProject} />
+            <ProjectRow key={id} id={id} index={shortcuts ? i : undefined} current={checked(id)} onPick={onPickProject} />
           ))}
         </CommandGroup>
       )}
@@ -173,7 +172,7 @@ export function ProjectRowGroups({
         <>
           {workspaces.length + projects.length > 0 && <CommandSeparator />}
           <CommandGroup>
-            <NoProjectRow current={current === HOME_KEY} onPick={onPickNoProject} />
+            <NoProjectRow current={checked(HOME_KEY)} onPick={onPickNoProject} />
           </CommandGroup>
         </>
       )}

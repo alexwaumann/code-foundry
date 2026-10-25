@@ -1,7 +1,7 @@
 /**
- * What a sidebar thread row shows besides its name and status: the project it runs in,
- * the branch there, the owning workspace (the badge), and a queued "Run in…" move. Pure,
- * over the projects and workspaces slices.
+ * What a sidebar thread row shows besides its name and status: the project it runs in
+ * (or, for several projects, its workspace's name or "N projects"), the branch, and a
+ * queued "Run in…" move. Pure, over the projects and workspaces slices.
  */
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
@@ -37,7 +37,7 @@ export function isNoProject(s: Pick<ThreadView, "projectId" | "workspaceId" | "w
 }
 
 export interface WorkspaceLookup {
-  byId: Readonly<Record<string, Pick<WorkspaceView, "name" | "members"> | undefined>>;
+  byId: Readonly<Record<string, Pick<WorkspaceView, "name"> | undefined>>;
 }
 
 export interface ThreadRowModel {
@@ -45,13 +45,20 @@ export interface ThreadRowModel {
   project: string;
   /** A thread without a project (isNoProject): no branch, no worktree, the House icon. */
   noProject: boolean;
-  /** The branch checked out in the cwd: branch, else the short head, else the directory name; "" without git. */
+  /**
+   * The branch: a multi-project thread's in worktree mode (Thread.branch), else the one
+   * checked out in the cwd (branch, else the short head, else the directory name); "" without git.
+   */
   branch: string;
   /** The cwd's project is not a git repository: show the No git badge instead of a branch. */
   noGit: boolean;
-  /** The owning workspace's name; null for a project thread. */
-  workspace: string | null;
-  /** Project name of the member a queued Run in moves the thread to; null when none is queued. */
+  /**
+   * What line 2 names instead of the project for a thread of several projects (or one that
+   * runs in its workspace's folder): its workspace's name, else "N projects"; null for a
+   * single-project thread (docs/notes/workspaces-v2-3-composer.md).
+   */
+  set: string | null;
+  /** Project name of the checkout a queued Run in moves the thread to; null when none is queued. */
   movingTo: string | null;
   /** The cwd is a linked worktree, not the project's main checkout (false when unknown or without git). */
   worktree: boolean;
@@ -79,28 +86,38 @@ export function projectOfPath(projects: ProjectLookup, path: string): string {
   return basename(path);
 }
 
-/** The project name a workspace member path belongs to, preferring the workspace's own member list. */
-export function memberName(projects: ProjectLookup, workspace: Pick<WorkspaceView, "members"> | undefined, path: string): string {
-  const m = workspace?.members.find((x) => x.worktreePath === path);
-  const name = m ? projects.byId[m.projectId]?.name : undefined;
-  return name ?? projectOfPath(projects, path);
+/** What threadRowModel reads of a thread: its place, and (for line 2 of a multi-project thread) its set size, branch and mode. */
+export type ThreadPlaceInput = Pick<ThreadView, "projectId" | "worktreePath" | "workspaceId" | "pendingWorktreePath"> & {
+  /** projectIds.length; absent counts as one. */
+  projectCount?: number;
+  branch?: string;
+  createdWorktree?: boolean;
+};
+
+/**
+ * The set label of a thread (ThreadRowModel.set): several projects, or a primary in its
+ * workspace's folder (no project id), read as the workspace's name, else "N projects".
+ */
+export function setLabel(s: Pick<ThreadPlaceInput, "projectId" | "workspaceId" | "projectCount">, workspaces: WorkspaceLookup): string | null {
+  const n = s.projectCount ?? 1;
+  if (n <= 1 && !(s.projectId === "" && s.workspaceId !== "")) return null;
+  if (s.workspaceId) return workspaces.byId[s.workspaceId]?.name ?? s.workspaceId;
+  return `${String(n)} projects`;
 }
 
-export function threadRowModel(
-  s: Pick<ThreadView, "projectId" | "worktreePath" | "workspaceId" | "pendingWorktreePath">,
-  projects: ProjectLookup,
-  workspaces: WorkspaceLookup,
-): ThreadRowModel {
-  if (isNoProject(s, projects)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, workspace: null, movingTo: null, worktree: false };
-  const ws = s.workspaceId ? workspaces.byId[s.workspaceId] : undefined;
+export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, workspaces: WorkspaceLookup): ThreadRowModel {
+  if (isNoProject(s, projects)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false };
+  const set = setLabel(s, workspaces);
+  // A multi-project thread in worktree mode is on one branch everywhere; in its workspace's folder it has no checkout branch.
+  const branch = set !== null && (s.createdWorktree === true || s.projectId === "") ? (s.branch ?? "") : worktreeBranch(projects, s.projectId, s.worktreePath);
   return {
     noProject: false,
-    project: projects.byId[s.projectId]?.name ?? (s.projectId || projectOfPath(projects, s.worktreePath)),
-    branch: worktreeBranch(projects, s.projectId, s.worktreePath),
-    noGit: isNoGit(projects, s.projectId),
-    // A workspace the slice does not know (older daemon, or just removed) still badges the row.
-    workspace: s.workspaceId ? (ws?.name ?? s.workspaceId) : null,
-    movingTo: s.pendingWorktreePath && s.pendingWorktreePath !== s.worktreePath ? memberName(projects, ws, s.pendingWorktreePath) : null,
+    // A thread in its workspace's folder (no project id) is in no project: its set label names it, never the folder's w-<id>.
+    project: projects.byId[s.projectId]?.name ?? (s.projectId || (s.workspaceId && set !== null ? set : projectOfPath(projects, s.worktreePath))),
+    branch,
+    noGit: set === null && isNoGit(projects, s.projectId),
+    set,
+    movingTo: s.pendingWorktreePath && s.pendingWorktreePath !== s.worktreePath ? projectOfPath(projects, s.pendingWorktreePath) : null,
     worktree: !isNoGit(projects, s.projectId) && projects.byId[s.projectId]?.worktrees.find((w) => w.path === s.worktreePath)?.isMain === false,
   };
 }

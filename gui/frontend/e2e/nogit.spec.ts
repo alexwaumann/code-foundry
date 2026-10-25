@@ -75,18 +75,13 @@ test("the composer in a project without git offers only its current checkout; th
   await compose(page, 5);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in writing?");
   await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
-  // Its member chip names the project with the No git badge, never a branch (no "cf/…").
-  const chip = page.getByTestId("composer-member");
-  await expect(chip).toHaveCount(1);
-  await expect(chip).toHaveAttribute("data-primary", "true");
-  await expect(chip.getByTestId("no-git-badge")).toBeVisible();
-  await expect(chip.getByTestId("composer-member-branch")).toHaveCount(0);
-  await expect(chip).not.toContainText("cf/");
-  await expect(chip.getByRole("button").first()).toHaveAccessibleName("writing, not a git repository, primary: the thread runs here");
-  // And the badge beside the worktree picker, where a branch would be.
+  // A lone project: no chip, only Add project (a plain folder can be part of a set).
+  await expect(page.getByTestId("composer-member")).toHaveCount(0);
+  await expect(page.getByTestId("composer-add-project")).toBeVisible();
+  // The No git badge beside the worktree picker, where a branch would be.
   await expect(page.getByTestId("composer-card").getByTestId("no-git-badge")).toBeVisible();
-  // No base ref, no branch, no Also in (a workspace needs git).
-  for (const id of ["composer-base", "composer-checkout-branch", "composer-also-in"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  // No base ref, no branch.
+  for (const id of ["composer-base", "composer-checkout-branch"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await page.getByTestId("composer-worktree").click();
   await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^The project folder itself\s*no git\s*Edits land in ~\/Documents\/writing directly/]);
   await page.keyboard.press("Escape");

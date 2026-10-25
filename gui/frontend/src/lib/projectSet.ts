@@ -1,0 +1,114 @@
+/**
+ * The project set of a new thread (workspaces v2, docs/notes/workspaces-v2-3-composer.md):
+ * which projects it works in, the workspace it references, and its primary (where it
+ * runs: one of the projects, or the workspace's folder). Pure; the compose store keeps the
+ * draft's choices and the composer reads them through these.
+ */
+
+/** The primary that runs a thread in its workspace's folder (thread.new --project workspace). */
+export const WORKSPACE_PRIMARY = "workspace";
+
+/** A workspace as the set logic needs it. */
+export interface SetWorkspace {
+  /** Member project ids. */
+  members: readonly string[];
+  /** A member project id, or WORKSPACE_PRIMARY; "" or absent when unknown. */
+  defaultPrimary?: string;
+}
+
+/** What a draft says about its set; null fields follow the composer's target. */
+export interface SetChoice {
+  /** The picked projects in the order the user picked them; null: the target's. */
+  projects: readonly string[] | null;
+  /** The referenced workspace id; "" none; null: the target's. */
+  workspace: string | null;
+  /** A picked project id or WORKSPACE_PRIMARY; null (or one no longer in the set): the default. */
+  primary: string | null;
+}
+
+/** What the composer's target gives a draft before the user picks anything. */
+export interface SetDefaults {
+  projects: readonly string[];
+  workspace: string;
+}
+
+export interface ResolvedSet {
+  /** The set, sorted by project id (how it is shown and sent). */
+  projectIds: string[];
+  /** The set in the order it was picked (the default primary is the first). */
+  picked: string[];
+  /** The referenced workspace; "" without one. */
+  workspaceId: string;
+  /** The primary: a project id, WORKSPACE_PRIMARY, or "" for an empty set without a workspace. */
+  primary: string;
+  /** Sent as a set (projects, workspace): more than one project, or a workspace. */
+  isSet: boolean;
+}
+
+function unique(ids: readonly string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function byId(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * The draft's set. Projects the registry no longer knows drop out. The primary is the
+ * draft's pick while it is still in the set (WORKSPACE_PRIMARY only with a workspace),
+ * else the workspace's default primary when that is the folder or in the set, else the
+ * first picked project, else the workspace's folder (a workspace without projects).
+ */
+export function resolveSet(d: SetChoice, defaults: SetDefaults, env: { workspace: (id: string) => SetWorkspace | undefined; known: (id: string) => boolean }): ResolvedSet {
+  const workspaceId = d.workspace ?? defaults.workspace;
+  const ws = workspaceId ? env.workspace(workspaceId) : undefined;
+  const picked = unique(d.projects ?? defaults.projects).filter(env.known);
+  const projectIds = [...picked].sort(byId);
+  const valid = (p: string | null | undefined): p is string => !!p && ((p === WORKSPACE_PRIMARY && workspaceId !== "") || projectIds.includes(p));
+  const fallback = picked[0] ?? (workspaceId ? WORKSPACE_PRIMARY : "");
+  const primary = valid(d.primary) ? d.primary : valid(ws?.defaultPrimary) ? ws.defaultPrimary : fallback;
+  return { projectIds, picked, workspaceId, primary, isSet: projectIds.length > 1 || workspaceId !== "" };
+}
+
+/** The set with a project added (at the end of the pick order) or, when it is in, removed. */
+export function toggled(picked: readonly string[], id: string): string[] {
+  return picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+}
+
+/**
+ * The heading's name for a set: the workspace's name, else the one project's name, else
+ * "N projects". `name` maps a project id to its name.
+ */
+export function setName(s: Pick<ResolvedSet, "projectIds" | "workspaceId">, workspaceName: string, name: (id: string) => string): string {
+  if (s.workspaceId) return workspaceName || s.workspaceId;
+  if (s.projectIds.length === 1) return name(s.projectIds[0] ?? "");
+  return `${String(s.projectIds.length)} projects`;
+}
+
+/** A primary picker option: "Workspace" (its folder) first when there is a workspace, then the projects by id. */
+export interface PrimaryOption {
+  value: string;
+  label: string;
+  detail?: string;
+}
+
+export function primaryOptions(s: Pick<ResolvedSet, "projectIds" | "workspaceId">, workspaceName: string, name: (id: string) => string): PrimaryOption[] {
+  const out: PrimaryOption[] = [];
+  if (s.workspaceId) out.push({ value: WORKSPACE_PRIMARY, label: "Workspace", detail: `${workspaceName || s.workspaceId}'s own folder` });
+  for (const id of s.projectIds) out.push({ value: id, label: name(id) });
+  return out;
+}
+
+/** The members of a saved workspace equal to this set (sorted ids compared); undefined when none matches. */
+export function matchingWorkspace<W extends { id: string; members: readonly string[] }>(projectIds: readonly string[], workspaces: readonly W[]): W | undefined {
+  const key = [...projectIds].sort(byId).join("\u0000");
+  return workspaces.find((w) => [...w.members].sort(byId).join("\u0000") === key);
+}
+
+/**
+ * Whether "Save as workspace" applies to a thread: two or more projects and no saved
+ * workspace with the same set.
+ */
+export function canSaveAsWorkspace(projectIds: readonly string[], workspaces: readonly { id: string; members: readonly string[] }[]): boolean {
+  return projectIds.length >= 2 && matchingWorkspace(projectIds, workspaces) === undefined;
+}

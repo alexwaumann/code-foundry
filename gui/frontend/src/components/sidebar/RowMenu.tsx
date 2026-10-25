@@ -1,5 +1,4 @@
-import { useShallow } from "zustand/react/shallow";
-import { Archive, ArchiveRestore, ArrowRightLeft, EyeOff, FolderGit2, GitFork, Pencil, Pin, PinOff, SquareTerminal, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRightLeft, EyeOff, FolderGit2, GitBranchPlus, GitFork, Layers, Pencil, Pin, PinOff, SquareTerminal, Trash2 } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -10,10 +9,12 @@ import {
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
+import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
+import { composeLike } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { archiveThread, forkThread, pinThread, removeThread, runThreadIn, setThreadSidebar } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
@@ -23,7 +24,7 @@ import { showWorktreeInThread } from "@/stores/worktreePanel";
 
 function MemberItem({ threadId, projectId, path, current, queued }: { threadId: string; projectId: string; path: string; current: boolean; queued: boolean }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
-  const branch = useProjectsStore((s) => worktreeBranch(s, projectId, path));
+  const branch = useProjectsStore((s) => (path ? worktreeBranch(s, projectId, path) : ""));
   return (
     <ContextMenuItem
       disabled={current}
@@ -35,7 +36,7 @@ function MemberItem({ threadId, projectId, path, current, queued }: { threadId: 
       <FolderGit2 className="text-cf-info-text/90" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{name}</span>
-        <span className="truncate font-mono text-caption">{branch}</span>
+        {branch && <span className="truncate font-mono text-caption">{branch}</span>}
       </span>
       {(current || queued) && <span className="ml-auto pl-3 text-caption">{current ? "runs here" : "queued"}</span>}
     </ContextMenuItem>
@@ -43,14 +44,18 @@ function MemberItem({ threadId, projectId, path, current, queued }: { threadId: 
 }
 
 /**
- * "Run in…" for a workspace thread: its workspace's members, the current one disabled.
- * Picking one invokes thread.run-in; the row shows the queued move until it happens.
+ * "Run in…" for a thread with somewhere else to run: its workspace's folder ("Workspace")
+ * and its projects' checkouts, the current one disabled. Picking one invokes
+ * thread.run-in; the row shows the queued move until it happens.
  */
-function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: string }) {
+function RunInMenu({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const pending = useThreadsStore((s) => s.byId[threadId]?.pendingWorktreePath ?? "");
-  const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.projectId}\u0000${m.worktreePath}`)));
-  const wsName = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? workspaceId);
+  const primary = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
+  const wsName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : ""));
+  const { projectIds, paths } = useThreadCheckouts(threadId);
+  const sorted = [...projectIds].sort();
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger data-testid="menu-run-in">
@@ -58,10 +63,26 @@ function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: s
         Run in…
       </ContextMenuSubTrigger>
       <ContextMenuSubContent data-testid="menu-run-in-members">
-        <ContextMenuLabel>{wsName}</ContextMenuLabel>
-        {members.map((k) => {
-          const [projectId = "", path = ""] = k.split("\u0000");
-          return <MemberItem key={k} threadId={threadId} projectId={projectId} path={path} current={path === cwd} queued={path === pending} />;
+        {workspaceId && (
+          <ContextMenuItem
+            disabled={primary === ""}
+            data-member="workspace"
+            onSelect={() => {
+              void runThreadIn(threadId, "workspace");
+            }}
+          >
+            <Layers className="text-cf-highlight-text" />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate">Workspace</span>
+              <span className="truncate text-caption">{wsName}</span>
+            </span>
+            {primary === "" && <span className="ml-auto pl-3 text-caption">runs here</span>}
+          </ContextMenuItem>
+        )}
+        {workspaceId && sorted.length > 0 && <ContextMenuLabel>Projects</ContextMenuLabel>}
+        {sorted.map((projectId) => {
+          const path = paths[projectId] ?? "";
+          return <MemberItem key={projectId} threadId={threadId} projectId={projectId} path={path} current={projectId === primary} queued={path !== "" && path === pending && path !== cwd} />;
         })}
       </ContextMenuSubContent>
     </ContextMenuSub>
@@ -77,7 +98,11 @@ export function RowMenu({ id }: { id: string }) {
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
-  const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
+  // Somewhere else to run: another project of its set, or its workspace's folder.
+  const runIn = useThreadsStore((s) => {
+    const t = s.byId[id];
+    return t !== undefined && (t.projectIds.length > 1 || t.workspaceId !== "");
+  });
   // Another thread created it: a row in the sidebar is shown, so it can be handed back.
   const created = useThreadsStore((s) => (s.byId[id]?.createdBy ?? "") !== "");
   return (
@@ -127,7 +152,7 @@ export function RowMenu({ id }: { id: string }) {
           Hide from sidebar
         </ContextMenuItem>
       )}
-      {workspaceId && <RunInMenu threadId={id} workspaceId={workspaceId} />}
+      {runIn && <RunInMenu threadId={id} />}
       <ContextMenuSeparator />
       <ContextMenuItem
         onSelect={() => {
@@ -148,6 +173,17 @@ export function RowMenu({ id }: { id: string }) {
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
+      {!noProject && (
+        <ContextMenuItem
+          data-testid="menu-new-like"
+          onSelect={() => {
+            composeLike(id);
+          }}
+        >
+          <GitBranchPlus />
+          New thread on this branch
+        </ContextMenuItem>
+      )}
       <ContextMenuItem
         onSelect={() => {
           void forkThread(id);

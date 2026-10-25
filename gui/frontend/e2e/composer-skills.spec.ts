@@ -204,11 +204,11 @@ test("hovering a skill tag says what it is", async ({ page }) => {
   await expect(tip).toContainText("Write a commit message and commit.");
 });
 
-test("Also in: skills grouped by project; removing the project removes its tags after a confirm", async ({ page }) => {
+test("a second project: skills grouped by project; removing the project removes its tags after a confirm", async ({ page }) => {
   await openApp(page);
   await compose(page);
-  await page.getByTestId("composer-also-in").click();
-  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
   await expect.poll(completionCalls).toContain("skills repo-cf,repo-sk true");
 
@@ -233,7 +233,7 @@ test("Also in: skills grouped by project; removing the project removes its tags 
   const dialog = page.getByTestId("confirm-dialog");
   await page.getByRole("button", { name: "Remove sketches" }).click();
   await expect(dialog).toContainText("Remove sketches from the thread?");
-  await expect(dialog).toContainText("1 reference in your text will be removed.");
+  await expect(dialog).toContainText("1 reference to sketches in your text will be removed.");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
   await expect(tags(page)).toHaveCount(2);
@@ -244,8 +244,8 @@ test("Also in: skills grouped by project; removing the project removes its tags 
   await expect(value(page)).toHaveAttribute("data-value", `and ${COMMIT}`);
 
   // Without references, removing asks nothing.
-  await page.getByTestId("composer-also-in").click();
-  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await page.getByRole("button", { name: "Remove sketches" }).click();
   await expect(page.getByTestId("composer-member")).toHaveCount(0);
   await expect(dialog).toHaveCount(0);

@@ -5,7 +5,7 @@ import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
-import { openNewThreadPicker } from "@/stores/compose";
+import { composeLike, openNewThreadPicker } from "@/stores/compose";
 import { getEmberAttentionId } from "@/stores/ember";
 import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
@@ -134,7 +134,7 @@ export function inPalette(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-like", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -188,11 +188,13 @@ export function isGlobalChord(chord: string): boolean {
 }
 
 /**
- * Opens the "Run in…" member picker for a workspace thread. False for a project thread
- * (or none), so the command falls back to its default presentation.
+ * Opens the "Run in…" picker for a thread with somewhere else to run: another project of
+ * its set, or its workspace's folder. False for a single-project thread without a
+ * workspace (or none), so the command falls back to its default presentation.
  */
 export function openRunInPicker(threadId: string): boolean {
-  if (!useThreadsStore.getState().byId[threadId]?.workspaceId) return false;
+  const t = useThreadsStore.getState().byId[threadId];
+  if (!t || (t.projectIds.length < 2 && !t.workspaceId)) return false;
   const ui = useUiStore.getState();
   const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
   // Deferred: picked inside the palette, the palette closes after the presenter runs.
@@ -223,7 +225,10 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     openNewThreadPicker();
     return true;
   },
-  // "Run in…": the member picker for the active workspace thread; it invokes thread.run-in.
+  // "New thread on this branch": the composer prefilled with the active thread's set,
+  // branch, primary, workspace and mode; it invokes thread.new-like.
+  "thread.new-like": () => composeLike(getUiContext().activeThreadId),
+  // "Run in…": the picker of the active thread's other places to run; it invokes thread.run-in.
   "thread.run-in": () => openRunInPicker(getUiContext().activeThreadId),
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.

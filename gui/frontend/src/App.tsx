@@ -8,6 +8,7 @@ import { ActionDialog } from "@/components/actions/ActionDialog";
 import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
 import { NewWorkspaceDialog } from "@/components/projects/NewWorkspaceDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
+import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { ConsentDialog } from "@/components/plugin/ConsentDialog";
@@ -105,7 +106,15 @@ function Content() {
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "view" && sel.name === EMBER_VIEW) return <EmberView />;
   if (sel.kind === "compose")
-    return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId} projectId={sel.projectId} workspaceId={sel.workspaceId} noProject={sel.noProject} />;
+    return (
+      <Composer
+        key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
+        projectId={sel.projectId}
+        workspaceId={sel.workspaceId}
+        noProject={sel.noProject}
+        likeThreadId={sel.likeThreadId}
+      />
+    );
   if (sel.kind === "thread") return <ThreadPane threadId={sel.id} />;
   return <StartPage />;
 }
@@ -228,6 +237,7 @@ export function App() {
         <PublishDialog />
         <NewWorkspaceDialog />
         <SnoozeDialog />
+        <SaveWorkspaceDialog />
         <ActionDialog />
         <ActionRunDialog />
         <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />

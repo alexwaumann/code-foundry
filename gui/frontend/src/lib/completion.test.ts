@@ -271,19 +271,15 @@ describe("commandItems", () => {
   });
 });
 
-describe("skillSources", () => {
-  const ws = [
-    { projectId: "r1", worktreePath: "/h/w/r1" },
-    { projectId: "r2", worktreePath: "/h/w/r2" },
-  ];
+describe("skillSources and fileSources", () => {
   it.each<[string, Parameters<typeof skillSources>[0], { projectId: string; path?: string }[]]>([
-    ["a project in a new worktree: its main worktree", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
-    ["a project in an existing worktree: that one", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/r1-wt" }]],
-    ["a project with Also in: main worktrees in order", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
-    ["a workspace: its member worktrees", { target: "workspace", projectIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }]],
-    ["a workspace in new-worktree mode: still its members", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ projectId: "r1", path: "/h/w/r1" }, { projectId: "r2", path: "/h/w/r2" }]],
+    ["a project with no known checkout: its main worktree", { projectIds: ["r1"] }, [{ projectId: "r1" }]],
+    ["a project in an existing worktree: that one", { projectIds: ["r1"], paths: { r1: "/h/r1-wt" } }, [{ projectId: "r1", path: "/h/r1-wt" }]],
+    ["a set: in the given order, the primary first", { projectIds: ["r3", "r1"], paths: {} }, [{ projectId: "r3" }, { projectId: "r1" }]],
+    ["a thread's checkouts: each where it is, the unknown one from its main worktree", { projectIds: ["r2", "r1", "r9"], paths: { r1: "/h/w/r1", r2: "/h/w/r2" } }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }, { projectId: "r9" }]],
   ])("%s", (_name, input, want) => {
     expect(skillSources(input)).toEqual(want);
+    expect(fileSources(input)).toEqual(want);
   });
 
   it("keys differ by member and path", () => {
@@ -292,25 +288,6 @@ describe("skillSources", () => {
     expect(k([{ projectId: "r1" }])).not.toBe(k([{ projectId: "r1", path: "/h/r1" }]));
     expect(k([{ projectId: "r1" }, { projectId: "r2" }])).not.toBe(k([{ projectId: "r2" }, { projectId: "r1" }]));
     expect(k([])).toBe("");
-  });
-});
-
-describe("fileSources", () => {
-  const ws = [
-    { projectId: "r1", worktreePath: "/h/w/r1" },
-    { projectId: "r2", worktreePath: "/h/w/r2" },
-  ];
-  it.each<[string, Parameters<typeof fileSources>[0], { projectId: string; path?: string }[]]>([
-    ["a project in a new worktree: its main worktree", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
-    ["a project in an existing worktree: that one", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/r1-wt" }]],
-    ["a project without git: its folder", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/notes" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/notes" }]],
-    ["a project with Also in: main worktrees in member order", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
-    ["Also in with a stale existing choice: still main worktrees", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
-    ["a workspace in Workspace worktrees: its member worktrees", { target: "workspace", projectIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }]],
-    ["a workspace in new-worktree mode: main worktrees", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ projectId: "r1" }, { projectId: "r2" }]],
-    ["a workspace member without a known worktree: its main worktree", { target: "workspace", projectIds: ["r1", "r9"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r1", path: "/h/w/r1" }, { projectId: "r9" }]],
-  ])("%s", (_name, input, want) => {
-    expect(fileSources(input)).toEqual(want);
   });
 });
 

@@ -44,7 +44,6 @@ describe("checkoutsKey", () => {
   it("none for a thread with one project or none", () => {
     expect(checkoutsKey(undefined, [])).toBeNull();
     expect(checkoutsKey({ ...t, projectIds: ["web"] }, [])).toBeNull();
-    expect(checkoutsKey({ ...t, projectIds: undefined }, [])).toBeNull();
   });
   it("changes with the cwd, the branch, the set and the members' worktrees, and names the thread", () => {
     const k = checkoutsKey(t, ["/src/api", "/src/web"]);
