@@ -146,6 +146,8 @@ type Store struct {
 	owners   ownersCache  // publish owners (owners.go)
 	prFiles  prFilesCache // pull request diffs and files (pr_files.go)
 	moved    movedDetails // when the poll saw a pull request move (detail_moved.go)
+	// mergedShown shows this store's merges before the searches do (pr_merged_overlay.go).
+	mergedShown mergedOverlay
 
 	// Worker goroutine only.
 	lastEnd     time.Time       // when the previous request finished
