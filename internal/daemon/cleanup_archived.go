@@ -23,14 +23,14 @@ const archiveCleanupTimeout = 2 * time.Minute
 
 // archiveCleaner removes archived threads' derived worktrees.
 type archiveCleaner struct {
-	log        *slog.Logger
-	projects   project.Store
-	checkouts  func(thread.Thread) []thread.Checkout
-	threads    func() *thread.Snapshot
-	terminals  func() []terminal.Terminal
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
+	log       *slog.Logger
+	projects  project.Store
+	checkouts func(thread.Thread) []thread.Checkout
+	threads   func() *thread.Snapshot
+	terminals func() []terminal.Terminal
+	wg        sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // stop cancels the cleanups running now and waits for them.

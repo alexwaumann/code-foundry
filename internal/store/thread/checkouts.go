@@ -171,7 +171,6 @@ func fileExists(p string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
-
 // checkouts is CheckoutsOf over the project store; with none (tests), only the primary.
 func (m *Manager) checkouts(t Thread) []Checkout {
 	var snap *project.Snapshot
