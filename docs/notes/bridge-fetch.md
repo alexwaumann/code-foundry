@@ -166,3 +166,38 @@ the request's so a daemon that never answers still ends). The error strip hears 
   upstream (`mock/proxyFetch.ts`, `https://upstream.test`): 200 with the issues, a 401 as a
   response, `http://127.0.0.1:7788/…` refused `invalid` on the strip (count 1), a 200 ms
   fetch to `/slow` times out and the mock sees its request aborted.
+
+## End to end (built app, isolated home)
+
+`make build && make gui-build`, `CODE_FOUNDRY_HOME=~/cf-fetch`, a no-project Haiku 5.5 thread
+(medium) asked, with no word about `cf.fetch` or CORS: "a page with (1) the 10 hottest
+stories from https://lobste.rs/hottest.json and (2) our test tracker at
+https://httpbin.org/anything/issues, which needs my API token in an X-Api-Key header: let me
+paste the token in the page, and show what the tracker returns; add a refresh button".
+lobste.rs sends no `Access-Control-Allow-Origin` at all (a page's own `fetch` fails);
+httpbin allows any origin and echoes what it received, so it shows what the daemon sent.
+
+- The model loaded the pages skill, read `reference/sources.md`, and wrote both calls with
+  `cf.fetch` (its comment: "lobste.rs sends no CORS header, so the page's own fetch would
+  fail"), the token in a password field kept with `cf.storage("tracker")`, and `res.ok`
+  checked. Its reply told the user the token shows in httpbin's echo.
+- Inline card and File tab: the ten stories showed. A token typed into the password field
+  and "Save and load" (synthetic CGEvent clicks and keys) stored `{"tracker:token": …}` in
+  `page-storage/<id>/storage.json`; httpbin echoed `User-Agent: code-foundry/dev` and
+  `X-Api-Key`, and no Origin or Cookie.
+- The GUI quit (SIGTERM), `daemon.restart --yes`, the GUI relaunched: the page read the
+  token from storage and fetched the tracker again by itself (a new httpbin trace id).
+- A page of refusals against the live daemon: the pages port on 127.0.0.1 and `localhost`
+  on the API port answered `invalid` ("localhost is a loopback address (::1), which a page
+  may not reach"), 169.254.169.254 `invalid` (link-local), api.github.com 200, a
+  `.invalid` host `failed` ("lookup nonexistent.invalid: no such host"); the card's strip
+  counted 4.
+- No log file under the home contained the token.
+
+The PR's live shots have httpbin's echo of the client's public address painted over. The
+home, its pages and the test thread were removed afterwards.
+
+## Daemon restart
+
+Needed: the GUI calls the new RPC and `bridge.js` (served by the daemon) has the new call.
+GUI and daemon ship together.
