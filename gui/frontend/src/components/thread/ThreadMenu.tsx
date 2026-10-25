@@ -4,22 +4,25 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
+import { canNewLike } from "@/lib/threadRow";
 import { composeLike } from "@/stores/compose";
+import { useThreadsStore } from "@/stores/threads";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
 
 /**
  * The thread header's "More" menu: "New thread on this branch" (thread.new-like's
  * presentation: the composer prefilled with this thread's set, branch, primary,
- * workspace and mode) and, for a thread of two or more projects that matches no saved
- * workspace, "Save as workspace" (stores/saveWorkspace.ts). None for a thread without a
- * project. What was picked runs once the menu has closed and handed focus back.
+ * workspace and mode; lib/threadRow canNewLike) and, for a thread of two or more projects
+ * that matches no saved workspace and does not run in its workspace's folder, "Save as
+ * workspace" (stores/saveWorkspace.ts). None for a thread without a project. What was picked runs once the menu has closed and handed focus back.
  */
 export function ThreadMenu({ threadId }: { threadId: string }) {
   const noProject = useNoProjectThread(threadId);
   const canSave = useCanSaveAsWorkspace(threadId);
+  const newLike = useThreadsStore((s) => canNewLike(s.byId[threadId]));
   const [open, setOpen] = useState(false);
   const picked = useRef<(() => void) | null>(null);
-  if (noProject) return null;
+  if (noProject || (!newLike && !canSave)) return null;
   const pick = (run: () => void) => {
     picked.current = run;
     setOpen(false);
@@ -57,17 +60,19 @@ export function ThreadMenu({ threadId }: { threadId: string }) {
           run();
         }}
       >
-        <DropdownMenuItem
-          data-testid="menu-new-like"
-          onSelect={() => {
-            pick(() => {
-              composeLike(threadId);
-            });
-          }}
-        >
-          <GitBranchPlus />
-          New thread on this branch
-        </DropdownMenuItem>
+        {newLike && (
+          <DropdownMenuItem
+            data-testid="menu-new-like"
+            onSelect={() => {
+              pick(() => {
+                composeLike(threadId);
+              });
+            }}
+          >
+            <GitBranchPlus />
+            New thread on this branch
+          </DropdownMenuItem>
+        )}
         {canSave && (
           <DropdownMenuItem
             data-testid="menu-save-workspace"

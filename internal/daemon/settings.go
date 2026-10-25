@@ -55,18 +55,18 @@ func applySettings(st *settings.Store, reg *command.Registry, level *slog.LevelV
 	})
 }
 
+// threadStarters are the commands that start a thread with a model and effort arg:
+// threads.default_model and threads.default_effort are their defaults (each marks a
+// value it did not get as defaulted, ModelDefaulted / EffortDefaulted).
+var threadStarters = []string{"thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"}
+
 // registryOverrides maps settings onto command.Overrides.
 func registryOverrides(s settings.Settings) command.Overrides {
-	return command.Overrides{
-		Keybindings: settings.KeybindingOverrides(s.Keybindings),
-		ArgDefaults: map[string]map[string]string{
-			"thread.new":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
-			"pr.ask":          {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
-			"pr.explain":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
-			"pr.fix.findings": {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
-			"theme.ask":       {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
-		},
+	defaults := make(map[string]map[string]string, len(threadStarters))
+	for _, name := range threadStarters {
+		defaults[name] = map[string]string{"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort}
 	}
+	return command.Overrides{Keybindings: settings.KeybindingOverrides(s.Keybindings), ArgDefaults: defaults}
 }
 
 func logLevel(s string) slog.Level {

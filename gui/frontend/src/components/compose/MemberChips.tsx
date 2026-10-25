@@ -29,6 +29,23 @@ const chipClass = "flex h-7 max-w-72 min-w-0 items-center rounded-full border te
 
 function MemberChip({ target, member, primary, disabled }: { target: ComposeTarget; member: MemberChipModel; primary: boolean; disabled: boolean }) {
   const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
+  // Where the project lives: hidden on the chip, and what tells similar long names apart.
+  const path = useProjectsStore((s) => s.byId[member.projectId]?.path ?? "");
+  const body = (
+    <span className={cn("flex h-full min-w-0 items-center gap-1.5 pl-2.5", member.removable ? "pr-1" : "pr-2.5")} data-testid="composer-member-body">
+      <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-cf-accent" : "bg-cf-text-muted/40")} />
+      <span className="truncate font-medium">{name}</span>
+      {member.noGit ? (
+        <NoGitBadge />
+      ) : (
+        member.branch && (
+          <span className="truncate font-mono text-caption-sm" data-testid="composer-member-branch">
+            {member.branch}
+          </span>
+        )
+      )}
+    </span>
+  );
   return (
     <li
       className={cn(chipClass, primary ? "border-cf-accent/50 bg-cf-control-hover text-cf-text" : "border-cf-border bg-cf-surface-raised text-cf-text-muted")}
@@ -37,19 +54,7 @@ function MemberChip({ target, member, primary, disabled }: { target: ComposeTarg
       data-primary={primary || undefined}
       aria-label={`${name}${member.noGit ? ", not a git repository" : member.branch ? ` on ${member.branch}` : ""}${primary ? ", the thread runs here" : ""}`}
     >
-      <span className={cn("flex h-full min-w-0 items-center gap-1.5 pl-2.5", member.removable ? "pr-1" : "pr-2.5")}>
-        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-cf-accent" : "bg-cf-text-muted/40")} />
-        <span className="truncate font-medium">{name}</span>
-        {member.noGit ? (
-          <NoGitBadge />
-        ) : (
-          member.branch && (
-            <span className="truncate font-mono text-caption-sm" data-testid="composer-member-branch">
-              {member.branch}
-            </span>
-          )
-        )}
-      </span>
+      {path ? <Tip label={tildify(path)}>{body}</Tip> : body}
       {member.removable && (
         <Tip label={`Remove ${name}`}>
           <button

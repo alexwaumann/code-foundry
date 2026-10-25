@@ -12,7 +12,8 @@ import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
-import { worktreeBranch } from "@/lib/threadRow";
+import { WORKSPACE_FOLDER } from "@/lib/projectSet";
+import { canNewLike, canRunElsewhere, worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { composeLike } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
@@ -44,7 +45,7 @@ function MemberItem({ threadId, projectId, path, current, queued }: { threadId: 
 }
 
 /**
- * "Run in…" for a thread with somewhere else to run: its workspace's folder ("Workspace")
+ * "Run in…" for a thread with somewhere else to run (canRunElsewhere): its workspace folder
  * and its projects' checkouts, the current one disabled. Picking one invokes
  * thread.run-in; the row shows the queued move until it happens.
  */
@@ -73,7 +74,7 @@ function RunInMenu({ threadId }: { threadId: string }) {
           >
             <Layers className="text-cf-highlight-text" />
             <span className="flex min-w-0 flex-col">
-              <span className="truncate">Workspace</span>
+              <span className="truncate">{WORKSPACE_FOLDER}</span>
               <span className="truncate text-caption">{wsName}</span>
             </span>
             {primary === "" && <span className="ml-auto pl-3 text-caption">runs here</span>}
@@ -98,11 +99,9 @@ export function RowMenu({ id }: { id: string }) {
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
-  // Somewhere else to run: another project of its set, or its workspace's folder.
-  const runIn = useThreadsStore((s) => {
-    const t = s.byId[id];
-    return t !== undefined && (t.projectIds.length > 1 || t.workspaceId !== "");
-  });
+  // The palette's and the daemon's rules (lib/threadRow): somewhere else to run; a project or workspace to copy.
+  const runIn = useThreadsStore((s) => canRunElsewhere(s.byId[id]));
+  const newLike = useThreadsStore((s) => canNewLike(s.byId[id]));
   // Another thread created it: a row in the sidebar is shown, so it can be handed back.
   const created = useThreadsStore((s) => (s.byId[id]?.createdBy ?? "") !== "");
   return (
@@ -110,8 +109,10 @@ export function RowMenu({ id }: { id: string }) {
       data-testid="row-menu"
       data-thread={id}
       onCloseAutoFocus={(e) => {
-        // Rename puts an input in the row; closing must not move focus back to the list.
-        if (useUiStore.getState().renamingThreadId === id) e.preventDefault();
+        // Rename puts an input in the row, and New thread on this branch focuses the
+        // composer's prompt: closing must not move focus back to the list.
+        const ui = useUiStore.getState();
+        if (ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id)) e.preventDefault();
       }}
     >
       <ContextMenuItem
@@ -173,7 +174,7 @@ export function RowMenu({ id }: { id: string }) {
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
-      {!noProject && (
+      {newLike && (
         <ContextMenuItem
           data-testid="menu-new-like"
           onSelect={() => {

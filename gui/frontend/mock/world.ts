@@ -3186,8 +3186,12 @@ export class World {
             { name: "worktree", type: ArgType.PATH, required: false, description: "A checkout's path" },
           ],
         },
-        // Like the daemon since workspaces v2: offered for every thread; Run refuses one with a single checkout.
-        when: (ctx) => activeThread(ctx) !== undefined,
+        // Like the daemon (runElsewhere): in the GUI only for a thread with somewhere else to run; from the CLI any, Run refuses one with a single checkout.
+        when: (ctx) => {
+          const s = activeThread(ctx);
+          // Two or more places among its projects and its workspace's folder (src/lib/threadRow canRunElsewhere).
+          return s !== undefined && (!ctx?.activeView || this.projectIdsOf(s).length + (s.workspaceId ? 1 : 0) > 1);
+        },
         run: (ctx, args) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
@@ -3295,7 +3299,8 @@ export class World {
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
           ],
         },
-        when: (ctx) => activeThread(ctx) !== undefined,
+        // Like the daemon (canNewLike): in the GUI only for a thread with a project or a workspace.
+        when: (ctx) => activeThread(ctx) !== undefined && (!ctx?.activeView || Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: (ctx, args) => this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args),
       },
       {
@@ -4090,7 +4095,7 @@ export class World {
     const entries = this.registry();
     const kb = this.settings.keybindings();
     const defaults: Record<string, string> = this.threadDefaults();
-    const startsThread = new Set(["thread.new", "pr.ask", "pr.explain", "pr.fix.findings"]);
+    const startsThread = new Set(["thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"]);
     return entries.map((e) => ({
       ...e,
       cmd: {

@@ -141,9 +141,9 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(primary).toHaveText("dotfiles");
   await primary.click();
   const options = page.getByTestId("composer-primary-list").getByRole("option");
-  await expect(options).toHaveText([/^Workspace\s*shop's own folder/, /^code-foundry/, /^dotfiles/]);
+  await expect(options).toHaveText([/^Workspace folder\s*shop's folder/, /^code-foundry/, /^dotfiles/]);
   await options.first().click();
-  await expect(primary).toHaveText("Workspace");
+  await expect(primary).toHaveText("Workspace folder");
   // The workspace's folder is no project: no base to pick.
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
 
@@ -193,8 +193,8 @@ test("collision hints under the chips before send, and the daemon's after", asyn
   await page.keyboard.type("Pair on the parser");
   await page.keyboard.press("Enter");
   await selectedThreadId(page);
-  // After the Create: the daemon's hints as toasts (its label has the thread id).
-  await expect(page.getByText(/^sketches @ main is also open in Busy one \(s-set-/)).toBeVisible();
+  // After the Create: the daemon's hints repeat the lines shown above, so no toast says them again (composer-fixes.spec.ts).
+  await expect(page.getByTestId("composer")).toHaveCount(0);
 });
 test("Save as workspace: offered for an unsaved set of two or more, names it and sets the reference", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&project=repo-gp&name=Pair")) as ThreadSummary;
@@ -262,7 +262,7 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   const primary = page.getByTestId("composer-primary");
   await expect(primary).toHaveText("code-foundry");
   await primary.click();
-  await expect(page.getByTestId("composer-primary-list").getByRole("option")).toHaveText([/^Workspace/, /^code-foundry/, /^ghostty-playground/]);
+  await expect(page.getByTestId("composer-primary-list").getByRole("option")).toHaveText([/^Workspace folder/, /^code-foundry/, /^ghostty-playground/]);
   await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
 
   await page.getByTestId("composer-input").click();
@@ -292,8 +292,8 @@ test("New thread on this branch from the header menu and the palette; Escape goe
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
   await page.getByTestId("menu-new-like").click();
   await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
-  // In place on main: the heading names the thread; one chip; no primary picker.
-  await expect(page.getByTestId("composer-heading")).toHaveText("What's next beside Solo?");
+  // In place on main: the heading names the project; one chip; no primary picker.
+  await expect(page.getByTestId("composer-heading")).toHaveText("What's next in code-foundry?");
   await expect(chips(page)).toHaveCount(1);
   await expect(page.getByTestId("composer-like-mode")).toHaveText("In place");
   await expect(page.getByTestId("composer-primary")).toHaveCount(0);

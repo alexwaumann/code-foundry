@@ -342,10 +342,12 @@ function ThreadTipBody({ id }: { id: string }) {
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
   const where = useThreadPlaceInput(id);
+  // A thread in its workspace's folder is in no project: the first row names the workspace (never its w-<id>).
+  const wsName = useWorkspacesStore((s) => (where.workspaceId ? (s.byId[where.workspaceId]?.name ?? "") : ""));
   const m = useProjectsStore(
     useShallow((st) => {
-      const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree, multi: r.set !== null };
+      const r = threadRowModel(where, st, wsName ? { byId: { [where.workspaceId]: { name: wsName } } } : NO_WORKSPACES);
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree, multi: r.set !== null, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "" };
     }),
   );
   return (
@@ -357,7 +359,7 @@ function ThreadTipBody({ id }: { id: string }) {
       {!snoozed && <TipWaiting id={id} />}
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
-      <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
+      <TipRow icon={<TipIcon icon={m.noProject ? House : m.inFolder ? Layers : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
       {m.multi && <TipSet id={id} />}

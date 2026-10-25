@@ -122,6 +122,27 @@ export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, wor
   };
 }
 
+/** What the "New thread on this branch" and "Run in…" rules read of a thread. */
+export type ThreadPlaces = Pick<ThreadView, "projectIds" | "workspaceId">;
+
+/**
+ * Whether "New thread on this branch" (thread.new-like) is offered for a thread: it has a
+ * project or a workspace. The daemon's availability is the same rule
+ * (internal/command canNewLike); the row and header menus and the palette follow it.
+ */
+export function canNewLike(t: ThreadPlaces | undefined): boolean {
+  return t !== undefined && (t.projectIds.length > 0 || t.workspaceId !== "");
+}
+
+/**
+ * Whether "Run in…" (thread.run-in) is offered for a thread: two or more places to run
+ * among its projects and its workspace's folder. The daemon's availability is the same
+ * rule (internal/command runElsewhere).
+ */
+export function canRunElsewhere(t: ThreadPlaces | undefined): boolean {
+  return t !== undefined && t.projectIds.length + (t.workspaceId ? 1 : 0) > 1;
+}
+
 /** The model as the thread tooltip names it: its registry label, else the raw id; "Default" when unset. */
 export function modelLabel(model: string, models: readonly Choice[]): string {
   const m = model.trim();

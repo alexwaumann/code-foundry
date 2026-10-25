@@ -129,6 +129,17 @@ func TestDecidePlacement(t *testing.T) {
 		{name: "like of a thread without a project, with a workspace: the workspace places it", src: &home, explicit: true,
 			req:  placeRequest{workspaceID: "w-9", wsMembers: []string{"docs"}, wsDefault: "docs"},
 			want: placement{projectIDs: []string{"docs"}, primary: "docs", workspaceID: "w-9"}},
+		// thread new-like --project workspace: the like thread's own workspace folder (fuzz D finding 2).
+		{name: "like: its workspace's folder as the primary", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{wsPrimary: true},
+			want: placement{projectIDs: []string{"api", "web"}, workspacePrimary: true, worktreeMode: true, branch: "feat/x", workspaceID: "w-1", from: "p"}},
+		{name: "like: a thread in its workspace's folder, the folder again", src: &wsParent, explicit: true,
+			req:  placeRequest{wsPrimary: true},
+			want: placement{projectIDs: []string{"api", "web"}, workspacePrimary: true, workspaceID: "w-2", from: "w"}},
+		{name: "like: the workspace's folder of a thread without a workspace", src: &coParent, cos: coCheckouts, explicit: true,
+			req: placeRequest{wsPrimary: true}, wantErr: ErrInvalidArgument},
+		{name: "like: the workspace's folder of a thread without a project", src: &home, explicit: true,
+			req: placeRequest{wsPrimary: true}, wantErr: ErrInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

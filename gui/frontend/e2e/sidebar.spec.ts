@@ -91,7 +91,7 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
-test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, workspace badges, no project or worktree rows", async ({ page }) => {
+test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace's name on line 2 (no badge), no project or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();

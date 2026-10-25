@@ -52,9 +52,9 @@ describe("helpers", () => {
     expect(setName(s, s.workspaceId ? "shop" : "", (id) => id.charAt(0).toUpperCase() + id.slice(1))).toBe(want);
   });
 
-  it("primaryOptions: Workspace first with a workspace, then the projects by id", () => {
+  it("primaryOptions: the workspace folder first with a workspace, then the projects by name", () => {
     expect(primaryOptions({ projectIds: ["api", "web"], workspaceId: "w-shop" }, "shop", (id) => id)).toEqual([
-      { value: WORKSPACE_PRIMARY, label: "Workspace", detail: "shop's own folder" },
+      { value: WORKSPACE_PRIMARY, label: "Workspace folder", detail: "shop's folder" },
       { value: "api", label: "api" },
       { value: "web", label: "web" },
     ]);
@@ -81,5 +81,10 @@ describe("helpers", () => {
     ];
     expect(canSaveAsWorkspace(ids, saved)).toBe(want);
     expect(matchingWorkspace(["web", "api"], saved)?.id).toBe("w-shop");
+  });
+
+  it("canSaveAsWorkspace: never for a thread in its workspace's folder (it belongs to that workspace)", () => {
+    expect(canSaveAsWorkspace(["api", "notes", "web"], [], false)).toBe(true);
+    expect(canSaveAsWorkspace(["api", "notes", "web"], [], true)).toBe(false);
   });
 });

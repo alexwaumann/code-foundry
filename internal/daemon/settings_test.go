@@ -24,6 +24,19 @@ func TestLogLevel(t *testing.T) {
 	}
 }
 
+// Every command that starts a thread with a model and effort takes the settings' as its
+// defaults; thread.new-like was missing (fuzz D follow-up).
+func TestRegistryOverridesThreadStarters(t *testing.T) {
+	var s settings.Settings
+	s.Threads.DefaultModel, s.Threads.DefaultEffort = "claude-haiku-5-5[1m]", "low"
+	defs := registryOverrides(s).ArgDefaults
+	for _, name := range []string{"thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"} {
+		if got := defs[name]; got["model"] != "claude-haiku-5-5[1m]" || got["effort"] != "low" {
+			t.Errorf("%s defaults = %v", name, got)
+		}
+	}
+}
+
 func openSettings(t *testing.T) *settings.Store {
 	t.Helper()
 	st, err := settings.Open(context.Background(), settings.Options{

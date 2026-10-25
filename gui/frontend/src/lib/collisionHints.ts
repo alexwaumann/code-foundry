@@ -98,6 +98,21 @@ function samePath(a: string, b: string): boolean {
   return a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
 }
 
+/** A hint with the thread labels' " (<id>)" taken out: the daemon's "fix (s-12)" reads as the composer's "fix". */
+function hintText(h: string): string {
+  return h.replace(/ \([^\s()]+\)(?= also works there$|$)/, "");
+}
+
+/**
+ * The daemon's after-create hints the composer did not already show under its chips
+ * (`shown`, the composer's own lines), compared by text with the daemon's thread ids left
+ * out. Each is said once, never as a toast after the same line in the composer.
+ */
+export function unshownHints(warnings: readonly string[], shown: readonly string[]): string[] {
+  const seen = new Set(shown.map(hintText));
+  return warnings.filter((w) => !seen.has(hintText(w)));
+}
+
 /**
  * One line per checkout of `mine` another thread that is not archived (and is not
  * `self`) also has: in worktree mode a plain folder "<name> is a folder, not a repo:

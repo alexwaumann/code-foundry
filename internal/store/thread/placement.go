@@ -81,6 +81,14 @@ type placement struct {
 // decidePlacement is the placement for req, copying from src when it is set (Like when
 // explicit, else the creator). srcCheckouts are src's checkouts (checkoutsOf). Pure.
 func decidePlacement(src *Thread, explicit bool, req placeRequest, srcCheckouts []Checkout) (placement, error) {
+	if req.wsPrimary && req.workspaceID == "" && (src == nil || !explicit || src.WorkspaceID == "") {
+		// The like thread's own workspace folder: only a like thread with a workspace has one.
+		why := ""
+		if src != nil {
+			why = "; thread " + src.ID + " has none"
+		}
+		return placement{}, fmt.Errorf("%w: project %q (the workspace's folder) needs a workspace%s", ErrInvalidArgument, workspace.PrimaryWorkspace, why)
+	}
 	if req.workspaceID != "" && !explicit {
 		return workspacePlacement(req) // told where: the workspace, not the creator
 	}
@@ -403,6 +411,10 @@ func (m *Manager) placeRequest(o CreateOptions) (placeRequest, map[string]string
 			req.wsPrimary = true
 			o.ProjectID = ""
 		}
+	} else if keyword && strings.TrimSpace(o.Like) != "" {
+		// The like thread's workspace folder, when it has a workspace (decidePlacement checks).
+		req.wsPrimary = true
+		o.ProjectID = ""
 	} else if keyword {
 		return req, nil, fmt.Errorf("%w: project %q (the workspace's folder) needs a workspace", ErrInvalidArgument, o.ProjectID)
 	}
