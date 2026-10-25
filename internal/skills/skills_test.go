@@ -414,16 +414,19 @@ func TestRender(t *testing.T) {
 	// Workspaces v2 (workspaces-v2-5-skills): a child inherits its creator's projects,
 	// workspace, branch and mode; --projects narrows a worker, one worker per checkout,
 	// archiving removes clean worktrees. Nothing says a new worktree is in one project.
-	orch := string(files[skills.Orchestrate+"/SKILL.md"])
-	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`),\n   workspace, branch and mode",
-		"collide (`thread new` warns): one worker per checkout", "`--projects <a,b>` for only those its task touches", "`--new-branch`",
+	// Compared with the line breaks folded to spaces: the paragraph is reflowed as it grows.
+	orch := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/SKILL.md"])), " ")
+	patterns := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/reference/patterns.md"])), " ")
+	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`), workspace, branch and mode",
+		"without `--new-worktree` (or `--new-branch`) it shares your worktrees", "one worker per checkout",
+		"`--projects` keeps it to the projects its task touches", "thread new --projects <project id> --new-worktree",
 		"removes clean worktrees no other thread uses, never a branch"} {
 		if !strings.Contains(orch, want) {
 			t.Errorf("orchestrate SKILL.md lacks %q", want)
 		}
 	}
-	for _, gone := range []string{"It keeps the\n   worktree and branch", "terminal or workspace on"} {
-		if strings.Contains(orch, gone) || strings.Contains(string(files[skills.Orchestrate+"/reference/patterns.md"]), gone) {
+	for _, gone := range []string{"It keeps the worktree and branch", "terminal or workspace on", "terminal or workspace still uses"} {
+		if strings.Contains(orch, gone) || strings.Contains(patterns, gone) {
 			t.Errorf("the orchestrate skill still says %q", gone)
 		}
 	}

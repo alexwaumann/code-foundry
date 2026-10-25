@@ -18,7 +18,7 @@ func TestSystemPrompt(t *testing.T) {
 		t.Errorf("ThreadPrompt does not name the entry skill first: %q", ThreadPrompt)
 	}
 	for _, want := range []string{"code-foundry-orchestrate", "code-foundry-help", "code-foundry-plugin", "delegate work to other threads", "build plugins",
-		"split up, run in parallel or landed on several branches", "never the Agent tool", "hand-made worktrees", "read-only research"} {
+		"split up, run in parallel or landed on several branches", "nor the Agent tool (read-only research)", "never hand-made worktrees"} {
 		if !strings.Contains(ThreadPrompt, want) {
 			t.Errorf("ThreadPrompt does not name %q: %q", want, ThreadPrompt)
 		}
@@ -28,7 +28,13 @@ func TestSystemPrompt(t *testing.T) {
 	// model-paths) and HTML, pull requests, where thread new puts a thread (the model's
 	// call, no recommendation: thread-new-base-origin), replaced slash commands, page
 	// verbs, no command names to the user.
-	for _, want := range []string{"how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both",
+	//
+	// The scope rule (control-8-memory-scope), with the workspace's folder between the app
+	// memory and Claude's own: without it a "remember for this workspace" went to memory add,
+	// then to the primary repo's CLAUDE.md (workspaces-v2-5-skills).
+	for _, want := range []string{"how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; " +
+		"a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo; " +
+		"what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both",
 		"code-foundry usage.show", "view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked)",
 		"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line", "a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown", "code-foundry pr.create (project.github.publish",
 		"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call",

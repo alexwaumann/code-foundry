@@ -33,32 +33,32 @@ ones you create stay out of it unless you hand them over.
    cover a task. `code-foundry project list` prints each project's name and id.
 
    ```
-   code-foundry thread new --project <project id> --new-worktree \
+   code-foundry thread new --projects <project id> --new-worktree \
      --name "Fix the login redirect" --brief "What and why, at most 500 characters" \
      --labels bug,auth --notify --request-id fix-login-redirect \
      --prompt "The whole task: goal, files it owns, how to verify, push, report last."
    ```
 
    It prints `created thread <name> (<id>) in <worktree>`; its branch follows settings
-   (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's report,
-   never from its name. A child inherits your projects (`code-foundry thread checkouts`),
-   workspace, branch and mode: without `--new-worktree` it shares your worktrees, and two
-   threads in one checkout collide (`thread new` warns): one worker per checkout. With
-   several projects, `--new-worktree` (or `--new-branch`) gives each a worktree on the new
-   branch: `--projects <a,b>` for only those its task touches (`reference/patterns.md` §2c).
-   The prompt is all the child knows (`reference/patterns.md` §0 is the checklist): say what
-   done means, which files it owns, and how to verify ("no new errors against the base",
-   never "must pass"). Edits at one spot of one file conflict: new code and its tests go in
-   the child's own new files, each child gets a distinct anchor in a shared switch or list,
-   and a README or changelog has one owner (or you, after the merge). Tell it to stage only
-   the files it changed (never `git add -A`), to push with `git push origin HEAD` (not
-   `-u`), never `git stash`, to open a PR only if `origin` is on GitHub (else pushing is
-   done), to check `git diff origin/<default> --stat` against what it claims, and to finish,
-   as its LAST step, with `code-foundry thread report done "<summary>" --data '{"branch":
-   "...", "files": [...]}'` (or `blocked`/`failed`), the summary at most 1000 characters
-   with its caveats first, and again after any later message. Work built on a sibling's
-   branch: `--base origin/<its branch>` once pushed, else `--base <its branch>
-   --base-from-origin no` (§2b).
+   (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's report, never
+   from its name. A child inherits your projects (`code-foundry thread checkouts`),
+   workspace, branch and mode: without `--new-worktree` (or `--new-branch`) it shares your
+   worktrees, and two threads in one checkout collide (`thread new` warns): one worker per
+   checkout. `--projects` keeps it to the projects its task touches (`a,b` for several;
+   `--project` picks where it starts), each in a worktree on its new branch
+   (`reference/patterns.md` §2c). The prompt is all the child knows
+   (`reference/patterns.md` §0 is the checklist): say what done means, which files it owns,
+   and how to verify ("no new errors against the base", never "must pass"). Edits at one spot
+   of one file conflict: new code and its tests go in the child's own new files, each child
+   gets a distinct anchor in a shared switch or list, and a README or changelog has one owner
+   (or you, after the merge). Tell it to stage only the files it changed (never `git add
+   -A`), to push with `git push origin HEAD` (not `-u`), never `git stash`, to open a PR only
+   if `origin` is on GitHub (else pushing is done), to check `git diff origin/<default>
+   --stat` against what it claims, and to finish, as its LAST step, with `code-foundry thread
+   report done "<summary>" --data '{"branch": "...", "files": [...]}'` (or
+   `blocked`/`failed`), the summary at most 1000 characters with its caveats first, and again
+   after any later message. Work built on a sibling's branch: `--base origin/<its branch>`
+   once pushed, else `--base <its branch> --base-from-origin no` (§2b).
 2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
    - `code-foundry thread wait <id> --for 30m` returns when the child finishes, fails, or
      asks you something: answer with the `thread respond` line it prints, then wait again.

@@ -32,25 +32,27 @@ const MaxWorkspaceInstructions = 32 << 10
 // entry skill first, which says what the app can do and routes to the others: driving
 // other threads, answering questions about the app, building plugins
 // (docs/notes/agent-skills.md, control-4-capabilities.md). Then the routing a thread
-// needs when no skill fires, as on ordinary task-shaped prompts: where preferences,
-// cost, showing things, pull requests and slash commands go in this app
+// needs when no skill fires, as on ordinary task-shaped prompts: where preferences
+// (the app memory, a workspace's folder, Claude's own memory files:
+// docs/notes/workspaces-v2-5-skills.md), cost, showing things, pull requests and slash
+// commands go in this app
 // (docs/notes/control-7-skill-routing.md), how to write a path so its chip opens the
 // file (absolute or against the cwd, which the chip resolves against:
 // docs/notes/model-paths.md), and where thread new puts a thread, stated without a
 // recommendation: the model's call (docs/notes/thread-new-base-origin.md). Its last
 // sentence holds the orchestration rule (docs/notes/orch-skill-v2.md). Static: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
-const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
-	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
+const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help for app questions, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
+	"Here: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
 	"cost: code-foundry usage.show; " +
-	"to show something: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
+	"to show: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
 	"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line; a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown; " +
-	"PRs: code-foundry pr.create (project.github.publish if not on GitHub); " +
+	"PRs: code-foundry pr.create (project.github.publish off GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
-	"never tell the user to type /model or /cost; " +
+	"never suggest /model or /cost; " +
 	"page verbs (view.*) move every window: prefer panel verbs; " +
-	"say what you will do, not command or skill names. " +
-	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
+	"say what you'll do, not command or skill names. " +
+	"Work split up, run in parallel or landed on several branches goes through code-foundry-orchestrate, never hand-made worktrees or branches, nor the Agent tool (read-only research)."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then a referenced workspace's
 // instructions (workspaceBlock) when there are any, then the app memory's entries
