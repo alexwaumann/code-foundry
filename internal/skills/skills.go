@@ -1,7 +1,8 @@
 // Package skills renders and installs the Claude Code skills the daemon ships to every
 // thread: code-foundry (the entry skill: what the app can do and which skill to read),
 // code-foundry-orchestrate (delegating work to other threads), code-foundry-help (how-to
-// questions about the app) and code-foundry-plugin (building plugins). Their SKILL.md files and the worked examples are static (files/, embedded);
+// questions about the app), code-foundry-plugin (building plugins) and code-foundry-pages
+// (HTML pages that call the app through /cf/bridge.js). Their SKILL.md files and the worked examples are static (files/, embedded);
 // their command and settings references are rendered from the daemon's own registry and
 // settings schema at every start (internal/guide), so they never drift from the build
 // that serves them. Nothing in a skill runs a shell command when it loads (managed

@@ -3,12 +3,14 @@ package command
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/bridge"
 )
 
 // view.inline: an HTML page shown inline in a thread's conversation
@@ -45,13 +47,21 @@ const (
 		"--cf-text-muted, --cf-accent, --cf-border, …), not fixed colours or prefers-color-scheme"
 	WarnNoResize = "page does not post cf:resize, so its card keeps the default height; on load, post " +
 		`{type: "cf:resize", height: document.body.scrollHeight} to parent`
+	// WarnNoBridge: the page calls window.cf without the script that defines it
+	// (docs/notes/bridge-3-skill.md).
+	WarnNoBridge = "page uses cf.* but does not load /cf/bridge.js, so window.cf is undefined; add " +
+		`<script src="/cf/bridge.js"></script> before your own scripts`
 )
+
+// bridgeCall is how a page uses the bridge's window.cf.
+var bridgeCall = regexp.MustCompile(`\bcf\.(run|on|ready|storage|thread)\b`)
 
 // pageReadMax is how much of a page pageWarnings reads.
 const pageReadMax = 256 << 10
 
 // pageWarnings reads the page shown (through Files, as view.panel.file's check does) and
-// says what it misses: the theme stylesheet, the resize message. A plain substring test:
+// says what it misses: the theme stylesheet, the resize message (which the bridge script
+// posts itself), the bridge script when it uses window.cf. A plain substring test:
 // a page that names them only in a comment passes, which is fine for a hint. Nothing when
 // the page cannot be read (it was shown; the GUI says what is wrong).
 func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string {
@@ -67,8 +77,13 @@ func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string 
 	if !strings.Contains(text, "/cf/theme.css") {
 		out = append(out, WarnNoThemeCSS)
 	}
-	if !strings.Contains(text, "cf:resize") {
+	// The bridge posts cf:resize itself.
+	hasBridge := strings.Contains(text, bridge.Path)
+	if !hasBridge && !strings.Contains(text, "cf:resize") {
 		out = append(out, WarnNoResize)
+	}
+	if !hasBridge && bridgeCall.MatchString(text) {
+		out = append(out, WarnNoBridge)
 	}
 	return out
 }
@@ -78,7 +93,7 @@ func (d ViewDeps) inlineCommand() Command {
 	return Command{
 		Name:         "view.inline",
 		Title:        "Show HTML Page Inline",
-		Description:  "Show an HTML page inline in a thread's conversation.",
+		Description:  "Show an HTML page inline in a thread's conversation; with /cf/bridge.js it can call Code Foundry.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		// The CLI outside a thread too, so it reaches runInline's "needs a thread" (and

@@ -99,6 +99,7 @@ func TestRender(t *testing.T) {
 		"code-foundry-help/reference/themes.md",
 	}
 	want = append(want, pluginSkillFiles...)
+	want = append(want, pagesSkillFiles...)
 	if len(files) != len(want) {
 		t.Errorf("files = %q, want %q", paths, want)
 	}
@@ -525,6 +526,8 @@ func TestShipped(t *testing.T) {
 		{Name: skills.Help, Purpose: "Answer how-to questions about Code Foundry, the app this thread runs in", Path: "/home/.claude/skills/code-foundry-help/SKILL.md"},
 		{Name: skills.Orchestrate, Purpose: "Run several pieces of work in parallel as Code Foundry threads, each in its own worktree and branch",
 			Path: "/home/.claude/skills/code-foundry-orchestrate/SKILL.md"},
+		{Name: skills.Pages, Purpose: "Build an HTML page that reads Code Foundry live and acts on it through /cf/bridge.js",
+			Path: "/home/.claude/skills/code-foundry-pages/SKILL.md"},
 		{Name: skills.Plugin, Purpose: "Build, debug and publish a Code Foundry plugin", Path: "/home/.claude/skills/code-foundry-plugin/SKILL.md"},
 	}
 	if !slices.Equal(got, want) {

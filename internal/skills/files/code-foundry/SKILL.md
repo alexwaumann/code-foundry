@@ -31,7 +31,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
-| A page, chart or HTML you make; a form, checklist or countdown "as a page" or "I can fill in" | an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) |
+| A page, chart, form, board, dashboard or tool you make; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) and can read and change the app |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
@@ -55,8 +55,8 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 `--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status fills
 `--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
-It posts `{type: "cf:resize", height}` (body height, on load) to fit its inline card.
-`view.inline` warns about what a page misses. More: code-foundry-help.
+`/cf/bridge.js` lets it call the app and fits its card (else post `{type: "cf:resize", height}`).
+`view.inline` warns about what a page misses. More: code-foundry-pages.
 
 ## Making a theme
 
