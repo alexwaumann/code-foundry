@@ -368,7 +368,7 @@ export function ProjectsPage() {
       <PaneHeader className="gap-3 px-5">
         <FolderGit2 className="size-4 text-cf-text-muted" aria-hidden />
         <h1 className="text-heading">Projects</h1>
-        <span className="text-caption tabular-nums" data-testid="projects-counts">
+        <span className="text-caption whitespace-nowrap tabular-nums" data-testid="projects-counts">
           {all.projects.length} {all.projects.length === 1 ? "project" : "projects"} · {all.workspaces.length} {all.workspaces.length === 1 ? "workspace" : "workspaces"}
         </span>
         <div className="relative ml-1 flex w-[220px] min-w-0 shrink items-center [--wails-draggable:no-drag]">
