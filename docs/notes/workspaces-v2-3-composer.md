@@ -122,4 +122,20 @@ Status: done on branch `cf/workspaces-v2-composer`. Design record:
   this branch from the row menu (prefill, read-only parts, another primary, the args, the
   new row), the header menu and the palette, Escape back; a workspace removed under its
   composer. `composer-switch.spec.ts` for the picker's placement, keyboard and moves.
-* Live app: see the PR body (isolated `CODE_FOUNDRY_HOME=/tmp/cfv2-gui3`).
+* **Live app** (isolated `CODE_FOUNDRY_HOME=/tmp/cfv2-gui3`, scratch repos `web` and `api`
+  and a folder `notes` under `~/cfv2-scratch-gui3`, Haiku 5.5 at medium effort, one-word
+  prompts; all removed afterwards):
+  * from the CLI: a set thread with fresh copies on `feat/checkout`, a `--workspace shop`
+    thread, a `web,notes` set with the folder as the primary (the CLI printed the
+    collision hint "web @ main is also open in Shop banner");
+  * the built Wails app (`make gui-build`) showed line 2 as `2 projects @ feat/checkout`,
+    `shop @ main` and `2 projects` (a folder primary in place: no branch), and the
+    header the same; screenshots in the PR body;
+  * the composer flows were driven in WebKit (Playwright) on the Vite dev server against
+    the same daemon restarted with `--dev` (the native window cannot be driven here: no
+    accessibility permission for synthetic clicks): the set picker, chips, Runs in and
+    hints; a set sent with fresh copies and `api` as the primary (`2 projects @ cf/…`); New
+    thread on this branch from the row menu with another primary (the new thread on
+    `feat/checkout` in api's worktree, the daemon's two hints as toasts); Save as workspace
+    on the `web,notes` thread (`workspace list` showed `docs` with notes as the default
+    primary, the thread's `workspaceId` set, its line 2 `docs`).

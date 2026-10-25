@@ -80,8 +80,8 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
 function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
-  // Member project names, in member order (projects the store does not know show their id).
-  const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r)));
+  // Member project names by name, case-insensitively (projects the store does not know show their id).
+  const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))));
   return (
     <CommandItem
       value={workspaceValue(id)}
