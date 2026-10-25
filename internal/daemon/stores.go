@@ -103,6 +103,9 @@ type stores struct {
 	// stopWorkspaceContents stops the glue that has the workspace store read a managed
 	// dir again when one of its threads ends a turn (workspace_contents.go).
 	stopWorkspaceContents func()
+	// stopWorkspaceProjects stops the glue that drops unregistered projects from
+	// workspaces (workspace_projects.go).
+	stopWorkspaceProjects func()
 	// archived removes an archived thread's derived worktrees nobody else has, in the
 	// background (cleanup_archived.go); stopped after thread, before project.
 	archived *archiveCleaner
@@ -208,6 +211,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	// (and re-checks its managed dir). New makes every managed dir.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
 		DB: s.db, Projects: s.project, Dir: p.Workspaces(), Home: s.home, Bus: s.bus, Log: log.With("store", "workspace"),
+		// Removing a synthetic workspace deletes its managed dir: not while a thread runs
+		// there (the thread store opens after this one; workspace_projects.go).
+		InUse: func(w workspace.Workspace) error {
+			if s.thread == nil {
+				return nil
+			}
+			return workspaceInUse(s.thread.Snapshot(), w)
+		},
 	}); err != nil {
 		return nil, err
 	}
@@ -304,6 +315,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
 	s.stopWorkspaceContents = startWorkspaceContents(ctx, log.With("store", "workspace"), s.thread.Snapshot, s.workspace, s.bus)
+	s.stopWorkspaceProjects = startWorkspaceProjects(ctx, log.With("store", "workspace"), s.workspace, s.project.Snapshot, s.bus)
 	// Once thread, action and gitops exist: they decide what a scheduled fetch's auto
 	// pull leaves alone, and gitops runs the pull (autopull.go).
 	s.project.SetAutoPull(autoPullHooks(autoPullSources{
@@ -386,6 +398,9 @@ func (s *stores) close() error {
 	}
 	if s.stopProjectActivity != nil {
 		s.stopProjectActivity()
+	}
+	if s.stopWorkspaceProjects != nil {
+		s.stopWorkspaceProjects()
 	}
 	if s.stopWorkspaceContents != nil {
 		s.stopWorkspaceContents()
