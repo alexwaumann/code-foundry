@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -94,6 +95,11 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 		}
 	}
 	children := ins.Msg.GetChildRepos()
+	if home, err := os.UserHomeDir(); err == nil && len(children) == 0 && (dir == home || dir == realPath(home)) {
+		// The inspection lists no children for home (the workspace store refuses it).
+		return Result{}, connect.NewError(connect.CodeFailedPrecondition,
+			fmt.Errorf("your home directory cannot be a workspace's root (its .claude is your own Claude config); pick a folder inside it"))
+	}
 	if len(children) == 0 {
 		return Result{}, connect.NewError(connect.CodeFailedPrecondition,
 			fmt.Errorf("no git repositories directly inside %s: add it as a project (`code-foundry project add %s`)", dir, dir))
