@@ -8,19 +8,13 @@
  *   cf.thread {id, name}          the thread the page is shown in
  *   cf.theme {id, scheme, vars}   the app's theme; cf.onTheme(fn) on every change
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
- *   cf.on(source, fn, onError?)   daemon events, fn(event, source); on returns an unsubscribe;
- *                                 a source not in cf.sources throws
- *   cf.off(source, fn?)
+ *   cf.on(source, fn) / cf.off    daemon events, fn(event, source); on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
- *   cf.storage(prefix?)           the thread's page storage, kept by the daemon: it survives
- *                                 reloads and app restarts and every page of the thread shares
- *                                 it (get/keys read at once; set/remove write through and
- *                                 return a Promise; 256 KiB per thread). Raw localStorage
- *                                 lasts only until the app quits.
+ *   cf.storage(prefix?)           the thread's page storage, kept across app restarts
  *
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
  * Every call is a postMessage to the app, which runs it as the page's thread would. A call
- * waiting on the user (the app's confirm dialog, open or queued) does not time out.
+ * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
  */
 (function () {
   "use strict";

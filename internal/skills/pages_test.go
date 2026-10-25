@@ -70,7 +70,7 @@ func TestRenderPagesSkill(t *testing.T) {
 	// The API block is bridge.js's header, verbatim.
 	for _, line := range []string{"cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}",
 		"cf.on(source, fn) / cf.off    daemon events, fn(event, source); on returns an unsubscribe",
-		`cf.storage(prefix?)           localStorage under "cf:<thread id>:"`} {
+		"cf.storage(prefix?)           the thread's page storage, kept across app restarts"} {
 		if !strings.Contains(body, "\n"+line+"\n") || !bytes.Contains(bridge.Script(), []byte(line)) {
 			t.Errorf("SKILL.md lacks the header line %q", line)
 		}

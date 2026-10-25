@@ -147,6 +147,11 @@ error, which is what the host's error badge reads.
 
 ## Gotchas
 
+- bridge.js's header comment is rendered into the pages skill (`{{cf.bridgeAPI}}`), which
+  `internal/skills/pages_test.go` caps at 160 lines and pins line by line. The header grew
+  by one line here (the storage line and a sentence on pending calls and `cf.on` throwing);
+  the full storage contract lives in the skill's State section (the sentence above).
+
 - A test harness that runs bridge.js with a fake `window` needs `console` on it: the script
   logs through `window.console`.
 - In the mock, `thread.archive` ignores `args.id` (it archives the context thread, the page's
