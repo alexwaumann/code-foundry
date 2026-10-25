@@ -106,7 +106,8 @@ func TestRenderPagesSkill(t *testing.T) {
 	// The API block is bridge.js's header, verbatim.
 	for _, line := range []string{"cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}",
 		"cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe",
-		"cf.storage(prefix?)           the thread's page storage, kept across app restarts"} {
+		"cf.storage(prefix?)           the thread's page storage, kept across app restarts",
+		"cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS"} {
 		if !strings.Contains(body, "\n"+line+"\n") || !bytes.Contains(bridge.Script(), []byte(line)) {
 			t.Errorf("SKILL.md lacks the header line %q", line)
 		}
@@ -146,7 +147,8 @@ func TestRenderPagesSkill(t *testing.T) {
 		"A starter list: every verb the CLI runs works", "not an error. Button back, at most a muted", "never print `text`",
 		"`request-id` per row: a second click then resolves with the same thread, a success",
 		// Limits.
-		"**On screen only.**", "SSO and OAuth redirects", "ask the user to paste an API", "a plugin is needed",
+		"**On screen only.**", "SSO and OAuth redirects", "to paste an API token into a password field", "send it in a header with `cf.fetch`",
+		"Plain `fetch` only for an API known to allow any origin", "CORS never blocks it", "localhost is refused", "any status resolves",
 		"**Data a source lacks**", "A plugin cannot feed a page",
 		"reference/examples.md", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
 	} {
@@ -239,7 +241,10 @@ func TestRenderPagesSkill(t *testing.T) {
 			t.Errorf("reference/sources.md has no section for %s", s)
 		}
 	}
-	for _, want := range []string{"THREAD_STATUS_IDLE", "AtMs", "`new Date(ms)`", "code unavailable"} {
+	for _, want := range []string{"THREAD_STATUS_IDLE", "AtMs", "`new Date(ms)`", "code unavailable",
+		// cf.fetch (bridge-fetch): the shape, the errors, the destinations.
+		"## External APIs: cf.fetch and tokens", "resolves for every status", "`json()` throws", "Private networks",
+		"localhost, 127.0.0.1", "1 MiB", "8 MiB", "120 s at most", "no Origin"} {
 		if !strings.Contains(ref, want) {
 			t.Errorf("reference/sources.md lacks %q", want)
 		}
@@ -247,7 +252,8 @@ func TestRenderPagesSkill(t *testing.T) {
 
 	ex := string(files[skills.Pages+"/reference/examples.md"])
 	for _, want := range []string{`cf.on("gh"`, `cf.run("pr.merge"`, `"head-sha": pr.headSha`, `cf.run("thread.new"`, "Promise.allSettled",
-		`type="password"`, `cf.storage("linear")`, "await cf.ready"} {
+		`type="password"`, `cf.storage("linear")`, "await cf.ready", `cf.fetch("https://api.linear.app/graphql"`, "res.json()",
+		`id="refresh"`, "res.status === 401"} {
 		if !strings.Contains(ex, want) {
 			t.Errorf("examples.md lacks %q", want)
 		}

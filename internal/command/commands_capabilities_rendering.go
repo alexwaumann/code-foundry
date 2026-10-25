@@ -61,7 +61,14 @@ var Renderings = []Rendering{
 		"reloads and app restarts, every page of the thread shares it (one prefix each) and the same page in another thread starts empty; " +
 		"get/keys answer at once, set/remove/clear return a Promise; raw localStorage lasts only until the app quits. " +
 		"A page runs only while it is on screen, so no background " +
-		"work: a wake (thread subscribe) or a plugin. Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead."},
+		"work: a wake (thread subscribe) or a plugin. " +
+		"cf.fetch(url, {method, headers, body, timeout}) makes an HTTP request from Code Foundry, not the page, so the API's CORS rules never " +
+		"block it (a page's own fetch fails for any API that does not allow the pages origin, most internal ones); it needs no click, " +
+		"resolves for every status with {status, ok, headers, text(), json()} (the body whole, text and json answer at once) and rejects " +
+		"with invalid (a bad URL, a refused host: this Mac's own and link-local addresses; private networks are allowed), failed (no answer) " +
+		"or timeout (30 s by default, 120 s at most); bodies up to 1 MiB out and 8 MiB back; no cookies or Origin are sent. " +
+		"Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead, keep it in cf.storage and send it " +
+		"in a header with cf.fetch."},
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
 		"Undo (back to what the slot showed just before: another theme, or the colours the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
 		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +

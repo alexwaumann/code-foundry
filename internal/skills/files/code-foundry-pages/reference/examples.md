@@ -135,8 +135,9 @@ made the first time, which is a success, not an error.
 ## A page that needs a token: an external API
 
 The frame cannot sign in (no SSO or OAuth redirects, none of the browser's cookies), so the
-page asks for an API token once and keeps it in `cf.storage`. Linear's GraphQL API takes a
-personal API key in `Authorization` and allows cross-origin calls.
+page asks for an API token once and keeps it in `cf.storage`. `cf.fetch` sends the request
+from Code Foundry, so it works whether or not the API allows the page's origin (most
+company APIs do not). Linear's GraphQL API takes a personal API key in `Authorization`.
 
 ```html
 <!doctype html>
@@ -146,55 +147,80 @@ personal API key in `Authorization` and allows cross-origin calls.
 <style>
   body { margin: 0; padding: 12px; }
   input { background: var(--cf-input); color: var(--cf-text); border: 1px solid var(--cf-border); border-radius: 6px; padding: 4px 8px; }
-  button { background: var(--cf-accent); color: var(--cf-accent-foreground); border: 0; border-radius: 6px; padding: 4px 10px; }
+  button { background: var(--cf-accent); color: var(--cf-accent-foreground); border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button.quiet { background: transparent; color: var(--cf-text-muted); }
+  button:disabled { opacity: .5; cursor: default; }
   .muted { color: var(--cf-text-muted); } .bad { color: var(--cf-error-text); }
-  a { color: var(--cf-link); }
+  ul { padding-left: 18px; } a { color: var(--cf-link); }
 </style>
 <body class="text-body">
 <form id="ask" hidden>
   <p class="muted">Paste a Linear personal API key (Linear › Settings › Security & access).</p>
   <input id="key" type="password" autocomplete="off"> <button>Save</button>
 </form>
-<div id="out"></div>
+<div id="bar" hidden>
+  <button id="refresh">Refresh</button> <button id="forget" class="quiet">Forget the key</button>
+  <span id="status" class="muted"></span>
+</div>
+<ul id="list"></ul>
 <script type="module">
   await cf.ready;
   const store = cf.storage("linear");
-  const out = document.getElementById("out");
-  const ask = document.getElementById("ask");
+  const $ = (id) => document.getElementById(id);
+  const query = "{ viewer { assignedIssues(first: 50, filter: {state: {type: {nin: [\"completed\", \"canceled\"]}}}) { nodes { identifier title url state { name } } } } }";
+  const say = (text, cls = "muted") => { $("status").textContent = text; $("status").className = cls; };
+
+  function row(i) {
+    const li = document.createElement("li");
+    li.append(Object.assign(document.createElement("a"), { href: i.url, target: "_blank", textContent: `${i.identifier} ${i.title}` }), ` · ${i.state.name}`);
+    return li;
+  }
 
   async function load() {
     const key = store.get("key");
-    if (!key) { ask.hidden = false; return; }
-    out.textContent = "Loading…";
+    $("ask").hidden = !!key;
+    $("bar").hidden = !key;
+    if (!key) return;
+    $("refresh").disabled = true;
+    say("Loading…");
     try {
-      const res = await fetch("https://api.linear.app/graphql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: key },
-        body: JSON.stringify({ query: "{ viewer { assignedIssues(first: 50, filter: {state: {type: {nin: [\"completed\", \"canceled\"]}}}) { nodes { identifier title url state { name } } } } }" }),
-      });
-      const body = await res.json();
-      if (!res.ok || body.errors) throw new Error(body.errors?.[0]?.message ?? res.statusText);
-      out.replaceChildren(...body.data.viewer.assignedIssues.nodes.map((i) => {
-        const p = document.createElement("p");
-        p.append(Object.assign(document.createElement("a"), { href: i.url, target: "_blank", textContent: `${i.identifier} ${i.title}` }), ` · ${i.state.name}`);
-        return p;
-      }));
+      // Code Foundry makes the request: no CORS. An object body is sent as JSON.
+      const res = await cf.fetch("https://api.linear.app/graphql", { method: "POST", headers: { Authorization: key }, body: { query } });
+      if (res.status === 401 || res.status === 403) {
+        await store.remove("key");
+        $("list").replaceChildren();
+        $("ask").hidden = false;
+        $("bar").hidden = false;
+        say("Linear refused the key: paste a new one.", "bad");
+        return;
+      }
+      const body = res.json(); // the body came back whole: no await needed
+      if (!res.ok || body.errors) throw new Error(body.errors?.[0]?.message ?? `${res.status} ${res.statusText}`);
+      const issues = body.data.viewer.assignedIssues.nodes;
+      $("list").replaceChildren(...issues.map(row));
+      say(`${issues.length} open · updated ${new Date().toLocaleTimeString()}`);
     } catch (e) {
-      out.innerHTML = "";
-      out.append(Object.assign(document.createElement("p"), { className: "bad", textContent: `Linear: ${e.message}` }));
-      ask.hidden = false; // a wrong or expired key: ask again
+      say(`Linear: ${e.message}`, "bad"); // failed (no answer), timeout, or the API's own error
+    } finally {
+      $("refresh").disabled = false;
     }
   }
 
-  ask.addEventListener("submit", (ev) => {
+  $("ask").addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    store.set("key", document.getElementById("key").value.trim());
-    ask.hidden = true;
+    await store.set("key", $("key").value.trim());
+    $("key").value = "";
+    load();
+  });
+  $("refresh").addEventListener("click", load);
+  $("forget").addEventListener("click", async () => {
+    await store.remove("key");
+    $("list").replaceChildren();
     load();
   });
   load();
 </script>
 ```
 
-A `fetch` needs no gesture (it is not a Code Foundry verb). Refresh such a list from a
-button the user clicks, not on a timer: a page runs only while it is on screen.
+`cf.fetch` needs no click (it changes nothing in Code Foundry), but refresh such a list
+from a button the user clicks, not on a timer: a page runs only while it is on screen.

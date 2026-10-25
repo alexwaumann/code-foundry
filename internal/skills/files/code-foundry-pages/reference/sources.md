@@ -44,14 +44,38 @@ pointer makes a click act on the wrong one. So:
 thread's storage is full (256 KiB, 1 KiB a key) or the write was refused: the value is
 then put back. Another page of the thread writing a key updates this page's copy.
 
-## Tokens for an external API
+## External APIs: cf.fetch and tokens
 
 The frame cannot sign in: SSO and OAuth redirects fail, and it has none of the user's
-browser cookies. For an external API (Linear, Jira, Sentry) ask the user to paste an API
-token into a password field, keep it in `cf.storage`, and send it in `fetch` headers;
-never write it into the file. The API must allow cross-origin calls (GitHub's and
-Linear's do); if it does not, say a plugin is needed. A `fetch` is not a Code Foundry
-verb: it needs no click.
+browser cookies. For an external API (Linear, Jira, Sentry, a company's own) ask the user to
+paste an API token into a password field, keep it in `cf.storage`, and send it in a header
+with `cf.fetch`; never write it into the file.
+
+`cf.fetch(url, init?)` has the Fetch API's shape, but Code Foundry makes the request, not
+the page, so the browser's CORS check never applies. A page's own `fetch` to an API that
+does not allow the page's origin fails whatever the token, and most internal APIs do not.
+
+- `init.method` (GET), `init.headers` an object of strings, `init.body` a string, or an
+  object sent as JSON with `Content-Type: application/json` unless you set one;
+  `init.timeout` in ms (30 s by default, 120 s at most).
+- It resolves for every status with `{status, statusText, ok, url, headers, text(), json()}`:
+  `headers` a plain object with lower-case names; `text()` and `json()` read the body, which
+  came back whole, and answer at once (`json()` throws on a body that is not JSON). Check
+  `res.ok`; on a 401 or 403 ask for the token again; show the status otherwise.
+- It rejects with `invalid` (a bad URL, a scheme other than http or https, a Cookie, Origin
+  or Host header, a body over 1 MiB, a refused host), `failed` (no answer: DNS, TLS, the
+  network, more than 5 redirects or one to another scheme, an answer over 8 MiB),
+  `timeout`, or `unavailable` (the page is not shown in a thread). Show `e.message`.
+- The app sends no cookies and no Origin, and adds `User-Agent: code-foundry/<version>`
+  unless you set one. An Authorization header is not sent on to a redirect to another domain.
+- Refused hosts: this Mac's own (localhost, 127.0.0.1, ::1, 0.0.0.0) and link-local
+  addresses (169.254.x.x). Private networks (10.x, 172.16-31.x, 192.168.x) are allowed, so
+  a company API on the VPN works; a dev server on this Mac does not: say so.
+- No click needed: it changes nothing in Code Foundry. A request that changes the service
+  (a POST that files an issue) still belongs in a click handler. Fetches count with `cf.run`
+  calls: 32 at the app at once, more wait.
+- Plain `fetch` still works for an API known to allow any origin (GitHub's does); use
+  `cf.fetch` for everything else.
 
 ## thread-list
 
