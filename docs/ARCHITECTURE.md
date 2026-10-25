@@ -97,8 +97,8 @@ internal/
     newproject/            new projects in the projects dir (git init, register); gh repo create to publish
     backdrop/              the user's backdrop images: copies named by content, selected through settings
     update/                release checks via gh (stable or tip channel), downloads and installs with the embedded installer
-    workspace/             branch sets: one branch as a worktree in several projects
-                           (docs/notes/workspaces-1-store.md)
+    workspace/             saved project sets with a managed dir for their instructions and
+                           skills (docs/notes/workspaces-v2-2-workspaces.md)
     action/                per-project actions (named command lines) and their runs, in a
                            kind=action terminal or in the background with captured output
                            (docs/notes/actions-1-daemon.md)
@@ -178,13 +178,13 @@ Services (v1):
   copy another thread's placement (`like_thread_id`, `new_branch`; a creating thread's
   is copied the same way) and answers collision hints; Checkouts lists a thread's
   checkouts (`docs/notes/workspaces-v2-1-threads.md`). Create can
-  make the worktrees first (`new_worktree`), start a thread in a workspace member
-  (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
+  make the worktrees first (`new_worktree`), reference a workspace (`workspace_id`: its
+  members are the set, its folder may be the cwd), or start without a project in the
   home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No
   project" picker row and composer: `docs/notes/no-project-2-gui.md`), sends the first prompt as
   the thread's first user message, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
-  `docs/notes/workspaces-2-launch.md`. Every thread runs headless (`claude -p` over
+  `docs/notes/workspaces-v2-2-workspaces.md`. Every thread runs headless (`claude -p` over
   stream-json, no terminal; the conversation is ThreadService items). The terminal
   thread mode (Claude's own interface in a PTY) was removed on 2026-10-12
   (`docs/notes/rendered-only.md`). A thread carries lifecycle `state` (starting,
@@ -249,11 +249,11 @@ Services (v1):
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   DeleteBranch (a branch no worktree has checked out, `-d` unless forced, origin's on
   request; `docs/notes/orch-cli-batch.md`), CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
-  no thread (archived ones aside), terminal or workspace on it; never deletes branches;
+  no thread (archived ones aside; any of its checkouts) or terminal on it; never deletes branches;
   each removed or kept worktree comes with its reason, which the confirmation lists;
   `force` also removes those kept only for uncommitted changes, which are marked so
   the command can ask first; a removal refused for uncommitted changes, here or in
-  RemoveWorktree and the workspace removals, carries an `UncommittedWork` detail;
+  RemoveWorktree, carries an `UncommittedWork` detail;
   `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
@@ -328,10 +328,13 @@ Services (v1):
   window auto-starts the installed daemon. `app.relaunch` and `daemon.restart` restart
   the halves separately and install nothing. See `docs/notes/update-restart.md`,
   `docs/notes/update-download-then-install.md` and `docs/notes/release-channels.md`.
-* `WorkspaceService` — List, Create, AddProject, RemoveProject, Remove, Members (by id, name,
-  or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
-  The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),
-  and the composer starts threads in them (`docs/notes/workspaces-3-composer.md`).
+* `WorkspaceService` — List, Create, AddProject, RemoveProject, Rename, SetDefaultPrimary,
+  Remove, Watch. A workspace is a saved set of projects (`members`, sorted ids), a
+  `default_primary` (a member or `workspace`), an optional `root_path` and a managed dir,
+  `<config home>/workspaces/<id>`: a synthetic workspace keeps its CLAUDE.md, AGENTS.md
+  and `.claude/skills` there; a rooted one holds links to its root's, re-checked at every
+  spawn. No branch, no worktrees. See `docs/notes/workspaces-v2-2-workspaces.md`. The GUI
+  gets workspaces from EventService's `workspace` source (a `workspaces` slice).
 * `FilesystemService` — ListDirectories: completes a typed path prefix to directories
   under the user's home (is_git, registered, common completion), for the palette's
   `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `project.Register` enforces
@@ -443,17 +446,19 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   Every spawn (create, a start on send, fork) first makes missing derived worktrees again
   (`ensureMembers`, beside `recreate.go`'s for the primary) and gives Claude `--add-dir`
   for every other member's checkout; a missing one is a spawn error. `workspace_id` is an
-  optional reference; until the workspace store's reshape a referenced v1 workspace's
-  member worktrees, `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` and one static
-  `--append-system-prompt` line pointing at `code-foundry workspace members` still come
-  with it, after the static line every thread gets pointing at the skills below and sending split-up,
+  optional reference to a workspace (`thread new --workspace`: its members are the set
+  unless `--projects`, its default primary the cwd, `workspace` its folder): every spawn
+  re-checks its managed dir, passes it as an `--add-dir` and appends its CLAUDE.md (else
+  AGENTS.md, at most 32 KiB) under "Workspace <name> instructions", unless the thread runs
+  in the managed dir or the root, where Claude loads them itself; that block follows the
+  static line every thread gets pointing at the skills below and sending split-up,
   parallel or multi-branch work to the orchestrate skill rather than the Agent tool
   (`ThreadPrompt`; `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`,
-  `docs/notes/orch-skill-v2.md`). `ThreadService.Checkouts` (`thread checkouts`) lists a
+  `docs/notes/orch-skill-v2.md`, `docs/notes/workspaces-v2-2-workspaces.md`). `ThreadService.Checkouts` (`thread checkouts`) lists a
   thread's checkouts; Create answers collision hints (a checkout another live thread has)
   that the CLI prints on stderr. An archive hands the thread to the daemon
   (`Options.Archived`), which removes each derived worktree the app made that is clean
-  and that no other thread, terminal or v1 workspace holds (`project.ArchivedVerdict`,
+  and that no other thread or terminal holds (`project.ArchivedVerdict`,
   `internal/daemon/cleanup_archived.go`), never its branch
   (`docs/notes/workspaces-v2-1-threads.md`).
 * **Skills**: at every start the daemon writes four Claude Code skills, `code-foundry`
@@ -464,7 +469,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `<config home>/claude/.claude/skills` (`internal/skills`: static SKILL.md files
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
-  `--add-dir`, before the attachments dir, the other members' checkouts and grants
+  `--add-dir`, before the attachments dir, a workspace's managed dir, the other members' checkouts and grants
   (`docs/notes/agent-skills.md`). Every skill file carries a provenance line under its
   title (`version.Info.Provenance`: the build, and its source on GitHub at the release
   tag or commit), and the help skill sends internals questions to that source
@@ -475,12 +480,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   index, `MEMORY.md`, written and never read (at most 40 entries, 4 KiB injected), written
   only by the daemon through `memory.*`. The old single `memory.md` is imported once at
   start. Every spawn reads the entries (`Options.Memory`) and, when there are any, appends
-  them under one heading after the `ThreadPrompt` (and workspace) line, before a thread's
+  them under one heading after the `ThreadPrompt` line and a workspace's instructions, before a thread's
   own append (`docs/notes/control-3-app-memory.md`, `docs/notes/memory-dir.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
   same `claudeCommand` path, read from the plugin store by a function the daemon sets
   (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,
-  the other members' checkouts, grants), their env after the daemon's and the workspace's, their PATH
+  the managed dir, the other members' checkouts, grants), their env after the daemon's, their PATH
   entries in front of PATH. A spawn may wait up to 2 s for a plugin still starting; the
   effort restart never waits and re-reads them. Naming and shells get none
   (`docs/notes/plugins-3-events-flags-env.md`).
@@ -551,7 +556,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   thread also has every link of the threads it created (`CreatedBy`, transitively, not
   forks): each new link is copied up the chain with its source and the direct child it
   came through (`docs/notes/linked-prs-children.md`). And it has every pull request whose
-  head is a branch it works on (its worktree's, or each workspace member's) in the
+  head is a branch it works on (each of its checkouts') in the
   project's GitHub repository: the daemon matches them against the GitHub store's cached
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
   store as `branch` links (`docs/notes/linked-prs-branch.md`).
@@ -604,8 +609,8 @@ type Command struct {
 ```
 
 `Context` is what the caller is looking at: active thread, active project/worktree, active
-view, and the workspace that owns the active thread or composer (so `thread.run-in` is
-offered for workspace threads only; the `thread.*` commands,
+view, and the workspace the active thread or composer references (`thread.run-in` is
+offered for any thread, the daemon refusing one with no other checkout; the `thread.*` commands,
 send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands/agents, are
 offered whenever a thread is active). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front

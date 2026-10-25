@@ -201,11 +201,6 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 	)
 }
 
-func withPositional(s ArgSpec) ArgSpec {
-	s.Positional = true
-	return s
-}
-
 // describeWorkspace is "shop (w-…): 2 projects (api, web), starts in api, folder /…".
 func describeWorkspace(w *v1.Workspace) string {
 	n := len(w.GetMembers())
