@@ -8,6 +8,12 @@
 /** The primary that runs a thread in its workspace's folder (thread.new --project workspace). */
 export const WORKSPACE_PRIMARY = "workspace";
 
+/**
+ * How the GUI names a workspace's folder as a place to run (the Runs in picker, Run
+ * in…): never just "Workspace", which reads like a project named "workspace".
+ */
+export const WORKSPACE_FOLDER = "Workspace folder";
+
 /** A workspace as the set logic needs it. */
 export interface SetWorkspace {
   /** Member project ids. */
@@ -93,7 +99,7 @@ export function byName(ids: readonly string[], name: (id: string) => string): st
   return [...ids].sort((a, b) => name(a).localeCompare(name(b), undefined, { sensitivity: "base" }) || byId(a, b));
 }
 
-/** A primary picker option: "Workspace" (its folder) first when there is a workspace, then the projects by name. */
+/** A primary picker option: the workspace's folder (WORKSPACE_FOLDER, "<name>'s folder") first when there is a workspace, then the projects by name. */
 export interface PrimaryOption {
   value: string;
   label: string;
@@ -102,7 +108,7 @@ export interface PrimaryOption {
 
 export function primaryOptions(s: Pick<ResolvedSet, "projectIds" | "workspaceId">, workspaceName: string, name: (id: string) => string): PrimaryOption[] {
   const out: PrimaryOption[] = [];
-  if (s.workspaceId) out.push({ value: WORKSPACE_PRIMARY, label: "Workspace", detail: `${workspaceName || s.workspaceId}'s own folder` });
+  if (s.workspaceId) out.push({ value: WORKSPACE_PRIMARY, label: WORKSPACE_FOLDER, detail: `${workspaceName || s.workspaceId}'s folder` });
   for (const id of byName(s.projectIds, name)) out.push({ value: id, label: name(id) });
   return out;
 }
@@ -115,8 +121,10 @@ export function matchingWorkspace<W extends { id: string; members: readonly stri
 
 /**
  * Whether "Save as workspace" applies to a thread: two or more projects and no saved
- * workspace with the same set.
+ * workspace with the same set. Never for a thread running in its workspace's folder
+ * (`inWorkspaceFolder`): it belongs to that workspace, and the daemon refuses to change
+ * its reference.
  */
-export function canSaveAsWorkspace(projectIds: readonly string[], workspaces: readonly { id: string; members: readonly string[] }[]): boolean {
-  return projectIds.length >= 2 && matchingWorkspace(projectIds, workspaces) === undefined;
+export function canSaveAsWorkspace(projectIds: readonly string[], workspaces: readonly { id: string; members: readonly string[] }[], inWorkspaceFolder = false): boolean {
+  return !inWorkspaceFolder && projectIds.length >= 2 && matchingWorkspace(projectIds, workspaces) === undefined;
 }

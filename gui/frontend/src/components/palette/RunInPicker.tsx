@@ -2,7 +2,7 @@ import { FolderGit2, Layers } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { tildify } from "@/lib/path";
-import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
+import { WORKSPACE_FOLDER, WORKSPACE_PRIMARY } from "@/lib/projectSet";
 import { worktreeBranch } from "@/lib/threadRow";
 import { runThreadIn } from "@/stores/threadActions";
 import { useProjectsStore } from "@/stores/projects";
@@ -34,7 +34,7 @@ function MemberItem({ projectId, path, current, queued, onPick }: { projectId: s
 }
 
 /**
- * The palette's "Run in…" page: the thread's workspace folder ("Workspace", when it
+ * The palette's "Run in…" page: the thread's workspace folder ("Workspace folder", when it
  * references one) and its projects' checkouts; picking one invokes thread.run-in for the
  * thread (the daemon moves a live thread once it is idle).
  */
@@ -70,8 +70,8 @@ export function RunInPicker({ threadId, close }: { threadId: string; close: () =
             >
               <Layers className="size-4 text-cf-highlight-text" aria-hidden />
               <span className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">Workspace</span>
-                <span className="truncate text-caption">{wsName}&apos;s own folder</span>
+                <span className="truncate font-medium">{WORKSPACE_FOLDER}</span>
+                <span className="truncate text-caption">{wsName}&apos;s folder</span>
               </span>
               {primary === "" && <span className="ml-auto text-caption">runs here</span>}
             </CommandItem>

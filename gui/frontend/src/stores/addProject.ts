@@ -4,10 +4,8 @@ import { inspectFolder, registerProject, type AddedProjectView, type FolderInfoV
 import { errorMessage } from "@/api/stream";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
-import { workspaceKey } from "@/lib/projects";
 import { useProjectsStore } from "./projects";
-import { revealOnProjectsPage } from "./projectsPage";
-import { useUiStore } from "./ui";
+import { showWorkspaceCard } from "./projectsPage";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
 /** The Add Project dialog's tabs, in display order. */
@@ -158,8 +156,7 @@ export function addProjectEscapeBack(): boolean {
 
 /** Shows a workspace just added: the Projects page, its cursor on the new card (scrolled into view) once the card is there. */
 export function showAddedWorkspace(workspaceId: string): void {
-  useUiStore.getState().select({ kind: "view", name: "projects" });
-  revealOnProjectsPage(workspaceKey(workspaceId));
+  showWorkspaceCard(workspaceId);
 }
 
 /**

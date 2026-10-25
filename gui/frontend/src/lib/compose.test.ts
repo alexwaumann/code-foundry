@@ -248,6 +248,17 @@ describe("project sets", () => {
   ])("setWorkIn: %s", (_name, choice, setting, want) => {
     expect(setWorkIn(choice, setting)).toBe(want);
   });
+
+  it("setWorkIn: a set without a git project runs in place, whatever the pick or the setting", () => {
+    expect(setWorkIn({ kind: "new" }, "new", false)).toBe("current");
+    expect(setWorkIn(null, "new", false)).toBe("current");
+    expect(setWorkIn({ kind: "new" }, "current", true)).toBe("new");
+  });
+
+  it("threadArgs: a workspace without projects sends no projects list (never an empty one)", () => {
+    const place: ThreadPlace = { kind: "set", projectIds: [], primary: "workspace", workspaceId: "w-0", newWorktree: false, base: "" };
+    expect(threadArgs(place, prompt, [])).toEqual({ project: "workspace", workspace: "w-0", "new-worktree": "false", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" });
+  });
 });
 
 describe("Work in", () => {

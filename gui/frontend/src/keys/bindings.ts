@@ -1,6 +1,7 @@
 import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { sidebarAnchor } from "@/lib/inSidebar";
+import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
 import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
@@ -130,18 +131,18 @@ const paletteHidden: ReadonlySet<string> = new Set(["thread.agent.open", "thread
 
 /**
  * Whether the palette lists this command: startable here, and not one it cannot prompt for
- * (paletteHidden). thread.run-in only for a thread with somewhere else to run (the daemon
- * offers it for every thread: its availability cannot count checkouts).
+ * (paletteHidden). thread.run-in only for a thread with somewhere else to run and
+ * thread.new-like only for one with a project or workspace (lib/threadRow; the daemon's
+ * availability is the same rule, this keeps a list fetched before the thread changed honest).
  */
 export function inPalette(c: CommandView): boolean {
-  if (c.name === "thread.run-in" && !canRunElsewhere(getUiContext().activeThreadId)) return false;
+  if (c.name === "thread.run-in" && !canRunElsewhere(activeThread())) return false;
+  if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
   return isStartable(c) && !paletteHidden.has(c.name) && !c.name.startsWith("ember.");
 }
 
-/** A thread with another project of its set, or a workspace's folder, to run in. */
-function canRunElsewhere(threadId: string): boolean {
-  const t = useThreadsStore.getState().byId[threadId];
-  return t !== undefined && (t.projectIds.length > 1 || t.workspaceId !== "");
+function activeThread() {
+  return useThreadsStore.getState().byId[getUiContext().activeThreadId];
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
@@ -199,12 +200,11 @@ export function isGlobalChord(chord: string): boolean {
 }
 
 /**
- * Opens the "Run in…" picker for a thread with somewhere else to run: another project of
- * its set, or its workspace's folder. False for a single-project thread without a
- * workspace (or none), so the command falls back to its default presentation.
+ * Opens the "Run in…" picker for a thread with somewhere else to run (lib/threadRow
+ * canRunElsewhere). False otherwise, so the command falls back to its default presentation.
  */
 export function openRunInPicker(threadId: string): boolean {
-  if (!canRunElsewhere(threadId)) return false;
+  if (!canRunElsewhere(useThreadsStore.getState().byId[threadId])) return false;
   const ui = useUiStore.getState();
   const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
   // Deferred: picked inside the palette, the palette closes after the presenter runs.

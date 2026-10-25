@@ -7,7 +7,12 @@ import type { ThreadView } from "@/api/threads";
 import {
   addAttachments,
   clearDraft,
+  composeIn,
   composeLike,
+  convertGoneLikeDraft,
+  isSetEmpty,
+  NO_SET,
+  sendDraft,
   composeNoProject,
   composeSelection,
   composeTarget,
@@ -117,6 +122,38 @@ describe("compose drafts", () => {
     expect(draftSet(login, getDraft("ws:w-1"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk" });
     await toggleDraftProject(login, "repo-sk");
     expect(draftSet(login, getDraft("ws:w-1"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp"], primary: "repo-gp" });
+  });
+
+  it("taking out every project of a workspace drops the reference too: no set, nothing to send", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    await toggleDraftProject(cf, "repo-gp");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-sk"], workspaceId: "w-1" });
+    await expect(toggleDraftProject(cf, "repo-sk")).resolves.toBe(true);
+    const set = draftSet(cf, getDraft("repo-cf"));
+    expect(set).toMatchObject({ projectIds: [], workspaceId: "", primary: "", isSet: false });
+    expect(isSetEmpty(set)).toBe(true);
+    updateDraft("repo-cf", { text: "go" });
+    await expect(sendDraft(cf, { model: "m", effort: "e" })).resolves.toBe(false);
+    expect(getDraft("repo-cf")).toMatchObject({ phase: "idle", error: NO_SET });
+    // A project picked again is the set.
+    await toggleDraftProject(cf, "repo-gp");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp"], workspaceId: "" });
+  });
+
+  it("a workspace target emptied the same way drops its own reference", async () => {
+    await toggleDraftProject(login, "repo-gp");
+    await toggleDraftProject(login, "repo-sk");
+    expect(isSetEmpty(draftSet(login, getDraft("ws:w-1")))).toBe(true);
+  });
+
+  it("composeIn: an empty draft starts again from the project alone; one with text keeps its set", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    composeIn("repo-cf");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-cf"], workspaceId: "" });
+    await pickDraftWorkspace(cf, "w-1");
+    updateDraft("repo-cf", { text: "keep" });
+    composeIn("repo-cf");
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1" });
   });
 
   it("a new primary resets the base (its refs differ)", () => {
@@ -229,6 +266,28 @@ describe("New thread on this branch", () => {
     expect(sel).toEqual({ kind: "compose", projectId: "repo-gp", likeThreadId: "s-1" });
     if (sel.kind !== "compose") throw new Error("not a composer");
     expect(composeTarget(sel)).toEqual({ kind: "like", threadId: "s-1" });
+  });
+
+  it("a like draft whose thread is removed becomes a plain draft with its set and primary, text kept", async () => {
+    useProjectsStore.setState({
+      byId: {
+        "repo-cf": { id: "repo-cf", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] },
+        "repo-gp": { id: "repo-gp", path: "/src/gp", name: "gp", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] },
+      },
+      order: ["repo-cf", "repo-gp"],
+    });
+    expect(composeLike("s-1")).toBe(true);
+    await Promise.resolve();
+    updateDraft("like:s-1", { text: "next step", primary: "repo-cf" });
+    expect(convertGoneLikeDraft("s-1")).toBe(false); // still there
+    useThreadsStore.setState({ byId: {}, order: [] });
+    expect(convertGoneLikeDraft("s-1")).toBe(true);
+    expect(useComposeStore.getState().drafts["like:s-1"]).toBeUndefined();
+    expect(getDraft("repo-cf")).toMatchObject({ text: "next step", workspace: "", primary: "repo-cf", worktree: { kind: "new" } });
+    expect(draftSet({ kind: "project", projectId: "repo-cf" }, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-cf", "repo-gp"], primary: "repo-cf", isSet: true });
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-cf" });
+    // Once only.
+    expect(convertGoneLikeDraft("s-1")).toBe(false);
   });
 
   it("the place is the thread itself; another primary only when picked", () => {

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useSidebarShown } from "@/stores/lineage";
 import { openPullRequestInPanel } from "@/stores/prPanel";
+import { showWorkspaceCard } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ThreadMenu } from "./ThreadMenu";
@@ -62,21 +63,34 @@ function LinkedPrs({ threadId }: { threadId: string }) {
   return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} className="text-cf-text-muted" data-testid="pane-linked-prs" />;
 }
 
-/** The referenced workspace by name, opening its surface (view.panel.workspace); only for a thread that references one. */
+/**
+ * The referenced workspace by name, opening the Projects page with its card as the
+ * cursor row (stores/projectsPage showWorkspaceCard, as after Add as workspace); only for
+ * a thread that references a workspace the slice knows.
+ */
 function WorkspaceChip({ threadId }: { threadId: string }) {
   const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  // A workspace the slice does not know (older daemon, or just removed) shows its id, like the sidebar badge.
-  const name = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : ""));
-  if (!workspaceId) return null;
+  const name = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
+  if (!workspaceId || !name) return null;
   return (
-    <CommandButton
-      command="view.panel.workspace"
-      icon={Layers}
-      label={name}
+    <Button
+      type="button"
+      variant="ghost"
       size="xs"
       className="min-w-0 gap-1.5 px-1.5 text-caption-sm text-cf-text-muted [&_svg]:size-3.5"
+      tabIndex={-1}
+      aria-label={`Workspace ${name}: show it on the Projects page`}
       data-testid="pane-workspace"
-    />
+      onMouseDown={(e) => {
+        e.preventDefault();
+      }}
+      onClick={() => {
+        showWorkspaceCard(workspaceId);
+      }}
+    >
+      <Layers aria-hidden />
+      <span className="truncate">{name}</span>
+    </Button>
   );
 }
 

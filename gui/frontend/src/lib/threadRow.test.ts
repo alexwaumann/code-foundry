@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNoProject, modelLabel, NO_PROJECT, projectOfPath, setLabel, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
+import { canNewLike, canRunElsewhere, isNoProject, modelLabel, NO_PROJECT, projectOfPath, setLabel, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
 
 const projects: ProjectLookup & { order: string[] } = {
   order: ["api", "notes", "web"],
@@ -129,5 +129,22 @@ describe("helpers", () => {
     expect(projectOfPath(projects, "/wt/api/cf-login")).toBe("api");
     expect(projectOfPath(projects, "/src/web/docs")).toBe("web");
     expect(projectOfPath(projects, "/nowhere/x")).toBe("x");
+  });
+});
+
+describe("canNewLike and canRunElsewhere (the menus', the palette's and the daemon's rule)", () => {
+  it.each([
+    ["no project", [], "", false, false],
+    ["one project", ["web"], "", true, false],
+    ["one project and a workspace: its folder is the other place", ["web"], "w-1", true, true],
+    ["two projects", ["api", "web"], "", true, true],
+    ["a workspace without projects, in its folder", [], "w-1", true, false],
+  ])("%s", (_name, projectIds, workspaceId, newLike, runIn) => {
+    expect(canNewLike({ projectIds, workspaceId })).toBe(newLike);
+    expect(canRunElsewhere({ projectIds, workspaceId })).toBe(runIn);
+  });
+  it("an unknown thread gets neither", () => {
+    expect(canNewLike(undefined)).toBe(false);
+    expect(canRunElsewhere(undefined)).toBe(false);
   });
 });

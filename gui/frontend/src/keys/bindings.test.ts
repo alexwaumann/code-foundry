@@ -445,10 +445,17 @@ describe("Run in… presentation (thread.run-in)", () => {
   });
 
   it("opens the member picker for a workspace thread", async () => {
-    useThreadsStore.setState({ byId: { s1: thread("s1", { workspaceId: "w-1" }) }, order: ["s1"] });
+    useThreadsStore.setState({ byId: { s1: thread("s1", { projectId: "web", projectIds: ["web"], workspaceId: "w-1" }) }, order: ["s1"] });
     expect(openRunInPicker("s1")).toBe(true);
     await Promise.resolve();
     expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "runin", threadId: "s1" });
+  });
+
+  it("is not offered in a workspace without projects: its folder is the only place", async () => {
+    useThreadsStore.setState({ byId: { s1: thread("s1", { projectIds: [], workspaceId: "w-1" }) }, order: ["s1"] });
+    expect(openRunInPicker("s1")).toBe(false);
+    await Promise.resolve();
+    expect(useUiStore.getState().palette.open).toBe(false);
   });
 
   it("is not offered for a project thread or an unknown one", async () => {

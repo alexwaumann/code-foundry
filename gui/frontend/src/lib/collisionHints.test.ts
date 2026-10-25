@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collisionHints, draftCheckouts, threadCheckouts, type HintProjects, type HintThread } from "./collisionHints";
+import { collisionHints, draftCheckouts, threadCheckouts, unshownHints, type HintProjects, type HintThread } from "./collisionHints";
 
 const projects: HintProjects = {
   web: {
@@ -108,5 +108,24 @@ describe("collisionHints", () => {
     ["the thread itself does not count", { checkouts: [{ projectId: "web", path: "/src/web" }], worktreeMode: false }, "s-1", []],
   ])("%s", (_name, mine, self, want) => {
     expect(collisionHints(mine, others, projects, self)).toEqual(want);
+  });
+});
+
+describe("unshownHints", () => {
+  const shown = ["web @ main is also open in Busy one", "notes is a folder, not a repo: thread Busy one also works there"];
+  it("drops the daemon's lines the composer showed (its thread labels carry the id)", () => {
+    expect(
+      unshownHints(
+        ["web @ main is also open in Busy one (s-12)", "notes is a folder, not a repo: thread Busy one (s-12) also works there", "api @ main is also open in Other (s-3)"],
+        shown,
+      ),
+    ).toEqual(["api @ main is also open in Other (s-3)"]);
+  });
+  it("keeps everything when nothing was shown, and an unnamed thread's id-only label", () => {
+    expect(unshownHints(["web @ main is also open in s-12"], [])).toEqual(["web @ main is also open in s-12"]);
+    expect(unshownHints(["web @ main is also open in s-12"], ["web @ main is also open in s-12"])).toEqual([]);
+  });
+  it("a thread named like another one with brackets still differs", () => {
+    expect(unshownHints(["web @ main is also open in fix (wip) (s-1)"], ["web @ main is also open in fix"])).toEqual(["web @ main is also open in fix (wip) (s-1)"]);
   });
 });

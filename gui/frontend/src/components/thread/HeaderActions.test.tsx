@@ -23,6 +23,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
+const { useProjectsPageStore } = await import("@/stores/projectsPage");
 const { useActionsStore } = await import("@/stores/actions");
 const { useSettingsStore } = await import("@/stores/settings");
 
@@ -34,7 +35,7 @@ const detail = (o: Partial<PullRequestView>): PullRequestDetailView => ({ pullRe
 beforeEach(() => {
   getPullRequestDetail.mockImplementation(() => new Promise(() => undefined));
   pullRequestDetailResource.store.setState({ entries: {} });
-  useCommandsStore.setState({ commands: [cmd("thread.snooze", "Snooze or Unsnooze Thread"), cmd("thread.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
+  useCommandsStore.setState({ commands: [cmd("thread.snooze", "Snooze or Unsnooze Thread"), cmd("thread.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
   useWorkspacesStore.setState({ byId: {} });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
   // A project the thread runs in, so it has one (its More menu shows).
@@ -61,7 +62,7 @@ describe("HeaderActions", () => {
     expect(order()).toEqual(["pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
   });
 
-  it("a workspace thread: the workspace chip by name first, opening view.panel.workspace", () => {
+  it("a workspace thread: the workspace chip by name first, opening the Projects page on its card", () => {
     useWorkspacesStore.setState({ byId: { w1: { name: "release-channels", members: [] } as never } });
     setThread({ workspaceId: "w1", linkedPullRequests: [link(1), link(2), link(3)] });
     render(<HeaderActions threadId="s-1" />);
@@ -70,7 +71,15 @@ describe("HeaderActions", () => {
     expect(ws.textContent).toBe("release-channels");
     expect(ws.getAttribute("title")).toBeNull();
     fireEvent.click(ws);
-    expect(startCommandNamed).toHaveBeenCalledWith("view.panel.workspace");
+    expect(startCommandNamed).not.toHaveBeenCalled();
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
+    expect(useProjectsPageStore.getState().reveal).toBe("ws:w1");
+  });
+
+  it("a workspace the slice does not know: no chip", () => {
+    setThread({ workspaceId: "w-gone" });
+    render(<HeaderActions threadId="s-1" />);
+    expect(screen.queryByTestId("pane-workspace")).toBeNull();
   });
 
   it.each([

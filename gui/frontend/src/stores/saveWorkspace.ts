@@ -26,11 +26,17 @@ export const useSaveWorkspaceStore = create<SaveWorkspaceState>()(() => ({ open:
 /** Whether "Save as workspace" applies to the thread (lib/projectSet canSaveAsWorkspace), as a narrow selector. */
 export function useCanSaveAsWorkspace(threadId: string): boolean {
   const ids = useThreadsStore((s) => (s.byId[threadId]?.projectIds ?? []).join("\u0000"));
+  // A thread in its workspace's folder (no project as its primary) belongs to that workspace.
+  const inFolder = useThreadsStore((s) => {
+    const t = s.byId[threadId];
+    return t !== undefined && t.projectId === "" && t.workspaceId !== "";
+  });
   return useWorkspacesStore((s) => {
     const projectIds = ids ? ids.split("\u0000") : [];
     return canSaveAsWorkspace(
       projectIds,
       s.order.map((id) => ({ id, members: s.byId[id]?.members.map((m) => m.projectId) ?? [] })),
+      inFolder,
     );
   });
 }

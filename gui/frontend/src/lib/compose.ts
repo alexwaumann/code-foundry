@@ -77,9 +77,12 @@ export function defaultWorktree(p: { setting?: string; mainPath?: string }): Pro
 /**
  * A set's mode (more than one project, or a workspace): fresh worktrees on one new branch
  * ("new") or every project's own checkout ("current"). The draft's pick (any existing
- * worktree counts as in place), else the setting, else in place.
+ * worktree counts as in place), else the setting, else in place. Always in place for a set
+ * without a git project (`hasGit` false: plain folders only, or a workspace without
+ * projects): there is nothing to make a worktree of.
  */
-export function setWorkIn(choice: WorktreeChoice | null, setting: string | undefined): WorkInMode {
+export function setWorkIn(choice: WorktreeChoice | null, setting: string | undefined, hasGit = true): WorkInMode {
+  if (!hasGit) return "current";
   if (choice) return choice.kind === "new" ? "new" : "current";
   return workInMode(setting) ?? "current";
 }
@@ -411,7 +414,9 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
       break;
     case "set":
       args.project = place.primary;
-      args.projects = place.projectIds.map((id) => (id === place.primary && place.base ? `${id}:${place.base}` : id)).join(",");
+      // Never an empty list: the daemon reads none as the workspace's members. Only a
+      // workspace without projects has none (sendDraft refuses any other empty set).
+      if (place.projectIds.length > 0) args.projects = place.projectIds.map((id) => (id === place.primary && place.base ? `${id}:${place.base}` : id)).join(",");
       if (place.workspaceId) args.workspace = place.workspaceId;
       args["new-worktree"] = String(place.newWorktree);
       break;

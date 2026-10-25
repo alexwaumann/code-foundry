@@ -42,16 +42,19 @@ import {
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { tildify } from "@/lib/path";
-import { byName, primaryOptions, resolveSet, setName, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
+import { byName, primaryOptions, resolveSet, setName, WORKSPACE_FOLDER, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import {
   addAttachments,
+  convertGoneLikeDraft,
   getDraft,
   isDraftEmpty,
+  isSetEmpty,
   loadRefs,
   noGitCheckout,
+  noteLikeSource,
   openPreview,
   removeAttachment,
   sendDraft,
@@ -221,11 +224,27 @@ function useLikeSource(threadId: string) {
   const branch = useThreadsStore((s) => s.byId[threadId]?.branch ?? "");
   const worktreeMode = useThreadsStore((s) => s.byId[threadId]?.createdWorktree ?? false);
   const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
+  const workspaceName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
   const projectId = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
   const name = useThreadsStore((s) => s.byId[threadId]?.name ?? "");
   const own = projectId || (workspaceId ? WORKSPACE_PRIMARY : "");
-  return { projectIds, sorted: ids, paths, branch, worktreeMode, workspaceId, own, name };
+  return { projectIds, sorted: ids, paths, branch, worktreeMode, workspaceId, workspaceName, own, name };
 }
+
+/**
+ * The like composer's heading name for a thread in place: its workspace's name, else its
+ * project's (or "N projects"; lib/projectSet setName). "" for an unknown thread.
+ */
+function useLikePlace(threadId: string): string {
+  const ids = useThreadsStore(useShallow((s) => s.byId[threadId]?.projectIds ?? []));
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
+  const wsName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
+  const names = useProjectNames(ids);
+  return setName({ projectIds: ids, workspaceId: wsName ? workspaceId : "" }, wsName, names);
+}
+
+/** The heading's switcher text while the draft has no set (every project of its workspace taken out). */
+const PICK_A_PROJECT = "Pick a project";
 
 /**
  * Removes an attachment from the draft. Still referenced by a chip in the text: asks
@@ -376,6 +395,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   const primary = like ? (primaryChoice && (primaryChoice === likeSrc.own || likeSrc.sorted.includes(primaryChoice) || (primaryChoice === WORKSPACE_PRIMARY && likeSrc.workspaceId)) ? primaryChoice : likeSrc.own) : set.primary;
   const primaryProject = primary === WORKSPACE_PRIMARY ? "" : primary;
   const isSet = !like && set.isSet;
+  // Every project of its workspace taken out: no set to send until one is picked.
+  const empty = !home && !like && isSetEmpty(set);
   const single = !like && !home && !set.isSet ? (set.projectIds[0] ?? "") : "";
   const worktrees = useWorktrees(single);
   const mainPath = worktrees.find((w) => w.isMain)?.path;
@@ -388,7 +409,9 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   const refs = useComposeStore((s) => s.refs[primaryProject]?.refs);
   const defaultRef = useComposeStore((s) => s.refs[primaryProject]?.defaultRef ?? "");
 
-  const setMode = setWorkIn(choice, workInSetting);
+  // A set without a git project (plain folders, or a workspace without projects) runs in place: nothing to make a worktree of.
+  const setGit = useProjectsStore((s) => (isSet ? set.projectIds.filter((id) => s.byId[id]?.git === true).length : 0));
+  const setMode = setWorkIn(choice, workInSetting, setGit > 0);
   const worktree: WorktreeChoice = like
     ? likeSrc.worktreeMode
       ? { kind: "new" }
@@ -400,10 +423,9 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, mainPath }), worktrees);
   const chosen = !isSet && worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
   const projectNames = useProjectNames(like ? likeSrc.sorted : set.projectIds);
-  const gitCount = useProjectsStore((s) => (isSet && worktree.kind === "new" ? set.projectIds.filter((id) => s.byId[id]?.git === true).length : 0));
-  const newWorktrees = home || like || worktree.kind !== "new" ? 0 : isSet ? gitCount : 1;
+  const newWorktrees = home || like || worktree.kind !== "new" ? 0 : isSet ? setGit : 1;
   const base = baseChoice ?? defaultRef;
-  const canSend = !busy && (text.trim() !== "" || hasAttachments);
+  const canSend = !busy && !empty && (text.trim() !== "" || hasAttachments);
   const showBase = !like && worktree.kind === "new" && (isSet ? primaryGit : noGitPath === undefined);
 
   // "/" and "@": the set's projects (the primary first), each read from the checkout the
@@ -478,7 +500,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   const hints = useCollisionHints(mine);
 
   const send = () => {
-    if (canSend) void sendDraft(target, defaults);
+    // The hints shown here are not toasted again after the create.
+    if (canSend) void sendDraft(target, defaults, hints);
   };
 
   /** Pasted, dropped or picked files: thumbnails, and chips at the caret. */
@@ -490,13 +513,13 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
 
   const worktreeGroups = useMemo<PickerGroup[]>(() => {
     if (isSet) {
+      const inPlace = { value: "current", label: ALL_IN_PLACE, tag: "in place", detail: ALL_IN_PLACE_DETAIL, wrap: true };
+      // No git project: fresh copies would have nothing to copy (the note under the picker says so).
+      if (setGit === 0) return [{ heading: "Work in", options: [inPlace] }];
       return [
         {
           heading: "Work in",
-          options: [
-            { value: "new", label: FRESH_COPIES, tag: "new worktrees", detail: FRESH_COPIES_DETAIL, wrap: true },
-            { value: "current", label: ALL_IN_PLACE, tag: "in place", detail: ALL_IN_PLACE_DETAIL, wrap: true },
-          ],
+          options: [{ value: "new", label: FRESH_COPIES, tag: "new worktrees", detail: FRESH_COPIES_DETAIL, wrap: true }, inPlace],
         },
       ];
     }
@@ -518,7 +541,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         options: worktrees.filter((w) => !w.isMain).map((w) => ({ value: w.path, label: worktreeName(w), detail: tildify(w.path) })),
       },
     ];
-  }, [isSet, worktrees, noGitPath]);
+  }, [isSet, setGit, worktrees, noGitPath]);
 
   // A like draft: the thread's branch on every git project in worktree mode, else each checkout's.
   const likeBranches = useProjectsStore(
@@ -548,13 +571,13 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
     : workInText({ set: isSet, noGit: noGitPath !== undefined, worktree, chosen });
   const worktreeIcon = like ? (likeSrc.worktreeMode ? GitBranch : FolderGit2) : noGitPath !== undefined ? Folder : isSet ? (worktree.kind === "new" ? GitBranchPlus : FolderGit2) : !chosen ? GitBranchPlus : chosen.isMain ? FolderGit2 : GitBranch;
 
-  // The primary picker: "Workspace" (its folder) first when there is one, then the projects by id.
+  // The primary picker: the workspace's folder (WORKSPACE_FOLDER) first when there is one, then the projects by name.
   const primaryGroups = useMemo<PickerGroup[]>(() => {
     const s = like ? { projectIds: likeSrc.sorted, workspaceId: likeSrc.workspaceId } : set;
-    return [{ heading: "Runs in", options: primaryOptions(s, workspaceName, projectNames) }];
-  }, [like, likeSrc.sorted, likeSrc.workspaceId, set, workspaceName, projectNames]);
+    return [{ heading: "Runs in", options: primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames) }];
+  }, [like, likeSrc.sorted, likeSrc.workspaceId, likeSrc.workspaceName, set, workspaceName, projectNames]);
   const showPrimary = (isSet && (set.projectIds.length > 1 || set.workspaceId !== "")) || (like && (likeSrc.sorted.length > 1 || likeSrc.workspaceId !== ""));
-  const primaryText = primary === WORKSPACE_PRIMARY ? "Workspace" : projectNames(primary);
+  const primaryText = primary === WORKSPACE_PRIMARY ? WORKSPACE_FOLDER : projectNames(primary);
 
   // ListRefs order (local branches, then remote-tracking refs), the default first.
   const refGroups = useMemo<PickerGroup[]>(() => {
@@ -603,7 +626,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
             dragging ? "border-cf-info/70 bg-cf-info/5" : "border-cf-border bg-cf-surface-raised/85 in-[.file-drop-target-active]:border-cf-info/70 in-[.file-drop-target-active]:bg-cf-info/5",
           )}
         />
-        <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
+        {/* data-chord-yield: cmd chords bound to commands (cmd+n's picker, cmd+j) reach the app from the prompt, as from a thread's (keys/bindings.ts). */}
+        <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col" data-chord-yield="">
           <Attachments draftKey={draftKey} disabled={busy} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
           <TagMultiProjectContext.Provider value={sourceIds.length > 1}>
@@ -724,8 +748,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         )}
         {/* relative: the completion card hangs under this row, out of flow (CompletionCard). */}
         <div className="relative col-span-2 col-start-1 row-start-4 flex flex-wrap items-center gap-0.5 px-1 pt-2" data-testid="composer-worktree-row">
-          {/* No project: no worktree, branch or base to pick. */}
-          {!home && (
+          {/* No project (or an emptied set): no worktree, branch or base to pick. */}
+          {!home && !empty && (
             <>
               {like ? (
                 // What thread.new-like copies: read-only, not a Tab stop.
@@ -733,13 +757,20 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                   role="note"
                   aria-label={`Work in: ${worktreeText}`}
                   data-testid="composer-like-mode"
-                  className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-cf-surface-sunken/50 px-1.5 text-caption font-medium whitespace-nowrap select-none"
+                  // The editable pickers' role (Button xs: text-body-sm, medium); mono for a branch only.
+                  className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-cf-surface-sunken/50 px-1.5 text-body-sm font-medium whitespace-nowrap select-none"
                 >
                   {(() => {
                     const Icon = worktreeIcon;
                     return <Icon className="size-3 shrink-0" aria-hidden />;
                   })()}
-                  <span className="truncate font-mono">{worktreeText}</span>
+                  {likeSrc.worktreeMode && likeSrc.branch ? (
+                    <span className="truncate">
+                      On <span className="font-mono">{likeSrc.branch}</span>
+                    </span>
+                  ) : (
+                    <span className="truncate">{worktreeText}</span>
+                  )}
                 </div>
               ) : (
                 <ComposerPicker
@@ -753,7 +784,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                     // The pick is this draft's alone; the next draft starts from the setting again.
                     updateDraft(draftKey, { worktree: next });
                   }}
-                  footer={noGitPath === undefined ? WORK_IN_FOOTER : undefined}
+                  footer={noGitPath === undefined && !(isSet && setGit === 0) ? WORK_IN_FOOTER : undefined}
                   disabled={busy}
                   contentClassName="w-90"
                   listClassName="max-h-96"
@@ -801,13 +832,23 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                   data-testid="composer-base"
                 />
               )}
+              {isSet && setGit === 0 && (
+                <p className="basis-full px-1 pt-1 text-caption text-cf-text-muted" data-testid="composer-nogit-note">
+                  No git repository in this set: it runs in place
+                </p>
+              )}
             </>
+          )}
+          {empty && (
+            <p className="px-1 text-caption text-cf-text-muted" data-testid="composer-empty-note">
+              Pick a project or a workspace to start the thread in.
+            </p>
           )}
           <CompletionCard completion={completion} />
         </div>
         <div className="col-start-2 row-start-2 flex items-end pr-2 pb-2">
           {/* Icon-only until it sends; the span carries the tooltip while it is disabled. */}
-          <Tip label={busy ? null : "Start thread"}>
+          <Tip label={busy ? null : empty ? "Pick a project first" : "Start thread"}>
             <span className="flex">
               <button
                 type="button"
@@ -857,14 +898,29 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
   const threadsLoaded = useThreadsStore((s) => s.loaded);
   const likeKnown = useThreadsStore((s) => (likeThreadId ? likeThreadId in s.byId : false));
   const likeBranch = useThreadsStore((s) => (likeThreadId ? (s.byId[likeThreadId]?.branch ?? "") : ""));
-  const likeName = useThreadsStore((s) => (likeThreadId ? s.byId[likeThreadId]?.name || likeThreadId : ""));
+  const likePlace = useLikePlace(likeThreadId ?? "");
   const workspaceGone = useWorkspacesStore((s) => (workspaceId ? !(workspaceId in s.byId) : false));
   const busy = useDraft(key, "phase") !== "idle";
+  // Every project of its workspace taken out (stores/compose toggleDraftProject): the empty state.
+  const picked = useDraft(key, "projects");
+  const emptied = !likeThreadId && !noProject && !(workspaceId && workspaceGone) && picked !== null && isSetEmpty(set);
   let name: string | null;
-  if (likeThreadId) name = likeKnown ? likeName : null;
+  if (likeThreadId) name = likeKnown ? likePlace : null;
   else if (noProject) name = NO_PROJECT;
   else if (workspaceId && workspaceGone) name = null;
+  else if (emptied) name = PICK_A_PROJECT;
   else name = set.projectIds.length === 0 && !set.workspaceId ? null : setName(set, workspaceName, names);
+
+  // A like draft follows its thread: remembered while it shows, a plain draft once it is removed.
+  const likeStamp = useThreadsStore((s) => {
+    const t = likeThreadId ? s.byId[likeThreadId] : undefined;
+    return t ? [t.name, t.projectId, t.workspaceId, t.projectIds.join(","), t.createdWorktree ? "1" : ""].join(SEP) : "";
+  });
+  useEffect(() => {
+    if (!likeThreadId) return;
+    if (likeStamp) noteLikeSource(likeThreadId);
+    else if (threadsLoaded) convertGoneLikeDraft(likeThreadId);
+  }, [likeThreadId, likeStamp, threadsLoaded]);
   const loaded = likeThreadId ? threadsLoaded : workspaceId ? workspacesLoaded : projectsLoaded;
   const gone = likeThreadId ? "This thread no longer exists." : workspaceId ? "This workspace no longer exists." : "This project is no longer registered.";
   return (
@@ -883,15 +939,18 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
             <h1 className="mb-6 text-center text-title" data-testid="composer-heading">
               {likeThreadId ? (
                 // "New thread on this branch": the set is the thread's; nothing to switch.
+                // Worktree mode has the thread's branch; in place, the workspace's or the project's name.
                 likeBranch ? (
                   <>
                     What&apos;s next on <span className="font-mono" data-testid="composer-like-branch">{likeBranch}</span>?
                   </>
                 ) : (
                   <>
-                    What&apos;s next beside <span data-testid="composer-like-name">{name}</span>?
+                    What&apos;s next in <span data-testid="composer-like-name">{name}</span>?
                   </>
                 )
+              ) : emptied ? (
+                <ProjectSwitcher target={target} name={name} set={set} disabled={busy} />
               ) : (
                 <>
                   {/* "build with No project" reads as "with no project"; "in" would not. */}

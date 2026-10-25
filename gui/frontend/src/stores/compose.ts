@@ -48,6 +48,7 @@ import {
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
+import { unshownHints } from "@/lib/collisionHints";
 import { pdfSummary } from "@/lib/pdf";
 import { resolveSet, toggled, WORKSPACE_PRIMARY, type ResolvedSet, type SetDefaults } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
@@ -264,16 +265,25 @@ async function writeSet(target: ComposeTarget, picked: readonly string[], worksp
 /**
  * Adds a project to the draft's set, or removes it (its skill and file tags go too, after
  * a confirm when the text has any). The last project of a set without a workspace stays:
- * "No project" is its own target. Picked on the no-project composer, it moves the draft
- * to that project's composer instead.
+ * "No project" is its own target. The last project of a workspace's set takes the
+ * workspace reference with it: the draft has no set then (the composer's empty state,
+ * nothing to send) until a project or a workspace is picked, so an empty project list is
+ * never sent with a workspace (the daemon would read it as all its members). Picked on
+ * the no-project composer, it moves the draft to that project's composer instead.
  */
 export async function toggleDraftProject(target: ComposeTarget, projectId: string): Promise<boolean> {
   if (target.kind === "home") return switchDraftTarget(target, { kind: "project", projectId });
   if (target.kind === "like") return false;
   const set = draftSet(target, getDraft(draftKey(target)));
-  if (set.picked.includes(projectId) && set.picked.length === 1 && !set.workspaceId) return false;
+  const last = set.picked.includes(projectId) && set.picked.length === 1;
+  if (last && !set.workspaceId) return false;
   const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
-  return writeSet(target, toggled(set.picked, projectId), undefined, `Remove ${name} from the thread?`);
+  return writeSet(target, toggled(set.picked, projectId), last ? "" : undefined, `Remove ${name} from the thread?`);
+}
+
+/** A draft whose set was emptied (every project of its workspace taken out): nothing to send until a project is picked. */
+export function isSetEmpty(set: Pick<ResolvedSet, "projectIds" | "workspaceId">): boolean {
+  return set.projectIds.length === 0 && set.workspaceId === "";
 }
 
 /**
@@ -491,6 +501,9 @@ export function findCitation(key: string, id: string): Citation | undefined {
  */
 export const NOTHING_TO_SEND = "Nothing to send: the quote is no longer in any draft.";
 
+/** Why a draft whose set was emptied (isSetEmpty) does not send. */
+export const NO_SET = "Pick a project or a workspace for the thread first.";
+
 /** A citation of a draft (narrow selector; findCitation's fallback included). */
 export function useCitation(key: string, id: string): Citation | undefined {
   return useComposeStore((s) => s.drafts[key]?.citations[id] ?? Object.values(s.drafts).find((d) => id in d.citations)?.citations[id]);
@@ -516,8 +529,18 @@ export function openNewThreadPicker(): void {
   });
 }
 
-/** Shows the composer for a project and focuses it. */
+/**
+ * Shows the composer for a project and focuses it. Its draft keeps what was typed and the
+ * set the user made of it; an empty draft (no text, no attachments) starts again from
+ * that project alone (the set, the workspace reference, the primary and the base reset),
+ * so a project picked from cmd+N, the Projects page or a row is always in the set its
+ * composer shows.
+ */
 export function composeIn(projectId: string, worktreePath?: string): void {
+  const d = useComposeStore.getState().drafts[projectId];
+  if (d && isDraftEmpty(d) && d.phase === "idle" && (d.projects !== null || d.workspace !== null)) {
+    updateDraft(projectId, { projects: null, workspace: null, primary: null, base: null, error: null });
+  }
   if (worktreePath) updateDraft(projectId, { worktree: { kind: "existing", path: worktreePath } });
   const ui = useUiStore.getState();
   ui.select({ kind: "compose", projectId });
@@ -545,6 +568,7 @@ export function composeInWorkspace(workspaceId: string): void {
 export function composeLike(threadId: string): boolean {
   const t = useThreadsStore.getState().byId[threadId];
   if (!t) return false;
+  noteLikeSource(threadId);
   // Picked in the palette: the composer takes focus when it closes, not what had it before.
   if (useUiStore.getState().palette.open) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "content" } }));
   // Deferred: picked inside the palette or a menu, that closes after the presenter runs.
@@ -553,6 +577,87 @@ export function composeLike(threadId: string): boolean {
     ui.select({ kind: "compose", projectId: t.projectId, likeThreadId: threadId });
     ui.focusComposer();
   });
+  return true;
+}
+
+/** What a like draft's thread was: what its draft becomes when the thread is removed (convertGoneLikeDraft). */
+interface LikeSource {
+  name: string;
+  projectIds: readonly string[];
+  workspaceId: string;
+  /** A project id, WORKSPACE_PRIMARY, or "" (no project). */
+  primary: string;
+  worktreeMode: boolean;
+}
+
+/** By thread id; in memory, as the drafts are. */
+const likeSources = new Map<string, LikeSource>();
+
+/** Remembers a like draft's thread as it is now (composeLike, and the like composer while it shows the thread). */
+export function noteLikeSource(threadId: string): void {
+  const t = useThreadsStore.getState().byId[threadId];
+  if (!t) return;
+  likeSources.set(threadId, {
+    name: t.name,
+    projectIds: t.projectIds,
+    workspaceId: t.workspaceId,
+    primary: t.projectId || (t.workspaceId ? WORKSPACE_PRIMARY : ""),
+    worktreeMode: t.createdWorktree,
+  });
+}
+
+/**
+ * The like draft of a thread that was removed becomes a plain draft with the thread's set,
+ * workspace and primary (the one the draft picked, else the thread's) and its mode as
+ * Work in, keeping the text, attachments and options; it moves to the workspace's
+ * composer (the primary project's without a workspace, No project without either) and
+ * that composer shows, with a toast. A draft already waiting there keeps its text first,
+ * the moved text after it. False when the thread still exists or was never seen.
+ */
+export function convertGoneLikeDraft(threadId: string): boolean {
+  const src = likeSources.get(threadId);
+  if (!src || threadId in useThreadsStore.getState().byId) return false;
+  likeSources.delete(threadId);
+  const fromKey = draftKey({ kind: "like", threadId });
+  const d = getDraft(fromKey);
+  if (d.phase !== "idle") return false;
+  const known = useProjectsStore.getState().byId;
+  const ids = src.projectIds.filter((id) => id in known);
+  const ws = src.workspaceId && src.workspaceId in useWorkspacesStore.getState().byId ? src.workspaceId : "";
+  const want = d.primary ?? src.primary;
+  const primary = (want === WORKSPACE_PRIMARY && ws) || ids.includes(want) ? want : (ids[0] ?? (ws ? WORKSPACE_PRIMARY : ""));
+  const to: ComposeTarget = ws
+    ? { kind: "workspace", workspaceId: ws }
+    : primary && primary !== WORKSPACE_PRIMARY
+      ? { kind: "project", projectId: primary }
+      : { kind: "home" };
+  const toKey = draftKey(to);
+  const waiting = useComposeStore.getState().drafts[toKey];
+  const keep = waiting && !isDraftEmpty(waiting) ? waiting : undefined;
+  const moved: Draft = {
+    ...d,
+    text: keep ? `${keep.text}\n\n${d.text}` : d.text,
+    attachments: keep ? [...keep.attachments, ...d.attachments] : d.attachments,
+    citations: keep ? { ...keep.citations, ...d.citations } : d.citations,
+    projects: to.kind === "home" ? null : [...(primary && primary !== WORKSPACE_PRIMARY ? [primary] : []), ...ids.filter((id) => id !== primary)],
+    workspace: to.kind === "home" ? null : ws,
+    primary: to.kind === "home" ? null : primary || null,
+    worktree: to.kind === "home" ? null : { kind: src.worktreeMode ? "new" : "current" },
+    base: null,
+    error: null,
+  };
+  useComposeStore.setState((s) => {
+    if (!keep) for (const a of s.drafts[toKey]?.attachments ?? []) URL.revokeObjectURL(a.url);
+    const { [fromKey]: _gone, ...drafts } = s.drafts;
+    return { drafts: { ...drafts, [toKey]: moved }, preview: null };
+  });
+  const ui = useUiStore.getState();
+  // Not composeIn: it would reset an empty draft's set to the project alone.
+  if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
+  else if (to.kind === "project") ui.select({ kind: "compose", projectId: to.projectId });
+  else ui.select({ kind: "compose", projectId: "", noProject: true });
+  useUiStore.getState().focusComposer();
+  toast.info(`Thread ${src.name || threadId} was removed; starting fresh`);
   return true;
 }
 
@@ -700,9 +805,16 @@ export async function loadRefs(projectId: string): Promise<void> {
   }
 }
 
-/** The worktree choice a draft's set starts in: its pick, else the setting (projectWorktree for one project). */
+/**
+ * The worktree choice a draft's set starts in: its pick, else the setting (projectWorktree
+ * for one project); in place for a set without a git project (lib/compose setWorkIn).
+ */
 export function draftWorktree(set: Pick<ResolvedSet, "isSet" | "projectIds">, d: Pick<Draft, "worktree">): WorktreeChoice {
-  if (set.isSet) return { kind: setWorkIn(d.worktree, useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY]) === "new" ? "new" : "current" };
+  if (set.isSet) {
+    const projects = useProjectsStore.getState().byId;
+    const hasGit = set.projectIds.some((id) => projects[id]?.git === true);
+    return { kind: setWorkIn(d.worktree, useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY], hasGit) === "new" ? "new" : "current" };
+  }
   return d.worktree ?? projectWorktree(set.projectIds[0] ?? "");
 }
 
@@ -747,12 +859,18 @@ export function noGitCheckout(r: Pick<ProjectView, "git" | "path" | "worktrees">
 /**
  * Sends a draft: stages its attachments one by one, then invokes thread.new. On success the
  * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
- * got there first). On failure the draft stays, with the error.
+ * got there first). On failure the draft stays, with the error. `shownHints` are the
+ * collision hints the composer showed under its chips; the daemon's after-create hints
+ * that repeat one of them are not toasted again (lib/collisionHints unshownHints).
  */
-export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }): Promise<boolean> {
+export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }, shownHints: readonly string[] = []): Promise<boolean> {
   const key = draftKey(target);
   const d = getDraft(key);
   if (d.phase !== "idle" || isDraftEmpty(d)) return false;
+  if (target.kind !== "home" && target.kind !== "like" && isSetEmpty(draftSet(target, d))) {
+    updateDraft(key, { error: NO_SET });
+    return false;
+  }
   const pending = d.attachments.filter((a) => a.stagedPath === null);
   updateDraft(key, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
   try {
@@ -765,6 +883,9 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     const cur = getDraft(key);
     const place = draftPlace(target, cur);
     if (!place) throw new Error(target.kind === "workspace" ? "This workspace no longer exists." : "None of these projects is registered any more.");
+    // An empty project list with a workspace is the workspace's members to the daemon:
+    // only a workspace that has none may go without projects.
+    if (place.kind === "set" && place.projectIds.length === 0 && (useWorkspacesStore.getState().byId[place.workspaceId]?.members.length ?? 0) > 0) throw new Error(NO_SET);
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
     const cite = (id: string) => findCitation(key, id);
     const text = projectPrompt(
@@ -796,8 +917,9 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       return false;
     }
     clearDraft(key);
-    // The daemon's collision hints (CreateThreadResponse.hints): never a refusal, said once the thread exists.
-    for (const w of res.warnings ?? []) toast.warning(w);
+    // The daemon's collision hints (CreateThreadResponse.hints): never a refusal, said once
+    // the thread exists; not again when the composer already showed the line.
+    for (const w of unshownHints(res.warnings ?? [], shownHints)) toast.warning(w);
     const id = createdThreadId(res.resultJson);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
