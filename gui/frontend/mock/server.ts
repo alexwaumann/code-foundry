@@ -1486,7 +1486,9 @@ const server = createServer((req, res) => {
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads",
+      // allow-same-origin as the frame has it (the bridge's storage); the pages listener's
+      // origin is not the app's (docs/notes/bridge-2-gui.md).
+      "Content-Security-Policy": "sandbox allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads",
     });
     res.end(e.data);
     return;

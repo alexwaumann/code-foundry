@@ -34,6 +34,19 @@ import { answerConfirm, useConfirmStore } from "./confirm";
 import { getUiContext } from "./context";
 import { useThreadsStore } from "./threads";
 
+declare global {
+  interface Window {
+    /**
+     * Dev/test hook (dev builds only): the live hosts, their subscriptions and every post
+     * so far, so e2e can see a closed card's frame let go of everything.
+     */
+    __cfBridge?: { hosts: number; subscriptions: number; posts: number };
+  }
+}
+
+/** The dev hook's counters; null in a production build. */
+const dev = import.meta.env.DEV ? (window.__cfBridge ??= { hosts: 0, subscriptions: 0, posts: 0 }) : null;
+
 /** How long a subscription gathers a burst of changes before it posts. */
 export const BRIDGE_DEBOUNCE_MS = 50;
 
@@ -70,8 +83,11 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   let open: unknown = null;
 
   const post = (forDoc: number, msg: HostMessage) => {
-    if (!disposed && forDoc === doc) frame.post(msg);
+    if (disposed || forDoc !== doc) return;
+    if (dev) dev.posts++;
+    frame.post(msg);
   };
+  if (dev) dev.hosts++;
 
   const listed = (): Promise<readonly CommandView[]> => {
     if (threadId === null) return Promise.resolve([]);
@@ -96,6 +112,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   /** Stops the document's subscriptions and cancels a confirmation it has open. */
   const stopAll = () => {
     for (const stop of subs.values()) stop();
+    if (dev) dev.subscriptions -= subs.size;
     subs.clear();
     if (open !== null && useConfirmStore.getState().pending === open) answerConfirm(false);
     open = null;
@@ -145,6 +162,14 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     }
   };
 
+  const unsubscribe = (id: CallId) => {
+    const stop = subs.get(id);
+    if (!stop) return;
+    stop();
+    subs.delete(id);
+    if (dev) dev.subscriptions--;
+  };
+
   const on = (forDoc: number, id: CallId, source: string) => {
     if (threadId === null) {
       post(forDoc, errorResult(id, NO_THREAD));
@@ -154,7 +179,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       post(forDoc, errorResult(id, { code: "invalid", message: `no source ${source}` }));
       return;
     }
-    subs.get(id)?.();
+    unsubscribe(id);
     const spec = bridgeSources[source];
     const send = (event: unknown) => {
       post(forDoc, { type: "cf:event", id, source, event: jsonSafe(event) });
@@ -183,6 +208,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       stop();
       clearTimeout(timer);
     });
+    if (dev) dev.subscriptions++;
     // The state as it is now, before any change.
     if (spec.snapshot) flush();
   };
@@ -209,8 +235,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
           on(forDoc, m.id, m.source);
           return;
         case "off":
-          subs.get(m.id)?.();
-          subs.delete(m.id);
+          unsubscribe(m.id);
           return;
         case "bad":
           post(forDoc, errorResult(m.id, { code: "invalid", message: m.message }));
@@ -221,6 +246,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       if (disposed) return;
       disposed = true;
       stopAll();
+      if (dev) dev.hosts--;
     },
   };
 }

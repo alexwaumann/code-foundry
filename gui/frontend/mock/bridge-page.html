@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Bridge check</title>
+<link rel="stylesheet" href="/cf/theme.css">
+<script src="/cf/bridge.js"></script>
+<style>
+body { margin: 0; padding: 18px 22px; background: var(--cf-surface-raised); color: var(--cf-text); font: 13px/1.45 system-ui, sans-serif; }
+h1 { margin: 0 0 2px; font-size: 16px; font-weight: 600; }
+p.sub { margin: 0 0 12px; color: var(--cf-text-muted); }
+.grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: center; }
+.k { color: var(--cf-text-muted); }
+button { background: var(--cf-surface); color: var(--cf-text); border: 1px solid var(--cf-border); border-radius: 6px; padding: 3px 10px; font: inherit; cursor: pointer; }
+button.primary { background: var(--cf-accent); color: var(--cf-accent-foreground); border-color: transparent; }
+.out { font-family: ui-monospace, monospace; font-size: 12px; }
+.ok { color: var(--cf-success-foreground); }
+.err { color: var(--cf-error-foreground); }
+</style>
+</head>
+<body>
+<h1>Bridge check</h1>
+<p class="sub">Shown in <b id="thread">…</b> · <span id="theme">?</span> theme · visit <span id="visits">0</span></p>
+<div class="grid">
+  <span class="k">thread.list</span><span><button id="list">Read</button> <span id="list-out" class="out"></span></span>
+  <span class="k">ui.notify</span><span><button id="notify" class="primary">Send a toast</button> <span id="notify-out" class="out"></span></span>
+  <span class="k">thread.archive</span><span><button id="archive">Archive this thread</button> <span id="archive-out" class="out"></span></span>
+  <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <span id="error-out" class="out"></span></span>
+  <span class="k">thread-list</span><span class="out"><span id="rows">–</span> threads · <span id="events">0</span> events</span>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+// Storage persists across reloads (allow-same-origin).
+const visits = Number(localStorage.getItem("cf-bridge-visits") || "0") + 1;
+localStorage.setItem("cf-bridge-visits", String(visits));
+$("visits").textContent = String(visits);
+const show = (el, p) =>
+  p.then(
+    (r) => { el.className = "out ok"; el.textContent = r.json ? JSON.stringify(r.json).slice(0, 80) : r.text || "ok"; },
+    (e) => { el.className = "out err"; el.textContent = e.code + ": " + e.message; },
+  );
+cf.ready.then((r) => {
+  $("thread").textContent = r.thread ? r.thread.name : "no thread";
+  $("theme").textContent = r.theme.scheme;
+  document.body.dataset.ready = "1";
+  document.body.dataset.readonly = String(r.readOnly.length);
+  document.body.dataset.sources = r.sources.join(",");
+});
+cf.onTheme((t) => {
+  document.documentElement.style.colorScheme = t.scheme;
+  for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
+  $("theme").textContent = t.scheme;
+});
+let events = 0;
+cf.on("thread-list", (rows) => {
+  events++;
+  $("rows").textContent = String(rows.length);
+  $("events").textContent = String(events);
+});
+$("list").addEventListener("click", () => show($("list-out"), cf.run("thread.list").then((r) => ({ ...r, json: { threads: r.json.threads.length } }))));
+$("notify").addEventListener("click", () => show($("notify-out"), cf.run("ui.notify", { level: "info" })));
+$("archive").addEventListener("click", () => show($("archive-out"), cf.run("thread.archive", { archived: "true" })));
+$("missing").addEventListener("click", () => show($("error-out"), cf.run("no.such.verb")));
+$("invalid").addEventListener("click", () => show($("error-out"), cf.run("ui.notify", {})));
+const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+addEventListener("load", ask);
+new ResizeObserver(ask).observe(document.body);
+</script>
+</body>
+</html>

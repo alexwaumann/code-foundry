@@ -15,6 +15,7 @@ import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefound
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
+import { bridgeCommands } from "./bridgeCommands";
 import { cloneExists } from "./clone";
 import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
@@ -183,6 +184,8 @@ interface ArgDef {
   description: string;
   enumValues?: string[];
   defaultValue?: string;
+  /** Like the daemon's ArgSpec.default_to_thread_env: the CLI (and a page's bridge) sends the caller's thread. */
+  defaultToThreadEnv?: boolean;
 }
 
 interface CmdDef {
@@ -198,6 +201,8 @@ interface CmdDef {
   confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
   /** Like the daemon's Command.ConfirmLabel: the confirm button's words. */
   confirmLabel?: string;
+  /** Like the daemon's Command.read_only: it changes nothing (a page's bridge runs it without a click). */
+  readOnly?: boolean;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -2690,6 +2695,7 @@ export class World {
     const always = () => true;
     return [
       ...viewCommands((i) => this.emit(i)),
+      ...bridgeCommands(() => [...this.threads.values()]),
       ...this.logs.commands(),
       ...mcpCommands(this.logs, (i) => this.emit(i)),
       ...panelItemCommands((id) => {
