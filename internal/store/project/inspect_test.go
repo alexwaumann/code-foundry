@@ -10,20 +10,34 @@ import (
 	"testing"
 )
 
-// mkdirs makes every dir under base; a name ending in "/.git" is a .git directory, one
-// ending in ".git=" a .git file (a linked worktree's or a submodule's).
+// mkdirs makes every dir under base; a name ending in "/.git" is a .git directory with
+// a HEAD, "/.git!" an empty one, ".git=" a .git file pointing into another repository's
+// .git/worktrees (a linked worktree's), ".git=sub" one pointing elsewhere (a submodule's).
 func mkdirs(t *testing.T, base string, dirs ...string) {
 	t.Helper()
 	for _, d := range dirs {
+		if err := os.MkdirAll(filepath.Join(base, filepath.Dir(strings.TrimRight(d, "=sub!"))), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if p, ok := strings.CutSuffix(d, "=sub"); ok {
+			writeFile(t, filepath.Join(base, p), "gitdir: ../.git/modules/sub\n")
+			continue
+		}
 		if p, ok := strings.CutSuffix(d, "="); ok {
-			if err := os.MkdirAll(filepath.Join(base, filepath.Dir(p)), 0o755); err != nil {
+			writeFile(t, filepath.Join(base, p), "gitdir: /src/main/.git/worktrees/wt\n")
+			continue
+		}
+		if p, ok := strings.CutSuffix(d, "!"); ok {
+			if err := os.MkdirAll(filepath.Join(base, p), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			writeFile(t, filepath.Join(base, p), "gitdir: /elsewhere\n")
 			continue
 		}
 		if err := os.MkdirAll(filepath.Join(base, d), 0o755); err != nil {
 			t.Fatal(err)
+		}
+		if strings.HasSuffix(d, "/.git") {
+			writeFile(t, filepath.Join(base, d, "HEAD"), "ref: refs/heads/main\n")
 		}
 	}
 }
@@ -39,7 +53,9 @@ func TestChildRepos(t *testing.T) {
 		{name: "empty folder"},
 		{name: "plain children only", dirs: []string{"notes", "drafts/sub"}},
 		{name: "one repo is enough", dirs: []string{"api/.git", "notes"}, want: []string{"api"}},
-		{name: "a .git file counts (worktree or submodule)", dirs: []string{"wt/.git=", "web/.git"}, want: []string{"web", "wt"}},
+		{name: "a linked worktree's .git file counts", dirs: []string{"wt/.git=", "web/.git"}, want: []string{"web", "wt"}},
+		{name: "a submodule's or separate git dir's .git file does not", dirs: []string{"sub/.git=sub", "web/.git"}, want: []string{"web"}},
+		{name: "an empty .git directory does not", dirs: []string{"fake/.git!", "web/.git"}, want: []string{"web"}},
 		{name: "sorted case-insensitively", dirs: []string{"Zeta/.git", "alpha/.git", "Beta/.git"}, want: []string{"alpha", "Beta", "Zeta"}},
 		{name: "two levels down does not count", dirs: []string{"group/inner/.git"}},
 		{name: "hidden children are skipped", dirs: []string{".hidden/.git", "shown/.git"}, want: []string{"shown"}},
@@ -118,7 +134,8 @@ func TestInspect(t *testing.T) {
 		{name: "a plain folder", path: filepath.Join(root, "plain"), want: Folder{Path: filepath.Join(root, "plain")}},
 		{name: "a repo child of a folder of repos is a repo", path: filepath.Join(product, "web"), want: Folder{Path: filepath.Join(product, "web"), IsRepo: true}},
 		{name: "outside home", path: filepath.Join(base, "outside"), wantErr: "outside your home directory"},
-		{name: "missing", path: filepath.Join(root, "nope"), wantErr: "no such file or directory"},
+		{name: "missing", path: filepath.Join(root, "nope"), wantErr: filepath.Join(root, "nope") + " does not exist"},
+		{name: "home itself: no scan", path: root, want: Folder{Path: root}},
 		{name: "empty", path: "", wantErr: "path is required"},
 	}
 	for _, tt := range tests {
@@ -140,5 +157,12 @@ func TestInspect(t *testing.T) {
 	}
 	if n := len(h.store.Snapshot().Projects); n != 0 {
 		t.Errorf("Inspect registered %d projects", n)
+	}
+	// A folder of repos added as a plain project is no workspace root.
+	if _, err := h.store.Register(context.Background(), product); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := h.store.Inspect(context.Background(), product); err != nil || len(got.ChildRepos) != 0 {
+		t.Errorf("a registered folder = %+v, %v; want no children", got, err)
 	}
 }

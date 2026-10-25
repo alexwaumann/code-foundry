@@ -17,20 +17,28 @@ service WorkspaceService {
   rpc Create(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {}
   // AddProject adds a member project.
   rpc AddProject(AddWorkspaceProjectRequest) returns (AddWorkspaceProjectResponse) {}
-  // RemoveProject drops a member project (nothing on disk changes). The default primary
-  // moves to "workspace" when it was the removed project.
+  // RemoveProject drops a member project (nothing on disk changes). The default primary,
+  // when it was the removed project, moves to the first member left of a synthetic
+  // workspace, else to "workspace". The daemon does the same for a project that is
+  // unregistered.
   rpc RemoveProject(RemoveWorkspaceProjectRequest) returns (RemoveWorkspaceProjectResponse) {}
   // Rename renames a workspace (names are unique, case-insensitively).
   rpc Rename(RenameWorkspaceRequest) returns (RenameWorkspaceResponse) {}
   // SetDefaultPrimary sets where new threads in the workspace start: a member project id,
   // or "workspace" (the managed dir, or the root of a rooted workspace).
   rpc SetDefaultPrimary(SetWorkspaceDefaultPrimaryRequest) returns (SetWorkspaceDefaultPrimaryResponse) {}
+  // SetRoot points a rooted workspace at another folder (moved or renamed), validated
+  // as Create's root_path; the managed dir's links are made again. A synthetic
+  // workspace is FailedPrecondition.
+  rpc SetRoot(SetWorkspaceRootRequest) returns (SetWorkspaceRootResponse) {}
   // Remove forgets a workspace. A synthetic one's managed dir is deleted with its
-  // instructions and skills; a rooted one loses only the symlinks (the root is the
+  // instructions and skills (FailedPrecondition, naming them, while a thread that is
+  // not archived runs in it); a rooted one loses only the symlinks (the root is the
   // user's). Threads that reference it keep running without it.
   rpc Remove(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse) {}
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
-  // snapshot.
+  // snapshot. Subscribing reads every workspace's folder again first (instructions,
+  // skills, links), so hand edits show without a spawn.
   rpc Watch(WatchWorkspacesRequest) returns (stream WorkspaceEvent) {}
 }
 
@@ -46,7 +54,8 @@ message Workspace {
   // Member project ids, sorted by id.
   repeated string members = 6;
   // A real folder the workspace came from (its CLAUDE.md, AGENTS.md and .claude are
-  // symlinked into the managed dir); empty for a synthetic workspace.
+  // symlinked into the managed dir); empty for a synthetic workspace. Under home, never
+  // home itself, and never in a registered project's checkout or worktree.
   string root_path = 7;
   // Where new threads start: a member project id, or "workspace" (managed_dir, or
   // root_path when set).
@@ -55,15 +64,17 @@ message Workspace {
   // as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
   // .claude/skills.
   string managed_dir = 9;
-  // The workspace's instructions file: CLAUDE.md, else AGENTS.md, in the managed dir (a
-  // rooted workspace's: the file the link points to, under root_path). Empty when there
-  // is neither. Read from disk when the store builds the snapshot entry, at every
-  // EnsureDirs (start, a spawn of a thread that references it) and when such a thread
-  // ends a turn.
+  // The workspace's instructions file: CLAUDE.md, else AGENTS.md (the first that is a
+  // regular file), in root_path when set, else in the managed dir. Empty when there is
+  // neither. Read from disk when the store builds the snapshot entry, at every
+  // EnsureDirs (start, a spawn of a thread that references it), when such a thread ends
+  // a turn and when a client subscribes to Watch.
   string instructions = 10;
-  // The skills in <managed dir>/.claude/skills: the names of its folders that hold a
-  // SKILL.md, sorted. Read like instructions.
+  // The skills in .claude/skills of the same folder: the names of its folders that hold
+  // a SKILL.md, sorted. Read like instructions.
   repeated string skills = 11;
+  // root_path is set and is not a folder now (moved or renamed): SetRoot repairs it.
+  bool root_missing = 12;
 }
 
 message ListWorkspacesRequest {}
@@ -135,6 +146,17 @@ message SetWorkspaceDefaultPrimaryRequest {
 }
 
 message SetWorkspaceDefaultPrimaryResponse {
+  Workspace workspace = 1;
+}
+
+message SetWorkspaceRootRequest {
+  // Workspace id or name.
+  string workspace = 1;
+  // The folder it lives in now: absolute, under home.
+  string root_path = 2;
+}
+
+message SetWorkspaceRootResponse {
   Workspace workspace = 1;
 }
 

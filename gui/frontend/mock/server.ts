@@ -79,7 +79,7 @@
  *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
  *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&root=…&primary=…&instructions=CLAUDE.md&skills=a,b]
  *                                                 (a workspace: a saved project set; nothing on disk changes)
- *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b]
+ *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b&rootMissing=1]
  *                                                 (what a thread wrote in the workspace's folder; "" clears)
  *   POST /__mock/set-thread?projects=repo-sk,repo-wr[&project=…|workspace][&workspace=…][&branch=feat/x][&name=…]
  *                                                 (a thread over a project set; a branch: worktree mode, none: in place)
@@ -1117,7 +1117,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/workspace-files":
       try {
         const skills = q.get("skills");
-        json(res, 200, world.setWorkspaceFiles(q.get("workspace") ?? "", q.get("instructions") ?? undefined, skills === null ? undefined : skills.split(",").filter(Boolean)));
+        const rootMissing = q.get("rootMissing");
+        json(res, 200, world.setWorkspaceFiles(q.get("workspace") ?? "", q.get("instructions") ?? undefined, skills === null ? undefined : skills.split(",").filter(Boolean),
+          rootMissing === null ? undefined : rootMissing === "1"));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

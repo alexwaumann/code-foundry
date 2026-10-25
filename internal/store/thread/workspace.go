@@ -17,11 +17,16 @@ import (
 //
 // A thread may reference a workspace (Thread.WorkspaceID), independent of its project
 // set. Every spawn of such a thread re-checks the workspace's managed dir (EnsureDirs:
-// a rooted workspace's symlinks), gives Claude the managed dir as an --add-dir and
-// appends the workspace's instructions (its CLAUDE.md, else AGENTS.md, read through the
-// managed dir) under one heading after ThreadPrompt, unless the thread runs in the
-// managed dir or the workspace's root, where Claude loads them itself. The thread store
-// reads workspaces from the workspace store, never the other way round.
+// a rooted workspace's symlinks), gives Claude the managed dir as an --add-dir (for its
+// skills) unless the thread runs in the managed dir or the root, and appends the
+// workspace's instructions (its CLAUDE.md, else AGENTS.md, read from Workspace.Dir: the
+// root of a rooted one) under one heading after ThreadPrompt, unless the thread runs in
+// the managed dir, the root or a folder inside the root, where Claude Code loads them
+// itself (it reads the cwd's and its parents' CLAUDE.md and AGENTS.md; it does not find
+// a parent's .claude/skills, hence the add-dir inside the root:
+// docs/notes/workspaces-v2-fix-1-workspace.md). A rooted workspace whose root is gone
+// adds nothing (logged). The thread store reads workspaces from the workspace store,
+// never the other way round.
 
 // MaxWorkspaceInstructions caps the workspace instructions a spawn appends; longer
 // files are cut there (logged).
@@ -102,18 +107,26 @@ func (m *Manager) workspaceSpawn(ctx context.Context, s Thread) wsSpawn {
 	if err := m.opts.Workspaces.EnsureDirs(ctx, w.ID); err != nil {
 		m.log.Warn("workspace managed dir", "thread", s.ID, "workspace", w.ID, "err", err)
 	}
+	if w.RootPath != "" && !isDir(w.RootPath) {
+		m.log.Warn("workspace root is gone; starting without its instructions and skills (workspace set-root repairs it)",
+			"thread", s.ID, "workspace", w.ID, "root", w.RootPath)
+		return wsSpawn{}
+	}
 	if samePath(s.WorktreePath, w.ManagedDir) || (w.RootPath != "" && samePath(s.WorktreePath, w.RootPath)) {
 		return wsSpawn{} // Claude loads the files from its cwd itself
 	}
 	out := wsSpawn{}
 	if isDir(w.ManagedDir) {
-		out.addDir = w.ManagedDir
+		out.addDir = w.ManagedDir // its skills: Claude does not find a parent folder's
 	}
-	text, path, err := readInstructions(w.ManagedDir)
+	if w.RootPath != "" && within(s.WorktreePath, w.RootPath) {
+		return out // Claude loads the root's CLAUDE.md or AGENTS.md as the cwd's parent's
+	}
+	text, path, err := m.readInstructions(w.Dir())
 	switch {
 	case err != nil:
 		m.log.Warn("workspace instructions not read", "thread", s.ID, "workspace", w.ID, "err", err)
-	case text != "":
+	case strings.TrimSpace(text) != "":
 		if len(text) > MaxWorkspaceInstructions {
 			m.log.Warn("workspace instructions cut", "thread", s.ID, "workspace", w.ID, "path", path,
 				"bytes", len(text), "limit", MaxWorkspaceInstructions)
@@ -129,25 +142,23 @@ func workspaceBlock(name, text string) string {
 	return "Workspace " + name + " instructions\n\n" + strings.TrimSpace(text)
 }
 
-// readInstructions reads dir/CLAUDE.md, else dir/AGENTS.md (through the symlinks of a
-// rooted workspace); "" when neither exists.
-func readInstructions(dir string) (text, path string, err error) {
-	if dir == "" {
+// readInstructions reads the instructions file in dir (workspace.InstructionsFile:
+// CLAUDE.md, else AGENTS.md, the first that is a regular file, as the Projects page
+// card shows); "" when there is none. A name that exists but is not a file (a folder, a
+// symlink loop) is skipped and logged.
+func (m *Manager) readInstructions(dir string) (text, path string, err error) {
+	path, skipped := workspace.InstructionsFile(dir)
+	for _, p := range skipped {
+		m.log.Warn("workspace instructions: not a file, skipped", "path", p)
+	}
+	if path == "" {
 		return "", "", nil
 	}
-	for _, name := range []string{"CLAUDE.md", "AGENTS.md"} {
-		p := filepath.Join(dir, name)
-		b, err := os.ReadFile(p)
-		switch {
-		case err == nil:
-			return string(b), p, nil
-		case errors.Is(err, os.ErrNotExist):
-			continue
-		default:
-			return "", p, fmt.Errorf("read %s: %w", p, err)
-		}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", path, fmt.Errorf("read %s: %w", path, err)
 	}
-	return "", "", nil
+	return string(b), path, nil
 }
 
 // cutUTF8 is s cut to at most n bytes on a rune boundary.
@@ -161,8 +172,10 @@ func cutUTF8(s string, n int) string {
 	return s[:n]
 }
 
-// workspaceDir is where a thread whose primary is workspace ref runs (Workspace.Dir).
-func (m *Manager) workspaceDir(ref string) (workspace.Workspace, error) {
+// resolveWorkspace is the workspace ref names (thread new --workspace), whether or not
+// its folder is there: only a thread whose primary is the workspace needs it
+// (workspaceDir).
+func (m *Manager) resolveWorkspace(ref string) (workspace.Workspace, error) {
 	if m.opts.Workspaces == nil {
 		return workspace.Workspace{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
 	}
@@ -170,10 +183,24 @@ func (m *Manager) workspaceDir(ref string) (workspace.Workspace, error) {
 	if err != nil {
 		return workspace.Workspace{}, workspaceError("workspace", err)
 	}
+	return w, nil
+}
+
+// workspaceDir is where a thread whose primary is workspace ref runs (Workspace.Dir):
+// the managed dir is made when missing; a missing root is an error.
+func (m *Manager) workspaceDir(ref string) (workspace.Workspace, error) {
+	w, err := m.resolveWorkspace(ref)
+	if err != nil {
+		return workspace.Workspace{}, err
+	}
 	if err := m.opts.Workspaces.EnsureDirs(context.Background(), w.ID); err != nil {
 		m.log.Warn("workspace managed dir", "workspace", w.ID, "err", err)
 	}
 	if !isDir(w.Dir()) {
+		if w.RootPath != "" {
+			return workspace.Workspace{}, fmt.Errorf("%w: workspace %s's root %s is missing (moved or renamed? workspace set-root %s <folder>)",
+				ErrFailedPrecondition, w.Name, w.RootPath, w.ID)
+		}
 		return workspace.Workspace{}, fmt.Errorf("%w: workspace %s has no folder at %s", ErrFailedPrecondition, w.Name, w.Dir())
 	}
 	return w, nil

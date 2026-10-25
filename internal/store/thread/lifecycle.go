@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
@@ -184,7 +183,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	}
 	if launchErr == nil {
 		var note string
-		l, lastErr, note, launchErr = m.resumeLaunch(prev)
+		l, lastErr, note, launchErr = m.resumeLaunch(ctx, prev)
 		if note != "" {
 			notes = append(notes, note)
 			m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
@@ -320,9 +319,9 @@ func userItem(id string, o *outgoing) Item {
 // transcript is gone, for the timeline (Claude remembers nothing of it). An error when
 // the worktree is gone (startStopped has recreated one a cleanup removed first, when
 // the thread qualifies: recreate.go).
-func (m *Manager) resumeLaunch(prev Thread) (l launch, lastErr, note string, err error) {
-	if _, err := os.Stat(prev.WorktreePath); err != nil {
-		return launch{}, "", "", fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, prev.WorktreePath, err)
+func (m *Manager) resumeLaunch(ctx context.Context, prev Thread) (l launch, lastErr, note string, err error) {
+	if err := m.ensureCwd(ctx, prev); err != nil {
+		return launch{}, "", "", err
 	}
 	if prev.FreshStart {
 		// A reseed asked for a new conversation (reseed.go).

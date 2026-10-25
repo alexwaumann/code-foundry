@@ -18,6 +18,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // Errors returned by Store methods. They are wrapped with detail; test with errors.Is.
@@ -44,11 +46,13 @@ type Workspace struct {
 	// ManagedDir is <Options.Dir>/<ID>.
 	ManagedDir string
 	CreatedAt  time.Time
-	// Instructions and Skills are what the managed dir holds (contents.go), read from
-	// disk, never persisted: refreshed when the workspace is saved and at every
-	// EnsureDirs. Skills is copy on write.
+	// Instructions and Skills are what the workspace's folder holds (contents.go: Dir,
+	// so a rooted workspace's root), read from disk, never persisted: refreshed when the
+	// workspace is saved and at every EnsureDirs. Skills is copy on write. RootMissing:
+	// a rooted workspace's root is not a folder now (moved or renamed: SetRoot).
 	Instructions string
 	Skills       []string
+	RootMissing  bool
 }
 
 // Member reports whether projectID is a member.
@@ -84,12 +88,13 @@ func (s *Snapshot) Workspace(id string) (Workspace, bool) {
 	return s.Workspaces[i], true
 }
 
-// Named returns the workspace named name, compared case-insensitively.
+// Named returns the workspace named name, compared case-insensitively and NFC-normalised.
 func (s *Snapshot) Named(name string) (Workspace, bool) {
 	if s == nil {
 		return Workspace{}, false
 	}
-	i := slices.IndexFunc(s.Workspaces, func(w Workspace) bool { return strings.EqualFold(w.Name, strings.TrimSpace(name)) })
+	name = norm.NFC.String(strings.TrimSpace(name))
+	i := slices.IndexFunc(s.Workspaces, func(w Workspace) bool { return strings.EqualFold(norm.NFC.String(w.Name), name) })
 	if i < 0 {
 		return Workspace{}, false
 	}
@@ -135,14 +140,23 @@ type Store interface {
 	// AddProject adds a member (ref as CreateOptions.Members).
 	AddProject(ctx context.Context, workspace, project string) (Workspace, error)
 	// RemoveProject drops a member; nothing on disk changes. A default primary that was
-	// the member becomes PrimaryWorkspace.
+	// the member moves (fallbackPrimary): to the first member left of a synthetic
+	// workspace, else PrimaryWorkspace.
 	RemoveProject(ctx context.Context, workspace, project string) (Workspace, error)
+	// ProjectRemoved drops an unregistered project from every workspace it is a member
+	// of, the default primary moving as with RemoveProject. The daemon calls it on the
+	// project store's ProjectRemoved event (and at start for members already gone).
+	ProjectRemoved(ctx context.Context, projectID string) error
+	// SetRoot points a rooted workspace at another folder (validated as Create's root):
+	// its links are made again for the new root. A synthetic workspace is refused.
+	SetRoot(ctx context.Context, workspace, root string) (Workspace, error)
 	// Rename renames a workspace; the name must be free (case-insensitively).
 	Rename(ctx context.Context, workspace, name string) (Workspace, error)
 	// SetDefaultPrimary sets a member (ref) or PrimaryWorkspace as the default primary.
 	SetDefaultPrimary(ctx context.Context, workspace, primary string) (Workspace, error)
 	// Remove forgets a workspace: a synthetic one's managed dir goes with it, a rooted
-	// one's symlinks only.
+	// one's symlinks only. A synthetic one is refused while Options.InUse says a thread
+	// runs in its managed dir.
 	Remove(ctx context.Context, workspace string) error
 	// EnsureDirs makes the managed dir of workspace id (every workspace when id is "")
 	// and, for a rooted one, re-checks its symlinks: missing ones added, dangling ones

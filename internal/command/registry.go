@@ -22,6 +22,8 @@ type Registry struct {
 	idListers, idFallbacks map[IDKind]IDLister
 	// refResolvers resolve references that are not suffixes (a project's name).
 	refResolvers map[IDKind]RefResolver
+	// projectNames names project ids in messages (project_names.go).
+	projectNames ProjectNameLister
 }
 
 // Overrides adjust registered commands without re-registering them. The daemon sets

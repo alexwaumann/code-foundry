@@ -109,7 +109,7 @@ func TestSyntheticWorkspace(t *testing.T) {
 	if _, err := e.m.AddProject(ctx, w.ID, "docs"); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("AddProject twice = %v", err)
 	}
-	if w, err = e.m.RemoveProject(ctx, "Shop", "web"); err != nil || w.DefaultPrimary != PrimaryWorkspace || w.Member("r-web") {
+	if w, err = e.m.RemoveProject(ctx, "Shop", "web"); err != nil || w.DefaultPrimary != "r-api" || w.Member("r-web") { // the first member left (synthetic)
 		t.Fatalf("RemoveProject = %+v, %v", w, err)
 	}
 	if w, err = e.m.SetDefaultPrimary(ctx, w.ID, "api"); err != nil || w.DefaultPrimary != "r-api" {

@@ -46,6 +46,7 @@ func TestProjectAddWorkspace(t *testing.T) {
 		folder     string
 		registered []string // project paths added before
 		workspaces []string // workspace names taken before
+		rootedWith []string // project paths (registered) of a workspace "mine" rooted at the folder
 		fail       string   // a child path Register refuses
 		wantErr    string
 		wantCode   connect.Code
@@ -70,6 +71,12 @@ func TestProjectAddWorkspace(t *testing.T) {
 			wantErr:   "could not add 1 of 3 repositories in /Users/me/product (docs: /Users/me/product/docs: permission denied); no workspace was made; added and kept as projects: api, web",
 			wantAdded: []string{product + "/api", product + "/web"}, wantCount: 2},
 		{name: "a folder outside home is refused before anything", folder: "/elsewhere", wantCode: connect.CodeInvalidArgument, wantErr: "outside your home directory"},
+		{name: "a folder a workspace has as its root: the missing projects join it", folder: product, registered: []string{product + "/docs"},
+			rootedWith: []string{product + "/docs"}, wantName: "mine", wantCount: 3, wantAdded: []string{product + "/api", product + "/web"},
+			wantMsg: "added api, web to workspace mine (w-mine): 3 projects (api, docs, web), starts in workspace, root /Users/me/product, " +
+				"folder /workspaces/w-mine, which already has this folder as its root; new projects: api, web"},
+		{name: "a folder inside a project is refused", folder: product, registered: []string{product}, wantCount: 1,
+			wantCode: connect.CodeFailedPrecondition, wantErr: "/Users/me/product is inside project product"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,6 +93,16 @@ func TestProjectAddWorkspace(t *testing.T) {
 			spaces := workspacetest.New(b)
 			for _, n := range tt.workspaces {
 				spaces.Put(workspace.Workspace{ID: "w-old-" + n, Name: n})
+			}
+			if tt.rootedWith != nil {
+				var members []string
+				for _, p := range projects.Snapshot().Projects {
+					if slices.Contains(tt.rootedWith, p.Path) {
+						members = append(members, p.ID)
+					}
+				}
+				spaces.Put(workspace.Workspace{ID: "w-mine", Name: "mine", RootPath: tt.folder, Members: members, DefaultPrimary: workspace.PrimaryWorkspace})
+				tt.workspaces = append(tt.workspaces, "mine")
 			}
 			projects.Calls = nil
 			var backend command.FolderBackend = api.NewProject(projects, b)

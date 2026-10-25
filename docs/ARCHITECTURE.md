@@ -335,12 +335,19 @@ Services (v1):
   the halves separately and install nothing. See `docs/notes/update-restart.md`,
   `docs/notes/update-download-then-install.md` and `docs/notes/release-channels.md`.
 * `WorkspaceService` — List, Create, AddProject, RemoveProject, Rename, SetDefaultPrimary,
-  Remove, Watch. A workspace is a saved set of projects (`members`, sorted ids), a
-  `default_primary` (a member or `workspace`), an optional `root_path` and a managed dir,
-  `<config home>/workspaces/<id>`: a synthetic workspace keeps its CLAUDE.md, AGENTS.md
-  and `.claude/skills` there; a rooted one holds links to its root's, re-checked at every
-  spawn. No branch, no worktrees. See `docs/notes/workspaces-v2-2-workspaces.md`. The GUI
-  gets workspaces from EventService's `workspace` source (a `workspaces` slice).
+  SetRoot, Remove, Watch. A workspace is a saved set of projects (`members`, sorted ids), a
+  `default_primary` (a member or `workspace`; a project named "workspace" wins over the
+  keyword), an optional `root_path` (under home, never home itself nor inside a
+  registered project; `root_missing` when it moved, which SetRoot repairs) and a managed
+  dir, `<config home>/workspaces/<id>` (0700, repaired at start): a synthetic workspace
+  keeps its CLAUDE.md, AGENTS.md and `.claude/skills` there; a rooted one holds links to
+  its root's, re-checked at every spawn, and its files are read from the root itself.
+  Names are NFC and never look like an id. The daemon drops unregistered projects from
+  every workspace and refuses removing a synthetic one while a thread that is not
+  archived runs in its managed dir; Watch reads every folder again on subscribe. No
+  branch, no worktrees. See `docs/notes/workspaces-v2-2-workspaces.md` and
+  `docs/notes/workspaces-v2-fix-1-workspace.md`. The GUI gets workspaces from
+  EventService's `workspace` source (a `workspaces` slice).
 * `FilesystemService` — ListDirectories: completes a typed path prefix to directories
   under the user's home (is_git, registered, common completion), for the palette's
   `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `project.Register` enforces
@@ -454,9 +461,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   for every other member's checkout; a missing one is a spawn error. `workspace_id` is an
   optional reference to a workspace (`thread new --workspace`: its members are the set
   unless `--projects`, its default primary the cwd, `workspace` its folder): every spawn
-  re-checks its managed dir, passes it as an `--add-dir` and appends its CLAUDE.md (else
-  AGENTS.md, at most 32 KiB) under "Workspace <name> instructions", unless the thread runs
-  in the managed dir or the root, where Claude loads them itself; that block follows the
+  re-checks its managed dir, passes it as an `--add-dir` (not when the thread runs in it
+  or the root) and appends its CLAUDE.md (else AGENTS.md, at most 32 KiB, read from the
+  root of a rooted one) under "Workspace <name> instructions", unless the thread runs in
+  the managed dir, the root or a folder inside the root, where Claude loads them itself
+  (a rooted workspace whose root moved adds nothing; a spawn whose cwd is gone fails
+  naming it, a workspace's managed dir is made again); that block follows the
   static line every thread gets pointing at the skills below and sending split-up,
   parallel or multi-branch work to the orchestrate skill rather than the Agent tool
   (`ThreadPrompt`; `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`,

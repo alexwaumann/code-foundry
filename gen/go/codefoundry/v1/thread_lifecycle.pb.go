@@ -4155,11 +4155,16 @@ type ThreadCheckoutsResponse struct {
 	// one (the name also when the workspace is gone).
 	WorkspaceId   string `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	WorkspaceName string `protobuf:"bytes,4,opt,name=workspace_name,json=workspaceName,proto3" json:"workspace_name,omitempty"`
-	// The workspace's managed dir (Workspace.managed_dir): its CLAUDE.md, AGENTS.md and
-	// .claude/skills, or links to a rooted workspace's.
-	WorkspaceDir  string `protobuf:"bytes,5,opt,name=workspace_dir,json=workspaceDir,proto3" json:"workspace_dir,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Where the workspace's CLAUDE.md, AGENTS.md and .claude/skills are written and read:
+	// a rooted workspace's root_path, else its managed dir (Workspace.managed_dir).
+	WorkspaceDir string `protobuf:"bytes,5,opt,name=workspace_dir,json=workspaceDir,proto3" json:"workspace_dir,omitempty"`
+	// workspace_dir is a rooted workspace's root and it is not a folder now.
+	WorkspaceDirMissing bool `protobuf:"varint,6,opt,name=workspace_dir_missing,json=workspaceDirMissing,proto3" json:"workspace_dir_missing,omitempty"`
+	// Real files or folders in a rooted workspace's managed dir where a link to the
+	// root's goes: not what the workspace's threads follow (the root's are).
+	WorkspaceStrays []string `protobuf:"bytes,7,rep,name=workspace_strays,json=workspaceStrays,proto3" json:"workspace_strays,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ThreadCheckoutsResponse) Reset() {
@@ -4225,6 +4230,20 @@ func (x *ThreadCheckoutsResponse) GetWorkspaceDir() string {
 		return x.WorkspaceDir
 	}
 	return ""
+}
+
+func (x *ThreadCheckoutsResponse) GetWorkspaceDirMissing() bool {
+	if x != nil {
+		return x.WorkspaceDirMissing
+	}
+	return false
+}
+
+func (x *ThreadCheckoutsResponse) GetWorkspaceStrays() []string {
+	if x != nil {
+		return x.WorkspaceStrays
+	}
+	return nil
 }
 
 type PinThreadRequest struct {
@@ -5623,13 +5642,15 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\finstructions\x18\b \x01(\tR\finstructions\x12\x10\n" +
 	"\x03git\x18\t \x01(\bR\x03git\x12\x18\n" +
 	"\aderived\x18\n" +
-	" \x01(\bR\aderived\"\xf6\x01\n" +
+	" \x01(\bR\aderived\"\xd5\x02\n" +
 	"\x17ThreadCheckoutsResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12<\n" +
 	"\tcheckouts\x18\x02 \x03(\v2\x1e.codefoundry.v1.ThreadCheckoutR\tcheckouts\x12!\n" +
 	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\x12%\n" +
 	"\x0eworkspace_name\x18\x04 \x01(\tR\rworkspaceName\x12#\n" +
-	"\rworkspace_dir\x18\x05 \x01(\tR\fworkspaceDir\":\n" +
+	"\rworkspace_dir\x18\x05 \x01(\tR\fworkspaceDir\x122\n" +
+	"\x15workspace_dir_missing\x18\x06 \x01(\bR\x13workspaceDirMissing\x12)\n" +
+	"\x10workspace_strays\x18\a \x03(\tR\x0fworkspaceStrays\":\n" +
 	"\x10PinThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"C\n" +

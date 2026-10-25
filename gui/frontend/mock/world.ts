@@ -72,6 +72,8 @@ export interface MockWorkspace {
   instructions: string;
   /** Skill folder names in .claude/skills, sorted. */
   skills: string[];
+  /** A rooted workspace's root is gone (moved or renamed). */
+  rootMissing?: boolean;
   createdAt: Date;
 }
 
@@ -953,6 +955,7 @@ export class World {
       name: w.name,
       members: [...w.members].sort(),
       rootPath: w.rootPath,
+      rootMissing: w.rootMissing === true,
       defaultPrimary: w.defaultPrimary,
       managedDir: this.managedDirOf(w),
       instructions: w.instructions ? `${this.workspaceDirOf(w)}/${w.instructions}` : "",
@@ -1119,10 +1122,11 @@ export class World {
   }
 
   /** Test control: what a thread wrote into the workspace's folder (its instructions file, its skills). POST /__mock/workspace-files. */
-  setWorkspaceFiles(ref: string, instructions: string | undefined, skills: readonly string[] | undefined): MockWorkspace {
+  setWorkspaceFiles(ref: string, instructions: string | undefined, skills: readonly string[] | undefined, rootMissing?: boolean): MockWorkspace {
     const w = this.workspaceRef(ref);
     if (instructions !== undefined) w.instructions = instructions;
     if (skills !== undefined) w.skills = [...skills].sort();
+    if (rootMissing !== undefined) w.rootMissing = rootMissing;
     this.publishWorkspace(w);
     return w;
   }

@@ -13,6 +13,7 @@ require (
 	github.com/wailsapp/wails/v3 v3.0.0-beta.34
 	go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79
 	golang.org/x/sys v0.48.0
+	golang.org/x/text v0.42.0
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1
 )

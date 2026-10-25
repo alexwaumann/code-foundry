@@ -223,6 +223,42 @@ func (f *Fake) Remove(_ context.Context, ref string) error {
 	return nil
 }
 
+// ProjectRemoved implements workspace.Store: the project leaves every workspace, a
+// default primary that was it becomes workspace.PrimaryWorkspace (the fake does not
+// fall back to another member).
+func (f *Fake) ProjectRemoved(_ context.Context, project string) error {
+	f.mu.Lock()
+	f.calls = append(f.calls, "ProjectRemoved "+project)
+	var changed []workspace.Workspace
+	for _, w := range f.byID {
+		if !w.Member(project) {
+			continue
+		}
+		w.Members = slices.DeleteFunc(slices.Clone(w.Members), func(id string) bool { return id == project })
+		if w.DefaultPrimary == project {
+			w.DefaultPrimary = workspace.PrimaryWorkspace
+		}
+		changed = append(changed, w)
+	}
+	f.mu.Unlock()
+	for _, w := range changed {
+		f.Put(w)
+	}
+	return nil
+}
+
+// SetRoot implements workspace.Store: the root is taken as given; a synthetic workspace
+// is refused.
+func (f *Fake) SetRoot(_ context.Context, ref, root string) (workspace.Workspace, error) {
+	return f.change("SetRoot "+ref+" "+root, ref, func(w *workspace.Workspace) error {
+		if w.Synthetic() {
+			return fmt.Errorf("%w: workspace %s has no root", workspace.ErrFailedPrecondition, w.Name)
+		}
+		w.RootPath = root
+		return nil
+	})
+}
+
 // EnsureDirs records "EnsureDirs <id>" and, with MakeDirs, makes the managed dirs.
 func (f *Fake) EnsureDirs(_ context.Context, id string) error {
 	f.mu.Lock()

@@ -11,13 +11,16 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/text/unicode/norm"
+
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Pure lookups and validation shared by the Manager and the fake.
 
-// ResolveWorkspace finds the workspace ref names in snap: by id, then by name
-// (case-insensitively).
+// ResolveWorkspace finds the workspace ref names in snap: by id (an exact match of an
+// existing id), then by name (case-insensitively, NFC). A name never looks like an id
+// (cleanName, nameFree), so the two cannot shadow each other.
 func ResolveWorkspace(snap *Snapshot, ref string) (Workspace, error) {
 	key := strings.TrimSpace(ref)
 	if key == "" {
@@ -26,7 +29,7 @@ func ResolveWorkspace(snap *Snapshot, ref string) (Workspace, error) {
 	if w, ok := snap.Workspace(key); ok {
 		return w, nil
 	}
-	if w, ok := snap.Named(key); ok {
+	if w, ok := snap.Named(norm.NFC.String(key)); ok {
 		return w, nil
 	}
 	return Workspace{}, fmt.Errorf("%w: workspace %q", ErrNotFound, key)
@@ -84,6 +87,17 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 	return project.Project{}, fmt.Errorf("%w: project %q is not registered (add it with `code-foundry project add <folder>`)", ErrNotFound, ref)
 }
 
+// IsKeyword reports whether ref is the PrimaryWorkspace keyword (any case) and no
+// registered project answers to it: a project whose id or name is "workspace" wins
+// everywhere a primary is named (thread new --project, set-primary, a default primary).
+func IsKeyword(snap *project.Snapshot, ref string) bool {
+	if !strings.EqualFold(strings.TrimSpace(ref), PrimaryWorkspace) {
+		return false
+	}
+	_, err := ResolveProject(snap, ref)
+	return err != nil
+}
+
 // memberRef resolves ref to one of w's members: a member id, a member project's name,
 // or anything ResolveProject resolves to a member.
 func memberRef(w Workspace, projects *project.Snapshot, ref string) (string, error) {
@@ -136,9 +150,14 @@ func realPath(p string) string {
 	return filepath.Join(realPath(parent), filepath.Base(p))
 }
 
-// cleanName trims and validates a workspace name.
+// idPattern is the shape of a workspace id; a name may not have it (ResolveWorkspace
+// tries ids first).
+var idPattern = regexp.MustCompile(`^w-[0-9a-fA-F]{12}$`)
+
+// cleanName trims, NFC-normalises (two spellings of "café" are one name) and validates
+// a workspace name.
 func cleanName(name string) (string, error) {
-	name = strings.TrimSpace(name)
+	name = norm.NFC.String(strings.TrimSpace(name))
 	switch {
 	case name == "":
 		return "", fmt.Errorf("%w: a workspace name is required", ErrInvalidArgument)
@@ -146,13 +165,21 @@ func cleanName(name string) (string, error) {
 		return "", fmt.Errorf("%w: name must be one line of at most 100 bytes", ErrInvalidArgument)
 	case strings.EqualFold(name, PrimaryWorkspace):
 		return "", fmt.Errorf("%w: %q is reserved (it names a workspace as a thread's primary)", ErrInvalidArgument, name)
+	case idPattern.MatchString(name):
+		return "", fmt.Errorf("%w: %q looks like a workspace id; pick another name", ErrInvalidArgument, name)
 	}
 	return name, nil
 }
 
 // nameFree refuses a name another workspace in snap has (case-insensitively); except is
 // the workspace being renamed.
+// A name equal to any workspace's id is refused too.
 func nameFree(snap *Snapshot, name, except string) error {
+	for _, w := range snap.Workspaces {
+		if strings.EqualFold(w.ID, name) {
+			return fmt.Errorf("%w: %q is the id of workspace %s; pick another name", ErrInvalidArgument, name, w.Name)
+		}
+	}
 	if w, ok := snap.Named(name); ok && w.ID != except {
 		return fmt.Errorf("%w: a workspace named %q exists (%s)", ErrFailedPrecondition, w.Name, w.ID)
 	}

@@ -352,17 +352,23 @@ func (m *Manager) placeRequest(o CreateOptions) (placeRequest, map[string]string
 			bases[pid] = base
 		}
 	}
+	// "workspace" as the project is the workspace's folder, unless a registered project
+	// answers to it (workspace.IsKeyword): then it is that project.
+	keyword := m.opts.Projects == nil && strings.EqualFold(strings.TrimSpace(o.ProjectID), workspace.PrimaryWorkspace) ||
+		m.opts.Projects != nil && workspace.IsKeyword(snap, o.ProjectID)
 	if ref := strings.TrimSpace(o.WorkspaceID); ref != "" {
-		w, err := m.workspaceDir(ref)
+		// The folder is checked only when the thread runs there (placeThread): a moved
+		// root does not stop a thread in a member.
+		w, err := m.resolveWorkspace(ref)
 		if err != nil {
 			return req, nil, err
 		}
 		req.workspaceID, req.wsMembers, req.wsDefault = w.ID, w.Members, w.DefaultPrimary
-		if strings.EqualFold(strings.TrimSpace(o.ProjectID), workspace.PrimaryWorkspace) {
+		if keyword {
 			req.wsPrimary = true
 			o.ProjectID = ""
 		}
-	} else if strings.EqualFold(strings.TrimSpace(o.ProjectID), workspace.PrimaryWorkspace) {
+	} else if keyword {
 		return req, nil, fmt.Errorf("%w: project %q (the workspace's folder) needs a workspace", ErrInvalidArgument, o.ProjectID)
 	}
 	if o.ProjectID != "" {

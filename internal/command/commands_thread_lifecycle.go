@@ -77,10 +77,11 @@ func noProjectAlone(a Args) error {
 
 // createdMessage is the first part of what thread.new and thread.new-like say about the
 // thread s that req made: where it runs, its projects, workspace and mode.
-func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest) string {
+// Project ids are named through name.
+func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest, name func(string) string) string {
 	msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 	if n := len(s.GetProjectIds()); n > 1 {
-		msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(s.GetProjectIds(), ", "))
+		msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(mapNames(s.GetProjectIds(), name), ", "))
 	}
 	if s.GetWorkspaceId() != "" {
 		msg += " (workspace " + s.GetWorkspaceId() + ")"
@@ -88,9 +89,11 @@ func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest) string {
 	if req.GetNoProject() {
 		msg += " (no project)"
 	}
-	if s.GetCreatedWorktree() && req.NewWorktree != nil {
+	switch {
+	case s.GetCreatedWorktree() && req.NewWorktree != nil && s.GetBaseRef() != "":
 		msg += " (new worktree from " + s.GetBaseRef() + ")"
-	} else if s.GetCreatedWorktree() {
+	case s.GetCreatedWorktree():
+		// No base when the primary is the workspace's folder: the members' worktrees.
 		msg += " (worktrees on " + s.GetBranch() + ")"
 	}
 	return msg
@@ -123,7 +126,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name it runs in (with projects or like: one of them)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
-				{Name: "workspace", Type: String, Description: "Workspace id or name: its projects (unless projects) and instructions; project workspace runs it in the workspace's folder"},
+				{Name: "workspace", Type: String, Description: "Workspace id or name: its projects (unless projects) and instructions; project workspace runs it in its folder (a project named workspace wins)"},
 				{Name: "projects", Type: String, Description: "Comma-separated projects it works in (project:base with new-worktree); it runs in the first unless project"},
 				{Name: "like", Type: String, ID: ThreadID, Description: "Thread to copy projects, branch and mode from"},
 				{Name: "new-branch", Type: Bool, Description: "With like, or in a thread: a new branch, new worktrees"},
@@ -138,8 +141,8 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
-				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
-				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree, base, base-from-origin or branch)"},
+				{Name: "composer-prompt", Type: String, Description: "The GUI's text of prompt with its tag tokens, for display (the GUI sets it)"},
+				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (no placement or worktree flags with it)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
@@ -235,7 +238,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
 				}
 				focusCreated(e, a, s.GetId())
-				msg := createdMessage(s, req)
+				msg := createdMessage(s, req, r.projectNamer(ctx))
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
 				}
@@ -246,7 +249,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil
 			},
 		},
-		threadNewLike(b, e),
+		threadNewLike(r, b, e),
 		Command{
 			Name:         "thread.focus",
 			Title:        "Focus Thread",

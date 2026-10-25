@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -95,6 +96,10 @@ func TestWorkspaceWatchSendsSnapshotThenEvents(t *testing.T) {
 	}
 	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetWorkspaces()) != 1 {
 		t.Fatalf("first event = %v (%v)", stream.Msg(), stream.Err())
+	}
+	// Subscribing read every workspace's folder again first (hand edits show).
+	if !slices.Contains(fake.Calls(), "EnsureDirs") {
+		t.Errorf("calls %v: want EnsureDirs of every workspace on subscribe", fake.Calls())
 	}
 	if _, err := fake.AddProject(ctx, "a", "s"); err != nil {
 		t.Fatal(err)

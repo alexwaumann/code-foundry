@@ -14,7 +14,7 @@ import (
 // CreateThreadRequest.like_thread_id (thread new --like). Only the prompt and the
 // Claude options are new; project picks another primary among the source's checkouts.
 // The GUI presents it as the composer prefilled from the thread.
-func threadNewLike(b ThreadBackend, e Emitter) Command {
+func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 	return Command{
 		Name:         "thread.new-like",
 		Title:        "New thread on this branch",
@@ -51,7 +51,7 @@ func threadNewLike(b ThreadBackend, e Emitter) Command {
 			s := res.Msg.GetThread()
 			focusCreated(e, a, s.GetId())
 			// Collision hints, never a refusal: the source thread works there too.
-			return Result{Message: createdMessage(s, req), JSON: s, Warnings: res.Msg.GetHints()}, nil
+			return Result{Message: createdMessage(s, req, r.projectNamer(ctx)), JSON: s, Warnings: res.Msg.GetHints()}, nil
 		},
 	}
 }

@@ -26,13 +26,15 @@ export interface WorkspaceView {
   members: WorkspaceMemberView[];
   /** The folder a rooted workspace came from; "" for a synthetic one. */
   rootPath?: string;
+  /** rootPath is set and is not a folder now (moved or renamed: workspace.set-root). */
+  rootMissing?: boolean;
   /** Where new threads start: a member project id, or "workspace" (its folder). */
   defaultPrimary?: string;
   /** <config home>/workspaces/<id>: its CLAUDE.md, AGENTS.md and .claude/skills (or links). */
   managedDir?: string;
-  /** Its instructions file: CLAUDE.md, else AGENTS.md (a rooted workspace's: the root's real file); "" when neither exists. */
+  /** Its instructions file: CLAUDE.md, else AGENTS.md, in rootPath when set, else managedDir; "" when neither exists. */
   instructions?: string;
-  /** The skills in <managedDir>/.claude/skills, sorted. */
+  /** The skills in .claude/skills of the same folder, sorted. */
   skills?: readonly string[];
   createdAtMs: number | null;
 }
@@ -49,6 +51,7 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     branch: "",
     members: w.members.map((projectId) => ({ projectId, worktreePath: "" })),
     rootPath: w.rootPath,
+    rootMissing: w.rootMissing,
     defaultPrimary: w.defaultPrimary,
     managedDir: w.managedDir,
     instructions: w.instructions,

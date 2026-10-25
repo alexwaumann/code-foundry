@@ -69,6 +69,17 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, ID: ProjectID, Description: ProjectRefHelp}
 	r.SetRefResolver(ProjectID, func(ctx context.Context, _, ref string) (string, error) { return projectRef(ctx, b, ref, false) })
+	r.SetProjectNames(func(ctx context.Context) (map[string]string, error) {
+		res, err := b.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
+		if err != nil {
+			return nil, err
+		}
+		names := make(map[string]string, len(res.Msg.GetProjects()))
+		for _, p := range res.Msg.GetProjects() {
+			names[p.GetId()] = p.GetName()
+		}
+		return names, nil
+	})
 	return r.RegisterAll(
 		Command{
 			Name:         "project.list",

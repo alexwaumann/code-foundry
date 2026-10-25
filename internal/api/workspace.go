@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 
 	"connectrpc.com/connect"
@@ -86,6 +87,15 @@ func (h *Workspace) SetDefaultPrimary(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(&v1.SetWorkspaceDefaultPrimaryResponse{Workspace: workspaceToProto(w)}), nil
 }
 
+// SetRoot points a rooted workspace at another folder.
+func (h *Workspace) SetRoot(ctx context.Context, req *connect.Request[v1.SetWorkspaceRootRequest]) (*connect.Response[v1.SetWorkspaceRootResponse], error) {
+	w, err := h.store.SetRoot(ctx, req.Msg.GetWorkspace(), req.Msg.GetRootPath())
+	if err != nil {
+		return nil, workspaceError(err)
+	}
+	return connect.NewResponse(&v1.SetWorkspaceRootResponse{Workspace: workspaceToProto(w)}), nil
+}
+
 // Remove forgets a workspace.
 func (h *Workspace) Remove(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
 	if err := h.store.Remove(ctx, req.Msg.GetWorkspace()); err != nil {
@@ -95,12 +105,16 @@ func (h *Workspace) Remove(ctx context.Context, req *connect.Request[v1.RemoveWo
 }
 
 // Watch sends a snapshot, then every workspace event. If the client falls behind and
-// events are dropped, it sends a fresh snapshot.
+// events are dropped, it sends a fresh snapshot. Subscribing has the store read every
+// workspace's folder again (EnsureDirs), so the Projects page shows hand edits.
 func (h *Workspace) Watch(ctx context.Context, _ *connect.Request[v1.WatchWorkspacesRequest], stream *connect.ServerStream[v1.WorkspaceEvent]) error {
 	// Subscribe first so nothing published between snapshot and stream is lost. Each
 	// event carries full state, so applying queued older events still converges.
 	sub := bus.Subscribe[workspace.Event](h.bus, watchBuffer)
 	defer sub.Close()
+	if err := h.store.EnsureDirs(ctx, ""); err != nil {
+		slog.WarnContext(ctx, "workspace folders on watch", "err", err)
+	}
 	if err := stream.Send(workspaceEventToProto(h.store.Snapshot())); err != nil {
 		return err
 	}
@@ -153,7 +167,8 @@ func workspacesToProto(snap *workspace.Snapshot) []*v1.Workspace {
 
 func workspaceToProto(w workspace.Workspace) *v1.Workspace {
 	p := &v1.Workspace{Id: w.ID, Name: w.Name, Members: slices.Clone(w.Members), RootPath: w.RootPath,
-		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir, Instructions: w.Instructions, Skills: slices.Clone(w.Skills)}
+		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir, Instructions: w.Instructions, Skills: slices.Clone(w.Skills),
+		RootMissing: w.RootMissing}
 	if !w.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(w.CreatedAt)
 	}

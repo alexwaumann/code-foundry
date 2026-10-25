@@ -36,7 +36,11 @@ of projects on the fly, and a workspace lived inside one project. Engineers read
   writable anyway; elsewhere Claude asks. Do **not** add prompt text about writability.
 * `--add-dir` refuses a path that does not exist. Loaded files are labelled with their
   path, but small models still blur which repo a file belongs to.
-* Claude Code does not read `AGENTS.md` itself.
+* ~~Claude Code does not read `AGENTS.md` itself.~~ Outdated: 2.1.306 loads `AGENTS.md` like
+  `CLAUDE.md`, from the cwd and its parents (verified 2026-10-25 for the fuzz fixes, an
+  `AGENTS.md`-only cwd: Haiku 5.5 quoted it with its path). It does **not** find a parent
+  folder's `.claude/skills` (a skill in `<root>/.claude/skills` was not listed from a
+  thread in `<root>/child`). See `workspaces-v2-fix-1-workspace.md`.
 
 Fixtures used: `/tmp/cfmd` (A, B, R, O, O2) on the user's machine; not in the repo.
 
@@ -130,7 +134,8 @@ spawn error, not a skip), grants.
 dir nor `root_path`: read `CLAUDE.md` from the managed dir (through the symlink), else
 `AGENTS.md`; append it under one heading ("Workspace <name> instructions") after the
 `ThreadPrompt` line and before app memory, capped at 32 KiB (truncate, log). When the cwd
-*is* the managed dir or the root, Claude loads the files natively and nothing is added.
+*is* the managed dir or the root (or, since the fuzz fixes, inside the root), Claude loads
+the files natively and nothing is added.
 Drop `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD` and the "This thread belongs to
 workspace" prompt line entirely. Only the primary's `CLAUDE.md` loads natively; the
 model learns the others' paths from `thread checkouts` and the entry skill tells it to

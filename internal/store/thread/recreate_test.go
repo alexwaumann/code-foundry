@@ -106,10 +106,10 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 			prepare: func(e *env, _ *recreatingEnv, s Thread) {
 				e.m.update(s.ID, true, func(r *record) { r.s.Branch = "" })
 			},
-			wantErr: "Claude did not start: failed precondition: worktree ", wantNoCreate: true},
+			wantErr: "Claude did not start: failed precondition: working directory ", wantNoCreate: true},
 		{name: "a worktree outside the worktrees root keeps the refusal", refs: []string{"refs/heads/<b>"},
 			prepare: func(e *env, _ *recreatingEnv, _ Thread) { e.m.opts.WorktreeRoot = t.TempDir() },
-			wantErr: "Claude did not start: failed precondition: worktree ", wantNoCreate: true},
+			wantErr: "Claude did not start: failed precondition: working directory ", wantNoCreate: true},
 		{name: "a project that is gone is refused", refs: []string{"refs/heads/<b>"},
 			prepare: func(e *env, _ *recreatingEnv, _ Thread) {
 				if err := e.projects.Unregister(context.Background(), "r1"); err != nil {
