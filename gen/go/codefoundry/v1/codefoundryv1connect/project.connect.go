@@ -35,6 +35,9 @@ const (
 const (
 	// ProjectServiceRegisterProcedure is the fully-qualified name of the ProjectService's Register RPC.
 	ProjectServiceRegisterProcedure = "/codefoundry.v1.ProjectService/Register"
+	// ProjectServiceInspectFolderProcedure is the fully-qualified name of the ProjectService's
+	// InspectFolder RPC.
+	ProjectServiceInspectFolderProcedure = "/codefoundry.v1.ProjectService/InspectFolder"
 	// ProjectServiceUnregisterProcedure is the fully-qualified name of the ProjectService's Unregister
 	// RPC.
 	ProjectServiceUnregisterProcedure = "/codefoundry.v1.ProjectService/Unregister"
@@ -93,6 +96,13 @@ type ProjectServiceClient interface {
 	// repository (its main worktree); any other existing directory registers as a
 	// project without git (Project.git false).
 	Register(context.Context, *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error)
+	// InspectFolder says what Register would make of a folder before the Add Project
+	// dialog adds it: whether it is (or is inside) a git repository, and, when it is not,
+	// the git repositories directly inside it (immediate children with a .git directory or
+	// file; hidden and symlinked children are skipped), sorted by name. A folder of repos
+	// can be added as a rooted workspace instead (the project.add-workspace command).
+	// InvalidArgument for a path Register would refuse (outside home, not a directory).
+	InspectFolder(context.Context, *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error)
 	// Unregister forgets a project. Worktrees on disk are not touched.
 	Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error)
 	// List returns registered projects with their worktrees.
@@ -194,6 +204,12 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+ProjectServiceRegisterProcedure,
 			connect.WithSchema(projectServiceMethods.ByName("Register")),
+			connect.WithClientOptions(opts...),
+		),
+		inspectFolder: connect.NewClient[v1.InspectFolderRequest, v1.InspectFolderResponse](
+			httpClient,
+			baseURL+ProjectServiceInspectFolderProcedure,
+			connect.WithSchema(projectServiceMethods.ByName("InspectFolder")),
 			connect.WithClientOptions(opts...),
 		),
 		unregister: connect.NewClient[v1.UnregisterProjectRequest, v1.UnregisterProjectResponse](
@@ -322,6 +338,7 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 // projectServiceClient implements ProjectServiceClient.
 type projectServiceClient struct {
 	register            *connect.Client[v1.RegisterProjectRequest, v1.RegisterProjectResponse]
+	inspectFolder       *connect.Client[v1.InspectFolderRequest, v1.InspectFolderResponse]
 	unregister          *connect.Client[v1.UnregisterProjectRequest, v1.UnregisterProjectResponse]
 	list                *connect.Client[v1.ListProjectsRequest, v1.ListProjectsResponse]
 	get                 *connect.Client[v1.GetProjectRequest, v1.GetProjectResponse]
@@ -347,6 +364,11 @@ type projectServiceClient struct {
 // Register calls codefoundry.v1.ProjectService.Register.
 func (c *projectServiceClient) Register(ctx context.Context, req *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error) {
 	return c.register.CallUnary(ctx, req)
+}
+
+// InspectFolder calls codefoundry.v1.ProjectService.InspectFolder.
+func (c *projectServiceClient) InspectFolder(ctx context.Context, req *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error) {
+	return c.inspectFolder.CallUnary(ctx, req)
 }
 
 // Unregister calls codefoundry.v1.ProjectService.Unregister.
@@ -455,6 +477,13 @@ type ProjectServiceHandler interface {
 	// repository (its main worktree); any other existing directory registers as a
 	// project without git (Project.git false).
 	Register(context.Context, *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error)
+	// InspectFolder says what Register would make of a folder before the Add Project
+	// dialog adds it: whether it is (or is inside) a git repository, and, when it is not,
+	// the git repositories directly inside it (immediate children with a .git directory or
+	// file; hidden and symlinked children are skipped), sorted by name. A folder of repos
+	// can be added as a rooted workspace instead (the project.add-workspace command).
+	// InvalidArgument for a path Register would refuse (outside home, not a directory).
+	InspectFolder(context.Context, *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error)
 	// Unregister forgets a project. Worktrees on disk are not touched.
 	Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error)
 	// List returns registered projects with their worktrees.
@@ -552,6 +581,12 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		ProjectServiceRegisterProcedure,
 		svc.Register,
 		connect.WithSchema(projectServiceMethods.ByName("Register")),
+		connect.WithHandlerOptions(opts...),
+	)
+	projectServiceInspectFolderHandler := connect.NewUnaryHandler(
+		ProjectServiceInspectFolderProcedure,
+		svc.InspectFolder,
+		connect.WithSchema(projectServiceMethods.ByName("InspectFolder")),
 		connect.WithHandlerOptions(opts...),
 	)
 	projectServiceUnregisterHandler := connect.NewUnaryHandler(
@@ -678,6 +713,8 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		switch r.URL.Path {
 		case ProjectServiceRegisterProcedure:
 			projectServiceRegisterHandler.ServeHTTP(w, r)
+		case ProjectServiceInspectFolderProcedure:
+			projectServiceInspectFolderHandler.ServeHTTP(w, r)
 		case ProjectServiceUnregisterProcedure:
 			projectServiceUnregisterHandler.ServeHTTP(w, r)
 		case ProjectServiceListProcedure:
@@ -729,6 +766,10 @@ type UnimplementedProjectServiceHandler struct{}
 
 func (UnimplementedProjectServiceHandler) Register(context.Context, *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.Register is not implemented"))
+}
+
+func (UnimplementedProjectServiceHandler) InspectFolder(context.Context, *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.InspectFolder is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error) {

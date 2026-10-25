@@ -51,6 +51,8 @@ type Fake struct {
 	// NotGit makes Register create projects without git (Git false, one main worktree
 	// with no branch), like the real store for a plain directory.
 	NotGit bool
+	// Folders answers Inspect for these paths (cleaned); others are read from disk.
+	Folders map[string]project.Folder
 	// Err, when set, is returned by every mutating method.
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
