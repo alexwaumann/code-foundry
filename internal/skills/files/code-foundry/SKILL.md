@@ -8,19 +8,17 @@ user-invocable: false
 
 {{cf.provenance}}
 
-Code Foundry is the macOS app this thread runs in: it runs Claude Code threads
-(conversations like this one) on the user's projects and shows them in one window with a
-sidebar, pages and a side panel per thread. The `code-foundry` CLI drives it (most
-buttons and menu items are commands you can run too) and changes the user's real app.
+Code Foundry is the macOS app this thread runs in: it runs Claude Code threads (conversations
+like this one) on the user's projects in one window with a sidebar, pages and a side panel per
+thread. The `code-foundry` CLI drives it (most buttons are commands too) and changes the real app.
 
 ## The one rule
 
 The user can ask you for anything about or in the app; if you can do it with the CLI,
 offer it and do it. A question ("how do I…?") gets the answer and the offer; run a change
 once the user says yes (code-foundry-help, "Explain first, then offer"). Skills never run
-commands themselves: you run `code-foundry …` with your Bash tool.
-
-Talk about the app as the user sees it: pages, buttons, the side panel, Settings labels.
+commands themselves: you run `code-foundry …` with your Bash tool. Talk about the app as the
+user sees it: pages, buttons, the side panel, Settings labels.
 Never tell the user skill or command names: say what you will do, not which command.
 
 ## Which skill or command
@@ -28,10 +26,10 @@ Never tell the user skill or command names: say what you will do, not which comm
 | The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists) or run |
 |---|---|
 | How to do something, a setting or keybinding | the code-foundry-help skill |
-| A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
+| A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences"); one for a set of projects or one repo, or a skill for them: "Scopes" below |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
-| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
-| A page, chart, form, board, dashboard, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) and can read and change the app |
+| To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` (also `usage`, `worktree`, `threads`, `mcp`): your own side panel. Add `--focus` only when the user asks to be taken there |
+| A page, chart, form, board, dashboard, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown; `--panel` also opens it beside the thread) and can read and change the app |
 | What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
 | To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
@@ -43,12 +41,6 @@ Never tell the user skill or command names: say what you will do, not which comm
 
 ## Showing things
 
-To show a page inline in the conversation: `code-foundry view.inline <path>` (your own
-thread; `--panel` also opens it beside the thread). Panel verbs open a surface in your own
-side panel: `view.panel.file`, `diff`, `pr`, `usage`, `worktree`, `threads`, `mcp`….
-Add `--focus` only when the user asks to be taken there. Page verbs move every window:
-only when asked. A path in your reply is a chip that opens the file.
-
 Write a page in `$CODE_FOUNDRY_PAGES` (your thread's own folder), never in the repository
 or the home folder. It links `<link rel="stylesheet" href="/cf/theme.css">` and paints only
 with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised`,
@@ -57,6 +49,15 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
 `/cf/bridge.js` lets it call the app and fits its card (else post `{type: "cf:resize", height}`).
 `view.inline` warns about what a page misses. More: code-foundry-pages.
+
+## Scopes
+
+How you act in the app everywhere is app memory (`memory add`). What spans a set of projects (a
+product's repos) is the workspace's, in the folder after `WORKSPACE` in `code-foundry thread
+checkouts`: instructions in `CLAUDE.md` (else `AGENTS.md`; a new file is `CLAUDE.md`), skills in
+`.claude/skills/<name>/SKILL.md` (frontmatter `name`, `description`), written with your file tools.
+One repo's is its own `CLAUDE.md`. Only your primary checkout's `CLAUDE.md` loads: read another
+checkout's (INSTRUCTIONS column) before you edit there. A running thread loads them at its next start.
 
 ## Making a theme
 
@@ -80,4 +81,3 @@ on screen: say so, offer `theme set-scheme light`, never switch unasked. Reply i
   Model, Effort and Permissions pickers, the MCP panel, Rename Thread, a new thread.
 - `$CODE_FOUNDRY_THREAD` is your thread's id. Thread commands without `--id` act on it.
 - Commands that ask first exit 2 without `--yes`: add it once the user agreed to that act.
-- The user's standing preferences about the app are in your system prompt; follow them.
