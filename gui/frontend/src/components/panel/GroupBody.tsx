@@ -6,6 +6,7 @@ import { activeTab, usePanelStore, type GroupIndex } from "@/stores/panel";
 import { useUiStore } from "@/stores/ui";
 import { surfaceOf, surfaces, type SurfaceContext } from "@/surfaces/registry";
 import { bodyDomId, tabDomId } from "./actions";
+import { PanelKeyContext } from "./panelKeyContext";
 import { SurfaceRow } from "./SurfaceRow";
 
 /**
@@ -55,7 +56,7 @@ export function GroupBody({ panelKey, group }: { panelKey: string; group: GroupI
     >
       {/* A surface that throws degrades to its tab; keyed by tab above, so switching retries. */}
       <ErrorBoundary label={`${active.kind} panel tab`} fallback={PaneError}>
-        {spec ? spec.render(active) : null}
+        <PanelKeyContext value={panelKey}>{spec ? spec.render(active) : null}</PanelKeyContext>
       </ErrorBoundary>
     </div>
   );

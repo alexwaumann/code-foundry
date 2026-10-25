@@ -20,6 +20,8 @@ export interface ArgSpecView {
   description: string;
   enumValues: string[];
   defaultValue: string;
+  /** The CLI sends $CODE_FOUNDRY_THREAD when the flag is not given (a page's bridge sends its thread). */
+  defaultToThreadEnv?: boolean;
 }
 
 export interface CommandView {
@@ -32,6 +34,8 @@ export interface CommandView {
   available: boolean;
   /** Invoke asks for confirmation first (FailedPrecondition + ConfirmationRequired). */
   requiresConfirmation?: boolean;
+  /** The command only reads (Command.read_only): a page's bridge runs it without a click. */
+  readOnly?: boolean;
 }
 
 /** A destructive command waiting for the user's yes (ConfirmationRequired detail). */
@@ -100,6 +104,7 @@ export function toArgSpecView(a: ArgSpec): ArgSpecView {
     description: a.description,
     enumValues: [...a.enumValues],
     defaultValue: a.defaultValue,
+    ...(a.defaultToThreadEnv ? { defaultToThreadEnv: true } : {}),
   };
 }
 
@@ -113,6 +118,7 @@ export function toCommandView(c: Command): CommandView {
     keybindings: [...c.keybindings],
     available: c.available,
     requiresConfirmation: c.requiresConfirmation,
+    ...(c.readOnly ? { readOnly: true } : {}),
   };
 }
 
