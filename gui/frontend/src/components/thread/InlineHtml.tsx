@@ -4,6 +4,7 @@ import { Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelR
 import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
+import { PageErrors } from "@/components/files/PageErrors";
 import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGrant";
 import { useTabRead, useToolEdits } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT } from "@/components/window/titleBand";
 import { SHELL_GAP } from "@/design/tokens";
 import { frameHeight, inlinePage, type InlinePage } from "@/lib/inlinePage";
+import type { PageError } from "@/lib/pageErrors";
 import { tildify } from "@/lib/path";
 import type { WorkNode } from "@/lib/threadTimeline";
 import { cn } from "@/lib/utils";
@@ -85,6 +87,7 @@ function CardBody({
   height,
   version,
   onResize,
+  onPageErrors,
 }: {
   threadId: string;
   page: InlinePage;
@@ -93,6 +96,7 @@ function CardBody({
   height: number;
   version: number;
   onResize?: (h: number) => void;
+  onPageErrors?: (errors: readonly PageError[]) => void;
 }) {
   if (grant.loading)
     return (
@@ -112,7 +116,7 @@ function CardBody({
       </>
     );
   if (source) return <SourceView page={page} height={height} version={version} />;
-  return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} testId="thread-html-frame" />;
+  return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} onPageErrors={onPageErrors} testId="thread-html-frame" />;
 }
 
 /** The file read-only as code (the File tab's code view), or why it cannot be read. */
@@ -178,6 +182,9 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   const [asked, setAsked] = useState<number | null>(null);
   const [pane, setPane] = useState(() => window.innerHeight);
   const [version, setVersion] = useState(0);
+  // The errors each frame's page got (the card's and the lightbox's are two documents).
+  const [errors, setErrors] = useState<readonly PageError[]>([]);
+  const [boxErrors, setBoxErrors] = useState<readonly PageError[]>([]);
   const ref = useRef<HTMLDivElement>(null);
   // The thread edited the file: load it again (the grant holds).
   useToolEdits(page.abs, () => {
@@ -200,8 +207,10 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   const close = () => {
     setLightbox(false);
   };
+  const label = page.title ? `${page.title} (${tildify(page.abs)})` : tildify(page.abs);
   const actions = (expanded: boolean) => (
     <>
+      <PageErrors errors={expanded ? boxErrors : errors} threadId={threadId} page={label} onAsk={expanded ? close : undefined} />
       <Action
         label="Open in side panel"
         icon={PanelRight}
@@ -236,7 +245,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   return (
     <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised" data-testid="thread-html-card">
       <Strip page={page}>{actions(false)}</Strip>
-      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} />
+      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} onPageErrors={setErrors} />
       {lightbox && (
         <Lightbox onClose={close} returnFocus={() => ref.current?.querySelector<HTMLElement>('[data-testid="thread-html-expand"]') ?? null}>
           <Strip page={page} big>
@@ -247,7 +256,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
             </Button>
           </Strip>
           {grant.preview && !source ? (
-            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" testId="thread-html-lightbox-frame" />
+            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setBoxErrors} testId="thread-html-lightbox-frame" />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">
               <CardBody threadId={threadId} page={page} grant={grant} source={source} height={Math.max(height, 2000)} version={version} />

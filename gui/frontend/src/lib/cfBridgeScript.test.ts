@@ -88,8 +88,8 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
   const send = (data: unknown, source: unknown = parent) => {
     for (const fn of listeners.message ?? []) fn({ data, source });
   };
-  const fire = (type: string) => {
-    for (const fn of listeners[type] ?? []) fn({});
+  const fire = (type: string, ev: object = {}) => {
+    for (const fn of listeners[type] ?? []) fn(ev);
   };
   const ready = (extra: Record<string, unknown> = {}) => {
     send({
@@ -173,6 +173,26 @@ describe("bridge.js", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(h.sent("cf:run")).toHaveLength(1);
     vi.advanceTimersByTime(5001);
+    await expect(h.cf.run("thread.send")).rejects.toMatchObject({ code: "gesture" });
+  });
+
+  it("takes a recent real press even when navigator.userActivation says inactive (the side panel's WebKit)", async () => {
+    vi.useFakeTimers();
+    const h = load({ userActivation: { isActive: false } });
+    h.ready();
+    await expect(h.cf.run("thread.send")).rejects.toMatchObject({ code: "gesture" });
+    h.fire("click", { isTrusted: true });
+    void h.cf.run("thread.send");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.sent("cf:run")).toHaveLength(1);
+    vi.advanceTimersByTime(5001);
+    await expect(h.cf.run("thread.send")).rejects.toMatchObject({ code: "gesture" });
+  });
+
+  it("does not take a page's own synthetic click as a gesture", async () => {
+    const h = load({ userActivation: { isActive: false } });
+    h.ready();
+    h.fire("click", { isTrusted: false });
     await expect(h.cf.run("thread.send")).rejects.toMatchObject({ code: "gesture" });
   });
 

@@ -20,7 +20,7 @@
   if (window.cf && window.cf.version) return;
 
   var VERSION = 1;
-  var GESTURE_MS = 5000; // the gesture window when navigator.userActivation is missing
+  var GESTURE_MS = 5000; // how long after a press, click or key a call counts as the user's
   var READY_MS = 10000; // how long cf.run waits for the app to say hello
   var RUN_MS = 60000; // cf.run's default timeout; opts.timeout overrides it, 0 waits forever
 
@@ -59,15 +59,20 @@
     return e;
   }
 
-  // Gestures: transient user activation, else a key or pointer press in the last 5 s.
-  function noteGesture() {
+  // Gestures: transient user activation, or a real press, click or key in the page in the
+  // last 5 s. Either is enough: in the app's side panel WebKit reported isActive false
+  // inside a genuine click's handler (docs/notes/bridge-fix-c-gui.md), so the API alone
+  // refused it. Only trusted events count: a page's own el.click() is not the user.
+  function noteGesture(e) {
+    if (e && e.isTrusted === false) return;
     lastGesture = Date.now();
   }
-  window.addEventListener("pointerdown", noteGesture, true);
-  window.addEventListener("keydown", noteGesture, true);
+  ["pointerdown", "mousedown", "pointerup", "click", "keydown"].forEach(function (t) {
+    window.addEventListener(t, noteGesture, true);
+  });
   function inGesture() {
     var ua = navigator.userActivation;
-    if (ua && typeof ua.isActive === "boolean") return ua.isActive;
+    if (ua && ua.isActive === true) return true;
     return lastGesture > 0 && Date.now() - lastGesture < GESTURE_MS;
   }
 
