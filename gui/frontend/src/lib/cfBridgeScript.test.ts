@@ -1,14 +1,11 @@
-import fs from "node:fs";
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import SRC from "../../../../internal/bridge/bridge.js?raw";
 
 /*
  * The daemon's page bridge script (internal/bridge/bridge.js, served as /cf/bridge.js),
  * run against a fake window whose parent records what the page posts: the page side of
  * the page↔host contract (docs/notes/bridge-1-daemon.md).
  */
-// Vitest runs from gui/frontend (import.meta.url is not a file URL under jsdom).
-const SRC = fs.readFileSync(path.resolve(process.cwd(), "../../internal/bridge/bridge.js"), "utf8");
 
 interface Msg {
   type: string;
@@ -83,8 +80,10 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     }
     observe() {}
   }
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- the script under test, as a page would run it
-  new Function("window", "navigator", "document", "localStorage", "ResizeObserver", SRC)(win, nav, doc, localStorage, ResizeObserver);
+  // The script under test, as a page would run it, with these globals.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const run = new Function("window", "navigator", "document", "localStorage", "ResizeObserver", SRC) as (...globals: unknown[]) => void;
+  run(win, nav, doc, localStorage, ResizeObserver);
   const cf = win.cf as Cf;
   const send = (data: unknown, source: unknown = parent) => {
     for (const fn of listeners.message ?? []) fn({ data, source });
