@@ -49,7 +49,7 @@ test("double-click on a worktree row and on a project row opens their tabs in th
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("code-foundry · feat/sidebar");
 });
 
-test("Enter on a workspace member row opens its tab in the page's panel", async ({ page }) => {
+test("Enter on a workspace card's project row opens that project's main worktree in the page's panel", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await openProjects(page);
@@ -57,8 +57,10 @@ test("Enter on a workspace member row opens its tab in the page's panel", async 
   await member.click();
   await page.keyboard.press("Enter");
   await expect(panel(page)).toHaveAttribute("data-panel-key", "view:projects");
-  await expect(tabs(page)).toHaveText(["ghostty-playground · cf/login"]);
-  await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("ghostty-playground@cf/login");
+  await expect(tabs(page)).toHaveText(["ghostty-playground"]);
+  await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("ghostty-playground@main");
+  // The page's panel belongs to no thread: no Also in list.
+  await expect(surface(page).getByTestId("worktree-also-in")).toHaveCount(0);
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
@@ -81,7 +83,7 @@ test("a thread's panel lists Worktree with T; T, the list entry, the palette com
   await expect(page.getByTestId("thread-header")).toContainText("Refactor sidebar tree");
 
   // The palette lists the command for a thread; its presenter runs locally (no round
-  // trip, like view.panel.workspace): the tab comes back and the panel takes focus.
+  // trip, like view.panel.toggle): the tab comes back and the panel takes focus.
   await page.keyboard.press("Meta+w");
   await expect(tabs(page)).toHaveCount(0);
   await page.keyboard.press("Meta+k");

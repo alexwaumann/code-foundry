@@ -87,7 +87,8 @@ export async function editWorkspaceInstructions(workspaceId: string): Promise<bo
   const res = await runCommandForResult(
     "thread.new",
     { workspace: workspaceId, project: PRIMARY_WORKSPACE, "new-worktree": "false", prompt },
-    { ctx: workspaceContext(workspaceId), quiet: true },
+    // The composer's context (thread.new is offered there with no project, as for a workspace without one).
+    { ctx: { ...emptyContext, activeView: "compose", activeWorkspaceId: workspaceId }, quiet: true },
   );
   return res !== null;
 }

@@ -405,18 +405,6 @@ export function ProjectsPage() {
             type="button"
             variant="ghost"
             size="xs"
-            data-testid="projects-new-workspace"
-            onClick={() => {
-              openNewWorkspaceDialog();
-            }}
-          >
-            <Layers />
-            New workspace
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
             data-testid="projects-register"
             onClick={() => {
               addProject();
@@ -464,10 +452,29 @@ export function ProjectsPage() {
               )}
             </div>
             <div className="flex flex-col gap-3" data-testid="workspaces-section">
-              <SectionTitle count={model.workspaces.length}>Workspaces</SectionTitle>
+              <SectionTitle
+                count={model.workspaces.length}
+                extra={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="text-cf-text-muted hover:text-cf-text"
+                    data-testid="projects-new-workspace"
+                    onClick={() => {
+                      openNewWorkspaceDialog();
+                    }}
+                  >
+                    <Layers />
+                    New workspace
+                  </Button>
+                }
+              >
+                Workspaces
+              </SectionTitle>
               {all.workspaces.length === 0 ? (
                 <p className="px-2 text-body text-cf-text-muted" data-testid="workspaces-empty">
-                  No workspaces. A workspace is a set of projects you start threads in together, with instructions and skills that span them: New workspace above,
+                  No workspaces. A workspace is a set of projects you start threads in together, with instructions and skills that span them: New workspace,
                   or <span className="font-mono">code-foundry workspace new</span>.
                 </p>
               ) : model.workspaces.length === 0 ? (

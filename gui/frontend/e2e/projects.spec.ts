@@ -35,12 +35,12 @@ test("collapse a project and a workspace by mouse and keyboard; it persists acro
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(cf.getByTestId("project-worktree")).toHaveCount(3);
 
-  // The chevron collapses: no rows, the header counts them (the workspace added a fourth).
+  // The chevron collapses: no rows, the header counts them (a workspace adds none).
   await toggle.click();
   await expect(cf).toHaveAttribute("data-collapsed", "true");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(cf.getByTestId("project-worktree")).toHaveCount(0);
-  await expect(cf.getByTestId("project-collapsed-summary")).toHaveText("4 worktrees · 1 in a workspace");
+  await expect(cf.getByTestId("project-collapsed-summary")).toHaveText("3 worktrees");
   // Its rows left the keyboard list; the list kept the focus.
   expect(await navKeys(page)).not.toContain("pw:repo-cf::/Users/dev/src/code-foundry");
   await expect(page.getByTestId("projects-list")).toBeFocused();
@@ -50,7 +50,7 @@ test("collapse a project and a workspace by mouse and keyboard; it persists acro
   await w.locator(`[data-nav-key="ws:${ws.id}"]`).click();
   await page.keyboard.press("ArrowLeft");
   await expect(w).toHaveAttribute("data-collapsed", "true");
-  await expect(w.getByTestId("workspace-collapsed-summary")).toHaveText("2 members");
+  await expect(w.getByTestId("workspace-collapsed-summary")).toHaveText("2 projects");
   await expect(w.getByTestId("workspace-collapse")).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("ArrowRight");
   await expect(w).toHaveAttribute("data-collapsed", "false");
@@ -98,10 +98,10 @@ test("the filter: / focuses it, it hides what does not match, shows collapsed ma
   await expect(page.getByTestId("project-name")).toHaveText(["ghostty-playground"]);
   await expect(project(page, "repo-gp").getByTestId("project-worktree")).toHaveCount(1);
 
-  // A tildified path, and the workspace by its branch.
+  // A tildified path, and the workspace by its name.
   await filter.fill("~/documents");
   await expect(page.getByTestId("project-name")).toHaveText(["writing"]);
-  await filter.fill("cf/login");
+  await filter.fill("logi");
   await expect(page.getByTestId("projects-no-matches")).toHaveText("No matches.");
   await expect(page.getByTestId("workspace-name")).toHaveText(["login"]);
 
@@ -139,11 +139,11 @@ test("row actions show without hover; rows show no path", async ({ page }) => {
   await page.mouse.move(0, 0);
   const main = wtRow(page, "repo-cf", CF);
   for (const id of ["worktree-new-thread", "worktree-new-terminal", "worktree-more"]) await expect(main.getByTestId(id)).toBeVisible();
-  // Members too: always shown.
+  // Workspace members too: always shown.
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await expect(page.getByTestId("workspace-member").first()).toBeVisible();
   await page.mouse.move(0, 0);
-  await expect(page.getByTestId("member-actions").first().getByTestId("member-terminal")).toBeVisible();
+  await expect(page.locator('[data-testid="workspace-member"]').first().locator("..").getByTestId("member-remove")).toBeVisible();
 
   // No path on git rows (the row's tooltip keeps it); the folder without git keeps it.
   await expect(project(page, "repo-cf").getByTestId("worktree-path")).toHaveCount(0);
@@ -163,13 +163,13 @@ test("each worktree counts its threads, whether or not Claude runs for them", as
   await expectTooltip(page, wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads"), "1 thread on this worktree");
   await mockPost("threads?project=repo-cf&count=2&status=idle");
   await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("4");
-  // A workspace member with a thread counts it too.
+  // A workspace thread is counted on its project's worktree (a workspace has none of its own).
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
-  const gp = page.locator('[data-testid="workspace-member"][data-project="repo-gp"]');
-  await expect(gp).toBeVisible();
-  await expect(gp.getByTestId("worktree-threads")).toHaveCount(0);
   await mockPost("workspace-thread?workspace=login&project=repo-gp&name=driver&status=busy");
+  const gp = wtRow(page, "repo-gp", "/Users/dev/.code-foundry/worktrees/alexwaumann/ghostty-playground/cf-login");
   await expect(gp.getByTestId("worktree-threads")).toHaveText("1");
+  // Its other checkout (code-foundry's cf/login worktree) is not its cwd: no count there.
+  await expect(wtRow(page, "repo-cf", "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-login").getByTestId("worktree-threads")).toHaveCount(0);
 });
 
 test("overflow menus per row kind; the menu keeps the list's cursor and gives it the keyboard back", async ({ page }) => {
@@ -199,11 +199,8 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
 
   const ws = page.getByTestId("workspace").first();
   await ws.getByTestId("workspace-more").click();
-  expect(await menuItems(page, "workspace-more")).toEqual(["Remove workspace"]);
+  expect(await menuItems(page, "workspace-more")).toEqual(["Rename…", "Remove workspace…"]);
   await closeMenu(page, "workspace-more");
-  await ws.getByTestId("member-more").first().click();
-  expect(await menuItems(page, "member-more")).toEqual(["Remove from workspace"]);
-  await closeMenu(page, "member-more");
 
   // Arrow keys in a menu move in the menu, not the list's cursor; closing it gives the list the keyboard.
   const list = page.getByTestId("projects-list");

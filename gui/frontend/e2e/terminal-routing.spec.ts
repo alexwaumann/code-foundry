@@ -1,12 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
 
 // Every way to start a shell lands in a bottom panel (docs/notes/bottom-panel-3-routing.md):
 // the thread's when a thread owns it, else the Projects page's. The sidebar never gets a row.
-
-/** Where the mock (like the daemon) puts a project's worktree for the cf/checkout branch. */
-const CF_MEMBER = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout";
-const WS = "w-000000000001";
 
 const bottom = (page: Page) => page.getByTestId("bottom-panel");
 const host = (page: Page) => page.getByTestId("bottom-terminal-host");
@@ -63,45 +59,6 @@ test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard 
   await noTerminalRows(page);
   // The new tab is the feedback: no "created terminal" toast.
   await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
-});
-
-test("a workspace member's New terminal here in a thread's side panel: the thread owns it, in the member's worktree", async ({ page }) => {
-  await mockPost("workspace-mixed?name=checkout");
-  const driver = ((await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string }).id;
-  await openApp(page);
-  await row(page, `s:${driver}`).getByTestId("row-workspace").click();
-  const cf = page.getByTestId("workspace-surface").locator(`[data-nav-key="m:${WS}::repo-cf"]`);
-  await cf.hover();
-  await cf.getByTestId("member-terminal").click();
-  const call = await lastNew();
-  expect(call?.args).toEqual({ cwd: CF_MEMBER });
-  expect(call?.context).toMatchObject({ activeThreadId: driver, activeView: "thread" });
-  // The thread's bottom panel, not the Projects page's.
-  await expect(row(page, `s:${driver}`)).toHaveAttribute("aria-selected", "true");
-  await expect(bottom(page).getByRole("tab")).toHaveCount(1);
-  const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
-  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", thread: driver });
-  await expectTooltip(page, bottom(page).getByRole("tab"), "~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout");
-});
-
-test("a member's New terminal here from an expanded side panel collapses it so the shell shows", async ({ page }) => {
-  await mockPost("workspace-mixed?name=checkout");
-  const driver = ((await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string }).id;
-  await openApp(page);
-  await row(page, `s:${driver}`).getByTestId("row-workspace").click();
-  const side = page.getByTestId("side-panel");
-  await side.getByTestId("panel-header").getByTestId("panel-expand").click();
-  await expect(side.getByTestId("panel-header").getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("content-pane")).toBeHidden();
-  const cf = page.getByTestId("workspace-surface").locator(`[data-nav-key="m:${WS}::repo-cf"]`);
-  await cf.hover();
-  await cf.getByTestId("member-terminal").click();
-  // The side panel is back to its split width, and the new shell shows, with the keyboard.
-  await expect(side.getByTestId("panel-header").getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByTestId("content-pane")).toBeVisible();
-  await expect(bottom(page).getByRole("tab")).toHaveCount(1);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
 });
 
 test("cmd+t from a Projects-page shell starts another in its worktree", async ({ page }) => {

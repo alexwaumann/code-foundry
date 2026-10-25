@@ -70,24 +70,30 @@
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
+ *   POST /__mock/worktree/dirty?path=…&modified=2   (the worktree has modified files; 0: clean)
  *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
  *                                                 (a git operation stops in that worktree: status
  *                                                 operation fields, U files lead its detail; no op ends it)
  *   POST /__mock/worktree/merged?project=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
  *                                                 work is in origin/main: merged_clean, so project.worktree.cleanup removes
  *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
- *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&branch=cf/login]
- *                                                 (a workspace: a cf/<name> worktree in each project)
- *   GET  /__mock/workspaces                       (id, name, branch, members)
+ *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&root=…&primary=…&instructions=CLAUDE.md&skills=a,b]
+ *                                                 (a workspace: a saved project set; nothing on disk changes)
+ *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b]
+ *                                                 (what a thread wrote in the workspace's folder; "" clears)
+ *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login]
+ *                                                 (a worktree-mode thread over several projects, its worktrees made)
+ *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
+ *   POST /__mock/thread/project-ids?id=…&projects=repo-cf,repo-gp   (a thread's project set)
  *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
  *   POST /__mock/threads?project=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
  *   POST /__mock/workspace-thread?workspace=login[&project=repo-gp&name=driver&status=busy]
- *                                                 (a connected thread owned by the workspace)
- *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
- *                                                 and dotfiles: an open PR with failing CI, 2 ahead, dirty)
+ *                                                 (a connected thread that references the workspace, its
+ *                                                 members as its set, in project's main worktree)
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
- *   thread.new takes workspace (a member thread) or new-worktree + projects (a new workspace),
- *   or no-project (a thread in the home directory with no project or workspace).
+ *   thread.new takes workspace and/or projects (the set; new-worktree makes worktrees on a new
+ *   branch), or no-project (a thread in the home directory with no project or workspace).
+ *   ThreadService.Checkouts derives a thread's checkouts (world.checkoutsOf).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
@@ -508,6 +514,8 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
     watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
+    // ThreadService.Checkouts: the thread's checkouts (world.checkoutsOf); the GUI's Worktree tab lists the others as Also in.
+    checkouts: (req) => guard(() => world.checkoutsMsg(req.id)),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
     listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),
@@ -863,6 +871,8 @@ function threadSummary(id: string): Record<string, unknown> {
     projectId: s.projectId,
     worktreePath: s.worktreePath,
     workspaceId: s.workspaceId,
+    projectIds: world.projectIdsOf(s),
+    branch: s.branch,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
     archivedAt: s.archivedAt?.toISOString() ?? null,
@@ -1056,6 +1066,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, ok ? 200 : 404, { ok });
       break;
     }
+    case "POST /__mock/worktree/dirty": {
+      // path=…&modified=2 (0: clean).
+      const ok = world.setDirty(q.get("path") ?? "", Number(q.get("modified") ?? "0"));
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
     case "POST /__mock/worktree/operation": {
       // path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go&file=b.go]; no op: it ends.
       const ok = world.setOperation(q.get("path") ?? "", q.get("op") ?? "", Number(q.get("step") ?? "0"), Number(q.get("total") ?? "0"), Number(q.get("conflicted") ?? "0"), q.getAll("file"));
@@ -1072,7 +1088,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/workspace":
       try {
-        const w = world.addWorkspace(q.get("name") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean), q.get("branch") ?? undefined);
+        const w = world.addWorkspace(q.get("name") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean), {
+          root: q.get("root") ?? "",
+          primary: q.get("primary") ?? "",
+          instructions: q.get("instructions") ?? "",
+          skills: (q.get("skills") ?? "").split(",").filter(Boolean),
+        });
         json(res, 200, w);
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -1087,9 +1108,27 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "POST /__mock/workspace-mixed":
+    case "POST /__mock/workspace-files":
       try {
-        json(res, 200, world.addMixedWorkspace(q.get("name") ?? "checkout"));
+        const skills = q.get("skills");
+        json(res, 200, world.setWorkspaceFiles(q.get("workspace") ?? "", q.get("instructions") ?? undefined, skills === null ? undefined : skills.split(",").filter(Boolean)));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/thread/project-ids":
+      // id=…&projects=repo-cf,repo-gp: the thread's project set (as a later thread new --projects would make it).
+      try {
+        const t = world.setThreadProjectIds(q.get("id") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean));
+        json(res, 200, threadSummary(t.id));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/multi-thread":
+      try {
+        const s = world.addMultiThread((q.get("projects") ?? "").split(",").filter(Boolean), q.get("project") ?? "", q.get("branch") ?? "feat/multi", q.get("name") ?? "multi", q.get("workspace") ?? "");
+        json(res, 200, threadSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

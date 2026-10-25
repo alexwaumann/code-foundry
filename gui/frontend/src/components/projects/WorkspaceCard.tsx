@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileText, Folder, FolderGit2, FolderOpen, Layers, Pencil, Plus, SquarePen, Star, Trash2, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "@/components/compose/ComposerPicker";
@@ -149,7 +149,7 @@ function InstructionsLine({ workspaceId }: { workspaceId: string }) {
   const name = instructionsName({ instructions: file });
   return (
     <div className="flex min-h-7 items-center gap-2" data-testid="workspace-instructions" data-file={file || undefined}>
-      <span className="w-20 shrink-0 text-overline">Instructions</span>
+      <span className="w-28 shrink-0 text-overline">Instructions</span>
       {file ? (
         <Tip label={file}>
           <Button type="button" variant="ghost" size="xs" className="-ml-1.5 min-w-0 text-code" data-testid="workspace-instructions-open" onClick={() => openWorkspaceInstructions(workspaceId)}>
@@ -188,7 +188,7 @@ function SkillsLine({ workspaceId }: { workspaceId: string }) {
   const skills = useWorkspacesStore(useShallow((s) => [...(s.byId[workspaceId]?.skills ?? [])]));
   return (
     <div className="flex min-h-7 items-center gap-2" data-testid="workspace-skills">
-      <span className="w-20 shrink-0 text-overline">Skills</span>
+      <span className="w-28 shrink-0 text-overline">Skills</span>
       {skills.length === 0 ? (
         <span className="text-caption" data-testid="workspace-skills-none">
           none yet
@@ -213,6 +213,11 @@ function SkillsLine({ workspaceId }: { workspaceId: string }) {
  */
 function NameEditor({ workspaceId, name, onDone }: { workspaceId: string; name: string; onDone: () => void }) {
   const [value, setValue] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Enter and Escape give the keyboard back to the page's list (the field unmounts).
+  const backToList = () => {
+    inputRef.current?.closest<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
+  };
   const others = useWorkspacesStore(useShallow((s) => s.order.filter((x) => x !== workspaceId).map((x) => s.byId[x]?.name ?? "")));
   const changed = value.trim() !== name;
   const error = changed ? workspaceNameError(value, others) : "";
@@ -223,6 +228,7 @@ function NameEditor({ workspaceId, name, onDone }: { workspaceId: string; name: 
   return (
     <span className="flex min-w-0 items-center gap-2">
       <Input
+        ref={inputRef}
         autoFocus
         value={value}
         aria-label="Workspace name"
@@ -247,10 +253,13 @@ function NameEditor({ workspaceId, name, onDone }: { workspaceId: string; name: 
           e.stopPropagation();
           if (e.key === "Escape") {
             e.preventDefault();
+            backToList();
             onDone();
           } else if (e.key === "Enter") {
             e.preventDefault();
-            if (!error) commit();
+            if (error) return;
+            backToList();
+            commit();
           }
         }}
         onBlur={() => {
