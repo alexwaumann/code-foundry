@@ -20,19 +20,16 @@ type CheckoutsBackend interface {
 // (docs/notes/workspaces-v2-1-threads.md). It replaces workspace.members.
 func threadCheckouts(b CheckoutsBackend) Command {
 	return Command{
-		Name:     "thread.checkouts",
-		ReadOnly: true,
-		Title:    "Thread Checkouts",
-		Description: "List a thread's projects and where each is checked out: one line per project with its path, branch and CLAUDE.md " +
-			"((current) marks the one holding the working directory, (missing) a path that is gone), then the thread's workspace. " +
-			"The thread is --id, else the one this command runs in ($CODE_FOUNDRY_THREAD), else the one whose checkout holds --cwd.",
+		Name:         "thread.checkouts",
+		ReadOnly:     true,
+		Title:        "Thread Checkouts",
+		Description:  "List a thread's projects: each one's path, branch and CLAUDE.md, then its workspace.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "id", Type: String, DefaultToThreadEnv: true, ID: ThreadID, Positional: true,
-				Description: "Thread id (default: the thread this command runs in, $CODE_FOUNDRY_THREAD, else the one whose checkout holds cwd)"},
-			{Name: "cwd", Type: Path, DefaultToCwd: true,
-				Description: "A path inside one of the thread's checkouts: marks it current, and finds the thread without an id (CLI default: the working directory)"},
+				Description: "Thread id (default: your own, else the one whose checkout holds cwd)"},
+			{Name: "cwd", Type: Path, DefaultToCwd: true, Description: "A path in one of its checkouts (default: the working directory)"},
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			id := strings.TrimSpace(a.String("id"))
