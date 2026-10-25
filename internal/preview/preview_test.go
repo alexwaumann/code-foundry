@@ -89,11 +89,18 @@ func TestHandler(t *testing.T) {
 	}
 	write(t, filepath.Join(home, ".code-foundry", "daemon.token"), "token")
 	write(t, filepath.Join(home, ".ssh", "id_rsa"), "key")
+	write(t, filepath.Join(home, "cf-1", "daemon.token"), "token")
+	write(t, filepath.Join(home, "cf-1", "db.sqlite"), "db")
+	write(t, filepath.Join(home, "cf-1", "worktrees", "app", "index.html"), "<p>wt</p>")
 	write(t, filepath.Join(home, "report.html"), "<p>report</p>")
 	write(t, filepath.Join(home, "notes.txt"), "sibling")
 	for link, target := range map[string]string{
 		"token.txt": filepath.Join(home, ".code-foundry", "daemon.token"),
 		"ssh":       filepath.Join(home, ".ssh"),
+		// Another daemon's home (a test daemon's CODE_FOUNDRY_HOME), which this floor was
+		// never told about: found by its markers.
+		"other-token.txt": filepath.Join(home, "cf-1", "daemon.token"),
+		"other":           filepath.Join(home, "cf-1"),
 	} {
 		if err := os.Symlink(target, filepath.Join(proj, "docs", link)); err != nil {
 			t.Fatal(err)
@@ -105,6 +112,10 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A home that appears inside the tree after the grant was minted (a test daemon
+	// started in the checkout) is guarded from then on.
+	write(t, filepath.Join(proj, "scratch-home", "pages.port"), "9300")
+	write(t, filepath.Join(proj, "scratch-home", "db.sqlite"), "db")
 	srv := httptest.NewServer(Handler(g, slog.Default()))
 	t.Cleanup(srv.Close)
 
@@ -126,6 +137,11 @@ func TestHandler(t *testing.T) {
 		{"symlink above the scope within home", "/preview/" + grant + "/docs/up.txt", 200, "text/plain; charset=utf-8", "no"},
 		{"symlink to the daemon token", "/preview/" + grant + "/docs/token.txt", 404, "", ""},
 		{"symlink into ~/.ssh", "/preview/" + grant + "/docs/ssh/id_rsa", 404, "", ""},
+		{"symlink to another home's token", "/preview/" + grant + "/docs/other-token.txt", 404, "", ""},
+		{"another home through a linked folder", "/preview/" + grant + "/docs/other/db.sqlite", 404, "", ""},
+		{"another home's checkout through a linked folder", "/preview/" + grant + "/docs/other/worktrees/app/index.html", 200, "text/html; charset=utf-8", "<p>wt</p>"},
+		{"a home made after the grant", "/preview/" + grant + "/scratch-home/db.sqlite", 404, "", ""},
+		{"its marker", "/preview/" + grant + "/scratch-home/pages.port", 404, "", ""},
 		{"one-file grant serves its file", "/preview/" + one + "/report.html", 200, "text/html; charset=utf-8", "<p>report</p>"},
 		{"one-file grant, a sibling", "/preview/" + one + "/notes.txt", 404, "", ""},
 		{"one-file grant, the daemon token", "/preview/" + one + "/.code-foundry/daemon.token", 404, "", ""},
