@@ -234,6 +234,17 @@ service ThreadService {
   // storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
   // not JSON, or a storage that would grow over 256 KiB (nothing is written then).
   rpc SetPageStorage(SetPageStorageRequest) returns (SetPageStorageResponse) {}
+  // ProxyFetch makes one HTTP request for a page of the thread (the bridge's cf.fetch,
+  // docs/notes/bridge-fetch.md): the daemon is not subject to the browser's CORS check, so
+  // a page reaches an API that does not allow the pages origin. No cookies, no Origin, no
+  // Code Foundry token; up to 5 redirects of the same scheme; a request body of 1 MiB and a
+  // response body of 8 MiB at most; at most 8 at once per thread (more wait). A non-2xx
+  // status is a response, not an error. InvalidArgument for a bad URL, a scheme other than
+  // http(s), a header the daemon does not send, a body too big or a destination it refuses
+  // (loopback, link-local, unspecified, the daemon's own ports); DeadlineExceeded after
+  // timeout_ms; ResourceExhausted for a response too big; Unavailable for a network error;
+  // NotFound for an unknown thread. Cancelling the call aborts the request.
+  rpc ProxyFetch(ProxyFetchRequest) returns (ProxyFetchResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -1002,6 +1013,30 @@ message SetPageStorageRequest {
 message SetPageStorageResponse {
   // The thread's page storage after the change.
   map<string, string> values = 1;
+}
+
+message ProxyFetchRequest {
+  string thread_id = 1;
+  // An absolute http or https URL.
+  string url = 2;
+  // GET when empty.
+  string method = 3;
+  // Header name → value, as the page set them.
+  map<string, string> headers = 4;
+  bytes body = 5;
+  // 30 s when zero; at most 120 s.
+  uint32 timeout_ms = 6;
+}
+
+message ProxyFetchResponse {
+  uint32 status = 1;
+  // Lower-case header name → value, several values joined with ", "; no Set-Cookie.
+  map<string, string> headers = 2;
+  bytes body = 3;
+  // The URL answered, after redirects.
+  string url = 4;
+  // The status's text ("Not Found"), without the code.
+  string status_text = 5;
 }
 
 message SlashCommandsRequest {

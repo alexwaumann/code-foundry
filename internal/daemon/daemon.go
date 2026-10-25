@@ -39,6 +39,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/preview"
+	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -189,7 +190,11 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		WithBaseFromOrigin(baseFromOrigin(st.settings)).
 		WithBeforeUnregister(st.archived.unregistering)
 	terminalAPI := api.NewTerminal(st.terminal)
-	threadAPI := api.NewThread(st.thread, events)
+	// A page's cf.fetch (docs/notes/bridge-fetch.md): never to the daemon's own listeners.
+	pageFetch := proxyfetch.New(proxyfetch.Options{UserAgent: "code-foundry/" + opts.Version.Version, OwnPorts: []int{port, pagesPort},
+		Log: log.With("component", "page-fetch")})
+	defer pageFetch.Close()
+	threadAPI := api.NewThread(st.thread, events).WithFetch(pageFetch)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings).WithBackdrops(st.backdrops)
