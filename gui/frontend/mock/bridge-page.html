@@ -14,8 +14,8 @@ p.sub { margin: 0 0 12px; color: var(--cf-text-muted); }
 button { background: var(--cf-surface); color: var(--cf-text); border: 1px solid var(--cf-border); border-radius: 6px; padding: 3px 10px; font: inherit; cursor: pointer; }
 button.primary { background: var(--cf-accent); color: var(--cf-accent-foreground); border-color: transparent; }
 .out { font-family: ui-monospace, monospace; font-size: 12px; }
-.ok { color: var(--cf-success-foreground); }
-.err { color: var(--cf-error-foreground); }
+.ok { color: var(--cf-success-text); }
+.err { color: var(--cf-error-text); }
 </style>
 </head>
 <body>
@@ -58,7 +58,7 @@ cf.on("thread-list", (rows) => {
   $("events").textContent = String(events);
 });
 $("list").addEventListener("click", () => show($("list-out"), cf.run("thread.list").then((r) => ({ ...r, json: { threads: r.json.threads.length } }))));
-$("notify").addEventListener("click", () => show($("notify-out"), cf.run("ui.notify", { level: "info" })));
+$("notify").addEventListener("click", () => show($("notify-out"), cf.run("ui.notify", { level: "info", title: "Hello from a page", body: "Sent through the bridge" })));
 $("archive").addEventListener("click", () => show($("archive-out"), cf.run("thread.archive", { archived: "true" })));
 $("missing").addEventListener("click", () => show($("error-out"), cf.run("no.such.verb")));
 $("invalid").addEventListener("click", () => show($("error-out"), cf.run("ui.notify", {})));

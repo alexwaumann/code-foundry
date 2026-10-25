@@ -56,7 +56,7 @@ test("cf:run reads and mutates in the thread's context; the daemon's errors come
   const notify = (await invocations()).find((i) => i.name === "ui.notify");
   expect(notify?.context?.activeThreadId).toBe("s-r1");
   expect(notify?.context?.activeView).toBe("thread");
-  expect(notify?.args).toEqual({ level: "info" });
+  expect(notify?.args).toEqual({ level: "info", title: "Hello from a page", body: "Sent through the bridge" });
   await doc(page).locator("#missing").click();
   await expect(doc(page).locator("#error-out")).toHaveText(/^unavailable: /);
   await doc(page).locator("#invalid").click();

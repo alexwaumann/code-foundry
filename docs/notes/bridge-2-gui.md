@@ -152,6 +152,33 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
 - `page.reload()` in e2e does not bring the thread back selected; reopening the card is the
   page reload that matters.
 
-## End to end
+## End to end (2026-10-25, built app, isolated home)
 
-(See below; filled in after the live run.)
+PR 1's branch had no commits yet, so the real daemon ran with a local stand-in for it, not
+committed: the preview route's CSP sandbox with `allow-same-origin`, and `/cf/bridge.js`
+serving `mock/bridge.js`. Preview pages were still on the API listener (PR 1 moves them).
+`make gui-build`; `gui/bin/Code Foundry` with `CODE_FOUNDRY_HOME=~/cf-bridge2-home`, the
+CLAUDE* variables unset; a non-git scratch folder registered; a Haiku 5.5
+(`claude-haiku-5-5[1m]`, medium) thread "Bridge check"; `mock/bridge-page.html` copied to
+its pages folder and shown with `view.inline <file> --thread <id>`.
+
+- Ready in WKWebView: "Shown in Bridge check · dark theme"; the `thread-list` snapshot
+  (1 thread), then live events as the thread went to Working.
+- `thread.list` → `{"threads":1}`; an unknown verb → `unavailable: unknown command …`;
+  missing args → `invalid: ui.notify: missing required argument "title"` (the real verb
+  needs a title; the page now sends one).
+- Send a toast → the app's toast "Hello from a page / Sent through the bridge", result
+  `{"windows":1,"receivers":1}`.
+- With a background shell running, Archive this thread → the app's confirm dialog, "Asked
+  by bridge.html, a page in Bridge check"; Cancel → `declined: the user declined`.
+- Closing and opening the card twice: visit 1 → 2 → 3 (localStorage kept).
+- `settings set appearance.theme light`: the page repainted light, still visit 3 with its
+  results (acked, no reload).
+- Found on the way: the test page painted results with `--cf-success-foreground`, the
+  colour on a filled status chip (dark on dark); it uses `--cf-*-text` now.
+
+The thread, scratch folder and home were removed afterwards.
+
+## Daemon restart
+
+Needed only for the proto field (PR 1 brings the daemon side). GUI and daemon ship together.
