@@ -31,8 +31,9 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 	nameArg := ArgSpec{Name: "name", Type: String, Required: true, Positional: true, Description: "Plugin name (code-foundry plugin list)"}
 	return r.RegisterAll(
 		Command{
-			Name:  "plugin.threads",
-			Title: "List Plugin Threads",
+			Name:     "plugin.threads",
+			ReadOnly: true,
+			Title:    "List Plugin Threads",
 			Description: "List the Claude threads a plugin owns (thread/create), archived ones too, the most recently active " +
 				"first. They are hidden from the sidebar and thread list; thread read, send and the other thread verbs " +
 				"take their ids like any thread's.",
@@ -56,8 +57,9 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 			},
 		},
 		Command{
-			Name:  "plugin.terminals",
-			Title: "List Plugin Terminals",
+			Name:     "plugin.terminals",
+			ReadOnly: true,
+			Title:    "List Plugin Terminals",
 			Description: "List the terminals a plugin owns (terminal/create): id, state, title, program and directory. " +
 				"terminal kill and terminal close take their ids, and the side panel's terminal node or the bottom panel shows " +
 				"them; the plugin closes them, and disabling it does too.",

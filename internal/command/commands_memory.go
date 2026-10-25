@@ -109,8 +109,9 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:  "memory.show",
-			Title: "Memory: Show Preferences",
+			Name:     "memory.show",
+			ReadOnly: true,
+			Title:    "Memory: Show Preferences",
 			Description: "List the user's standing preferences about Code Foundry and how the model behaves in it, numbered. " +
 				"Every thread's system prompt carries them from its start.",
 			Category:     "Settings",

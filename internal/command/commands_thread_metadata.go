@@ -177,8 +177,9 @@ func pendingLine(p *v1.ThreadPendingDetail) string {
 func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:  "thread.get",
-		Title: "Show Thread",
+		Name:     "thread.get",
+		ReadOnly: true,
+		Title:    "Show Thread",
 		Description: "Print one thread: its status and pending request, worktree, who created it and why, labels, report " +
 			"(`*`: from before its last message) and cost.",
 		Category:     "Thread",

@@ -106,6 +106,11 @@ func (p Paths) Token() string { return filepath.Join(p.home, "daemon.token") }
 // Port is the file holding the loopback HTTP port (decimal).
 func (p Paths) Port() string { return filepath.Join(p.home, "daemon.port") }
 
+// PagesPort is the file holding the pages listener's port (decimal): the origin the HTML
+// pages the model shows are served from. The daemon tries it again on the next start, so
+// a page's origin, and its storage, survive restarts.
+func (p Paths) PagesPort() string { return filepath.Join(p.home, "pages.port") }
+
 // Lock is the single-instance lock file.
 func (p Paths) Lock() string { return filepath.Join(p.home, "daemon.lock") }
 

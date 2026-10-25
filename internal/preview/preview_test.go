@@ -163,7 +163,7 @@ func TestHandler(t *testing.T) {
 					t.Errorf("%s = %q, want %q", k, got, want)
 				}
 			}
-			if csp := res.Header.Get("Content-Security-Policy"); csp == "" || csp[:7] != "sandbox" || strings.Contains(csp, "allow-same-origin") {
+			if csp := res.Header.Get("Content-Security-Policy"); csp != CSP || strings.Contains(csp, "allow-top-navigation") {
 				t.Errorf("CSP %q", csp)
 			}
 			if tc.body != "" {

@@ -13,9 +13,15 @@ export default defineConfig({
     // The help overlay's guide is the repo's docs/GETTING-STARTED.md, imported with ?raw
     // (components/help/guide.ts). The directory, not the file: Vite checks "file.md?raw"
     // itself against the list, and only a parent directory matches it. The plugin tests read
-    // the hello demo's captured views the daemon's tests use (src/test/pluginFixtures.ts).
+    // the hello demo's captured views the daemon's tests use (src/test/pluginFixtures.ts), and
+    // the page bridge script's test the daemon's script (src/lib/cfBridgeScript.test.ts).
     fs: {
-      allow: [searchForWorkspaceRoot(process.cwd()), path.resolve(import.meta.dirname, "../../docs"), path.resolve(import.meta.dirname, "../../internal/store/plugin/testdata/hello-demo")],
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        path.resolve(import.meta.dirname, "../../docs"),
+        path.resolve(import.meta.dirname, "../../internal/store/plugin/testdata/hello-demo"),
+        path.resolve(import.meta.dirname, "../../internal/bridge"),
+      ],
     },
   },
   resolve: {

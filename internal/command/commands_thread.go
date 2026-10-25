@@ -247,6 +247,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:         "thread.items",
+			ReadOnly:     true,
 			Title:        "Show Thread Conversation",
 			Description:  "Print a thread's conversation as a readable log.",
 			Category:     "Thread",

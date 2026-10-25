@@ -257,6 +257,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "theme.list",
+			ReadOnly:     true,
 			Title:        "List Themes",
 			Description:  "Print every colour theme by scheme, yours first, marking the ones in use. Yours show the theme each was copied from.",
 			Category:     "Settings",
@@ -297,6 +298,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		},
 		Command{
 			Name:         "theme.show",
+			ReadOnly:     true,
 			Title:        "Show Theme File",
 			Description:  "Print a theme's file (curated or yours) as JSON. It is the format theme save reads.",
 			Category:     "Settings",

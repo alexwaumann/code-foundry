@@ -104,6 +104,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 	return errors.Join(r.RegisterAll(
 		Command{
 			Name:         "ember.status",
+			ReadOnly:     true,
 			Title:        "Ember: Status",
 			Description:  "Whether Ember is on, its thread, its epoch (fresh sessions so far), the context size against the epoch limit, the epoch's age and its open tasks.",
 			Category:     emberCategory,
@@ -115,6 +116,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.board",
+			ReadOnly:     true,
 			Title:        "Ember: Board",
 			Description:  "Print Ember's task board as markdown: in progress, up next, blocked and done today, with ids and each worker's progress.",
 			Category:     emberCategory,

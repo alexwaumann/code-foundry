@@ -78,6 +78,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:         "workspace.list",
+			ReadOnly:     true,
 			Title:        "List Workspaces",
 			Description:  "List workspaces with their branch and member projects.",
 			Category:     "Workspace",
@@ -99,8 +100,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:  "workspace.members",
-			Title: "Workspace Members",
+			Name:     "workspace.members",
+			ReadOnly: true,
+			Title:    "Workspace Members",
 			Description: "List a workspace's worktrees: one line per member project with its worktree path and branch. " +
 				"Without a workspace, the one whose worktree contains --cwd (the working directory) is used.",
 			Category:     "Workspace",

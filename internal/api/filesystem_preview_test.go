@@ -151,3 +151,42 @@ func TestFilesystemPreviewFile(t *testing.T) {
 		}
 	})
 }
+
+// With a pages origin (the daemon's pages listener), PreviewFile's URL is absolute on it,
+// and serves the file from there.
+func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := filepath.Join(root, "site", "index.html")
+	if err := os.MkdirAll(filepath.Dir(page), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(page, []byte("<p>x</p>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	grants := testGrants(root)
+	pages := httptest.NewServer(preview.Handler(grants, slog.Default()))
+	t.Cleanup(pages.Close)
+	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesOrigin(pages.URL).Route()
+	api := httptest.NewServer(route.Handler)
+	t.Cleanup(api.Close)
+	c := codefoundryv1connect.NewFilesystemServiceClient(api.Client(), api.URL)
+	res, err := c.PreviewFile(context.Background(), connect.NewRequest(&v1.PreviewFileRequest{Path: page}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	url := res.Msg.GetUrl()
+	if !strings.HasPrefix(url, pages.URL+preview.Prefix) || !strings.HasSuffix(url, "/index.html") {
+		t.Fatalf("url %q, want one under %s%s", url, pages.URL, preview.Prefix)
+	}
+	r, err := pages.Client().Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Body.Close() }()
+	if r.StatusCode != http.StatusOK {
+		t.Errorf("GET %s: %d", url, r.StatusCode)
+	}
+}

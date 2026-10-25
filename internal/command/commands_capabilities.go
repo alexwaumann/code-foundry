@@ -93,7 +93,7 @@ var capGroups = []capGroup{
 	{"commands", "commands: the CLI verbs, which most buttons and menu items run too", capCommands},
 	{"pages", "main-pane pages and the verb that shows each", capPages},
 	{"panel", "side panel surfaces and the verb that opens each in a thread", capPanel},
-	{"rendering", "what the thread view renders: markdown, code, paths, images, PDFs, HTML", capRendering},
+	{"rendering", "what the thread view renders: markdown, code, paths, images, PDFs, HTML, and the bridge pages call the app with", capRendering},
 	{"skills", "skills every thread gets, and ones installed for Claude Code", capSkills},
 	{"plugins", "installed plugins with their commands and surfaces", capPlugins},
 	{"settings", "settings; values with code-foundry settings get --json", capSettings},
@@ -130,8 +130,9 @@ type CapabilityRow struct {
 // never stale (docs/notes/control-4-capabilities.md).
 func RegisterCapabilities(r *Registry, d CapabilitiesDeps) error {
 	return r.Register(Command{
-		Name:  "daemon.capabilities",
-		Title: "Show Capabilities",
+		Name:     "daemon.capabilities",
+		ReadOnly: true,
+		Title:    "Show Capabilities",
 		Description: "List what Code Foundry can do, one line per group (build, commands, pages, panel, rendering, " +
 			"skills, plugins, settings, memory, presence); --group <name> shows one group in detail.",
 		Category:     "Daemon",

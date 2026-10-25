@@ -103,8 +103,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 	whyNoProject := func(Context) string { return noProject }
 	return r.RegisterAll(
 		Command{
-			Name:  "action.list",
-			Title: "List Actions",
+			Name:     "action.list",
+			ReadOnly: true,
+			Title:    "List Actions",
 			Description: "List a project's actions: the commands `action run` starts, in order, with their ids. " +
 				"The project is the thread's, else the worktree's, else the working directory's.",
 			Category:       "Action",
@@ -295,8 +296,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:  "action.wait",
-			Title: "Wait for Action Run",
+			Name:     "action.wait",
+			ReadOnly: true,
+			Title:    "Wait for Action Run",
 			Description: "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code. " +
 				"Interrupting the wait leaves the run going (action stop ends it).",
 			Category:     "Action",
@@ -328,6 +330,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:           "action.runs",
+			ReadOnly:       true,
 			Title:          "List Action Runs",
 			Description:    "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.",
 			Category:       "Action",

@@ -8,9 +8,12 @@
 // A grant reads only its tree, never above it, outside the home directory or inside a
 // guarded folder (symlinks resolved), and lasts until the daemon stops.
 //
-// The page loads with the frame's sandbox (scripts on, same-origin off) and a CSP sandbox
-// header that keeps it opaque even if its URL is opened in a browser, so it cannot become
-// same-origin with the daemon; the other routes still need the bearer token anyway.
+// The route is served on the daemon's pages listener, not the API's
+// (docs/notes/bridge-1-daemon.md). Its CSP sandbox keeps scripts and forms on and allows
+// same-origin, so a page in a frame (whose sandbox allows it too) has the pages origin,
+// http://127.0.0.1:<pages port>, and its storage, across reloads and restarts. That origin
+// is never the API's: the API listens on another port and its CORS refuses the pages
+// origin, so a page cannot call it even holding a token.
 package preview
 
 import (
@@ -106,6 +109,11 @@ func (g *Grants) Dir(id string) (string, bool) {
 	return e.dir, ok
 }
 
+// CSP is the sandbox every served file runs in: the frame's own (the GUI's HtmlFrame) can
+// only narrow it. allow-same-origin gives a page the pages origin and its storage; never
+// allow-top-navigation, so a page cannot replace the app.
+const CSP = "sandbox allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
+
 // URL is the root-relative URL of rel (slash-separated, relative to the grant's
 // directory) under grant.
 func URL(grant, rel string) string {
@@ -140,7 +148,8 @@ func escapeSegment(s string) string {
 // above the grant's directory, is 404 like a missing one. A directory serves its
 // index.html. Responses are never cached (the thread edits these files), carry no
 // referrer, so the grant does not leak to the sites a page loads from, and allow any
-// origin: the page is opaque-origin and reads its own files with fetch().
+// origin: a page reads its own files with fetch(), and a frame that is not same-origin
+// (an older sandbox, a page opened elsewhere) must still be able to.
 func Handler(g *Grants, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Any origin, on errors too, so a page's fetch() sees a 404 rather than a CORS failure.
@@ -230,7 +239,7 @@ func serve(w http.ResponseWriter, r *http.Request, p string) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
-	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads")
+	h.Set("Content-Security-Policy", CSP)
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
 

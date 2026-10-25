@@ -140,6 +140,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.task.list",
+			ReadOnly:     true,
 			Title:        "Ember: List Tasks",
 			Description:  "List Ember's open tasks (todo, doing, blocked), one line each with its worker's progress; --all adds done and cancelled ones.",
 			Category:     emberCategory,
@@ -165,6 +166,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.task.show",
+			ReadOnly:     true,
 			Title:        "Ember: Show Task",
 			Description:  "Show one task: its state, detail, outcome, parent and subtasks, and its worker thread's status and report.",
 			Category:     emberCategory,

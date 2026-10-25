@@ -272,8 +272,9 @@ func renderUsage(heading string, rep UsageReport) string {
 // usage [--thread <id>] [--json]`). The GUI's entry point is view.usage.
 func RegisterUsage(r *Registry, b ThreadBackend) error {
 	return r.Register(Command{
-		Name:  "usage.show",
-		Title: "Show Token Usage",
+		Name:     "usage.show",
+		ReadOnly: true,
+		Title:    "Show Token Usage",
 		Description: "Print token usage and its cost at Claude API rates, per model with totals: " +
 			"one thread (default inside a thread: that thread), else every thread plus removed ones.",
 		Category:     "View",

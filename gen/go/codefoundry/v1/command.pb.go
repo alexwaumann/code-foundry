@@ -87,7 +87,9 @@ type UiContext struct {
 	ActiveThreadId     string                 `protobuf:"bytes,2,opt,name=active_thread_id,json=activeThreadId,proto3" json:"active_thread_id,omitempty"`
 	ActiveProjectId    string                 `protobuf:"bytes,3,opt,name=active_project_id,json=activeProjectId,proto3" json:"active_project_id,omitempty"`
 	ActiveWorktreePath string                 `protobuf:"bytes,4,opt,name=active_worktree_path,json=activeWorktreePath,proto3" json:"active_worktree_path,omitempty"`
-	// Logical view name, e.g. "terminal", "project", "dashboard". Empty from the CLI.
+	// Logical view name, e.g. "terminal", "project", "dashboard". Empty from the CLI, and
+	// from a page's bridge, which runs a verb as the CLI inside the page's thread would:
+	// active_thread_id that thread, nothing else (docs/notes/bridge-1-daemon.md).
 	ActiveView string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`
 	// Workspace that owns what is active: the active thread's workspace, or the workspace
 	// a composer or page is for. Empty for project threads and from the CLI.
@@ -350,8 +352,12 @@ type Command struct {
 	// Invoke fails with FailedPrecondition and a ConfirmationRequired detail unless
 	// InvokeCommandRequest.confirmed is set. Clients ask the user, then re-invoke.
 	RequiresConfirmation bool `protobuf:"varint,8,opt,name=requires_confirmation,json=requiresConfirmation,proto3" json:"requires_confirmation,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// The command only reads: it creates, changes, sends, runs, opens or writes nothing and
+	// moves no window. A page's bridge runs these freely and any other command only from a
+	// user gesture in the page (docs/notes/bridge-1-daemon.md). A plugin's commands never are.
+	ReadOnly      bool `protobuf:"varint,9,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Command) Reset() {
@@ -436,6 +442,13 @@ func (x *Command) GetAvailable() bool {
 func (x *Command) GetRequiresConfirmation() bool {
 	if x != nil {
 		return x.RequiresConfirmation
+	}
+	return false
+}
+
+func (x *Command) GetReadOnly() bool {
+	if x != nil {
+		return x.ReadOnly
 	}
 	return false
 }
@@ -875,7 +888,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"repeatable\x12\x0e\n" +
 	"\x02id\x18\f \x01(\bR\x02id\x12#\n" +
 	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\x12\x12\n" +
-	"\x04rest\x18\x0e \x01(\bR\x04rest\"\x93\x02\n" +
+	"\x04rest\x18\x0e \x01(\bR\x04rest\"\xb0\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -884,7 +897,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x04args\x18\x05 \x03(\v2\x17.codefoundry.v1.ArgSpecR\x04args\x12 \n" +
 	"\vkeybindings\x18\x06 \x03(\tR\vkeybindings\x12\x1c\n" +
 	"\tavailable\x18\a \x01(\bR\tavailable\x123\n" +
-	"\x15requires_confirmation\x18\b \x01(\bR\x14requiresConfirmation\"{\n" +
+	"\x15requires_confirmation\x18\b \x01(\bR\x14requiresConfirmation\x12\x1b\n" +
+	"\tread_only\x18\t \x01(\bR\breadOnly\"{\n" +
 	"\x13ListCommandsRequest\x123\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12/\n" +
 	"\x13include_unavailable\x18\x02 \x01(\bR\x12includeUnavailable\"K\n" +

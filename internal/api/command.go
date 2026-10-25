@@ -159,5 +159,6 @@ func commandToProto(c command.Listed) *v1.Command {
 		Keybindings:          c.Keybindings,
 		Available:            c.Available,
 		RequiresConfirmation: c.Confirm != "",
+		ReadOnly:             c.ReadOnly,
 	}
 }

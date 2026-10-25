@@ -39,6 +39,12 @@ type Command struct {
 	// the GUI (ui.notify, thread.focus). The settings page offers no keybinding for it,
 	// and it may not have default Keybindings. The palette still lists it.
 	NoKeybinding bool
+	// ReadOnly marks a command that only reads: it creates, changes, sends, runs, opens
+	// or writes nothing, and moves no window (view.* and ui.* are not read-only). A page's
+	// bridge runs a read-only verb freely and any other only from a user gesture in the
+	// page (docs/notes/bridge-1-daemon.md). Unset, a command counts as a change, so a new
+	// verb is one until it is classified (readonly_test.go keeps the list).
+	ReadOnly bool
 	// When reports whether the command is available in a context; nil means always.
 	// On Invoke it sees the caller's context with explicitly passed context-bound args
 	// overlaid (see ArgSpec.Context), so it must be a pure function of Context.

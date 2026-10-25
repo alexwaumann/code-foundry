@@ -77,8 +77,9 @@ func RegisterPullRequestChecks(r *Registry, d PullRequestChecksDeps) error {
 		d.Gh = codefoundryv1connect.UnimplementedGhServiceHandler{}
 	}
 	return r.Register(Command{
-		Name:  "pr.checks",
-		Title: "List Pull Request Checks",
+		Name:     "pr.checks",
+		ReadOnly: true,
+		Title:    "List Pull Request Checks",
 		Description: "List the checks on a pull request's head commit: name, workflow, status, conclusion, the GitHub App " +
 			"that ran it (provider: github-actions, another app, or status for commit statuses), its details URL, and " +
 			"when it started and completed. Name the pull request (repo-slug and number) or a thread (--thread, " +

@@ -1,11 +1,15 @@
-// Package daemon bootstraps the code-foundry daemon: single-instance lock, logging, and
-// two listeners serving the same Connect handlers.
+// Package daemon bootstraps the code-foundry daemon: single-instance lock, logging, two
+// listeners serving the same Connect handlers, and the pages listener.
 //
 //   - A Unix socket ($HOME/daemon.sock, 0600) for the CLI and the Wails host. Access is
 //     controlled by filesystem permissions.
 //   - A loopback TCP listener (127.0.0.1, random port) for the GUI frontend, guarded by
 //     a bearer token. The port and token are written to daemon.port and daemon.token
 //     (0600) once both listeners are up, and removed on shutdown.
+//   - A second loopback TCP listener for the HTML pages the model shows (pages.go): the
+//     preview route and /cf/ only, nothing behind the token. Its port is written to
+//     pages.port and kept, so the next start can take it again and pages keep their
+//     origin.
 //
 // Both listeners speak HTTP/1.1 and HTTP/2 with prior knowledge (h2c), so Connect
 // streaming works over either.
@@ -17,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -28,6 +33,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/bridge"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -132,6 +138,13 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	if err != nil {
 		return err
 	}
+	// The pages listener binds first, so its last port cannot have gone to the API.
+	pagesLn, err := listenPages(log, p.PagesPort())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = pagesLn.Close() }()
+	pagesPort := pagesLn.Addr().(*net.TCPAddr).Port
 	tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return fmt.Errorf("listen loopback: %w", err)
@@ -182,7 +195,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
-	filesystemAPI := api.NewFilesystem(st.home, st.project, grants)
+	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithPagesOrigin(pagesOrigin(pagesPort))
 	commands := command.NewRegistry()
 	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's
@@ -345,23 +358,34 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		_ = unixLn.Close()
 		return err
 	}
+	if err := writeFileAtomic(p.PagesPort(), []byte(strconv.Itoa(pagesPort)+"\n"), 0o600); err != nil {
+		_ = unixLn.Close()
+		return err
+	}
 
 	// Request contexts derive from reqCtx, cancelled before Shutdown, so long-lived
 	// server streams (Watch, Attach) return instead of holding shutdown for its timeout.
 	reqCtx, cancelRequests := context.WithCancel(ctx)
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
-	previewH := preview.Handler(grants, log.With("component", "preview"))
-	open := map[string]http.Handler{preview.Prefix: previewH, theme.FramePrefix: theme.FrameHandler(liveTheme)}
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, open, mux)))
+	// What a page loads without a credential, by path prefix (the most specific wins): the
+	// preview (its grant in the URL), the theme and the bridge script (reveal nothing).
+	pageRoutes := map[string]http.Handler{
+		preview.Prefix:    preview.Handler(grants, log.With("component", "preview")),
+		theme.FramePrefix: theme.FrameHandler(liveTheme),
+		bridge.Path:       bridge.Handler(),
+	}
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, mux)))
+	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", pagesHandler(pageRoutes)))
 
-	errc := make(chan error, 2)
+	errc := make(chan error, 3)
 	go func() { errc <- serve(unixSrv, unixLn) }()
 	go func() { errc <- serve(tcpSrv, tcpLn) }()
+	go func() { errc <- serve(pagesSrv, pagesLn) }()
 
 	log.Info("daemon started",
 		"pid", os.Getpid(), "version", opts.Version.Version, "commit", opts.Version.Commit,
-		"socket", p.Socket(), "port", port, "home", p.Home())
+		"socket", p.Socket(), "port", port, "pages_port", pagesPort, "home", p.Home())
 	// Up: the wakes the last stop owes its orchestrators (interrupted children, a
 	// restart notice) can start their threads now (docs/notes/orch-restart-wakes.md).
 	st.thread.DeliverRestartWakes()
@@ -378,7 +402,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	cancelRequests()
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancel()
-	for _, s := range []*http.Server{unixSrv, tcpSrv} {
+	for _, s := range []*http.Server{unixSrv, tcpSrv, pagesSrv} {
 		if err := s.Shutdown(shutdownCtx); err != nil {
 			log.Warn("graceful shutdown incomplete", "err", err)
 			_ = s.Close()
@@ -408,6 +432,8 @@ func serve(s *http.Server, ln net.Listener) error {
 	return nil
 }
 
+// removeRuntimeFiles removes what only a running daemon means. pages.port stays: it is
+// the port the next start tries first (pages.go), and nothing reads it to connect.
 func removeRuntimeFiles(log *slog.Logger, p paths.Paths) {
 	for _, f := range []string{p.Port(), p.Token(), p.Socket()} {
 		if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
