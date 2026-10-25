@@ -3,9 +3,9 @@ import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The bridge (docs/notes/bridge-2-gui.md): mock/bridge-page.html, shown inline by the
- * scripted thread's "bridge" state (mock/thread.ts, a working turn), loads the mock's
- * /cf/bridge.js and calls Code Foundry through its frame's host. SHOTS=<dir> saves the card
- * in both schemes.
+ * scripted thread's "bridge" state (mock/thread.ts, a working turn), loads /cf/bridge.js
+ * (the daemon's script, served by the mock) and calls Code Foundry through its frame's
+ * host. SHOTS=<dir> saves the card in both schemes.
  */
 
 test.beforeEach(async () => {
@@ -54,8 +54,8 @@ test("cf:run reads and mutates in the thread's context; the daemon's errors come
   await expect(doc(page).locator("#notify-out")).toHaveText("ok");
   await expect(page.getByText("Test info")).toBeVisible();
   const notify = (await invocations()).find((i) => i.name === "ui.notify");
-  expect(notify?.context?.activeThreadId).toBe("s-r1");
-  expect(notify?.context?.activeView).toBe("thread");
+  // The CLI's context inside the thread: the thread and nothing else.
+  expect(notify?.context).toMatchObject({ activeThreadId: "s-r1", activeView: "", activeProjectId: "", activeWorktreePath: "" });
   expect(notify?.args).toEqual({ level: "info", title: "Hello from a page", body: "Sent through the bridge" });
   await doc(page).locator("#missing").click();
   await expect(doc(page).locator("#error-out")).toHaveText(/^unavailable: /);
@@ -120,7 +120,7 @@ test("storage survives a reload; a theme switch reaches the page without one", a
   const scheme = await doc(page).locator("#theme").textContent();
   await page.emulateMedia({ colorScheme: scheme === "dark" ? "light" : "dark" });
   await expect(doc(page).locator("#theme")).toHaveText(scheme === "dark" ? "light" : "dark");
-  // It acked (the stand-in script does for a page with a theme listener): no reload, the same visit.
+  // The bridge script applied it and acked: no reload, the same visit.
   await page.waitForTimeout(600);
   await expect(doc(page).locator("#visits")).toHaveText("2");
 });

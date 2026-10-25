@@ -1,7 +1,8 @@
 # Phase 3, the bridge: the GUI's host (2026-10-25)
 
-PR 2 of 3 of the bridge (phase 3). A page the model shows in a thread (`view.inline` →
-`InlineHtml.tsx` → `components/files/HtmlFrame.tsx`) calls Code Foundry through
+PR 2 of 3 of the bridge (phase 3), on top of PR 1 (#341, `bridge-1-daemon.md`). A page the
+model shows in a thread (`view.inline` → `InlineHtml.tsx` → `components/files/HtmlFrame.tsx`)
+calls Code Foundry through
 `/cf/bridge.js` (the daemon's page script, PR 1): it posts to its parent window, and the
 frame's host in the GUI answers. The page never talks to the API: page → postMessage →
 host → `CommandService.Invoke` with the GUI's token. This PR is that host.
@@ -27,9 +28,10 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
 - **Sandbox.** `HTML_PREVIEW_SANDBOX` gains `allow-same-origin`, so a page keeps its
   localStorage and IndexedDB; the iframe gets `allow="clipboard-write"`. Still no
   `allow-top-navigation`, still `no-referrer`. Safe because PR 1 serves `/preview/` and
-  `/cf/` from a pages listener of their own (a persisted port): the page's origin is that
-  listener's, never the app's (`wails://localhost`) and never the API's, whose CORS refuses
-  it. The page holds no token and cannot reach the app's window.
+  `/cf/` from a pages listener of their own (a persisted port) and its preview CSP allows
+  same-origin too: the page's origin is that listener's, never the app's
+  (`wails://localhost`) and never the API's, whose CORS refuses it. The page holds no token
+  and cannot reach the app's window. The mock's preview route now sends the same CSP.
 - **`lib/bridge.ts`**: the contract as code. `parsePageMessage` (strict: `cf: 1`, an id that
   is a non-empty string or a number, args strings only; a malformed call with an id is
   answered `invalid`), `fillThreadArgs`, `readyMessage`, `okResult` / `errorResult`,
@@ -44,11 +46,11 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
     names (`CommandService.List` in the thread's context, `include_unavailable`, the
     commands with `read_only`; listed once per frame, again after a failure) and every
     source name.
-  - `cf:run` → `invokeConfirmed` with `getUiContext({kind: "thread", id})`: the thread view's
-    own context (thread, its project and worktree, its workspace, view `thread`). Every arg
-    with `default_to_thread_env` that the page did not pass gets the thread's id, as the
-    CLI inside the thread sends `$CODE_FOUNDRY_THREAD`; an explicit `""` stays (the CLI's
-    `--flag=`). A `ConfirmationRequired` opens the app's confirm dialog (the palette's
+  - `cf:run` → `invokeConfirmed` with `pageContext(thread)`: `active_thread_id` and
+    nothing else, which is what the CLI inside the thread sends (the proto's `active_view`
+    comment, PR 1). Every arg with `default_to_thread_env` that the page did not pass gets
+    the thread's id, as that CLI sends `$CODE_FOUNDRY_THREAD`; an explicit `""` stays (the
+    CLI's `--flag=`). `default_to_cwd` args stay unset (a page has no cwd). A `ConfirmationRequired` opens the app's confirm dialog (the palette's
     `ConfirmDialog`, or a command's own presenter), "Asked by `<page>`, a page in `<thread>`";
     yes re-invokes with `bind`/`args` merged (the existing stages); no answers
     `ok:false, error:{code:"declined"}`, plus `result` when the command had already done
@@ -90,15 +92,20 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
   `readOnly: []`, `sources: []`, and every `cf:run` and `cf:on` answered `unavailable`
   "this page is not shown in a thread". The thread's bridge is for pages the thread made
   and showed, not for every HTML file that happens to open beside it.
-- **Proto.** `Command.read_only` (field 9) is added here so the GUI builds before PR 1; PR 1
-  adds the same field and fills it, and its version wins on rebase. `CommandView.readOnly`
-  and `ArgSpecView.defaultToThreadEnv` map it (set only when true).
+- **Proto.** `Command.read_only` is PR 1's (this branch carried a stand-in until the rebase).
+  `CommandView.readOnly` and `ArgSpecView.defaultToThreadEnv` map it (set only when true).
 - **`invokeConfirmed`** gains `opts.around(ask)`: the host queues each question through it
   and learns the answer (a declined call returns the `declined` result or null, which a
   caller cannot tell from success otherwise).
 
 ## Decisions
 
+- **The CLI's context, not the thread view's** (a deviation from this PR's brief, which
+  asked for the thread's project and worktree too): PR 1 settled that a page runs exactly
+  as the CLI in its thread, so availability and every `active_view == ""` behaviour match
+  it, and a verb on a worktree or terminal needs it in its args. Seen live: `thread.archive`
+  without `id` refuses ("not archiving the thread this runs in … pass --id"), as the CLI
+  does; the test page passes `id: cf.thread.id`.
 - **Origin pinned, not `"*"`.** With `allow-same-origin` a link in the page can navigate the
   frame to any site, which then is the frame's window: `event.source` alone would hand that
   site the thread's verbs. The host therefore also requires `event.origin` to be the grant
@@ -115,17 +122,19 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
 - **A dev hook** `window.__cfBridge` (`{hosts, subscriptions, posts}`, dev builds only, like
   `__cfTerminal`) lets e2e prove a closed card's frame let go of everything.
 
-## For PR 1 (daemon) to match
+## With PR 1's script
 
-- The preview route's `Content-Security-Policy: sandbox …` must also allow
-  `allow-same-origin` (the mock's does now). A CSP sandbox without it keeps the document
-  opaque whatever the iframe says: no storage, and `event.origin` is `"null"`, which this
-  host refuses.
-- `/cf/bridge.js`: the mock serves `mock/bridge.js`, a stand-in with this contract
-  (`cf.ready`, `cf.thread`, `cf.run(verb, args)`, `cf.on(source, cb)` → off, `cf.onTheme`,
-  the gesture rule via `navigator.userActivation`, acking `cf:theme` only for a page with a
-  theme listener). Swap in PR 1's script when it lands.
-- A `cf:on` that the host refuses comes back as a `cf:result` with its id (no event follows).
+- The mock serves PR 1's `internal/bridge/bridge.js` (`mock/bridge.ts`), so the e2e page runs
+  the real script: `cf.ready` resolves with the `cf:ready` message, `cf.onTheme`, the
+  gesture rule, `pagehide` → `cf:off`. The host's refusal of a `cf:on` is a `cf:result` with
+  the subscription's id, which the script tolerates (onError or a warning).
+- The script applies `cf:theme` itself and acks, so every bridge page keeps its state
+  across a theme switch (PR 1's note, the ack deviation).
+- **Open question (from PR 1): sibling frames share the pages origin.** Two pages on screen
+  (two inline cards, or a card and a File tab) can reach each other's `window.cf` through
+  `parent.frames`; the host attributes the call to the frame that posted it. The host's
+  `event.source` check is per frame, so that widens nothing a thread can do (every thread
+  may run the same verbs with `--id`), but a per-thread origin would close it.
 
 ## Tests
 
@@ -151,34 +160,38 @@ origin `"*"` only when the frame is the one you mounted (never broadcast).
   again: the closing dialog's overlay still takes the click.
 - `page.reload()` in e2e does not bring the thread back selected; reopening the card is the
   page reload that matters.
+- The test page painted results with `--cf-success-foreground`, the colour on a filled
+  status chip (dark on dark); `--cf-*-text` is the one for text.
 
-## End to end (2026-10-25, built app, isolated home)
+## End to end (2026-10-25, built app, isolated home, the merged daemon)
 
-PR 1's branch had no commits yet, so the real daemon ran with a local stand-in for it, not
-committed: the preview route's CSP sandbox with `allow-same-origin`, and `/cf/bridge.js`
-serving `mock/bridge.js`. Preview pages were still on the API listener (PR 1 moves them).
-`make gui-build`; `gui/bin/Code Foundry` with `CODE_FOUNDRY_HOME=~/cf-bridge2-home`, the
-CLAUDE* variables unset; a non-git scratch folder registered; a Haiku 5.5
-(`claude-haiku-5-5[1m]`, medium) thread "Bridge check"; `mock/bridge-page.html` copied to
-its pages folder and shown with `view.inline <file> --thread <id>`.
+First against a local stand-in for PR 1 (before it landed: same-origin CSP, the stand-in
+script), then again after the rebase against `main` with PR 1 merged (#341), which is what
+this records. `make gui-build`; `gui/bin/Code Foundry` with
+`CODE_FOUNDRY_HOME=~/cf-bridge2-home` and `CODE_FOUNDRY_BIN=bin/code-foundry`, the CLAUDE*
+variables unset; a non-git scratch folder registered; a Haiku 5.5 (`claude-haiku-5-5[1m]`,
+medium) thread "Bridge check" asked to run `sleep 120` in the background (so archiving it
+asks); `mock/bridge-page.html` copied to its pages folder and shown with
+`view.inline <file> --thread <id>`. Clicks went through CGEvents to the WKWebView.
 
-- Ready in WKWebView: "Shown in Bridge check · dark theme"; the `thread-list` snapshot
-  (1 thread), then live events as the thread went to Working.
-- `thread.list` → `{"threads":1}`; an unknown verb → `unavailable: unknown command …`;
-  missing args → `invalid: ui.notify: missing required argument "title"` (the real verb
-  needs a title; the page now sends one).
+- The frame loaded from the pages listener (`pages.port`); ready: "Shown in Bridge check ·
+  dark theme · visit 1", the `thread-list` snapshot (1 thread), then live events as the
+  thread changed.
+- Read → `{"threads":1}`; No such verb → `unavailable: unknown command "no.such.verb"`;
+  missing args → `invalid: ui.notify: missing required argument "title"`.
 - Send a toast → the app's toast "Hello from a page / Sent through the bridge", result
   `{"windows":1,"receivers":1}`.
-- With a background shell running, Archive this thread → the app's confirm dialog, "Asked
-  by bridge.html, a page in Bridge check"; Cancel → `declined: the user declined`.
-- Closing and opening the card twice: visit 1 → 2 → 3 (localStorage kept).
-- `settings set appearance.theme light`: the page repainted light, still visit 3 with its
-  results (acked, no reload).
-- Found on the way: the test page painted results with `--cf-success-foreground`, the
-  colour on a filled status chip (dark on dark); it uses `--cf-*-text` now.
+- Archive this thread (with `id`) → the app's confirm dialog, "Archive thread Bridge check?
+  1 background shell is running; archiving stops it." and "Asked by bridge.html, a page in
+  Bridge check"; Cancel → `declined: the user declined`. Again with the confirm button: the
+  thread was archived (`archivedAt` set) and the app left it, its frame with it.
+- Closing and opening the card: visit 1 → 2 (localStorage kept on the pages origin).
+- `settings set appearance.theme light`: the page repainted light and kept visit 2 and its
+  results (the script acked, no reload).
 
 The thread, scratch folder and home were removed afterwards.
 
 ## Daemon restart
 
-Needed only for the proto field (PR 1 brings the daemon side). GUI and daemon ship together.
+Not needed for this PR on its own (GUI only); PR 1's daemon changes need one. GUI and daemon
+ship together.

@@ -59,7 +59,7 @@ describe("bridge host", () => {
       expect(posts).toHaveLength(1);
     });
     expect(posts[0]).toMatchObject({ type: "cf:ready", cf: 1, thread: { id: "t-1", name: "Fix stale badge" }, readOnly: ["thread.list"] });
-    expect(listCommands).toHaveBeenCalledWith(expect.objectContaining({ activeThreadId: "t-1", activeView: "thread" }), { includeUnavailable: true });
+    expect(listCommands).toHaveBeenCalledWith({ activeTerminalId: "", activeThreadId: "t-1", activeProjectId: "", activeWorktreePath: "", activeView: "", activeWorkspaceId: "" }, { includeUnavailable: true });
   });
 
   it("runs a verb in the thread's context, filling the args that default to the thread", async () => {

@@ -1,8 +1,8 @@
 /**
  * The host side of the bridge (docs/notes/bridge-2-gui.md): one per mounted HtmlFrame. A
  * page shown in a thread asks through `/cf/bridge.js`; this answers. `cf:run` becomes
- * CommandService.Invoke with the owning thread's context and the args the CLI inside that
- * thread would send; `cf:on` forwards one of the GUI's own slices (stores/bridgeSources.ts),
+ * CommandService.Invoke with the context and args the CLI inside the owning thread would
+ * send (pageContext, fillThreadArgs); `cf:on` forwards one of the GUI's own slices (stores/bridgeSources.ts),
  * so a page never talks to the API and never opens a stream. The message shapes are
  * lib/bridge.ts's.
  *
@@ -11,7 +11,7 @@
  * still on their way to it are dropped. dispose (the frame unmounts) does the same for good. A frame with no owning thread (a File tab on an arbitrary HTML file) gets a
  * ready with no thread, no verbs and no sources, and every call refused.
  */
-import { listCommands, type CommandView } from "@/api/command";
+import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
 import {
   errorResult,
@@ -31,7 +31,7 @@ import { publishedTheme } from "@/lib/theme";
 import { bridgeSources } from "./bridgeSources";
 import { invokeConfirmed } from "./commands";
 import { answerConfirm, useConfirmStore } from "./confirm";
-import { getUiContext } from "./context";
+import { emptyContext } from "./context";
 import { useThreadsStore } from "./threads";
 
 declare global {
@@ -49,6 +49,15 @@ const dev = import.meta.env.DEV ? (window.__cfBridge ??= { hosts: 0, subscriptio
 
 /** How long a subscription gathers a burst of changes before it posts. */
 export const BRIDGE_DEBOUNCE_MS = 50;
+
+/**
+ * What a page's call runs in: its thread and nothing else, which is what the CLI inside
+ * that thread sends (UiContext.active_view's proto comment; docs/notes/bridge-1-daemon.md).
+ * A verb on a worktree or terminal takes it in its args, as from the CLI.
+ */
+export function pageContext(threadId: string): UiContextView {
+  return { ...emptyContext, activeView: "", activeThreadId: threadId };
+}
 
 export type HostMessage = ReadyMessage | ResultMessage | EventMessage;
 
@@ -93,7 +102,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     if (threadId === null) return Promise.resolve([]);
     const id = threadId;
     commands ??= Promise.resolve()
-      .then(() => listCommands(getUiContext({ kind: "thread", id }), { includeUnavailable: true }))
+      .then(() => listCommands(pageContext(id), { includeUnavailable: true }))
       .catch((err: unknown) => {
       // Asked again by the next ready or run.
       commands = null;
@@ -151,7 +160,7 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
         () => undefined,
       );
       const callArgs = spec ? fillThreadArgs(args, spec.args, threadId) : args;
-      const res = await invokeConfirmed(verb, callArgs, getUiContext({ kind: "thread", id: threadId }), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
+      const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
         around: async (ask) => {
           const yes = await queued(forDoc, ask);
           if (!yes) asked.declined = true;
