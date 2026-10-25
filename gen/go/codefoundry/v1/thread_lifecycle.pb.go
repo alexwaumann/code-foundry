@@ -2468,7 +2468,22 @@ type CreateThreadResponse struct {
 	// worktree mode a plain-folder member another thread also works in ("<name> is a
 	// folder, not a repo: thread <thread> also works there"). The CLI prints them on
 	// stderr.
-	Hints         []string `protobuf:"bytes,3,rep,name=hints,proto3" json:"hints,omitempty"`
+	Hints []string `protobuf:"bytes,3,rep,name=hints,proto3" json:"hints,omitempty"`
+	// What the placement did with the primary, for the CLI's summary (not set when
+	// reused). made_worktree: this create made the primary's worktree (from
+	// thread.base_ref). existing_worktree: it existed and is reused; shared_with is then
+	// another thread that is not archived with it as a checkout ("<name> (<id>)"), empty
+	// when none. Neither: the primary is not a worktree (a folder, a workspace's folder,
+	// a checkout-mode checkout).
+	MadeWorktree     bool   `protobuf:"varint,4,opt,name=made_worktree,json=madeWorktree,proto3" json:"made_worktree,omitempty"`
+	ExistingWorktree bool   `protobuf:"varint,5,opt,name=existing_worktree,json=existingWorktree,proto3" json:"existing_worktree,omitempty"`
+	SharedWith       string `protobuf:"bytes,6,opt,name=shared_with,json=sharedWith,proto3" json:"shared_with,omitempty"`
+	// The copied thread works in worktrees, but the projects given have no git, so this
+	// one runs in their folders (checkout mode).
+	WorktreeModeDropped bool `protobuf:"varint,7,opt,name=worktree_mode_dropped,json=worktreeModeDropped,proto3" json:"worktree_mode_dropped,omitempty"`
+	// With made_worktree: its branch was made too (from thread.base_ref); false: an
+	// existing branch, local or origin's, was checked out.
+	MadeBranch    bool `protobuf:"varint,8,opt,name=made_branch,json=madeBranch,proto3" json:"made_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2522,6 +2537,41 @@ func (x *CreateThreadResponse) GetHints() []string {
 		return x.Hints
 	}
 	return nil
+}
+
+func (x *CreateThreadResponse) GetMadeWorktree() bool {
+	if x != nil {
+		return x.MadeWorktree
+	}
+	return false
+}
+
+func (x *CreateThreadResponse) GetExistingWorktree() bool {
+	if x != nil {
+		return x.ExistingWorktree
+	}
+	return false
+}
+
+func (x *CreateThreadResponse) GetSharedWith() string {
+	if x != nil {
+		return x.SharedWith
+	}
+	return ""
+}
+
+func (x *CreateThreadResponse) GetWorktreeModeDropped() bool {
+	if x != nil {
+		return x.WorktreeModeDropped
+	}
+	return false
+}
+
+func (x *CreateThreadResponse) GetMadeBranch() bool {
+	if x != nil {
+		return x.MadeBranch
+	}
+	return false
 }
 
 type ForkThreadRequest struct {
@@ -5521,11 +5571,18 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"I\n" +
 	"\x16ReadAttachmentResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +
-	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"t\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"\xbc\x02\n" +
 	"\x14CreateThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x16\n" +
 	"\x06reused\x18\x02 \x01(\bR\x06reused\x12\x14\n" +
-	"\x05hints\x18\x03 \x03(\tR\x05hints\"7\n" +
+	"\x05hints\x18\x03 \x03(\tR\x05hints\x12#\n" +
+	"\rmade_worktree\x18\x04 \x01(\bR\fmadeWorktree\x12+\n" +
+	"\x11existing_worktree\x18\x05 \x01(\bR\x10existingWorktree\x12\x1f\n" +
+	"\vshared_with\x18\x06 \x01(\tR\n" +
+	"sharedWith\x122\n" +
+	"\x15worktree_mode_dropped\x18\a \x01(\bR\x13worktreeModeDropped\x12\x1f\n" +
+	"\vmade_branch\x18\b \x01(\bR\n" +
+	"madeBranch\"7\n" +
 	"\x11ForkThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +

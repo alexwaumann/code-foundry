@@ -110,11 +110,11 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		Command{
 			Name:        "project.unregister",
 			Title:       "Remove Project",
-			Description: "Stop tracking a project. Nothing on disk is touched.",
+			Description: "Stop tracking a project. The worktrees Code Foundry made for it that no thread uses and that are clean are removed (never a branch); nothing else on disk is touched.",
 			Category:    "Project",
 			Args:        []ArgSpec{projectArg},
 			When:        hasProject,
-			Confirm:     "Stop tracking project {project}? Its threads lose their worktree; nothing on disk is touched.",
+			Confirm:     "Stop tracking project {project}? Its threads lose their worktree; clean worktrees Code Foundry made that no thread uses are removed (branches stay).",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("project")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterProjectRequest{Id: id})); err != nil {

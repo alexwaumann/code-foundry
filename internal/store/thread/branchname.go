@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
@@ -171,44 +173,102 @@ func slugPart(branch string) string {
 
 // pickBranch turns the composed branch (may be "") into the one to create, in every
 // repository at projectPaths. A user-chosen branch is kept as it is (existing reports
-// whether it exists locally or on origin in one of them, to be checked out). An
-// auto-generated one gets -2..-9 while it is taken there, or while taken (when set)
-// reports its slugPart as used. Anything unusable is cf/<id>.
-func (m *Manager) pickBranch(ctx context.Context, projectPaths []string, bc branchChoice, branch, id string, taken func(string) bool) (string, bool) {
+// whether it exists locally or on origin in one of them, to be checked out; origin is
+// asked first when no ref has it: userBranchExists). An auto-generated one gets -2..-9
+// while it is taken there or reserved by another Create picking at the same time
+// (reserveBranch); release ends the reservation once the worktrees are made (a no-op
+// for a user-chosen branch, which parallel Creates share). Anything unusable is cf/<id>.
+func (m *Manager) pickBranch(ctx context.Context, projectPaths []string, bc branchChoice, branch, id string) (picked string, existing bool, release func()) {
+	none := func() {}
 	fallback := fallbackPrefix + id
 	if bc.verbatim != "" {
-		return bc.verbatim, m.branchExists(ctx, projectPaths, bc.verbatim)
+		return bc.verbatim, m.userBranchExists(ctx, projectPaths, bc.verbatim), none
 	}
 	if branch == "" {
-		return fallback, false
+		return fallback, false, none
 	}
 	if bc.cfg.Mode == BranchModeCustom && !validBranch(ctx, branch) {
 		m.log.Warn("custom branch name is not a valid git branch; using a fallback", "thread", id, "branch", branch)
 		if bc.hint != "" {
-			return fallbackPrefix + bc.hint, m.branchExists(ctx, projectPaths, fallbackPrefix+bc.hint)
+			return fallbackPrefix + bc.hint, m.userBranchExists(ctx, projectPaths, fallbackPrefix+bc.hint), none
 		}
-		return fallback, false
+		return fallback, false, none
 	}
 	if bc.hint != "" {
-		return branch, m.branchExists(ctx, projectPaths, branch)
+		return branch, m.userBranchExists(ctx, projectPaths, branch), none
 	}
 	for i := 1; i <= maxBranchSuffix; i++ {
 		b := branch
 		if i > 1 {
 			b += "-" + strconv.Itoa(i)
 		}
-		if (taken == nil || !taken(slugPart(b))) && !m.branchExists(ctx, projectPaths, b) {
-			return b, false
+		release, ok := m.reserveBranch(projectPaths, b)
+		if !ok {
+			continue
+		}
+		if !m.branchExists(ctx, projectPaths, b) {
+			return b, false, release
+		}
+		release()
+	}
+	return fallback, false, none
+}
+
+// reserveBranch reserves branch in every repository at projectPaths for the Create that
+// picked it, unless another Create holds it in one of them (ok false): two Creates
+// naming their branch alike at the same time get branch and branch-2 instead of racing
+// to make the same new branch.
+func (m *Manager) reserveBranch(projectPaths []string, branch string) (release func(), ok bool) {
+	m.branchResMu.Lock()
+	defer m.branchResMu.Unlock()
+	keys := make([]string, len(projectPaths))
+	for i, p := range projectPaths {
+		keys[i] = filepath.Clean(p) + "\x00" + branch
+		if _, held := m.branchRes[keys[i]]; held {
+			return nil, false
 		}
 	}
-	return fallback, false
+	if m.branchRes == nil {
+		m.branchRes = map[string]struct{}{}
+	}
+	for _, k := range keys {
+		m.branchRes[k] = struct{}{}
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			m.branchResMu.Lock()
+			defer m.branchResMu.Unlock()
+			for _, k := range keys {
+				delete(m.branchRes, k)
+			}
+		})
+	}, true
 }
 
 // branchExists reports whether branch exists locally or on origin in any of
-// projectPaths.
+// projectPaths (the refs on disk; nothing is fetched).
 func (m *Manager) branchExists(ctx context.Context, projectPaths []string, branch string) bool {
 	for _, p := range projectPaths {
 		if m.opts.RefExists(ctx, p, "refs/heads/"+branch) || m.opts.RefExists(ctx, p, "refs/remotes/origin/"+branch) {
+			return true
+		}
+	}
+	return false
+}
+
+// userBranchExists is branchExists for a branch the user named, which may be on origin
+// only and not fetched yet (pushed from another clone): when no ref has it, each
+// repository's origin is asked (FetchBranch, which also writes the remote-tracking ref
+// the new worktree's branch then tracks). Without that the branch would be made anew
+// from the base, beside origin's.
+func (m *Manager) userBranchExists(ctx context.Context, projectPaths []string, branch string) bool {
+	if m.branchExists(ctx, projectPaths, branch) {
+		return true
+	}
+	for _, p := range projectPaths {
+		if m.opts.FetchBranch(ctx, p, branch) {
+			m.log.Info("branch found on origin", "path", p, "branch", branch)
 			return true
 		}
 	}

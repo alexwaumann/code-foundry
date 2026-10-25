@@ -50,6 +50,9 @@ type Thread struct {
 	// Cascade is List's answer to a filter with archive_cascade_of, by that id (none
 	// when absent): the hidden threads archiving it takes along.
 	Cascade map[string][]*v1.Thread
+	// Placement, when set, gives Create's made_worktree, made_branch, existing_worktree, shared_with
+	// and worktree_mode_dropped (else made_worktree and made_branch are new_worktree's presence).
+	Placement *v1.CreateThreadResponse
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
@@ -86,7 +89,12 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	}
 	slices.Sort(ids)
 	out.ProjectIds = slices.Compact(ids)
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out, Reused: s.Reused, Hints: s.Hints}), nil
+	res := &v1.CreateThreadResponse{Thread: out, Reused: s.Reused, Hints: s.Hints, MadeWorktree: m.GetNewWorktree() != nil, MadeBranch: m.GetNewWorktree() != nil}
+	if p := s.Placement; p != nil {
+		res.MadeWorktree, res.MadeBranch, res.ExistingWorktree, res.SharedWith = p.GetMadeWorktree(), p.GetMadeBranch(), p.GetExistingWorktree(), p.GetSharedWith()
+		res.WorktreeModeDropped = p.GetWorktreeModeDropped()
+	}
+	return connect.NewResponse(res), nil
 }
 
 // Checkouts returns CheckoutsResp (an empty answer for the requested thread when nil).

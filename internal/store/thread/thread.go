@@ -382,6 +382,24 @@ func (Removed) isThreadListEvent()      {}
 func (RetiredUsage) isThreadListEvent() {}
 func (*Snapshot) isThreadListEvent()    {}
 
+// CreateReport is what a Create's placement did with the primary (CreateOptions.Report),
+// for the summary a caller prints.
+type CreateReport struct {
+	// MadeWorktree: this Create made the primary's worktree (from Thread.BaseRef when
+	// its branch was new). ExistingWorktree: the primary's worktree existed and is
+	// reused; SharedWith then names another thread that is not archived with it as a
+	// checkout ("<name> (<id>)"), "" when none. Both false: the primary is not a worktree
+	// (a folder, a workspace's folder, an own checkout).
+	MadeWorktree, ExistingWorktree bool
+	SharedWith                     string
+	// MadeBranch: with MadeWorktree, its branch was new too; false: an existing branch
+	// (local or origin's) was checked out.
+	MadeBranch bool
+	// DroppedWorktreeMode: the copied thread works in worktrees, but the projects given
+	// have no git, so this one runs in their folders (checkout mode).
+	DroppedWorktreeMode bool
+}
+
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
 	// ProjectID and WorktreePath select the primary (placement.go). Either may be empty:
@@ -406,6 +424,9 @@ type CreateOptions struct {
 	// CheckoutMode runs every member in its own checkout even when Like or the inherited
 	// thread is in worktree mode (thread new --new-worktree=false).
 	CheckoutMode bool
+	// Report, when set, is filled in by Create with what the placement did (the CLI's
+	// summary); untouched when Create fails or a request id repeats.
+	Report *CreateReport
 	// WorkspaceID (an id or a name) is the workspace the thread references. Without
 	// ProjectIDs its members are the set; the primary is ProjectID, else the workspace's
 	// default primary, else the first member (placement.go).

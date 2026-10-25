@@ -641,6 +641,21 @@ message CreateThreadResponse {
   // folder, not a repo: thread <thread> also works there"). The CLI prints them on
   // stderr.
   repeated string hints = 3;
+  // What the placement did with the primary, for the CLI's summary (not set when
+  // reused). made_worktree: this create made the primary's worktree (from
+  // thread.base_ref). existing_worktree: it existed and is reused; shared_with is then
+  // another thread that is not archived with it as a checkout ("<name> (<id>)"), empty
+  // when none. Neither: the primary is not a worktree (a folder, a workspace's folder,
+  // a checkout-mode checkout).
+  bool made_worktree = 4;
+  bool existing_worktree = 5;
+  string shared_with = 6;
+  // The copied thread works in worktrees, but the projects given have no git, so this
+  // one runs in their folders (checkout mode).
+  bool worktree_mode_dropped = 7;
+  // With made_worktree: its branch was made too (from thread.base_ref); false: an
+  // existing branch, local or origin's, was checked out.
+  bool made_branch = 8;
 }
 
 message ForkThreadRequest {

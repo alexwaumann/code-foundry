@@ -99,6 +99,36 @@ func TestDecidePlacement(t *testing.T) {
 			want: placement{projectIDs: []string{"api", "web"}, primary: "api", workspaceID: "w-2", from: "w"}},
 		{name: "like: a thread without a project has no branch", src: &home, explicit: true, req: placeRequest{newBranch: true},
 			wantErr: ErrInvalidArgument},
+
+		// Fuzz finding A3: a set of plain folders has nothing to put in a worktree.
+		{name: "inherit: projects narrowed to folders drop worktree mode", src: &wtParent, cos: wtCheckouts,
+			req:  placeRequest{projectIDs: []string{"notes"}, noGit: true},
+			want: placement{projectIDs: []string{"notes"}, primary: "notes", workspaceID: "w-1", from: "p", droppedWorktreeMode: true}},
+		{name: "like: projects narrowed to folders drop worktree mode", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{projectIDs: []string{"notes"}, noGit: true},
+			want: placement{projectIDs: []string{"notes"}, primary: "notes", workspaceID: "w-1", from: "p", droppedWorktreeMode: true}},
+		{name: "like: folders with a new branch keep asking for worktrees", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{projectIDs: []string{"notes"}, noGit: true, newBranch: true},
+			want: placement{projectIDs: []string{"notes"}, primary: "notes", workspaceID: "w-1", from: "p", worktreeMode: true, newBranch: true}},
+
+		// Fuzz finding A4: like with a workspace copies the like and swaps the reference.
+		{name: "like with a workspace: the like's set, branch, primary and mode, the given workspace", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{workspaceID: "w-9", wsMembers: []string{"docs"}, wsDefault: "docs"},
+			want: placement{projectIDs: []string{"api", "web"}, primary: "web", worktreeMode: true, branch: "feat/x", workspaceID: "w-9", from: "p"}},
+		{name: "like with a workspace and projects: they narrow", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{workspaceID: "w-9", wsMembers: []string{"docs"}, projectIDs: []string{"api"}},
+			want: placement{projectIDs: []string{"api"}, primary: "api", worktreeMode: true, branch: "feat/x", workspaceID: "w-9", from: "p"}},
+		{name: "like with a workspace's folder as the primary", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{workspaceID: "w-9", wsPrimary: true},
+			want: placement{projectIDs: []string{"api", "web"}, workspacePrimary: true, worktreeMode: true, branch: "feat/x", workspaceID: "w-9", from: "p"}},
+		{name: "like with a workspace, a new branch", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req:  placeRequest{workspaceID: "w-9", newBranch: true},
+			want: placement{projectIDs: []string{"api", "web"}, primary: "web", worktreeMode: true, newBranch: true, workspaceID: "w-9", from: "p"}},
+		{name: "like with a workspace, a project outside the like's set", src: &wtParent, cos: wtCheckouts, explicit: true,
+			req: placeRequest{workspaceID: "w-9", primary: "docs"}, wantErr: ErrInvalidArgument},
+		{name: "like of a thread without a project, with a workspace: the workspace places it", src: &home, explicit: true,
+			req:  placeRequest{workspaceID: "w-9", wsMembers: []string{"docs"}, wsDefault: "docs"},
+			want: placement{projectIDs: []string{"docs"}, primary: "docs", workspaceID: "w-9"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,5 +152,6 @@ func TestDecidePlacement(t *testing.T) {
 func samePlacement(a, b placement) bool {
 	return slices.Equal(a.projectIDs, b.projectIDs) && a.noProject == b.noProject && a.primary == b.primary &&
 		a.primaryPath == b.primaryPath && a.worktreeMode == b.worktreeMode && a.branch == b.branch &&
-		a.newBranch == b.newBranch && a.workspaceID == b.workspaceID && a.from == b.from && a.workspacePrimary == b.workspacePrimary
+		a.newBranch == b.newBranch && a.workspaceID == b.workspaceID && a.from == b.from && a.workspacePrimary == b.workspacePrimary &&
+		a.droppedWorktreeMode == b.droppedWorktreeMode
 }

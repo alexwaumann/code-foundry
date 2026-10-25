@@ -31,6 +31,9 @@ func TestArchivedVerdict(t *testing.T) {
 		{"status failed", with(func(w *Worktree) { w.Status.Error = "boom" }), false, "git status failed: boom"},
 		{"status not read", with(func(w *Worktree) { w.Status.RefreshedAt = time.Time{} }), false, "git status not read yet"},
 		{"rebase in progress", with(func(w *Worktree) { w.Status.Operation = "rebase" }), false, "rebase in progress"},
+		{"rebase in progress, HEAD detached by it", with(func(w *Worktree) {
+			w.Status.Operation, w.Detached, w.Branch = "rebase", true, ""
+		}), false, "rebase in progress"},
 		{"untracked file", with(func(w *Worktree) { w.Status.Untracked = 1 }), false, UncommittedReason},
 		{"staged", with(func(w *Worktree) { w.Status.Staged = 1 }), false, UncommittedReason},
 	}

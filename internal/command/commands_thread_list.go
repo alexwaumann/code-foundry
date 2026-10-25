@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -41,6 +42,9 @@ const threadListDefaultLimit = "50"
 type ThreadListDeps struct {
 	Thread  ThreadBackend
 	Project ProjectBackend
+	// Workspace names the workspace a thread runs in the folder of; nil (or a failing
+	// list): the folder's name.
+	Workspace WorkspaceBackend
 }
 
 // RegisterThreadList registers thread.list.
@@ -97,10 +101,29 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				return Result{}, err
 			}
 			markCaller(res.Msg.GetThreads(), uctx.CallerThreadID)
-			msg := formatThreadList(res.Msg.GetThreads(), res.Msg.GetRemoved(), projects.Msg.GetProjects(), names, f, time.Now())
+			ws := workspaceNames(ctx, d.Workspace, res.Msg.GetThreads())
+			msg := formatThreadList(res.Msg.GetThreads(), res.Msg.GetRemoved(), projects.Msg.GetProjects(), ws, names, f, time.Now())
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	})
+}
+
+// workspaceNames are the names of the workspaces threads run in the folder of (no
+// project as the primary), by id; nil when none does, or b is nil or fails (the folder's
+// name is shown then).
+func workspaceNames(ctx context.Context, b WorkspaceBackend, threads []*v1.Thread) map[string]string {
+	if b == nil || !slices.ContainsFunc(threads, func(s *v1.Thread) bool { return s.GetProjectId() == "" && s.GetWorkspaceId() != "" }) {
+		return nil
+	}
+	res, err := b.List(ctx, connect.NewRequest(&v1.ListWorkspacesRequest{}))
+	if err != nil {
+		return nil
+	}
+	out := map[string]string{}
+	for _, w := range res.Msg.GetWorkspaces() {
+		out[w.GetId()] = w.GetName()
+	}
+	return out
 }
 
 // markCaller sets is_caller on the row of the thread the command runs in (its context
@@ -179,7 +202,7 @@ func creatorName(s *v1.Thread, names map[string]string) (name string, exists boo
 // is empty. names resolves creators (threadNames). With f.descendants_of the threads
 // are a subtree in tree order: each name indented for its depth (subtreeName) instead
 // of the creator after it, its cost after its age, and a total line.
-func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter,
+func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, projects []*v1.Project, workspaces, names map[string]string, f *v1.ThreadFilter,
 	now time.Time) string {
 	if len(threads) == 0 && len(removed) == 0 {
 		if f.GetOwner() != "" {
@@ -202,7 +225,7 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if tree {
 			name = subtreeName(name, s.GetDepth())
 		}
-		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), name, threadPlace(s, projects), age(lastActivity(s), now))
+		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), name, threadPlace(s, projects, workspaces), age(lastActivity(s), now))
 		if tree {
 			line += "\t" + formatUSD(s.GetCostUsd())
 			cost += s.GetCostUsd()
@@ -290,10 +313,17 @@ func threadDisplayName(s *v1.Thread) string {
 }
 
 // threadPlace is "<project>@<branch>" for a thread's cwd ("<project>" alone when the
-// branch is unknown), "no project" for a thread without one.
-func threadPlace(s *v1.Thread, projects []*v1.Project) string {
+// branch is unknown), "no project" for a thread without one, and "<workspace>" for one
+// that runs in its workspace's folder (workspaces: names by id; the folder's name when
+// the workspace is gone).
+func threadPlace(s *v1.Thread, projects []*v1.Project, workspaces map[string]string) string {
 	if s.GetProjectId() == "" && s.GetWorkspaceId() == "" {
 		return "no project"
+	}
+	if s.GetProjectId() == "" {
+		if n := workspaces[s.GetWorkspaceId()]; n != "" {
+			return n
+		}
 	}
 	for _, r := range projects {
 		if r.GetId() != s.GetProjectId() {

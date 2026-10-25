@@ -31,6 +31,8 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef(), Branch: nw.GetBranch(), BaseFromOrigin: optionalBool(nw.BaseFromOrigin)}
 	}
+	var report thread.CreateReport
+	o.Report = &report
 	s, reused, err := h.store.CreateOnce(ctx, m.GetRequestId(), o)
 	if err != nil {
 		return nil, threadError(err)
@@ -38,6 +40,8 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	res := &v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}
 	if !reused {
 		res.Hints = h.store.CheckoutHints(s)
+		res.MadeWorktree, res.ExistingWorktree, res.SharedWith = report.MadeWorktree, report.ExistingWorktree, report.SharedWith
+		res.WorktreeModeDropped, res.MadeBranch = report.DroppedWorktreeMode, report.MadeBranch
 	}
 	return connect.NewResponse(res), nil
 }

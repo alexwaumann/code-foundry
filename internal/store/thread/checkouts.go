@@ -134,23 +134,44 @@ func branchAt(snap *project.Snapshot, projectID, path, fallback string, derived 
 }
 
 // derivedWorktree is r's worktree for branch: the one at want (the default path) when
-// listed, else another worktree with the branch checked out (one made before the path
-// rule, or by hand), the main checkout last.
+// listed, else another linked worktree with the branch checked out (one made before the
+// path rule, or by hand). Never the main checkout, even on the branch: it is the user's,
+// who may switch it to another branch under the thread (fuzz finding A7); making the
+// thread's worktree is refused while it is there (mainCheckoutBusy).
 func derivedWorktree(r project.Project, branch, want string) (project.Worktree, bool) {
-	var found *project.Worktree
-	for i, w := range r.Worktrees {
-		switch {
-		case want != "" && samePath(w.Path, want):
+	for _, w := range r.Worktrees {
+		if !w.IsMain && want != "" && samePath(w.Path, want) {
 			return w, true
-		case w.Branch != branch || w.Detached:
-		case found == nil || found.IsMain:
-			found = &r.Worktrees[i]
 		}
 	}
-	if found == nil {
-		return project.Worktree{}, false
+	for _, w := range r.Worktrees {
+		if !w.IsMain && !w.Detached && w.Branch == branch {
+			return w, true
+		}
 	}
-	return *found, true
+	return project.Worktree{}, false
+}
+
+// mainOnBranch is r's main checkout when it has branch checked out.
+func mainOnBranch(r project.Project, branch string) (project.Worktree, bool) {
+	for _, w := range r.Worktrees {
+		if w.IsMain && !w.Detached && branch != "" && w.Branch == branch {
+			return w, true
+		}
+	}
+	return project.Worktree{}, false
+}
+
+// mainCheckoutBusy is the refusal to make r's worktree for branch while r's main
+// checkout has branch checked out: a second worktree on one branch (git worktree add
+// --force) leaves a commit in one looking reverted in the other. nil otherwise.
+func mainCheckoutBusy(r project.Project, branch string) error {
+	w, ok := mainOnBranch(r, branch)
+	if !ok {
+		return nil
+	}
+	return fmt.Errorf("%w: %s's main checkout at %s is on %s; switch it to another branch, or start the thread in place (--new-worktree=false)",
+		ErrFailedPrecondition, cmp.Or(r.Name, r.ID), w.Path, branch)
 }
 
 // mainCheckout is r's own checkout: its main worktree, else its path.
@@ -221,6 +242,31 @@ func (m *Manager) requireCheckouts(t Thread) error {
 	return nil
 }
 
+// unregisteredMembers are t's members (not the primary) whose project is no longer
+// registered: a start goes without them (requireCheckouts) and notes it once.
+func (m *Manager) unregisteredMembers(t Thread) []string {
+	if m.opts.Projects == nil {
+		return nil
+	}
+	var out []string
+	for _, c := range m.checkouts(t) {
+		if !c.Primary && !c.Registered {
+			out = append(out, c.ProjectID)
+		}
+	}
+	return out
+}
+
+// unregisteredNoteID is the timeline note's id for an unregistered member: one note per
+// project and thread.
+func unregisteredNoteID(projectID string) string { return "note-unregistered-" + projectID }
+
+// unregisteredNote tells the timeline a member's project left.
+func unregisteredNote(projectID string) string {
+	return "Project " + projectID + " of this thread is no longer registered in Code Foundry, so the thread now starts without it " +
+		"(its checkout is no longer an added directory). Registering the project again brings it back."
+}
+
 // CheckoutsRef selects a thread for Checkouts: by ID, else the cwd.
 type CheckoutsRef struct {
 	ID  string
@@ -261,7 +307,7 @@ func (m *Manager) Checkouts(_ context.Context, ref CheckoutsRef) (ThreadCheckout
 		}
 		s, ok := m.threadAt(ref.Cwd)
 		if !ok {
-			return ThreadCheckouts{}, fmt.Errorf("%w: no thread has a checkout holding %s", ErrNotFound, ref.Cwd)
+			return ThreadCheckouts{}, classified{kind: ErrNotFound, err: fmt.Errorf("no thread has a checkout holding %s", ref.Cwd)}
 		}
 		t = s
 	default:

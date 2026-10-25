@@ -53,7 +53,7 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: formatThreadList(res.Msg.GetThreads(), nil, projects.Msg.GetProjects(), nil, f, time.Now()), JSON: res.Msg}, nil
+				return Result{Message: formatThreadList(res.Msg.GetThreads(), nil, projects.Msg.GetProjects(), nil, nil, f, time.Now()), JSON: res.Msg}, nil
 			},
 		},
 		Command{

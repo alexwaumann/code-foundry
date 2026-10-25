@@ -449,13 +449,24 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   is derived, never stored (`checkouts.go`): in worktree mode (`created_worktree`) a git
   member's worktree on the thread's `branch` at the project store's
   `DefaultWorktreePath`, which every thread computes alike, so threads on one branch
-  share it; a plain folder is the folder; in checkout mode each member's own checkout.
+  share it (or a hand-made linked worktree on the branch; never the project's main
+  checkout: while it has the branch checked out, making the thread's worktree is refused,
+  naming the project, the branch and the checkout, since a second worktree on one branch
+  makes a commit in one look reverted in the other); a plain folder is the folder; in
+  checkout mode each member's own checkout.
   `thread new` places a thread (`placement.go`): `--projects` gives the set,
   `--new-worktree` makes one new branch in every git member (in parallel, fetch first,
   pre-trusted, recorded as made; one failure removes what the others got and fails the
-  Create naming the project), `--like` copies another thread's set, branch, primary,
-  workspace reference and mode, and a thread made by another (`created_by`) copies its
-  creator's the same way unless `--project`/`--worktree` name a place outside its set.
+  Create naming the project; a named `--branch` only on origin is fetched and tracked;
+  Creates at the same time share a named branch's worktrees under the per-(project,
+  branch) lock and reserve an auto-named one, so the second gets `-2`), `--like` copies
+  another thread's set, branch, primary, workspace reference and mode (`--workspace` with
+  it replaces only the reference), and a thread made by another (`created_by`) copies its
+  creator's the same way unless `--project`/`--worktree` name a place outside its set
+  (`--created-by=` opts out of both). A narrowed `--projects` with no git project drops
+  worktree mode. Create reports what it did with the primary (`CreateThreadResponse`
+  `made_worktree`, `existing_worktree`/`shared_with`, `worktree_mode_dropped`) for the
+  CLI's summary (`docs/notes/workspaces-v2-fix-2-threads.md`).
   Every spawn (create, a start on send, fork) first makes missing derived worktrees again
   (`ensureMembers`, beside `recreate.go`'s for the primary) and gives Claude `--add-dir`
   for every other member's checkout; a missing one is a spawn error. `workspace_id` is an
@@ -475,8 +486,11 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   that the CLI prints on stderr. An archive hands the thread to the daemon
   (`Options.Archived`), which removes each derived worktree the app made that is clean
   and that no other thread or terminal holds (`project.ArchivedVerdict`,
-  `internal/daemon/cleanup_archived.go`), never its branch
-  (`docs/notes/workspaces-v2-1-threads.md`).
+  `internal/daemon/cleanup_archived.go`; cleanups of one path run one at a time), never
+  its branch (`docs/notes/workspaces-v2-1-threads.md`). Unregistering a project runs the
+  same verdict first over every worktree the app made for it
+  (`api.Project.WithBeforeUnregister`); a member whose project is no longer registered is
+  left out of a start with one timeline note.
 * **Skills**: at every start the daemon writes four Claude Code skills, `code-foundry`
   (the entry skill: what the app is, the one rule, which skill to read, and
   `daemon.capabilities` for what exists now; `docs/notes/control-4-capabilities.md`),
