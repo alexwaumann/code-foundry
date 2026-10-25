@@ -26,8 +26,8 @@ export const THEME_ACK_MS = 300;
  * preview and a thread's inline page are this one frame (docs/notes/
  * html-preview-interactive.md, inline-html.md). A page that links `/cf/theme.css` paints in
  * the user's theme; the frame is also posted `{ type: "cf:theme", id, scheme, vars }` on
- * load and on every theme change (docs/notes/theme-css-route.md). The target is "*": the
- * frame is opaque-origin.
+ * load and on every theme change (docs/notes/theme-css-route.md), to "*" as before the
+ * bridge (a page holds nothing secret in it).
  *
  * Theme changes (inline-html-2-fixes.md):
  * - The iframe element's own `color-scheme` is the app's scheme, which WebKit hands the page
