@@ -71,6 +71,8 @@ type ThreadBackend interface {
 	HTMLShower
 	// ThemeCardShower backs theme.save's card (commands_theme_card.go).
 	ThemeCardShower
+	// CheckoutsBackend backs thread.checkouts (commands_thread_checkouts.go).
+	CheckoutsBackend
 }
 
 var (

@@ -29,6 +29,11 @@ project list, a branch and a primary; worktrees are derived per (project, branch
 spawn and removed when the last thread archives. Six PRs in the handoff's §8; each lands
 with a `workspaces-v2-<n>-*.md` note.
 
+* PR 1 (daemon: thread project sets, derived checkouts, member add-dirs, `thread
+  checkouts`, `thread new --projects/--like/--new-branch` and inheritance, collision
+  hints, cleanup on archive, migration 0047) on `cf/workspaces-v2-threads`:
+  `docs/notes/workspaces-v2-1-threads.md`.
+
 ### Multi-repo workspaces: the five steps are built
 
 Design settled 2026-10-09 (`docs/notes/workspaces-handoff.md`); all five steps of its

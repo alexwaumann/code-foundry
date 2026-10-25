@@ -25,7 +25,7 @@ var readOnly = []string{
 	"skill.browse",
 	"terminal.list",
 	"theme.check", "theme.list", "theme.show",
-	"thread.agents", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read",
+	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read",
 	"thread.reports", "thread.subscriptions", "thread.wait",
 	"ui.presence",
 	"usage.show",

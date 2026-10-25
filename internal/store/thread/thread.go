@@ -120,17 +120,24 @@ const ReasonArchived = "archived"
 // Thread is an immutable snapshot of one thread. Field meanings follow
 // codefoundry.v1.Thread.
 //
-// Owner: WorkspaceID when set, else the project ProjectID when set, else none (a thread
-// without a project, CreateOptions.NoProject, running in Options.Home). ProjectID and
-// WorktreePath are the cwd (for a workspace thread, the member worktree it runs in),
-// never the owner beyond that order.
+// Projects: a thread has a set of projects (ProjectIDs, sorted by id), one of which is
+// the primary (ProjectID and WorktreePath: the cwd). Every member has a checkout,
+// derived and never stored (checkouts.go, docs/notes/workspaces-v2-1-threads.md): in
+// worktree mode (CreatedWorktree) a git member's is the worktree for (project, Branch),
+// a plain folder's the folder; otherwise each member's own checkout. A thread without a
+// project (CreateOptions.NoProject) has an empty set and runs in Options.Home.
+// WorkspaceID is an optional reference to a workspace, independent of the set.
 type Thread struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
-	ProjectID       string // repository of the cwd; the owner when WorkspaceID is empty
-	WorktreePath    string // the cwd
-	Name            string
-	AutoNamed       bool
+	ProjectID       string // the primary: the project of the cwd; "" without a project
+	// ProjectIDs is the thread's project set, sorted by id and without duplicates; it
+	// holds ProjectID when that is set (CleanProjectIDs), and is empty for a thread
+	// without a project. Persisted (threads.project_ids). Copy on write.
+	ProjectIDs   []string
+	WorktreePath string // the cwd
+	Name         string
+	AutoNamed    bool
 	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
 	// namer still replaces it; a rename or the namer's title clears it. Persisted.
 	NameProvisional bool
@@ -162,19 +169,24 @@ type Thread struct {
 	PermissionMode PermissionMode
 	// BaseRef is the ref the worktree's branch was created from, when Create made the
 	// worktree (CreatedWorktree).
-	BaseRef         string
+	BaseRef string
+	// CreatedWorktree is worktree mode: every git member works in its worktree for
+	// Branch, made at spawn when missing (checkouts.go). False: checkout mode, every
+	// member in its own checkout.
 	CreatedWorktree bool
-	// Branch is the branch the worktree was made for, when Create made it
-	// (CreatedWorktree; copied by Fork): a worktree removed by a cleanup is made again on
-	// it, at the same path, when the thread resumes (recreate.go). It is what the thread
-	// was created for, not what the worktree has checked out now. Persisted; rows from
-	// before it are filled in from the project store at startup while their worktree
-	// exists (backfillBranches).
+	// Branch is the branch of a worktree-mode thread (CreatedWorktree; copied by Fork):
+	// its members' worktrees are on it, and one a cleanup removed is made again on it, at
+	// the same path, when the thread starts (recreate.go). It is what the thread was
+	// created for, not what the worktree has checked out now. Persisted; rows from before
+	// it are filled in from the project store at startup while their worktree exists
+	// (backfillBranches).
 	Branch string
-	// WorkspaceID is the owner workspace; empty for a project thread. Each spawn reads
-	// the workspace's current members from the workspace store.
+	// WorkspaceID is an optional reference to a workspace (its instructions and skills),
+	// independent of ProjectIDs. Until the workspace store's reshape a workspace still
+	// has member worktrees, and a spawn of a thread that references one also reads them
+	// from the workspace store (workspace.go).
 	WorkspaceID string
-	// PendingWorktreePath is the member a queued RunIn moves the thread to once it is
+	// PendingWorktreePath is the checkout a queued RunIn moves the thread to once it is
 	// idle at its prompt; empty when nothing is queued. Not persisted.
 	PendingWorktreePath string
 	// Pinned is the user's pin (Store.Pin). Persisted.
@@ -372,11 +384,28 @@ func (*Snapshot) isThreadListEvent()    {}
 
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
-	// ProjectID and WorktreePath select the worktree. Either may be empty: a project alone
-	// means its main worktree; a path alone is looked up among registered projects. With
-	// WorkspaceID or NewWorkspace they pick the member worktree instead.
+	// ProjectID and WorktreePath select the primary (placement.go). Either may be empty:
+	// a project alone means its checkout (in worktree mode its worktree on the branch); a
+	// path alone is looked up among registered projects. With WorkspaceID or NewWorkspace
+	// they pick the member worktree instead.
 	ProjectID    string
 	WorktreePath string
+	// ProjectIDs is the project set (refs: an id, a name when unique, or an absolute
+	// path inside one; "<ref>:<base ref>" gives that member its own base for a new
+	// branch). Empty: ProjectID's alone, or the inherited thread's. ProjectID, when set,
+	// must be in it; otherwise the first is the primary.
+	ProjectIDs []string
+	// Like copies the project set, branch, primary, workspace reference and mode from
+	// another thread (thread new --like); the other options narrow or override them
+	// (placement.go). Without Like, a thread with CreatedBy inherits the same from its
+	// creator unless the options place it elsewhere.
+	Like string
+	// NewBranch, with Like or an inherited thread: a new branch for the same set, in
+	// worktree mode (as NewWorktree without options).
+	NewBranch bool
+	// CheckoutMode runs every member in its own checkout even when Like or the inherited
+	// thread is in worktree mode (thread new --new-worktree=false).
+	CheckoutMode bool
 	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
 	// The thread runs in the member WorktreePath or ProjectID names, else the first
 	// member. Exclusive with NewWorktree and NewWorkspace.
@@ -450,8 +479,8 @@ type CreateOptions struct {
 	SystemPromptAppend string
 }
 
-// RunInTarget names the member a workspace thread should run in: its project id or
-// its worktree path (both, if given, must agree).
+// RunInTarget names the checkout a thread should run in: a member's project id (or
+// name) or its checkout path (both, if given, must agree).
 type RunInTarget struct {
 	ProjectID    string
 	WorktreePath string
@@ -494,10 +523,16 @@ type Store interface {
 	Reconnect(ctx context.Context, id string) (Thread, error)
 	// Remove closes the thread if needed and forgets it.
 	Remove(ctx context.Context, id string) error
-	// RunIn moves a workspace thread to another member worktree: set_cwd once the live
-	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
-	// row's cwd at once for a disconnected thread.
+	// RunIn moves a thread to another of its checkouts (another member becomes the
+	// primary): set_cwd once the live thread is idle at its prompt (the row's cwd changes
+	// when Claude accepts), or the row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Thread, error)
+	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds
+	// the cwd, the deepest winning) and lists its checkouts (checkouts.go).
+	Checkouts(ctx context.Context, ref CheckoutsRef) (ThreadCheckouts, error)
+	// CheckoutHints are the collision hints for t's checkouts: members another thread
+	// that is not archived also has (checkouts.go). Never an error; nil when none.
+	CheckoutHints(t Thread) []string
 	// Pin sets or clears the user's pin, in any state. Pinning unarchives and unsnoozes.
 	Pin(ctx context.Context, id string, pinned bool) (Thread, error)
 	// Archive archives a thread (archived true): it closes it like Close, kills and

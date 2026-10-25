@@ -53,6 +53,9 @@ type Fake struct {
 	createDefaults thread.CreateDefaultsFunc
 	residentTools  map[string]thread.ResidentTools
 	wakeNotes      map[string]thread.WakeNoteFunc
+	// checkouts and hints back Checkouts and CheckoutHints (checkouts.go).
+	checkouts map[string][]thread.Checkout
+	hints     []string
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -193,6 +196,25 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 		call += " workspace=" + o.WorkspaceID
 		s.WorkspaceID = o.WorkspaceID
 	}
+	if len(o.ProjectIDs) > 0 {
+		call += " projects=" + strings.Join(o.ProjectIDs, ",")
+		for _, p := range o.ProjectIDs {
+			id, _, _ := strings.Cut(p, ":")
+			s.ProjectIDs = append(s.ProjectIDs, id)
+		}
+		if s.ProjectID == "" {
+			s.ProjectID = s.ProjectIDs[0]
+		}
+	}
+	if o.Like != "" {
+		call += " like=" + o.Like
+	}
+	if o.NewBranch {
+		call += " new-branch"
+	}
+	if o.CheckoutMode {
+		call += " checkout-mode"
+	}
 	if nw := o.NewWorkspace; nw != nil && len(nw.Projects) > 0 {
 		call += " new-workspace=" + strings.Join(nw.Projects, ",")
 		s.ProjectID = o.ProjectID
@@ -223,6 +245,7 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 	if len(o.Attachments) > 0 {
 		call += " attachments=" + strings.Join(o.Attachments, ",")
 	}
+	s.ProjectIDs = thread.CleanProjectIDs(s.ProjectID, s.ProjectIDs)
 	if err := f.createMetadata(&s, o, &call); err != nil {
 		return thread.Thread{}, err
 	}
@@ -444,8 +467,11 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 // gets it as PendingWorktreePath.
 func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
 	return f.mutate("RunIn "+id+" "+t.ProjectID+" "+t.WorktreePath, id, func(s *thread.Thread) error {
-		if s.WorkspaceID == "" {
-			return fmt.Errorf("%w: thread %s does not belong to a workspace", thread.ErrFailedPrecondition, id)
+		if len(s.Projects()) == 0 {
+			return fmt.Errorf("%w: thread %s has no project to run in", thread.ErrFailedPrecondition, id)
+		}
+		if t.ProjectID != "" && !slices.Contains(s.Projects(), t.ProjectID) {
+			return fmt.Errorf("%w: project %s is not one of thread %s's projects", thread.ErrFailedPrecondition, t.ProjectID, id)
 		}
 		path := t.WorktreePath
 		if path == "" {

@@ -174,8 +174,11 @@ Services (v1):
   Close and Reconnect remain in the proto for compatibility; no command calls them: the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
-  (`docs/notes/thread-lifecycle.md`). Create can
-  make the worktree first (`new_worktree`), start a thread in a workspace member
+  (`docs/notes/thread-lifecycle.md`). Create takes a project set (`project_ids`), can
+  copy another thread's placement (`like_thread_id`, `new_branch`; a creating thread's
+  is copied the same way) and answers collision hints; Checkouts lists a thread's
+  checkouts (`docs/notes/workspaces-v2-1-threads.md`). Create can
+  make the worktrees first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
   home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No
   project" picker row and composer: `docs/notes/no-project-2-gui.md`), sends the first prompt as
@@ -423,18 +426,36 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   prompt as the first user message (with image blocks; see below). It records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead threads can be resumed
   with `claude --resume`.
-* A thread has at most one owner: its workspace when `workspace_id` is set, else its
-  project when `project_id` is set, else none: a thread without a project runs in the home
-  directory (`Options.Home`), pre-trusted like any cwd, and RunIn refuses it
-  (`docs/notes/no-project-1-daemon.md`). `project_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
-  (create, a start on send, fork) reads the workspace's current members from the workspace
-  store and adds `--add-dir` for each other member,
-  `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
-  `--append-system-prompt` line pointing at `code-foundry workspace members`, after the
-  static line every thread gets pointing at the skills below and sending split-up,
+* A thread has a **project set** (`project_ids`, sorted by id; persisted as a JSON column)
+  and one **primary** (`project_id`/`worktree_path`: the cwd); a thread without a project
+  has an empty set, runs in the home directory (`Options.Home`), pre-trusted like any cwd,
+  and RunIn refuses it (`docs/notes/no-project-1-daemon.md`). Every member's **checkout**
+  is derived, never stored (`checkouts.go`): in worktree mode (`created_worktree`) a git
+  member's worktree on the thread's `branch` at the project store's
+  `DefaultWorktreePath`, which every thread computes alike, so threads on one branch
+  share it; a plain folder is the folder; in checkout mode each member's own checkout.
+  `thread new` places a thread (`placement.go`): `--projects` gives the set,
+  `--new-worktree` makes one new branch in every git member (in parallel, fetch first,
+  pre-trusted, recorded as made; one failure removes what the others got and fails the
+  Create naming the project), `--like` copies another thread's set, branch, primary,
+  workspace reference and mode, and a thread made by another (`created_by`) copies its
+  creator's the same way unless `--project`/`--worktree` name a place outside its set.
+  Every spawn (create, a start on send, fork) first makes missing derived worktrees again
+  (`ensureMembers`, beside `recreate.go`'s for the primary) and gives Claude `--add-dir`
+  for every other member's checkout; a missing one is a spawn error. `workspace_id` is an
+  optional reference; until the workspace store's reshape a referenced v1 workspace's
+  member worktrees, `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` and one static
+  `--append-system-prompt` line pointing at `code-foundry workspace members` still come
+  with it, after the static line every thread gets pointing at the skills below and sending split-up,
   parallel or multi-branch work to the orchestrate skill rather than the Agent tool
   (`ThreadPrompt`; `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`,
-  `docs/notes/orch-skill-v2.md`).
+  `docs/notes/orch-skill-v2.md`). `ThreadService.Checkouts` (`thread checkouts`) lists a
+  thread's checkouts; Create answers collision hints (a checkout another live thread has)
+  that the CLI prints on stderr. An archive hands the thread to the daemon
+  (`Options.Archived`), which removes each derived worktree the app made that is clean
+  and that no other thread, terminal or v1 workspace holds (`project.ArchivedVerdict`,
+  `internal/daemon/cleanup_archived.go`), never its branch
+  (`docs/notes/workspaces-v2-1-threads.md`).
 * **Skills**: at every start the daemon writes four Claude Code skills, `code-foundry`
   (the entry skill: what the app is, the one rule, which skill to read, and
   `daemon.capabilities` for what exists now; `docs/notes/control-4-capabilities.md`),
@@ -443,7 +464,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `<config home>/claude/.claude/skills` (`internal/skills`: static SKILL.md files
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
-  `--add-dir`, before the attachments dir, workspace members and grants
+  `--add-dir`, before the attachments dir, the other members' checkouts and grants
   (`docs/notes/agent-skills.md`). Every skill file carries a provenance line under its
   title (`version.Info.Provenance`: the build, and its source on GitHub at the release
   tag or commit), and the help skill sends internals questions to that source
@@ -459,7 +480,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
   same `claudeCommand` path, read from the plugin store by a function the daemon sets
   (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,
-  workspace members, grants), their env after the daemon's and the workspace's, their PATH
+  the other members' checkouts, grants), their env after the daemon's and the workspace's, their PATH
   entries in front of PATH. A spawn may wait up to 2 s for a plugin still starting; the
   effort restart never waits and re-reads them. Naming and shells get none
   (`docs/notes/plugins-3-events-flags-env.md`).
@@ -468,8 +489,8 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   cleared by the plugin, when it is disabled or removed, on archive, and for until-seen
   flags when the thread's items are watched. The GUI counts a flagged thread as needing
   attention (sort group, line 2, bell, dock).
-  `ThreadService.RunIn` moves a workspace thread to another member with the control
-  protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
+  `ThreadService.RunIn` moves a thread to another of its checkouts (that member becomes
+  the primary) with the control protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
 * **Status** (busy / idle / needs-attention) comes from the stream, never from a screen:
   busy from send to `result`, needs-attention while a `can_use_tool` or question is
@@ -484,8 +505,8 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   running in the background; up at least 5 minutes), disconnect reason "idle"
   (`docs/notes/thread-lifecycle.md`). A start of a thread whose worktree the app made and
   a cleanup removed makes it again first, on the branch the row records, at the same
-  path, so `--resume` finds the transcript; workspace threads and user checkouts keep the
-  refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
+  path, so `--resume` finds the transcript, and the thread's other derived worktrees too;
+  user checkouts keep the refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
 * **The runner** (`runner.go`, `stream.go`): `internal/claudestream` speaks the control
   protocol (initialize handshake, `can_use_tool` routed to the store, interrupt,
   set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into

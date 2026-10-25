@@ -103,7 +103,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Name:     "workspace.members",
 			ReadOnly: true,
 			Title:    "Workspace Members",
-			Description: "List a workspace's worktrees: one line per member project with its worktree path and branch. " +
+			Description: "Deprecated: thread checkouts lists a thread's projects and checkouts; this goes with the workspace reshape. " +
+				"List a workspace's worktrees: one line per member project with its worktree path and branch. " +
 				"Without a workspace, the one whose worktree contains --cwd (the working directory) is used.",
 			Category:     "Workspace",
 			NoKeybinding: true,

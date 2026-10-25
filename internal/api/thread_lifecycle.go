@@ -26,6 +26,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		Notify: m.GetNotify(), InSidebar: optionalBool(m.InSidebar),
 		ModelDefaulted: m.GetModelDefaulted(), EffortDefaulted: m.GetEffortDefaulted(),
 		SystemPromptAppend: m.GetSystemPromptAppend(),
+		ProjectIDs:         m.GetProjectIds(), Like: m.GetLikeThreadId(), NewBranch: m.GetNewBranch(), CheckoutMode: m.GetCheckoutMode(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef(), Branch: nw.GetBranch(), BaseFromOrigin: optionalBool(nw.BaseFromOrigin)}
@@ -38,7 +39,11 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	if err != nil {
 		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}), nil
+	res := &v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}
+	if !reused {
+		res.Hints = h.store.CheckoutHints(s)
+	}
+	return connect.NewResponse(res), nil
 }
 
 // Fork continues a thread's conversation in a new thread.
@@ -251,6 +256,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		Id:                  s.ID,
 		ClaudeSessionId:     s.ClaudeSessionID,
 		ProjectId:           s.ProjectID,
+		ProjectIds:          s.Projects(),
 		WorktreePath:        s.WorktreePath,
 		Name:                s.Name,
 		AutoNamed:           s.AutoNamed,

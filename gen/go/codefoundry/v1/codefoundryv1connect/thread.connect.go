@@ -53,6 +53,8 @@ const (
 	ThreadServiceRemoveProcedure = "/codefoundry.v1.ThreadService/Remove"
 	// ThreadServiceRunInProcedure is the fully-qualified name of the ThreadService's RunIn RPC.
 	ThreadServiceRunInProcedure = "/codefoundry.v1.ThreadService/RunIn"
+	// ThreadServiceCheckoutsProcedure is the fully-qualified name of the ThreadService's Checkouts RPC.
+	ThreadServiceCheckoutsProcedure = "/codefoundry.v1.ThreadService/Checkouts"
 	// ThreadServicePinProcedure is the fully-qualified name of the ThreadService's Pin RPC.
 	ThreadServicePinProcedure = "/codefoundry.v1.ThreadService/Pin"
 	// ThreadServiceArchiveProcedure is the fully-qualified name of the ThreadService's Archive RPC.
@@ -158,13 +160,19 @@ type ThreadServiceClient interface {
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs.
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
-	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's worktree_path and project_id change when Claude
-	// accepts it. A disconnected thread's row
-	// changes at once; the next reconnect resumes there. Refused for a project thread or
-	// a target that is not a member.
+	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
+	// becomes the primary. A live thread gets set_cwd once it is idle
+	// (pending_worktree_path shows the queued target until then) and the row's
+	// worktree_path and project_id change when Claude accepts it. A disconnected thread's
+	// row changes at once; the next start resumes there. Refused for a thread without a
+	// project and for a target that is not one of its checkouts.
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
+	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
+	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
+	// folder the folder; otherwise each member's own checkout. See
+	// docs/notes/workspaces-v2-1-threads.md.
+	Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error)
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
@@ -407,6 +415,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("RunIn")),
 			connect.WithClientOptions(opts...),
 		),
+		checkouts: connect.NewClient[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse](
+			httpClient,
+			baseURL+ThreadServiceCheckoutsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Checkouts")),
+			connect.WithClientOptions(opts...),
+		),
 		pin: connect.NewClient[v1.PinThreadRequest, v1.PinThreadResponse](
 			httpClient,
 			baseURL+ThreadServicePinProcedure,
@@ -608,6 +622,7 @@ type threadServiceClient struct {
 	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
+	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
 	setSidebar        *connect.Client[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse]
@@ -689,6 +704,11 @@ func (c *threadServiceClient) Remove(ctx context.Context, req *connect.Request[v
 // RunIn calls codefoundry.v1.ThreadService.RunIn.
 func (c *threadServiceClient) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	return c.runIn.CallUnary(ctx, req)
+}
+
+// Checkouts calls codefoundry.v1.ThreadService.Checkouts.
+func (c *threadServiceClient) Checkouts(ctx context.Context, req *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
+	return c.checkouts.CallUnary(ctx, req)
 }
 
 // Pin calls codefoundry.v1.ThreadService.Pin.
@@ -875,13 +895,19 @@ type ThreadServiceHandler interface {
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs.
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
-	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's worktree_path and project_id change when Claude
-	// accepts it. A disconnected thread's row
-	// changes at once; the next reconnect resumes there. Refused for a project thread or
-	// a target that is not a member.
+	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
+	// becomes the primary. A live thread gets set_cwd once it is idle
+	// (pending_worktree_path shows the queued target until then) and the row's
+	// worktree_path and project_id change when Claude accepts it. A disconnected thread's
+	// row changes at once; the next start resumes there. Refused for a thread without a
+	// project and for a target that is not one of its checkouts.
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
+	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
+	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
+	// folder the folder; otherwise each member's own checkout. See
+	// docs/notes/workspaces-v2-1-threads.md.
+	Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error)
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
@@ -1120,6 +1146,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("RunIn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceCheckoutsHandler := connect.NewUnaryHandler(
+		ThreadServiceCheckoutsProcedure,
+		svc.Checkouts,
+		connect.WithSchema(threadServiceMethods.ByName("Checkouts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServicePinHandler := connect.NewUnaryHandler(
 		ThreadServicePinProcedure,
 		svc.Pin,
@@ -1328,6 +1360,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRemoveHandler.ServeHTTP(w, r)
 		case ThreadServiceRunInProcedure:
 			threadServiceRunInHandler.ServeHTTP(w, r)
+		case ThreadServiceCheckoutsProcedure:
+			threadServiceCheckoutsHandler.ServeHTTP(w, r)
 		case ThreadServicePinProcedure:
 			threadServicePinHandler.ServeHTTP(w, r)
 		case ThreadServiceArchiveProcedure:
@@ -1437,6 +1471,10 @@ func (UnimplementedThreadServiceHandler) Remove(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RunIn is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Checkouts is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {

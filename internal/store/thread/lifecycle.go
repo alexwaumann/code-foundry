@@ -176,6 +176,12 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	if rw != nil {
 		notes = append(notes, rw.note())
 	}
+	var remade []madeWorktree // the other members' worktrees made again
+	if launchErr == nil {
+		if remade, launchErr = m.ensureMembers(ctx, prev); len(remade) > 0 {
+			notes = append(notes, remadeNote(remade))
+		}
+	}
 	if launchErr == nil {
 		var note string
 		l, lastErr, note, launchErr = m.resumeLaunch(prev)
@@ -185,7 +191,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		}
 	}
 	noteLog := log
-	if noteLog == nil && rw != nil {
+	if noteLog == nil && (rw != nil || len(remade) > 0) {
 		// No message: the recreation is still told in the timeline.
 		if noteLog, err = m.thread(ctx, id); err != nil {
 			m.log.Warn("note the recreated worktree", "thread", id, "err", err)
@@ -235,9 +241,14 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	} else if err != nil {
 		return it, m.failStart(id, log, err)
 	}
-	if rw != nil && m.opts.WorktreeCreated != nil {
+	if m.opts.WorktreeCreated != nil {
 		// The project's on-worktree-create actions run again, as after Create.
-		m.opts.WorktreeCreated(id, rw.projectID, rw.path)
+		if rw != nil {
+			m.opts.WorktreeCreated(id, rw.projectID, rw.path)
+		}
+		for _, w := range remade {
+			m.opts.WorktreeCreated(id, w.projectID, w.path)
+		}
 	}
 	return it, nil
 }

@@ -97,11 +97,11 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 				e.projects.Put(r)
 			},
 			wantErr: "not at the thread's"},
-		{name: "a workspace thread keeps the refusal", refs: []string{"refs/heads/<b>"},
+		{name: "a workspace reference does not stop it", refs: []string{"refs/heads/<b>"},
 			prepare: func(e *env, _ *recreatingEnv, s Thread) {
 				e.m.update(s.ID, true, func(r *record) { r.s.WorkspaceID = "w1" })
 			},
-			wantErr: "Claude did not start: failed precondition: worktree ", wantNoCreate: true},
+			wantNote: "recreated from branch <b>."},
 		{name: "a row without a branch keeps the refusal", refs: []string{"refs/heads/<b>"},
 			prepare: func(e *env, _ *recreatingEnv, s Thread) {
 				e.m.update(s.ID, true, func(r *record) { r.s.Branch = "" })

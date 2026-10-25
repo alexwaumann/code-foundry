@@ -103,7 +103,13 @@ interface MockThread {
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
-  /** The owning workspace; "" for a project thread. */
+  /**
+   * Thread.project_ids: the project set besides projectId (the primary), as the daemon's
+   * thread new --projects makes it; threadMsg sorts it with projectId and a workspace
+   * thread's members (docs/notes/workspaces-v2-1-threads.md).
+   */
+  projectIds: string[];
+  /** The workspace the thread references; "" when none. */
   workspaceId: string;
   /** A queued thread.run-in target; "" when none (published, not "persisted"). */
   pendingWorktreePath: string;
@@ -1356,6 +1362,7 @@ export class World {
       permissionMode: PermissionMode.AUTO,
       baseRef: "",
       createdWorktree: false,
+      projectIds: [],
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
@@ -1387,11 +1394,21 @@ export class World {
     return s;
   }
 
+  /** Thread.project_ids: the set, the primary and a workspace thread's members, sorted. */
+  projectIdsOf(s: MockThread): string[] {
+    const ids = new Set(s.projectIds);
+    if (s.projectId) ids.add(s.projectId);
+    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
+    for (const m of ws?.members ?? []) ids.add(m.projectId);
+    return [...ids].sort();
+  }
+
   threadMsg(s: MockThread): ThreadInit {
     return {
       id: s.id,
       claudeSessionId: s.claudeSessionId,
       projectId: s.projectId,
+      projectIds: this.projectIdsOf(s),
       worktreePath: s.worktreePath,
       name: s.name,
       autoNamed: s.autoNamed,

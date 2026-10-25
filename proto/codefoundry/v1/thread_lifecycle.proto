@@ -60,22 +60,26 @@ enum ThreadStatus {
   THREAD_STATUS_ERROR = 4;
 }
 
-// Ownership: a thread has at most one owner. When workspace_id is set the owner is that
-// workspace; otherwise, when project_id is set, it is the project project_id;
-// otherwise the thread has no project (CreateThreadRequest.no_project) and runs in the
-// daemon's home directory. project_id and worktree_path are facts about the thread's cwd
-// (for a workspace thread, the member worktree it runs in) and never decide the owner
-// beyond that order. Rows from before projects were required may also have an empty
-// project_id with a worktree_path inside a project; clients may place those by the path.
+// Projects: a thread has a project set (project_ids, sorted by id) and one primary
+// (project_id and worktree_path: its cwd). Every member has a checkout, derived, never
+// stored (ThreadService.Checkouts): in worktree mode (created_worktree) a git member's
+// worktree on branch, a plain folder the folder; otherwise each member's own checkout.
+// A thread without a project (CreateThreadRequest.no_project) has an empty set and runs
+// in the daemon's home directory. workspace_id is an optional reference to a workspace,
+// independent of the set. Rows from before projects were required may also have an
+// empty project_id with a worktree_path inside a project; clients may place those by the
+// path. See docs/notes/workspaces-v2-1-threads.md.
 message Thread {
   // Our stable id (survives reconnects).
   string id = 1;
   // Claude's own session id, once discovered from the transcript directory. Needed for
   // resume; empty until known.
   string claude_session_id = 2;
-  // Project of the cwd. The owner when workspace_id is empty. Empty, with an empty
-  // workspace_id, for a thread without a project.
+  // The primary: the project of the cwd. Empty for a thread without a project.
   string project_id = 3;
+  // The project set, sorted by id, project_id included; empty for a thread without a
+  // project. One entry for a single-project thread.
+  repeated string project_ids = 68;
   // The cwd: the worktree claude runs in (the home directory for a thread without a
   // project).
   string worktree_path = 4;
@@ -126,15 +130,17 @@ message Thread {
   PermissionMode permission_mode = 19;
   // Ref the thread's worktree branch was created from, when Create made the worktree.
   string base_ref = 20;
-  // Create made the worktree for this thread (new_worktree or new_workspace was set).
+  // Worktree mode: every git member works in its worktree on branch, made at spawn when
+  // missing and removed by an archive when nothing else has it. False: checkout mode,
+  // each member in its own checkout.
   bool created_worktree = 21;
-  // The branch Create made the worktree for (with created_worktree; a fork has its
-  // parent's). When a cleanup removed the worktree, a start of the thread makes it again
-  // on this branch at the same path. Empty when the app did not make the worktree.
+  // The branch of a worktree-mode thread (with created_worktree; a fork has its
+  // parent's). When a cleanup removed a member's worktree, a start of the thread makes
+  // it again on this branch at the same path. Empty in checkout mode.
   string branch = 52;
-  // Owner workspace (see the ownership rule above); empty for a project thread and for a
-  // thread without a project. Every spawn of a workspace thread gets --add-dir for the
-  // workspace's other member worktrees, read from the workspace store at launch.
+  // An optional reference to a workspace (its instructions and skills), independent of
+  // project_ids; empty without one. Until the workspace store's reshape, a spawn also
+  // gets --add-dir for the referenced workspace's member worktrees.
   string workspace_id = 22;
   // Member worktree a queued RunIn will move the thread to once it is idle; empty when
   // nothing is queued. Not persisted: a thread that disconnects first moves its row
@@ -549,6 +555,27 @@ message CreateThreadRequest {
   // not the user's words, so it stays out of the first message (theme.ask's "the user
   // asked on the Themes page"). At most 64 KiB, no NUL. Empty: none.
   string system_prompt_append = 24;
+  // The project set (id, name when unique, or an absolute path inside one; with
+  // new_worktree "<project>:<base ref>" gives that member its own base). project_id,
+  // when set, is the primary and must be in it; otherwise the first listed is. Every
+  // member's checkout is derived (Thread): with new_worktree, a worktree on one new
+  // branch in every git member, made in parallel (one failure fails the Create, naming
+  // the project). Empty: project_id's alone, or a copied thread's (like_thread_id, or the
+  // creating thread). Not with workspace_id, new_workspace or no_project.
+  repeated string project_ids = 25;
+  // Copy the project set, branch, primary, workspace reference and mode from this
+  // thread ("New thread on this branch"): project_ids narrows the set, project_id picks
+  // the primary (it must be in the set), new_worktree or new_branch branches off,
+  // checkout_mode leaves worktree mode. Without it, a Create with created_by copies the
+  // same from its creator unless project_id or worktree_path name a place outside the
+  // creator's set (docs/notes/workspaces-v2-1-threads.md).
+  string like_thread_id = 26;
+  // With like_thread_id (or a creating thread with a project): a new branch for the same
+  // set, in worktree mode, named as new_worktree's.
+  bool new_branch = 27;
+  // Run every member in its own checkout even when the copied thread is in worktree mode
+  // (thread new --new-worktree=false). Not with new_worktree or new_branch.
+  bool checkout_mode = 28;
 }
 
 message NewWorktree {
@@ -625,6 +652,12 @@ message CreateThreadResponse {
   Thread thread = 1;
   // The request_id was seen before: thread is the one made then; nothing new started.
   bool reused = 2;
+  // Collision hints, one line each, never a refusal: a member checkout another thread
+  // that is not archived also has ("<name> @ <branch> is also open in <thread>"), or in
+  // worktree mode a plain-folder member another thread also works in ("<name> is a
+  // folder, not a repo: thread <thread> also works there"). The CLI prints them on
+  // stderr.
+  repeated string hints = 3;
 }
 
 message ForkThreadRequest {
@@ -857,6 +890,50 @@ message RunInThreadRequest {
 
 message RunInThreadResponse {
   Thread thread = 1;
+}
+
+message ThreadCheckoutsRequest {
+  // Thread id. Empty: the thread one of whose checkouts holds cwd.
+  string id = 1;
+  // An absolute path: finds the thread when id is empty, and marks the checkout holding
+  // it as current.
+  string cwd = 2;
+}
+
+// ThreadCheckout is one member of a thread's project set and its checkout.
+message ThreadCheckout {
+  string project_id = 1;
+  // Empty when the project is no longer registered.
+  string project_name = 2;
+  // Empty when nothing can be derived (the project is no longer registered).
+  string path = 3;
+  // Checked out there now; for a derived worktree not made yet, the thread's branch.
+  // Empty for a plain folder.
+  string branch = 4;
+  // The thread's cwd.
+  bool primary = 5;
+  // The path does not exist (a worktree not made yet, or removed).
+  bool missing = 6;
+  // The request's cwd is in this checkout (the deepest), else, without a cwd, the
+  // primary.
+  bool current = 7;
+  // <path>/CLAUDE.md when it exists; empty otherwise.
+  string instructions = 8;
+  // The project has git; false for a plain folder (one checkout, shared by every thread).
+  bool git = 9;
+  // A worktree-mode git member: the app makes this worktree when missing and an archive
+  // may remove it (never its branch).
+  bool derived = 10;
+}
+
+message ThreadCheckoutsResponse {
+  Thread thread = 1;
+  // One per project in the thread's set, in project id order.
+  repeated ThreadCheckout checkouts = 2;
+  // The thread's workspace reference (Thread.workspace_id) and its name; empty without
+  // one (the name also when the workspace is gone).
+  string workspace_id = 3;
+  string workspace_name = 4;
 }
 
 message PinThreadRequest {

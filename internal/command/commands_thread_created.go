@@ -27,8 +27,9 @@ func focusCreated(e Emitter, a Args, id string) {
 
 // callerPlacement places a thread.new that names no project, worktree, workspace or
 // no-project and runs in a thread (its CLI, or a page that thread shows): where that
-// thread runs. Its worktree and project, its workspace too for a workspace thread, and
-// no-project for a thread without a project. False when the call runs in no thread (the
+// thread runs, as like_thread_id (its project set, branch, primary, workspace and mode;
+// docs/notes/workspaces-v2-1-threads.md), and no-project for a thread without a project.
+// False when the call runs in no thread (the
 // CLI outside one; the app always names a placement).
 func callerPlacement(ctx context.Context, b ThreadBackend, c Context, req *v1.CreateThreadRequest) (bool, error) {
 	if c.ActiveView != "" || c.CallerThreadID == "" {
@@ -39,10 +40,10 @@ func callerPlacement(ctx context.Context, b ThreadBackend, c Context, req *v1.Cr
 		return false, fmt.Errorf("the thread this runs in (%s): %w", c.CallerThreadID, err)
 	}
 	t := res.Msg.GetThread()
-	if t.GetProjectId() == "" && t.GetWorkspaceId() == "" {
+	if len(t.GetProjectIds()) == 0 && t.GetProjectId() == "" && t.GetWorkspaceId() == "" {
 		req.NoProject = true
 		return true, nil
 	}
-	req.ProjectId, req.WorktreePath, req.WorkspaceId = t.GetProjectId(), t.GetWorktreePath(), t.GetWorkspaceId()
+	req.LikeThreadId = c.CallerThreadID
 	return true, nil
 }

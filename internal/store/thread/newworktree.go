@@ -1,7 +1,6 @@
 package thread
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,9 +12,10 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// New-worktree threads (CreateOptions.NewWorktree).
+// New-worktree threads (CreateOptions.NewWorktree; the worktrees themselves, one per
+// member with git of the thread's set, are placement.go's).
 //
-// Create makes the worktree synchronously so a failure reaches the caller before
+// Create makes the worktrees synchronously so a failure reaches the caller before
 // anything is persisted (the GUI composer keeps its draft). The branch follows the
 // projects.branch_naming mode (branchname.go) from the namer's reply for the first
 // prompt (and the explicit name, and a --branch slug), else cf/<thread id>. Only the
@@ -31,17 +31,6 @@ type namingResult struct {
 	err error
 }
 
-// createdWorktree is what newWorktree made.
-type createdWorktree struct {
-	projectID, path, baseRef, branch string
-	// name is the namer's title when it arrived within SlugTimeout.
-	name string
-	// namerCalled: the namer was started for this thread (in time or not).
-	namerCalled bool
-	// late delivers the namer's answer when it did not arrive in time.
-	late <-chan namingResult
-}
-
 // fromOrigin is a new worktree's project.CreateWorktreeOptions.BaseFromOrigin: the
 // call's override (thread new --base-from-origin) when set, else the setting.
 func (m *Manager) fromOrigin(override *bool) bool {
@@ -49,62 +38,6 @@ func (m *Manager) fromOrigin(override *bool) bool {
 		return *override
 	}
 	return m.opts.BaseFromOrigin()
-}
-
-// newWorktree resolves the branch and creates the worktree for a new thread.
-func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOptions) (createdWorktree, error) {
-	var nw createdWorktree
-	if m.opts.Projects == nil {
-		return nw, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
-	}
-	base := strings.TrimSpace(o.NewWorktree.BaseRef)
-	if err := validateRef(base); err != nil {
-		return nw, err
-	}
-	bc, err := m.newBranchChoice(o.NewWorktree.Branch)
-	if err != nil {
-		return nw, err
-	}
-	projectID := o.ProjectID
-	if projectID == "" {
-		if o.WorktreePath == "" {
-			return nw, fmt.Errorf("%w: a project is required for a new worktree", ErrInvalidArgument)
-		}
-		var err error
-		if projectID, _, err = m.resolveWorktree("", o.WorktreePath); err != nil {
-			return nw, err
-		}
-	}
-	r, err := m.projectByRef(m.opts.Projects.Snapshot(), projectID)
-	if err != nil {
-		return nw, err
-	}
-	if !r.Git {
-		// Before the namer: a project without git runs threads in its one checkout.
-		return nw, fmt.Errorf("%w: %s is not a git repository; threads run in its current checkout", ErrFailedPrecondition, r.Name)
-	}
-
-	sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
-	if err != nil {
-		return nw, err
-	}
-	nw.name, nw.namerCalled, nw.late = sl.name, sl.namerCalled, sl.late
-	branch, existing := m.pickBranch(ctx, []string{r.Path}, bc, sl.branch, id, nil)
-	if existing && base != "" {
-		m.log.Info("branch exists; checking it out and ignoring the base", "thread", id, "branch", branch, "base", base)
-		base = ""
-	}
-	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true, BaseFromOrigin: m.fromOrigin(o.NewWorktree.BaseFromOrigin),
-	})
-	if err != nil {
-		return nw, projectError("create worktree "+branch, err)
-	}
-	nw.projectID, nw.path, nw.branch = r.ID, wt.Path, branch
-	nw.baseRef = cmp.Or(wt.StartPoint, base, wt.Status.BaseRef, r.DefaultBranch)
-	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
-		"existing", existing, "path", wt.Path, "base", nw.baseRef)
-	return nw, nil
 }
 
 // slugWait is the outcome of waitNaming.
