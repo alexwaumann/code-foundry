@@ -17,6 +17,41 @@ has other field names there. Read a `cf.run` result with the names you saw from 
 in Bash, and a `cf.on` value with the names below; never one with the other's.
 
 The fn gets the whole value at once (when there is one) and again after every change.
+The third argument, `onError(e)`, gets a refusal (unavailable: the app does not hold the
+source now; a misspelt source throws at the call): show `e.message` in the page, or the
+user sees a board that never fills. `cf.off(source)`, or the function `cf.on` returns,
+ends the subscription.
+
+## Lists with buttons that update live
+
+A change re-draws the list while the user's pointer is on it: a row that moves under the
+pointer makes a click act on the wrong one. So:
+
+- keep rows where they are between updates: sort by a stable key (`id`, a creation time),
+  or keep the order the rows had and add new ones at the end;
+- re-sort (by status, by time) only on a Refresh click, or while nothing in the list is
+  hovered or focused (`list.matches(":hover")`, `list.contains(document.activeElement)`);
+- each button's handler acts on the id its row was drawn with (`const id = t.id` in the
+  closure), never on an index into the latest array;
+- an archived or snoozed thread leaves the list at once (filter on `archivedAtMs`,
+  `snoozedUntilMs`); after your own Archive click remove the row from the result, not
+  from the next update.
+
+## Page storage, in detail
+
+`get(key)` and `keys()` answer at once from the copy the page got with `cf.ready`; `set`,
+`remove` and `clear` change that copy at once and return a Promise that rejects when the
+thread's storage is full (256 KiB, 1 KiB a key) or the write was refused: the value is
+then put back. Another page of the thread writing a key updates this page's copy.
+
+## Tokens for an external API
+
+The frame cannot sign in: SSO and OAuth redirects fail, and it has none of the user's
+browser cookies. For an external API (Linear, Jira, Sentry) ask the user to paste an API
+token into a password field, keep it in `cf.storage`, and send it in `fetch` headers;
+never write it into the file. The API must allow cross-origin calls (GitHub's and
+Linear's do); if it does not, say a plugin is needed. A `fetch` is not a Code Foundry
+verb: it needs no click.
 
 ## thread-list
 

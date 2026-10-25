@@ -6,6 +6,11 @@ For the code-foundry-pages skill: three complete pages to start from. Each is on
 `$CODE_FOUNDRY_PAGES`, shown with `code-foundry view.inline <path>`. Check every verb's args
 with `code-foundry help <verb>` and its JSON with `--json` before you change them.
 
+What they all do: every `cf.on` passes an `onError` that shows the refusal in the page;
+every `cf.run` is caught and its message shown where it happened; a decline (`declined`)
+is the user's no, shown muted with the button back, never in the error colour; a success
+is said in the page's own words from `json`, never the CLI's `text` sentence.
+
 ## A live list with an action: open PRs, merge the green ones
 
 The `gh` source sends the dashboard whole, now and after every change: no polling. The
@@ -28,9 +33,11 @@ refuses a PR that moved since the page drew it.
 </style>
 <body class="text-body">
 <div id="list" class="muted">Loading pull requests…</div>
+<p id="err" class="bad" hidden></p>
 <script type="module">
   await cf.ready;
   const list = document.getElementById("list");
+  const err = document.getElementById("err");
   const green = (pr) => pr.checks.state === "success" && !pr.draft && pr.mergeable !== "conflicting";
 
   function row(pr) {
@@ -45,20 +52,27 @@ refuses a PR that moved since the page drew it.
         btn.disabled = true;
         // In the click handler, before any await: a merge changes something.
         cf.run("pr.merge", { "repo-slug": pr.repoSlug, number: pr.number, method: "merge", "head-sha": pr.headSha })
-          .then(() => { state.textContent = "merged"; btn.remove(); })
-          .catch((e) => { btn.disabled = false; if (e.code !== "declined") state.textContent = e.message; });
+          .then(() => { state.textContent = "merged"; state.className = "ok"; btn.remove(); })
+          .catch((e) => {
+            btn.disabled = false; // the button back either way
+            state.textContent = e.code === "declined" ? "not merged" : e.message;
+            state.className = e.code === "declined" ? "muted" : "bad";
+          });
       });
       el.append(btn);
     }
     return el;
   }
 
+  // A stable order (repository, then number): rows never move under the pointer.
+  const byKey = (a, b) => a.repoSlug.localeCompare(b.repoSlug) || a.number - b.number;
   cf.on("gh", (dash) => {
+    err.hidden = true;
     if (!dash.authenticated) { list.textContent = "Sign in to GitHub (gh auth login) to see your pull requests."; return; }
     if (dash.authored.length === 0) { list.textContent = "No open pull requests."; return; }
     list.className = "";
-    list.replaceChildren(...dash.authored.map(row));
-  });
+    list.replaceChildren(...[...dash.authored].sort(byKey).map(row));
+  }, (e) => { err.textContent = e.message; err.hidden = false; });
 </script>
 ```
 
@@ -69,7 +83,9 @@ app asks once per PR.
 ## A form that creates threads
 
 One `thread.new` per line, all started in the submit handler. The threads are this
-thread's children; `sidebar: true` shows them in the user's sidebar.
+thread's children; `sidebar: true` shows them in the user's sidebar. A `request-id` per
+line makes a second submit of the same line start nothing: it resolves with the thread
+made the first time, which is a success, not an error.
 
 ```html
 <!doctype html>
@@ -95,17 +111,20 @@ thread's children; `sidebar: true` shows them in the user's sidebar.
   const tasks = document.getElementById("tasks");
   tasks.value = draft.get("text") ?? "";
   tasks.addEventListener("input", () => draft.set("text", tasks.value));
+  // The same line gives the same key (at most 128 characters).
+  const key = (line) => line.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 100);
 
   document.getElementById("f").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const lines = tasks.value.split("\n").map((s) => s.trim()).filter(Boolean);
     // Every call starts here, inside the submit: an await between them would lose the gesture.
     const results = await Promise.allSettled(lines.map((line) =>
-      cf.run("thread.new", { prompt: line, sidebar: true })));
+      cf.run("thread.new", { prompt: line, sidebar: true, "request-id": "spawner-" + key(line) })));
     const out = document.getElementById("done");
     results.forEach((r, i) => {
       const li = document.createElement("li");
-      if (r.status === "fulfilled") li.textContent = `Started: ${r.value.json?.thread?.name ?? lines[i]}`;
+      // json is the thread (its --json); a repeated request-id resolves with the same one.
+      if (r.status === "fulfilled") li.textContent = `Started: ${r.value.json?.name || lines[i]}`;
       else { li.textContent = `${lines[i]}: ${r.reason.message}`; li.className = "bad"; }
       out.append(li);
     });
