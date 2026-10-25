@@ -113,8 +113,8 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
   const id = await selectedThreadId(page);
   expect((await threads()).find((t) => t.id === id)).toMatchObject({ projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], workspaceId: "", createdWorktree: false });
   // Line 2: "2 projects @ <the primary checkout's branch>" (no workspace badge).
-  await expect(row(page, `t:${id}`).getByTestId("row-project")).toHaveText("2 projects");
-  await expect(row(page, `t:${id}`).getByTestId("row-branch")).toHaveText("main");
+  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("2 projects");
+  await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("main");
 });
 
 test("a workspace row selects its members and the reference; Workspace as the primary; fresh copies", async ({ page }) => {
@@ -162,9 +162,9 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   });
   const id = await selectedThreadId(page);
   expect((await threads()).find((t) => t.id === id)).toMatchObject({ projectId: "", workspaceId: "w-000000000001", branch: "cf/ship-the-shop-banner", createdWorktree: true });
-  await expect(row(page, `t:${id}`).getByTestId("row-project")).toHaveText("shop");
-  await expect(row(page, `t:${id}`).getByTestId("row-branch")).toHaveText("cf/ship-the-shop-banner");
-  await expect(row(page, `t:${id}`).getByTestId("row-workspace")).toHaveCount(0);
+  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("shop");
+  await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("cf/ship-the-shop-banner");
+  await expect(row(page, `s:${id}`).getByTestId("row-workspace")).toHaveCount(0);
 });
 
 test("collision hints under the chips before send, and the daemon's after", async ({ page }) => {
@@ -199,8 +199,8 @@ test("collision hints under the chips before send, and the daemon's after", asyn
 test("Save as workspace: offered for an unsaved set of two or more, names it and sets the reference", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&project=repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
-  await row(page, `t:${t.id}`).click();
-  await expect(row(page, `t:${t.id}`).getByTestId("row-project")).toHaveText("2 projects");
+  await row(page, `s:${t.id}`).click();
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("2 projects");
   await page.getByTestId("pane-thread-menu").click();
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace…"]);
   await page.getByTestId("menu-save-workspace").click();
@@ -214,7 +214,7 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   expect(await lastInvoked("workspace.new")).toEqual({ name: "parser pair", projects: "repo-cf,repo-gp", primary: "repo-gp" });
   expect(await lastInvoked("thread.workspace")).toEqual({ workspace: "w-000000000001" });
   await expect.poll(async () => (await threads()).find((x) => x.id === t.id)?.workspaceId).toBe("w-000000000001");
-  await expect(row(page, `t:${t.id}`).getByTestId("row-project")).toHaveText("parser pair");
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("parser pair");
   // Saved: the set matches a workspace now, so the item is gone.
   await page.getByTestId("pane-thread-menu").click();
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
@@ -224,12 +224,13 @@ test("Save as workspace refuses a taken name in place", async ({ page }) => {
   await mockPost("workspace?name=taken&projects=repo-dot");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
-  await row(page, `t:${t.id}`).click();
+  await row(page, `s:${t.id}`).click();
   await page.getByTestId("pane-thread-menu").click();
   await page.getByTestId("menu-save-workspace").click();
+  await expect(page.getByTestId("save-workspace-name")).toBeFocused();
   await page.keyboard.type("Taken");
   await page.getByTestId("save-workspace-submit").click();
-  await expect(page.getByTestId("save-workspace-error")).toContainText('a workspace named "Taken" exists');
+  await expect(page.getByTestId("save-workspace-error")).toContainText(`a workspace named "taken" exists`);
   await expect(page.getByTestId("save-workspace-dialog")).toBeVisible();
 });
 
@@ -237,9 +238,9 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&branch=feat/parser&name=Parser")) as ThreadSummary;
   await openApp(page);
-  await expect(row(page, `t:${t.id}`).getByTestId("row-project")).toHaveText("shop");
-  await expect(row(page, `t:${t.id}`).getByTestId("row-branch")).toHaveText("feat/parser");
-  await row(page, `t:${t.id}`).click({ button: "right" });
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("shop");
+  await expect(row(page, `s:${t.id}`).getByTestId("row-branch")).toHaveText("feat/parser");
+  await row(page, `s:${t.id}`).click({ button: "right" });
   await page.getByTestId("row-menu").getByTestId("menu-new-like").click();
 
   await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
@@ -278,14 +279,14 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   const id = await selectedThreadId(page);
   expect(id).not.toBe(t.id);
   expect((await threads()).find((x) => x.id === id)).toMatchObject({ projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], workspaceId: "w-000000000001", branch: "feat/parser", createdWorktree: true });
-  await expect(row(page, `t:${id}`).getByTestId("row-project")).toHaveText("shop");
-  await expect(row(page, `t:${id}`).getByTestId("row-branch")).toHaveText("feat/parser");
+  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("shop");
+  await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("feat/parser");
 });
 
 test("New thread on this branch from the header menu and the palette; Escape goes back to the thread", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf&name=Solo")) as ThreadSummary;
   await openApp(page);
-  await row(page, `t:${t.id}`).click();
+  await row(page, `s:${t.id}`).click();
   await page.getByTestId("pane-thread-menu").click();
   // A single project: nothing to save.
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
@@ -298,7 +299,7 @@ test("New thread on this branch from the header menu and the palette; Escape goe
   await expect(page.getByTestId("composer-primary")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(row(page, `t:${t.id}`)).toHaveAttribute("aria-selected", "true");
+  await expect(row(page, `s:${t.id}`)).toHaveAttribute("aria-selected", "true");
 
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("New thread on this branch");

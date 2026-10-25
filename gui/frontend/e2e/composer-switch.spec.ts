@@ -66,7 +66,8 @@ test("the heading's picker: centred under the name, the set checked; toggles kee
   await page.keyboard.type("ghostty");
   await page.keyboard.press("Enter");
   await expect(list(page)).toBeVisible();
-  await expect(list(page).locator("[data-current]")).toHaveCount(2);
+  // The filter shows ghostty-playground alone: checked now.
+  await expect(list(page).locator('[data-project="repo-gp"]')).toHaveAttribute("data-current", "true");
   await page.keyboard.press("Escape");
   await expect(list(page)).toHaveCount(0);
   await expect(trigger(page)).toBeFocused();
