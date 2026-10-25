@@ -68,7 +68,7 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 		Title: "Clean Up Merged Worktrees",
 		Description: "Fetch, then remove the project's worktrees (or one) whose work is in origin/<default>: " +
 			"made by Code Foundry (not by hand), clean, merged (or a rebased/squashed copy), not new and empty (10 min), " +
-			"no thread (archived aside), terminal or workspace on it. Without --yes: lists what goes and stays. Branches are kept. " +
+			"no thread (archived aside) with it as its cwd or a checkout of its projects, and no terminal in it. Without --yes: lists what goes and stays. Branches are kept. " +
 			"One kept only for uncommitted changes is asked about again, with its counts, before they are deleted; --yes does " +
 			"not answer that question (it is kept), --force does.",
 		Category: "Project",

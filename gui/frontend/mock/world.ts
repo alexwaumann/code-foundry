@@ -3656,7 +3656,7 @@ export class World {
       {
         cmd: {
           name: "project.unregister", title: "Remove Project", category: "Project", description: "Stop tracking the active project", keybindings: [], args: [],
-          confirm: (ctx) => `Stop tracking project ${ctx?.activeProjectId ?? ""}? Nothing on disk is touched.`,
+          confirm: (ctx) => `Stop tracking project ${ctx?.activeProjectId ?? ""}? Its threads lose their worktree; clean worktrees Code Foundry made that no thread uses are removed (branches stay).`,
         },
         when: (ctx) => Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)),
         run: (ctx) => {

@@ -178,7 +178,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	var remade []madeWorktree // the other members' worktrees made again
 	if launchErr == nil {
 		if remade, launchErr = m.ensureMembers(ctx, prev); len(remade) > 0 {
-			notes = append(notes, remadeNote(remade))
+			notes = append(notes, remadeNote(remade, prev.Branch))
 		}
 	}
 	if launchErr == nil {
@@ -189,8 +189,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 			m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
 		}
 	}
+	gone := m.unregisteredMembers(prev) // left out of the spawn (requireCheckouts)
 	noteLog := log
-	if noteLog == nil && (rw != nil || len(remade) > 0) {
+	if noteLog == nil && (rw != nil || len(remade) > 0 || len(gone) > 0) {
 		// No message: the recreation is still told in the timeline.
 		if noteLog, err = m.thread(ctx, id); err != nil {
 			m.log.Warn("note the recreated worktree", "thread", id, "err", err)
@@ -200,6 +201,12 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		w := itemWriter{log: noteLog, save: func(it Item) { m.saveItem(id, it) }}
 		for _, note := range notes {
 			w.add(Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: note})
+		}
+		for _, pid := range gone {
+			// Once per project: the id is fixed, and a later start finds the note.
+			if _, ok := noteLog.get(unregisteredNoteID(pid)); !ok {
+				w.add(Item{ID: unregisteredNoteID(pid), Kind: KindNote, Text: unregisteredNote(pid)})
+			}
 		}
 	}
 	var it Item

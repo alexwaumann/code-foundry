@@ -40,7 +40,7 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 
 		{name: "new-like: the context thread, only a prompt", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread"},
 			args:      map[string]string{"prompt": "next step"},
-			wantMsg:   "created thread s1 in ",
+			wantMsg:   "created thread s1 in  (no project)", // the fake's thread has none, as a like of a no-project thread
 			wantReqs:  []proto.Message{&v1.CreateThreadRequest{LikeThreadId: "s-src", InitialPrompt: "next step", PermissionMode: auto}},
 			wantFocus: true},
 		{name: "new-like: another primary and the composer's options", cmd: "thread.new-like",

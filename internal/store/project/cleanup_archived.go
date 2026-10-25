@@ -17,14 +17,15 @@ func ArchivedVerdict(w Worktree, _ time.Time) (removable bool, reason string) {
 		return false, "main worktree"
 	case !w.Managed:
 		return false, NotManagedReason
+	case st.Operation != "":
+		// Before the detached check: a rebase detaches HEAD, and it is the reason.
+		return false, st.Operation + " in progress"
 	case w.Detached || w.Branch == "":
 		return false, "detached HEAD"
 	case st.Error != "":
 		return false, "git status failed: " + st.Error
 	case st.RefreshedAt.IsZero():
 		return false, "git status not read yet"
-	case st.Operation != "":
-		return false, st.Operation + " in progress"
 	case st.HasUncommitted():
 		return false, UncommittedReason
 	}

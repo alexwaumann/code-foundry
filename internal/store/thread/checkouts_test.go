@@ -39,6 +39,8 @@ func TestCheckoutsOf(t *testing.T) {
 	pathFor := func(id, branch string) string { return filepath.Join(dir, "wt", id, "feat-x") }
 	withAPIElsewhere := &project.Snapshot{Projects: slices.Clone(snap.Projects)}
 	withAPIElsewhere.Projects[1].Worktrees = append(slices.Clone(snap.Projects[1].Worktrees), project.Worktree{ProjectID: "api", Path: apiOther, Branch: "feat/x"})
+	withAPIMainOnBranch := &project.Snapshot{Projects: slices.Clone(snap.Projects)}
+	withAPIMainOnBranch.Projects[1].Worktrees = []project.Worktree{{ProjectID: "api", Path: apiMain, IsMain: true, Branch: "feat/x"}}
 
 	tests := []struct {
 		name string
@@ -59,6 +61,15 @@ func TestCheckoutsOf(t *testing.T) {
 			snap: withAPIElsewhere,
 			want: []Checkout{
 				{ProjectID: "api", ProjectName: "api", Path: apiOther, Branch: "feat/x", Git: true, Registered: true, Derived: true},
+				{ProjectID: "web", ProjectName: "web", Path: webWT, Branch: "feat/x", Primary: true, Git: true, Registered: true, Derived: true,
+					Instructions: filepath.Join(webWT, "CLAUDE.md")},
+			}},
+		// Fuzz finding A7: the user may switch the main checkout to another branch.
+		{name: "worktree mode: a main checkout on the branch is never the member's",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"},
+			snap: withAPIMainOnBranch,
+			want: []Checkout{
+				{ProjectID: "api", ProjectName: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Branch: "feat/x", Git: true, Registered: true, Derived: true, Missing: true},
 				{ProjectID: "web", ProjectName: "web", Path: webWT, Branch: "feat/x", Primary: true, Git: true, Registered: true, Derived: true,
 					Instructions: filepath.Join(webWT, "CLAUDE.md")},
 			}},

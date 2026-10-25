@@ -51,7 +51,7 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			s := res.Msg.GetThread()
 			focusCreated(e, a, s.GetId())
 			// Collision hints, never a refusal: the source thread works there too.
-			return Result{Message: createdMessage(s, req, r.projectNamer(ctx)), JSON: s, Warnings: res.Msg.GetHints()}, nil
+			return Result{Message: createdMessage(req, res.Msg, r.projectNamer(ctx)), JSON: s, Warnings: res.Msg.GetHints()}, nil
 		},
 	}
 }

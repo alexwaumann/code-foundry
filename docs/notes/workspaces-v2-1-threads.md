@@ -35,16 +35,19 @@ the migration, §8 step 1). PR 2 (workspace store and managed dirs) follows on
   invariant.
 * **Derivation order.** The primary's checkout is the row's `worktree_path`. A worktree-mode
   git member's is the worktree listed at `DefaultWorktreePath(project, branch)`, else any
-  other listed worktree on the branch (one made before the path rule, or by hand), the
-  main checkout last; when none is listed, the default path, `missing`. A plain folder is
-  its folder in any mode. Checkout mode: the main worktree.
+  other listed worktree on the branch (one made before the path rule, or by hand), never
+  the main checkout (changed in `workspaces-v2-fix-2-threads.md`, finding 7: it was
+  "the main checkout last"); when none is listed, the default path, `missing`. A plain
+  folder is its folder in any mode. Checkout mode: the main worktree.
 * **`DefaultWorktreePath` reads the slug of the last reconcile.** `CreateWorktree` reads
   `origin` afresh; the two only differ before a project's first reconcile, and the lookup
   of an existing worktree on the branch comes first anyway.
 * **Reuse.** A worktree for (project, branch) that exists is reused (Create, start,
   fork); one only for a branch known to be new is never looked up. Making one is
   serialized per (project, branch) inside the store, so two threads starting together
-  share the result instead of racing `git worktree add`.
+  share the result instead of racing `git worktree add`. (That held only for a branch that
+  already existed until `workspaces-v2-fix-2-threads.md`, finding 2: under the lock a
+  "new" branch that exists now is shared too, and auto-named branches are reserved.)
 * **Unregistered members are skipped, missing checkouts are errors.** A spawn fails,
   naming the project, when a registered member's checkout is missing after the start
   made what it could; a member whose project is no longer registered is logged and
@@ -57,7 +60,9 @@ the migration, §8 step 1). PR 2 (workspace store and managed dirs) follows on
   primary worktree again (`recreatable`); the other members' are made again by
   `ensureMembers`, with a timeline note, and the on-worktree-create actions run for each.
 * **Inheritance (`placement.go`).** The source is the creator (`created_by`, which the CLI
-  defaults to `$CODE_FOUNDRY_THREAD`; `--created-by=` opts out of both). A creator without
+  defaults to `$CODE_FOUNDRY_THREAD`; `--created-by=` opts out of both the creator and the
+  caller's placement, so without a project, worktree, workspace or like it is refused; it
+  only dropped `created_by` until `workspaces-v2-fix-2-threads.md`, finding 8). A creator without
   a project passes nothing on (Ember). `--project` alone keeps the set and picks the
   primary; `--projects` narrows (or replaces) the set and keeps branch and mode;
   `--new-worktree` or `--new-branch` branch off; `--new-worktree=false` is checkout mode

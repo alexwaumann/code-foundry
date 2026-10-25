@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -50,6 +51,21 @@ func splitList(v string) []string {
 	return out
 }
 
+// projectRefs is splitList for a list of project refs: a path ref's leading ~/ is
+// expanded, which a shell does not do after a comma (--projects web,~/src/api). The
+// daemon runs as the user, so its home is the CLI's.
+func projectRefs(v string) []string {
+	refs := splitList(v)
+	for i, r := range refs {
+		if r == "~" || strings.HasPrefix(r, "~/") {
+			if home, err := os.UserHomeDir(); err == nil {
+				refs[i] = home + r[1:]
+			}
+		}
+	}
+	return refs
+}
+
 func hasThread(c Context) bool { return c.ActiveThreadID != "" }
 
 func hasProjectOrWorktree(c Context) bool {
@@ -76,9 +92,11 @@ func noProjectAlone(a Args) error {
 }
 
 // createdMessage is the first part of what thread.new and thread.new-like say about the
-// thread s that req made: where it runs, its projects, workspace and mode.
+// thread req made (res): where it runs, its projects, workspace and mode, and what the
+// placement did with the primary (docs/notes/workspaces-v2-fix-2-threads.md, finding 7).
 // Project ids are named through name.
-func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest, name func(string) string) string {
+func createdMessage(req *v1.CreateThreadRequest, res *v1.CreateThreadResponse, name func(string) string) string {
+	s := res.GetThread()
 	msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 	if n := len(s.GetProjectIds()); n > 1 {
 		msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(mapNames(s.GetProjectIds(), name), ", "))
@@ -86,15 +104,23 @@ func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest, name func(string)
 	if s.GetWorkspaceId() != "" {
 		msg += " (workspace " + s.GetWorkspaceId() + ")"
 	}
-	if req.GetNoProject() {
-		msg += " (no project)"
+	if req.GetNoProject() || (req.GetLikeThreadId() != "" && len(s.GetProjectIds()) == 0 && s.GetProjectId() == "" && s.GetWorkspaceId() == "") {
+		msg += " (no project)" // also a like of a thread without one
 	}
 	switch {
-	case s.GetCreatedWorktree() && req.NewWorktree != nil && s.GetBaseRef() != "":
+	case res.GetMadeWorktree() && res.GetMadeBranch() && s.GetBaseRef() != "":
 		msg += " (new worktree from " + s.GetBaseRef() + ")"
+	case res.GetMadeWorktree():
+		msg += " (new worktree on existing branch " + s.GetBranch() + ")"
+	case res.GetExistingWorktree() && res.GetSharedWith() != "":
+		msg += " (worktree " + s.GetWorktreePath() + ", shared with " + res.GetSharedWith() + ")"
+	case res.GetExistingWorktree():
+		msg += " (existing worktree)"
 	case s.GetCreatedWorktree():
-		// No base when the primary is the workspace's folder: the members' worktrees.
-		msg += " (worktrees on " + s.GetBranch() + ")"
+		msg += " (worktrees on " + s.GetBranch() + ")" // the primary is a folder
+	}
+	if res.GetWorktreeModeDropped() {
+		msg += " (no worktrees: none of its projects has git, so it runs in their folders)"
 	}
 	return msg
 }
@@ -156,7 +182,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
-				ws, projects := a.String("workspace"), splitList(a.String("projects"))
+				ws, projects := a.String("workspace"), projectRefs(a.String("projects"))
 				unplaced := false
 				if a.Bool("no-project") {
 					if err := noProjectAlone(a); err != nil {
@@ -179,10 +205,17 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
 				}
 				if unplaced {
-					// From a thread (its CLI or a page it shows): where that thread runs.
-					placed, err := callerPlacement(ctx, b, c, req)
-					if err != nil {
-						return Result{}, err
+					// From a thread (its CLI or a page it shows): where that thread runs,
+					// unless --created-by= opted out of that thread altogether.
+					placed := false
+					if !a.Blank("created-by") {
+						var err error
+						if placed, err = callerPlacement(ctx, b, c, req); err != nil {
+							return Result{}, err
+						}
+					}
+					if !placed && a.Blank("created-by") && c.CallerThreadID != "" {
+						return Result{}, InvalidArg("created-by", "an empty created-by opts out of the thread this runs in, its placement too; name a project, worktree, workspace or like (or no-project)")
 					}
 					if !placed {
 						return Result{}, InvalidArg("worktree", "a worktree, project, or workspace is required (or no-project)")
@@ -238,7 +271,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
 				}
 				focusCreated(e, a, s.GetId())
-				msg := createdMessage(s, req, r.projectNamer(ctx))
+				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
 				}

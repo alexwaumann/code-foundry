@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -28,6 +30,8 @@ type archiveCleaner struct {
 	checkouts func(thread.Thread) []thread.Checkout
 	threads   func() *thread.Snapshot
 	terminals func() []terminal.Terminal
+	// pathLocks serialize cleanups of one worktree path (cleanOne): path -> *sync.Mutex.
+	pathLocks sync.Map
 	wg        sync.WaitGroup
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -56,23 +60,56 @@ func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread) {
 		if !co.Derived || co.Missing || !co.Registered || co.Path == "" {
 			continue
 		}
-		res, err := project.Cleanup(ctx, c.projects, project.CleanupOptions{
-			ProjectID: co.ProjectID, Path: co.Path, Verdict: project.ArchivedVerdict,
-			Hold: func(w project.Worktree) string {
-				return cleanupHold(w.Path, checkoutThreads(c.threads(), c.checkouts), c.terminals())
-			},
-			Removing: logLeftovers(c.log),
-		})
-		switch {
-		case err != nil:
-			c.log.Warn("archived thread's worktree not cleaned up", "thread", t.ID, "project", co.ProjectID, "path", co.Path, "err", err)
-		case len(res.Removed) > 0:
-			c.log.Info("archived thread's worktree removed (its branch stays)", "thread", t.ID, "project", co.ProjectID,
-				"path", co.Path, "branch", co.Branch)
-		case len(res.Skipped) > 0:
-			c.log.Info("archived thread's worktree kept", "thread", t.ID, "project", co.ProjectID, "path", co.Path,
-				"reason", res.Skipped[0].Reason)
+		c.cleanOne(ctx, "thread", t.ID, co.ProjectID, co.Path)
+	}
+}
+
+// cleanOne runs the archived verdict on one worktree (by is "thread" or "project", id
+// its id, for the log). Cleanups of one path run one at a time: threads archived
+// together that share a worktree each start one, and the later ones find it no longer
+// listed (NotFound after Cleanup's refresh) instead of failing on a worktree git just
+// removed.
+func (c *archiveCleaner) cleanOne(ctx context.Context, by, id, projectID, path string) {
+	v, _ := c.pathLocks.LoadOrStore(filepath.Clean(path), &sync.Mutex{})
+	mu := v.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+	res, err := project.Cleanup(ctx, c.projects, project.CleanupOptions{
+		ProjectID: projectID, Path: path, Verdict: project.ArchivedVerdict,
+		Hold: func(w project.Worktree) string {
+			return cleanupHold(w.Path, checkoutThreads(c.threads(), c.checkouts), c.terminals())
+		},
+		Removing: logLeftovers(c.log),
+	})
+	switch {
+	case errors.Is(err, project.ErrNotFound):
+		c.log.Debug("worktree already removed", by, id, "project", projectID, "path", path)
+	case err != nil:
+		c.log.Warn("worktree not cleaned up", by, id, "project", projectID, "path", path, "err", err)
+	case len(res.Removed) > 0:
+		c.log.Info("worktree removed (its branch stays)", by, id, "project", projectID, "path", path)
+	case len(res.Skipped) > 0:
+		c.log.Info("worktree kept", by, id, "project", projectID, "path", path, "reason", res.Skipped[0].Reason)
+	}
+}
+
+// unregistering is the project API's hook before a project is unregistered
+// (api.Project.WithBeforeUnregister): the worktrees Code Foundry made for it that no
+// thread that is not archived uses go through the archived verdict, as an archive's do
+// (clean: removed; never a branch), since nothing removes them once the project is gone.
+// Synchronous, bounded by archiveCleanupTimeout.
+func (c *archiveCleaner) unregistering(ctx context.Context, projectID string) {
+	r, ok := c.projects.Snapshot().Project(projectID)
+	if !ok || !r.Git {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, archiveCleanupTimeout)
+	defer cancel()
+	for _, w := range r.Worktrees {
+		if w.IsMain || !w.Managed {
+			continue
 		}
+		c.cleanOne(ctx, "project", projectID, projectID, w.Path)
 	}
 }
 

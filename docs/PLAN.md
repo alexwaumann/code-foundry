@@ -64,6 +64,11 @@ with a `workspaces-v2-<n>-*.md` note.
   once, ids for star/add/remove, members by name, Edit instructions steering once, the
   folder-head Worktree tab, the skills cap, filter by member, Add Project Escape) on
   `cf/workspaces-v2-fix-gui`: `docs/notes/workspaces-v2-fix-3-gui.md`.
+* Fuzz fixes, area A (threads, derived checkouts, cleanup, `thread new` inheritance:
+  findings 2-10; parallel creates share or suffix, named branches fetched, like with a
+  workspace, folder-only sets drop worktree mode, never the main checkout, honest
+  summaries and notes, cleanup on unregister) on `cf/workspaces-v2-fix-threads`:
+  `docs/notes/workspaces-v2-fix-2-threads.md`.
 
 ### Multi-repo workspaces: the five steps are built
 

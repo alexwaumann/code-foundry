@@ -332,6 +332,10 @@ type Manager struct {
 	// wtLocks serialize making one (project, branch) worktree (placement.go): key ->
 	// *sync.Mutex.
 	wtLocks sync.Map
+	// branchRes are the auto-named new branches Creates picked and are making now
+	// (reserveBranch, branchname.go): "<repo path>\x00<branch>".
+	branchResMu sync.Mutex
+	branchRes   map[string]struct{}
 	// residentTools are each resident's own --allowedTools rules (residenthooks.go):
 	// resident name -> ResidentTools.
 	residentTools sync.Map
@@ -660,6 +664,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	namingTried := name != ""
 	var late <-chan namingResult
 	var made []madeWorktree // the worktrees placement made, for the hook
+	var report CreateReport
 	if o.Cwd != "" && !o.NoProject {
 		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
 	}
@@ -686,6 +691,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		}
 		namingTried = namingTried || p.namerCalled
 		late, made = p.late, p.made
+		report = CreateReport{MadeWorktree: p.madePrimary, MadeBranch: p.madeBranch, ExistingWorktree: p.reusedPrimary, DroppedWorktreeMode: p.droppedWorktreeMode}
 	}
 	s.ProjectIDs = CleanProjectIDs(s.ProjectID, s.ProjectIDs)
 	if s.Name == "" {
@@ -759,6 +765,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	if o.Notify {
 		m.notifyCreator(ctx, creatorID, id)
+	}
+	if o.Report != nil {
+		if report.ExistingWorktree {
+			if other, ok := m.otherHolder(id, s.WorktreePath); ok {
+				report.SharedWith = holderLabel(other)
+			}
+		}
+		*o.Report = report
 	}
 	return m.Get(ctx, id)
 }
@@ -839,7 +853,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, err
 	}
 	// The fork shares the parent's checkouts: one a cleanup removed is made again first.
-	if _, err := m.ensureMembers(ctx, s); err != nil {
+	remade, err := m.ensureMembers(ctx, s)
+	if err != nil {
 		drop()
 		return Thread{}, err
 	}
@@ -848,6 +863,21 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, err
 	}
 	m.persistForkLog(ctx, newID, items)
+	if len(remade) > 0 {
+		// As a start's (startStopped): the note in the fork's timeline, then the
+		// projects' on-worktree-create actions.
+		if log, err := m.thread(ctx, newID); err != nil {
+			m.log.Warn("note the recreated worktrees", "thread", newID, "err", err)
+		} else {
+			itemWriter{log: log, save: func(it Item) { m.saveItem(newID, it) }}.add(
+				Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: remadeNote(remade, s.Branch)})
+		}
+		if m.opts.WorktreeCreated != nil {
+			for _, w := range remade {
+				m.opts.WorktreeCreated(newID, w.projectID, w.path)
+			}
+		}
+	}
 	return m.Get(ctx, newID)
 }
 

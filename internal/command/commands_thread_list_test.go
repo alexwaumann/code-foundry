@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 )
@@ -31,6 +32,8 @@ func TestThreadList(t *testing.T) {
 	shown.InSidebar, hidden.InSidebar = proto.Bool(true), proto.Bool(false)
 	home := &v1.Thread{Id: "s-000000000001", Name: "notes", Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted",
 		WorktreePath: "/Users/me", CreatedAt: ago(72 * time.Hour), ArchivedAt: ago(time.Hour)}
+	inWorkspace := &v1.Thread{Id: "s-00000000000b", ProjectIds: []string{"r1"}, WorkspaceId: "w-000000000001", WorktreePath: "/cf/workspaces/w-000000000001"}
+	inGoneWorkspace := &v1.Thread{Id: "s-00000000000c", WorkspaceId: "w-0000000000ff", WorktreePath: "/cf/workspaces/w-0000000000ff"}
 	tests := []struct {
 		name       string
 		args       map[string]string
@@ -115,6 +118,9 @@ func TestThreadList(t *testing.T) {
 			wantFilter: &v1.ThreadFilter{CreatedBy: "s-7754a478e649", Limit: 50}, wantLines: []string{"s-7754a478e649"}},
 		{name: "created-by an unknown suffix", args: map[string]string{"created-by": "ffff"}, wantCode: connect.CodeNotFound},
 		{name: "a negative limit", args: map[string]string{"limit": "-1"}, wantCode: connect.CodeInvalidArgument},
+		// A thread in its workspace's folder shows the workspace's name, not the folder's (fuzz finding A9).
+		{name: "a thread in its workspace folder", threads: []*v1.Thread{inWorkspace, inGoneWorkspace}, wantFilter: &v1.ThreadFilter{Limit: 50},
+			wantLines: []string{"s-00000000000b  starting  (unnamed)  shop            -", "s-00000000000c  starting  (unnamed)  w-0000000000ff  -"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,7 +129,8 @@ func TestThreadList(t *testing.T) {
 			if len(tt.threads) > 0 {
 				b.Current, b.Others = tt.threads[0], tt.threads[1:]
 			}
-			if err := command.RegisterThreadList(reg, command.ThreadListDeps{Thread: b, Project: &commandtest.Project{Projects: projects}}); err != nil {
+			if err := command.RegisterThreadList(reg, command.ThreadListDeps{Thread: b, Project: &commandtest.Project{Projects: projects},
+				Workspace: listWorkspaces{ws: []*v1.Workspace{{Id: "w-000000000001", Name: "shop"}}}}); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: tt.caller}, "thread.list", tt.args)
@@ -185,4 +192,14 @@ func TestThreadList(t *testing.T) {
 			}
 		})
 	}
+}
+
+// listWorkspaces is a WorkspaceBackend whose List answers ws.
+type listWorkspaces struct {
+	codefoundryv1connect.UnimplementedWorkspaceServiceHandler
+	ws []*v1.Workspace
+}
+
+func (l listWorkspaces) List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error) {
+	return connect.NewResponse(&v1.ListWorkspacesResponse{Workspaces: l.ws}), nil
 }

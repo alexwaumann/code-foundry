@@ -41,6 +41,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 		ctx        command.Context
 		args       map[string]string
 		current    *v1.Thread
+		placement  *v1.CreateThreadResponse // Create's placement fields
 		backendErr error
 		wantErr    error
 		wantCode   connect.Code
@@ -124,8 +125,9 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantMsg:  "created thread s1 in  (workspace login)",
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{WorkspaceId: "login", ProjectId: "api", PermissionMode: auto}}},
 		{name: "new worktrees with the workspace's folder as the primary: no base", cmd: "thread.new",
-			args:    map[string]string{"workspace": "login", "project": "workspace", "new-worktree": "true", "branch": "feat/x"},
-			wantMsg: "created thread s1 in /worktrees/s1 (workspace login) (worktrees on feat/x)",
+			args:      map[string]string{"workspace": "login", "project": "workspace", "new-worktree": "true", "branch": "feat/x"},
+			placement: &v1.CreateThreadResponse{}, // the daemon makes no worktree for a folder primary
+			wantMsg:   "created thread s1 in /worktrees/s1 (workspace login) (worktrees on feat/x)",
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{WorkspaceId: "login", ProjectId: "workspace", PermissionMode: auto,
 				NewWorktree: &v1.NewWorktree{Branch: "feat/x"}}}},
 		{name: "new worktrees in several projects", cmd: "thread.new",
@@ -197,6 +199,28 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			current:  &v1.Thread{Name: "drv", Pinned: true},
 			wantMsg:  "unpinned thread drv (s5)",
 			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"}, &v1.PinThreadRequest{Id: "s5"}}},
+		// The summary says what placement did with the primary (fuzz finding A7).
+		{name: "like: a worktree another thread has", cmd: "thread.new", args: map[string]string{"like": "s-0", "project": "web", "worktree": "/wt/web"},
+			placement: &v1.CreateThreadResponse{ExistingWorktree: true, SharedWith: "race-a (s-0)"},
+			wantMsg:   "created thread s1 in /wt/web (worktree /wt/web, shared with race-a (s-0))"},
+		{name: "a new worktree of a branch origin has", cmd: "thread.new", args: map[string]string{"project": "api", "new-worktree": "true", "branch": "feat/ro"},
+			placement: &v1.CreateThreadResponse{MadeWorktree: true},
+			wantMsg:   "created thread s1 in /worktrees/s1 (new worktree on existing branch feat/ro)"},
+		{name: "like: a worktree nobody else has", cmd: "thread.new", args: map[string]string{"like": "s-0", "project": "web", "worktree": "/wt/web"},
+			placement: &v1.CreateThreadResponse{ExistingWorktree: true}, wantMsg: "created thread s1 in /wt/web (existing worktree)"},
+		{name: "like narrowed to a folder: no worktrees", cmd: "thread.new", args: map[string]string{"like": "s-0", "projects": "notes"},
+			placement: &v1.CreateThreadResponse{WorktreeModeDropped: true},
+			wantMsg:   "created thread s1 in  (no worktrees: none of its projects has git, so it runs in their folders)"},
+		{name: "like a thread without a project", cmd: "thread.new", args: map[string]string{"like": "s-0"}, wantMsg: "created thread s1 in  (no project)"},
+		{name: "projects: a path ref after a comma is expanded", cmd: "thread.new", args: map[string]string{"projects": "web,~/src/api"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{PermissionMode: auto, ProjectIds: []string{"web", "/Users/me/src/api"}}}},
+		// --created-by= opts out of the thread this runs in, its placement too (fuzz finding A8).
+		{name: "created-by empty opts out of the caller's placement", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			args: map[string]string{"created-by": ""}, current: &v1.Thread{ProjectId: "r1", WorktreePath: "/wt/r1"},
+			wantErr: command.ErrInvalidArgs, wantReqs: []proto.Message{}},
+		{name: "created-by empty with a project", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			args:     map[string]string{"created-by": "", "project": "r1"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto}}},
 		{name: "pin explicit", cmd: "thread.pin", args: map[string]string{"id": "s5", "pinned": "true"}, current: &v1.Thread{Pinned: true},
 			wantMsg: "pinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5", Pinned: true}}},
 		{name: "unpin explicit", cmd: "thread.pin", args: map[string]string{"id": "s5", "pinned": "false"},
@@ -211,6 +235,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, b, e := newLifecycleRegistry(t)
 			b.Current, b.Err = tt.current, tt.backendErr
+			b.Placement = tt.placement
 			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			switch {
 			case tt.wantCode != 0:

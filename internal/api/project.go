@@ -45,6 +45,9 @@ type Project struct {
 	// baseFromOrigin reads projects.base_from_origin for CreateWorktree and ListRefs'
 	// default ref; nil is on (WithBaseFromOrigin).
 	baseFromOrigin func() bool
+	// beforeUnregister runs before Unregister forgets a project (WithBeforeUnregister);
+	// nil is nothing.
+	beforeUnregister func(ctx context.Context, projectID string)
 }
 
 var _ codefoundryv1connect.ProjectServiceHandler = (*Project)(nil)
@@ -88,8 +91,19 @@ func (h *Project) Register(ctx context.Context, req *connect.Request[v1.Register
 	return connect.NewResponse(&v1.RegisterProjectResponse{Project: projectToProto(r)}), nil
 }
 
+// WithBeforeUnregister sets what runs before Unregister forgets a project: the daemon
+// cleans up the worktrees the app made for it that nothing uses (docs/notes/
+// workspaces-v2-fix-2-threads.md), which nothing can remove once it is gone.
+func (h *Project) WithBeforeUnregister(f func(ctx context.Context, projectID string)) *Project {
+	h.beforeUnregister = f
+	return h
+}
+
 // Unregister forgets a project.
 func (h *Project) Unregister(ctx context.Context, req *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error) {
+	if h.beforeUnregister != nil {
+		h.beforeUnregister(ctx, req.Msg.GetId())
+	}
 	if err := h.store.Unregister(ctx, req.Msg.GetId()); err != nil {
 		return nil, projectError(err)
 	}

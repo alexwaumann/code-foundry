@@ -273,7 +273,8 @@ type Store interface {
 	// whether it is (inside) a git repository, else the git repositories directly inside
 	// it (inspect.go). The same path rules and errors as Register.
 	Inspect(ctx context.Context, path string) (Folder, error)
-	// Unregister forgets a project. Nothing on disk is touched.
+	// Unregister forgets a project. Nothing on disk is touched (the daemon cleans up the
+	// clean worktrees the app made for it that nothing uses before it calls this).
 	Unregister(ctx context.Context, id string) error
 	// CreateWorktree, RemoveWorktree, ListRefs and WorktreeDetail fail with
 	// ErrFailedPrecondition for a project without git.

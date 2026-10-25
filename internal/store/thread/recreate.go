@@ -56,17 +56,28 @@ func (m *Manager) recreatable(s Thread) bool {
 		project.InsideRoot(s.WorktreePath, m.opts.WorktreeRoot)
 }
 
-// remadeNote is the timeline line for member worktrees ensureMembers made again.
-func remadeNote(made []madeWorktree) string {
-	paths := make([]string, len(made))
-	for i, w := range made {
-		paths[i] = w.path
+// remadeNote is the timeline line for member worktrees ensureMembers made again on
+// branch. One whose branch was gone too (newBranch) says so, as the primary's note does.
+func remadeNote(made []madeWorktree, branch string) string {
+	var paths, lines []string
+	for _, w := range made {
+		if !w.newBranch {
+			paths = append(paths, w.path)
+			continue
+		}
+		start := cmp.Or(w.startPoint, "the default branch")
+		lines = append(lines, "The worktree of project "+cmp.Or(w.projectName, w.projectID)+" ("+w.path+") was removed and branch "+branch+
+			" no longer existed there, so both were recreated from "+start+". Commits made on the branch there earlier are on it only if they reached "+
+			start+" (a merged branch's have), and untracked and ignored files from before are gone.")
 	}
-	what := "The worktree of another project of this thread was removed and has been recreated"
-	if len(made) > 1 {
-		what = "The worktrees of other projects of this thread were removed and have been recreated"
+	if len(paths) > 0 {
+		what := "The worktree of another project of this thread was removed and has been recreated"
+		if len(paths) > 1 {
+			what = "The worktrees of other projects of this thread were removed and have been recreated"
+		}
+		lines = append([]string{what + " from branch " + branch + " (" + strings.Join(paths, ", ") + "). Untracked and ignored files from before are gone."}, lines...)
 	}
-	return what + " (" + strings.Join(paths, ", ") + "). Untracked and ignored files from before are gone."
+	return strings.Join(lines, " ")
 }
 
 // ensureWorktree makes s's worktree again when it is missing and recreatable, and
@@ -104,6 +115,9 @@ func (m *Manager) recreateWorktree(ctx context.Context, s Thread) (recreatedWork
 	}
 	if !r.Git {
 		return recreatedWorktree{}, gone(r.Name + " is not a git repository")
+	}
+	if err := mainCheckoutBusy(r, s.Branch); err != nil {
+		return recreatedWorktree{}, err // never a second worktree on that branch
 	}
 	rw := recreatedWorktree{projectID: r.ID, branch: s.Branch}
 	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: s.Branch, Fetch: true, BaseFromOrigin: m.opts.BaseFromOrigin()}

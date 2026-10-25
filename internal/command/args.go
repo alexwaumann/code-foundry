@@ -183,6 +183,9 @@ type Args struct {
 	// given are the names the caller passed a value for (not a context or Default);
 	// nil from NewArgs, where every value counts as given.
 	given map[string]bool
+	// blank are the names the caller passed an empty value for (--created-by=), which
+	// otherwise reads as absent.
+	blank map[string]bool
 }
 
 // Given reports whether the caller passed name explicitly, rather than its value coming
@@ -193,6 +196,10 @@ func (a Args) Given(name string) bool {
 	}
 	return a.given[name]
 }
+
+// Blank reports whether the caller passed name with an empty value (an opt-out, such as
+// --created-by=); Has and Given are false for it.
+func (a Args) Blank(name string) bool { return a.blank[name] }
 
 // Has reports whether name has a value (explicit, context default, or Default).
 func (a Args) Has(name string) bool {
@@ -246,7 +253,13 @@ func parseArgs(specs []ArgSpec, raw map[string]string, uctx Context) (Args, Cont
 	}
 	vals := make(map[string]any, len(specs))
 	given := map[string]bool{}
+	blank := map[string]bool{}
 	eff := uctx
+	for _, s := range specs {
+		if v, ok := raw[s.Name]; ok && v == "" {
+			blank[s.Name] = true
+		}
+	}
 	for _, s := range specs {
 		if v := raw[s.Name]; v != "" {
 			parsed, err := s.parse(v)
@@ -270,7 +283,7 @@ func parseArgs(specs []ArgSpec, raw map[string]string, uctx Context) (Args, Cont
 			vals[s.Name], _ = s.parse(s.Default) // validated at Register
 		}
 	}
-	return Args{vals: vals, given: given}, eff, nil
+	return Args{vals: vals, given: given, blank: blank}, eff, nil
 }
 
 // checkRequired returns an *ArgError for the first required spec without a value.

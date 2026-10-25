@@ -163,7 +163,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterNewProjects(r, d.NewProjects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
-		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project}),
+		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project, Workspace: d.Workspace}),
 		command.RegisterThreadReports(r, d.Thread),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
