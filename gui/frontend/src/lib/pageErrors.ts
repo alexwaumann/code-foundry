@@ -35,8 +35,13 @@ export function pageErrorCount(list: readonly PageError[]): number {
   return list.reduce((n, e) => n + e.count, 0);
 }
 
+/** An error's message without the call it already names ("thread.list: unknown argument" → "unknown argument"). */
+export function errorText(e: Pick<PageError, "call" | "message">): string {
+  return e.message.startsWith(`${e.call}: `) ? e.message.slice(e.call.length + 2) : e.message;
+}
+
 /** The composer text "Ask Claude" puts in the thread: the page, then each error on a line. */
 export function askAboutPageErrors(page: string, list: readonly PageError[]): string {
-  const lines = list.map((e) => `- ${e.call}: ${e.code}: ${e.message}${e.count > 1 ? ` (${String(e.count)} times)` : ""}`);
+  const lines = list.map((e) => `- ${e.call}: ${e.code}: ${errorText(e)}${e.count > 1 ? ` (${String(e.count)} times)` : ""}`);
   return [`The page ${page} got ${list.length === 1 ? "this error" : "these errors"} from Code Foundry. Please fix the page:`, ...lines].join("\n");
 }

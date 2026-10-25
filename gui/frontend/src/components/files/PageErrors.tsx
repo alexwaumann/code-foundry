@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MessageSquareText, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { askAboutPageErrors, pageErrorCount, type PageError } from "@/lib/pageErrors";
+import { askAboutPageErrors, errorText, pageErrorCount, type PageError } from "@/lib/pageErrors";
 import { cn } from "@/lib/utils";
 import { putInThreadComposer } from "@/stores/composerText";
 
@@ -39,7 +39,7 @@ export function PageErrors({ errors, threadId, page, onAsk, className }: { error
                 </span>
               </div>
               <div className="text-caption text-cf-text-muted">
-                <span className="text-cf-error-text">{e.code}</span> {e.message}
+                <span className="text-cf-error-text">{e.code}</span> {errorText(e)}
               </div>
             </li>
           ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPageError, askAboutPageErrors, PAGE_ERRORS_MAX, pageErrorCount, type PageError } from "./pageErrors";
+import { addPageError, askAboutPageErrors, errorText, PAGE_ERRORS_MAX, pageErrorCount, type PageError } from "./pageErrors";
 
 const err = (call: string, atMs = 1, message = "bad"): Omit<PageError, "count"> => ({ call, code: "invalid", message, atMs });
 
@@ -25,6 +25,13 @@ describe("addPageError", () => {
     for (let i = 0; i < PAGE_ERRORS_MAX + 2; i++) list = addPageError(list, err(`v${String(i)}`, i));
     expect(list.map((e) => e.call)).toEqual(["v2", "v3", "v4", "v5", "v6"]);
     expect(pageErrorCount(addPageError(list, err("v6", 9)))).toBe(PAGE_ERRORS_MAX + 1);
+  });
+});
+
+describe("errorText", () => {
+  it("drops the call the daemon's message repeats", () => {
+    expect(errorText({ call: "thread.list", message: 'thread.list: unknown argument "x"' })).toBe('unknown argument "x"');
+    expect(errorText({ call: "no.such.verb", message: 'unknown command "no.such.verb"' })).toBe('unknown command "no.such.verb"');
   });
 });
 
