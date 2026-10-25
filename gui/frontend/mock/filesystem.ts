@@ -41,6 +41,8 @@ const tree: Dir = {
     dotfiles: { git: true },
     // A folder of repos (the Add Project dialog's workspace choice): three repos and a plain folder.
     product: { children: { web: { git: true }, api: { git: true }, "docs-site": { git: true }, notes: {} } },
+    // A folder of repos whose "broken" child the mock's project.add-workspace refuses.
+    mixed: { children: { ok: { git: true }, broken: { git: true } } },
     Documents: { children: { Projects: { children: { "side-project": { git: true } } } } },
     Downloads: {},
     Library: {},
