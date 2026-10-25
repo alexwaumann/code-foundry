@@ -12,7 +12,7 @@ import (
 
 // ShowHtml answers an html item "html-1" holding the path relative to Current's
 // worktree path when inside it; a path not ending in .html or .htm is
-// INVALID_ARGUMENT, like the daemon.
+// INVALID_ARGUMENT, like the daemon. With PageShown it answers reused unless again.
 func (s *Thread) ShowHtml(_ context.Context, r *connect.Request[v1.ShowThreadHtmlRequest]) (*connect.Response[v1.ShowThreadHtmlResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -26,5 +26,5 @@ func (s *Thread) ShowHtml(_ context.Context, r *connect.Request[v1.ShowThreadHtm
 		p = rel
 	}
 	return connect.NewResponse(&v1.ShowThreadHtmlResponse{Item: &v1.ThreadItem{Id: "html-1", Payload: &v1.ThreadItem_Html{
-		Html: &v1.HtmlItem{Path: p, Title: r.Msg.GetTitle(), BaseDir: base}}}}), nil
+		Html: &v1.HtmlItem{Path: p, Title: r.Msg.GetTitle(), BaseDir: base}}}, Reused: s.PageShown && !r.Msg.GetAgain()}), nil
 }

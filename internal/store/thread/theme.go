@@ -51,5 +51,5 @@ func (m *Manager) ShowTheme(ctx context.Context, id string, card ThemeCard) (Ite
 	return m.verbItem(ctx, id, func(Thread) (Item, error) {
 		c := card
 		return Item{Kind: KindTheme, Theme: &c}, nil
-	})
+	}, nil)
 }

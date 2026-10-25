@@ -81,11 +81,26 @@ func (e pageNotFound) Error() string { return string(e) }
 // Is makes errors.Is(err, ErrNotFound) hold.
 func (e pageNotFound) Is(target error) bool { return target == ErrNotFound }
 
+// ShowHTMLOptions are ShowHTML's choices about a page shown before.
+type ShowHTMLOptions struct {
+	// Again adds a card even when the page's card is still live.
+	Again bool
+	// Panel: the page also opens in the side panel, so a card of it anywhere in the
+	// thread is enough, not only one since the last user message.
+	Panel bool
+}
+
 // ShowHTML implements Store: it appends an html item for path to thread id, on the
 // runner's goroutine while it runs (inside the running turn: the model calls it from a
-// tool), else straight onto the stopped thread's log.
-func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, error) {
-	return m.verbItem(ctx, id, func(s Thread) (Item, error) {
+// tool), else straight onto the stopped thread's log. Unless o.Again, a page already
+// shown since the thread's last user message (with o.Panel, at all) is not shown twice:
+// that card (shownHTML) is returned with reused set, its title changed when title is
+// given, and the GUI has already reloaded it for the edit
+// (docs/notes/bridge-fix-c-daemon.md).
+func (m *Manager) ShowHTML(ctx context.Context, id, path, title string, o ShowHTMLOptions) (Item, bool, error) {
+	var abs string
+	reused := false
+	it, err := m.verbItem(ctx, id, func(s Thread) (Item, error) {
 		cwd := s.WorktreePath
 		if cwd == "" {
 			cwd = m.opts.Home
@@ -94,16 +109,61 @@ func (m *Manager) ShowHTML(ctx context.Context, id, path, title string) (Item, e
 		if err != nil {
 			return Item{}, err
 		}
+		abs = filepath.Clean(path)
 		return Item{Kind: KindHTML, HTML: page}, nil
+	}, func(w itemWriter) (Item, bool) {
+		if o.Again {
+			return Item{}, false
+		}
+		prev, ok := w.log.shownHTML(abs, o.Panel)
+		if !ok {
+			return Item{}, false
+		}
+		reused = true
+		if t := strings.TrimSpace(title); t != "" && t != prev.HTML.Title {
+			if got, ok := w.change(prev.ID, func(it *Item) { it.HTML = &HTMLPage{Path: it.HTML.Path, Title: t, BaseDir: it.HTML.BaseDir} }); ok {
+				return got, true
+			}
+		}
+		return prev, true
 	})
+	return it, reused, err
+}
+
+// shownHTML is the newest html item showing the page at abs since the last message the
+// user sent (a queued one, not read yet, does not count), or anywhere with anywhere: its
+// card is still the one in view, so showing the page again would only stack a second
+// copy under it.
+func (t *threadLog) shownHTML(abs string, anywhere bool) (Item, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for i := len(t.items) - 1; i >= 0; i-- {
+		it := t.items[i]
+		switch {
+		case it.Kind == KindUserMessage && !it.Queued && !anywhere:
+			return Item{}, false
+		case it.Kind == KindHTML && it.HTML != nil && htmlItemPath(it.HTML) == abs:
+			return cloneItem(it), true
+		}
+	}
+	return Item{}, false
+}
+
+// htmlItemPath is the absolute path an html item shows.
+func htmlItemPath(p *HTMLPage) string {
+	if filepath.IsAbs(p.Path) || p.BaseDir == "" {
+		return filepath.Clean(p.Path)
+	}
+	return filepath.Join(p.BaseDir, filepath.FromSlash(p.Path))
 }
 
 // verbItem appends the item a verb adds to a thread's conversation (an html page, a
 // theme card: the daemon's, not Claude's), which build makes from the thread's record. On
 // the runner's goroutine while it runs, so it lands inside the running turn after the
 // tool call that made it; else straight onto the stopped thread's log. The item's id is
-// "<kind>-…".
-func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (Item, error)) (Item, error) {
+// "<kind>-…". reuse, when not nil, may answer with an item already in the log instead
+// (on the same goroutine as the append, so nothing lands between the look and the add).
+func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (Item, error), reuse func(itemWriter) (Item, bool)) (Item, error) {
 	for {
 		live, closing, reserved, s, err := m.lifecycle(id)
 		if err != nil {
@@ -115,7 +175,7 @@ func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (I
 		}
 		switch {
 		case live != nil:
-			got, err := live.call(ctx, threadCmd{verb: &it})
+			got, err := live.call(ctx, threadCmd{verb: &it, reuse: reuse})
 			if errors.Is(err, errProcessGone) {
 				continue
 			}
@@ -138,13 +198,23 @@ func (m *Manager) verbItem(ctx context.Context, id string, build func(Thread) (I
 			return Item{}, err
 		}
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
+		if reuse != nil {
+			if got, ok := reuse(w); ok {
+				return got, nil
+			}
+		}
 		it.ID = string(it.Kind) + "-" + itemSuffix()
 		return w.add(it), nil
 	}
 }
 
 // onVerbItem is verbItem on the runner's goroutine.
-func (r *runner) onVerbItem(it Item) Item {
+func (r *runner) onVerbItem(it Item, reuse func(itemWriter) (Item, bool)) Item {
+	if reuse != nil {
+		if got, ok := reuse(r.st.proj.w); ok {
+			return got
+		}
+	}
 	it.ID = r.st.proj.nextID(string(it.Kind))
 	return r.st.proj.w.add(it)
 }

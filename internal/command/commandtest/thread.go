@@ -36,6 +36,9 @@ type Thread struct {
 	Subscriptions  []*v1.ThreadSubscription
 	// Reused is Create's answer flag (a repeated request_id).
 	Reused bool
+	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
+	// request has again.
+	PageShown bool
 	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the
 	// call is recorded first).
 	FailIDs map[string]error

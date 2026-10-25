@@ -942,10 +942,19 @@ message ShowThreadHtmlRequest {
   // Absolute (the CLI resolves a relative path against its own directory).
   string path = 2;
   string title = 3;
+  // A second card even when this page's card is still live (see reused).
+  bool again = 4;
+  // The page also opens in the side panel (view.inline --panel): a card of it anywhere
+  // in the thread is reused, not only one since the last user message.
+  bool panel = 5;
 }
 
 message ShowThreadHtmlResponse {
   ThreadItem item = 1;
+  // The page was already shown in this thread since its last user message (with panel,
+  // at all), so no card was added: item is that card (its title updated when one was
+  // given). The GUI reloads a page's card when its file changes.
+  bool reused = 2;
 }
 
 message ShowThreadThemeRequest {

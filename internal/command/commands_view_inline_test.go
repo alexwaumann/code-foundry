@@ -25,6 +25,7 @@ func TestViewInline(t *testing.T) {
 		uctx      command.Context
 		args      map[string]string
 		contents  string // the page's ("" for good)
+		shown     bool   // the page's card is still live (commandtest.Thread.PageShown)
 		windows   int
 		wantReq   *v1.ShowThreadHtmlRequest
 		wantMsg   string
@@ -49,6 +50,56 @@ func TestViewInline(t *testing.T) {
 			contents: good + `<script>cf.run("thread.list")</script>`,
 			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
 			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnNoBridge}},
+		{name: "cf.* without the bridge: only the bridge warning (it sizes the card too)", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script>cf.on("gh", draw)</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnNoBridge}},
+		{name: "setInterval in a page that calls cf.run", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>async function load() { await cf.run("thread.list") } setInterval(load, 5000)</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnPolling}},
+		{name: "a setTimeout that re-runs cf.run", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>function tick() { setTimeout(async () => { draw(await cf.run("pr.checks", {number: 4})); tick() }, 3000) }</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnPolling}},
+		{name: "a setTimeout for a flash message is fine", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>btn.onclick = () => cf.run("thread.pin", {id}).then(() => { msg.hidden = false; setTimeout(() => { msg.hidden = true }, 2000) })</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week"},
+		{name: "setInterval without cf.run (a clock) is fine", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>cf.on("thread-list", draw); setInterval(() => { clock.textContent = new Date() }, 1000)</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week"},
+		{name: "confirm() before a merge", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>btn.onclick = () => { if (!window.confirm("Merge?")) return; cf.run("pr.merge", args) }; other.onclick = () => confirm("x")</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnConfirm}},
+		{name: "a method called confirm is not window.confirm", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>dialog.confirm(); const requestConfirm = 1; cf.on("gh", draw)</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week"},
+		{name: "yes in cf.run's args", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>btn.onclick = () => cf.run("thread.archive", { id: t.id, yes: true })</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnReservedArg}},
+		{name: "force in cf.run's args, quoted", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>btn.onclick = () => cf.run("project.cleanup", {"force": true})</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week", wantWarn: []string{command.WarnReservedArg}},
+		{name: "an arg named like yes is fine", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
+			contents: `<link rel="stylesheet" href="/cf/theme.css"><script src="/cf/bridge.js"></script>` + `<script>btn.onclick = () => cf.run("thread.new", { prompt: "yes: do it", "new-worktree": true })</script>`,
+			wantReq:  &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg:  "shown docs/page.html in thread Usage week"},
+		{name: "a page still live: no second card", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1, shown: true,
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantMsg: "updated the page already shown in thread Usage week (docs/page.html): its card reloads after every edit, so no card was added; " +
+				"run view.inline only for a new file (--again adds a second card)"},
+		{name: "--again: a second card", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "again": "true"}, windows: 1, shown: true,
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Again: true},
+			wantMsg: "shown docs/page.html in thread Usage week"},
+		{name: "--panel on a page shown before: the panel only", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 1, shown: true,
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
+			wantMsg: "opened docs/page.html in thread Usage week's side panel; it was shown inline before, so no card was added", wantPanel: true},
 		{name: "the CLI outside a thread", uctx: command.Context{}, args: map[string]string{"path": "/wt/docs/page.html"}, argErr: "thread"},
 		{name: "the caller's thread", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
@@ -57,16 +108,16 @@ func TestViewInline(t *testing.T) {
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/home/a/x.htm", Title: "Chart"},
 			wantMsg: "shown /home/a/x.htm in thread Usage week"},
 		{name: "--panel opens the File tab too", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 1,
-			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
 			wantMsg: "shown docs/page.html in thread Usage week and in its side panel", wantPanel: true},
 		{name: "--panel with no window", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 0,
-			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
+			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
 			wantMsg: "shown docs/page.html in thread Usage week (" + command.NoWindowMessage + ")", wantPanel: true},
 		{name: "not html", uctx: inThread, args: map[string]string{"path": "/wt/main.go"}, code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			th := &commandtest.Thread{Current: named}
+			th := &commandtest.Thread{Current: named, PageShown: tt.shown}
 			contents := tt.contents
 			if contents == "" {
 				contents = good
@@ -91,7 +142,7 @@ func TestViewInline(t *testing.T) {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
 			out, ok := res.JSON.(command.InlineResult)
-			if !ok || out.Item != "html-1" || out.Thread != "s-aaaaaaaaaaa1" || (out.Panel != nil) != tt.wantPanel {
+			if !ok || out.Item != "html-1" || out.Thread != "s-aaaaaaaaaaa1" || (out.Panel != nil) != tt.wantPanel || out.Reused != (tt.shown && tt.args["again"] == "") {
 				t.Errorf("JSON = %+v", res.JSON)
 			}
 			if !slices.Equal(out.Warnings, tt.wantWarn) || !slices.Equal(res.Warnings, tt.wantWarn) {
