@@ -185,6 +185,8 @@ type Project struct {
 	OnCleanup func(*v1.CleanupWorktreesRequest) (*v1.CleanupWorktreesResponse, error)
 	// OnRemoveWorktree, when set, answers RemoveWorktree's error.
 	OnRemoveWorktree func(*v1.RemoveWorktreeRequest) error
+	// OnInspect, when set, answers InspectFolder.
+	OnInspect func(*v1.InspectFolderRequest) (*v1.InspectFolderResponse, error)
 }
 
 var _ command.ProjectBackend = (*Project)(nil)
@@ -196,6 +198,23 @@ func (f *Project) Register(_ context.Context, r *connect.Request[v1.RegisterProj
 		return nil, f.Err
 	}
 	return connect.NewResponse(&v1.RegisterProjectResponse{Project: &v1.Project{Id: "r1", Name: "repo", Path: r.Msg.GetPath()}}), nil
+}
+
+// InspectFolder records the request and answers OnInspect, else a folder with no
+// repositories in it.
+func (f *Project) InspectFolder(_ context.Context, r *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	if f.OnInspect != nil {
+		res, err := f.OnInspect(r.Msg)
+		if err != nil {
+			return nil, err
+		}
+		return connect.NewResponse(res), nil
+	}
+	return connect.NewResponse(&v1.InspectFolderResponse{Path: r.Msg.GetPath()}), nil
 }
 
 // Unregister records the request.
