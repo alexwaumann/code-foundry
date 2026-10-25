@@ -379,8 +379,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		theme.FramePrefix: theme.FrameHandler(liveTheme),
 		bridge.Path:       bridge.Handler(),
 	}
-	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux)))
-	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", pagesHandler(pageRoutes)))
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
+		loopbackHost(port, loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux))))
+	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
 
 	errc := make(chan error, 3)
 	go func() { errc <- serve(unixSrv, unixLn) }()

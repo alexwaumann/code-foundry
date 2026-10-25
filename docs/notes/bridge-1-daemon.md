@@ -141,9 +141,10 @@ the user says no).
   and no moved window (`view.*`, `ui.*` but `ui.presence`, `thread.focus`,
   `thread.previous`/`next`, `worktree.reveal`, `view.open.url`). Refreshes
   (`project.refresh`, `pr.refresh`, `app.update.check`, `skill.refresh`) make the daemon
-  work, so they need a gesture. Waits (`thread.wait`, `action.wait`) and network reads
-  (`plugin.browse`, `skill.browse`) are reads. A plugin's own commands are never read-only
-  (the manifest has no such field).
+  work, so they need a gesture. Waits (`thread.wait`, `action.wait`) are reads. Since
+  `bridge-fix-floor.md`, `thread.mcp`, `plugin.browse` and `skill.browse` are not (a flag,
+  or a stale cache, makes them work). A plugin's own commands are never read-only (the
+  manifest has no such field).
 - **The API 404s the page routes** rather than 401 without a token, so nothing suggests a
   token would help.
 - **Cookies are not port-scoped**, so a page shares cookies for `127.0.0.1` with the dev

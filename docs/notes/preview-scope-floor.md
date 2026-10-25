@@ -46,6 +46,17 @@ direct children does not refuse the grant, but every path inside it is 404. The 
 is the other half: it no longer reflects any loopback origin outside dev mode, so a page on
 another daemon's pages origin cannot call this one's API even holding its token.
 
+**Identity, not names (2026-10-25, `bridge-fix-floor.md`).** Every rule above is about
+files, not spellings. APFS folds names more than any string comparison here does (`~/.ßh`
+and `~/.ſsh` open `~/.ssh`, `~/.conﬁg` opens `~/.config`, a home named `cf-test` is also
+`cf-teſt`), so the names are only a fast path and file identity decides: `Guarded` stats
+the path (symlinks resolved) and each directory above it and compares them with
+`os.SameFile` against the guarded roots, stat'd on every call (a config home is open again
+below its own `worktrees/`, `projects/` and `pages/`, compared the same way), and `ScopeOK`
+refuses a tree that is, by identity, home or above a guarded root. A regular file with more
+than one link is also compared against the guarded files (a hard link to `daemon.token` is
+the token), up to two levels below each guarded folder, `~/Library` skipped.
+
 ## CORS
 
 * `cors` now wraps only the bearer-protected side (`loopbackHandler`) and reflects only

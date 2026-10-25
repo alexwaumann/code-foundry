@@ -85,8 +85,16 @@ func isHome(dir string) bool {
 	return false
 }
 
-// Guarded reports whether p (absolute, cleaned) lies in a tree no grant may read.
+// Guarded reports whether p (absolute, cleaned) lies in a tree no grant may read. The
+// names are compared first, then file identities (guardedByIdentity): APFS folds names
+// more than any string comparison here does (~/.ßh is ~/.ssh), so the names are only a
+// fast path and the identities decide.
 func (f Floor) Guarded(p string) bool {
+	return f.guardedByName(p) || f.guardedByIdentity(p)
+}
+
+// guardedByName is Guarded on the spelling of p.
+func (f Floor) guardedByName(p string) bool {
 	for _, h := range f.homes {
 		if inHome(h, p) {
 			return true
@@ -117,9 +125,19 @@ func (f Floor) ScopeOK(dir string) bool {
 	if fsx.Within(dir, f.home) || !fsx.Within(f.home, dir) || f.Guarded(dir) {
 		return false
 	}
-	for _, g := range append(f.homes[:len(f.homes):len(f.homes)], f.creds...) {
+	roots := append(f.homes[:len(f.homes):len(f.homes)], f.creds...)
+	for _, g := range roots {
 		if fsx.Within(dir, g) {
 			return false
+		}
+	}
+	// The same by identity: dir, however it is spelled, is no ancestor of home or of a
+	// guarded tree.
+	if fi, err := os.Stat(dir); err == nil {
+		for _, g := range append(roots, f.home) {
+			if ancestorOf(fi, g) {
+				return false
+			}
 		}
 	}
 	entries, _ := os.ReadDir(dir)

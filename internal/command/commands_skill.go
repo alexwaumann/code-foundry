@@ -70,9 +70,8 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 	kindOf := func(a Args) marketplace.Kind { return marketplace.Kind(a.String("kind")) }
 	return r.RegisterAll(
 		Command{
-			Name:     "skill.browse",
-			ReadOnly: true,
-			Title:    "Browse Skills",
+			Name:  "skill.browse",
+			Title: "Browse Skills",
 			Description: "Search the plugins and skills of the marketplaces Claude Code has (claude plugin marketplace list): " +
 				"name, description, keywords and author, name matches first; no query lists them by name. " +
 				"Shows what is installed and each marketplace's state.",
