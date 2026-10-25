@@ -89,14 +89,11 @@ func threadLabel(s *v1.Thread) string {
 // command names and identifiers keep "thread".
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
-	focus := func(id string) int {
-		return e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}})
-	}
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.new",
 			Title: "New Thread",
-			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree), or in a new worktree. " +
+			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
 				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and projects it gets a new workspace. " +
 				"With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
@@ -126,18 +123,20 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
 				sidebarCreateArg,
+				createdFocusArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
 					"in the last 24 hours prints the thread made then and starts nothing"},
 			},
 			When: canStartThread,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 				ws, projects := a.String("workspace"), splitList(a.String("projects"))
+				unplaced := false
 				if a.Bool("no-project") {
 					if err := noProjectAlone(a); err != nil {
 						return Result{}, err
 					}
 				} else if a.String("project") == "" && a.Path("worktree") == "" && ws == "" && len(projects) == 0 {
-					return Result{}, InvalidArg("worktree", "a worktree, project, or workspace is required (or no-project)")
+					unplaced = true
 				}
 				req := &v1.CreateThreadRequest{
 					ProjectId: a.String("project"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
@@ -150,6 +149,21 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					// worker defaults may replace it (docs/notes/ember-2-store.md).
 					ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
 					EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
+				}
+				if unplaced {
+					// From a thread (its CLI or a page it shows): where that thread runs.
+					placed, err := callerPlacement(ctx, b, c, req)
+					if err != nil {
+						return Result{}, err
+					}
+					if !placed {
+						return Result{}, InvalidArg("worktree", "a worktree, project, or workspace is required (or no-project)")
+					}
+					if req.GetNoProject() {
+						if err := noProjectAlone(a); err != nil {
+							return Result{}, InvalidArg("project", "the thread this runs in has no project, so the new thread has none either; name a project for a worktree or branch")
+						}
+					}
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
@@ -194,7 +208,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{Message: "thread " + threadLabel(s) + " in " + s.GetWorktreePath() +
 						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
 				}
-				focus(s.GetId())
+				focusCreated(e, a, s.GetId())
 				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 				if s.GetWorkspaceId() != "" {
 					msg += " (workspace " + s.GetWorkspaceId() + ")"
@@ -250,7 +264,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Title:       "Fork Thread",
 			Description: "Start a new thread that continues this thread's conversation.",
 			Category:    "Thread",
-			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}},
+			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}, createdFocusArg},
 			When:        hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Fork(ctx, connect.NewRequest(&v1.ForkThreadRequest{Id: a.String("id"), Name: a.String("name")}))
@@ -258,7 +272,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{}, err
 				}
 				s := res.Msg.GetThread()
-				focus(s.GetId())
+				focusCreated(e, a, s.GetId())
 				return Result{Message: "forked " + a.String("id") + " into " + threadLabel(s), JSON: s}, nil
 			},
 		},
