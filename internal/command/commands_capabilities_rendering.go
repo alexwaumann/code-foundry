@@ -1,5 +1,11 @@
 package command
 
+import (
+	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/bridge"
+)
+
 // Rendering is one thing the thread view (or the side panel's File tab, reached from it)
 // shows, for daemon.capabilities --group rendering.
 type Rendering struct {
@@ -34,7 +40,19 @@ var Renderings = []Rendering{
 		"on load and on every theme change; a page that applies it replies {type: \"cf:theme:ack\"} and keeps its state, any other " +
 		"reloads 300 ms later. The frame's prefers-color-scheme is the app's scheme, but paint with the variables, not fixed colours " +
 		"or prefers-color-scheme blocks. view.inline shows a page inline in the conversation instead, in the same frame; " +
-		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink)."},
+		"it may post {type: \"cf:resize\", height} (measure document.body, not the document, so it can shrink), or load the bridge, which does it."},
+	{"bridge", "A page shown with view.inline can call Code Foundry: <script src=\"/cf/bridge.js\"></script> gives window.cf. " +
+		"await cf.ready, then cf.thread is {id, name} and cf.theme {id, scheme, vars}. " +
+		"cf.run(verb, {arg: value}) runs a command as your thread's CLI would (the same verbs and args, values as strings) and " +
+		"resolves {text, json}. A verb that changes anything (all but reads such as thread get, settings get, pr checks) runs only " +
+		"from a click or key press in the page, and a confirmation still asks the user. It rejects with {code, message}, code one of " +
+		strings.Join(bridge.ErrorCodes, ", ") + ". " +
+		"cf.on(source, fn) calls fn(event) for each daemon event and returns an unsubscribe; sources: " +
+		strings.Join(bridge.Sources, ", ") + " (thread: this thread's status and pending requests, not its items). " +
+		"cf.onTheme(fn) hears theme changes (the script applies them and acks); the card follows the page's height by itself " +
+		"(cf.resize() forces it). cf.storage(prefix) is localStorage under this thread's keys: storage persists across reloads and " +
+		"restarts and is shared by every page (raw localStorage too). A page runs only while it is on screen, so no background " +
+		"work: that is a plugin. Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead."},
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
 		"Undo (back to what the slot showed just before: another theme, or the colours the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
 		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +
