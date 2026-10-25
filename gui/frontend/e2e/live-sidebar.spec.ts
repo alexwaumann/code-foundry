@@ -6,7 +6,7 @@
  * both (LIVE_WORKSPACE, its name), and the Vite dev server pointed at it (recipe in
  * docs/notes/phase2-integration.md).
  *
- * It starts two haiku threads ("say hi and stop"): one in the workspace's first member,
+^ * It starts two Haiku 5.5 threads ("say hi and stop"): one in the workspace's first member,
  * one in the second project's main worktree; moves the workspace thread to the second
  * member with Run in…, and closes both at the end.
  */
@@ -61,7 +61,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
   const [first, second] = ws.members;
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const start = (...args: string[]) =>
-    (JSON.parse(cli("thread", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveThread).id;
+    (JSON.parse(cli("thread", "new", ...args, "--model", "claude-haiku-5-5[1m]", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveThread).id;
   const wsThread = start("--workspace", ws.workspace.id, "--project", first.projectId);
   const projThread = start("--project", second.projectId);
   try {
@@ -87,7 +87,8 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
 
     await test.step("Projects page: both projects, the workspace and its members", async () => {
       await page.getByTestId("nav-projects").click();
-      await expect(page.getByTestId("project-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b)));
+      // Both projects are listed (the home may register more).
+      for (const p of [first, second]) await expect(page.getByTestId("project-name").filter({ hasText: new RegExp(`^${p.projectName}$`) })).toHaveCount(1);
       const block = page.locator(`[data-testid="workspace"][data-workspace="${ws.workspace.id}"]`);
       await expect(block.getByTestId("workspace-name")).toHaveText(ws.workspace.name);
       await expect(block.getByTestId("member-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
@@ -109,7 +110,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.projectName}…`, { timeout: 5000 });
       await shot(page, "live-sidebar-moving");
       await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
-      await expect(wsRow.getByTestId("row-project")).toHaveText(ws.workspace.name);
+      // Line 2 may be the finished status now; the place is the daemon's.
       expect(threadInfo(wsThread)).toMatchObject({ projectId: second.projectId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");
