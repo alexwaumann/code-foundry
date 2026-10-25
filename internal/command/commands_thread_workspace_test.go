@@ -38,7 +38,7 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 			wantReqs: []proto.Message{&v1.SetThreadWorkspaceRequest{Id: "s-c"}}},
 		{name: "workspace: no thread in the GUI", cmd: "thread.workspace", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"workspace": "shop"}, wantErr: command.ErrUnavailable},
 
-		{name: "new-like: the context thread, only a prompt", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread"},
+		{name: "new-like: the context thread, only a prompt", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread", ActiveProjectID: "web"},
 			args:      map[string]string{"prompt": "next step"},
 			wantMsg:   "created thread s1 in  (no project)", // the fake's thread has none, as a like of a no-project thread
 			wantReqs:  []proto.Message{&v1.CreateThreadRequest{LikeThreadId: "s-src", InitialPrompt: "next step", PermissionMode: auto}},
@@ -53,6 +53,11 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 				Attachments: []string{"/a/1.png", "/a/2.pdf"}, Name: "n"}},
 			wantWarns: []string{"web @ feat/x is also open in fix (s-src)"}},
 		{name: "new-like: no thread in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"prompt": "p"}, wantErr: command.ErrUnavailable},
+		{name: "new-like: a thread without a project in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread"},
+			args: map[string]string{"prompt": "p"}, wantErr: command.ErrUnavailable},
+		{name: "new-like: a thread in its workspace's folder in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread", ActiveWorkspaceID: "w-1"},
+			args: map[string]string{"prompt": "p", "focus": "false"}, wantMsg: "created thread s1 in  (no project)",
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{LikeThreadId: "s-src", InitialPrompt: "p", PermissionMode: auto}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

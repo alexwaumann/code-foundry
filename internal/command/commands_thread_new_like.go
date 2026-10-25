@@ -33,7 +33,7 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			{Name: "name", Type: String, Description: "Thread name"},
 			createdFocusArg,
 		},
-		When: hasThread,
+		When: canNewLike,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			req := &v1.CreateThreadRequest{
 				LikeThreadId: a.String("id"), ProjectId: a.String("project"),
@@ -54,4 +54,12 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			return Result{Message: createdMessage(req, res.Msg, r.projectNamer(ctx)), JSON: s, Warnings: res.Msg.GetHints()}, nil
 		},
 	}
+}
+
+// canNewLike is thread.new-like's availability: a thread, and in the GUI (an active
+// view) one with a project or a workspace, the rule the GUI's menus apply too
+// (gui/frontend/src/lib/threadRow.ts canNewLike): a thread without a project has no
+// branch to start on. The CLI still copies one (a thread in the same home directory).
+func canNewLike(c Context) bool {
+	return hasThread(c) && (c.ActiveView == "" || c.ActiveProjectID != "" || c.ActiveWorkspaceID != "")
 }
