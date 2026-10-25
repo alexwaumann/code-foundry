@@ -287,7 +287,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			return Result{}, wrapStep("start thread", err)
 		}
 		th := created.Msg.GetThread()
-		d.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: th.GetId()}}})
+		focusCreated(d.Emitter, a, th.GetId())
 		return Result{Message: fmt.Sprintf("Started thread %s for PR #%d", threadLabel(th), n), JSON: th}, nil
 	}
 
@@ -299,7 +299,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			Category:    "Pull Request",
 			Args: []ArgSpec{slug, number,
 				{Name: "question", Type: String, Required: true, Positional: true, Description: "What to ask"},
-				worktree, model, effort,
+				worktree, model, effort, createdFocusArg,
 			},
 			When: hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -317,7 +317,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			Title:       "Explain Pull Request",
 			Description: "Start a thread that walks through a pull request for a first-time reviewer.",
 			Category:    "Pull Request",
-			Args:        []ArgSpec{slug, number, worktree, model, effort},
+			Args:        []ArgSpec{slug, number, worktree, model, effort, createdFocusArg},
 			When:        hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				return start(ctx, uctx, a, prThreadRead, func(d *v1.PullRequestDetail, _ PRCheckout) string {
@@ -330,7 +330,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			Title:       "Fix Pull Request Findings",
 			Description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
 			Category:    "Pull Request",
-			Args:        []ArgSpec{slug, number, worktree, model, effort},
+			Args:        []ArgSpec{slug, number, worktree, model, effort, createdFocusArg},
 			When:        hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				return start(ctx, uctx, a, prThreadFix, FixFindingsPRPrompt)

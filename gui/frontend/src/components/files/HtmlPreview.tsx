@@ -2,7 +2,9 @@ import { useState } from "react";
 import { ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tildify } from "@/lib/path";
+import type { PageError } from "@/lib/pageErrors";
 import { HtmlFrame } from "./HtmlFrame";
+import { PageErrors } from "./PageErrors";
 import { usePreviewGrant } from "./previewGrant";
 import { usePageThread } from "./usePageThread";
 import { FileEmptyState, FileLoading } from "./states";
@@ -23,10 +25,11 @@ export { HTML_PREVIEW_SANDBOX } from "./HtmlFrame";
 export function HtmlPreview({ path, text, name }: { path: string; text: string; name: string }) {
   const grant = usePreviewGrant("", path);
   // A page its panel's thread showed has that thread's bridge; any other file none.
-  const thread = usePageThread(path);
+  const page = usePageThread(path);
   // A new key remounts the frame when the text changes (derived state, not an effect, so the first render loads once).
   const [prevText, setPrevText] = useState(text);
   const [version, setVersion] = useState(0);
+  const [errors, setErrors] = useState<readonly PageError[]>([]);
   if (text !== prevText) {
     setPrevText(text);
     setVersion(version + 1);
@@ -50,12 +53,13 @@ export function HtmlPreview({ path, text, name }: { path: string; text: string; 
     );
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-html">
-      <HtmlFrame key={version} url={grant.preview.url} name={name} thread={thread} className="min-h-0 flex-1" testId="file-html-frame" />
+      <HtmlFrame key={version} url={grant.preview.url} name={page?.title || name} thread={page?.thread ?? null} className="min-h-0 flex-1" onPageErrors={setErrors} testId="file-html-frame" />
       <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="file-html-footer">
         <ShieldCheck className="size-3 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">
           Sandboxed from Code Foundry · scripts and network on · {grant.preview.singleFile ? "loads this file only" : `loads files under ${tildify(grant.preview.scope)}`}
         </span>
+        <PageErrors errors={errors} threadId={page?.thread ?? null} page={page?.title ? `${page.title} (${tildify(path)})` : tildify(path)} className="-my-1 ml-auto h-5" />
       </div>
     </div>
   );

@@ -9,7 +9,7 @@
  */
 import type { BridgeSource } from "@/lib/bridge";
 import { useActionsStore } from "./actions";
-import { useEmberStore } from "./ember";
+import { emberBoardHeld, useEmberStore } from "./ember";
 import { onDaemonEvent } from "./events";
 import { dashboardResource } from "./gh";
 import { usePluginsStore } from "./plugins";
@@ -29,7 +29,16 @@ export interface SourceSpec {
   snapshot?: (threadId: string) => unknown;
   /** Calls cb on every change (state sources) or with every event (feeds). Returns the unsubscribe. */
   subscribe: (threadId: string, cb: (event?: unknown) => void) => () => void;
+  /**
+   * Why the source cannot be followed now, or null when it can: a source fed by a stream
+   * only a view on screen holds, which the bridge never opens. The subscription is then
+   * answered `unavailable` with these words instead of staying silent.
+   */
+  unavailable?: () => string | null;
 }
+
+/** The refusal of `ember` while nothing on screen holds Ember's board stream. */
+export const EMBER_OFF_SCREEN = "Ember's board is only live while it is on screen; open the Ember board or sidebar row";
 
 interface Subscribable {
   subscribe: (listener: () => void) => () => void;
@@ -120,10 +129,13 @@ export const bridgeSources: Record<BridgeSource, SourceSpec> = {
     snapshot: () => useUpdateStore.getState().status ?? undefined,
     subscribe: onStores(useUpdateStore),
   },
-  // Ember's board while the app holds its stream (its sidebar row, chat or Board panel).
+  // Ember's board while the app holds its stream (its sidebar row, chat or Board panel);
+  // refused otherwise. The only source that depends on a view on screen: gh holds its read
+  // itself, the rest come from the one EventService stream the app always holds.
   ember: {
     snapshot: () => useEmberStore.getState().board ?? undefined,
     subscribe: onStores(useEmberStore),
+    unavailable: () => (emberBoardHeld() ? null : EMBER_OFF_SCREEN),
   },
   // UI intents (toasts, focus, palette) as they arrive; there is no state to send first.
   ui: {

@@ -139,6 +139,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 			{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model, else Claude's default)"},
 			{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort, else Claude's default)"},
 			{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto", Description: "Permission mode, as thread new's"},
+			createdFocusArg,
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			ask := strings.TrimSpace(a.String("description"))
@@ -195,7 +196,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 				return Result{}, wrapStep("start thread", err)
 			}
 			th := created.Msg.GetThread()
-			d.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: th.GetId()}}})
+			focusCreated(d.Emitter, a, th.GetId())
 			return Result{Message: fmt.Sprintf("started thread %s to make the theme (no project)", threadLabel(th)), JSON: th}, nil
 		},
 	})

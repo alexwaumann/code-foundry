@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
+import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { isThemeAck, resizeHeight } from "./previewGrant";
@@ -47,6 +48,8 @@ export const THEME_ACK_MS = 300;
  * subscribes to the app's state as `thread`, the thread that shows it; without one (a File
  * tab on any other HTML file) it gets a bridge that refuses every call. Only this frame's
  * own window, at the origin its URL names, is heard; replies go to that window and origin.
+ * `onPageErrors` hears the errors the bridge answered the frame's document with
+ * (lib/pageErrors.ts; deduped, the latest few), and [] again on each load and on unmount.
  */
 export function HtmlFrame({
   url,
@@ -56,6 +59,7 @@ export function HtmlFrame({
   onResize,
   testId,
   thread = null,
+  onPageErrors,
 }: {
   url: string;
   name: string;
@@ -64,6 +68,8 @@ export function HtmlFrame({
   className?: string;
   style?: CSSProperties;
   onResize?: (height: number) => void;
+  /** The errors the page's bridge answered, for its strip (components/files/PageErrors.tsx). */
+  onPageErrors?: (errors: readonly PageError[]) => void;
   testId: string;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -116,6 +122,22 @@ export function HtmlFrame({
       clearTimeout(timer.current);
     };
   }, []);
+  // The errors of the document now in the frame.
+  const errors = useRef<readonly PageError[]>([]);
+  const errorsRef = useRef(onPageErrors);
+  useEffect(() => {
+    errorsRef.current = onPageErrors;
+  });
+  const report = useCallback((list: readonly PageError[]) => {
+    errors.current = list;
+    errorsRef.current?.(list);
+  }, []);
+  useEffect(
+    () => () => {
+      if (errors.current.length > 0) report([]);
+    },
+    [report],
+  );
   // The bridge's host for this frame: one per owning thread and page; gone on unmount.
   const origin = useMemo(() => originOf(url), [url]);
   const host = useRef<BridgeHost | null>(null);
@@ -128,6 +150,9 @@ export function HtmlFrame({
         const win = frameRef.current?.contentWindow;
         if (win && origin) win.postMessage(msg, origin);
       },
+      onError: (e) => {
+        report(addPageError(errors.current, e));
+      },
     });
     host.current = h;
     // A page already up (its thread was learnt after it loaded) hears a new ready now.
@@ -136,7 +161,7 @@ export function HtmlFrame({
       h.dispose();
       if (host.current === h) host.current = null;
     };
-  }, [thread, name, origin]);
+  }, [thread, name, origin, report]);
   const resizeRef = useRef(onResize);
   useEffect(() => {
     resizeRef.current = onResize;
@@ -168,6 +193,7 @@ export function HtmlFrame({
       onLoad={() => {
         post();
         hasLoaded.current = true;
+        if (errors.current.length > 0) report([]);
         host.current?.loaded();
       }}
       aria-label={`${name} (rendered)`}

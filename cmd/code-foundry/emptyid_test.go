@@ -28,7 +28,7 @@ func testCLIRefusesEmptyIDs(t *testing.T, c *client.Client) {
 		{"empty --ids", []string{"thread", "remove", "--ids=", "--yes"}, errUsage, "--ids is empty; give an id"},
 		{"an empty positional id", []string{"thread", "get", ""}, errUsage, "--id is empty"},
 		{"ids of only commas", []string{"thread", "archive", "--ids", ",", "--yes"}, errUsage, "ids holds no thread ids"},
-		{"--created-by= still opts out", []string{"thread", "new", "--created-by="}, errUsage, "a worktree, project, or workspace is required"},
+		{"--created-by= still opts out", []string{"thread", "new", "--created-by=", "--context-thread="}, errUsage, "a worktree, project, or workspace is required"},
 		{"no --id at all is not the caller's own thread", []string{"thread", "archive", "--yes"}, errUsage,
 			"not archiving the thread this runs in (s-000000000001) without --id"},
 	}

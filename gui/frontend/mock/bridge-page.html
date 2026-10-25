@@ -13,6 +13,7 @@ p.sub { margin: 0 0 12px; color: var(--cf-text-muted); }
 .k { color: var(--cf-text-muted); }
 button { background: var(--cf-surface); color: var(--cf-text); border: 1px solid var(--cf-border); border-radius: 6px; padding: 3px 10px; font: inherit; cursor: pointer; }
 button.primary { background: var(--cf-accent); color: var(--cf-accent-foreground); border-color: transparent; }
+input { background: var(--cf-surface); color: var(--cf-text); border: 1px solid var(--cf-border); border-radius: 6px; padding: 3px 6px; font: inherit; }
 .out { font-family: ui-monospace, monospace; font-size: 12px; }
 .ok { color: var(--cf-success-text); }
 .err { color: var(--cf-error-text); }
@@ -25,7 +26,8 @@ button.primary { background: var(--cf-accent); color: var(--cf-accent-foreground
   <span class="k">thread.list</span><span><button id="list">Read</button> <span id="list-out" class="out"></span></span>
   <span class="k">ui.notify</span><span><button id="notify" class="primary">Send a toast</button> <span id="notify-out" class="out"></span></span>
   <span class="k">thread.archive</span><span><button id="archive">Archive this thread</button> <span id="archive-out" class="out"></span></span>
-  <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <span id="error-out" class="out"></span></span>
+  <span class="k">errors</span><span><button id="missing">No such verb</button> <button id="invalid">Bad args</button> <button id="misspelt">Misspelt arg</button> <span id="error-out" class="out"></span></span>
+  <span class="k">thread.new</span><span><input id="task" value="Reply with OK only." size="22"> <button id="start">Start</button> <span id="start-out" class="out"></span></span>
   <span class="k">thread-list</span><span class="out"><span id="rows">–</span> threads · <span id="events">0</span> events</span>
 </div>
 <script>
@@ -62,6 +64,19 @@ $("notify").addEventListener("click", () => show($("notify-out"), cf.run("ui.not
 $("archive").addEventListener("click", () => show($("archive-out"), cf.run("thread.archive", { id: cf.thread.id, archived: "true" })));
 $("missing").addEventListener("click", () => show($("error-out"), cf.run("no.such.verb")));
 $("invalid").addEventListener("click", () => show($("error-out"), cf.run("ui.notify", {})));
+$("misspelt").addEventListener("click", () => show($("error-out"), cf.run("thread.list", { archivd: "true" })));
+// The pages skill's example call, unchanged: no project, shown in the sidebar.
+let started = 0;
+$("start").addEventListener("click", () =>
+  show(
+    $("start-out"),
+    cf.run("thread.new", { prompt: $("task").value, sidebar: true }).then((r) => {
+      started++;
+      $("task").value = "";
+      return { text: "started " + String(started) + ": " + r.text, json: null };
+    }),
+  ),
+);
 const ask = () => parent.postMessage({ type: "cf:resize", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
 addEventListener("load", ask);
 new ResizeObserver(ask).observe(document.body);

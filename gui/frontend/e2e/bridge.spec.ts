@@ -76,7 +76,8 @@ test("a verb that asks opens the app's confirm dialog: no is declined, yes runs 
   await doc(page).locator("#archive").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByTestId("confirm-caller")).toContainText("bridge.html, a page in");
+  // The page's title, as shown with it (view.inline --title / the page's <title>).
+  await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
   if (shots) await page.screenshot({ path: `${shots}/bridge-confirm.png` });
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
@@ -149,4 +150,67 @@ test("the File tab of a page its thread showed has that thread's bridge", async 
   await expect(inner.locator("#thread")).not.toHaveText("no thread");
   await inner.locator("#notify").click();
   await expect(inner.locator("#notify-out")).toHaveText("ok");
+});
+
+test("a page starts a thread without moving the view: its handler runs, the sidebar shows the new row", async ({ page }) => {
+  await openBridgeThread(page);
+  await doc(page).locator("#start").click();
+  await expect(doc(page).locator("#start-out")).toHaveText(/^started 1: created thread /);
+  // The page's own success handling ran: the box is empty, so a second click cannot repeat it.
+  await expect(doc(page).locator("#task")).toHaveValue("");
+  const call = (await invocations()).find((i) => i.name === "thread.new");
+  // The skill's example call, unchanged: no project (the thread's placement), focus off by the host.
+  expect(call?.args).toEqual({ prompt: "Reply with OK only.", sidebar: "true", "created-by": "s-r1", focus: "false" });
+  await expect(card(page)).toBeVisible();
+  await expect(row(page, "s:s-r1")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("sidebar").getByText("Reply with OK only")).toBeVisible();
+});
+
+test("a page's errors show on its strip; Ask Claude puts them in the thread's composer, not sent", async ({ page }) => {
+  await openBridgeThread(page);
+  const badge = card(page).getByTestId("page-errors");
+  await expect(badge).toHaveCount(0);
+  await doc(page).locator("#misspelt").click();
+  await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: .*unknown argument "archivd"/);
+  await doc(page).locator("#misspelt").click();
+  await doc(page).locator("#missing").click();
+  await expect(badge).toHaveText("3");
+  await badge.click();
+  const pop = page.getByTestId("page-errors-popover");
+  await expect(pop.getByTestId("page-error")).toHaveCount(2);
+  await expect(pop.getByTestId("page-error").first()).toContainText("no.such.verb");
+  await expect(pop.getByTestId("page-error").last()).toContainText("2×");
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${shots}/bridge-errors-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
+  await pop.getByTestId("page-errors-ask").click();
+  const prompt = page.getByTestId("thread-composer").getByTestId("composer-prompt");
+  await expect(prompt).toHaveAttribute("data-value", /^The page Bridge check \(.*bridge\.html\) got these errors from Code Foundry/);
+  await expect(prompt).toHaveAttribute("data-value", /thread\.list: invalid: .*archivd.* \(2 times\)/);
+  expect((await invocations()).some((i) => i.name === "thread.send")).toBe(false);
+  // A reload of the page clears them.
+  const pageRow = page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row");
+  await pageRow.click();
+  await pageRow.click();
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  await expect(card(page).getByTestId("page-errors")).toHaveCount(0);
+});
+
+test("the panel copy names the page by its title and counts its errors too", async ({ page }) => {
+  await openBridgeThread(page);
+  await card(page).getByTestId("thread-html-panel").click();
+  const inner = page.frameLocator('[data-testid="file-html-frame"]');
+  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
+  await inner.locator("#archive").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog.getByTestId("confirm-caller")).toContainText("Bridge check, a page in");
+  await dialog.getByTestId("confirm-cancel").click();
+  await expect(dialog).toHaveCount(0);
+  await inner.locator("#invalid").click();
+  await expect(page.getByTestId("file-html-footer").getByTestId("page-errors")).toHaveText("1");
 });

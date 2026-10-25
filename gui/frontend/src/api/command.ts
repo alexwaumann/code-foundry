@@ -22,6 +22,8 @@ export interface ArgSpecView {
   defaultValue: string;
   /** The CLI sends $CODE_FOUNDRY_THREAD when the flag is not given (a page's bridge sends its thread). */
   defaultToThreadEnv?: boolean;
+  /** The CLI sends its working directory when the flag is not given (a page's bridge sends its thread's checkout). */
+  defaultToCwd?: boolean;
 }
 
 export interface CommandView {
@@ -105,6 +107,7 @@ export function toArgSpecView(a: ArgSpec): ArgSpecView {
     enumValues: [...a.enumValues],
     defaultValue: a.defaultValue,
     ...(a.defaultToThreadEnv ? { defaultToThreadEnv: true } : {}),
+    ...(a.defaultToCwd ? { defaultToCwd: true } : {}),
   };
 }
 

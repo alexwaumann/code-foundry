@@ -2178,7 +2178,10 @@ export class World {
   private async newThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
     if (args["no-project"] === "true") return this.newHomeThread(ctx, args);
     if (args.workspace || args.projects) return this.newWorkspaceThread(args);
-    const project = this.projects.get(args.project || ctx?.activeProjectId || "") ?? this.worktreeOf(ctx)?.project;
+    // Like the daemon: from a thread (its CLI, or a page it shows) with no placement, where that thread runs.
+    const caller = !args.project && !args.worktree && ctx?.activeView === "" && ctx.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
+    if (caller && !caller.projectId) return this.newHomeThread(undefined, args);
+    const project = this.projects.get(args.project || ctx?.activeProjectId || caller?.projectId || "") ?? this.worktreeOf(ctx)?.project;
     if (!project) throw new CommandError("invalid", "a worktree or project is required");
     const first = firstMessageOf(args);
     const prompt = args.prompt ?? "";
@@ -2194,7 +2197,7 @@ export class World {
       await sleep(ms);
       if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
     };
-    let path = args.worktree ?? "";
+    let path = args.worktree ?? caller?.worktreePath ?? "";
     let baseRef = "";
     const created = args["new-worktree"] === "true";
     if (created) requireGit(project, "a new worktree");
@@ -2227,8 +2230,8 @@ export class World {
     });
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, project.id, path);
-    // Like the daemon: every new thread is focused; the GUI skips a hidden one (stores/intents.ts).
-    this.focusThread(s.id);
+    // Like the daemon: every new thread is focused (unless focus=false); the GUI skips a hidden one (stores/intents.ts).
+    if (args.focus !== "false") this.focusThread(s.id);
     const where = lineage.inSidebar === null || lineage.inSidebar === undefined ? "" : `; ${lineage.inSidebar ? "shown in" : "hidden from"} the sidebar`;
     return { message: `created thread ${s.id} in ${path}${where}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
   }
@@ -2273,7 +2276,7 @@ export class World {
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       firstMessage: firstMessageOf(args),
     });
-    this.focusThread(s.id);
+    if (args.focus !== "false") this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${HOME} (no project)`, resultJson: JSON.stringify({ id: s.id, worktreePath: HOME }) };
   }
 
@@ -2334,7 +2337,7 @@ export class World {
       workspaceId: ws.id,
       firstMessage: first,
     });
-    this.focusThread(s.id);
+    if (args.focus !== "false") this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
   }
 
@@ -2763,7 +2766,7 @@ export class World {
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
-            { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)" },
+            { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
             {
               name: "sidebar",
               type: ArgType.BOOL,
@@ -2771,10 +2774,12 @@ export class World {
               description:
                 "With created-by: show the new thread in the sidebar (or with false, hide it) whatever settings threads.show_created_threads says; a thread another thread creates is hidden by default and archived with its creator",
             },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves)", defaultValue: "true" },
           ],
         },
-        // Like the daemon: also in the composer, whose no-project target has no project.
-        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)) || ctx?.activeView === "compose",
+        // Like the daemon: also in the composer, whose no-project target has no project, and from a thread's CLI or page.
+        when: (ctx) =>
+          this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)) || ctx?.activeView === "compose" || (ctx?.activeView === "" && activeThread(ctx) !== undefined),
         run: (ctx, args) => this.newThread(ctx, args),
       },
       {

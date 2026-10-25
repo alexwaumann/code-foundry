@@ -831,7 +831,7 @@ export class MockThreadLogs {
       // mock/bridge-page.html), shown in a working turn: archiving the thread asks first.
       it({ case: "userMessage", value: { text: "Show me a page that checks the bridge.", attachments: [] } }, { at: ago(1) });
       tool("Bash", { command: "code-foundry view.inline docs/bridge.html" }, { output: `shown docs/bridge.html in thread Fix stale PR badge` }, { at: ago(0, 48) });
-      it({ case: "html", value: { path: "docs/bridge.html", title: "", baseDir: cwd } }, { at: ago(0, 48) });
+      it({ case: "html", value: { path: "docs/bridge.html", title: "Bridge check", baseDir: cwd } }, { at: ago(0, 48) });
       it({ case: "assistantText", value: { text: "Here it is." } }, { at: ago(0, 46), streaming: true });
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.BUSY, "working");

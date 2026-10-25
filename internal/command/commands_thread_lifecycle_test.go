@@ -102,6 +102,25 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{PermissionMode: auto, NewWorkspace: &v1.NewWorkspace{Projects: []string{"web", "api"}, Branch: "add-filter"}}}},
 		{name: "new unavailable in the GUI without a project or worktree", cmd: "thread.new", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		{name: "new from the CLI needs a target", cmd: "thread.new", wantErr: command.ErrInvalidArgs},
+		// From a thread (its CLI, or a page it shows) with no placement: where that thread runs.
+		{name: "new from a thread runs where it does", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			args: map[string]string{"prompt": "go"}, current: &v1.Thread{ProjectId: "r1", WorktreePath: "/wt/r1"},
+			wantMsg: "created thread s1 in /wt/r1",
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"},
+				&v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/r1", InitialPrompt: "go", PermissionMode: auto}},
+			wantIntent: focusIntent("s1")},
+		{name: "new from a workspace thread joins its workspace", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			current: &v1.Thread{ProjectId: "api", WorktreePath: "/wt/api", WorkspaceId: "w-1"},
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"},
+				&v1.CreateThreadRequest{ProjectId: "api", WorktreePath: "/wt/api", WorkspaceId: "w-1", PermissionMode: auto}}},
+		{name: "new from a no-project thread has no project", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			current:  &v1.Thread{WorktreePath: "/Users/me"},
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s5"}, &v1.CreateThreadRequest{NoProject: true, PermissionMode: auto}}},
+		{name: "new from a no-project thread refuses a new worktree", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			args: map[string]string{"new-worktree": "true"}, current: &v1.Thread{WorktreePath: "/Users/me"}, wantErr: command.ErrInvalidArgs},
+		{name: "new from a thread with a project names it", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s5"},
+			args: map[string]string{"project": "r2"}, current: &v1.Thread{ProjectId: "r1", WorktreePath: "/wt/r1"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r2", PermissionMode: auto}}},
 		{name: "new in a workspace", cmd: "thread.new", args: map[string]string{"workspace": "login", "project": "api"},
 			wantMsg:  "created thread s1 in  (workspace login)",
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{WorkspaceId: "login", ProjectId: "api", PermissionMode: auto}}},
@@ -203,6 +222,29 @@ func TestThreadLifecycleCommands(t *testing.T) {
 				if len(in) != 1 || !proto.Equal(in[0], tt.wantIntent) {
 					t.Errorf("intents = %v, want %v", in, tt.wantIntent)
 				}
+			}
+		})
+	}
+}
+
+// A thread-starting verb with focus=false (what a page's bridge sends unless the page
+// asks) moves no window; the default still does (the cases above).
+func TestThreadCreatedNoFocus(t *testing.T) {
+	for _, tt := range []struct {
+		cmd  string
+		ctx  command.Context
+		args map[string]string
+	}{
+		{"thread.new", command.Context{ActiveThreadID: "s5"}, map[string]string{"project": "r1", "focus": "false"}},
+		{"thread.fork", command.Context{ActiveThreadID: "s5"}, map[string]string{"focus": "false"}},
+	} {
+		t.Run(tt.cmd, func(t *testing.T) {
+			reg, _, e := newLifecycleRegistry(t)
+			if _, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args); err != nil {
+				t.Fatal(err)
+			}
+			if in := e.Intents(); len(in) != 0 {
+				t.Errorf("intents = %v, want none", in)
 			}
 		})
 	}
