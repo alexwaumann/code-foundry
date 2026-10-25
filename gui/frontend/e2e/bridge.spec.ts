@@ -421,7 +421,7 @@ test("cf.fetch goes through the daemon: the upstream's answer, a 401 as a respon
     .evaluate(() =>
       (window as unknown as { cf: { fetch: (u: string, i: object) => Promise<unknown> } }).cf.fetch("https://upstream.test/slow", { timeout: 200 }).then(
         () => "ok",
-        (e: { code: string }) => e.code,
+        (e: unknown) => (e as { code: string }).code,
       ),
     );
   expect(code).toBe("timeout");
