@@ -99,7 +99,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"explicit --cwd wins", []string{"thread", "checkouts", "--cwd", "/elsewhere"}, errUsage, "", "no thread has a checkout holding /elsewhere"},
 		{"project add prints the CLI hint", []string{"project", "add"}, nil, "code-foundry project add <folder>", ""},
 		{"project add resolves a relative folder against the working directory", []string{"project", "add", "rel"}, errUsage, "",
-			"code-foundry project.add: /work/rel: lstat /work: no such file or directory"},
+			"code-foundry project.add: /work/rel does not exist"},
 		{"project add-workspace needs a folder", []string{"project", "add-workspace"}, errUsage, "",
 			`code-foundry project.add-workspace: missing required argument "folder"`},
 		{"project add-workspace refuses a folder outside home", []string{"project", "add-workspace", "/"}, errUsage, "", "outside your home directory"},
