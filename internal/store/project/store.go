@@ -543,6 +543,9 @@ func resolveDir(path string) (string, error) {
 		return "", fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
 	}
 	real, err := filepath.EvalSymlinks(abs)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("%w: %s does not exist", ErrInvalidArgument, abs)
+	}
 	if err != nil {
 		return "", fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
 	}
