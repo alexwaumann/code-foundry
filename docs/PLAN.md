@@ -60,6 +60,10 @@ with a `workspaces-v2-<n>-*.md` note.
   missing cwd named, `thread checkouts` prints a rooted workspace's root, no instructions
   block inside the root, the scan lists only children Register takes) on
   `cf/workspaces-v2-fix-workspace`: `docs/notes/workspaces-v2-fix-1-workspace.md`.
+* Fuzz round C fixes, GUI (`workspace.reveal`'s nil RevealFunc, the card's rename settling
+  once, ids for star/add/remove, members by name, Edit instructions steering once, the
+  folder-head Worktree tab, the skills cap, filter by member, Add Project Escape) on
+  `cf/workspaces-v2-fix-gui`: `docs/notes/workspaces-v2-fix-3-gui.md`.
 
 ### Multi-repo workspaces: the five steps are built
 

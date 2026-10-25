@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /**
  * The Projects page's workspace cards and the Worktree tab's Also in list (workspaces v2,
@@ -26,7 +26,7 @@ async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
   return { shop: shop.id, mono: mono.id };
 }
 
-test("a card shows its name, root, projects by id with where threads start, the instructions file and skills; no worktree rows", async ({ page }) => {
+test("a card shows its name, root, projects by name with where threads start, the instructions file and skills; no worktree rows", async ({ page }) => {
   const { shop, mono } = await twoWorkspaces();
   await openApp(page);
   await openProjects(page);
@@ -34,7 +34,7 @@ test("a card shows its name, root, projects by id with where threads start, the 
   // Sorted by name: mono, shop.
   await expect(page.getByTestId("workspace-name")).toHaveText(["mono", "shop"]);
 
-  // A synthetic workspace: no root, its projects by id (repo-cf before repo-gp), the first given starts threads.
+  // A synthetic workspace: no root, its projects by name, the first given starts threads.
   const s = card(page, shop);
   await expect(s).not.toHaveAttribute("data-rooted");
   await expect(s.getByTestId("workspace-root")).toHaveCount(0);
@@ -95,8 +95,24 @@ test("rename in place: double-click or Rename…, Enter renames, Escape keeps, a
   const inv = await lastInvocation("workspace.rename");
   expect(inv?.args).toEqual({ name: "store", workspace: shop });
   expect(inv?.context).toMatchObject({ activeView: "projects", activeWorkspaceId: shop });
-  // The page's list has the keyboard back.
+  // The page's list has the keyboard back, and Enter renamed once (the blur that follows does not again).
   await expect(page.getByTestId("projects-list")).toBeFocused();
+  expect((await invocations()).filter((i) => i.name === "workspace.rename")).toHaveLength(1);
+
+  // Escape after typing a good name keeps the stored one: nothing is renamed.
+  await s.getByTestId("workspace-name").dblclick();
+  await input.fill("renamedByEscape");
+  await page.keyboard.press("Escape");
+  await expect(s.getByTestId("workspace-name")).toHaveText("store");
+  await expect(page.getByTestId("projects-list")).toBeFocused();
+  expect((await invocations()).filter((i) => i.name === "workspace.rename")).toHaveLength(1);
+
+  // Leaving the field renames, once.
+  await s.getByTestId("workspace-name").dblclick();
+  await input.fill("shop");
+  await page.getByTestId("projects-counts").click();
+  await expect(s.getByTestId("workspace-name")).toHaveText("shop");
+  expect((await invocations()).filter((i) => i.name === "workspace.rename").map((i) => i.args.name)).toEqual(["store", "shop"]);
 });
 
 test("set where new threads start: a project, or the workspace's folder", async ({ page }) => {
@@ -108,7 +124,7 @@ test("set where new threads start: a project, or the workspace's folder", async 
   await expect(member(page, shop, "repo-gp").getByTestId("member-make-default")).toHaveCount(0);
   await cf.hover();
   await cf.getByTestId("member-make-default").click();
-  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "code-foundry", workspace: shop });
+  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "repo-cf", workspace: shop });
   await expect(card(page, shop).locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-cf");
 
   const folder = card(page, shop).getByTestId("workspace-folder");
@@ -129,14 +145,14 @@ test("add and remove a project: a picker of the registered projects that are not
   // Plain folders can be members too.
   await expect(list.getByRole("option")).toHaveText(["dotfiles", "sketches", "writing"]);
   await list.getByRole("option", { name: "writing" }).click();
-  expect((await lastInvocation("workspace.add-project"))?.args).toEqual({ project: "writing", workspace: shop });
+  expect((await lastInvocation("workspace.add-project"))?.args).toEqual({ project: "repo-wr", workspace: shop });
   await expect(s.getByTestId("member-name")).toHaveText(["code-foundry", "ghostty-playground", "writing"]);
 
   // Removing the default moves it to the folder; nothing is asked (nothing on disk changes).
   const gp = member(page, shop, "repo-gp");
   await gp.hover();
   await gp.getByTestId("member-remove").click();
-  expect((await lastInvocation("workspace.remove-project"))?.args).toEqual({ project: "ghostty-playground", workspace: shop });
+  expect((await lastInvocation("workspace.remove-project"))?.args).toEqual({ project: "repo-gp", workspace: shop });
   await expect(s.getByTestId("member-name")).toHaveText(["code-foundry", "writing"]);
   await expect(s.getByTestId("workspace-folder")).toHaveAttribute("data-default", "true");
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
@@ -215,7 +231,18 @@ test("the instructions file opens as a File tab; Edit instructions starts a thre
   // The daemon focuses the new thread: it runs in the root.
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 
-  // Again: the thread in the workspace's folder is steered, not a second one started.
+  // Again while that thread is still on its first turn: it is only shown, nothing is sent or started.
+  const id = (await page.getByTestId("thread-pane").getAttribute("data-thread-id")) ?? "";
+  expect(id).not.toBe("");
+  await openProjects(page);
+  await m.getByTestId("workspace-edit-instructions").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
+  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(0);
+  expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(1);
+
+  // Once it is up and idle: the thread in the workspace's folder is steered, not a second one started.
+  await expect.poll(async () => ((await (await fetch(`${mockUrl}/__mock/threads`)).json()) as { id: string; state: string }[]).find((x) => x.id === id)?.state).toBe("CONNECTED");
+  await mockPost(`thread/status?id=${id}&status=idle`);
   await openProjects(page);
   await m.getByTestId("workspace-edit-instructions").click();
   const sent = await lastInvocation("thread.send");
@@ -288,4 +315,158 @@ test("Also in follows the thread's set: a worktree not made yet is marked, and t
   // The worktree appears (a start made it): the list reads the checkouts again.
   await mockPost("worktree/merged?project=repo-cf&branch=feat/later");
   await expect(cf).not.toHaveAttribute("data-missing");
+});
+
+// ---- Fuzz round C fixes (docs/notes/workspaces-v2-fix-3-gui.md) ----
+
+test("a project named “workspace”: its star sets the project, by id, not the workspace's folder", async ({ page }) => {
+  await mockPost("project/rename?id=repo-dot&name=workspace");
+  const { mono } = await twoWorkspaces();
+  await openApp(page);
+  await openProjects(page);
+  const m = card(page, mono);
+  await expect(m.getByTestId("workspace-folder")).toHaveAttribute("data-default", "true");
+  const dot = member(page, mono, "repo-dot");
+  await expect(dot.getByTestId("member-name")).toHaveText("workspace");
+  await dot.hover();
+  await dot.getByTestId("member-make-default").click();
+  expect((await lastInvocation("workspace.set-primary"))?.args).toEqual({ primary: "repo-dot", workspace: mono });
+  await expect(m.locator('[data-testid="workspace-member"][data-default]')).toHaveAttribute("data-project", "repo-dot");
+  await expect(m.getByTestId("workspace-folder")).not.toHaveAttribute("data-default");
+  // Removing it goes by id too.
+  await dot.hover();
+  await dot.getByTestId("member-remove").click();
+  expect((await lastInvocation("workspace.remove-project"))?.args).toEqual({ project: "repo-dot", workspace: mono });
+  await expect(m.getByTestId("workspace-member")).toHaveCount(0);
+});
+
+test("an unregistered member reads “not registered” and opens nothing", async ({ page }) => {
+  const ws = (await mockPost("workspace?name=sk&projects=repo-sk,repo-cf")) as { id: string };
+  await openApp(page);
+  await openProjects(page);
+  await page.locator('[data-testid="project"][data-project="repo-sk"]').getByTestId("project-more").click();
+  await page.getByTestId("project-unregister").click();
+  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
+  const sk = member(page, ws.id, "repo-sk");
+  await expect(sk.getByTestId("workspace-member")).toHaveAttribute("data-unregistered", "true");
+  await expect(sk).toContainText("not registered");
+  await sk.dblclick();
+  await page.keyboard.press("Enter");
+  // No blank tab: the page's panel has no tab for it (nor opened at all).
+  await expect(page.getByTestId("side-panel").getByRole("tab", { name: "repo-sk" })).toHaveCount(0);
+  // A registered member still opens its main worktree.
+  await member(page, ws.id, "repo-cf").dblclick();
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry");
+});
+
+test("Edit instructions steers once: the toast names the thread (no CLI text); while it works a press only shows it", async ({ page }) => {
+  const { mono } = await twoWorkspaces();
+  const t = (await mockPost(`workspace-thread?workspace=${mono}&project=workspace&name=driver&status=busy`)) as { id: string };
+  await openApp(page);
+  await openProjects(page);
+  const edit = card(page, mono).getByTestId("workspace-edit-instructions");
+  await edit.click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
+  const toasts = page.locator("[data-sonner-toast]");
+  await expect(toasts.filter({ hasText: "Sent to driver" })).toHaveCount(1);
+  await expect(toasts.filter({ hasText: "wait with" })).toHaveCount(0);
+  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(1);
+
+  // Still working on it: shown again, not sent again.
+  await openProjects(page);
+  await edit.click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
+  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(1);
+
+  // Done: the next press steers again.
+  await mockPost(`thread/status?id=${t.id}&status=idle`);
+  await openProjects(page);
+  await edit.click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.send").length).toBe(2);
+  expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(0);
+});
+
+test("member rows, Also in and the New workspace list show projects by name, not by id", async ({ page }) => {
+  // repo-cf sorts first by id; as "Zebra" it goes last by name.
+  await mockPost("project/rename?id=repo-cf&name=Zebra");
+  const ws = (await mockPost("workspace?name=zoo&projects=repo-cf,repo-gp,repo-dot")) as { id: string };
+  await openApp(page);
+  await openProjects(page);
+  await expect(card(page, ws.id).getByTestId("member-name")).toHaveText(["dotfiles", "ghostty-playground", "Zebra"]);
+  // The keyboard walks them in the same order.
+  await card(page, ws.id).getByTestId("workspace-name").click();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator('[aria-selected="true"][data-nav-key]')).toHaveAttribute("data-nav-key", `m:${ws.id}::repo-dot`);
+
+  await page.getByTestId("projects-new-workspace").click();
+  await expect(page.getByTestId("new-workspace-project").locator("label")).toHaveText(["dotfiles", "ghostty-playground", "sketches", "writing", "Zebra"]);
+  await page.keyboard.press("Escape");
+
+  // Also in, from ghostty-playground's tab: by name too.
+  const t = (await mockPost("multi-thread?projects=repo-cf,repo-gp,repo-dot&project=repo-gp&branch=feat/zoo&name=zoo")) as { id: string };
+  await row(page, `s:${t.id}`).click();
+  await page.keyboard.press("Meta+Shift+e");
+  await page.keyboard.press("t");
+  await expect(page.getByTestId("worktree-surface").getByTestId("also-in-name")).toHaveText(["dotfiles", "Zebra"]);
+});
+
+test("a thread in its workspace's folder gets a Worktree tab: the workspace and folder, then every member under Also in", async ({ page }) => {
+  const { mono } = await twoWorkspaces();
+  const t = (await mockPost(`workspace-thread?workspace=${mono}&project=workspace&name=folder`)) as { id: string };
+  await openApp(page);
+  await row(page, `s:${t.id}`).click();
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await page.keyboard.press("Meta+Shift+e");
+  await page.keyboard.press("t");
+  const surface = page.getByTestId("worktree-surface");
+  await expect(surface).toHaveAttribute("data-folder", "true");
+  await expect(surface).toHaveAttribute("data-workspace", mono);
+  await expect(surface.getByTestId("worktree-surface-title")).toHaveText("mono");
+  await expect(surface.getByTestId("worktree-surface-folder")).toHaveText("~/mono");
+  // No git facts for a folder.
+  await expect(surface.getByTestId("worktree-facts")).toHaveCount(0);
+  const also = surface.getByTestId("worktree-also-in");
+  await expect(also.getByTestId("also-in-name")).toHaveText(["dotfiles"]);
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("mono");
+
+  // A member opens as its own Worktree tab in the thread's panel.
+  await also.locator('[data-project="repo-dot"]').click();
+  await expect(surface).toHaveAttribute("data-project", "repo-dot");
+  await expect(surface.getByTestId("worktree-also-in")).toHaveCount(0);
+});
+
+test("skills: eight chips, then “+N more” whose tooltip lists the rest; the label sits on the first row", async ({ page }) => {
+  const skills = Array.from({ length: 11 }, (_, i) => `skill-${String(i).padStart(2, "0")}`);
+  const ws = (await mockPost(`workspace?name=many&projects=repo-dot&skills=${skills.join(",")}`)) as { id: string };
+  await openApp(page);
+  await openProjects(page);
+  const line = card(page, ws.id).getByTestId("workspace-skills");
+  await expect(line.getByTestId("workspace-skill")).toHaveText(skills.slice(0, 8));
+  const more = line.getByTestId("workspace-skills-more");
+  await expect(more).toHaveText("+3 more");
+  await expectTooltip(page, more, "skill-08, skill-09, skill-10");
+  // Top-aligned: the label's box starts where the first chip row's does.
+  const label = await line.getByText("Skills", { exact: true }).boundingBox();
+  const first = await line.getByTestId("workspace-skill").first().boundingBox();
+  expect(Math.abs((label?.y ?? 0) + (label?.height ?? 0) / 2 - ((first?.y ?? 0) + (first?.height ?? 0) / 2))).toBeLessThanOrEqual(2);
+});
+
+test("the filter matches a workspace by a project's name; a removed workspace's collapsed mark goes", async ({ page }) => {
+  const { shop, mono } = await twoWorkspaces();
+  await openApp(page);
+  await openProjects(page);
+  await page.getByTestId("projects-filter").fill("ghostty");
+  await expect(page.getByTestId("workspace-name")).toHaveText(["shop"]);
+  await page.getByTestId("projects-filter").fill("");
+
+  await card(page, mono).getByTestId("workspace-collapse").click();
+  await expect(card(page, mono)).toHaveAttribute("data-collapsed", "true");
+  const collapsed = () => page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { collapsedWorkspaces?: string[] } }).state?.collapsedWorkspaces ?? []);
+  expect(await collapsed()).toEqual([mono]);
+  await card(page, mono).getByTestId("workspace-more").click();
+  await page.getByTestId("workspace-remove").click();
+  await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
+  await expect(card(page, mono)).toHaveCount(0);
+  await expect.poll(collapsed).toEqual([]);
+  await expect(card(page, shop)).toBeVisible();
 });

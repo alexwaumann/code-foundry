@@ -6,6 +6,7 @@
  */
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
+import { byName } from "./projectSet";
 
 /** The default primary that runs new threads in the workspace's own folder. */
 export const PRIMARY_WORKSPACE = "workspace";
@@ -48,7 +49,7 @@ export function editInstructionsPrompt(ws: Pick<WorkspaceView, "name" | "instruc
 }
 
 /** The two spellings of a path under /tmp or /var on macOS (a symlink to /private/…). */
-function samePath(a: string, b: string): boolean {
+export function samePath(a: string, b: string): boolean {
   if (!a || !b) return false;
   const norm = (p: string) => p.replace(/\/+$/, "").replace(/^\/private(?=\/(tmp|var)\/)/, "");
   return norm(a) === norm(b);
@@ -70,6 +71,52 @@ export function instructionsThread(threads: { order: readonly string[]; byId: Re
     if (!best || at > best.at) best = { id: t.id, at };
   }
   return best?.id ?? null;
+}
+
+/** A thread "Edit instructions" acts on is live while Claude works or is starting: a press then only focuses it. */
+type StepThread = Pick<ThreadView, "id" | "workspaceId" | "worktreePath" | "archivedAtMs" | "createdBy" | "lastActivityAtMs" | "createdAtMs" | "status" | "state">;
+
+/**
+ * What a press of "Edit instructions" does: start a thread in the workspace's folder when
+ * none is there (instructionsThread), else steer it, except that while the thread the
+ * last press sent to (or started) is still live, a press only focuses it: the prompt is
+ * not sent twice. `last` is that thread's id ("" before any press).
+ */
+export type InstructionsStep = { kind: "start" } | { kind: "steer"; id: string } | { kind: "focus"; id: string };
+
+export function instructionsStep(threads: { order: readonly string[]; byId: Readonly<Record<string, StepThread | undefined>> }, ws: Pick<WorkspaceView, "id" | "rootPath" | "managedDir">, last: string): InstructionsStep {
+  const id = instructionsThread(threads, ws);
+  if (id === null) {
+    // The thread the last press started may not be in the slice yet, or not placed yet.
+    const started = last ? threads.byId[last] : undefined;
+    if (last && (!started || live(started))) return { kind: "focus", id: last };
+    return { kind: "start" };
+  }
+  const t = threads.byId[id];
+  return id === last && t && live(t) ? { kind: "focus", id } : { kind: "steer", id };
+}
+
+function live(t: Pick<ThreadView, "status" | "state">): boolean {
+  return t.status === "busy" || t.state === "starting";
+}
+
+/** Member project ids in display order: by name, case-insensitive (an unregistered one by its id), id as the tiebreak. The stored order stays by id. */
+export function membersByName(ids: readonly string[], nameOf: (id: string) => string | undefined): string[] {
+  return byName(ids, (id) => nameOf(id) ?? id);
+}
+
+/** Project display order: name, case-insensitive, then id. */
+export function compareByName(aName: string, aId: string, bName: string, bId: string): number {
+  return aName.localeCompare(bName, undefined, { sensitivity: "base" }) || (aId < bId ? -1 : aId > bId ? 1 : 0);
+}
+
+/** How many skill chips a card shows before a "+N more" chip (whose tooltip lists the rest). */
+export const SKILL_CHIPS = 8;
+
+/** The skills a card shows as chips and the rest behind "+N more" (none when they fit). */
+export function skillChips(skills: readonly string[], cap = SKILL_CHIPS): { shown: string[]; rest: string[] } {
+  if (skills.length <= cap) return { shown: [...skills], rest: [] };
+  return { shown: skills.slice(0, cap), rest: skills.slice(cap) };
 }
 
 /** Projects a card can add: registered and not yet members, in the projects slice's order (by name). */

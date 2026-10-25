@@ -16,7 +16,7 @@ function thread(sel: Selection): string | null {
  * transcript records), newest first, with state, checks and branch; a row opens the pull
  * request as its own tab. Enabled for a thread with at least one
  * link, hidden otherwise. One tab per panel, no params: the body follows the selection's
- * thread, like the workspace surface. Opened by L in the panel, view.panel.linked-prs
+ * thread. Opened by L in the panel, view.panel.linked-prs
  * (the thread header's button) and the sidebar's PR badge (stores/linkedPrsPanel.ts).
  */
 export const linkedPrsSurface: SurfaceSpec = {

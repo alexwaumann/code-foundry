@@ -219,6 +219,8 @@ interface UiState {
   setProjectCollapsed: (projectId: string, collapsed: boolean) => boolean;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
   setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) => boolean;
+  /** Drops collapsed workspaces that no longer exist (a removal, a snapshot without them). */
+  pruneCollapsedWorkspaces: (exists: (workspaceId: string) => boolean) => void;
 }
 
 /** `ids` with `id` in (collapsed) or out; the same array when nothing changes. */
@@ -489,6 +491,11 @@ export const useUiStore = create<UiState>()(
         if (next === prev) return false;
         set({ collapsedWorkspaces: next });
         return true;
+      },
+      pruneCollapsedWorkspaces: (exists) => {
+        const prev = get().collapsedWorkspaces;
+        const next = prev.filter(exists);
+        if (next.length !== prev.length) set({ collapsedWorkspaces: next });
       },
     }),
     {

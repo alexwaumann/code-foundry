@@ -4,7 +4,9 @@ import { inspectFolder, registerProject, type AddedProjectView, type FolderInfoV
 import { errorMessage } from "@/api/stream";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
+import { workspaceKey } from "@/lib/projects";
 import { useProjectsStore } from "./projects";
+import { revealOnProjectsPage } from "./projectsPage";
 import { useUiStore } from "./ui";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
@@ -136,9 +138,28 @@ export async function addFolderAsWorkspace(path: string): Promise<AddedWorkspace
   }
 }
 
-/** Shows a workspace just added: the Projects page, which lists the workspaces. */
-export function showAddedWorkspace(): void {
+/** A step inside a tab that Escape leaves before it closes the dialog (the Local folder tab's two choices). */
+let escapeBack: (() => void) | null = null;
+
+/** Registers the step's way back while it shows; returns the unregister. */
+export function onAddProjectEscape(back: () => void): () => void {
+  escapeBack = back;
+  return () => {
+    if (escapeBack === back) escapeBack = null;
+  };
+}
+
+/** The dialog's Escape: true when a step went back (the dialog stays open). */
+export function addProjectEscapeBack(): boolean {
+  if (!escapeBack) return false;
+  escapeBack();
+  return true;
+}
+
+/** Shows a workspace just added: the Projects page, its cursor on the new card (scrolled into view) once the card is there. */
+export function showAddedWorkspace(workspaceId: string): void {
   useUiStore.getState().select({ kind: "view", name: "projects" });
+  revealOnProjectsPage(workspaceKey(workspaceId));
 }
 
 /**

@@ -71,6 +71,27 @@ func TestWorkspaceReveal(t *testing.T) {
 	}
 }
 
+// The daemon registers workspace.reveal with no RevealFunc: it falls back to
+// RevealInFinder (as settings.reveal does) rather than calling nil. The folder does not
+// exist, so `open -R` fails without showing Finder; the point is the error, not a panic.
+func TestWorkspaceRevealNilFunc(t *testing.T) {
+	b := bus.New()
+	fake := workspacetest.New(b)
+	ctx := context.Background()
+	missing := t.TempDir() + "/gone"
+	if _, err := fake.Create(ctx, workspace.CreateOptions{Name: "mono", RootPath: missing}); err != nil {
+		t.Fatal(err)
+	}
+	reg := command.NewRegistry()
+	if err := command.RegisterWorkspaceReveal(reg, api.NewWorkspace(fake, b), nil); err != nil {
+		t.Fatal(err)
+	}
+	_, err := reg.Invoke(ctx, command.Context{}, "workspace.reveal", map[string]string{"workspace": "mono"})
+	if err == nil || !strings.Contains(err.Error(), "open -R "+missing) {
+		t.Fatalf("err = %v, want RevealInFinder's error for %s", err, missing)
+	}
+}
+
 // workspace.remove's confirm says what goes: a synthetic workspace's instructions and
 // skills, a rooted one's links only.
 func TestWorkspaceRemoveConfirm(t *testing.T) {

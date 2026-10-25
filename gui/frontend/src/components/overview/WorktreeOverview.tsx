@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, CloudUpload, Folder, GitBranch, GitBranchPlus, MessageSquare, Terminal, TriangleAlert } from "lucide-react";
+import { ChevronRight, CloudUpload, Folder, GitBranch, GitBranchPlus, Layers, MessageSquare, Terminal, TriangleAlert } from "lucide-react";
 import type { PullRequestView } from "@/api/gh";
 import { isRemoteless, type GitStatusView, type ProjectView, type WorktreeView } from "@/api/project";
 import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
@@ -23,6 +23,7 @@ import { useResource } from "@/stores/resource";
 import { useThreadsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
+import { useWorkspacesStore } from "@/stores/workspaces";
 import { alsoInKey, openAlsoIn, useAlsoIn } from "@/stores/threadCheckouts";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { baseFact, branchPullRequest, operationStrip, originFact, otherThreads, shellsIn, shortRef, upstreamRemote, workingTreeFact, type FactPart, type FactTone } from "./facts";
@@ -457,6 +458,44 @@ export function WorktreePanelView({ projectId, path }: { projectId: string; path
           </p>
         ) : (
           <OverviewBody key={wt.path} project={project} wt={wt} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Worktree tab's folder head: a thread whose primary is its workspace's folder (the
+ * root, or the folder the app keeps) runs in no worktree, so the head shows the
+ * workspace's name and the folder (no git facts), and Also in lists every member checkout
+ * (each opening as its own Worktree tab).
+ */
+export function WorkspaceFolderPanelView({ workspaceId, path }: { workspaceId: string; path: string }) {
+  const name = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? "");
+  const known = useWorkspacesStore((s) => s.byId[workspaceId] !== undefined);
+  return (
+    <div className="@container min-w-0" data-testid="worktree-surface" data-workspace={workspaceId} data-path={path} data-folder>
+      <div className="flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3">
+        <header className="-mx-4 flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pb-2 @max-[340px]:-mx-3 @max-[340px]:px-3" data-testid="worktree-surface-header">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
+            <Layers className="size-4 shrink-0 text-cf-highlight-text" aria-hidden />
+            <span className="min-w-0 truncate" data-testid="worktree-surface-title">
+              {name || workspaceId}
+            </span>
+          </h2>
+          <Tip label={path} align="start">
+            <span className="min-w-0 truncate text-caption font-mono" data-testid="worktree-surface-folder">
+              {tildify(path)}
+            </span>
+          </Tip>
+          <WhoElse path={path} />
+        </header>
+        {known ? (
+          <StandaloneAlsoIn path={path} folder />
+        ) : (
+          <p className="text-body text-cf-text-muted" data-testid="worktree-surface-missing">
+            This workspace was removed.
+          </p>
         )}
       </div>
     </div>

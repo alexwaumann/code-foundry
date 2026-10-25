@@ -17,11 +17,20 @@ const view = (...checkouts: ThreadCheckoutView[]): ThreadCheckoutsView => ({ che
 
 describe("alsoInRows", () => {
   const v = view(co("api", "/wt/api/feat-x"), co("notes", "/src/notes", { git: false, branch: "" }), co("web", "/wt/web/feat-x", { primary: true }));
-  it("the other checkouts, in the response's order (by project id)", () => {
+  it("the other checkouts", () => {
     expect(alsoInRows(v, "/wt/web/feat-x")).toEqual([
       { projectId: "api", path: "/wt/api/feat-x", name: "api", branch: "feat/x", missing: false, git: true },
       { projectId: "notes", path: "/src/notes", name: "notes", branch: "", missing: false, git: false },
     ]);
+  });
+  it("by project name, case-insensitive, not by the response's id order", () => {
+    const named = view(co("p-1", "/a", { projectName: "web" }), co("p-2", "/b", { projectName: "Api" }), co("p-3", "/c", { projectName: "billing" }), co("p-4", "/d", { projectName: "zeta", primary: true }));
+    expect(alsoInRows(named, "/d").map((r) => r.name)).toEqual(["Api", "billing", "web"]);
+  });
+  it("a folder head (a thread in its workspace's folder): every checkout", () => {
+    const members = view(co("web", "/src/web", { branch: "main" }), co("api", "/src/api", { branch: "main" }));
+    expect(alsoInRows(members, "/Users/me/mono", true).map((r) => r.projectId)).toEqual(["api", "web"]);
+    expect(alsoInRows(members, "/Users/me/mono")).toEqual([]);
   });
   it("from a member's tab: the primary is listed too", () => {
     expect(alsoInRows(v, "/wt/api/feat-x").map((r) => r.projectId)).toEqual(["notes", "web"]);
@@ -44,6 +53,10 @@ describe("checkoutsKey", () => {
   it("none for a thread with one project or none", () => {
     expect(checkoutsKey(undefined, [])).toBeNull();
     expect(checkoutsKey({ ...t, projectIds: ["web"] }, [])).toBeNull();
+  });
+  it("a folder head asks for one project too (min 1), never for none", () => {
+    expect(checkoutsKey({ ...t, projectIds: ["web"] }, [], 1)).not.toBeNull();
+    expect(checkoutsKey({ ...t, projectIds: [] }, [], 1)).toBeNull();
   });
   it("changes with the cwd, the branch, the set and the members' worktrees, and names the thread", () => {
     const k = checkoutsKey(t, ["/src/api", "/src/web"]);

@@ -1462,7 +1462,8 @@ export class World {
   /** workspace.remove-project: nothing on disk changes; a default primary that was the project becomes "workspace". */
   removeWorkspaceProject(workspace: string, projectRef: string): MockWorkspace {
     const ws = this.workspaceRef(workspace);
-    const id = this.projectRef(projectRef).id;
+    // Like the daemon's memberRef: a member's id first (an unregistered one too), else a project ref.
+    const id = ws.members.includes(projectRef) ? projectRef : this.projectRef(projectRef).id;
     if (!ws.members.includes(id)) throw new CommandError("unavailable", `${projectRef} is not in workspace ${ws.name}`);
     ws.members = ws.members.filter((m) => m !== id);
     if (ws.defaultPrimary === id) ws.defaultPrimary = "workspace";
@@ -2875,6 +2876,14 @@ export class World {
   projectInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined {
     const r = this.projects.get(id);
     return r && { name: r.name, path: r.path, git: r.git !== false, remotes: r.remotes };
+  }
+
+  /** Test control: a project's name (the daemon takes it from the folder; e.g. "workspace", the primary keyword). POST /__mock/project/rename. */
+  renameProject(id: string, name: string): MockProject {
+    const r = this.projectRef(id);
+    r.name = name;
+    this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(r) } });
+    return r;
   }
 
   /** ProjectService.Delete (and project.unregister): the project is gone. */

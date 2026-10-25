@@ -72,8 +72,8 @@ export function AlsoIn({ rows }: { rows: readonly AlsoInRow[] }) {
 }
 
 /** AlsoIn with a keyboard list of its own, for a tab body that has none (a folder without git). */
-export function StandaloneAlsoIn({ path }: { path: string }) {
-  const rows = useAlsoIn(path);
+export function StandaloneAlsoIn({ path, folder = false }: { path: string; folder?: boolean }) {
+  const rows = useAlsoIn(path, folder);
   const items = useMemo<NavItem[]>(() => rows.map((r) => ({ key: alsoInKey(r.path), activate: () => { openAlsoIn(r); } })), [rows]);
   const nav = useNav(items);
   if (rows.length === 0) return null;

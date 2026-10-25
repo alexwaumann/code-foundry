@@ -1334,7 +1334,8 @@ export class MockThreadLogs {
           refuseSlashCommand(a.text ?? "");
           this.calls.push(`send ${a.id ?? ""} ${a.text ?? ""}${atts.length > 0 ? ` [${atts.join(",")}]` : ""}`);
           this.send(a.id ?? "", a.text ?? "", atts, a["composer-text"] ?? "");
-          return `sent to thread ${a.id ?? ""}`;
+          // The daemon's message is for the CLI (commands_thread.go sendNext); the GUI must not toast it as is.
+          return `sent to thread ${a.id ?? ""}; wait with: code-foundry thread wait ${a.id ?? ""}`;
         },
       },
       {

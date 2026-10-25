@@ -3,14 +3,16 @@
  * worktree's overview shows: the Projects page's project and worktree rows (into the
  * page's own panel), the daemon's ui.focus.project and the thread row menu's Show
  * worktree, and the selected thread's own worktree through T in the panel and
- * view.panel.worktree (worktreePanelCommand in stores/views.ts). Workspace member tabs
- * are stores/workspacePanel.ts openMemberTab.
+ * view.panel.worktree (worktreePanelCommand in stores/views.ts); a thread whose primary
+ * is its workspace's folder gets the folder head instead (selectionTab). A thread's other
+ * checkouts open from its tab's Also in list (stores/threadCheckouts.ts openAlsoIn).
  */
-import { selectionWorktree, worktreeTab } from "@/surfaces/worktreeTarget";
-import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
+import { folderTab, selectionFolder, selectionWorktree, worktreeTab } from "@/surfaces/worktreeTarget";
+import { keyOf, openSurface, togglePanel, type PanelTarget, type Tab } from "./panel";
 import { findWorktree, mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
+import { useWorkspacesStore } from "./workspaces";
 
 /**
  * A worktree tab's title: the project's name, and off the main worktree its branch too
@@ -66,13 +68,28 @@ export function showWorktreeInThread(threadId: string): boolean {
 }
 
 /**
- * Opens (or activates) the selection's own worktree tab in its panel when the selection
- * is a thread in a registered worktree. Returns that panel's key, or null
- * otherwise. It does not request focus.
+ * The selection's own Worktree tab: its worktree's for a thread in a registered worktree,
+ * the folder head for a thread in its workspace's folder (titled with the workspace);
+ * null for anything else.
+ */
+export function selectionTab(sel: Selection): Tab | null {
+  const projects = useProjectsStore.getState();
+  const threads = useThreadsStore.getState();
+  const w = selectionWorktree(sel, { projects, threads });
+  if (w) return worktreeTab(w.projectId, w.path, worktreeTabTitle(projects, w.projectId, w.path));
+  const workspaces = useWorkspacesStore.getState();
+  const f = selectionFolder(sel, { threads, workspaces });
+  return f ? folderTab(f.workspaceId, f.path, workspaces.byId[f.workspaceId]?.name ?? f.workspaceId) : null;
+}
+
+/**
+ * Opens (or activates) the selection's own Worktree tab (selectionTab) in its panel.
+ * Returns that panel's key, or null when the selection has none. It does not request
+ * focus.
  */
 export function openWorktreeSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const w = selectionWorktree(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
-  if (key === null || w === null) return null;
-  return openWorktreeTab(key, w.projectId, w.path) ? key : null;
+  const tab = selectionTab(sel);
+  if (key === null || tab === null) return null;
+  return openSurface(key, tab) ? key : null;
 }

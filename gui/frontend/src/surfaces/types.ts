@@ -30,7 +30,7 @@ export interface SurfaceSpec {
   /**
    * Single lowercase letter that opens the surface while the panel has focus. None for a
    * surface that is only opened from elsewhere (it is then also "hidden" in the empty
-   * list), e.g. a workspace member's worktree, opened from the workspace surface.
+   * list), e.g. a pull request, opened from a row elsewhere.
    */
   hotkey?: string;
   /**

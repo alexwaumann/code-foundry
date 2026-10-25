@@ -87,6 +87,19 @@ func placed(ok func(*v1.Thread) bool, why string) panelCheck {
 // inWorktree is view.panel.worktree's check (view.panel.diff's starts with it).
 var inWorktree = placed(func(t *v1.Thread) bool { return t.GetProjectId() != "" && t.GetWorktreePath() != "" }, "runs in no project worktree")
 
+// inWorktreeOrFolder is view.panel.worktree's check: a project worktree, or its
+// workspace's folder (no primary project, a workspace reference), which the Worktree tab
+// shows with a folder head and every member checkout (docs/notes/workspaces-v2-fix-3-gui.md).
+var inWorktreeOrFolder = placed(func(t *v1.Thread) bool {
+	return t.GetWorktreePath() != "" && (t.GetProjectId() != "" || t.GetWorkspaceId() != "")
+}, "runs in no project worktree or workspace folder")
+
+// inWorkspaceFolderContext is the app's context for a thread whose primary is its
+// workspace's folder: a thread and a workspace, a cwd, no project.
+func inWorkspaceFolderContext(c Context) bool {
+	return hasThread(c) && c.ActiveWorkspaceID != "" && c.ActiveProjectID == "" && c.ActiveWorktreePath != ""
+}
+
 // withLinkedPRs is view.panel.linked-prs's check: the GUI lists the surface only for a
 // thread with links, and opening it for one without is a no-op there.
 var withLinkedPRs = placed(func(t *v1.Thread) bool { return len(t.GetLinkedPullRequests()) > 0 }, "has no linked pull requests yet")

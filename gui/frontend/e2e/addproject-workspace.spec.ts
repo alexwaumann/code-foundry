@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, listProjects, mockUrl, openAddProjectDialog, openApp, projectAt, resetMock } from "./fixtures";
+import { invocations, listProjects, mockPost, mockUrl, openAddProjectDialog, openApp, projectAt, resetMock } from "./fixtures";
 
 // The Add Project dialog's folder-of-repos scan (docs/notes/workspaces-v2-6-scan.md): a
 // folder that is not a git repository but has git repositories directly inside it asks
@@ -130,4 +130,37 @@ test("a repository that cannot be added shows the daemon's error in place", asyn
   await expect(dialog(page)).toBeVisible();
   await expect(page.getByTestId("add-project-as-workspace")).toBeEnabled();
   expect(await listWorkspaces()).toEqual([]);
+});
+
+test("Escape on the two choices goes back to the path as typed; Escape again closes the dialog", async ({ page }) => {
+  await openApp(page);
+  await askAbout(page, "product");
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toBeVisible();
+  await expect(page.getByTestId("add-project-choice")).toHaveCount(0);
+  const input = page.getByTestId("add-project-local-input");
+  await expect(input).toHaveValue("product");
+  await expect(input).toBeFocused();
+  await expect(page.getByTestId("add-project-local-submit")).toBeVisible();
+  // Enter asks again.
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("add-project-choice")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await listWorkspaces()).toEqual([]);
+});
+
+test("after Add as workspace the new card is the Projects page's cursor row, scrolled into view", async ({ page }) => {
+  // Enough workspaces before it that it would sit below the fold.
+  for (const name of ["a1", "a2", "a3", "a4", "a5", "a6"]) await mockPost(`workspace?name=${name}&projects=repo-cf,repo-gp,repo-dot`);
+  await page.setViewportSize({ width: 1100, height: 640 });
+  await openApp(page);
+  await askAbout(page, "product");
+  await page.getByTestId("add-project-as-workspace").click();
+  await expect(dialog(page)).toHaveCount(0);
+  const ws = (await listWorkspaces()).find((w) => w.name === "product");
+  const header = page.locator(`[data-nav-key="ws:${ws?.id ?? ""}"]`);
+  await expect(header).toHaveAttribute("aria-selected", "true");
+  await expect(header).toBeInViewport();
 });
