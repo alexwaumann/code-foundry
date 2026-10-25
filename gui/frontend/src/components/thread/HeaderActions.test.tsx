@@ -23,7 +23,6 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
-const { useProjectsPageStore } = await import("@/stores/projectsPage");
 const { useActionsStore } = await import("@/stores/actions");
 const { useSettingsStore } = await import("@/stores/settings");
 
@@ -62,23 +61,11 @@ describe("HeaderActions", () => {
     expect(order()).toEqual(["pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
   });
 
-  it("a workspace thread: the workspace chip by name first, opening the Projects page on its card", () => {
+  it("a workspace thread: no workspace chip (the left side's place name opens its card, ThreadParts)", () => {
     useWorkspacesStore.setState({ byId: { w1: { name: "release-channels", members: [] } as never } });
     setThread({ workspaceId: "w1", linkedPullRequests: [link(1), link(2), link(3)] });
     render(<HeaderActions threadId="s-1" />);
-    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
-    const ws = screen.getByTestId("pane-workspace");
-    expect(ws.textContent).toBe("release-channels");
-    expect(ws.getAttribute("title")).toBeNull();
-    fireEvent.click(ws);
-    expect(startCommandNamed).not.toHaveBeenCalled();
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
-    expect(useProjectsPageStore.getState().reveal).toBe("ws:w1");
-  });
-
-  it("a workspace the slice does not know: no chip", () => {
-    setThread({ workspaceId: "w-gone" });
-    render(<HeaderActions threadId="s-1" />);
+    expect(order()).toEqual(["pane-linked-prs", "pane-snooze", "thread.archive", "pane-thread-menu", "bottom-toggle", "panel-toggle"]);
     expect(screen.queryByTestId("pane-workspace")).toBeNull();
   });
 

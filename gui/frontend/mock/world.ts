@@ -4095,7 +4095,7 @@ export class World {
     const entries = this.registry();
     const kb = this.settings.keybindings();
     const defaults: Record<string, string> = this.threadDefaults();
-    const startsThread = new Set(["thread.new", "pr.ask", "pr.explain", "pr.fix.findings"]);
+    const startsThread = new Set(["thread.new", "thread.new-like", "pr.ask", "pr.explain", "pr.fix.findings", "theme.ask"]);
     return entries.map((e) => ({
       ...e,
       cmd: {

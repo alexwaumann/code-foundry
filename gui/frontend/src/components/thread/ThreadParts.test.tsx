@@ -6,6 +6,8 @@ import { useCommandsStore } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { useProjectsPageStore } from "@/stores/projectsPage";
+import { useUiStore } from "@/stores/ui";
 import { ThreadTitle } from "./ThreadParts";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
@@ -130,6 +132,36 @@ describe("ThreadTitle", () => {
     render(<ThreadTitle id="s-1" />);
     expect(location().textContent).toBe("shop@feat/x");
     expect(location().querySelector("svg.lucide-layers")).not.toBeNull();
+  });
+
+  it("a place that names the thread's workspace opens the Projects page on its card; others open the Worktree tab", () => {
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "shop", members: ["cf", "api"] } as never }, order: ["w-1"] });
+    // In its workspace's folder, and a set with the workspace: the place reads "shop".
+    for (const t of [
+      { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", workspaceId: "w-1", projectIds: ["api", "cf"] },
+      { projectId: "cf", worktreePath: "/src/cf", workspaceId: "w-1", projectIds: ["api", "cf"] },
+    ]) {
+      useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+      useProjectsPageStore.setState({ reveal: null });
+      useThreadsStore.setState({ byId: { "s-1": thread(t) } });
+      render(<ThreadTitle id="s-1" />);
+      expect(location().textContent).toContain("shop");
+      expect(location().dataset.opens).toBe("workspace");
+      fireEvent.click(location());
+      expect(startCommandNamed).not.toHaveBeenCalled();
+      expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
+      expect(useProjectsPageStore.getState().reveal).toBe("ws:w-1");
+      cleanup();
+    }
+    // A thread without a workspace (and one whose place is its single project): the Worktree tab, as before.
+    for (const t of [{ projectIds: ["api", "cf"], projectId: "cf", worktreePath: "/src/cf" }, { workspaceId: "w-1" }]) {
+      useThreadsStore.setState({ byId: { "s-1": thread(t) } });
+      render(<ThreadTitle id="s-1" />);
+      expect(location().dataset.opens).toBeUndefined();
+      fireEvent.click(location());
+      expect(startCommandNamed).toHaveBeenLastCalledWith("view.panel.worktree");
+      cleanup();
+    }
   });
 
   it("an unnamed thread shows its id", () => {

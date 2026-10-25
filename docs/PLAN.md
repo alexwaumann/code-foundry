@@ -73,7 +73,8 @@ with a `workspaces-v2-<n>-*.md` note.
   the workspace, like with the workspace folder, folder-only sets in place, cmd+N resets
   an empty draft, no Save as workspace in a workspace folder, like headings and "Workspace
   folder", a like draft outlives its thread, new-like and run-in availability, deduped
-  hints, chip paths, the header workspace chip) on `cf/workspaces-v2-fix-composer`:
+  hints, chip paths, the header's place name opens the workspace's card; new-like takes the
+  default model and effort) on `cf/workspaces-v2-fix-composer`:
   `docs/notes/workspaces-v2-fix-4-composer.md`.
 
 ### Multi-repo workspaces: the five steps are built

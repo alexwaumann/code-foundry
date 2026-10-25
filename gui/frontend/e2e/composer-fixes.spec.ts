@@ -314,16 +314,17 @@ test("11, 13: the hints shown under the chips are not toasted again; a chip's to
   await expect(page.getByText(/is also open in Busy one \(s-set-/)).toHaveCount(0);
 });
 
-test("12: the thread header's workspace chip opens the Projects page on that workspace's card", async ({ page }) => {
+test("12: the thread header's place name opens the Projects page on its workspace's card (no separate chip)", async ({ page }) => {
   for (const name of ["a1", "a2", "a3", "a4", "a5"]) await mockPost(`workspace?name=${name}&projects=repo-cf,repo-gp,repo-dot`);
   await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&name=Shop")) as ThreadSummary;
   await page.setViewportSize({ width: 1100, height: 640 });
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  const chip = page.getByTestId("pane-workspace");
-  await expect(chip).toHaveText("shop");
-  await chip.click();
+  await expect(page.getByTestId("pane-workspace")).toHaveCount(0);
+  const place = page.getByTestId("thread-location");
+  await expect(place.getByTestId("thread-project")).toHaveText("shop");
+  await place.click();
   await expect(page.getByTestId("projects-page")).toBeVisible();
   const header = page.locator('[data-nav-key="ws:w-000000000006"]');
   await expect(header).toHaveAttribute("aria-selected", "true");

@@ -1,13 +1,16 @@
 import { CornerDownRight, Folder, FolderGit2, House, Layers } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { useThreadPlace, useThreadPlaceInput } from "./useThreadPlace";
 import { cn } from "@/lib/utils";
 import { useCreator } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
+import { showWorkspaceCard } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
+import { useWorkspacesStore } from "@/stores/workspaces";
 import { Chip } from "./Chip";
 
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
@@ -41,23 +44,22 @@ function ThreadName({ id }: { id: string }) {
  * thread without a project the House icon and "No project", nothing else. The
  * same threadRowModel the sidebar row reads, so the two never disagree. A click opens the
  * Worktree surface in the side panel (view.panel.worktree); where that is not available it
- * is plain text.
+ * is plain text. When it names the thread's workspace (several projects, or the
+ * workspace's folder, with a workspace the slice knows) a click opens the Projects page
+ * with that workspace's card as the cursor row instead (stores/projectsPage
+ * showWorkspaceCard, as after Add as workspace).
  */
 function ThreadLocation({ id }: { id: string }) {
   const where = useThreadPlaceInput(id);
   const place = useThreadPlace(id);
   const worktree = useProjectsStore((st) => threadRowModel(where, st, NO_WORKSPACES).worktree);
+  const workspaceKnown = useWorkspacesStore((s) => where.workspaceId !== "" && where.workspaceId in s.byId);
   // A thread of several projects, or in its workspace's folder: the workspace's name (else "N projects"), as on line 2.
   const m = { ...place, project: place.set ?? place.project, worktree };
   const Icon = m.noProject ? House : m.set !== null ? Layers : m.noGit ? Folder : FolderGit2;
-  return (
-    <CommandButton
-      command="view.panel.worktree"
-      whenUnavailable="plain"
-      size="xs"
-      className="flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-cf-text-muted"
-      data-testid="thread-location"
-    >
+  const className = "flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-cf-text-muted";
+  const content = (
+    <>
       <Icon className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate" data-testid="thread-project" data-no-project={m.noProject || undefined}>
         {m.project}
@@ -73,6 +75,28 @@ function ThreadLocation({ id }: { id: string }) {
           {m.worktree && <Chip data-testid="thread-worktree-chip">worktree</Chip>}
         </>
       )}
+    </>
+  );
+  if (!m.noProject && m.set !== null && workspaceKnown) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        className={className}
+        data-testid="thread-location"
+        data-opens="workspace"
+        onClick={() => {
+          showWorkspaceCard(where.workspaceId);
+        }}
+      >
+        {content}
+      </Button>
+    );
+  }
+  return (
+    <CommandButton command="view.panel.worktree" whenUnavailable="plain" size="xs" className={className} data-testid="thread-location">
+      {content}
     </CommandButton>
   );
 }

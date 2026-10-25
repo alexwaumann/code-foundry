@@ -66,14 +66,20 @@ decisions differed from the report's suggested fixes, the decisions were built.
 11. **After-create toasts repeated the hints.** The composer passes the hints it showed to
     `sendDraft`; `lib/collisionHints unshownHints` drops the daemon's lines that match one,
     compared with the daemon's " (<id>)" thread label left out.
-12. **The header's workspace chip ran a removed command.** It is a button that opens the
+12. **The header's workspace chip ran a removed command.** The chip is gone: it repeated
+    the header's place name, which already reads the workspace's name for a thread of
+    several projects with a workspace or one in its folder. That place name now opens the
     Projects page with the workspace's card as the cursor row
     (`stores/projectsPage showWorkspaceCard`, the reveal #359 added for Add as workspace,
-    which `showAddedWorkspace` now calls too); hidden for a workspace the slice does not
-    know. The smaller of the two options: no new command arg (the chip is navigation, as the
-    composer's Escape to the Projects page is). Unit test updated; `live-sidebar.spec.ts`
-    reads v2 (no badge, the workspace's name on line 2, `workspace list` instead of the
-    removed `workspace members`); `sidebar.spec.ts`'s title.
+    which `showAddedWorkspace` now calls too; `ThreadParts ThreadLocation`,
+    `data-opens="workspace"`). Every other place name keeps opening the Worktree tab: a
+    thread without a workspace, a workspace the slice does not know, and a single-project
+    thread with a workspace reference, whose place name is its project and branch (its
+    workspace shows in the composer and on the Projects page). No new command arg: this is
+    navigation, as the composer's Escape to the Projects page is. Unit tests
+    (`ThreadParts.test.tsx`, `HeaderActions.test.tsx`); `live-sidebar.spec.ts` reads v2 (no
+    badge, the workspace's name on line 2, `workspace list` instead of the removed
+    `workspace members`); `sidebar.spec.ts`'s title.
 13. **Long similar chip names.** Each chip's name and branch carry a tooltip with the
     project's path (hidden information, `tildify`).
 14. **"Workspace" beside a project named "workspace".** The folder is "Workspace folder" in
@@ -121,7 +127,7 @@ decisions differed from the report's suggested fixes, the decisions were built.
     for a thread without a workspace says "project "workspace" (the workspace's folder)
     needs a workspace; thread <id> has none".
   * The built Wails app (`make gui-build`), dark and light: a thread in shop's folder, line
-    2 `shop`, the header's workspace chip.
+    2 `shop`, the header's place name `shop` with no chip beside the actions.
   * WebKit (Playwright) on the Vite dev server against the same daemon restarted with
     `--dev` (synthetic input to the native window was not used): the like composer of an
     in-place shop thread reads "What's next in shop?", Runs in lists "Workspace folder /
@@ -133,9 +139,13 @@ decisions differed from the report's suggested fixes, the decisions were built.
 
 * The CLI keeps `--project workspace` meaning the folder whenever a workspace is in play
   (finding 14's CLI half): a project named "workspace" needs its id there.
-* The header now shows the workspace twice for a thread whose location already names it
-  (a workspace-folder thread or a set with a workspace: the location reads `shop`, the chip
-  `shop`). Either the chip shows only where the location does not name the workspace, or
-  the location itself opens the card; left as decided (the chip always shows).
-* `thread new-like` from the CLI does not apply `threads.default_model` (a CLI like ran on
-  the Claude default, `thread new --like` on Haiku): pre-existing, not changed here.
+
+## Found while checking, fixed here
+
+* **`thread new-like` ignored the default model and effort** (pre-existing: a CLI like ran
+  on Claude's default where `thread new --like` ran on the settings' model). The daemon's
+  settings-to-registry overrides now come from one list, `internal/daemon threadStarters`
+  (thread.new, thread.new-like, pr.ask, pr.explain, pr.fix.findings, theme.ask), so every
+  command that starts a thread takes `threads.default_model` and `threads.default_effort`
+  the same way, marked as defaulted. The mock's list matches.
+  `TestRegistryOverridesThreadStarters`; `TestThreadNewDefaultedModel` covers both verbs.

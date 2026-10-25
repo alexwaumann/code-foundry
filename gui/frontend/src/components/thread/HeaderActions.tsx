@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Archive, ArchiveRestore, Eye, EyeOff, GitPullRequest, Layers } from "lucide-react";
+import { Archive, ArchiveRestore, Eye, EyeOff, GitPullRequest } from "lucide-react";
 import { ThreadActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
@@ -12,9 +12,7 @@ import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useSidebarShown } from "@/stores/lineage";
 import { openPullRequestInPanel } from "@/stores/prPanel";
-import { showWorkspaceCard } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
-import { useWorkspacesStore } from "@/stores/workspaces";
 import { ThreadMenu } from "./ThreadMenu";
 
 /**
@@ -64,37 +62,6 @@ function LinkedPrs({ threadId }: { threadId: string }) {
 }
 
 /**
- * The referenced workspace by name, opening the Projects page with its card as the
- * cursor row (stores/projectsPage showWorkspaceCard, as after Add as workspace); only for
- * a thread that references a workspace the slice knows.
- */
-function WorkspaceChip({ threadId }: { threadId: string }) {
-  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const name = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
-  if (!workspaceId || !name) return null;
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="xs"
-      className="min-w-0 gap-1.5 px-1.5 text-caption-sm text-cf-text-muted [&_svg]:size-3.5"
-      tabIndex={-1}
-      aria-label={`Workspace ${name}: show it on the Projects page`}
-      data-testid="pane-workspace"
-      onMouseDown={(e) => {
-        e.preventDefault();
-      }}
-      onClick={() => {
-        showWorkspaceCard(workspaceId);
-      }}
-    >
-      <Layers aria-hidden />
-      <span className="truncate">{name}</span>
-    </Button>
-  );
-}
-
-/**
  * thread.archive for this thread: Archive, or Unarchive (its own icon and tooltip) while
  * it is archived. Run without args, the command toggles; the daemon asks for confirmation
  * only while Claude is mid-turn.
@@ -117,7 +84,7 @@ function SidebarButton({ threadId }: { threadId: string }) {
 }
 
 /**
- * The thread header's right side: the workspace, the linked pull requests, then the
+ * The thread header's right side: the linked pull requests (the workspace is the left side's place name, ThreadParts), then the
  * thread's commands (its "More" menu among them: ThreadMenu) and the window's, run against the current selection (this thread) exactly
  * as the palette runs them. Each command button hides when the daemon does not list it as
  * available.
@@ -125,7 +92,6 @@ function SidebarButton({ threadId }: { threadId: string }) {
 export function HeaderActions({ threadId }: { threadId: string }) {
   return (
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
-      <WorkspaceChip threadId={threadId} />
       <LinkedPrs threadId={threadId} />
       <SnoozeButton threadId={threadId} />
       <SidebarButton threadId={threadId} />
