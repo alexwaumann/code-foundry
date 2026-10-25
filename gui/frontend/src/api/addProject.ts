@@ -28,6 +28,27 @@ export async function registerProject(path: string, conn: DaemonConnection = dae
   return { id: res.project.id, name: res.project.name || res.project.id };
 }
 
+/** What Register would make of a folder (ProjectService.InspectFolder). */
+export interface FolderInfoView {
+  /** Absolute, symlinks resolved. */
+  path: string;
+  /** The folder is (inside) a git repository: Register adds that repository. */
+  isRepo: boolean;
+  /** When not a repository: the git repositories directly inside it, sorted by name. */
+  childRepos: { path: string; name: string }[];
+}
+
+/**
+ * Asks the daemon what a folder is before it is added (the folder-of-repos scan,
+ * docs/notes/workspaces-v2-6-scan.md). Errors are the daemon's ConnectError (the same
+ * path rules as Register).
+ */
+export async function inspectFolder(path: string, conn: DaemonConnection = daemon): Promise<FolderInfoView> {
+  const c = await conn.client(ProjectService);
+  const res = await c.inspectFolder({ path });
+  return { path: res.path, isRepo: res.isRepo, childRepos: res.childRepos.map((r) => ({ path: r.path, name: r.name })) };
+}
+
 export type RepoVisibility = "public" | "private" | "internal" | "";
 
 /** A github.com repository as the dialog lists it. */

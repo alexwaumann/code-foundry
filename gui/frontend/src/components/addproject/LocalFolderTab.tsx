@@ -7,7 +7,16 @@ import { usePathCompletion } from "@/components/palette/usePathListing";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { descendInto, entryPath, HOME_PREFIX, homeDisplay, homeRelative } from "@/palette/paths";
-import { finishAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
+import type { FolderInfoView } from "@/api/addProject";
+import {
+  addFolderAsWorkspace,
+  finishAddProject,
+  folderOfRepos,
+  registerFolder,
+  selectAddedProject,
+  showAddedWorkspace,
+} from "@/stores/addProject";
+import { FolderChoice, type FolderChoiceBusy } from "./FolderChoice";
 
 /**
  * cmdk always highlights an item (the first, after each keystroke). This hidden one comes
@@ -23,11 +32,19 @@ const TYPED = "__typed";
  *
  * A click on a folder (or Tab, or `/` on the highlighted one) opens it; only Enter and the
  * Add project button add. Enter adds the highlighted folder, else the typed path.
+ *
+ * A folder that is not a git repository but has git repositories directly inside it is
+ * not added at once: the tab asks how (FolderChoice), as a workspace of those
+ * repositories (project.add-workspace) or as one plain project. Editing the path drops
+ * the question.
  */
 export function LocalFolderTab({ active }: { active: boolean }) {
   const [path, setPath] = useState(HOME_PREFIX);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The folder of repos being asked about (with the path as typed), else null. */
+  const [choice, setChoice] = useState<{ typed: string; folder: FolderInfoView } | null>(null);
+  const [choiceBusy, setChoiceBusy] = useState<FolderChoiceBusy>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Focus the path when the tab is shown (a click on the tab, or the dialog opening,
@@ -45,14 +62,16 @@ export function LocalFolderTab({ active }: { active: boolean }) {
   const change = (v: string) => {
     setPath(homeRelative(v));
     setError(null);
+    setChoice(null);
   };
   const { paths, host, handleKey, chooseFolder } = usePathCompletion({
     query: path,
-    enabled: !busy,
+    enabled: !busy && !choice,
     rootRef,
     replace: (from, next) => {
       setPath((cur) => (cur === from ? homeRelative(next) : cur));
       setError(null);
+      setChoice(null);
     },
   });
 
@@ -64,6 +83,13 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     }
     setBusy(true);
     setError(null);
+    const folder = await folderOfRepos(p);
+    if (folder) {
+      setPath(p);
+      setChoice({ typed: p, folder });
+      setBusy(false);
+      return;
+    }
     try {
       const project = await registerFolder(p);
       toast.success(`Added ${project.name}`);
@@ -72,6 +98,28 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
+    }
+  };
+
+  const addChosen = async (as: "workspace" | "project") => {
+    if (!choice || choiceBusy) return;
+    setChoiceBusy(as);
+    setError(null);
+    try {
+      if (as === "workspace") {
+        const w = await addFolderAsWorkspace(choice.typed);
+        toast.success(`Added workspace ${w.name}`);
+        finishAddProject();
+        showAddedWorkspace();
+      } else {
+        const project = await registerFolder(choice.typed);
+        toast.success(`Added ${project.name}`);
+        finishAddProject();
+        selectAddedProject(project.id);
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+      setChoiceBusy(null);
     }
   };
 
@@ -114,7 +162,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
         <CommandInput
           value={typed}
           onValueChange={change}
-          disabled={busy}
+          disabled={busy || choiceBusy !== null}
           placeholder="path/to/folder"
           aria-label="Folder path under your home directory"
           className="-ml-2 font-mono"
@@ -138,7 +186,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
             ) : undefined
           }
         />
-        <CommandList className="max-h-64">
+        <CommandList className={choice ? "hidden" : "max-h-64"}>
           <CommandItem
             value={TYPED}
             className="hidden"
@@ -156,15 +204,26 @@ export function LocalFolderTab({ active }: { active: boolean }) {
           />
         </CommandList>
       </Command>
-      <div className="flex items-center justify-between gap-3">
-        <span className={`text-caption ${error ? "text-cf-error-text" : "text-cf-text-muted"}`} role={error ? "alert" : undefined} data-testid="add-project-local-message">
-          {error ?? "Click or Tab opens a folder · Enter adds"}
-        </span>
-        <Button type="button" size="sm" disabled={busy || typed === ""} onClick={() => void submit(path)} data-testid="add-project-local-submit">
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FolderPlus aria-hidden />}
-          Add project
-        </Button>
-      </div>
+      {choice ? (
+        <FolderChoice
+          path={choice.typed}
+          repos={choice.folder.childRepos.length}
+          busy={choiceBusy}
+          error={error}
+          onWorkspace={() => void addChosen("workspace")}
+          onProject={() => void addChosen("project")}
+        />
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <span className={`text-caption ${error ? "text-cf-error-text" : "text-cf-text-muted"}`} role={error ? "alert" : undefined} data-testid="add-project-local-message">
+            {error ?? "Click or Tab opens a folder · Enter adds"}
+          </span>
+          <Button type="button" size="sm" disabled={busy || typed === ""} onClick={() => void submit(path)} data-testid="add-project-local-submit">
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FolderPlus aria-hidden />}
+            Add project
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

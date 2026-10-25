@@ -17,7 +17,7 @@ import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { bridgeCommands } from "./bridgeCommands";
 import { cloneExists } from "./clone";
-import { HOME, projectFolder } from "./filesystem";
+import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
@@ -59,6 +59,10 @@ export interface MockWorkspace {
   branch: string;
   members: { projectId: string; worktreePath: string }[];
   createdAt: Date;
+  /** A rooted workspace's folder (project.add-workspace); unset for a synthetic one. */
+  rootPath?: string;
+  /** Unset: the first member, else "workspace". */
+  defaultPrimary?: string;
 }
 
 interface MockThread {
@@ -914,7 +918,8 @@ export class World {
       id: w.id,
       name: w.name,
       members: w.members.map((m) => m.projectId).sort(),
-      defaultPrimary: w.members[0]?.projectId ?? "workspace",
+      rootPath: w.rootPath ?? "",
+      defaultPrimary: w.defaultPrimary ?? w.members[0]?.projectId ?? "workspace",
       managedDir: `${HOME}/.code-foundry/workspaces/${w.id}`,
       createdAt: timestampFromDate(w.createdAt),
     };
@@ -2462,7 +2467,8 @@ export class World {
    * under home, a folder inside a git repository adds that repository, any other folder
    * a project without git, and an already registered project is returned unchanged.
    */
-  registerFolder(raw: string): MockProject {
+  /** A typed path as the daemon's handlers take it: "~" expanded, absolute, cleaned, under home. */
+  private homePath(raw: string): string {
     if (raw === "") throw new CommandError("invalid", "invalid argument: path is required");
     if (raw.startsWith("~") && raw !== "~" && !raw.startsWith("~/")) throw new CommandError("invalid", `~user paths are not supported: "${raw}"`);
     const expanded = raw.replace(/^~(?=\/|$)/, HOME);
@@ -2475,6 +2481,53 @@ export class World {
     }
     const path = `/${segs.join("/")}`;
     if (path !== HOME && !path.startsWith(`${HOME}/`)) throw new CommandError("invalid", `invalid argument: ${path} is outside your home directory`);
+    return path;
+  }
+
+  /** ProjectService.InspectFolder: is the folder (inside) a repository, else its child repositories. */
+  inspectFolder(raw: string): { path: string; isRepo: boolean; childRepos: { path: string; name: string }[] } {
+    const path = this.homePath(raw);
+    const info = folderInfo(path);
+    if (!info) throw new CommandError("invalid", `invalid argument: ${path}: no such file or directory`);
+    return info;
+  }
+
+  /**
+   * project.add-workspace: every child repository becomes a project (registered ones are
+   * reused), then a rooted workspace named after the folder ("<name> 2" when taken) with
+   * "workspace" as its default primary. Test control: a child named "broken" fails.
+   */
+  addFolderWorkspace(raw: string): MockWorkspace {
+    const info = this.inspectFolder(raw);
+    const hint = `add it as a project (code-foundry project add ${info.path})`;
+    if (info.isRepo) throw new CommandError("unavailable", `${info.path} is a git repository: ${hint}`);
+    if (info.childRepos.length === 0) throw new CommandError("unavailable", `no git repositories directly inside ${info.path}: ${hint}`);
+    const ids: string[] = [];
+    for (const c of info.childRepos) {
+      if (c.name === "broken") throw new CommandError("invalid", `could not add 1 of ${String(info.childRepos.length)} repositories in ${info.path} (broken: permission denied); no workspace was made`);
+      const id = this.registerFolder(c.path).id;
+      if (!ids.includes(id)) ids.push(id);
+    }
+    const base = info.path.split("/").pop() || "Workspace";
+    const taken = (n: string) => n.toLowerCase() === "workspace" || [...this.workspaces.values()].some((w) => w.name.toLowerCase() === n.toLowerCase());
+    let name = base;
+    for (let i = 2; taken(name); i++) name = `${base} ${String(i)}`;
+    const w: MockWorkspace = {
+      id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
+      name,
+      branch: "",
+      members: ids.map((projectId) => ({ projectId, worktreePath: "" })),
+      createdAt: new Date(),
+      rootPath: info.path,
+      defaultPrimary: "workspace",
+    };
+    this.workspaces.set(w.id, w);
+    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(w) } });
+    return w;
+  }
+
+  registerFolder(raw: string): MockProject {
+    const path = this.homePath(raw);
     const registered = (p: string) =>
       [...this.projects.values()].find((r) => r.path === p || p.startsWith(`${r.path}/`) || r.worktrees.some((w) => w.path === p || p.startsWith(`${w.path}/`)));
     const known = registered(path);
@@ -3178,6 +3231,22 @@ export class World {
           if (!args.path) return "Add a project from the CLI with `code-foundry project add <folder>` or `code-foundry project clone <owner/repo>`; in the app, project.add opens the Add Project dialog.";
           const project = this.registerFolder(args.path);
           return Promise.resolve({ message: `registered ${project.name} (${project.id})`, resultJson: JSON.stringify(this.projectMsg(project)) });
+        },
+      },
+      {
+        cmd: {
+          name: "project.add-workspace",
+          title: "Add Folder as Workspace",
+          category: "Project",
+          description: "Add a folder of git repositories: every repository directly inside it becomes a project, and a workspace named after the folder holds them, with the folder as its root.",
+          keybindings: [],
+          args: [{ name: "folder", type: ArgType.PATH, required: true, description: "A folder under home whose immediate subfolders are git repositories" }],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const w = this.addFolderWorkspace(args.folder ?? "");
+          const json = { id: w.id, name: w.name, rootPath: w.rootPath, members: w.members.map((m) => m.projectId).sort(), defaultPrimary: w.defaultPrimary };
+          return Promise.resolve({ message: `created workspace ${w.name} (${w.id})`, resultJson: JSON.stringify(json) });
         },
       },
       {
