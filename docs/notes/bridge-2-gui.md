@@ -9,6 +9,10 @@ host → `CommandService.Invoke` with the GUI's token. This PR is that host.
 
 ## The contract (shared with PR 1, verbatim)
 
+Superseded in part by `bridge-fix-frames.md`: every page message also carries the frame's
+`nonce`, `cf:ready` answers only `cf:hello` (never a bare load), `cf:bye` ends a document,
+and a frame without a thread is in an opaque origin.
+
 Page → host (all carry `cf: 1`):
 - `{type:"cf:run", id, verb, args}`  args: object of strings
 - `{type:"cf:on", id, source}`   `{type:"cf:off", id}`
