@@ -116,8 +116,8 @@ export function HeaderActions({ threadId }: { threadId: string }) {
       <SnoozeButton threadId={threadId} />
       <SidebarButton threadId={threadId} />
       <ArchiveButton threadId={threadId} />
-      <ThreadActionsMenu threadId={threadId} />
       <ThreadMenu threadId={threadId} />
+      <ThreadActionsMenu threadId={threadId} />
       <BottomToggle />
       <PanelToggle />
     </span>

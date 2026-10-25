@@ -141,7 +141,7 @@ describe("HeaderActions", () => {
     // The More menu (ThreadMenu) is there for every thread with a project.
     const more = projectId ? ["pane-thread-menu"] : [];
     const want = shown
-      ? ["pane-snooze", "thread.archive", "pane-actions-menu", ...more, "bottom-toggle", "panel-toggle"]
+      ? ["pane-snooze", "thread.archive", ...more, "pane-actions-menu", "bottom-toggle", "panel-toggle"]
       : ["pane-snooze", "thread.archive", ...more, "bottom-toggle", "panel-toggle"];
     expect(order()).toEqual(want);
   });

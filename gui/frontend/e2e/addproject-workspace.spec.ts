@@ -24,8 +24,9 @@ interface WorkspaceRow {
 async function listWorkspaces(): Promise<WorkspaceRow[]> {
   const res = await fetch(`${mockUrl}/__mock/workspaces`);
   expect(res.ok).toBe(true);
-  const list = (await res.json()) as (Omit<WorkspaceRow, "members"> & { members: { projectId: string }[] })[];
-  return list.map((w) => ({ id: w.id, name: w.name, rootPath: w.rootPath, defaultPrimary: w.defaultPrimary, members: w.members.map((m) => m.projectId).sort() }));
+  // Members are project ids since the v2 workspace model (docs/notes/workspaces-v2-4-projects-page.md).
+  const list = (await res.json()) as WorkspaceRow[];
+  return list.map((w) => ({ id: w.id, name: w.name, rootPath: w.rootPath, defaultPrimary: w.defaultPrimary, members: [...(w.members ?? [])].sort() }));
 }
 
 async function askAbout(page: Page, path: string) {

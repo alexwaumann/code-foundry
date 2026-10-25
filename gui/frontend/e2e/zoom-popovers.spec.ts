@@ -73,7 +73,8 @@ test("at 150% a picker without room below flips above its trigger, the same gap 
 });
 
 test("at 125% a row's context menu opens at the pointer and stays inside the window near the bottom", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 640 });
+  // Tall enough for the menu (New thread on this branch among its items) below the top row.
+  await page.setViewportSize({ width: 1280, height: 700 });
   await openApp(page);
   await setZoom(page, 125);
   // The top row (the waiting thread): room below for the menu.
@@ -110,7 +111,7 @@ test("at 125% a row's context menu opens at the pointer and stays inside the win
   const lr = await rect(low);
   await page.mouse.click(lr.left + 30, lr.top + 5, { button: "right" });
   await expect(menu).toBeVisible();
-  await expect.poll(async () => (await rect(menu)).bottom).toBeLessThanOrEqual(640.5);
+  await expect.poll(async () => (await rect(menu)).bottom).toBeLessThanOrEqual(700.5);
   const m = await rect(menu);
   expect(m.top).toBeLessThan(lr.top + 5);
   expect(Math.abs(m.left - (lr.left + 30))).toBeLessThanOrEqual(3);
