@@ -29,6 +29,11 @@ project list, a branch and a primary; worktrees are derived per (project, branch
 spawn and removed when the last thread archives. Six PRs in the handoff's §8; each lands
 with a `workspaces-v2-<n>-*.md` note.
 
+* PR 1 (daemon: thread project sets, derived checkouts, member add-dirs, `thread
+  checkouts`, `thread new --projects/--like/--new-branch` and inheritance, collision
+  hints, cleanup on archive, migration 0047) on `cf/workspaces-v2-threads`:
+  `docs/notes/workspaces-v2-1-threads.md`.
+
 ### Multi-repo workspaces: the five steps are built
 
 Design settled 2026-10-09 (`docs/notes/workspaces-handoff.md`); all five steps of its
@@ -229,18 +234,6 @@ database from a newer build. Design record: `docs/notes/release-channels-handoff
 
 * PR 1 (workflow, release/install scripts, `make promote`, tip pruning): done: see docs/notes/release-channels-1-pipeline.md.
 * PR 2 (`update.channel`, channel-aware source, migration guard, dialog label): done: see docs/notes/release-channels.md.
-
-### Workspaces v2: project sets and derived checkouts (design 2026-10-25)
-
-A thread has a set of projects and one primary; every member's checkout is derived
-(worktree mode: the (project, branch) worktree, made at spawn, removed on archive);
-a workspace becomes a saved project set with a managed dir for instructions and skills.
-Design record: `docs/notes/workspaces-v2-handoff.md` (§8 is the build order).
-
-* PR 1 (daemon: thread project sets, derived checkouts, member add-dirs, `thread
-  checkouts`, `thread new --projects/--like/--new-branch` and inheritance, collision
-  hints, cleanup on archive, migration 0047) on `cf/workspaces-v2-threads`:
-  `docs/notes/workspaces-v2-1-threads.md`.
 
 ### Open items
 

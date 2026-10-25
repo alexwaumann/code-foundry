@@ -146,6 +146,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
+					ProjectIds: projects, LikeThreadId: a.String("like"), NewBranch: a.Bool("new-branch"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
 					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
 					// A model or effort from the settings' default, not chosen: a resident's
@@ -185,7 +186,6 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if err != nil {
 					return Result{}, err
 				}
-				req.ProjectIds, req.LikeThreadId, req.NewBranch = projects, a.String("like"), a.Bool("new-branch")
 				newBranch := a.Bool("new-worktree") || req.NewBranch
 				switch {
 				case ws != "" && (newBranch || len(projects) > 0 || req.LikeThreadId != ""):

@@ -68,6 +68,10 @@ the migration, §8 step 1). PR 2 (workspace store and managed dirs) follows on
   in checkout mode keeps the source's cwd (a user's own worktree). The orchestrate
   skill's `thread new --project <id> --new-worktree --created-by --request-id` is the
   "branches off" row: same as before for a single-project parent.
+* **Caller placement now goes through like.** `thread new` with no placement inside a
+  thread (its CLI or a page it shows; `callerPlacement`, landed on main the same day)
+  used to copy the caller's project, worktree and workspace; it now sends
+  `like_thread_id` = the caller, so the set, branch and mode come along too.
 * **`--projects` changes meaning.** It is the set in any mode; with `--new-worktree` it no
   longer makes a v1 workspace (`new_workspace` stays in the proto and the store until
   PR 2 removes it, for the GUI's raw API use). The GUI composer still sends
