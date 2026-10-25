@@ -84,9 +84,6 @@ func placed(ok func(*v1.Thread) bool, why string) panelCheck {
 	}
 }
 
-// inWorkspace is view.panel.workspace's check.
-var inWorkspace = placed(func(t *v1.Thread) bool { return t.GetWorkspaceId() != "" }, "is in no workspace")
-
 // inWorktree is view.panel.worktree's check (view.panel.diff's starts with it).
 var inWorktree = placed(func(t *v1.Thread) bool { return t.GetProjectId() != "" && t.GetWorktreePath() != "" }, "runs in no project worktree")
 

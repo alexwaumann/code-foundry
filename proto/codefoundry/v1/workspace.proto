@@ -55,6 +55,15 @@ message Workspace {
   // as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
   // .claude/skills.
   string managed_dir = 9;
+  // The workspace's instructions file: CLAUDE.md, else AGENTS.md, in the managed dir (a
+  // rooted workspace's: the file the link points to, under root_path). Empty when there
+  // is neither. Read from disk when the store builds the snapshot entry, at every
+  // EnsureDirs (start, a spawn of a thread that references it) and when such a thread
+  // ends a turn.
+  string instructions = 10;
+  // The skills in <managed dir>/.claude/skills: the names of its folders that hold a
+  // SKILL.md, sorted. Read like instructions.
+  repeated string skills = 11;
 }
 
 message ListWorkspacesRequest {}

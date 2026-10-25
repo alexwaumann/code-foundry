@@ -100,6 +100,9 @@ type stores struct {
 	// stopProjectActivity stops the glue that tells project which worktrees have live
 	// threads and when a thread edited files (projectactivity.go).
 	stopProjectActivity func()
+	// stopWorkspaceContents stops the glue that has the workspace store read a managed
+	// dir again when one of its threads ends a turn (workspace_contents.go).
+	stopWorkspaceContents func()
 	// archived removes an archived thread's derived worktrees nobody else has, in the
 	// background (cleanup_archived.go); stopped after thread, before project.
 	archived *archiveCleaner
@@ -300,6 +303,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
+	s.stopWorkspaceContents = startWorkspaceContents(ctx, log.With("store", "workspace"), s.thread.Snapshot, s.workspace, s.bus)
 	// Once thread, action and gitops exist: they decide what a scheduled fetch's auto
 	// pull leaves alone, and gitops runs the pull (autopull.go).
 	s.project.SetAutoPull(autoPullHooks(autoPullSources{
@@ -382,6 +386,9 @@ func (s *stores) close() error {
 	}
 	if s.stopProjectActivity != nil {
 		s.stopProjectActivity()
+	}
+	if s.stopWorkspaceContents != nil {
+		s.stopWorkspaceContents()
 	}
 	if s.stopBranchLinks != nil {
 		s.stopBranchLinks()

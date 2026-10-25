@@ -40,7 +40,16 @@ type Workspace struct {
 	// <config home>/workspaces/<id>: given to every thread that references the workspace
 	// as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
 	// .claude/skills.
-	ManagedDir    string `protobuf:"bytes,9,opt,name=managed_dir,json=managedDir,proto3" json:"managed_dir,omitempty"`
+	ManagedDir string `protobuf:"bytes,9,opt,name=managed_dir,json=managedDir,proto3" json:"managed_dir,omitempty"`
+	// The workspace's instructions file: CLAUDE.md, else AGENTS.md, in the managed dir (a
+	// rooted workspace's: the file the link points to, under root_path). Empty when there
+	// is neither. Read from disk when the store builds the snapshot entry, at every
+	// EnsureDirs (start, a spawn of a thread that references it) and when such a thread
+	// ends a turn.
+	Instructions string `protobuf:"bytes,10,opt,name=instructions,proto3" json:"instructions,omitempty"`
+	// The skills in <managed dir>/.claude/skills: the names of its folders that hold a
+	// SKILL.md, sorted. Read like instructions.
+	Skills        []string `protobuf:"bytes,11,rep,name=skills,proto3" json:"skills,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -122,6 +131,20 @@ func (x *Workspace) GetManagedDir() string {
 		return x.ManagedDir
 	}
 	return ""
+}
+
+func (x *Workspace) GetInstructions() string {
+	if x != nil {
+		return x.Instructions
+	}
+	return ""
+}
+
+func (x *Workspace) GetSkills() []string {
+	if x != nil {
+		return x.Skills
+	}
+	return nil
 }
 
 type ListWorkspacesRequest struct {
@@ -975,7 +998,7 @@ var File_codefoundry_v1_workspace_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_workspace_proto_rawDesc = "" +
 	"\n" +
-	"\x1ecodefoundry/v1/workspace.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xff\x01\n" +
+	"\x1ecodefoundry/v1/workspace.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\x02\n" +
 	"\tWorkspace\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
@@ -985,7 +1008,10 @@ const file_codefoundry_v1_workspace_proto_rawDesc = "" +
 	"\troot_path\x18\a \x01(\tR\brootPath\x12'\n" +
 	"\x0fdefault_primary\x18\b \x01(\tR\x0edefaultPrimary\x12\x1f\n" +
 	"\vmanaged_dir\x18\t \x01(\tR\n" +
-	"managedDirJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x06branch\"\x17\n" +
+	"managedDir\x12\"\n" +
+	"\finstructions\x18\n" +
+	" \x01(\tR\finstructions\x12\x16\n" +
+	"\x06skills\x18\v \x03(\tR\x06skillsJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x06branch\"\x17\n" +
 	"\x15ListWorkspacesRequest\"S\n" +
 	"\x16ListWorkspacesResponse\x129\n" +
 	"\n" +

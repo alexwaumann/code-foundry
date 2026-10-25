@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -204,5 +205,78 @@ func TestManagedDirsAtStart(t *testing.T) {
 	e.open()
 	if fi, err := os.Stat(w.ManagedDir); err != nil || !fi.IsDir() {
 		t.Errorf("managed dir not made at start: %v", err)
+	}
+}
+
+// The managed dir's contents: none at first; CLAUDE.md beats AGENTS.md; skills are the
+// folders with a SKILL.md, sorted; EnsureDirs reads them again and publishes Updated only
+// when they changed; a rooted workspace reports the root's real file; a reopen reads them.
+func TestWorkspaceContents(t *testing.T) {
+	e := newStoreEnv(t)
+	ctx := context.Background()
+	events := bus.Subscribe[Event](e.m.Bus(), 16)
+	defer events.Close()
+	w, err := e.m.Create(ctx, CreateOptions{Name: "shop", Members: []string{"web"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-events.C() // Create's Updated
+	if w.Instructions != "" || len(w.Skills) != 0 {
+		t.Fatalf("new synthetic workspace: instructions %q, skills %v; want none", w.Instructions, w.Skills)
+	}
+	write(t, filepath.Join(w.ManagedDir, "AGENTS.md"), "agents")
+	write(t, filepath.Join(w.ManagedDir, ".claude", "skills", "zeta", "SKILL.md"), "z")
+	write(t, filepath.Join(w.ManagedDir, ".claude", "skills", "alpha", "SKILL.md"), "a")
+	write(t, filepath.Join(w.ManagedDir, ".claude", "skills", "notes", "README.md"), "no SKILL.md")
+	if err := e.m.EnsureDirs(ctx, w.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := e.m.Snapshot().Workspace(w.ID)
+	if want := filepath.Join(w.ManagedDir, "AGENTS.md"); got.Instructions != want || !slices.Equal(got.Skills, []string{"alpha", "zeta"}) {
+		t.Fatalf("after writes: instructions %q, skills %v; want %q, [alpha zeta]", got.Instructions, got.Skills, want)
+	}
+	select {
+	case ev := <-events.C():
+		if u, ok := ev.(Updated); !ok || u.Workspace.Instructions == "" {
+			t.Fatalf("event %#v, want Updated with the instructions", ev)
+		}
+	default:
+		t.Fatal("no Updated after the contents changed")
+	}
+	write(t, filepath.Join(w.ManagedDir, "CLAUDE.md"), "claude")
+	if err := e.m.EnsureDirs(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	<-events.C()
+	if err := e.m.EnsureDirs(ctx, w.ID); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-events.C():
+		t.Fatalf("unchanged contents published %#v", ev)
+	default:
+	}
+	got, _ = e.m.Snapshot().Workspace(w.ID)
+	if want := filepath.Join(w.ManagedDir, "CLAUDE.md"); got.Instructions != want {
+		t.Fatalf("instructions %q, want %q (CLAUDE.md first)", got.Instructions, want)
+	}
+	// A rename keeps them (the commit reads them again).
+	if r, err := e.m.Rename(ctx, w.ID, "store"); err != nil || r.Instructions == "" || len(r.Skills) != 2 {
+		t.Fatalf("rename: %+v, %v", r, err)
+	}
+
+	root := filepath.Join(e.home, "mono")
+	write(t, filepath.Join(root, "CLAUDE.md"), "root")
+	write(t, filepath.Join(root, ".claude", "skills", "demo", "SKILL.md"), "demo")
+	rw, err := e.m.Create(ctx, CreateOptions{Name: "mono", RootPath: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(realPath(root), "CLAUDE.md"); rw.Instructions != want || !slices.Equal(rw.Skills, []string{"demo"}) {
+		t.Fatalf("rooted: instructions %q, skills %v; want %q, [demo]", rw.Instructions, rw.Skills, want)
+	}
+	e.open()
+	if got, _ := e.m.Snapshot().Workspace(rw.ID); got.Instructions == "" || len(got.Skills) != 1 {
+		t.Fatalf("after reopen: %+v", got)
 	}
 }

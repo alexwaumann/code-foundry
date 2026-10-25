@@ -74,16 +74,10 @@ const ViewThreadPrevious = "thread.previous"
 // window's sidebar order, wrapping at the bottom; from a page it selects the first row.
 const ViewThreadNext = "thread.next"
 
-// ViewPanelWorkspace is the ShowView name that opens (or reveals) the workspace surface
-// in the side panel of the selected workspace thread: the workspace's members with their
-// git and pull request state. Like ViewPanelToggle it is an action on per-selection GUI
-// state, not a page; a window whose selection is not a workspace thread ignores it.
-const ViewPanelWorkspace = "panel.workspace"
-
 // ViewPanelLinkedPRs is the ShowView name that opens (or reveals) the Linked PRs surface
 // in the side panel of the selected thread: the pull requests Claude linked to it (its
 // pr-link transcript records). An action on per-selection GUI state like
-// ViewPanelWorkspace; a window whose selection is not a thread ignores it, and one whose
+// ViewPanelToggle; a window whose selection is not a thread ignores it, and one whose
 // thread has no linked pull requests says so instead of opening an empty surface.
 const ViewPanelLinkedPRs = "panel.linked-prs"
 
@@ -96,7 +90,7 @@ const ViewPanelUsage = "panel.usage"
 // ViewPanelWorktree is the ShowView name that opens (or reveals) the Worktree surface in
 // the side panel of the selected thread: the overview of the worktree it runs in (sync
 // state, GitHub activity, files, log). An action on per-selection GUI state like
-// ViewPanelWorkspace; a window whose selection is not a thread in a registered worktree
+// ViewPanelUsage; a window whose selection is not a thread in a registered worktree
 // ignores it.
 const ViewPanelWorktree = "panel.worktree"
 
@@ -106,13 +100,6 @@ const ViewPanelWorktree = "panel.worktree"
 // action on per-selection GUI state like ViewPanelUsage; a window whose selection is not
 // a thread ignores it.
 const ViewPanelThreads = "panel.threads"
-
-// hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
-// and it belongs to a workspace (the GUI passes the thread's workspace as
-// ActiveWorkspaceID; the CLI with --context-thread and --context-workspace).
-func hasWorkspaceThreadContext(c Context) bool {
-	return hasThread(c) && c.ActiveWorkspaceID != ""
-}
 
 // hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
 // it sits in a registered worktree (the GUI passes the placement as ActiveProjectID and
@@ -347,23 +334,12 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         show(ViewThreadNext),
 		},
 		{
-			Name:  "view.panel.workspace",
-			Title: "Show Workspace in Side Panel",
-			Description: "Open the workspace surface in a workspace thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the workspace's members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
-			Category: "View",
-			// No default chord, like view.panel.expand (W opens it while the panel has focus).
-			When: func(c Context) bool { return hasWorkspaceThreadContext(c) || cliThread(c) },
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelWorkspace, inWorkspace),
-		},
-		{
 			Name:  "view.panel.linked-prs",
 			Title: "Show Linked PRs in Side Panel",
 			Description: "Open the Linked PRs surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the pull requests the thread created or touched, newest first, with state, checks and branch.",
 			Category: "View",
-			// No default chord, like view.panel.workspace (L opens it while the panel has
+			// No default chord, like view.panel.expand (L opens it while the panel has
 			// focus). Available for any thread, even one without links, so the palette
 			// finds it and the GUI can say there are none yet; a scoped call refuses one.
 			When: hasThread,
@@ -401,7 +377,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Description: "Open the Worktree surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the overview of the worktree the thread runs in, with sync state, GitHub activity, changed files and log.",
 			Category: "View",
-			// No default chord, like view.panel.workspace (T opens it while the panel has focus).
+			// No default chord, like view.panel.usage (T opens it while the panel has focus).
 			When: func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelWorktree, inWorktree),

@@ -153,7 +153,7 @@ func workspacesToProto(snap *workspace.Snapshot) []*v1.Workspace {
 
 func workspaceToProto(w workspace.Workspace) *v1.Workspace {
 	p := &v1.Workspace{Id: w.ID, Name: w.Name, Members: slices.Clone(w.Members), RootPath: w.RootPath,
-		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir}
+		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir, Instructions: w.Instructions, Skills: slices.Clone(w.Skills)}
 	if !w.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(w.CreatedAt)
 	}
