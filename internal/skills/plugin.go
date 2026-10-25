@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/bridge"
 	"github.com/alexwaumann/code-foundry/internal/guide"
 	"github.com/alexwaumann/code-foundry/plugins"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -48,6 +49,8 @@ func placeholders(src Sources) map[string]string {
 		"limits":        viewLimits(),
 		"eventVariants": eventVariants(),
 		"icons":         codeList(ui.Icons),
+		"bridgeAPI":     bridgeAPI(),
+		"bridgeErrors":  codeList(bridge.ErrorCodes),
 	}
 }
 
