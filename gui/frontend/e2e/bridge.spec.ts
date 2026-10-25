@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The bridge (docs/notes/bridge-2-gui.md): mock/bridge-page.html, shown inline by the
@@ -267,4 +267,107 @@ test("the panel copy names the page by its title and counts its errors too", asy
   await expect(dialog).toHaveCount(0);
   await inner.locator("#invalid").click();
   await expect(page.getByTestId("file-html-footer").getByTestId("page-errors")).toHaveText("1");
+});
+
+/** The frame's nonce, as the page reads it from its own URL (lib/bridge.ts withNonce). */
+const NONCE = () => /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+
+/** The mock's thread.wait calls, each held until its caller aborts it (mock/bridge.ts). */
+const mockWaitList = async (): Promise<unknown> => (await fetch(`${mockUrl}/__mock/waits`)).json();
+
+test("a page that leads its frame to another page, another grant's or itself without the nonce, has no bridge there", async ({ page }) => {
+  await openBridgeThread(page);
+  const other = await page.evaluate(`import("/src/api/files.ts").then((m) => m.previewFile("", "/Users/dev/elsewhere/bridge.html")).then((p) => p.url)`);
+  expect(other).toMatch(/\/preview\/mock-preview-\d+\/bridge\.html$/);
+  const before = await bridgeCounters(page);
+  await doc(page).locator("body").evaluate((_b, url) => {
+    location.href = url as string;
+  }, other);
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "no");
+  await expect(doc(page).locator("#thread")).toHaveText(/^unavailable: this page was not opened by Code Foundry in this frame/);
+  await doc(page).locator("#notify").click();
+  await expect(doc(page).locator("#notify-out")).toHaveText(/^unavailable: /);
+  // A raw run with no nonce, or a guessed one, is not heard either.
+  await doc(page).locator("body").evaluate(() => {
+    parent.postMessage({ cf: 1, type: "cf:hello" }, "*");
+    parent.postMessage({ cf: 1, type: "cf:run", id: "x", verb: "ui.notify", args: { title: "t" }, nonce: "0".repeat(32) }, "*");
+  });
+  await page.waitForTimeout(400);
+  expect((await invocations()).some((i) => i.name === "ui.notify")).toBe(false);
+  // The host sent the new document nothing: no cf:ready, no events of the old one's subscription.
+  const after = await bridgeCounters(page);
+  await mockPost(`threads?project=repo-cf&count=1&status=idle&prefix=Gone`);
+  await page.waitForTimeout(400);
+  expect((await bridgeCounters(page)).posts).toBe(after.posts);
+  expect(after.subscriptions).toBe(before.subscriptions - 1);
+  // The bridge page itself, without its fragment: the same.
+  await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
+  await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  await doc(page).locator("body").evaluate(() => {
+    location.replace(location.pathname);
+  });
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "no");
+});
+
+test("a reload keeps the frame's nonce and its bridge", async ({ page }) => {
+  await openBridgeThread(page);
+  const nonce = await doc(page).locator("body").evaluate(NONCE);
+  expect(nonce).toMatch(/^[0-9a-f]{32}$/);
+  await doc(page).locator("body").evaluate(() => {
+    location.reload();
+  });
+  await expect(doc(page).locator("#visits")).toHaveText("2");
+  expect(await doc(page).locator("body").evaluate(NONCE)).toBe(nonce);
+});
+
+test("a File tab page with no thread is opaque: it cannot reach a thread's page beside it", async ({ page }) => {
+  await openBridgeThread(page);
+  const target = JSON.stringify({ project: "repo-cf", base: CF, path: "docs/probe.html" });
+  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
+  const probe = page.getByTestId("file-html-frame");
+  await expect(probe).not.toHaveAttribute("sandbox", /allow-same-origin/);
+  await expect(card(page).getByTestId("thread-html-frame")).toHaveAttribute("sandbox", /allow-same-origin/);
+  // Every sibling (the thread's inline page at least) throws on access.
+  await expect(page.frameLocator('[data-testid="file-html-frame"]').locator("body")).toHaveAttribute("data-probe", /^blocked(,blocked)*$/);
+});
+
+test("a run id already in flight is refused, and a page's cancel or reload aborts the daemon's wait", async ({ page }) => {
+  await openBridgeThread(page);
+  // Raw posts, as a page could send without the script (it reads its own nonce).
+  const results = await doc(page)
+    .locator("body")
+    .evaluate(async () => {
+      const nonce = /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+      const got: unknown[] = [];
+      addEventListener("message", (e: MessageEvent<{ type?: string; id?: string }>) => {
+        if (e.data.type === "cf:result" && e.data.id === "dup") got.push(e.data);
+      });
+      const run = { cf: 1, type: "cf:run", id: "dup", verb: "thread.wait", args: { id: "s-1" }, nonce };
+      parent.postMessage(run, "*");
+      parent.postMessage(run, "*");
+      await new Promise((r) => setTimeout(r, 500));
+      return got;
+    });
+  expect(results).toEqual([{ type: "cf:result", id: "dup", ok: false, error: { code: "invalid", message: "a call with id dup is already running" } }]);
+  await expect.poll(mockWaitList).toEqual([{ args: { id: "s-1" }, aborted: false }]);
+  await doc(page)
+    .locator("body")
+    .evaluate(() => {
+      const nonce = /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
+      parent.postMessage({ cf: 1, type: "cf:cancel", id: "dup", nonce }, "*");
+      parent.postMessage({ cf: 1, type: "cf:run", id: "next", verb: "thread.wait", args: { id: "s-2" }, nonce }, "*");
+    });
+  await expect.poll(mockWaitList).toEqual([
+    { args: { id: "s-1" }, aborted: true },
+    { args: { id: "s-2" }, aborted: false },
+  ]);
+  // The page goes: its wait goes with it.
+  await doc(page).locator("body").evaluate(() => {
+    location.reload();
+  });
+  await expect.poll(mockWaitList).toEqual([
+    { args: { id: "s-1" }, aborted: true },
+    { args: { id: "s-2" }, aborted: true },
+  ]);
 });
