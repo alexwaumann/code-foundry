@@ -196,6 +196,11 @@ func (p Paths) Memory() string { return filepath.Join(p.home, "memory") }
 // a file written by hand is read the same way.
 func (p Paths) Themes() string { return filepath.Join(p.home, "themes") }
 
+// Workspaces holds each workspace's managed dir, <home>/workspaces/<id>: its
+// instructions and skills, or links to a rooted workspace's
+// (docs/notes/workspaces-v2-2-workspaces.md).
+func (p Paths) Workspaces() string { return filepath.Join(p.home, "workspaces") }
+
 // LegacyMemory is the single memory file before the directory, one "- <text>" line per
 // entry. The daemon imports it into Memory at start and renames it to
 // memory.md.imported.

@@ -8,16 +8,10 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// hasWorkspaceThread is thread.run-in's availability: a thread is active and, in the
-// GUI, it belongs to a workspace (the GUI passes the thread's workspace as
-// ActiveWorkspaceID). A CLI caller (no active view) names the thread with --id, which
-// When cannot look up, so the daemon refuses a project thread instead.
-func hasWorkspaceThread(c Context) bool {
-	return hasThread(c) && (c.ActiveWorkspaceID != "" || c.ActiveView == "")
-}
-
-// threadRunIn is thread.run-in: move a workspace thread to another member worktree
-// ("Run in…"). The daemon moves a live thread (set_cwd) once it is idle at its prompt.
+// threadRunIn is thread.run-in: move a thread to another of its checkouts ("Run in…").
+// It is offered for any thread (When cannot see how many checkouts the active thread
+// has; the daemon refuses one with no other). The daemon moves a live thread (set_cwd)
+// once it is idle at its prompt.
 func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.run-in",
@@ -30,7 +24,7 @@ func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 			{Name: "project", Type: String, Positional: true, Description: "One of the thread's projects (id or name)"},
 			{Name: "worktree", Type: Path, Description: "One of the thread's checkout paths"},
 		},
-		When: hasWorkspaceThread,
+		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			if a.String("project") == "" && a.Path("worktree") == "" {
 				return Result{}, InvalidArg("project", "name the checkout: a project or a checkout path")

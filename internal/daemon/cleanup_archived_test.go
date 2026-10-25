@@ -13,7 +13,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // An archived thread's derived worktrees go at once unless something else holds them;
@@ -41,10 +40,9 @@ func TestArchiveCleanup(t *testing.T) {
 	tests := []struct {
 		name string
 		// others are the other threads; dirty marks the api worktree dirty; term opens a
-		// terminal in the web worktree; ws makes it a v1 workspace member.
+		// terminal in the web worktree.
 		others      []thread.Thread
 		dirty, term bool
-		ws          *workspace.Snapshot
 		wantRemoved []string
 	}{
 		{name: "both go", wantRemoved: []string{apiWT, webWT}},
@@ -56,9 +54,6 @@ func TestArchiveCleanup(t *testing.T) {
 			wantRemoved: []string{apiWT}},
 		{name: "uncommitted changes keep it", dirty: true, wantRemoved: []string{webWT}},
 		{name: "a terminal keeps it", term: true, wantRemoved: []string{apiWT}},
-		{name: "a v1 workspace member keeps it",
-			ws:          &workspace.Snapshot{Workspaces: []workspace.Workspace{{ID: "w-1", Name: "x", Members: []workspace.Member{{ProjectID: "api", WorktreePath: apiWT}}}}},
-			wantRemoved: []string{webWT}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,7 +78,6 @@ func TestArchiveCleanup(t *testing.T) {
 			c := &archiveCleaner{
 				log: slog.New(slog.NewTextHandler(io.Discard, nil)), projects: pf, checkouts: checkouts,
 				threads: func() *thread.Snapshot { return snap }, terminals: func() []terminal.Terminal { return terms },
-				workspaces: func() *workspace.Snapshot { return tt.ws },
 			}
 			c.ctx, c.cancel = context.WithCancel(context.Background())
 			c.archived(archived)

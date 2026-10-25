@@ -225,20 +225,3 @@ func validBranch(ctx context.Context, branch string) bool {
 	defer cancel()
 	return exec.CommandContext(ctx, "git", "check-ref-format", "--branch", branch).Run() == nil
 }
-
-// WorkspaceBranch is the branch of a workspace named name that is created without one
-// (`workspace new`; the daemon hands it to the workspace store): the name's slug
-// wrapped by the branch naming mode, as a --branch slug would be (semantic and custom
-// modes ask the namer, bounded by SlugTimeout). "" when the name has nothing to slug
-// or a custom branch is not valid; the workspace store then uses cf/<slug>.
-func (m *Manager) WorkspaceBranch(ctx context.Context, name string) string {
-	bc := branchChoice{cfg: m.opts.BranchNaming(), hint: workspace.Slug(name)}
-	if bc.hint == "" {
-		return ""
-	}
-	sw, err := m.waitNaming(ctx, "", name, "", bc)
-	if err != nil || (bc.cfg.Mode == BranchModeCustom && !validBranch(ctx, sw.branch)) {
-		return ""
-	}
-	return sw.branch
-}

@@ -190,7 +190,7 @@ func (m *Manager) resolveListRefs(o ListOptions) (ListOptions, error) {
 		if m.opts.Workspaces == nil {
 			return o, fmt.Errorf("%w: no workspace %q", ErrInvalidArgument, o.Workspace)
 		}
-		w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), workspace.Ref{Workspace: o.Workspace})
+		w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), o.Workspace)
 		if err != nil {
 			return o, listRefError("workspace", o.Workspace, err)
 		}

@@ -33,6 +33,10 @@ with a `workspaces-v2-<n>-*.md` note.
   checkouts`, `thread new --projects/--like/--new-branch` and inheritance, collision
   hints, cleanup on archive, migration 0047) on `cf/workspaces-v2-threads`:
   `docs/notes/workspaces-v2-1-threads.md`.
+* PR 2 (daemon: the workspace store reshaped to project sets with managed dirs and root
+  links, the managed dir and the workspace's instructions at every spawn, `thread new
+  --workspace`, `workspace new/list/add-project/remove-project/rename/set-primary/remove`,
+  migration 0048) on `cf/workspaces-v2-workspaces`: `docs/notes/workspaces-v2-2-workspaces.md`.
 
 ### Multi-repo workspaces: the five steps are built
 

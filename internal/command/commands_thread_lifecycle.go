@@ -96,13 +96,13 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
 				"Inside a thread it copies that thread's projects, branch and mode. " +
-				"With workspace it runs in one of that workspace's member worktrees. With no-project it belongs to no project and runs in your home directory.",
+				"With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name it runs in (with projects or like: one of them)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
-				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
+				{Name: "workspace", Type: String, Description: "Workspace id or name: its projects (unless projects) and instructions; project workspace runs it in the workspace's folder"},
 				{Name: "projects", Type: String, Description: "Comma-separated projects it works in (project:base with new-worktree); it runs in the first unless project"},
 				{Name: "like", Type: String, ID: ThreadID, Description: "Thread to copy projects, branch and mode from"},
 				{Name: "new-branch", Type: Bool, Description: "With like, or in a thread: a new branch, new worktrees"},
@@ -188,8 +188,6 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				newBranch := a.Bool("new-worktree") || req.NewBranch
 				switch {
-				case ws != "" && (newBranch || len(projects) > 0 || req.LikeThreadId != ""):
-					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member worktree; it takes no new-worktree, new-branch, projects or like")
 				case req.NewBranch && a.Given("new-worktree") && !a.Bool("new-worktree"):
 					return Result{}, InvalidArg("new-branch", "a new branch is made in new worktrees; it does not go with new-worktree=false")
 				case newBranch:

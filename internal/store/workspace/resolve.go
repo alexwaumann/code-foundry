@@ -2,11 +2,9 @@ package workspace
 
 import (
 	"cmp"
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,99 +16,20 @@ import (
 
 // Pure lookups and validation shared by the Manager and the fake.
 
-// branchPrefix namespaces the branch derived from a name when Options.DefaultBranch
-// gives none.
-const branchPrefix = "cf/"
-
-// ResolveWorkspace finds the workspace ref names in snap: by id, then by name, else
-// (with no Workspace given) the one with a member worktree containing ref.Cwd.
-func ResolveWorkspace(snap *Snapshot, ref Ref) (Workspace, error) {
-	if snap == nil {
-		snap = &Snapshot{}
+// ResolveWorkspace finds the workspace ref names in snap: by id, then by name
+// (case-insensitively).
+func ResolveWorkspace(snap *Snapshot, ref string) (Workspace, error) {
+	key := strings.TrimSpace(ref)
+	if key == "" {
+		return Workspace{}, fmt.Errorf("%w: a workspace id or name is required", ErrInvalidArgument)
 	}
-	if key := strings.TrimSpace(ref.Workspace); key != "" {
-		if w, ok := snap.Workspace(key); ok {
-			return w, nil
-		}
-		for _, w := range snap.Workspaces {
-			if w.Name == key {
-				return w, nil
-			}
-		}
-		return Workspace{}, fmt.Errorf("%w: workspace %q", ErrNotFound, key)
-	}
-	if ref.Cwd == "" {
-		return Workspace{}, fmt.Errorf("%w: a workspace id or name, or a path inside a workspace worktree, is required", ErrInvalidArgument)
-	}
-	if !filepath.IsAbs(ref.Cwd) {
-		return Workspace{}, fmt.Errorf("%w: path %q must be absolute", ErrInvalidArgument, ref.Cwd)
-	}
-	if w, _, ok := MemberAt(snap, ref.Cwd); ok {
+	if w, ok := snap.Workspace(key); ok {
 		return w, nil
 	}
-	return Workspace{}, fmt.Errorf("%w: %s is not inside a workspace worktree", ErrNotFound, ref.Cwd)
-}
-
-// MemberAt returns the workspace and member whose worktree contains path. When
-// worktrees nest, the deepest wins.
-func MemberAt(snap *Snapshot, path string) (Workspace, Member, bool) {
-	var (
-		bw    Workspace
-		bm    Member
-		depth = -1
-	)
-	if snap == nil || path == "" {
-		return bw, bm, false
+	if w, ok := snap.Named(key); ok {
+		return w, nil
 	}
-	for _, w := range snap.Workspaces {
-		for _, m := range w.Members {
-			if within(path, m.WorktreePath) && len(m.WorktreePath) > depth {
-				bw, bm, depth = w, m, len(m.WorktreePath)
-			}
-		}
-	}
-	return bw, bm, depth >= 0
-}
-
-// within reports whether path is root or inside it, comparing both the cleaned paths
-// and their symlink-resolved forms (/tmp and /private/tmp are the same place).
-func within(path, root string) bool {
-	if path == "" || root == "" {
-		return false
-	}
-	for _, p := range []string{filepath.Clean(path), realPath(path)} {
-		for _, r := range []string{filepath.Clean(root), realPath(root)} {
-			if p == r || strings.HasPrefix(p, strings.TrimSuffix(r, "/")+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// realPath resolves symlinks. For a path that does not exist (yet), it resolves the
-// longest existing ancestor and keeps the rest, so /tmp/x/missing still compares
-// equal to /private/tmp/x/missing.
-func realPath(p string) string {
-	p = filepath.Clean(p)
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	parent := filepath.Dir(p)
-	if parent == p {
-		return p
-	}
-	return filepath.Join(realPath(parent), filepath.Base(p))
-}
-
-// RequireGit refuses a project without git as a workspace member: a member is a
-// worktree on the workspace branch, which needs git. Repositories without a remote
-// are fine.
-func RequireGit(r project.Project) error {
-	if r.Git {
-		return nil
-	}
-	return fmt.Errorf("%w: %s is not a git repository; workspaces need git in every project", ErrFailedPrecondition, r.Name)
+	return Workspace{}, fmt.Errorf("%w: workspace %q", ErrNotFound, key)
 }
 
 // ResolveProject finds a registered project by id, by name when exactly one has it,
@@ -153,7 +72,7 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 				roots = append(roots, w.Path)
 			}
 			for _, root := range roots {
-				if within(ref, root) && len(root) > depth {
+				if Within(ref, root) && len(root) > depth {
 					best, depth = r, len(root)
 				}
 			}
@@ -165,109 +84,56 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 	return project.Project{}, fmt.Errorf("%w: project %q is not registered (add it with `code-foundry project add <folder>`)", ErrNotFound, ref)
 }
 
-// memberFor finds the member of w that ref names: a path inside its worktree, its
-// project's id or name, or a path inside its project.
-func memberFor(w Workspace, projects *project.Snapshot, ref string) (Member, error) {
+// memberRef resolves ref to one of w's members: a member id, a member project's name,
+// or anything ResolveProject resolves to a member.
+func memberRef(w Workspace, projects *project.Snapshot, ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return Member{}, fmt.Errorf("%w: a project is required", ErrInvalidArgument)
+		return "", fmt.Errorf("%w: a project is required", ErrInvalidArgument)
 	}
-	if filepath.IsAbs(ref) {
-		for _, m := range w.Members {
-			if within(ref, m.WorktreePath) {
-				return m, nil
+	if w.Member(ref) {
+		return ref, nil
+	}
+	for _, id := range w.Members {
+		if r, ok := projects.Project(id); ok && r.Name == ref {
+			return id, nil
+		}
+	}
+	if r, err := ResolveProject(projects, ref); err == nil && w.Member(r.ID) {
+		return r.ID, nil
+	}
+	return "", fmt.Errorf("%w: %q is not a member of workspace %s", ErrNotFound, ref, w.Name)
+}
+
+// Within reports whether path is root or inside it, comparing both the cleaned paths
+// and their symlink-resolved forms (/tmp and /private/tmp are the same place).
+func Within(path, root string) bool {
+	if path == "" || root == "" {
+		return false
+	}
+	for _, p := range []string{filepath.Clean(path), realPath(path)} {
+		for _, r := range []string{filepath.Clean(root), realPath(root)} {
+			if p == r || strings.HasPrefix(p, strings.TrimSuffix(r, "/")+"/") {
+				return true
 			}
 		}
 	}
-	if m, ok := w.Member(ref); ok {
-		return m, nil
-	}
-	if projects != nil {
-		for _, m := range w.Members {
-			if r, ok := projects.Project(m.ProjectID); ok && r.Name == ref {
-				return m, nil
-			}
-		}
-	}
-	r, err := ResolveProject(projects, ref)
-	if err == nil {
-		if m, ok := w.Member(r.ID); ok {
-			return m, nil
-		}
-	}
-	return Member{}, fmt.Errorf("%w: %q is not a member of workspace %s", ErrNotFound, ref, w.Name)
+	return false
 }
 
-// Join lists w's members with the project store's current state; the member containing
-// cwd (if any) is Current.
-func Join(w Workspace, projects *project.Snapshot, cwd string) Membership {
-	out := Membership{Workspace: w, Members: make([]MemberInfo, len(w.Members))}
-	current := -1
-	depth := -1
-	for i, m := range w.Members {
-		info := MemberInfo{Member: m, Branch: w.Branch, Missing: true}
-		if r, ok := projects.Project(m.ProjectID); ok {
-			info.ProjectName = r.Name
-			if wt, ok := projects.Worktree(r.ID, m.WorktreePath); ok {
-				info.Missing = false
-				if wt.Branch != "" {
-					info.Branch = wt.Branch
-				} else if wt.Detached {
-					info.Branch = "(detached)"
-				}
-			}
-		}
-		if cwd != "" && within(cwd, m.WorktreePath) && len(m.WorktreePath) > depth {
-			current, depth = i, len(m.WorktreePath)
-		}
-		out.Members[i] = info
+// realPath resolves symlinks. For a path that does not exist (yet), it resolves the
+// longest existing ancestor and keeps the rest, so /tmp/x/missing still compares
+// equal to /private/tmp/x/missing.
+func realPath(p string) string {
+	p = filepath.Clean(p)
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
 	}
-	if current >= 0 {
-		out.Members[current].Current = true
+	parent := filepath.Dir(p)
+	if parent == p {
+		return p
 	}
-	return out
-}
-
-// threadsIn returns the threads running inside path.
-func threadsIn(threads []Thread, path string) []Thread {
-	var out []Thread
-	for _, t := range threads {
-		if within(t.Cwd, path) {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-// describeThreads is "thread fix-login (s-1), thread s-2".
-func describeThreads(ts []Thread) string {
-	parts := make([]string, len(ts))
-	for i, t := range ts {
-		if t.Name != "" {
-			parts[i] = "thread " + t.Name + " (" + t.ID + ")"
-		} else {
-			parts[i] = "thread " + t.ID
-		}
-	}
-	return strings.Join(parts, ", ")
-}
-
-// archiveThem is what a refusal asks for the threads on a worktree a removal would
-// delete: archiving puts a thread away (and stops its Claude). "archive it" for one
-// thread, "archive them" for more.
-func archiveThem(n int) string {
-	if n == 1 {
-		return "archive it"
-	}
-	return "archive them"
-}
-
-// isAre is "is" for one thread, "are" for more.
-func isAre(n int) string {
-	if n == 1 {
-		return "is"
-	}
-	return "are"
+	return filepath.Join(realPath(parent), filepath.Base(p))
 }
 
 // cleanName trims and validates a workspace name.
@@ -278,8 +144,19 @@ func cleanName(name string) (string, error) {
 		return "", fmt.Errorf("%w: a workspace name is required", ErrInvalidArgument)
 	case len(name) > 100 || strings.IndexFunc(name, unicode.IsControl) >= 0:
 		return "", fmt.Errorf("%w: name must be one line of at most 100 bytes", ErrInvalidArgument)
+	case strings.EqualFold(name, PrimaryWorkspace):
+		return "", fmt.Errorf("%w: %q is reserved (it names a workspace as a thread's primary)", ErrInvalidArgument, name)
 	}
 	return name, nil
+}
+
+// nameFree refuses a name another workspace in snap has (case-insensitively); except is
+// the workspace being renamed.
+func nameFree(snap *Snapshot, name, except string) error {
+	if w, ok := snap.Named(name); ok && w.ID != except {
+		return fmt.Errorf("%w: a workspace named %q exists (%s)", ErrFailedPrecondition, w.Name, w.ID)
+	}
+	return nil
 }
 
 var slugJunk = regexp.MustCompile(`[^a-z0-9]+`)
@@ -294,39 +171,6 @@ func Slug(name string) string {
 	return s
 }
 
-// branchFor is the branch a workspace gets: the given one, else derive's for name
-// (Options.DefaultBranch: the branch naming settings), else cf/<slug of name>.
-func branchFor(ctx context.Context, name, branch string, derive func(context.Context, string) string) (string, error) {
-	branch = strings.TrimSpace(branch)
-	if branch == "" {
-		s := Slug(name)
-		if s == "" {
-			return "", fmt.Errorf("%w: cannot derive a branch from name %q; pass a branch", ErrInvalidArgument, name)
-		}
-		if derive != nil {
-			branch = derive(ctx, name)
-		}
-		if branch == "" {
-			branch = branchPrefix + s
-		}
-	}
-	return branch, validateRef("branch", branch)
-}
-
-// validateRef rejects refs that could be read as a git option or are not one word.
-// git validates the rest (project.Store.CreateWorktree runs check-ref-format).
-func validateRef(what, ref string) error {
-	if ref == "" {
-		return nil
-	}
-	if strings.HasPrefix(ref, "-") || len(ref) > 250 || strings.IndexFunc(ref, func(r rune) bool {
-		return unicode.IsSpace(r) || unicode.IsControl(r)
-	}) >= 0 {
-		return fmt.Errorf("%w: %s %q", ErrInvalidArgument, what, ref)
-	}
-	return nil
-}
-
 // newID returns a workspace id ("w-" + 12 hex digits).
 func newID() (string, error) {
 	var b [6]byte
@@ -336,15 +180,16 @@ func newID() (string, error) {
 	return "w-" + hex.EncodeToString(b[:]), nil
 }
 
-// exists reports whether path exists on disk.
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// sortWorkspaces orders a snapshot: by name, then id.
+// sortWorkspaces orders a snapshot: by name (case-insensitively), then id.
 func sortWorkspaces(ws []Workspace) {
 	slices.SortFunc(ws, func(a, b Workspace) int {
-		return cmp.Or(strings.Compare(a.Name, b.Name), strings.Compare(a.ID, b.ID))
+		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.ID, b.ID))
 	})
+}
+
+// sortedMembers is ids sorted, without blanks and duplicates.
+func sortedMembers(ids []string) []string {
+	out := slices.DeleteFunc(slices.Clone(ids), func(s string) bool { return s == "" })
+	slices.Sort(out)
+	return slices.Compact(out)
 }

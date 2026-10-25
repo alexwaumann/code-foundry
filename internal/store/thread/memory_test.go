@@ -13,7 +13,7 @@ import (
 func TestSystemPromptMemory(t *testing.T) {
 	mem := []string{"Always open PRs as drafts", "Explain git terms when you use them"}
 	block := MemoryHeading + "\n- Always open PRs as drafts\n- Explain git terms when you use them"
-	ws := workspacePrompt("login")
+	ws := workspaceBlock("login", "Use tabs.")
 	for _, tt := range []struct {
 		name         string
 		ws           string
@@ -24,8 +24,8 @@ func TestSystemPromptMemory(t *testing.T) {
 		{"no memory", "", nil, "", ThreadPrompt},
 		{"empty memory", "", []string{}, "", ThreadPrompt},
 		{"project thread", "", mem, "", ThreadPrompt + "\n\n" + block},
-		{"workspace thread", ws, mem, "", ThreadPrompt + " " + ws + "\n\n" + block},
-		{"seeded thread", ws, mem, "You are Ember.", ThreadPrompt + " " + ws + "\n\n" + block + "\n\nYou are Ember."},
+		{"workspace thread", ws, mem, "", ThreadPrompt + "\n\n" + ws + "\n\n" + block},
+		{"seeded thread", ws, mem, "You are Ember.", ThreadPrompt + "\n\n" + ws + "\n\n" + block + "\n\nYou are Ember."},
 		{"seeded without memory", "", nil, "You are Ember.", ThreadPrompt + "\n\nYou are Ember."},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -904,8 +904,20 @@ export class World {
 
   // ---- Workspaces ---------------------------------------------------------------
 
+  /**
+   * WorkspaceService's Workspace since the reshape (docs/notes/workspaces-v2-2-workspaces.md):
+   * member project ids sorted, the first member added as the default primary, a managed dir.
+   * The mock still keeps its v1 branch and member worktrees internally for its thread.new.
+   */
   workspaceMsg(w: MockWorkspace): WorkspaceInit {
-    return { id: w.id, name: w.name, branch: w.branch, members: w.members.map((m) => ({ ...m })), createdAt: timestampFromDate(w.createdAt) };
+    return {
+      id: w.id,
+      name: w.name,
+      members: w.members.map((m) => m.projectId).sort(),
+      defaultPrimary: w.members[0]?.projectId ?? "workspace",
+      managedDir: `${HOME}/.code-foundry/workspaces/${w.id}`,
+      createdAt: timestampFromDate(w.createdAt),
+    };
   }
 
   workspaceSnapshot(): WorkspaceEventInit {

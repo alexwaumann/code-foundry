@@ -29,7 +29,7 @@ var readOnly = []string{
 	"thread.reports", "thread.subscriptions", "thread.wait",
 	"ui.presence",
 	"usage.show",
-	"workspace.list", "workspace.members",
+	"workspace.list",
 }
 
 // Every registered command is classified on purpose: the read-only ones are exactly the

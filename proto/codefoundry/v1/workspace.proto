@@ -4,27 +4,31 @@ package codefoundry.v1;
 
 import "google/protobuf/timestamp.proto";
 
-// WorkspaceService manages workspaces: one branch checked out as a worktree in each of
-// several projects (a branch set), for changes that span projects. See
-// docs/notes/workspaces-handoff.md and docs/notes/workspaces-1-store.md.
+// WorkspaceService manages workspaces: saved sets of projects with a place for the
+// instructions and skills that span them (the managed dir). A workspace has no branch
+// and no worktrees: a thread's project set and branch decide those
+// (ThreadService.Checkouts). See docs/notes/workspaces-v2-handoff.md and
+// docs/notes/workspaces-v2-2-workspaces.md.
 service WorkspaceService {
-  // List returns every workspace.
+  // List returns every workspace, sorted by name.
   rpc List(ListWorkspacesRequest) returns (ListWorkspacesResponse) {}
-  // Create makes a workspace and one worktree per member project on its branch
-  // (fetching each base first). All or nothing: on failure, worktrees it made are
-  // removed again.
+  // Create saves a workspace and makes its managed dir (for a rooted one, the symlinks
+  // to the root's CLAUDE.md, AGENTS.md and .claude).
   rpc Create(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {}
-  // AddProject creates a worktree on the workspace branch in another project.
+  // AddProject adds a member project.
   rpc AddProject(AddWorkspaceProjectRequest) returns (AddWorkspaceProjectResponse) {}
-  // RemoveProject removes a member's worktree (refused while a live thread runs in it, or
-  // when it has uncommitted changes and force is not set) and drops the member.
+  // RemoveProject drops a member project (nothing on disk changes). The default primary
+  // moves to "workspace" when it was the removed project.
   rpc RemoveProject(RemoveWorkspaceProjectRequest) returns (RemoveWorkspaceProjectResponse) {}
-  // Remove removes every member worktree (same guards as RemoveProject) and forgets the
-  // workspace.
+  // Rename renames a workspace (names are unique, case-insensitively).
+  rpc Rename(RenameWorkspaceRequest) returns (RenameWorkspaceResponse) {}
+  // SetDefaultPrimary sets where new threads in the workspace start: a member project id,
+  // or "workspace" (the managed dir, or the root of a rooted workspace).
+  rpc SetDefaultPrimary(SetWorkspaceDefaultPrimaryRequest) returns (SetWorkspaceDefaultPrimaryResponse) {}
+  // Remove forgets a workspace. A synthetic one's managed dir is deleted with its
+  // instructions and skills; a rooted one loses only the symlinks (the root is the
+  // user's). Threads that reference it keep running without it.
   rpc Remove(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse) {}
-  // Members resolves a workspace by id, name, or a path inside one of its member
-  // worktrees, and lists its members with project names and checked-out branches.
-  rpc Members(WorkspaceMembersRequest) returns (WorkspaceMembersResponse) {}
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
   // snapshot.
   rpc Watch(WatchWorkspacesRequest) returns (stream WorkspaceEvent) {}
@@ -33,42 +37,24 @@ service WorkspaceService {
 message Workspace {
   // "w-" + 12 hex digits.
   string id = 1;
-  // Unique display name.
+  // Unique display name (case-insensitively); editable.
   string name = 2;
-  // The branch every member worktree was created on.
-  string branch = 3;
-  // In the order they were added.
-  repeated WorkspaceMember members = 4;
+  // 3 was the v1 branch, 4 the v1 member worktrees.
+  reserved 3, 4;
+  reserved "branch";
   google.protobuf.Timestamp created_at = 5;
-}
-
-message WorkspaceMember {
-  string project_id = 1;
-  string worktree_path = 2;
-}
-
-// MemberInfo is a member joined with the project store's current state.
-message WorkspaceMemberInfo {
-  string project_id = 1;
-  // Empty when the project is no longer registered.
-  string project_name = 2;
-  string worktree_path = 3;
-  // The branch checked out in the worktree now; the workspace branch when unknown.
-  string branch = 4;
-  // The worktree is not among the project's worktrees (deleted by hand, or the
-  // project is unregistered or not reconciled yet).
-  bool missing = 5;
-  // The request's cwd is inside this worktree.
-  bool current = 6;
-}
-
-// WorkspaceMemberSpec names a project to add and the ref its branch starts from.
-message WorkspaceMemberSpec {
-  // Project id, name (when unique), or a path inside it.
-  string project = 1;
-  // Ref to branch from when the branch does not exist yet. Empty: the request's
-  // base_ref, else the default branch (resolved as CreateWorktreeRequest.base_ref).
-  string base_ref = 2;
+  // Member project ids, sorted by id.
+  repeated string members = 6;
+  // A real folder the workspace came from (its CLAUDE.md, AGENTS.md and .claude are
+  // symlinked into the managed dir); empty for a synthetic workspace.
+  string root_path = 7;
+  // Where new threads start: a member project id, or "workspace" (managed_dir, or
+  // root_path when set).
+  string default_primary = 8;
+  // <config home>/workspaces/<id>: given to every thread that references the workspace
+  // as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
+  // .claude/skills.
+  string managed_dir = 9;
 }
 
 message ListWorkspacesRequest {}
@@ -79,13 +65,17 @@ message ListWorkspacesResponse {
 
 message CreateWorkspaceRequest {
   string name = 1;
-  // Branch for every member. Empty: cf/<name as a slug>.
-  string branch = 2;
-  repeated WorkspaceMemberSpec members = 3;
-  // Default base ref for members without their own.
-  string base_ref = 4;
-  // Fetch each remote-tracking base first (bounded; a failed fetch uses the local copy).
-  bool fetch = 5;
+  // 2 was the v1 branch, 3 the v1 member specs, 4 and 5 their base and fetch.
+  reserved 2, 3, 4, 5;
+  reserved "branch", "base_ref", "fetch";
+  // Projects (id, name when unique, or an absolute path inside one). At least one unless
+  // root_path is set.
+  repeated string members = 6;
+  // An absolute folder under home; empty for a synthetic workspace.
+  string root_path = 7;
+  // A member (id or name) or "workspace". Empty: "workspace" for a rooted workspace,
+  // else the first member given.
+  string default_primary = 8;
 }
 
 message CreateWorkspaceResponse {
@@ -93,13 +83,12 @@ message CreateWorkspaceResponse {
 }
 
 message AddWorkspaceProjectRequest {
-  // Workspace id or name. Empty: the workspace whose member contains cwd.
+  // Workspace id or name.
   string workspace = 1;
-  string cwd = 2;
+  reserved 2, 4, 5;
+  reserved "cwd", "base_ref", "fetch";
   // Project id, name (when unique), or a path inside it.
   string project = 3;
-  string base_ref = 4;
-  bool fetch = 5;
 }
 
 message AddWorkspaceProjectResponse {
@@ -107,41 +96,47 @@ message AddWorkspaceProjectResponse {
 }
 
 message RemoveWorkspaceProjectRequest {
-  // Workspace id or name. Empty: the workspace whose member contains cwd.
+  // Workspace id or name.
   string workspace = 1;
-  string cwd = 2;
-  // Project id, name, or a path inside it (or the member worktree path).
+  reserved 2, 4, 5;
+  reserved "cwd", "force", "delete_branch";
+  // Project id or name (a member).
   string project = 3;
-  // Remove the worktree even with uncommitted changes.
-  bool force = 4;
-  // Also delete the member's branch.
-  bool delete_branch = 5;
 }
 
 message RemoveWorkspaceProjectResponse {
   Workspace workspace = 1;
 }
 
+message RenameWorkspaceRequest {
+  // Workspace id or name.
+  string workspace = 1;
+  string name = 2;
+}
+
+message RenameWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message SetWorkspaceDefaultPrimaryRequest {
+  // Workspace id or name.
+  string workspace = 1;
+  // A member project (id or name), or "workspace".
+  string default_primary = 2;
+}
+
+message SetWorkspaceDefaultPrimaryResponse {
+  Workspace workspace = 1;
+}
+
 message RemoveWorkspaceRequest {
   // Workspace id or name.
   string workspace = 1;
-  bool force = 2;
-  bool delete_branch = 3;
+  reserved 2, 3;
+  reserved "force", "delete_branch";
 }
 
 message RemoveWorkspaceResponse {}
-
-message WorkspaceMembersRequest {
-  // Workspace id or name. Empty: the workspace whose member contains cwd.
-  string workspace = 1;
-  // An absolute path; marks the member it is in as current.
-  string cwd = 2;
-}
-
-message WorkspaceMembersResponse {
-  Workspace workspace = 1;
-  repeated WorkspaceMemberInfo members = 2;
-}
 
 message WatchWorkspacesRequest {}
 

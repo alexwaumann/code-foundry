@@ -12,8 +12,6 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
 
@@ -33,57 +31,46 @@ func newWorkspaceServer(t *testing.T) (*workspacetest.Fake, codefoundryv1connect
 
 func TestWorkspaceUnaryAndErrorCodes(t *testing.T) {
 	fake, c := newWorkspaceServer(t)
-	fake.Projects = func() *project.Snapshot {
-		return &project.Snapshot{Projects: []project.Project{{ID: "web", Name: "web-ui", Worktrees: []project.Worktree{
-			{ProjectID: "web", Path: "/worktrees/web/cf-login", Branch: "cf/login"},
-		}}}}
-	}
 	ctx := context.Background()
-	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{
-		Name: "login", Members: []*v1.WorkspaceMemberSpec{{Project: "web"}, {Project: "api", BaseRef: "origin/dev"}}, Fetch: true,
-	}))
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "shop", Members: []string{"web", "api"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	w := res.Msg.GetWorkspace()
-	if w.GetId() != "w-1" || w.GetBranch() != "cf/login" || len(w.GetMembers()) != 2 || w.GetCreatedAt() == nil ||
-		w.GetMembers()[1].GetWorktreePath() != "/worktrees/api/cf-login" {
+	if w.GetId() != "w-1" || len(w.GetMembers()) != 2 || w.GetMembers()[0] != "api" || w.GetDefaultPrimary() != "web" ||
+		w.GetManagedDir() != "/workspaces/w-1" || w.GetCreatedAt() == nil {
 		t.Fatalf("Create = %v", w)
 	}
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "login", Members: []*v1.WorkspaceMemberSpec{{Project: "x"}}})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "SHOP", Members: []string{"x"}})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("Create duplicate: %v", err)
 	}
-	if _, err := c.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{Cwd: "/worktrees/web/cf-login/src", Project: "lib"})); err != nil {
+	if _, err := c.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{Workspace: "shop", Project: "lib"})); err != nil {
 		t.Fatal(err)
 	}
-	mem, err := c.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{Cwd: "/worktrees/web/cf-login"}))
-	if err != nil {
-		t.Fatal(err)
+	if _, err := c.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{Workspace: "nope", Project: "lib"})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("AddProject to a missing workspace: %v", err)
 	}
-	ms := mem.Msg.GetMembers()
-	if mem.Msg.GetWorkspace().GetName() != "login" || len(ms) != 3 || ms[0].GetProjectName() != "web-ui" || !ms[0].GetCurrent() ||
-		ms[0].GetMissing() || !ms[1].GetMissing() || ms[1].GetBranch() != "cf/login" {
-		t.Fatalf("Members = %v", mem.Msg)
-	}
-	if _, err := c.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{Cwd: "/elsewhere"})); connect.CodeOf(err) != connect.CodeNotFound {
-		t.Errorf("Members outside: %v", err)
-	}
-	if _, err := c.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Errorf("Members without a ref: %v", err)
-	}
-	rr, err := c.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{Workspace: "login", Project: "api", Force: true}))
-	if err != nil || len(rr.Msg.GetWorkspace().GetMembers()) != 2 {
+	rr, err := c.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{Workspace: "shop", Project: "web"}))
+	if err != nil || len(rr.Msg.GetWorkspace().GetMembers()) != 2 || rr.Msg.GetWorkspace().GetDefaultPrimary() != "workspace" {
 		t.Fatalf("RemoveProject = %v, %v", rr, err)
 	}
-	if _, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{Workspace: "w-1", DeleteBranch: true})); err != nil {
+	rn, err := c.Rename(ctx, connect.NewRequest(&v1.RenameWorkspaceRequest{Workspace: "w-1", Name: "store"}))
+	if err != nil || rn.Msg.GetWorkspace().GetName() != "store" {
+		t.Fatalf("Rename = %v, %v", rn, err)
+	}
+	sp, err := c.SetDefaultPrimary(ctx, connect.NewRequest(&v1.SetWorkspaceDefaultPrimaryRequest{Workspace: "store", DefaultPrimary: "api"}))
+	if err != nil || sp.Msg.GetWorkspace().GetDefaultPrimary() != "api" {
+		t.Fatalf("SetDefaultPrimary = %v, %v", sp, err)
+	}
+	if _, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{Workspace: "w-1"})); err != nil {
 		t.Fatal(err)
 	}
 	list, err := c.List(ctx, connect.NewRequest(&v1.ListWorkspacesRequest{}))
 	if err != nil || len(list.Msg.GetWorkspaces()) != 0 {
 		t.Fatalf("List = %v, %v", list, err)
 	}
-	want := []string{"Create login web,api:origin/dev", "Create login x", "AddProject /worktrees/web/cf-login/src lib",
-		"Members /worktrees/web/cf-login", "Members /elsewhere", "Members ", "RemoveProject login api force", "Remove w-1 delete-branch"}
+	want := []string{"Create shop", "Create SHOP", "AddProject shop lib", "AddProject nope lib", "RemoveProject shop web",
+		"Rename w-1 store", "SetDefaultPrimary store api", "Remove w-1"}
 	if got := fake.Calls(); len(got) != len(want) {
 		t.Fatalf("calls = %q", got)
 	} else {
@@ -99,7 +86,7 @@ func TestWorkspaceWatchSendsSnapshotThenEvents(t *testing.T) {
 	fake, c := newWorkspaceServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "a", Members: []*v1.WorkspaceMemberSpec{{Project: "r"}}})); err != nil {
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "a", Members: []string{"r"}})); err != nil {
 		t.Fatal(err)
 	}
 	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchWorkspacesRequest{}))
@@ -109,7 +96,7 @@ func TestWorkspaceWatchSendsSnapshotThenEvents(t *testing.T) {
 	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetWorkspaces()) != 1 {
 		t.Fatalf("first event = %v (%v)", stream.Msg(), stream.Err())
 	}
-	if _, err := fake.AddProject(ctx, workspaceAddProject("a", "s")); err != nil {
+	if _, err := fake.AddProject(ctx, "a", "s"); err != nil {
 		t.Fatal(err)
 	}
 	if !stream.Receive() || len(stream.Msg().GetUpdated().GetMembers()) != 2 {
@@ -121,8 +108,4 @@ func TestWorkspaceWatchSendsSnapshotThenEvents(t *testing.T) {
 	if !stream.Receive() || stream.Msg().GetRemovedId() != "w-1" {
 		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
 	}
-}
-
-func workspaceAddProject(ws, projectID string) workspace.AddProjectOptions {
-	return workspace.AddProjectOptions{Ref: workspace.Ref{Workspace: ws}, Member: workspace.MemberSpec{Project: projectID}}
 }

@@ -215,14 +215,6 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 	if o.CheckoutMode {
 		call += " checkout-mode"
 	}
-	if nw := o.NewWorkspace; nw != nil && len(nw.Projects) > 0 {
-		call += " new-workspace=" + strings.Join(nw.Projects, ",")
-		s.ProjectID = o.ProjectID
-		if s.ProjectID == "" {
-			s.ProjectID = nw.Projects[0]
-		}
-		s.WorkspaceID, s.WorktreePath, s.CreatedWorktree, s.BaseRef = "w-new", "/worktrees/"+s.ProjectID, true, nw.BaseRef
-	}
 	if o.NoProject {
 		call += " no-project"
 		s.WorktreePath = "/home"

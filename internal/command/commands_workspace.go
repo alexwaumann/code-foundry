@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"text/tabwriter"
 
 	"connectrpc.com/connect"
 
@@ -19,8 +18,9 @@ type WorkspaceBackend interface {
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
 	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
+	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
+	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
-	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 }
 
 var (
@@ -28,59 +28,56 @@ var (
 	_ WorkspaceBackend = codefoundryv1connect.WorkspaceServiceClient(nil)
 )
 
-// RegisterWorkspace registers workspace.new, workspace.list, workspace.members,
-// workspace.add-project, workspace.remove-project and workspace.remove.
+// RegisterWorkspace registers workspace.new, workspace.list, workspace.add-project,
+// workspace.remove-project, workspace.rename, workspace.set-primary and workspace.remove
+// (docs/notes/workspaces-v2-2-workspaces.md). A workspace is a saved set of projects
+// with a managed dir for the instructions and skills that span them; it has no branch
+// and no worktrees (a thread's project set and branch decide those).
 func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
-	// A workspace is named by id or name, else found from a path inside one of its
-	// member worktrees: the CLI's working directory, or the GUI's active worktree.
-	wsArg := ArgSpec{Name: "workspace", Type: String, Description: "Workspace id or name (default: the workspace whose worktree contains --cwd)"}
-	cwdArg := ArgSpec{
-		Name: "cwd", Type: Path, Context: ContextWorktree, DefaultToCwd: true,
-		Description: "A path inside a member worktree, used to find the workspace when none is named (CLI default: the working directory)",
+	// A workspace is named by id or name, else the active one (the GUI's, or
+	// --context-workspace).
+	wsArg := ArgSpec{Name: "workspace", Type: String, Description: "Workspace id or name (default: the active workspace)"}
+	ws := func(c Context, a Args) (string, error) {
+		if w := strings.TrimSpace(a.String("workspace")); w != "" {
+			return w, nil
+		}
+		if c.ActiveWorkspaceID != "" {
+			return c.ActiveWorkspaceID, nil
+		}
+		return "", InvalidArg("workspace", "name the workspace (an id or a name)")
 	}
-	fetchArg := ArgSpec{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch each remote base branch first (bounded; a failed fetch uses the local copy; never with projects.base_from_origin off)"}
 	return r.RegisterAll(
 		Command{
 			Name:  "workspace.new",
 			Title: "New Workspace",
-			Description: "Create a workspace: one branch checked out as a new worktree in each of several projects. " +
-				"Nothing is created unless every worktree can be.",
+			Description: "Save a set of projects as a workspace, with a folder of its own for the instructions and skills that span them " +
+				"(with root: links to the root's CLAUDE.md, AGENTS.md and .claude). Nothing else is created.",
 			Category: "Workspace",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Workspace name"},
-				{Name: "projects", Type: String, Required: true, Description: "Comma-separated projects (id, name, or absolute path), each optionally project:base-ref"},
-				{Name: "branch", Type: String, Description: "Branch for every worktree (default: the name's slug in the settings' projects.branch_naming mode, e.g. feat/<slug>; an existing branch is checked out)"},
-				{Name: "base", Type: String, Description: "Ref to branch from for projects without their own (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
-				fetchArg,
+				{Name: "projects", Type: String, Description: "Comma-separated projects (id, name, or absolute path)"},
+				{Name: "root", Type: Path, Description: "A folder the workspace comes from (its CLAUDE.md, AGENTS.md and .claude reach its threads)"},
+				{Name: "primary", Type: String, Description: "Where new threads start: a project, or workspace (its folder) (default: workspace with root, else the first project)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				req := &v1.CreateWorkspaceRequest{
-					Name: a.String("name"), Branch: a.String("branch"), BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
-				}
-				for _, item := range splitList(a.String("projects")) {
-					project, base, _ := strings.Cut(item, ":")
-					req.Members = append(req.Members, &v1.WorkspaceMemberSpec{Project: strings.TrimSpace(project), BaseRef: strings.TrimSpace(base)})
-				}
-				if len(req.Members) == 0 {
-					return Result{}, InvalidArg("projects", "argument \"projects\": name at least one project")
+				req := &v1.CreateWorkspaceRequest{Name: a.String("name"), Members: splitList(a.String("projects")),
+					RootPath: a.Path("root"), DefaultPrimary: a.String("primary")}
+				if len(req.Members) == 0 && req.RootPath == "" {
+					return Result{}, InvalidArg("projects", "argument \"projects\": name at least one project (or a root)")
 				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
 				}
 				w := res.Msg.GetWorkspace()
-				msg := "created workspace " + describeWorkspace(w)
-				if ms, err := b.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{Workspace: w.GetId()})); err == nil {
-					msg = "created " + formatMembers(ms.Msg)
-				}
-				return Result{Message: msg, JSON: w}, nil
+				return Result{Message: "created workspace " + describeWorkspace(w), JSON: w}, nil
 			},
 		},
 		Command{
 			Name:         "workspace.list",
 			ReadOnly:     true,
 			Title:        "List Workspaces",
-			Description:  "List workspaces with their branch and member projects.",
+			Description:  "List workspaces with their projects, default primary and folder.",
 			Category:     "Workspace",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -100,149 +97,126 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:     "workspace.members",
-			ReadOnly: true,
-			Title:    "Workspace Members",
-			Description: "Deprecated: thread checkouts lists a thread's projects and checkouts; this goes with the workspace reshape. " +
-				"List a workspace's worktrees: one line per member project with its worktree path and branch. " +
-				"Without a workspace, the one whose worktree contains --cwd (the working directory) is used.",
-			Category:     "Workspace",
-			NoKeybinding: true,
-			Args:         []ArgSpec{withPositional(wsArg), cwdArg},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"),
-				}))
-				if err != nil {
-					return Result{}, err
-				}
-				return Result{Message: formatMembers(res.Msg), JSON: res.Msg}, nil
-			},
-		},
-		Command{
 			Name:        "workspace.add-project",
 			Title:       "Add Project to Workspace",
-			Description: "Create a worktree on the workspace branch in another project and add it to the workspace.",
+			Description: "Add a project to a workspace. Nothing on disk changes.",
 			Category:    "Workspace",
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or absolute path"},
-				wsArg, cwdArg,
-				{Name: "base", Type: String, Description: "Ref to branch from when the branch does not exist (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
-				fetchArg,
+				wsArg,
 			},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("project"),
-					BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
-				}))
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				w, err := ws(c, a)
 				if err != nil {
 					return Result{}, err
 				}
-				w := res.Msg.GetWorkspace()
-				msg := "added " + a.String("project") + " to workspace " + w.GetName()
-				if ms := w.GetMembers(); len(ms) > 0 {
-					msg += ": " + ms[len(ms)-1].GetWorktreePath() + " on " + w.GetBranch()
+				res, err := b.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{Workspace: w, Project: a.String("project")}))
+				if err != nil {
+					return Result{}, err
 				}
-				return Result{Message: msg, JSON: w}, nil
+				return Result{Message: "added " + a.String("project") + " to workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
-			Name:  "workspace.remove-project",
-			Title: "Remove Project from Workspace",
-			Description: "Delete a member project's worktree and drop it from the workspace. Refused while a thread runs " +
-				"in that worktree." + forceNote,
-			Category: "Workspace",
+			Name:        "workspace.remove-project",
+			Title:       "Remove Project from Workspace",
+			Description: "Drop a project from a workspace. Nothing on disk changes; threads keep their projects.",
+			Category:    "Workspace",
 			Args: []ArgSpec{
-				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or path (the member worktree path works too)"},
-				wsArg, cwdArg,
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
-				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch when it is merged into the default branch (with --force: always)"},
+				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id or name"},
+				wsArg,
 			},
-			Confirm: "Remove project {project} from its workspace? This deletes its worktree from disk.",
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("project"),
-					Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
-				}))
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				w, err := ws(c, a)
 				if err != nil {
-					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
-						return Result{}, deleteWorkConfirm("workspace.remove-project", wts, withBranch(a, "the worktree"))
-					}
 					return Result{}, err
 				}
-				w := res.Msg.GetWorkspace()
-				return Result{Message: fmt.Sprintf("removed %s from workspace %s (%d left)", a.String("project"), w.GetName(), len(w.GetMembers())), JSON: w}, nil
+				res, err := b.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{Workspace: w, Project: a.String("project")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: "removed " + a.String("project") + " from workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+			},
+		},
+		Command{
+			Name:        "workspace.rename",
+			Title:       "Rename Workspace",
+			Description: "Rename a workspace (names are unique, whatever their case).",
+			Category:    "Workspace",
+			Args: []ArgSpec{
+				{Name: "name", Type: String, Required: true, Positional: true, Description: "New name"},
+				wsArg,
+			},
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				w, err := ws(c, a)
+				if err != nil {
+					return Result{}, err
+				}
+				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameWorkspaceRequest{Workspace: w, Name: a.String("name")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: "renamed workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
+			},
+		},
+		Command{
+			Name:        "workspace.set-primary",
+			Title:       "Set Workspace Default Primary",
+			Description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder).",
+			Category:    "Workspace",
+			Args: []ArgSpec{
+				{Name: "primary", Type: String, Required: true, Positional: true, Description: "A project of the workspace (id or name), or workspace"},
+				wsArg,
+			},
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				w, err := ws(c, a)
+				if err != nil {
+					return Result{}, err
+				}
+				res, err := b.SetDefaultPrimary(ctx, connect.NewRequest(&v1.SetWorkspaceDefaultPrimaryRequest{Workspace: w, DefaultPrimary: a.String("primary")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: "workspace " + describeWorkspace(res.Msg.GetWorkspace()), JSON: res.Msg.GetWorkspace()}, nil
 			},
 		},
 		Command{
 			Name:  "workspace.remove",
 			Title: "Remove Workspace",
-			Description: "Delete every member worktree and forget the workspace. Refused while a thread runs in any member " +
-				"worktree; nothing is removed then." + forceNote,
+			Description: "Forget a workspace. Its folder goes with its instructions and skills; for a workspace with a root, only the links " +
+				"(the root is yours). Projects, worktrees and threads stay.",
 			Category: "Workspace",
 			Args: []ArgSpec{
 				{Name: "workspace", Type: String, Required: true, Positional: true, Description: "Workspace id or name"},
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
-				{Name: "delete-branch", Type: Bool, Description: "Also delete each member's branch that is merged into its default branch (with --force: every one)"},
 			},
-			Confirm: "Remove workspace {workspace}? This deletes every member worktree from disk.",
+			Confirm: "Remove workspace {workspace}? Its instructions and skills are deleted too (a workspace with a root keeps the root's).",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				ws := a.String("workspace")
-				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{
-					Workspace: ws, Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
-				})); err != nil {
-					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
-						return Result{}, deleteWorkConfirm("workspace.remove", wts, withBranch(a, "the workspace's worktrees"))
-					}
+				w := a.String("workspace")
+				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{Workspace: w})); err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "removed workspace " + ws}, nil
+				return Result{Message: "removed workspace " + w}, nil
 			},
 		},
 	)
 }
 
-func withPositional(s ArgSpec) ArgSpec {
-	s.Positional = true
-	return s
-}
-
-// describeWorkspace is "login (w-…) on cf/login, 2 projects".
+// describeWorkspace is "shop (w-…): 2 projects (api, web), starts in api, folder /…".
 func describeWorkspace(w *v1.Workspace) string {
 	n := len(w.GetMembers())
 	noun := "projects"
 	if n == 1 {
 		noun = "project"
 	}
-	return fmt.Sprintf("%s (%s) on %s, %d %s", w.GetName(), w.GetId(), w.GetBranch(), n, noun)
-}
-
-// formatMembers renders a membership for people and for Claude: a header line, then
-// one aligned line per member with project name, id, worktree path and branch.
-func formatMembers(m *v1.WorkspaceMembersResponse) string {
-	var b strings.Builder
-	w := m.GetWorkspace()
-	fmt.Fprintf(&b, "workspace %s (%s), branch %s\n", w.GetName(), w.GetId(), w.GetBranch())
-	if len(m.GetMembers()) == 0 {
-		b.WriteString("no member projects")
-		return b.String()
+	s := fmt.Sprintf("%s (%s): %d %s", w.GetName(), w.GetId(), n, noun)
+	if n > 0 {
+		s += " (" + strings.Join(w.GetMembers(), ", ") + ")"
 	}
-	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PROJECT\tID\tWORKTREE\tBRANCH")
-	for _, mem := range m.GetMembers() {
-		branch := mem.GetBranch()
-		if mem.GetCurrent() {
-			branch += " (current)"
-		}
-		if mem.GetMissing() {
-			branch += " (missing)"
-		}
-		name := mem.GetProjectName()
-		if name == "" {
-			name = "?"
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", name, mem.GetProjectId(), mem.GetWorktreePath(), branch)
+	if p := w.GetDefaultPrimary(); p != "" {
+		s += ", starts in " + p
 	}
-	_ = tw.Flush()
-	return strings.TrimRight(b.String(), "\n")
+	if r := w.GetRootPath(); r != "" {
+		s += ", root " + r
+	}
+	return s + ", folder " + w.GetManagedDir()
 }

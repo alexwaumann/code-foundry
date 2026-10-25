@@ -12,7 +12,6 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // uncommittedErr is a backend's refusal of a dirty worktree: FailedPrecondition with an
@@ -27,12 +26,11 @@ func uncommittedErr(wts ...*v1.Worktree) error {
 	return err
 }
 
-// TestRemovalsAskBeforeDeletingUncommittedWork: the three removals that refuse a dirty
+// TestRemovalsAskBeforeDeletingUncommittedWork: the removals that refuse a dirty
 // worktree ask their own question first, then (confirmed) a second one naming the work
 // and its counts with args force=true; invoked again with force they remove it. Without
 // that second yes nothing is forced.
 func TestRemovalsAskBeforeDeletingUncommittedWork(t *testing.T) {
-	dirtyStatus := project.Status{Dirty: true, Modified: 2, Untracked: 1}
 	tests := []struct {
 		name    string
 		cmd     string
@@ -69,36 +67,6 @@ func TestRemovalsAskBeforeDeletingUncommittedWork(t *testing.T) {
 			},
 			first:   "Remove worktree /wt/app-fix? This deletes files on disk.",
 			message: []string{"The worktree of cf/fix at /wt/app-fix has uncommitted work: 2 modified, 1 untracked.", "Removing the worktree deletes that work for good."},
-		},
-		{
-			name: "workspace.remove-project", cmd: "workspace.remove-project", args: map[string]string{"project": "web", "workspace": "base"},
-			setup: func(t *testing.T) (*command.Registry, func() []string) {
-				reg, fake := newWorkspaceRegistry(t)
-				if _, err := fake.Create(context.Background(), wsCreate("base", "web", "api")); err != nil {
-					t.Fatal(err)
-				}
-				fake.Uncommitted = []project.Worktree{{ProjectID: "web", Path: "/worktrees/web/cf-login", Branch: "cf/login", Status: dirtyStatus}}
-				return reg, func() []string { return fake.Calls()[1:] }
-			},
-			first:   "Remove project web from its workspace? This deletes its worktree from disk.",
-			message: []string{"The worktree of cf/login at /worktrees/web/cf-login has uncommitted work: 2 modified, 1 untracked."},
-		},
-		{
-			name: "workspace.remove, two dirty members", cmd: "workspace.remove", args: map[string]string{"workspace": "base"},
-			setup: func(t *testing.T) (*command.Registry, func() []string) {
-				reg, fake := newWorkspaceRegistry(t)
-				if _, err := fake.Create(context.Background(), wsCreate("base", "web", "api")); err != nil {
-					t.Fatal(err)
-				}
-				fake.Uncommitted = []project.Worktree{
-					{ProjectID: "web", Path: "/worktrees/web/cf-login", Branch: "cf/login", Status: dirtyStatus},
-					{ProjectID: "api", Path: "/worktrees/api/cf-login", Branch: "cf/login", Status: project.Status{Dirty: true, Staged: 1, Conflicted: 1}},
-				}
-				return reg, func() []string { return fake.Calls()[1:] }
-			},
-			first: "Remove workspace base? This deletes every member worktree from disk.",
-			message: []string{"2 worktrees have uncommitted work:\n- cf/login at /worktrees/web/cf-login: 2 modified, 1 untracked\n" +
-				"- cf/login at /worktrees/api/cf-login: 1 staged, 1 conflicted", "Removing the workspace's worktrees deletes that work for good."},
 		},
 	}
 	for _, tt := range tests {

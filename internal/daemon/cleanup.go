@@ -10,7 +10,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
@@ -72,9 +71,9 @@ func cleanupAbandoned(path string, snap *thread.Snapshot, removed []thread.Remov
 // cleanupHold is the non-git half of the worktree cleanup rule (project.CleanupVerdict
 // is the git half): why something keeps the worktree at path, or "". A thread is on it
 // (its cwd is the worktree or inside it; any state, archived ones excluded by the caller), a terminal that has not exited
-// belongs to it (worktree label) or runs inside it, or it is a workspace member. Pure;
-// the daemon passes the thread, terminal and workspace stores' current state.
-func cleanupHold(path string, threads []workspace.Thread, terminals []terminal.Terminal, workspaces *workspace.Snapshot) string {
+// belongs to it (worktree label) or runs inside it. Pure; the daemon passes the thread and
+// terminal stores' current state (workspaces have no worktrees).
+func cleanupHold(path string, threads []holder, terminals []terminal.Terminal) string {
 	for _, t := range threads {
 		if inside(t.Cwd, path) {
 			if t.Name != "" {
@@ -88,10 +87,14 @@ func cleanupHold(path string, threads []workspace.Thread, terminals []terminal.T
 			return "a terminal is open in it"
 		}
 	}
-	if w, _, ok := workspace.MemberAt(workspaces, path); ok {
-		return "member of workspace " + w.Name
-	}
 	return ""
+}
+
+// holder is a thread that holds a path for the cleanup rule: its cwd, or one of its
+// checkouts (checkoutThreads).
+type holder struct {
+	ID, Name string
+	Cwd      string
 }
 
 // inside reports whether p is root or below it. Both are snapshot paths (cleaned,

@@ -81,9 +81,8 @@ type stores struct {
 	// skills reads the Skills marketplaces Claude Code has and what is installed
 	// (skill_registry.go); it holds no resources.
 	skills *skill.Store
-	// workspace holds branch sets across projects; it creates and removes worktrees
-	// through project and asks thread which threads are live. Opened before thread,
-	// which reads workspace members at launch.
+	// workspace holds saved project sets and their managed dirs; opened before thread,
+	// whose spawns read the workspace a thread references.
 	workspace *workspace.Manager
 	// action holds each project's actions and runs them (in a terminal, or in the
 	// background). Opened before thread (whose new worktrees run on-worktree-create
@@ -202,31 +201,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.terminal = terminal.New(terminal.Options{
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Threads.ScrollbackLines),
 	})
-	// Workspaces open before threads: a thread reads a workspace thread's members at
-	// every spawn, and the workspace store asks threads about their threads (and
-	// pre-trusts worktrees) only through these closures, which run after both exist.
+	// Workspaces open before threads: a spawn of a thread that references one reads it
+	// (and re-checks its managed dir). New makes every managed dir.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
-		DB: s.db, Projects: s.project, Bus: s.bus, Log: log.With("store", "workspace"),
-		Threads: func() []workspace.Thread {
-			if s.thread == nil {
-				return nil
-			}
-			return worktreeThreads(s.thread.Snapshot())
-		},
-		Trust: func(dir string) error {
-			if s.thread == nil {
-				return nil
-			}
-			return s.thread.PreTrust(dir)
-		},
-		BaseFromOrigin: baseFromOrigin(s.settings),
-		// `workspace new` without a branch follows projects.branch_naming.
-		DefaultBranch: func(ctx context.Context, name string) string {
-			if s.thread == nil {
-				return ""
-			}
-			return s.thread.WorkspaceBranch(ctx, name)
-		},
+		DB: s.db, Projects: s.project, Dir: p.Workspaces(), Home: s.home, Bus: s.bus, Log: log.With("store", "workspace"),
 	}); err != nil {
 		return nil, err
 	}
@@ -253,10 +231,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.memory.Watch(ctx)
 	s.archived = &archiveCleaner{
 		log: log.With("store", "thread"), projects: s.project,
-		checkouts:  func(t thread.Thread) []thread.Checkout { return s.thread.CheckoutsOf(t) },
-		threads:    func() *thread.Snapshot { return s.thread.Snapshot() },
-		terminals:  func() []terminal.Terminal { return s.terminal.List(context.Background()) },
-		workspaces: func() *workspace.Snapshot { return s.workspace.Snapshot() },
+		checkouts: func(t thread.Thread) []thread.Checkout { return s.thread.CheckoutsOf(t) },
+		threads:   func() *thread.Snapshot { return s.thread.Snapshot() },
+		terminals: func() []terminal.Terminal { return s.terminal.List(context.Background()) },
 	}
 	s.archived.ctx, s.archived.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	threadLog := log.With("store", "thread")
@@ -328,7 +305,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.project.SetAutoPull(autoPullHooks(autoPullSources{
 		enabled: autoPullEnabled(s.settings), threads: s.thread.Snapshot, actions: s.action.Snapshot, ops: s.gitops,
 	}))
-	s.stopBranchLinks = startBranchLinks(ctx, log.With("store", "thread"), s.thread, s.project.Snapshot, s.workspace.Snapshot, s.gh, s.bus)
+	s.stopBranchLinks = startBranchLinks(ctx, log.With("store", "thread"), s.thread, s.project.Snapshot, s.gh, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
@@ -372,14 +349,14 @@ func threadOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
 // workspace store's removal guards: every thread but an archived one, whatever its state
 // (a stopped thread looks like any other in the GUI and a message starts it again in the
 // same worktree; a snoozed one comes back to it).
-func worktreeThreads(snap *thread.Snapshot) []workspace.Thread {
-	var out []workspace.Thread
+func worktreeThreads(snap *thread.Snapshot) []holder {
+	var out []holder
 	if snap == nil {
 		return nil
 	}
 	for _, s := range snap.Threads {
 		if s.ArchivedAt.IsZero() {
-			out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
+			out = append(out, holder{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
 		}
 	}
 	return out

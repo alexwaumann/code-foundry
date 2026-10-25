@@ -1,19 +1,22 @@
-// Package workspace is the workspace store. A workspace is a branch set: one branch
-// checked out as a worktree in each of several registered projects, for a change
-// that spans them. The store persists workspaces in SQLite, publishes an immutable
-// Snapshot behind an atomic pointer, and emits Updated/Removed events on the bus.
+// Package workspace is the workspace store. A workspace is a saved set of projects (its
+// members, project ids) plus a place for the instructions and skills that span them: its
+// managed dir, <config home>/workspaces/<id>/. A synthetic workspace's managed dir holds
+// the files themselves (a thread writes CLAUDE.md, AGENTS.md and .claude/skills there);
+// a rooted one came from a real folder (root_path) and its managed dir holds symlinks
+// CLAUDE.md, AGENTS.md and .claude to the same names under the root. A workspace has no
+// branch and no worktrees: those are a thread's (its project set and branch; the thread
+// store's derived checkouts).
 //
-// Worktrees are made and removed through the project store (the same fetch-then-`git
-// worktree add` path a new thread's worktree takes) and pre-trusted for Claude like a
-// thread's worktree. The store never looks at threads directly: the daemon hands it
-// a function listing live threads, so a member worktree a thread runs in is not
-// removed from under it. See docs/notes/workspaces-1-store.md.
+// The store persists workspaces in SQLite, publishes an immutable Snapshot behind an
+// atomic pointer and emits Updated/Removed events on the bus. It never looks at threads.
+// See docs/notes/workspaces-v2-handoff.md and docs/notes/workspaces-v2-2-workspaces.md.
 package workspace
 
 import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -24,36 +27,42 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 )
 
+// PrimaryWorkspace is the DefaultPrimary (and a thread's primary choice) that runs a
+// thread in the workspace itself: its root when it has one, else its managed dir.
+const PrimaryWorkspace = "workspace"
+
 // Workspace is an immutable snapshot of one workspace.
 type Workspace struct {
-	ID        string // "w-" + 12 hex digits
-	Name      string // unique
-	Branch    string // every member worktree was created on it
-	CreatedAt time.Time
-	Members   []Member // in the order they were added
+	ID   string // "w-" + 12 hex digits
+	Name string // unique, case-insensitively
+	// RootPath is the real folder a rooted workspace came from; "" for a synthetic one.
+	RootPath string
+	// Members are project ids, sorted. Copy on write.
+	Members []string
+	// DefaultPrimary is where new threads start: a member, or PrimaryWorkspace.
+	DefaultPrimary string
+	// ManagedDir is <Options.Dir>/<ID>.
+	ManagedDir string
+	CreatedAt  time.Time
 }
 
-// Member is one project's worktree in a workspace.
-type Member struct {
-	ProjectID    string
-	WorktreePath string
-	// StartPoint is the ref the member's branch was created from
-	// (project.Worktree.StartPoint). Set only in the Workspace that Create and
-	// AddProject return, never in a snapshot or the database; "" when the branch
-	// existed.
-	StartPoint string
-}
+// Member reports whether projectID is a member.
+func (w Workspace) Member(projectID string) bool { return slices.Contains(w.Members, projectID) }
 
-// Member returns the member for projectID.
-func (w Workspace) Member(projectID string) (Member, bool) {
-	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.ProjectID == projectID })
-	if i < 0 {
-		return Member{}, false
+// Dir is where a thread whose primary is the workspace runs: RootPath when set, else
+// ManagedDir.
+func (w Workspace) Dir() string {
+	if w.RootPath != "" {
+		return w.RootPath
 	}
-	return w.Members[i], true
+	return w.ManagedDir
 }
 
-// Snapshot is every workspace, sorted by name. Never mutate it.
+// Synthetic: no root; the managed dir holds the instructions and skills themselves.
+func (w Workspace) Synthetic() bool { return w.RootPath == "" }
+
+// Snapshot is every workspace, sorted by name (case-insensitively), then id. Never
+// mutate it.
 type Snapshot struct {
 	Workspaces []Workspace
 }
@@ -64,6 +73,18 @@ func (s *Snapshot) Workspace(id string) (Workspace, bool) {
 		return Workspace{}, false
 	}
 	i := slices.IndexFunc(s.Workspaces, func(w Workspace) bool { return w.ID == id })
+	if i < 0 {
+		return Workspace{}, false
+	}
+	return s.Workspaces[i], true
+}
+
+// Named returns the workspace named name, compared case-insensitively.
+func (s *Snapshot) Named(name string) (Workspace, bool) {
+	if s == nil {
+		return Workspace{}, false
+	}
+	i := slices.IndexFunc(s.Workspaces, func(w Workspace) bool { return strings.EqualFold(w.Name, strings.TrimSpace(name)) })
 	if i < 0 {
 		return Workspace{}, false
 	}
@@ -85,87 +106,18 @@ func (Updated) isWorkspaceEvent()   {}
 func (Removed) isWorkspaceEvent()   {}
 func (*Snapshot) isWorkspaceEvent() {}
 
-// Ref selects a workspace: by id or name, else the workspace one of whose member
-// worktrees contains Cwd.
-type Ref struct {
-	Workspace string // id or name
-	Cwd       string // absolute path
-}
-
-// MemberSpec names a project to add.
-type MemberSpec struct {
-	// Project is a project id, its name when unique, or a path inside it.
-	Project string
-	// BaseRef is where the branch starts when it does not exist yet. Empty: the
-	// operation's default base, else the project store's default (origin/<default>,
-	// or the local default branch with projects.base_from_origin off).
-	BaseRef string
-}
-
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
 	Name string
-	// Branch for every member. Empty: Options.DefaultBranch's for Name, else
-	// cf/<Name as a slug>.
-	Branch  string
-	Members []MemberSpec
-	// BaseRef is the default base for members without their own.
-	BaseRef string
-	// Fetch refreshes each remote-tracking base first (see project.CreateWorktreeOptions).
-	Fetch bool
-	// BaseFromOrigin, when set, overrides Options.BaseFromOrigin (projects.base_from_origin)
-	// for every member (project.CreateWorktreeOptions.BaseFromOrigin).
-	BaseFromOrigin *bool
-}
-
-// AddProjectOptions configures Store.AddProject.
-type AddProjectOptions struct {
-	Ref
-	Member MemberSpec
-	Fetch  bool
-}
-
-// RemoveProjectOptions configures Store.RemoveProject.
-type RemoveProjectOptions struct {
-	Ref
-	// Project is a project id, name, or a path inside it (the member worktree path
-	// works too).
-	Project string
-	// Force removes the worktree even with uncommitted changes.
-	Force bool
-	// DeleteBranch also deletes the member's branch.
-	DeleteBranch bool
-}
-
-// RemoveOptions configures Store.Remove.
-type RemoveOptions struct {
-	Workspace    string // id or name
-	Force        bool
-	DeleteBranch bool
-}
-
-// Membership is a workspace with its members joined to the project store's state.
-type Membership struct {
-	Workspace Workspace
-	Members   []MemberInfo
-}
-
-// MemberInfo is a member with what the project store knows about it now.
-type MemberInfo struct {
-	Member
-	ProjectName string // empty when the project is no longer registered
-	// Branch checked out in the worktree now; the workspace branch when unknown.
-	Branch string
-	// Missing: the worktree is not among its project's worktrees.
-	Missing bool
-	// Current: the Ref's Cwd is inside this worktree.
-	Current bool
-}
-
-// Thread is a live thread as the removal guard sees it.
-type Thread struct {
-	ID, Name string
-	Cwd      string // the worktree it runs in
+	// Members are project refs: an id, a name when unique, or an absolute path inside
+	// one. At least one unless RootPath is set.
+	Members []string
+	// RootPath is an absolute folder (under Options.Home when that is set); "" for a
+	// synthetic workspace.
+	RootPath string
+	// DefaultPrimary is a member ref or PrimaryWorkspace. "": PrimaryWorkspace for a
+	// rooted workspace, else the first member given.
+	DefaultPrimary string
 }
 
 // Store is the workspace store API. *Manager implements it; workspacetest.Fake is an
@@ -173,19 +125,23 @@ type Thread struct {
 type Store interface {
 	// Snapshot returns the current immutable snapshot. It never returns nil.
 	Snapshot() *Snapshot
-	// Create makes a workspace and a worktree on its branch in every member
-	// repository. On failure, worktrees it made are removed again.
+	// Create saves a workspace and makes its managed dir (EnsureDirs).
 	Create(ctx context.Context, opts CreateOptions) (Workspace, error)
-	// AddProject creates a worktree on the workspace branch in another project.
-	AddProject(ctx context.Context, opts AddProjectOptions) (Workspace, error)
-	// RemoveProject removes a member's worktree and drops the member. It refuses while a
-	// live thread runs in the worktree, and (without Force) when git refuses because
-	// of uncommitted changes (the error wraps *project.UncommittedError).
-	RemoveProject(ctx context.Context, opts RemoveProjectOptions) (Workspace, error)
-	// Remove removes every member worktree and forgets the workspace, with the same
-	// guards across all members, checked before anything is removed (uncommitted
-	// changes: an error wrapping *project.UncommittedError naming every dirty member).
-	Remove(ctx context.Context, opts RemoveOptions) error
-	// Members resolves ref and joins its members with the project store's state.
-	Members(ctx context.Context, ref Ref) (Membership, error)
+	// AddProject adds a member (ref as CreateOptions.Members).
+	AddProject(ctx context.Context, workspace, project string) (Workspace, error)
+	// RemoveProject drops a member; nothing on disk changes. A default primary that was
+	// the member becomes PrimaryWorkspace.
+	RemoveProject(ctx context.Context, workspace, project string) (Workspace, error)
+	// Rename renames a workspace; the name must be free (case-insensitively).
+	Rename(ctx context.Context, workspace, name string) (Workspace, error)
+	// SetDefaultPrimary sets a member (ref) or PrimaryWorkspace as the default primary.
+	SetDefaultPrimary(ctx context.Context, workspace, primary string) (Workspace, error)
+	// Remove forgets a workspace: a synthetic one's managed dir goes with it, a rooted
+	// one's symlinks only.
+	Remove(ctx context.Context, workspace string) error
+	// EnsureDirs makes the managed dir of workspace id (every workspace when id is "")
+	// and, for a rooted one, re-checks its symlinks: missing ones added, dangling ones
+	// removed. The thread store calls it at every spawn of a thread that references the
+	// workspace; the daemon at start.
+	EnsureDirs(ctx context.Context, id string) error
 }

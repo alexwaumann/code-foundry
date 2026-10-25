@@ -76,7 +76,7 @@ type ArgSpec struct {
 	Positional bool
 	// DefaultToCwd makes the CLI send its working directory when the flag is not
 	// given (Path args only). A Claude session runs the CLI from its worktree, so
-	// `code-foundry workspace members` finds the thread's workspace.
+	// `code-foundry thread checkouts` finds the thread from its checkout.
 	DefaultToCwd bool
 	// DefaultToThreadEnv makes the CLI send $CODE_FOUNDRY_THREAD (the thread its Claude
 	// runs in) when the flag is not given; --flag= opts out (String args only). Unlike

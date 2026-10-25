@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // Store methods for a thread's conversation (Send, Respond, Interrupt, SetModel,
@@ -115,21 +114,11 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	}
 }
 
-// fileRefRoots resolves a file reference's repository to its checkout for thread s: a
-// referenced workspace's member worktree in that project, else s's checkout of it
+// fileRefRoots resolves a file reference's repository to s's checkout of it
 // (checkouts.go). A thread without a project resolves none.
 func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
-	var members []workspace.Member
-	if s.WorkspaceID != "" && m.opts.Workspaces != nil {
-		if w, ok := m.opts.Workspaces.Snapshot().Workspace(s.WorkspaceID); ok {
-			members = w.Members
-		}
-	}
 	cos := m.checkouts(s)
 	return func(projectID string) (string, bool) {
-		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
-			return members[i].WorktreePath, true
-		}
 		if i := slices.IndexFunc(cos, func(c Checkout) bool { return c.ProjectID == projectID && c.Path != "" }); i >= 0 {
 			return cos[i].Path, true
 		}

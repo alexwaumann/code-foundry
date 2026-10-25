@@ -42,7 +42,6 @@ func TestCreateNoProjectIsExclusive(t *testing.T) {
 		{"new worktree", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}}},
 		{"new worktree alone", CreateOptions{NewWorktree: &NewWorktree{}}},
 		{"workspace", CreateOptions{WorkspaceID: "login"}},
-		{"new workspace", CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

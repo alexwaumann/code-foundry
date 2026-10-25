@@ -3,7 +3,6 @@ package thread
 import (
 	"context"
 	"os"
-	"slices"
 	"strings"
 )
 
@@ -81,20 +80,13 @@ func (m *Manager) SpawnInfo(id string) (SpawnInfo, bool) {
 	return spawnInfoOf(s, m.memberProjects(s), false), true
 }
 
-// memberProjects is the projects of a multi-project thread's set and of a referenced
-// workspace's members (the cwd's included), sorted, as a spawn passes them; nil for a
-// single-project thread without a workspace (or whose workspace is gone).
+// memberProjects is a multi-project thread's set, sorted, as a spawn passes it; nil for
+// a thread with one project or none.
 func (m *Manager) memberProjects(s Thread) []string {
-	var ids []string
-	if set := s.Projects(); len(set) > 1 {
-		ids = set
+	if set := s.Projects(); len(set) > 1 || (len(set) == 1 && s.ProjectID == "") {
+		return set
 	}
-	if s.WorkspaceID != "" && m.opts.Workspaces != nil {
-		if wl, ok := workspaceLaunch(m.opts.Workspaces.Snapshot(), s.WorkspaceID, s.WorktreePath, isDir); ok {
-			ids = CleanProjectIDs("", append(slices.Clone(ids), wl.projects...))
-		}
-	}
-	return ids
+	return nil
 }
 
 // spawnInfoOf is SpawnInfo for s (the workspace's members as snap has them).

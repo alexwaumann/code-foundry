@@ -43,34 +43,38 @@ const (
 	// WorkspaceServiceRemoveProjectProcedure is the fully-qualified name of the WorkspaceService's
 	// RemoveProject RPC.
 	WorkspaceServiceRemoveProjectProcedure = "/codefoundry.v1.WorkspaceService/RemoveProject"
+	// WorkspaceServiceRenameProcedure is the fully-qualified name of the WorkspaceService's Rename RPC.
+	WorkspaceServiceRenameProcedure = "/codefoundry.v1.WorkspaceService/Rename"
+	// WorkspaceServiceSetDefaultPrimaryProcedure is the fully-qualified name of the WorkspaceService's
+	// SetDefaultPrimary RPC.
+	WorkspaceServiceSetDefaultPrimaryProcedure = "/codefoundry.v1.WorkspaceService/SetDefaultPrimary"
 	// WorkspaceServiceRemoveProcedure is the fully-qualified name of the WorkspaceService's Remove RPC.
 	WorkspaceServiceRemoveProcedure = "/codefoundry.v1.WorkspaceService/Remove"
-	// WorkspaceServiceMembersProcedure is the fully-qualified name of the WorkspaceService's Members
-	// RPC.
-	WorkspaceServiceMembersProcedure = "/codefoundry.v1.WorkspaceService/Members"
 	// WorkspaceServiceWatchProcedure is the fully-qualified name of the WorkspaceService's Watch RPC.
 	WorkspaceServiceWatchProcedure = "/codefoundry.v1.WorkspaceService/Watch"
 )
 
 // WorkspaceServiceClient is a client for the codefoundry.v1.WorkspaceService service.
 type WorkspaceServiceClient interface {
-	// List returns every workspace.
+	// List returns every workspace, sorted by name.
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
-	// Create makes a workspace and one worktree per member project on its branch
-	// (fetching each base first). All or nothing: on failure, worktrees it made are
-	// removed again.
+	// Create saves a workspace and makes its managed dir (for a rooted one, the symlinks
+	// to the root's CLAUDE.md, AGENTS.md and .claude).
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
-	// AddProject creates a worktree on the workspace branch in another project.
+	// AddProject adds a member project.
 	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
-	// RemoveProject removes a member's worktree (refused while a live thread runs in it, or
-	// when it has uncommitted changes and force is not set) and drops the member.
+	// RemoveProject drops a member project (nothing on disk changes). The default primary
+	// moves to "workspace" when it was the removed project.
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
-	// Remove removes every member worktree (same guards as RemoveProject) and forgets the
-	// workspace.
+	// Rename renames a workspace (names are unique, case-insensitively).
+	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
+	// SetDefaultPrimary sets where new threads in the workspace start: a member project id,
+	// or "workspace" (the managed dir, or the root of a rooted workspace).
+	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
+	// Remove forgets a workspace. A synthetic one's managed dir is deleted with its
+	// instructions and skills; a rooted one loses only the symlinks (the root is the
+	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
-	// Members resolves a workspace by id, name, or a path inside one of its member
-	// worktrees, and lists its members with project names and checked-out branches.
-	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest]) (*connect.ServerStreamForClient[v1.WorkspaceEvent], error)
@@ -111,16 +115,22 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("RemoveProject")),
 			connect.WithClientOptions(opts...),
 		),
+		rename: connect.NewClient[v1.RenameWorkspaceRequest, v1.RenameWorkspaceResponse](
+			httpClient,
+			baseURL+WorkspaceServiceRenameProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("Rename")),
+			connect.WithClientOptions(opts...),
+		),
+		setDefaultPrimary: connect.NewClient[v1.SetWorkspaceDefaultPrimaryRequest, v1.SetWorkspaceDefaultPrimaryResponse](
+			httpClient,
+			baseURL+WorkspaceServiceSetDefaultPrimaryProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("SetDefaultPrimary")),
+			connect.WithClientOptions(opts...),
+		),
 		remove: connect.NewClient[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse](
 			httpClient,
 			baseURL+WorkspaceServiceRemoveProcedure,
 			connect.WithSchema(workspaceServiceMethods.ByName("Remove")),
-			connect.WithClientOptions(opts...),
-		),
-		members: connect.NewClient[v1.WorkspaceMembersRequest, v1.WorkspaceMembersResponse](
-			httpClient,
-			baseURL+WorkspaceServiceMembersProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("Members")),
 			connect.WithClientOptions(opts...),
 		),
 		watch: connect.NewClient[v1.WatchWorkspacesRequest, v1.WorkspaceEvent](
@@ -134,13 +144,14 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // workspaceServiceClient implements WorkspaceServiceClient.
 type workspaceServiceClient struct {
-	list          *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
-	create        *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
-	addProject    *connect.Client[v1.AddWorkspaceProjectRequest, v1.AddWorkspaceProjectResponse]
-	removeProject *connect.Client[v1.RemoveWorkspaceProjectRequest, v1.RemoveWorkspaceProjectResponse]
-	remove        *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
-	members       *connect.Client[v1.WorkspaceMembersRequest, v1.WorkspaceMembersResponse]
-	watch         *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
+	list              *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
+	create            *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
+	addProject        *connect.Client[v1.AddWorkspaceProjectRequest, v1.AddWorkspaceProjectResponse]
+	removeProject     *connect.Client[v1.RemoveWorkspaceProjectRequest, v1.RemoveWorkspaceProjectResponse]
+	rename            *connect.Client[v1.RenameWorkspaceRequest, v1.RenameWorkspaceResponse]
+	setDefaultPrimary *connect.Client[v1.SetWorkspaceDefaultPrimaryRequest, v1.SetWorkspaceDefaultPrimaryResponse]
+	remove            *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
+	watch             *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
 }
 
 // List calls codefoundry.v1.WorkspaceService.List.
@@ -163,14 +174,19 @@ func (c *workspaceServiceClient) RemoveProject(ctx context.Context, req *connect
 	return c.removeProject.CallUnary(ctx, req)
 }
 
+// Rename calls codefoundry.v1.WorkspaceService.Rename.
+func (c *workspaceServiceClient) Rename(ctx context.Context, req *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error) {
+	return c.rename.CallUnary(ctx, req)
+}
+
+// SetDefaultPrimary calls codefoundry.v1.WorkspaceService.SetDefaultPrimary.
+func (c *workspaceServiceClient) SetDefaultPrimary(ctx context.Context, req *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error) {
+	return c.setDefaultPrimary.CallUnary(ctx, req)
+}
+
 // Remove calls codefoundry.v1.WorkspaceService.Remove.
 func (c *workspaceServiceClient) Remove(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
 	return c.remove.CallUnary(ctx, req)
-}
-
-// Members calls codefoundry.v1.WorkspaceService.Members.
-func (c *workspaceServiceClient) Members(ctx context.Context, req *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error) {
-	return c.members.CallUnary(ctx, req)
 }
 
 // Watch calls codefoundry.v1.WorkspaceService.Watch.
@@ -180,23 +196,25 @@ func (c *workspaceServiceClient) Watch(ctx context.Context, req *connect.Request
 
 // WorkspaceServiceHandler is an implementation of the codefoundry.v1.WorkspaceService service.
 type WorkspaceServiceHandler interface {
-	// List returns every workspace.
+	// List returns every workspace, sorted by name.
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
-	// Create makes a workspace and one worktree per member project on its branch
-	// (fetching each base first). All or nothing: on failure, worktrees it made are
-	// removed again.
+	// Create saves a workspace and makes its managed dir (for a rooted one, the symlinks
+	// to the root's CLAUDE.md, AGENTS.md and .claude).
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
-	// AddProject creates a worktree on the workspace branch in another project.
+	// AddProject adds a member project.
 	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
-	// RemoveProject removes a member's worktree (refused while a live thread runs in it, or
-	// when it has uncommitted changes and force is not set) and drops the member.
+	// RemoveProject drops a member project (nothing on disk changes). The default primary
+	// moves to "workspace" when it was the removed project.
 	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
-	// Remove removes every member worktree (same guards as RemoveProject) and forgets the
-	// workspace.
+	// Rename renames a workspace (names are unique, case-insensitively).
+	Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error)
+	// SetDefaultPrimary sets where new threads in the workspace start: a member project id,
+	// or "workspace" (the managed dir, or the root of a rooted workspace).
+	SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error)
+	// Remove forgets a workspace. A synthetic one's managed dir is deleted with its
+	// instructions and skills; a rooted one loses only the symlinks (the root is the
+	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
-	// Members resolves a workspace by id, name, or a path inside one of its member
-	// worktrees, and lists its members with project names and checked-out branches.
-	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest], *connect.ServerStream[v1.WorkspaceEvent]) error
@@ -233,16 +251,22 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("RemoveProject")),
 		connect.WithHandlerOptions(opts...),
 	)
+	workspaceServiceRenameHandler := connect.NewUnaryHandler(
+		WorkspaceServiceRenameProcedure,
+		svc.Rename,
+		connect.WithSchema(workspaceServiceMethods.ByName("Rename")),
+		connect.WithHandlerOptions(opts...),
+	)
+	workspaceServiceSetDefaultPrimaryHandler := connect.NewUnaryHandler(
+		WorkspaceServiceSetDefaultPrimaryProcedure,
+		svc.SetDefaultPrimary,
+		connect.WithSchema(workspaceServiceMethods.ByName("SetDefaultPrimary")),
+		connect.WithHandlerOptions(opts...),
+	)
 	workspaceServiceRemoveHandler := connect.NewUnaryHandler(
 		WorkspaceServiceRemoveProcedure,
 		svc.Remove,
 		connect.WithSchema(workspaceServiceMethods.ByName("Remove")),
-		connect.WithHandlerOptions(opts...),
-	)
-	workspaceServiceMembersHandler := connect.NewUnaryHandler(
-		WorkspaceServiceMembersProcedure,
-		svc.Members,
-		connect.WithSchema(workspaceServiceMethods.ByName("Members")),
 		connect.WithHandlerOptions(opts...),
 	)
 	workspaceServiceWatchHandler := connect.NewServerStreamHandler(
@@ -261,10 +285,12 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceAddProjectHandler.ServeHTTP(w, r)
 		case WorkspaceServiceRemoveProjectProcedure:
 			workspaceServiceRemoveProjectHandler.ServeHTTP(w, r)
+		case WorkspaceServiceRenameProcedure:
+			workspaceServiceRenameHandler.ServeHTTP(w, r)
+		case WorkspaceServiceSetDefaultPrimaryProcedure:
+			workspaceServiceSetDefaultPrimaryHandler.ServeHTTP(w, r)
 		case WorkspaceServiceRemoveProcedure:
 			workspaceServiceRemoveHandler.ServeHTTP(w, r)
-		case WorkspaceServiceMembersProcedure:
-			workspaceServiceMembersHandler.ServeHTTP(w, r)
 		case WorkspaceServiceWatchProcedure:
 			workspaceServiceWatchHandler.ServeHTTP(w, r)
 		default:
@@ -292,12 +318,16 @@ func (UnimplementedWorkspaceServiceHandler) RemoveProject(context.Context, *conn
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.RemoveProject is not implemented"))
 }
 
-func (UnimplementedWorkspaceServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Remove is not implemented"))
+func (UnimplementedWorkspaceServiceHandler) Rename(context.Context, *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Rename is not implemented"))
 }
 
-func (UnimplementedWorkspaceServiceHandler) Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Members is not implemented"))
+func (UnimplementedWorkspaceServiceHandler) SetDefaultPrimary(context.Context, *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.SetDefaultPrimary is not implemented"))
+}
+
+func (UnimplementedWorkspaceServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Remove is not implemented"))
 }
 
 func (UnimplementedWorkspaceServiceHandler) Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest], *connect.ServerStream[v1.WorkspaceEvent]) error {

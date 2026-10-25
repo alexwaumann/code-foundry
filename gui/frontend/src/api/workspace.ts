@@ -1,25 +1,35 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import type { Workspace, WorkspaceEvent } from "@/gen/codefoundry/v1/workspace_pb";
 
-/** A member of a workspace: a project and its worktree on the workspace branch. */
+/**
+ * A member of a workspace: a project. A workspace has no worktrees since the reshape
+ * (docs/notes/workspaces-v2-2-workspaces.md): worktreePath is always "" until the GUI
+ * moves to thread checkouts (workspaces v2, PRs 3 and 4).
+ */
 export interface WorkspaceMemberView {
   projectId: string;
   worktreePath: string;
 }
 
 /**
- * View model for a workspace: one branch checked out as a worktree in several
- * projects (docs/notes/workspaces-1-store.md). Generated types stay inside src/api.
+ * View model for a workspace: a saved set of projects with a managed dir for the
+ * instructions and skills that span them. Generated types stay inside src/api.
  */
 export interface WorkspaceView {
   /** "w-" + 12 hex digits. */
   id: string;
-  /** Unique display name. */
+  /** Unique display name (case-insensitively). */
   name: string;
-  /** The branch every member worktree was created on. */
+  /** "" since the reshape: a workspace has no branch (a thread has one). */
   branch: string;
-  /** In the order they were added. */
+  /** Sorted by project id. */
   members: WorkspaceMemberView[];
+  /** The folder a rooted workspace came from; "" for a synthetic one. */
+  rootPath?: string;
+  /** Where new threads start: a member project id, or "workspace" (its folder). */
+  defaultPrimary?: string;
+  /** <config home>/workspaces/<id>: its CLAUDE.md, AGENTS.md and .claude/skills (or links). */
+  managedDir?: string;
   createdAtMs: number | null;
 }
 
@@ -32,8 +42,11 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
   return {
     id: w.id,
     name: w.name,
-    branch: w.branch,
-    members: w.members.map((m) => ({ projectId: m.projectId, worktreePath: m.worktreePath })),
+    branch: "",
+    members: w.members.map((projectId) => ({ projectId, worktreePath: "" })),
+    rootPath: w.rootPath,
+    defaultPrimary: w.defaultPrimary,
+    managedDir: w.managedDir,
     createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
   };
 }

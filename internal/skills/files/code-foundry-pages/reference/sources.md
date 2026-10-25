@@ -141,8 +141,10 @@ An array of projects: `id`, `name`, `path`, `githubSlug` (owner/name or ""),
 
 ## workspace
 
-An array of workspaces: `id`, `name`, `branch`, `members` (each `projectId`,
-`worktreePath`), `createdAtMs`.
+An array of workspaces (saved project sets): `id`, `name`, `members` (each `projectId`;
+its `worktreePath` and the workspace's `branch` are always ""), `rootPath` ("" unless the
+workspace came from a folder), `defaultPrimary` (a project id, or "workspace"),
+`managedDir` (its instructions and skills folder), `createdAtMs`.
 
 ## settings
 
