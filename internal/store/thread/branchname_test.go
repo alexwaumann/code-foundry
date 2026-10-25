@@ -3,10 +3,8 @@ package thread
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestParseNaming(t *testing.T) {
@@ -207,48 +205,5 @@ func TestValidBranch(t *testing.T) {
 		if got := validBranch(context.Background(), b); got != want {
 			t.Errorf("validBranch(%q) = %v, want %v", b, got, want)
 		}
-	}
-}
-
-// TestWorkspaceBranch checks `workspace new`'s default branch: the name's slug wrapped
-// by the mode, the namer asked only for what needs a model.
-func TestWorkspaceBranch(t *testing.T) {
-	tests := []struct {
-		name      string
-		cfg       BranchNaming
-		wsName    string
-		reply     string
-		err       error
-		want      string
-		wantCalls int
-	}{
-		{"semantic asks the type", BranchNaming{Mode: BranchModeSemantic}, "Login Redirect", "Title: x\nBranch: fix/login-redirect", nil, "fix/login-redirect", 1},
-		{"semantic, namer fails", BranchNaming{Mode: BranchModeSemantic}, "Login Redirect", "", errors.New("boom"), "chore/login-redirect", 1},
-		{"semantic, naming off", BranchNaming{Mode: BranchModeSemantic}, "Login Redirect", "", ErrNamingOff, "chore/login-redirect", 1},
-		{"prefix needs no model", BranchNaming{Mode: BranchModePrefix, Prefix: "me"}, "Login Redirect", "", nil, "me/login-redirect", 0},
-		{"custom", BranchNaming{Mode: BranchModeCustom, Instructions: "i"}, "Login", "Branch: ab/login", nil, "ab/login", 1},
-		{"custom invalid", BranchNaming{Mode: BranchModeCustom, Instructions: "i"}, "Login", "Branch: ab/..", nil, "", 1},
-		{"nothing to slug", BranchNaming{Mode: BranchModeSemantic}, "!!!", "", nil, "", 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := newEnv(t, func(o *Options) {
-				o.BranchNaming = func() BranchNaming { return tt.cfg }
-				o.SlugTimeout = time.Second
-			})
-			e.namer = func(string) (string, error) { return tt.reply, tt.err }
-			if got := e.m.WorkspaceBranch(e.ctx(), tt.wsName); got != tt.want {
-				t.Errorf("WorkspaceBranch = %q, want %q", got, tt.want)
-			}
-			e.mu.Lock()
-			reqs := slices.Clone(e.namingReqs)
-			e.mu.Unlock()
-			if len(reqs) != tt.wantCalls {
-				t.Fatalf("naming calls = %+v, want %d", reqs, tt.wantCalls)
-			}
-			if len(reqs) == 1 && (reqs[0].Name != tt.wsName || reqs[0].Branch == nil || reqs[0].Branch.Hint == "") {
-				t.Errorf("naming request = %+v", reqs[0])
-			}
-		})
 	}
 }

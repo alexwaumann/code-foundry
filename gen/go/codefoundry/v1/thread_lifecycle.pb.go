@@ -4155,6 +4155,9 @@ type ThreadCheckoutsResponse struct {
 	// one (the name also when the workspace is gone).
 	WorkspaceId   string `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	WorkspaceName string `protobuf:"bytes,4,opt,name=workspace_name,json=workspaceName,proto3" json:"workspace_name,omitempty"`
+	// The workspace's managed dir (Workspace.managed_dir): its CLAUDE.md, AGENTS.md and
+	// .claude/skills, or links to a rooted workspace's.
+	WorkspaceDir  string `protobuf:"bytes,5,opt,name=workspace_dir,json=workspaceDir,proto3" json:"workspace_dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4213,6 +4216,13 @@ func (x *ThreadCheckoutsResponse) GetWorkspaceId() string {
 func (x *ThreadCheckoutsResponse) GetWorkspaceName() string {
 	if x != nil {
 		return x.WorkspaceName
+	}
+	return ""
+}
+
+func (x *ThreadCheckoutsResponse) GetWorkspaceDir() string {
+	if x != nil {
+		return x.WorkspaceDir
 	}
 	return ""
 }
@@ -5516,12 +5526,13 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\finstructions\x18\b \x01(\tR\finstructions\x12\x10\n" +
 	"\x03git\x18\t \x01(\bR\x03git\x12\x18\n" +
 	"\aderived\x18\n" +
-	" \x01(\bR\aderived\"\xd1\x01\n" +
+	" \x01(\bR\aderived\"\xf6\x01\n" +
 	"\x17ThreadCheckoutsResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12<\n" +
 	"\tcheckouts\x18\x02 \x03(\v2\x1e.codefoundry.v1.ThreadCheckoutR\tcheckouts\x12!\n" +
 	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\x12%\n" +
-	"\x0eworkspace_name\x18\x04 \x01(\tR\rworkspaceName\":\n" +
+	"\x0eworkspace_name\x18\x04 \x01(\tR\rworkspaceName\x12#\n" +
+	"\rworkspace_dir\x18\x05 \x01(\tR\fworkspaceDir\":\n" +
 	"\x10PinThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"C\n" +

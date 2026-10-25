@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -39,14 +40,10 @@ func (h *Workspace) List(context.Context, *connect.Request[v1.ListWorkspacesRequ
 	return connect.NewResponse(&v1.ListWorkspacesResponse{Workspaces: workspacesToProto(h.store.Snapshot())}), nil
 }
 
-// Create makes a workspace and its member worktrees.
+// Create saves a workspace and makes its managed dir.
 func (h *Workspace) Create(ctx context.Context, req *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error) {
 	m := req.Msg
-	o := workspace.CreateOptions{Name: m.GetName(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(), Fetch: m.GetFetch()}
-	for _, s := range m.GetMembers() {
-		o.Members = append(o.Members, workspace.MemberSpec{Project: s.GetProject(), BaseRef: s.GetBaseRef()})
-	}
-	w, err := h.store.Create(ctx, o)
+	w, err := h.store.Create(ctx, workspace.CreateOptions{Name: m.GetName(), Members: m.GetMembers(), RootPath: m.GetRootPath(), DefaultPrimary: m.GetDefaultPrimary()})
 	if err != nil {
 		return nil, workspaceError(err)
 	}
@@ -55,56 +52,46 @@ func (h *Workspace) Create(ctx context.Context, req *connect.Request[v1.CreateWo
 
 // AddProject adds a member project.
 func (h *Workspace) AddProject(ctx context.Context, req *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error) {
-	m := req.Msg
-	w, err := h.store.AddProject(ctx, workspace.AddProjectOptions{
-		Ref:    workspace.Ref{Workspace: m.GetWorkspace(), Cwd: m.GetCwd()},
-		Member: workspace.MemberSpec{Project: m.GetProject(), BaseRef: m.GetBaseRef()},
-		Fetch:  m.GetFetch(),
-	})
+	w, err := h.store.AddProject(ctx, req.Msg.GetWorkspace(), req.Msg.GetProject())
 	if err != nil {
 		return nil, workspaceError(err)
 	}
 	return connect.NewResponse(&v1.AddWorkspaceProjectResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// RemoveProject removes a member project's worktree.
+// RemoveProject drops a member project.
 func (h *Workspace) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error) {
-	m := req.Msg
-	w, err := h.store.RemoveProject(ctx, workspace.RemoveProjectOptions{
-		Ref:     workspace.Ref{Workspace: m.GetWorkspace(), Cwd: m.GetCwd()},
-		Project: m.GetProject(), Force: m.GetForce(), DeleteBranch: m.GetDeleteBranch(),
-	})
+	w, err := h.store.RemoveProject(ctx, req.Msg.GetWorkspace(), req.Msg.GetProject())
 	if err != nil {
 		return nil, workspaceError(err)
 	}
 	return connect.NewResponse(&v1.RemoveWorkspaceProjectResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// Remove removes every member worktree and forgets the workspace.
-func (h *Workspace) Remove(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
-	m := req.Msg
-	if err := h.store.Remove(ctx, workspace.RemoveOptions{
-		Workspace: m.GetWorkspace(), Force: m.GetForce(), DeleteBranch: m.GetDeleteBranch(),
-	}); err != nil {
-		return nil, workspaceError(err)
-	}
-	return connect.NewResponse(&v1.RemoveWorkspaceResponse{}), nil
-}
-
-// Members resolves a workspace and lists its members.
-func (h *Workspace) Members(ctx context.Context, req *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error) {
-	ms, err := h.store.Members(ctx, workspace.Ref{Workspace: req.Msg.GetWorkspace(), Cwd: req.Msg.GetCwd()})
+// Rename renames a workspace.
+func (h *Workspace) Rename(ctx context.Context, req *connect.Request[v1.RenameWorkspaceRequest]) (*connect.Response[v1.RenameWorkspaceResponse], error) {
+	w, err := h.store.Rename(ctx, req.Msg.GetWorkspace(), req.Msg.GetName())
 	if err != nil {
 		return nil, workspaceError(err)
 	}
-	out := &v1.WorkspaceMembersResponse{Workspace: workspaceToProto(ms.Workspace)}
-	for _, m := range ms.Members {
-		out.Members = append(out.Members, &v1.WorkspaceMemberInfo{
-			ProjectId: m.ProjectID, ProjectName: m.ProjectName, WorktreePath: m.WorktreePath, Branch: m.Branch,
-			Missing: m.Missing, Current: m.Current,
-		})
+	return connect.NewResponse(&v1.RenameWorkspaceResponse{Workspace: workspaceToProto(w)}), nil
+}
+
+// SetDefaultPrimary sets where new threads in a workspace start.
+func (h *Workspace) SetDefaultPrimary(ctx context.Context, req *connect.Request[v1.SetWorkspaceDefaultPrimaryRequest]) (*connect.Response[v1.SetWorkspaceDefaultPrimaryResponse], error) {
+	w, err := h.store.SetDefaultPrimary(ctx, req.Msg.GetWorkspace(), req.Msg.GetDefaultPrimary())
+	if err != nil {
+		return nil, workspaceError(err)
 	}
-	return connect.NewResponse(out), nil
+	return connect.NewResponse(&v1.SetWorkspaceDefaultPrimaryResponse{Workspace: workspaceToProto(w)}), nil
+}
+
+// Remove forgets a workspace.
+func (h *Workspace) Remove(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
+	if err := h.store.Remove(ctx, req.Msg.GetWorkspace()); err != nil {
+		return nil, workspaceError(err)
+	}
+	return connect.NewResponse(&v1.RemoveWorkspaceResponse{}), nil
 }
 
 // Watch sends a snapshot, then every workspace event. If the client falls behind and
@@ -165,10 +152,8 @@ func workspacesToProto(snap *workspace.Snapshot) []*v1.Workspace {
 }
 
 func workspaceToProto(w workspace.Workspace) *v1.Workspace {
-	p := &v1.Workspace{Id: w.ID, Name: w.Name, Branch: w.Branch}
-	for _, m := range w.Members {
-		p.Members = append(p.Members, &v1.WorkspaceMember{ProjectId: m.ProjectID, WorktreePath: m.WorktreePath})
-	}
+	p := &v1.Workspace{Id: w.ID, Name: w.Name, Members: slices.Clone(w.Members), RootPath: w.RootPath,
+		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir}
 	if !w.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(w.CreatedAt)
 	}
@@ -190,5 +175,5 @@ func workspaceError(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		code = connect.CodeDeadlineExceeded
 	}
-	return withUncommittedDetail(connect.NewError(code, err), err)
+	return connect.NewError(code, err)
 }

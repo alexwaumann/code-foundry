@@ -219,7 +219,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
-	f.ws.Put(workspace.Workspace{ID: "w-1", Name: "login", Branch: "cf/login", Members: []workspace.Member{{ProjectID: "a", WorktreePath: "/wt/a"}}})
+	f.ws.Put(workspace.Workspace{ID: "w-1", Name: "login", Members: []string{"a"}})
 
 	s := f.watch(t, ctx)
 	want := []string{
@@ -249,11 +249,11 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "project.updated b" {
 		t.Fatalf("got %q, want project.updated b", got)
 	}
-	f.ws.Put(workspace.Workspace{ID: "w-2", Name: "billing", Branch: "cf/billing"})
+	f.ws.Put(workspace.Workspace{ID: "w-2", Name: "billing"})
 	if got := describe(s.next()); got != "workspace.updated billing" {
 		t.Fatalf("got %q, want workspace.updated billing", got)
 	}
-	if err := f.ws.Remove(ctx, workspace.RemoveOptions{Workspace: "w-2"}); err != nil {
+	if err := f.ws.Remove(ctx, "w-2"); err != nil {
 		t.Fatal(err)
 	}
 	if got := describe(s.next()); got != "workspace.removed w-2" {

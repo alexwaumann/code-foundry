@@ -183,7 +183,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	events := st.bus
 	projectAPI := api.NewProject(st.project, events).WithGitHub(st.gh, st.cloner).WithNewProjects(st.newProjects, st.gh).
 		WithCleanupHold(func(w project.Worktree) string {
-			return cleanupHold(w.Path, checkoutThreads(st.thread.Snapshot(), st.thread.CheckoutsOf), st.terminal.List(context.Background()), st.workspace.Snapshot())
+			return cleanupHold(w.Path, checkoutThreads(st.thread.Snapshot(), st.thread.CheckoutsOf), st.terminal.List(context.Background()))
 		}).
 		WithCleanupAbandoned(abandonedBy(st.thread), logLeftovers(log)).
 		WithBaseFromOrigin(baseFromOrigin(st.settings))

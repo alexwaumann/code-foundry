@@ -54,6 +54,9 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 	if t.GetCreatedWorktree() && t.GetBranch() != "" {
 		mode = "worktrees on branch " + t.GetBranch()
 	}
+	if t.GetProjectId() == "" && t.GetWorkspaceId() != "" {
+		mode += "; runs in its workspace's folder " + t.GetWorktreePath()
+	}
 	fmt.Fprintf(&b, "thread %s: %s\n", threadLabel(t), mode)
 	if len(m.GetCheckouts()) == 0 {
 		b.WriteString("no projects (the thread runs in " + t.GetWorktreePath() + ")")
@@ -95,7 +98,11 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 		if name == "" {
 			name = ws + " (gone)"
 		}
-		fmt.Fprintf(&b, "WORKSPACE %s  -\n", name)
+		dir := m.GetWorkspaceDir()
+		if dir == "" {
+			dir = "-"
+		}
+		fmt.Fprintf(&b, "WORKSPACE %s  %s\n", name, dir)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

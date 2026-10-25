@@ -134,15 +134,15 @@ func TestThreadCreateWorkspaceFields(t *testing.T) {
 		t.Fatalf("Create in workspace = %v, %v", res, err)
 	}
 	res, err = c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
-		ProjectId: "api", NewWorkspace: &v1.NewWorkspace{Projects: []string{"web", "api"}, BaseRef: "origin/dev", Name: "login"},
+		ProjectId: "api", ProjectIds: []string{"web", "api"}, LikeThreadId: "s-0", NewBranch: true,
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := res.Msg.GetThread(); s.GetWorkspaceId() != "w-new" || s.GetWorktreePath() != "/worktrees/api" || !s.GetCreatedWorktree() {
-		t.Errorf("Create new workspace = %v", s)
+	if s := res.Msg.GetThread(); !slices.Equal(s.GetProjectIds(), []string{"api", "web"}) {
+		t.Errorf("Create with projects = %v", s)
 	}
-	want := []string{"Create api    workspace=login", "Create api    new-workspace=web,api"}
+	want := []string{"Create api    workspace=login", "Create api    projects=web,api like=s-0 new-branch"}
 	if calls := fake.Calls(); !slices.Equal(calls, want) {
 		t.Errorf("calls = %q, want %q", calls, want)
 	}

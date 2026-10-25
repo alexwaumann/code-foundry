@@ -16,7 +16,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 var branchT0 = time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
@@ -46,17 +45,6 @@ func branchProjects() *project.Snapshot {
 		{ID: "p-local", Worktrees: []project.Worktree{
 			{ProjectID: "p-local", Path: "/local", Branch: "cf/x", IsMain: true},
 		}},
-	}}
-}
-
-// branchWorkspaces: w-1 on cf/x with members api and web (web's worktree switched to
-// cf/y on disk in some cases), w-gone-member whose web member's worktree is gone.
-func branchWorkspaces() *workspace.Snapshot {
-	return &workspace.Snapshot{Workspaces: []workspace.Workspace{
-		{ID: "w-1", Branch: "cf/x", Members: []workspace.Member{
-			{ProjectID: "p-api", WorktreePath: "/wt/api-x"}, {ProjectID: "p-web", WorktreePath: "/wt/web-x"}}},
-		{ID: "w-gone", Branch: "cf/ws", Members: []workspace.Member{
-			{ProjectID: "p-api", WorktreePath: "/wt/api-x"}, {ProjectID: "p-web", WorktreePath: "/wt/web-ws"}}},
 	}}
 }
 
@@ -121,23 +109,18 @@ func TestBranchLinksFor(t *testing.T) {
 				return []gh.PullRequest{merged, branchPR("o/api", 2, "cf/x"), closed}
 			}(),
 			want: []string{"t: o/api#1@1 o/api#2@2 o/api#4@4"}},
-		{name: "workspace thread: every member's branch",
-			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/wt/api-x", WorkspaceID: "w-1"}},
+		{name: "worktree-mode thread with two projects: every member's branch",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x", CreatedWorktree: true, Branch: "cf/x"}},
 			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "cf/y")},
 			want:    []string{"t: o/api#1@1 o/web#2@2"}},
-		{name: "workspace thread: a member that switched branches",
-			threads:  []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/wt/api-x", WorkspaceID: "w-1"}},
-			projects: func(s *project.Snapshot) { s.Projects[1].Worktrees[1].Branch = "cf/y" },
-			prs:      []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "cf/y")},
-			want:     []string{"t: o/api#1@1 o/web#3@3"}},
-		{name: "workspace thread: a member whose worktree is gone has the workspace's branch",
-			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", WorktreePath: "/wt/api-x", WorkspaceID: "w-gone"}},
-			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/ws"), branchPR("o/api", 3, "cf/ws")},
+		{name: "worktree-mode thread: a member whose worktree is gone has the thread's branch",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x", CreatedWorktree: true, Branch: "cf/ws"}},
+			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/ws")},
 			want:    []string{"t: o/api#1@1 o/web#2@2"}},
-		{name: "workspace gone: the cwd's worktree",
-			threads: []thread.Thread{{ID: "t", ProjectID: "p-web", WorktreePath: "/wt/web-x", WorkspaceID: "w-removed"}},
-			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x")},
-			want:    []string{"t: o/web#2@2"}},
+		{name: "checkout mode: each member's own checkout",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x"}},
+			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "main")},
+			want:    []string{"t: o/api#1@1 o/web#3@3"}},
 		{name: "slug case: the project's O/Web matches the cache's o/web",
 			threads: []thread.Thread{{ID: "t", ProjectID: "p-web", WorktreePath: "/wt/web-x"}},
 			prs:     []gh.PullRequest{branchPR("O/WEB", 2, "cf/x")},
@@ -185,7 +168,7 @@ func TestBranchLinksFor(t *testing.T) {
 			if tt.projects != nil {
 				tt.projects(projects)
 			}
-			found := branchLinksFor(&thread.Snapshot{Threads: tt.threads}, projects, branchWorkspaces(), prsByHead(tt.prs), now)
+			found := branchLinksFor(&thread.Snapshot{Threads: tt.threads}, projects, prsByHead(tt.prs), now)
 			if got := branchFacts(t, found, now); !slices.Equal(got, tt.want) {
 				t.Errorf("found = %q; want %q", got, tt.want)
 			}
@@ -259,7 +242,7 @@ func TestStartBranchLinks(t *testing.T) {
 	projects := branchProjects()
 	projectsNow := func() *project.Snapshot { mu.Lock(); defer mu.Unlock(); return projects }
 	stop := startBranchLinks(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)), threads,
-		projectsNow, branchWorkspaces, g, b)
+		projectsNow, g, b)
 	defer stop()
 
 	waitCalls := func(want ...string) {
@@ -314,8 +297,6 @@ func TestWakesBranchLinks(t *testing.T) {
 		{project.WorktreeUpdated{}, true},
 		{project.ProjectUpdated{}, true},
 		{project.WorktreeFilesChanged{}, false},
-		{workspace.Updated{}, true},
-		{workspace.Removed{}, false},
 	}
 	for _, tt := range tests {
 		if got := wakesBranchLinks(tt.ev); got != tt.want {

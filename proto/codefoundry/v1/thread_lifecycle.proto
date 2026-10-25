@@ -917,6 +917,9 @@ message ThreadCheckoutsResponse {
   // one (the name also when the workspace is gone).
   string workspace_id = 3;
   string workspace_name = 4;
+  // The workspace's managed dir (Workspace.managed_dir): its CLAUDE.md, AGENTS.md and
+  // .claude/skills, or links to a rooted workspace's.
+  string workspace_dir = 5;
 }
 
 message PinThreadRequest {

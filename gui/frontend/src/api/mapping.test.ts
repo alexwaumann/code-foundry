@@ -559,21 +559,23 @@ describe("workspace mapping", () => {
     const login = {
       id: "w-1",
       name: "login",
-      branch: "cf/login",
-      members: [
-        { projectId: "web", worktreePath: "/wt/web/cf-login" },
-        { projectId: "api", worktreePath: "/wt/api/cf-login" },
-      ],
+      members: ["api", "web"],
+      rootPath: "/Users/me/shop",
+      defaultPrimary: "workspace",
+      managedDir: "/Users/me/.code-foundry/workspaces/w-1",
       createdAt: timestampFromMs(7000),
     };
     const want = {
       id: "w-1",
       name: "login",
-      branch: "cf/login",
+      branch: "",
       members: [
-        { projectId: "web", worktreePath: "/wt/web/cf-login" },
-        { projectId: "api", worktreePath: "/wt/api/cf-login" },
+        { projectId: "api", worktreePath: "" },
+        { projectId: "web", worktreePath: "" },
       ],
+      rootPath: "/Users/me/shop",
+      defaultPrimary: "workspace",
+      managedDir: "/Users/me/.code-foundry/workspaces/w-1",
       createdAtMs: 7000,
     };
     expect(toWorkspaceEventView(create(WorkspaceEventSchema, { event: { case: "snapshot", value: { workspaces: [login] } } }))).toEqual({ kind: "snapshot", workspaces: [want] });

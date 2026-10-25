@@ -9,14 +9,13 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
-	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // Cleanup on archive (docs/notes/workspaces-v2-1-threads.md). When a thread is
 // archived, each of its derived worktrees (worktree mode, any member that has git) goes
 // at once when the app made it, its status is clean with no operation in progress
 // (project.ArchivedVerdict), no other thread that is not archived has it as a checkout
-// or its cwd, no terminal is open in it, and no v1 workspace has it as a member
+// or its cwd, and no terminal is open in it
 // (cleanupHold). Never its branch. Runs in the background, after the archive.
 
 // archiveCleanupTimeout bounds one archived thread's cleanup (a refresh per member).
@@ -29,7 +28,6 @@ type archiveCleaner struct {
 	checkouts  func(thread.Thread) []thread.Checkout
 	threads    func() *thread.Snapshot
 	terminals  func() []terminal.Terminal
-	workspaces func() *workspace.Snapshot
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -61,7 +59,7 @@ func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread) {
 		res, err := project.Cleanup(ctx, c.projects, project.CleanupOptions{
 			ProjectID: co.ProjectID, Path: co.Path, Verdict: project.ArchivedVerdict,
 			Hold: func(w project.Worktree) string {
-				return cleanupHold(w.Path, checkoutThreads(c.threads(), c.checkouts), c.terminals(), c.workspaces())
+				return cleanupHold(w.Path, checkoutThreads(c.threads(), c.checkouts), c.terminals())
 			},
 			Removing: logLeftovers(c.log),
 		})
@@ -80,7 +78,7 @@ func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread) {
 
 // checkoutThreads is worktreeThreads with every checkout of each thread that is not
 // archived (checkouts.go), not only its cwd: what the cleanup holds keep.
-func checkoutThreads(snap *thread.Snapshot, checkouts func(thread.Thread) []thread.Checkout) []workspace.Thread {
+func checkoutThreads(snap *thread.Snapshot, checkouts func(thread.Thread) []thread.Checkout) []holder {
 	out := worktreeThreads(snap)
 	if snap == nil {
 		return out
@@ -91,7 +89,7 @@ func checkoutThreads(snap *thread.Snapshot, checkouts func(thread.Thread) []thre
 		}
 		for _, co := range checkouts(s) {
 			if !co.Primary && co.Path != "" {
-				out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: co.Path})
+				out = append(out, holder{ID: s.ID, Name: s.Name, Cwd: co.Path})
 			}
 		}
 	}

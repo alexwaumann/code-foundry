@@ -77,12 +77,6 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
 	}
-	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetProjects()) > 0 {
-		if out.ProjectId == "" {
-			out.ProjectId = nw.GetProjects()[0]
-		}
-		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.ProjectId, true, nw.GetBaseRef()
-	}
 	if m.GetNoProject() {
 		out.WorktreePath = "/home"
 	}
