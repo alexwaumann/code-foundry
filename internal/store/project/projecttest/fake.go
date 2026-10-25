@@ -233,6 +233,19 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	return w, nil
 }
 
+// DefaultWorktreePath is where CreateWorktree puts project id's worktree for branch
+// (project.Git.DefaultWorktreePath); "" for an unknown project or one without git.
+func (f *Fake) DefaultWorktreePath(projectID, branch string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.projects[projectID]
+	if !ok || !r.Git || branch == "" {
+		return ""
+	}
+	slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
+	return filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(branch, "/", "-"))
+}
+
 // RemoveWorktree implements project.Store.
 func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions) error {
 	f.mu.Lock()

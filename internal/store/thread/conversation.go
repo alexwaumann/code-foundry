@@ -115,9 +115,9 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	}
 }
 
-// fileRefRoots resolves a file reference's repository to its worktree for thread s:
-// the workspace's member in that project, else s's own worktree for its project. A
-// thread without a project resolves none.
+// fileRefRoots resolves a file reference's repository to its checkout for thread s: a
+// referenced workspace's member worktree in that project, else s's checkout of it
+// (checkouts.go). A thread without a project resolves none.
 func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
 	var members []workspace.Member
 	if s.WorkspaceID != "" && m.opts.Workspaces != nil {
@@ -125,11 +125,15 @@ func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
 			members = w.Members
 		}
 	}
+	cos := m.checkouts(s)
 	return func(projectID string) (string, bool) {
 		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
 			return members[i].WorktreePath, true
 		}
-		return s.WorktreePath, s.ProjectID != "" && projectID == s.ProjectID
+		if i := slices.IndexFunc(cos, func(c Checkout) bool { return c.ProjectID == projectID && c.Path != "" }); i >= 0 {
+			return cos[i].Path, true
+		}
+		return "", false
 	}
 }
 

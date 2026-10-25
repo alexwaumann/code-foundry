@@ -209,7 +209,8 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed && !stopped {
 		return rec.s, false, nil
 	}
-	if rec.s.ArchivedAt.IsZero() {
+	newly := rec.s.ArchivedAt.IsZero()
+	if newly {
 		rec.s.ArchivedAt = m.opts.Now()
 	}
 	rec.s.Pinned = false
@@ -218,6 +219,9 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 		m.log.Warn("clear the flags of an archived thread", "thread", id, "err", err)
 	}
 	m.commitLocked(rec, true)
+	if newly && m.opts.Archived != nil {
+		m.opts.Archived(rec.s) // its worktrees nobody else has go (the daemon's cleanupArchived)
+	}
 	return rec.s, true, nil
 }
 

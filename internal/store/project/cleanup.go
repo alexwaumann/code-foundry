@@ -152,6 +152,10 @@ type CleanupOptions struct {
 	Removing func(ctx context.Context, w Worktree)
 	// Now is the time CleanupVerdict judges at. Nil: time.Now.
 	Now func() time.Time
+	// Verdict replaces the merged-into-base rule (CleanupVerdict, with Abandoned) by
+	// another git rule, such as ArchivedVerdict for an archived thread's worktrees;
+	// Abandoned is not asked then. Nil: the merged rule.
+	Verdict func(w Worktree, now time.Time) (removable bool, reason string)
 }
 
 // CleanupItem is a worktree Cleanup removed (or would), or kept, and why.
@@ -211,13 +215,17 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 		if opts.Path == "" && w.IsMain {
 			continue
 		}
-		abandoned := opts.Abandoned != nil && opts.Abandoned(w)
-		removable, reason := cleanupVerdict(w, now(), abandoned)
+		verdict := opts.Verdict
+		if verdict == nil {
+			abandoned := opts.Abandoned != nil && opts.Abandoned(w)
+			verdict = func(w Worktree, at time.Time) (bool, string) { return cleanupVerdict(w, at, abandoned) }
+		}
+		removable, reason := verdict(w, now())
 		// Kept for its uncommitted changes alone: with them set aside every other
 		// condition passes.
 		uncommitted := false
 		if !removable && w.Status.HasUncommitted() {
-			if ok, why := cleanupVerdict(withoutUncommitted(w), now(), abandoned); ok {
+			if ok, why := verdict(withoutUncommitted(w), now()); ok {
 				uncommitted = true
 				if opts.Force {
 					removable, reason = true, why

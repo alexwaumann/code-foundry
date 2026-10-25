@@ -82,6 +82,25 @@ func samePath(a, b string) bool {
 	return res(a) == res(b)
 }
 
+// DefaultWorktreePath is where CreateWorktree puts project id's worktree for branch: the
+// same path every caller computes, so threads on one branch share one worktree (a
+// thread's derived checkouts, docs/notes/workspaces-v2-1-threads.md). It reads the
+// GitHub slug of the project's last reconcile (CreateWorktree reads origin afresh, so
+// before the first reconcile of a project with a GitHub origin the two can differ;
+// callers look for an existing worktree on the branch first). "" for an unknown project
+// or one without git.
+func (g *Git) DefaultWorktreePath(projectID, branch string) string {
+	st := g.project(projectID)
+	if st == nil || branch == "" {
+		return ""
+	}
+	m := st.meta.Load()
+	if !m.Git {
+		return ""
+	}
+	return filepath.Clean(defaultWorktreePath(g.wtRoot, g.worktreeDirKey(m, m.GitHubSlug), branch))
+}
+
 // requireFree refuses a worktree path something already occupies, before `git
 // worktree add -b` would create the branch and then fail on it (leaving the branch).
 func requireFree(path string) error {

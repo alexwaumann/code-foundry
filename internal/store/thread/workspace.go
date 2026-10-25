@@ -109,6 +109,16 @@ func workspaceLaunch(snap *workspace.Snapshot, id, cwd string, exists func(strin
 	return l, true
 }
 
+// memberProjectIDs is the project set of a thread in a workspace's members (with the
+// cwd's project).
+func memberProjectIDs(primary string, members []workspace.Member) []string {
+	ids := make([]string, len(members))
+	for i, mem := range members {
+		ids[i] = mem.ProjectID
+	}
+	return CleanProjectIDs(primary, ids)
+}
+
 // isDir reports whether path is an existing directory.
 func isDir(path string) bool {
 	fi, err := os.Stat(path)

@@ -21,11 +21,14 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// ProjectSource is the part of the project store threads need: resolving worktrees and
-// creating one for a new thread. *project.Git implements it.
+// ProjectSource is the part of the project store threads need: resolving worktrees,
+// deriving a member's worktree path, and creating (or, when a Create fails half way,
+// removing again) the worktrees of a thread's members. *project.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
+	RemoveWorktree(ctx context.Context, opts project.RemoveWorktreeOptions) error
+	DefaultWorktreePath(projectID, branch string) string
 }
 
 // Options configures a Manager. DB and Terminals are required.
@@ -114,6 +117,11 @@ type Options struct {
 	// (CreateOptions.NewWorktree) and the thread has started. It must not block: the
 	// daemon runs the project's on-worktree-create actions from it in the background.
 	WorktreeCreated func(threadID, projectID, worktree string)
+	// Archived, when set, is called with each thread an archive just archived (the
+	// cascade's included), under the store's lock: it must return at once and not call
+	// back into the store. The daemon removes the thread's derived worktrees nobody else
+	// has from it, in the background (docs/notes/workspaces-v2-1-threads.md).
+	Archived func(t Thread)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -321,6 +329,9 @@ type Manager struct {
 	// createDefaults picks the model and effort of threads some threads create
 	// (residenthooks.go); nil: none.
 	createDefaults atomic.Pointer[CreateDefaultsFunc]
+	// wtLocks serialize making one (project, branch) worktree (placement.go): key ->
+	// *sync.Mutex.
+	wtLocks sync.Map
 	// residentTools are each resident's own --allowedTools rules (residenthooks.go):
 	// resident name -> ResidentTools.
 	residentTools sync.Map
@@ -649,14 +660,19 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	namingTried := name != ""
 	var late <-chan namingResult
 	var members []workspace.Member // a workspace thread's, for file references
+	var made []madeWorktree        // the worktrees placement made, for the hook
 	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
 		return Thread{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
+	}
+	if (o.WorkspaceID != "" || o.NewWorkspace != nil) && (len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
+		return Thread{}, fmt.Errorf("%w: projects, like, new branch and checkout mode do not apply to a workspace or a new workspace", ErrInvalidArgument)
 	}
 	if o.Cwd != "" && !o.NoProject {
 		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
 	}
-	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil) {
-		return Thread{}, fmt.Errorf("%w: no_project excludes a project, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
+	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil ||
+		len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
+		return Thread{}, fmt.Errorf("%w: no_project excludes a project, projects, worktree, new worktree, like, workspace and new workspace", ErrInvalidArgument)
 	}
 	switch {
 	case o.NoProject:
@@ -673,6 +689,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		s.WorkspaceID, s.ProjectID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.projectID, cw.path, cw.baseRef, true
 		s.Branch = cw.branch
 		members = cw.members
+		s.ProjectIDs = memberProjectIDs(cw.projectID, cw.members)
 		if cw.name != "" {
 			s.Name, s.AutoNamed = cw.name, true
 		}
@@ -684,34 +701,35 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 		s.WorkspaceID, s.ProjectID, s.WorktreePath = w.ID, mem.ProjectID, mem.WorktreePath
+		// The workspace's members are the set, in worktree mode on its branch: their
+		// derived checkouts are its member worktrees.
+		s.ProjectIDs, s.Branch, s.CreatedWorktree = memberProjectIDs(mem.ProjectID, w.Members), w.Branch, w.Branch != ""
 		members = w.Members
-	case o.NewWorktree != nil:
-		nw, err := m.newWorktree(ctx, id, name, o)
+	default:
+		p, err := m.placeThread(ctx, id, name, creatorID, o)
 		if err != nil {
 			return Thread{}, err
 		}
-		s.ProjectID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = nw.projectID, nw.path, nw.baseRef, true
-		s.Branch = nw.branch
-		if nw.name != "" {
-			s.Name, s.AutoNamed = nw.name, true
+		s.ProjectID, s.ProjectIDs, s.WorktreePath, s.WorkspaceID = p.projectID, p.projectIDs, p.path, p.workspaceID
+		s.BaseRef, s.CreatedWorktree, s.Branch = p.baseRef, p.createdWorktree, p.branch
+		if p.name != "" {
+			s.Name, s.AutoNamed = p.name, true
 		}
-		namingTried = namingTried || nw.namerCalled
-		late = nw.late
-	default:
-		if s.ProjectID, s.WorktreePath, err = m.resolveWorktree(o.ProjectID, o.WorktreePath); err != nil {
-			return Thread{}, err
-		}
+		namingTried = namingTried || p.namerCalled
+		late, made = p.late, p.made
 	}
+	s.ProjectIDs = CleanProjectIDs(s.ProjectID, s.ProjectIDs)
 	if s.Name == "" {
 		// Until the namer answers (provisional.go); namingTried stays false so it runs.
 		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)
 	}
 	// The worktrees exist now: point file references at them (see filerefs.go).
+	roots := m.fileRefRoots(s)
 	prompt, dropped := rewriteFileRefs(prompt, func(projectID string) (string, bool) {
 		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
 			return members[i].WorktreePath, true
 		}
-		return s.WorktreePath, s.ProjectID != "" && projectID == s.ProjectID
+		return roots(projectID)
 	})
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
@@ -760,6 +778,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	if err := m.spawn(ctx, id, launch{newID: cid}); err != nil {
 		drop()
+		m.rollback(ctx, made)
 		return Thread{}, err
 	}
 	if note != nil {
@@ -769,8 +788,11 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if late != nil {
 		m.applyLateName(id, late)
 	}
-	if o.NewWorktree != nil && m.opts.WorktreeCreated != nil {
-		m.opts.WorktreeCreated(id, s.ProjectID, s.WorktreePath)
+	if m.opts.WorktreeCreated != nil {
+		// Every worktree placement made runs its project's on-worktree-create actions.
+		for _, w := range made {
+			m.opts.WorktreeCreated(id, w.projectID, w.path)
+		}
 	}
 	if o.Notify {
 		m.notifyCreator(ctx, creatorID, id)
@@ -825,7 +847,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	}
 	now := m.opts.Now()
 	s := Thread{
-		ID: newID, ProjectID: parent.ProjectID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
+		ID: newID, ProjectID: parent.ProjectID, ProjectIDs: parent.Projects(), WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
 		// The fork runs in the parent's worktree, so it inherits what the worktree was made
 		// for: a cleanup that removes it is undone when either resumes (recreate.go).
 		BaseRef: parent.BaseRef, CreatedWorktree: parent.CreatedWorktree, Branch: parent.Branch,
@@ -850,6 +872,11 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	}
 	items, err := m.forkLog(ctx, parent, newID)
 	if err != nil {
+		drop()
+		return Thread{}, err
+	}
+	// The fork shares the parent's checkouts: one a cleanup removed is made again first.
+	if _, err := m.ensureMembers(ctx, s); err != nil {
 		drop()
 		return Thread{}, err
 	}
@@ -890,6 +917,10 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	first := firstMessages(s, rec.first)
 	rec.first = nil
 	m.mu.Unlock()
+	// Every other member's checkout is an --add-dir, and claude refuses a missing one.
+	if err := m.requireCheckouts(s); err != nil {
+		return err
+	}
 
 	if !m.opts.DisablePreTrust {
 		if changed, err := trustWorktree(m.opts.Paths.Config, s.WorktreePath); err != nil {
@@ -996,7 +1027,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		env = append(env, paths.EnvPages+"="+pages)
 	}
 	var wl wsLaunch
-	var members []string
+	members := m.memberProjects(s) // the plugins' scope (spawnextras.go)
 	if s.WorkspaceID != "" {
 		// The current members, every spawn (create, reconnect, fork): a project added to
 		// the workspace since the row was written is included.
@@ -1008,7 +1039,6 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
 			sa.appendSystemPrompt = systemPrompt(wl.prompt, entries, s.SystemPromptAppend)
 			env = append(slices.Clip(env), wl.env...)
-			members = wl.projects
 			if len(wl.missing) > 0 {
 				m.log.Warn("workspace member worktrees missing; not passed to claude", "thread", s.ID,
 					"workspace", s.WorkspaceID, "paths", wl.missing)
@@ -1032,7 +1062,18 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	if pages != "" {
 		sa.addDirs = append(sa.addDirs, pages)
 	}
-	sa.addDirs = append(sa.addDirs, wl.addDirs...)
+	// Every other member's checkout (checkouts.go), then a referenced workspace's member
+	// worktrees it does not already have.
+	dirs, missing := m.memberDirs(s)
+	if len(missing) > 0 && wait {
+		m.log.Warn("member checkouts missing; not passed to claude", "thread", s.ID, "projects", len(missing))
+	}
+	for _, d := range wl.addDirs {
+		if !slices.ContainsFunc(dirs, func(x string) bool { return samePath(x, d) }) {
+			dirs = append(dirs, d)
+		}
+	}
+	sa.addDirs = append(sa.addDirs, dirs...)
 	sa.addDirs = append(sa.addDirs, g.dirs...)
 	env = append(slices.Clip(env), x.Env...)
 	env = append(env, s.SpawnEnv...)

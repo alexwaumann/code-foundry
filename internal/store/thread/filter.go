@@ -30,10 +30,11 @@ type ListOptions struct {
 	// match any.
 	Status Status
 	State  State
-	// Project: only threads whose cwd is in this project. Store.List takes an id, a
-	// name or a path inside one of its worktrees; FilterThreads compares the id.
+	// Project: only threads with this project in their set (Thread.Projects: the cwd's
+	// or another member). Store.List takes an id, a name or a path inside one of its
+	// worktrees; FilterThreads compares the id.
 	Project string
-	// Workspace: only threads the workspace owns. Store.List takes an id or a name;
+	// Workspace: only threads that reference the workspace. Store.List takes an id or a name;
 	// FilterThreads compares the id.
 	Workspace string
 	// CreatedBy: only threads this thread created, or CreatedByUser for the user's.
@@ -128,7 +129,7 @@ func (o ListOptions) matches(t Thread) bool {
 		return false
 	case o.State != StateUnspecified && t.State != o.State:
 		return false
-	case o.Project != "" && t.ProjectID != o.Project:
+	case o.Project != "" && t.ProjectID != o.Project && !slices.Contains(t.ProjectIDs, o.Project):
 		return false
 	case o.Workspace != "" && t.WorkspaceID != o.Workspace:
 		return false

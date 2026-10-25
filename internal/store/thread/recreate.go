@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -20,9 +21,9 @@ import (
 // never recreates anything.
 //
 // It applies when the cwd is missing, lies under the app's worktrees directory
-// (Options.WorktreeRoot), the row has a branch, and the thread is not a workspace's (a
-// workspace member's worktree belongs to the workspace). Anything else keeps the refusal
-// resumeLaunch gives a missing worktree.
+// (Options.WorktreeRoot) and the row has a branch. Anything else keeps the refusal
+// resumeLaunch gives a missing worktree. The thread's other members' worktrees are made
+// again the same way (ensureMembers, placement.go).
 
 // fetchBranchTimeout bounds the fetch that looks for a branch on origin.
 const fetchBranchTimeout = 30 * time.Second
@@ -47,10 +48,25 @@ func (rw recreatedWorktree) note() string {
 		" (a merged branch's have), and untracked and ignored files from before are gone."
 }
 
-// recreatable reports whether s's missing cwd may be made again (see above).
+// recreatable reports whether s's missing cwd may be made again (see above). A
+// workspace reference no longer stops it: the members' worktrees are derived from the
+// thread's branch (checkouts.go), and ensureMembers makes the others' again.
 func (m *Manager) recreatable(s Thread) bool {
-	return s.Branch != "" && s.WorkspaceID == "" && s.ProjectID != "" && m.opts.Projects != nil &&
+	return s.Branch != "" && s.ProjectID != "" && m.opts.Projects != nil &&
 		project.InsideRoot(s.WorktreePath, m.opts.WorktreeRoot)
+}
+
+// remadeNote is the timeline line for member worktrees ensureMembers made again.
+func remadeNote(made []madeWorktree) string {
+	paths := make([]string, len(made))
+	for i, w := range made {
+		paths[i] = w.path
+	}
+	what := "The worktree of another project of this thread was removed and has been recreated"
+	if len(made) > 1 {
+		what = "The worktrees of other projects of this thread were removed and have been recreated"
+	}
+	return what + " (" + strings.Join(paths, ", ") + "). Untracked and ignored files from before are gone."
 }
 
 // ensureWorktree makes s's worktree again when it is missing and recreatable, and
