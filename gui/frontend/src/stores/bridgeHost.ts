@@ -6,10 +6,21 @@
  * so a page never talks to the API and never opens a stream. The message shapes are
  * lib/bridge.ts's.
  *
- * Every new document in the frame (a load: a reload, an in-frame navigation) starts over:
- * its predecessor's subscriptions stop, a confirmation it opened is cancelled and answers
- * still on their way to it are dropped. dispose (the frame unmounts) does the same for good. A frame with no owning thread (a File tab on an arbitrary HTML file) gets a
- * ready with no thread, no verbs and no sources, and every call refused.
+ * The frame (HtmlFrame) hands on only messages from its own window, at its origin, with its
+ * nonce (docs/notes/bridge-fix-frames.md); `cf:ready` answers `cf:hello` and nothing else.
+ *
+ * Every new document in the frame starts over: its predecessor's calls are aborted, its
+ * subscriptions stop, a confirmation it opened is cancelled and answers still on their way
+ * to it are dropped. A document says hello as its script starts and bye as it goes
+ * (pagehide); a load with no hello since the one before is a document without the script
+ * (a link followed elsewhere) and starts over too. dispose (the frame unmounts) does the
+ * same for good. A frame with no owning thread (a File tab on an arbitrary HTML file) gets
+ * a ready with no thread, no verbs and no sources, and every call refused.
+ *
+ * Limits (BRIDGE_LIMITS): BRIDGE_LIMITS.runs runs in flight and BRIDGE_LIMITS.subscriptions
+ * subscriptions per document, a run id unique among the runs in flight; past them a call
+ * is refused `invalid`. A page that gives up on a run (`cf:cancel`) aborts its Invoke, so a
+ * daemon-side wait (thread.wait, action.wait) ends with it.
  *
  * A run that has to ask the user tells the page (`cf:pending`) as its question is queued,
  * so the page's clock stops until the answer (`cf:resume`); a page that gives up
@@ -23,6 +34,7 @@ import { listCommands, type CommandView, type UiContextView } from "@/api/comman
 import { bridgeErrorOf } from "@/api/bridge";
 import { getPageStorage, setPageStorage, type PageStorageValues } from "@/api/pageStorage";
 import {
+  BRIDGE_LIMITS,
   errorResult,
   fillPageArgs,
   isBridgeSource,
@@ -45,6 +57,7 @@ import { publishedTheme } from "@/lib/theme";
 import { bridgeSources } from "./bridgeSources";
 import { invokeConfirmed } from "./commands";
 import { answerConfirm, useConfirmStore } from "./confirm";
+import { isAbort } from "@/api/stream";
 import { emptyContext } from "./context";
 import { useThreadsStore } from "./threads";
 
@@ -91,9 +104,9 @@ function onStorageChain<T>(threadId: string, call: () => Promise<T>): Promise<T>
 }
 
 export interface BridgeHost {
-  /** A new document loaded in the frame: forget the last one's calls and subscriptions, and say ready. */
+  /** The frame fired load: a document without the script, unless it said hello since the last load, starts over. */
   loaded: () => void;
-  /** A message from the frame's own window (the caller checked `event.source` and origin). */
+  /** A message from the frame's own window (the caller checked `event.source`, origin and nonce). */
   receive: (data: unknown) => void;
   /** The frame unmounts: stop everything. */
   dispose: () => void;
@@ -126,6 +139,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   let open: unknown = null;
   /** The runs whose question is open or queued, by call id: cancel declines it. */
   const asking = new Map<CallId, { cancelled: boolean; dialog: unknown }>();
+  /** The document's runs in flight, by call id: cancel and a new document abort them. */
+  const running = new Map<CallId, AbortController>();
+  /** Whether a document said hello since the frame's last load. */
+  let greeted = false;
   const hearStorage = (values: PageStorageValues) => {
     post(doc, { type: "cf:storage", values });
   };
@@ -196,8 +213,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     );
   };
 
-  /** Stops the document's subscriptions and cancels a confirmation it has open. */
+  /** Aborts the document's runs, stops its subscriptions and cancels a confirmation it has open. */
   const stopAll = () => {
+    for (const c of running.values()) c.abort();
+    running.clear();
     for (const stop of subs.values()) stop();
     if (dev) dev.subscriptions -= subs.size;
     subs.clear();
@@ -206,8 +225,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     asking.clear();
   };
 
-  /** A page gave up on a run: its question, open or queued, is declined. */
+  /** A page gave up on a run: its Invoke is aborted, and its question, open or queued, declined. */
   const cancel = (id: CallId) => {
+    running.get(id)?.abort();
     const call = asking.get(id);
     if (!call) return;
     call.cancelled = true;
@@ -246,6 +266,16 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       fail(forDoc, id, verb, NO_THREAD);
       return;
     }
+    if (running.has(id)) {
+      fail(forDoc, id, verb, { code: "invalid", message: `a call with id ${String(id)} is already running` });
+      return;
+    }
+    if (running.size >= BRIDGE_LIMITS.runs) {
+      fail(forDoc, id, verb, { code: "invalid", message: `too many calls at once (${String(BRIDGE_LIMITS.runs)}); wait for one to finish` });
+      return;
+    }
+    const abort = new AbortController();
+    running.set(id, abort);
     const asked = { declined: false };
     try {
       const spec = await listed().then(
@@ -254,7 +284,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       );
       const cwd = useThreadsStore.getState().byId[threadId]?.worktreePath ?? "";
       const callArgs = spec ? fillPageArgs(args, spec.args, { threadId, cwd }) : args;
+      if (abort.signal.aborted) return;
       const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
+        signal: abort.signal,
         around: async (ask) => {
           const yes = await queued(forDoc, id, ask);
           if (!yes) asked.declined = true;
@@ -265,7 +297,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       if (asked.declined) fail(forDoc, id, verb, { code: "declined", message: "the user declined" }, res);
       else post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
     } catch (err) {
-      fail(forDoc, id, verb, bridgeErrorOf(err));
+      // An aborted call's page gave up on it, or is gone: nobody to answer.
+      if (!(abort.signal.aborted && isAbort(err))) fail(forDoc, id, verb, bridgeErrorOf(err));
+    } finally {
+      if (running.get(id) === abort) running.delete(id);
     }
   };
 
@@ -288,6 +323,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       return;
     }
     unsubscribe(id);
+    if (subs.size >= BRIDGE_LIMITS.subscriptions) {
+      fail(forDoc, id, call, { code: "invalid", message: `too many subscriptions (${String(BRIDGE_LIMITS.subscriptions)}); end one with cf.off first` });
+      return;
+    }
     const spec = bridgeSources[source];
     const why = spec.unavailable?.() ?? null;
     if (why !== null) {
@@ -326,21 +365,34 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     if (spec.snapshot) flush();
   };
 
+  /** The document now in the frame is a new one: drop everything the last one had. */
+  const startOver = () => {
+    doc++;
+    stopAll();
+  };
+
   return {
     loaded: () => {
-      doc++;
-      stopAll();
-      ready(doc);
+      if (disposed) return;
+      if (greeted) greeted = false;
+      else startOver();
     },
     receive: (data) => {
       if (disposed) return;
       const m = parsePageMessage(data);
       if (!m) return;
-      const forDoc = doc;
       switch (m.kind) {
         case "hello":
-          ready(forDoc);
+          startOver();
+          greeted = true;
+          ready(doc);
           return;
+        case "bye":
+          startOver();
+          return;
+      }
+      const forDoc = doc;
+      switch (m.kind) {
         case "run":
           void run(forDoc, m.id, m.verb, m.args);
           return;

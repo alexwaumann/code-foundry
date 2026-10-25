@@ -15,6 +15,12 @@
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
  * Every call is a postMessage to the app, which runs it as the page's thread would. A call
  * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
+ * At most 32 runs are at the app at once (more wait here, their timeouts running) and 16
+ * subscriptions; a call's args, or a stored value, may be up to 256 KiB.
+ *
+ * The app opens the page with a nonce in its URL's fragment (#cf=<nonce>), sent back on
+ * every message (docs/notes/bridge-fix-frames.md): a page reached any other way (a link
+ * followed in the frame, another tab) has no bridge, and cf.ready rejects at once.
  */
 (function () {
   "use strict";
@@ -24,14 +30,23 @@
   var GESTURE_MS = 5000; // how long after a press, click or key a call counts as the user's
   var READY_MS = 10000; // how long cf.run waits for the app to say hello
   var RUN_MS = 60000; // cf.run's default timeout; opts.timeout overrides it, 0 waits forever
+  var MAX_RUNS = 32; // runs at the app at once; the app refuses more
+  var MAX_CHARS = 256 * 1024; // the largest call the app hears
   // The sources a page may subscribe to, until cf:ready names them (internal/bridge Sources).
   var SOURCES = ["thread-list", "thread", "gh", "action", "plugin", "terminal", "project", "workspace", "settings", "update", "ui", "ember"];
 
   var host = window.parent;
   var embedded = !!host && host !== window;
+  // The frame's nonce, from the fragment the app opened the page with; "" for none.
+  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  var NONCE = nonceMatch ? nonceMatch[1] : "";
+  // Whether the app hears this page's calls: a frame the app opened for it, nonce and all.
+  var bridged = embedded && NONCE !== "";
   var seq = 0;
   var idBase = "cf" + Math.random().toString(36).slice(2, 10) + "-";
-  var pending = {}; // run id -> {resolve, reject, timer, left, until, verb, total}
+  var pending = {}; // run id -> {resolve, reject, timer, left, until, verb, total, msg, sent}
+  var queue = []; // run ids waiting for one of the MAX_RUNS places, oldest first
+  var sending = 0; // runs posted and not answered
   var stores = {}; // storage write id -> {key, resolve, reject}
   var stored = {}; // the thread's page storage: key -> the value's JSON text
   var writing = {}; // key -> writes not answered yet; cf:storage leaves those keys alone
@@ -48,9 +63,13 @@
     return idBase + seq;
   }
 
+  // Bridge messages go only from a page the app opened (bridged); cf:resize and
+  // cf:theme:ack from any embedded page, which the app hears without a nonce.
   function post(msg) {
     if (!embedded) return;
     msg.cf = VERSION;
+    if (NONCE) msg.nonce = NONCE;
+    else if (msg.type !== "cf:resize" && msg.type !== "cf:theme:ack") return;
     try {
       host.postMessage(msg, "*");
     } catch (e) {
@@ -84,7 +103,7 @@
 
   function whenReady(ms) {
     if (readyMsg) return Promise.resolve(readyMsg);
-    if (!embedded) return Promise.reject(cfError("unavailable", "this page is not shown in Code Foundry"));
+    if (!bridged) return Promise.reject(notShown());
     return new Promise(function (resolve, reject) {
       var w = { resolve: resolve, reject: reject, timer: 0 };
       if (ms > 0) {
@@ -95,6 +114,20 @@
       }
       readyWaiters.push(w);
     });
+  }
+
+  function notShown() {
+    return embedded
+      ? cfError("unavailable", "this page was not opened by Code Foundry in this frame (a link followed here has no bridge)")
+      : cfError("unavailable", "this page is not shown in Code Foundry");
+  }
+
+  // A rough size of what a call sends: the app ignores anything past MAX_CHARS.
+  function tooLarge(verb, args) {
+    var n = verb.length;
+    var keys = Object.keys(args);
+    for (var i = 0; i < keys.length; i++) n += keys[i].length + args[keys[i]].length;
+    return n > MAX_CHARS;
   }
 
   function normalizeArgs(args) {
@@ -119,6 +152,7 @@
     try {
       if (typeof verb !== "string" || verb === "") throw cfError("invalid", "verb must be a command name");
       clean = normalizeArgs(args);
+      if (tooLarge(verb, clean)) throw cfError("invalid", verb + ": the args are too large (256 KiB at most)");
     } catch (e) {
       return Promise.reject(e);
     }
@@ -128,23 +162,49 @@
       }
       return new Promise(function (resolve, reject) {
         var id = nextId();
-        var p = { resolve: resolve, reject: reject, timer: 0, left: timeout, until: 0, verb: verb, total: timeout };
+        var p = { resolve: resolve, reject: reject, timer: 0, left: timeout, until: 0, verb: verb, total: timeout, msg: { type: "cf:run", id: id, verb: verb, args: clean }, sent: false };
         pending[id] = p;
         arm(id, p);
-        post({ type: "cf:run", id: id, verb: verb, args: clean });
+        queue.push(id);
+        pump();
       });
     });
   }
 
+  // Posts waiting runs while fewer than MAX_RUNS are at the app.
+  function pump() {
+    while (sending < MAX_RUNS && queue.length > 0) {
+      var id = queue.shift();
+      var p = pending[id];
+      if (!p || p.sent) continue;
+      p.sent = true;
+      sending += 1;
+      post(p.msg);
+    }
+  }
+
+  // A run is over (answered or given up): its place at the app goes to the next one.
+  function done(id, p) {
+    delete pending[id];
+    clearTimeout(p.timer);
+    if (p.sent) {
+      sending -= 1;
+      pump();
+    } else {
+      queue = queue.filter(function (x) { return x !== id; });
+    }
+  }
+
   // Starts (or, after the app's confirm dialog, resumes) a run's timeout with what is left
-  // of it. Giving up tells the app, which then never runs a command still waiting to ask.
+  // of it. Giving up tells the app, which aborts the call and never runs a command still
+  // waiting to ask.
   function arm(id, p) {
     if (!(p.left > 0)) return;
     p.until = Date.now() + p.left;
     p.timer = setTimeout(function () {
       if (pending[id] !== p) return;
-      delete pending[id];
-      post({ type: "cf:cancel", id: id });
+      if (p.sent) post({ type: "cf:cancel", id: id });
+      done(id, p);
       p.reject(cfError("timeout", p.verb + " did not answer in " + Math.round(p.total / 1000) + " s"));
     }, p.left);
   }
@@ -275,6 +335,7 @@
       },
       set: function (key, value) {
         var text = JSON.stringify(value);
+        if (text !== undefined && tooLarge(base + key, { v: text })) return Promise.reject(cfError("invalid", "cf.storage: " + key + " is too large (256 KiB at most)"));
         return write(base + key, text === undefined ? null : text);
       },
       remove: function (key) {
@@ -310,9 +371,8 @@
       return;
     }
     var p = pending[id];
-    if (p) {
-      delete pending[id];
-      clearTimeout(p.timer);
+    if (p && p.sent) {
+      done(id, p);
       if (msg.ok) {
         var r = msg.result || {};
         var json = r.json;
@@ -405,7 +465,7 @@
     rejectReady = reject;
   });
   ready.catch(function () {}); // a page that never awaits it outside the app logs nothing
-  if (!embedded) rejectReady(cfError("unavailable", "this page is not shown in Code Foundry"));
+  if (!bridged) rejectReady(notShown());
   else {
     setTimeout(function () {
       if (!readyMsg) rejectReady(cfError("unavailable", "Code Foundry did not answer this page"));
@@ -429,10 +489,11 @@
   window.cf = cf;
 
   window.addEventListener("message", receive);
-  // A reload keeps the frame's window, so the app could keep feeding a subscription the new
-  // document never made: end them as the page goes.
+  // A reload keeps the frame's window, so the app could keep feeding the new document what
+  // this one asked for: tell it this one goes, so its calls and subscriptions end.
   window.addEventListener("pagehide", function () {
-    Object.keys(subs).forEach(offId);
+    subs = {};
+    post({ type: "cf:bye" });
   });
 
   function observe() {
