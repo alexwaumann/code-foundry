@@ -1,9 +1,9 @@
-import { CornerDownRight, Folder, FolderGit2, House } from "lucide-react";
-import { useShallow } from "zustand/react/shallow";
+import { CornerDownRight, Folder, FolderGit2, House, Layers } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Tip } from "@/components/ui/tooltip";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { useThreadPlace, useThreadPlaceInput } from "./useThreadPlace";
 import { cn } from "@/lib/utils";
 import { useCreator } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
@@ -35,7 +35,8 @@ function ThreadName({ id }: { id: string }) {
 }
 
 /**
- * Where the thread runs: project @ branch (mono), and a "worktree" chip off the main
+ * Where the thread runs: project @ branch (mono; for several projects, or a workspace's
+ * folder, the workspace's name or "N projects"), and a "worktree" chip off the main
  * checkout; a project without git shows a plain folder and the No git badge instead; a
  * thread without a project the House icon and "No project", nothing else. The
  * same threadRowModel the sidebar row reads, so the two never disagree. A click opens the
@@ -43,19 +44,12 @@ function ThreadName({ id }: { id: string }) {
  * is plain text.
  */
 function ThreadLocation({ id }: { id: string }) {
-  const where = useThreadsStore(
-    useShallow((st) => {
-      const x = st.byId[id];
-      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
-    }),
-  );
-  const m = useProjectsStore(
-    useShallow((st) => {
-      const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };
-    }),
-  );
-  const Icon = m.noProject ? House : m.noGit ? Folder : FolderGit2;
+  const where = useThreadPlaceInput(id);
+  const place = useThreadPlace(id);
+  const worktree = useProjectsStore((st) => threadRowModel(where, st, NO_WORKSPACES).worktree);
+  // A thread of several projects, or in its workspace's folder: the workspace's name (else "N projects"), as on line 2.
+  const m = { ...place, project: place.set ?? place.project, worktree };
+  const Icon = m.noProject ? House : m.set !== null ? Layers : m.noGit ? Folder : FolderGit2;
   return (
     <CommandButton
       command="view.panel.worktree"
@@ -68,7 +62,7 @@ function ThreadLocation({ id }: { id: string }) {
       <span className="truncate" data-testid="thread-project" data-no-project={m.noProject || undefined}>
         {m.project}
       </span>
-      {m.noProject ? null : m.noGit ? (
+      {m.noProject || (m.set !== null && !m.branch) ? null : m.noGit ? (
         <NoGitBadge />
       ) : (
         <>

@@ -149,7 +149,7 @@ function AddProject({ target, exclude, disabled }: { target: ComposeTarget; excl
 }
 
 /**
- * The projects a thread works in, above the composer card, sorted by project id: the
+ * The projects a thread works in, above the composer card, by name (the caller's order): the
  * referenced workspace first, then one chip per project with its branch, the primary
  * (where the thread runs, its cwd) marked; the primary itself is picked in the Runs in
  * picker. A lone project shows only "Add project" (a set starts with a second one); in a

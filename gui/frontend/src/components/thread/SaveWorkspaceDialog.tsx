@@ -11,7 +11,8 @@ import { useThreadsStore } from "@/stores/threads";
 /** The dialog's body for one thread: the name, the projects it saves, Cancel and Save. */
 function SaveBody({ threadId }: { threadId: string }) {
   const ids = useThreadsStore(useShallow((s) => s.byId[threadId]?.projectIds ?? []));
-  const names = useProjectsStore(useShallow((s) => ids.map((id) => s.byId[id]?.name ?? id)));
+  // By name for display; saving sends the ids.
+  const names = useProjectsStore(useShallow((s) => ids.map((id) => s.byId[id]?.name ?? id).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))));
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

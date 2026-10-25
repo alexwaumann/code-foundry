@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSaveAsWorkspace, matchingWorkspace, primaryOptions, resolveSet, setName, toggled, WORKSPACE_PRIMARY, type SetChoice, type SetDefaults, type SetWorkspace } from "./projectSet";
+import { byName, canSaveAsWorkspace, matchingWorkspace, primaryOptions, resolveSet, setName, toggled, WORKSPACE_PRIMARY, type SetChoice, type SetDefaults, type SetWorkspace } from "./projectSet";
 
 const known = new Set(["api", "web", "lib", "notes"]);
 const workspaces: Record<string, SetWorkspace> = {
@@ -59,6 +59,14 @@ describe("helpers", () => {
       { value: "web", label: "web" },
     ]);
     expect(primaryOptions({ projectIds: ["api"], workspaceId: "" }, "", (id) => id)).toEqual([{ value: "api", label: "api" }]);
+    // By name, whatever the ids.
+    const names: Record<string, string> = { "p-1": "zeta", "p-2": "Alpha", "p-3": "beta" };
+    expect(primaryOptions({ projectIds: ["p-1", "p-2", "p-3"], workspaceId: "" }, "", (id) => names[id] ?? id).map((o) => o.label)).toEqual(["Alpha", "beta", "zeta"]);
+  });
+
+  it("byName: by name case-insensitively, then by id", () => {
+    const names: Record<string, string> = { a: "web", b: "Api", c: "api", d: "docs" };
+    expect(byName(["a", "c", "b", "d"], (id) => names[id] ?? id)).toEqual(["b", "c", "d", "a"]);
   });
 
   it.each<[string, string[], boolean]>([

@@ -85,7 +85,15 @@ export function setName(s: Pick<ResolvedSet, "projectIds" | "workspaceId">, work
   return `${String(s.projectIds.length)} projects`;
 }
 
-/** A primary picker option: "Workspace" (its folder) first when there is a workspace, then the projects by id. */
+/**
+ * Project ids in display order: by name, case-insensitively (then by id). The set is
+ * stored and sent by id; ids look random to a user, names do not.
+ */
+export function byName(ids: readonly string[], name: (id: string) => string): string[] {
+  return [...ids].sort((a, b) => name(a).localeCompare(name(b), undefined, { sensitivity: "base" }) || byId(a, b));
+}
+
+/** A primary picker option: "Workspace" (its folder) first when there is a workspace, then the projects by name. */
 export interface PrimaryOption {
   value: string;
   label: string;
@@ -95,7 +103,7 @@ export interface PrimaryOption {
 export function primaryOptions(s: Pick<ResolvedSet, "projectIds" | "workspaceId">, workspaceName: string, name: (id: string) => string): PrimaryOption[] {
   const out: PrimaryOption[] = [];
   if (s.workspaceId) out.push({ value: WORKSPACE_PRIMARY, label: "Workspace", detail: `${workspaceName || s.workspaceId}'s own folder` });
-  for (const id of s.projectIds) out.push({ value: id, label: name(id) });
+  for (const id of byName(s.projectIds, name)) out.push({ value: id, label: name(id) });
   return out;
 }
 

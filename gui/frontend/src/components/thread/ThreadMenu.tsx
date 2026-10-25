@@ -11,7 +11,7 @@ import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace
  * The thread header's "More" menu: "New thread on this branch" (thread.new-like's
  * presentation: the composer prefilled with this thread's set, branch, primary,
  * workspace and mode) and, for a thread of two or more projects that matches no saved
- * workspace, "Save as workspace…" (stores/saveWorkspace.ts). None for a thread without a
+ * workspace, "Save as workspace" (stores/saveWorkspace.ts). None for a thread without a
  * project. What was picked runs once the menu has closed and handed focus back.
  */
 export function ThreadMenu({ threadId }: { threadId: string }) {
@@ -78,7 +78,7 @@ export function ThreadMenu({ threadId }: { threadId: string }) {
             }}
           >
             <Layers />
-            Save as workspace…
+            Save as workspace
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

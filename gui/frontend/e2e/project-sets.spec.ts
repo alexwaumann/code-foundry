@@ -202,7 +202,7 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   await row(page, `s:${t.id}`).click();
   await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("2 projects");
   await page.getByTestId("pane-thread-menu").click();
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace…"]);
+  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace"]);
   await page.getByTestId("menu-save-workspace").click();
   const dialog = page.getByTestId("save-workspace-dialog");
   await expect(dialog).toBeVisible();

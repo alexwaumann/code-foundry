@@ -42,7 +42,7 @@ import {
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { tildify } from "@/lib/path";
-import { primaryOptions, resolveSet, setName, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
+import { byName, primaryOptions, resolveSet, setName, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
@@ -534,7 +534,9 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
     (id: string) => (likeSrc.worktreeMode && likeSrc.branch ? likeSrc.branch : likeBranches[likeSrc.sorted.indexOf(id)]),
     [likeSrc.worktreeMode, likeSrc.branch, likeBranches, likeSrc.sorted],
   );
-  const setChips = useSetChips(like ? likeSrc.sorted : set.projectIds, worktree.kind === "new", !like && (set.projectIds.length > 1 || set.workspaceId !== ""), like ? likeBranchOf : undefined);
+  // Chips in display order: by name (the set is sent by id).
+  const chipIds = useMemo(() => byName(like ? likeSrc.sorted : set.projectIds, projectNames), [like, likeSrc.sorted, set.projectIds, projectNames]);
+  const setChips = useSetChips(chipIds, worktree.kind === "new", !like && (set.projectIds.length > 1 || set.workspaceId !== ""), like ? likeBranchOf : undefined);
   const singleChip = projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen });
   const chips: MemberChipModel[] = isSet || like ? setChips : single ? [{ projectId: single, branch: singleChip.branch, noGit: singleChip.noGit, removable: false }] : [];
   const worktreeText = like

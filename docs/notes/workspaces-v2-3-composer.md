@@ -44,11 +44,12 @@ Status: done on branch `cf/workspaces-v2-composer`. Design record:
   again drops the reference and keeps the projects. A project row toggles it (picked last
   in the pick order). The last project of a set without a workspace cannot be removed
   (No project is its own row). cmd+N's picker stays single-pick (Enter, cmd+1..9).
-* **Chips.** Sorted by project id; a lone project shows only "Add project" (as v1's lone
+* **Chips.** Shown by project name, case-insensitively (`byName`; the set is stored and
+  sent by id, which looks random to a user); a lone project shows only "Add project" (as v1's lone
   project showed "Also in…"); a set shows every project with a × and, before them, a
   workspace chip whose × drops the reference. The primary chip keeps its accent but is no
   longer a button: the primary is picked in **Runs in** ("Workspace" first with a
-  workspace, then the projects by id). Default: the workspace's `default_primary`, else
+  workspace, then the projects by name). Default: the workspace's `default_primary`, else
   the first project picked.
 * **Plain folders can be in a set** (v1 refused them in Also in); in worktree mode they are
   their folder (the daemon's rule).
@@ -73,7 +74,9 @@ Status: done on branch `cf/workspaces-v2-composer`. Design record:
   Runs in changes; it sends `id` (+ `project` only when changed) and the prompt. The
   heading reads "What's next on <branch>?" (no branch: "beside <thread>"). Escape on an
   empty draft returns to the thread. Row menu, header More menu and palette.
-* **Save as workspace** is two registry commands from a small dialog: `workspace.new`
+* **Save as workspace** (the menu item reads exactly that, as the help skill names it)
+  sends project ids, never names (a project named `workspace` would be the primary
+  keyword). It is two registry commands from a small dialog: `workspace.new`
   (projects, the thread's primary as `primary`; a thread in a workspace folder sends no
   primary) and `thread.workspace`. `ThreadService.SetWorkspace` is new: no thread verb set
   the reference. Offered (header More menu only, as the spec says) for a set of two or more
@@ -83,7 +86,8 @@ Status: done on branch `cf/workspaces-v2-composer`. Design record:
   branch is the thread's in worktree mode, else the cwd checkout's; none in the
   workspace's folder in place (just the name). Single-project threads are unchanged, also
   with a workspace reference. The tooltip lists the projects (the workspace as its chip).
-  The Threads tab's place uses the same hook.
+  The Threads tab's place and the thread header's location use the same hook, so a
+  thread in its workspace's folder never shows the folder's `w-…` name.
 * **Run in** lists the workspace's folder and the thread's projects (their derived
   checkouts), for any thread with more than one place to run; the palette lists the
   command only then (the daemon offers it for every thread).

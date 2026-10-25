@@ -315,13 +315,13 @@ function TipMoving({ id }: { id: string }) {
 }
 
 /**
- * The projects of a multi-project thread, by name in id order, with its workspace's name
+ * The projects of a multi-project thread, by name, with its workspace's name
  * as the chip (none without one): the row's line 2 only says "N projects".
  */
 function TipSet({ id }: { id: string }) {
   const ids = useThreadsStore(useShallow((s) => s.byId[id]?.projectIds ?? []));
   const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
-  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? p)));
+  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? p).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))));
   const workspace = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : null));
   return (
     <TipRow icon={<TipIcon icon={Layers} />} chip={workspace} testId="tip-set">
