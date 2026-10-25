@@ -104,6 +104,10 @@ decisions differed from the report's suggested fixes, the decisions were built.
 * The mock's `POST /__mock/workspace` needs a project or a root: a workspace without
   projects in the specs is a rooted one.
 * A ThreadMenu with neither item (no new-like, nothing to save) renders nothing.
+* The row menu's New thread on this branch could lose the prompt's focus under load: the
+  context menu's close handed focus back to the list after the composer took it
+  (`project-sets.spec.ts` failed twice in full runs). The menu now keeps focus where it is
+  when the selection is that thread's like composer, as it already did for rename.
 * The sandbox refuses shell commands that mix git words with file edits; edits went through
   the editor tool.
 
