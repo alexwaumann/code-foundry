@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -35,7 +36,7 @@ func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "head-sha", Type: String, Description: "Merge only if the head is still this commit (full SHA): refused when the pull request changed since you looked"},
 		},
 		When:    hasPullRequest,
-		Confirm: "Merge #{number} with {method}?",
+		Confirm: "Merge #{number} in {repo-slug} with {method}?",
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 			return mergeConfirm(ctx, b, a)
 		},
@@ -67,10 +68,12 @@ func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 	}
 }
 
-// mergeConfirm is "Merge #N into <base> with <method>?", plus the branch it deletes.
-// Without head-sha it also names what merges ("#N (3 commits, head e2e0142)"): the
-// daemon merges its head at the time, and this is the user's look at it. Empty (the
-// static Confirm instead) when the args are bad or the detail cannot be read.
+// mergeConfirm is "Merge #N “<title>” into <base> in <owner/name> with <method>?", plus
+// the branch it deletes: the title and repository say which pull request when a page
+// asks (docs/notes/bridge-fix-c-daemon.md). Without head-sha it also names what merges
+// ("#N “…” (3 commits, head e2e0142)"): the daemon merges its head at the time, and this
+// is the user's look at it. Empty (the static Confirm instead) when the args are bad or
+// the detail cannot be read.
 func mergeConfirm(ctx context.Context, b GhBackend, a Args) string {
 	words, ok := mergeMethodWords[a.String("method")]
 	if !ok || checkPullRequestArgs(a) != nil {
@@ -89,6 +92,9 @@ func mergeConfirm(ctx context.Context, b GhBackend, a Args) string {
 		return ""
 	}
 	what := fmt.Sprintf("#%d", n)
+	if t := strings.TrimSpace(pr.GetTitle()); t != "" {
+		what += " “" + truncateRunes(t, mergeTitleMax) + "”"
+	}
 	if sha := pr.GetHeadSha(); a.String("head-sha") == "" && sha != "" {
 		commits := "1 commit"
 		if c := d.GetCommitCount(); c != 1 {
@@ -96,11 +102,23 @@ func mergeConfirm(ctx context.Context, b GhBackend, a Args) string {
 		}
 		what += fmt.Sprintf(" (%s, head %s)", commits, sha[:min(7, len(sha))])
 	}
-	msg := fmt.Sprintf("Merge %s into %s with %s?", what, pr.GetBaseRef(), words)
+	msg := fmt.Sprintf("Merge %s into %s in %s with %s?", what, pr.GetBaseRef(), a.String("repo-slug"), words)
 	if a.Bool("delete-branch") && deletableBranch(d) {
 		msg += fmt.Sprintf(" Branch origin/%s is deleted afterwards.", pr.GetHeadRef())
 	}
 	return msg
+}
+
+// mergeTitleMax is how much of a pull request's title its merge confirmation quotes.
+const mergeTitleMax = 80
+
+// truncateRunes is s cut to max runes, with "…" when cut.
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return strings.TrimSpace(string(r[:max-1])) + "…"
 }
 
 // deletableBranch reports whether a merge would delete d's head branch when asked: not

@@ -678,20 +678,23 @@ export class PrDetailWorld {
             },
             { name: "head-sha", type: ArgType.STRING, required: false, description: "Merge only if the head is still this commit (full SHA): refused when the pull request changed since you looked" },
           ],
-          // Like the daemon's DynamicConfirm: the base from the detail, what merges without
+          // Like the daemon's DynamicConfirm: the title, base and repository, what merges without
           // head-sha, and the branch it deletes (origin's; not a fork's, the default or base).
           confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => {
             const method = args.method ?? "";
             const k = key(args["repo-slug"] ?? "", Number(args.number));
             const d = this.details.get(k);
             const pr = d?.pullRequest ?? this.h.findPr(args["repo-slug"] ?? "", Number(args.number));
-            if (!pr?.baseRef) return `Merge #${args.number ?? ""} with ${method}?`;
+            const slug = args["repo-slug"] ?? "";
+            if (!pr?.baseRef) return `Merge #${args.number ?? ""} in ${slug} with ${method}?`;
             let what = `#${args.number ?? ""}`;
+            const title = (pr.title ?? "").trim();
+            if (title) what += ` “${[...title].length > 80 ? `${[...title].slice(0, 79).join("").trim()}…` : title}”`;
             if (!args["head-sha"] && pr.headSha) {
               const c = d?.commitCount ?? 0;
               what += ` (${c === 1 ? "1 commit" : `${String(c)} commits`}, head ${pr.headSha.slice(0, 7)})`;
             }
-            let msg = `Merge ${what} into ${pr.baseRef} with ${methodWords[method] ?? method}?`;
+            let msg = `Merge ${what} into ${pr.baseRef} in ${slug} with ${methodWords[method] ?? method}?`;
             if (args["delete-branch"] === "true" && keepBranch(pr, d?.defaultBranch ?? "main") === "") msg += ` Branch origin/${pr.headRef ?? ""} is deleted afterwards.`;
             return msg;
           },
