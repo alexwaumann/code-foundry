@@ -21,6 +21,14 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **Skills marketplace** done (2026-10-20, four PRs): PR 1 (the `internal/store/skill` store: marketplaces from `claude plugin marketplace list`, checkouts read into plugin and skill entries, search, installed state, migration 0038, hourly refresh) done (`skills-1-registry.md`); PR 2 (install, enable, disable, update, uninstall, remove, setup in the store; the nine `skill.*` commands; `kind=setup` terminals) done (`skills-2-lifecycle.md`); PR 3 (`SkillService` Search/Installed/Registries/Watch and the EventService skill source, `api/skill.ts` + `stores/skill.ts`, the mock `ai-marketplace`, the plugin.json update offer) done (`skills-3-api.md`); PR 4 (Settings → Skills: Installed, Browse, Registries; the page's confirms; section hits in the settings search) done (`skills-4-gui.md`).
 * **Ember** (the resident agent, three PRs) in progress (2026-10-20): PR 1 (the daemon's primitives: timer wake subscriptions `thread subscribe --at/--every`, resident threads `Thread.kind`/`resident_name` made by `EnsureResident` and kept out of the user's lists, `ThreadService.Reseed` / `thread reseed` with `Thread.epoch`, migration 0041) done (`ember-1-primitives.md`); PR 2 (the Ember store: the `ember.*` settings, its home and seed, epochs with consolidation, the task board `ember_tasks` (migration 0042), worker models, `EmberService`, the `ember.*` commands, the code-foundry-ember skill) done (`ember-2-store.md`); PR 3 (the GUI: the flame, the pinned row above New thread, the chat with its "Worked for" folds and task links, the Board surface, the worker-model chips) done (`ember-3-gui.md`).
 
+### Workspaces v2: project sets and derived checkouts (2026-10-25, in progress)
+
+Design settled 2026-10-25 (`docs/notes/workspaces-v2-handoff.md`): a workspace becomes a
+saved set of projects with a managed dir for instructions and skills; a thread owns a
+project list, a branch and a primary; worktrees are derived per (project, branch), made on
+spawn and removed when the last thread archives. Six PRs in the handoff's §8; each lands
+with a `workspaces-v2-<n>-*.md` note.
+
 ### Multi-repo workspaces: the five steps are built
 
 Design settled 2026-10-09 (`docs/notes/workspaces-handoff.md`); all five steps of its
