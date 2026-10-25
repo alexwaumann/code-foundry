@@ -1,24 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  Broom,
-  ChevronDown,
-  ChevronRight,
-  CloudUpload,
-  Folder,
-  FolderGit2,
-  FolderPlus,
-  GitBranchPlus,
-  Layers,
-  PanelRight,
-  Play,
-  RefreshCw,
-  Search,
-  SquarePen,
-  SquareTerminal,
-  Trash2,
-  Unlink,
-} from "lucide-react";
+import { Broom, CloudUpload, Folder, FolderGit2, FolderPlus, GitBranchPlus, Layers, PanelRight, Play, RefreshCw, Search, SquarePen, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
@@ -34,7 +16,6 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import {
   collapsedProjectSummary,
-  collapsedWorkspaceSummary,
   filterProjects,
   NONE_COLLAPSED,
   pageItems,
@@ -44,7 +25,6 @@ import {
   projectNextStep,
   projectsModel,
   projectWorktreeKey,
-  workspaceKey,
   type Collapsed,
   type ProjectKind,
   type ProjectModel,
@@ -64,21 +44,19 @@ import {
   newWorktreeIn,
   publishProject,
   refreshProject,
-  removeWorkspace,
   removeWorktree,
   unregisterProject,
 } from "@/stores/projectActions";
 import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/projects";
-import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { showWorkspaceInThread } from "@/stores/workspacePanel";
+import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { workspaceThread } from "@/surfaces/workspaceTarget";
+import { CollapseToggle } from "./CollapseToggle";
 import { useCleanable, useCleanableCount } from "./useCleanable";
 import { NoGitBadge } from "./NoGitBadge";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
-import { WorkspaceMembers } from "./WorkspaceMembers";
+import { WorkspaceCard } from "./WorkspaceCard";
 import { RowAction, WorktreeState } from "./WorktreeState";
 
 const ROW_H = 32;
@@ -87,7 +65,7 @@ const SEP = "\u0001";
 /** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
 function useStructure(): { projects: string[]; workspaces: string[] } {
   const projects = useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
-  const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.flatMap((m) => [m.projectId, m.worktreePath]) ?? [])].join(SEP))));
+  const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.map((m) => m.projectId) ?? [])].join(SEP))));
   return { projects, workspaces };
 }
 
@@ -105,10 +83,8 @@ function decode(projectKeys: readonly string[], wsKeys: readonly string[]) {
     order: wsKeys.map((k) => k.split(SEP)[0] ?? ""),
     byId: Object.fromEntries(
       wsKeys.map((k) => {
-        const [id = "", ...rest] = k.split(SEP);
-        const members = [];
-        for (let i = 0; i + 1 < rest.length; i += 2) members.push({ projectId: rest[i] ?? "", worktreePath: rest[i + 1] ?? "" });
-        return [id, { id, members }];
+        const [id = "", ...members] = k.split(SEP);
+        return [id, { id, members: members.map((projectId) => ({ projectId, worktreePath: "" })) }];
       }),
     ),
   };
@@ -126,7 +102,7 @@ function useSearchInputs(active: boolean): { projects: string[]; workspaces: str
       return [id, r?.name ?? "", r?.githubSlug ?? "", ...(r?.worktrees.flatMap((w) => [w.path, w.branch]) ?? [])].join(SEP);
     }) : [])),
   );
-  const workspaces = useWorkspacesStore(useShallow((s) => (active ? s.order.map((id) => [id, s.byId[id]?.name ?? "", s.byId[id]?.branch ?? ""].join(SEP)) : [])));
+  const workspaces = useWorkspacesStore(useShallow((s) => (active ? s.order.map((id) => [id, s.byId[id]?.name ?? ""].join(SEP)) : [])));
   return { projects, workspaces };
 }
 
@@ -142,41 +118,11 @@ function decodeSearch(projectKeys: readonly string[], wsKeys: readonly string[])
     ),
     workspaces: Object.fromEntries(
       wsKeys.map((k) => {
-        const [id = "", name = "", branch = ""] = k.split(SEP);
-        return [id, { name, branch }];
+        const [id = "", name = ""] = k.split(SEP);
+        return [id, { name }];
       }),
     ),
   };
-}
-
-/**
- * The chevron at the left of a project or workspace header. Mouse-down keeps the focus
- * where it is (the list, so the arrow keys keep working); disabled while the filter shows
- * everything that matches expanded.
- */
-function CollapseToggle({ collapsed, disabled, onToggle, testId, label }: { collapsed: boolean; disabled: boolean; onToggle: () => void; testId: string; label: string }) {
-  const Chevron = collapsed ? ChevronRight : ChevronDown;
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-expanded={!collapsed}
-      aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
-      disabled={disabled}
-      data-testid={testId}
-      className="-ml-1 flex size-[18px] shrink-0 items-center justify-center rounded-sm text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text disabled:opacity-50 disabled:hover:bg-transparent [&_svg]:size-3.5"
-      onMouseDown={(e) => {
-        e.preventDefault();
-      }}
-      onDoubleClick={(e) => {
-        // Quick toggles must not open the row's panel tab.
-        e.stopPropagation();
-      }}
-      onClick={onToggle}
-    >
-      <Chevron aria-hidden />
-    </button>
-  );
 }
 
 const KIND_ICON: Record<ProjectKind, { Icon: React.ComponentType<{ className?: string }>; className: string }> = {
@@ -353,70 +299,6 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
       {!collapsed && (
         <div className="p-0.5">
           <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(projectId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow projectId={projectId} path={p} cleanupSlot={cleanable > 0} />} />
-          {project.inWorkspaces > 0 && (
-            <p className="px-6 py-1 text-caption" data-testid="project-in-workspaces">
-              {project.inWorkspaces} {project.inWorkspaces === 1 ? "worktree is" : "worktrees are"} in workspaces (below)
-            </p>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: boolean; filtering: boolean }) {
-  const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
-  const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
-  const members = useWorkspacesStore((s) => s.byId[id]?.members.length ?? 0);
-  // A thread of the workspace: the row can show the workspace surface in its panel.
-  const thread = useThreadsStore((s) => workspaceThread(s, id));
-  const threadName = useThreadsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
-  return (
-    <section className="group/card rounded-lg border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
-      <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
-        <CollapseToggle
-          collapsed={collapsed}
-          disabled={filtering}
-          label={name}
-          testId="workspace-collapse"
-          onToggle={() => {
-            useUiStore.getState().setWorkspaceCollapsed(id, !collapsed);
-          }}
-        />
-        <Layers className="size-4 shrink-0 text-cf-highlight-text/90" aria-hidden />
-        <span className="truncate font-medium" data-testid="workspace-name">
-          {name}
-        </span>
-        <span className="min-w-0 truncate text-caption font-mono" data-testid="workspace-branch">
-          {branch}
-        </span>
-        {collapsed && (
-          <span className="shrink-0 text-caption tabular-nums" data-testid="workspace-collapsed-summary">
-            {collapsedWorkspaceSummary(members)}
-          </span>
-        )}
-        <span
-          className="ml-auto flex shrink-0 items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/ws:opacity-100 group-aria-selected/ws:opacity-100 has-[[aria-expanded=true]]:opacity-100"
-          data-testid="workspace-actions"
-        >
-          {thread && (
-            <RowAction label={`Show in ${threadName}'s side panel`} testId="workspace-show-panel" onClick={() => { showWorkspaceInThread(thread); }}>
-              <PanelRight />
-            </RowAction>
-          )}
-          <RowAction label="New thread in this workspace" testId="workspace-new-thread" onClick={() => { composeInWorkspace(id); }}>
-            <SquarePen />
-          </RowAction>
-          <OverflowMenu
-            label="More workspace actions"
-            testId="workspace-more"
-            items={[{ label: "Remove workspace", icon: Trash2, destructive: true, testId: "workspace-remove", onSelect: () => void removeWorkspace(id) }]}
-          />
-        </span>
-      </NavRow>
-      {!collapsed && (
-        <div className="p-0.5 pb-1.5">
-          <WorkspaceMembers workspaceId={id} />
         </div>
       )}
     </section>
@@ -425,13 +307,13 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
 
 /**
  * The Projects page: what the sidebar's project tree used to show. Per project its
- * own worktrees with git and pull request state and actions (new thread, new terminal,
- * remove worktree, unregister); per workspace its members (add, remove, remove the
- * workspace). Workspace member worktrees are listed under their workspace only. Projects
- * and workspaces collapse (persisted in the UI store); the header's filter narrows both.
- * Keyboard: ↑/↓ move, →/← expand or collapse a header, Enter (like double-click) shows a
- * project or worktree in the page's side panel, or opens a workspace's composer; / goes
- * to the filter, Escape there clears it and comes back.
+ * worktrees (every one: a thread's checkouts show under their projects) with git and pull
+ * request state and actions (new thread, new terminal, remove worktree, unregister); per
+ * workspace a card (WorkspaceCard: name, root, projects, where threads start, instructions,
+ * skills). Projects and workspaces collapse (persisted in the UI store); the header's
+ * filter narrows both. Keyboard: ↑/↓ move, →/← expand or collapse a header, Enter (like
+ * double-click) shows a project, worktree or workspace member in the page's side panel, or
+ * opens a workspace's composer; / goes to the filter, Escape there clears it and comes back.
  */
 export function ProjectsPage() {
   const structure = useStructure();
@@ -460,8 +342,10 @@ export function ProjectsPage() {
               toggle: (open) => !filtering && useUiStore.getState().setProjectCollapsed(it.projectId, !open),
             };
           case "worktree":
-          case "member":
             return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, it.path); } };
+          // A workspace member: its project's main worktree.
+          case "member":
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, mainWorktreePath(useProjectsStore.getState(), it.projectId)); } };
           case "workspace":
             return {
               key: it.key,
@@ -484,7 +368,7 @@ export function ProjectsPage() {
       <PaneHeader className="gap-3 px-5">
         <FolderGit2 className="size-4 text-cf-text-muted" aria-hidden />
         <h1 className="text-heading">Projects</h1>
-        <span className="text-caption tabular-nums" data-testid="projects-counts">
+        <span className="text-caption whitespace-nowrap tabular-nums" data-testid="projects-counts">
           {all.projects.length} {all.projects.length === 1 ? "project" : "projects"} · {all.workspaces.length} {all.workspaces.length === 1 ? "workspace" : "workspaces"}
         </span>
         <div className="relative ml-1 flex w-[220px] min-w-0 shrink items-center [--wails-draggable:no-drag]">
@@ -568,18 +452,37 @@ export function ProjectsPage() {
               )}
             </div>
             <div className="flex flex-col gap-3" data-testid="workspaces-section">
-              <SectionTitle count={model.workspaces.length}>Workspaces</SectionTitle>
+              <SectionTitle
+                count={model.workspaces.length}
+                extra={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="text-cf-text-muted hover:text-cf-text"
+                    data-testid="projects-new-workspace"
+                    onClick={() => {
+                      openNewWorkspaceDialog();
+                    }}
+                  >
+                    <Layers />
+                    New workspace
+                  </Button>
+                }
+              >
+                Workspaces
+              </SectionTitle>
               {all.workspaces.length === 0 ? (
-                <p className="px-2 text-body text-cf-text-muted">
-                  No workspaces. A workspace is one branch across several projects: start one from the composer with “Also in…”, or with{" "}
-                  <span className="font-mono">code-foundry workspace new</span>.
+                <p className="px-2 text-body text-cf-text-muted" data-testid="workspaces-empty">
+                  No workspaces. A workspace is a set of projects you start threads in together, with instructions and skills that span them: New workspace,
+                  or <span className="font-mono">code-foundry workspace new</span>.
                 </p>
               ) : model.workspaces.length === 0 ? (
                 <p className="px-2 text-body text-cf-text-muted" data-testid="workspaces-no-matches">
                   No matches.
                 </p>
               ) : (
-                model.workspaces.map((id) => <WorkspaceBlock key={id} id={id} collapsed={collapsed.workspaces.has(id)} filtering={filtering} />)
+                model.workspaces.map((id) => <WorkspaceCard key={id} id={id} collapsed={collapsed.workspaces.has(id)} filtering={filtering} />)
               )}
             </div>
           </div>

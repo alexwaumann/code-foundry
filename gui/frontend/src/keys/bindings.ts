@@ -8,6 +8,7 @@ import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { getEmberAttentionId } from "@/stores/ember";
 import { openPublishDialog } from "@/stores/publish";
+import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
@@ -18,7 +19,7 @@ import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -133,7 +134,7 @@ export function inPalette(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "thread.sidebar","project.clone", "project.create", "project.github.publish", "workspace.new", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -249,6 +250,8 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // The publish dialog (owner and visibility pickers) for the active project; it
   // invokes project.github.publish.
   "project.github.publish": () => openPublishDialog(getUiContext().activeProjectId),
+  // The New workspace dialog (a name and its projects); it invokes workspace.new.
+  "workspace.new": () => openNewWorkspaceDialog(),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => toggleView("settings"),
@@ -283,11 +286,6 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Same for splitting or joining the panel's tab groups: this window's panel for its selection.
   "view.panel.split": () => {
     splitPanelCommand();
-    return true;
-  },
-  // Same for the workspace surface: this window's workspace thread's panel.
-  "view.panel.workspace": () => {
-    workspacePanelCommand();
     return true;
   },
   // And for the Linked PRs surface: this window's thread's panel (or a toast without links).

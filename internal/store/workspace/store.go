@@ -102,6 +102,7 @@ func (m *Manager) rebuild() {
 
 // commit persists w, publishes the snapshot and emits Updated. Callers hold m.mu.
 func (m *Manager) commit(ctx context.Context, w Workspace) (Workspace, error) {
+	w = withContents(w)
 	if err := saveWorkspace(context.WithoutCancel(ctx), m.opts.DB, w); err != nil {
 		return Workspace{}, err
 	}
@@ -304,7 +305,26 @@ func (m *Manager) EnsureDirs(_ context.Context, id string) error {
 	for _, w := range m.Snapshot().Workspaces {
 		if id == "" || w.ID == id {
 			errs = append(errs, ensureDir(m.log, w))
+			m.refreshContents(w.ID)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// refreshContents reads workspace id's instructions file and skills again; when they
+// changed it publishes the snapshot and Updated (nothing is persisted: they live on disk).
+func (m *Manager) refreshContents(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	w, ok := m.byID[id]
+	if !ok {
+		return
+	}
+	next := withContents(w)
+	if sameContents(w, next) {
+		return
+	}
+	m.byID[id] = next
+	m.rebuild()
+	bus.Publish[Event](m.opts.Bus, Updated{Workspace: next})
 }

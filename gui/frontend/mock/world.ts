@@ -52,17 +52,38 @@ export type EventInit = MessageInitShape<typeof EventSchema>;
 type WorkspaceInit = MessageInitShape<typeof WorkspaceSchema>;
 type WorkspaceEventInit = MessageInitShape<typeof WorkspaceEventSchema>;
 
-/** A workspace: one branch as a worktree in several projects (the daemon's workspace store). */
+/**
+ * A workspace (the daemon's workspace store since workspaces v2,
+ * docs/notes/workspaces-v2-2-workspaces.md): a saved set of projects, an optional root and
+ * where new threads start. What its managed dir holds (the instructions file's name and
+ * the skills) is set by the test controls, as a thread writing them would.
+ */
 export interface MockWorkspace {
   id: string;
   name: string;
-  branch: string;
-  members: { projectId: string; worktreePath: string }[];
+  /** Project ids, sorted. */
+  members: string[];
+  /** A rooted workspace's folder; "" for a synthetic one. */
+  rootPath: string;
+  /** A member project id, or "workspace". */
+  defaultPrimary: string;
+  /** "CLAUDE.md", "AGENTS.md" or "" (none yet). */
+  instructions: string;
+  /** Skill folder names in .claude/skills, sorted. */
+  skills: string[];
   createdAt: Date;
-  /** A rooted workspace's folder (project.add-workspace); unset for a synthetic one. */
-  rootPath?: string;
-  /** Unset: the first member, else "workspace". */
-  defaultPrimary?: string;
+}
+
+/** One checkout of a thread (ThreadService.Checkouts). */
+interface MockCheckout {
+  projectId: string;
+  projectName: string;
+  path: string;
+  branch: string;
+  primary: boolean;
+  missing: boolean;
+  git: boolean;
+  derived: boolean;
 }
 
 interface MockThread {
@@ -113,6 +134,8 @@ interface MockThread {
    * thread's members (docs/notes/workspaces-v2-1-threads.md).
    */
   projectIds: string[];
+  /** Thread.branch: a worktree-mode thread's branch (createdWorktree); "" in checkout mode. */
+  branch: string;
   /** The workspace the thread references; "" when none. */
   workspaceId: string;
   /** A queued thread.run-in target; "" when none (published, not "persisted"). */
@@ -908,21 +931,37 @@ export class World {
 
   // ---- Workspaces ---------------------------------------------------------------
 
+  /** <config home>/workspaces/<id>. */
+  managedDirOf(w: MockWorkspace): string {
+    return `${HOME}/.code-foundry/workspaces/${w.id}`;
+  }
+
+  /** Where a thread whose primary is the workspace runs: its root, else its managed dir. */
+  workspaceDirOf(w: MockWorkspace): string {
+    return w.rootPath || this.managedDirOf(w);
+  }
+
   /**
-   * WorkspaceService's Workspace since the reshape (docs/notes/workspaces-v2-2-workspaces.md):
-   * member project ids sorted, the first member added as the default primary, a managed dir.
-   * The mock still keeps its v1 branch and member worktrees internally for its thread.new.
+   * WorkspaceService's Workspace (docs/notes/workspaces-v2-2-workspaces.md): member project
+   * ids sorted, root, default primary, managed dir, and what the managed dir holds (the
+   * instructions file, a rooted workspace's under its root; the skills).
    */
   workspaceMsg(w: MockWorkspace): WorkspaceInit {
     return {
       id: w.id,
       name: w.name,
-      members: w.members.map((m) => m.projectId).sort(),
-      rootPath: w.rootPath ?? "",
-      defaultPrimary: w.defaultPrimary ?? w.members[0]?.projectId ?? "workspace",
-      managedDir: `${HOME}/.code-foundry/workspaces/${w.id}`,
+      members: [...w.members].sort(),
+      rootPath: w.rootPath,
+      defaultPrimary: w.defaultPrimary,
+      managedDir: this.managedDirOf(w),
+      instructions: w.instructions ? `${this.workspaceDirOf(w)}/${w.instructions}` : "",
+      skills: [...w.skills].sort(),
       createdAt: timestampFromDate(w.createdAt),
     };
+  }
+
+  private publishWorkspace(w: MockWorkspace): void {
+    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(w) } });
   }
 
   workspaceSnapshot(): WorkspaceEventInit {
@@ -934,13 +973,6 @@ export class World {
   private projectRef(ref: string): MockProject {
     const r = this.projects.get(ref) ?? [...this.projects.values()].find((x) => x.name === ref);
     if (!r) throw new CommandError("notfound", `project ${ref} not found`);
-    return r;
-  }
-
-  /** A workspace member's project: like projectRef, and never a project without git. */
-  private memberProjectRef(ref: string): MockProject {
-    const r = this.projectRef(ref);
-    if (r.git === false) throw new CommandError("unavailable", `${r.name} is not a git repository; workspaces need git in every project`);
     return r;
   }
 
@@ -966,7 +998,11 @@ export class World {
     for (const t of this.terms.values()) {
       if (t.state === TerminalState.RUNNING && (t.labels[LABEL_WORKTREE] === path || t.cwd === path || t.cwd.startsWith(`${path}/`))) return "a terminal is open in it";
     }
-    for (const ws of this.workspaces.values()) if (ws.members.some((m) => m.worktreePath === path)) return `member of workspace ${ws.name}`;
+    // Like the daemon's checkoutThreads: another thread's checkout holds it too.
+    for (const t of this.threads.values()) {
+      if (t.archivedAt !== null) continue;
+      if (this.checkoutsOf(t).some((c) => !c.missing && c.path === path)) return t.name ? `thread ${t.name} is on it` : "a thread is on it";
+    }
     return "";
   }
 
@@ -989,11 +1025,16 @@ export class World {
     return out;
   }
 
+  /** Where the daemon makes `project`'s worktree for `branch` (DefaultWorktreePath). */
+  private worktreePathFor(project: MockProject, branch: string): string {
+    return `${HOME}/.code-foundry/worktrees/${project.githubSlug || `_local/${project.name}`}/${branch.replace(/\//g, "-")}`;
+  }
+
   /** A new worktree on `branch` in `project` (published), where the daemon would put it. */
   private addWorktree(project: MockProject, branch: string, baseRef: string): MockWorktree {
     requireGit(project, "a new worktree");
     const w: MockWorktree = {
-      path: `${HOME}/.code-foundry/worktrees/${project.githubSlug || `_local/${project.name}`}/${branch.replace(/\//g, "-")}`,
+      path: this.worktreePathFor(project, branch),
       branch,
       head: "c0ffee00",
       isMain: false,
@@ -1005,56 +1046,84 @@ export class World {
   }
 
   /**
-   * workspace.new: a worktree on cf/<name> (or `branch`) in every project ("<project>[:<base>]"
-   * refs, by id or name), then the workspace. Test control: POST /__mock/workspace.
+   * workspace.new like the daemon: names unique whatever their case ("workspace" is the
+   * primary keyword), members by id or name, sorted; the default primary is `primary`, else
+   * "workspace" for a rooted one (or one without projects), else the first project given.
+   * Nothing on disk changes. Test control: POST /__mock/workspace (with instructions and
+   * skills, as a thread would have written them).
    */
-  addWorkspace(name: string, refs: readonly string[], branch = `cf/${name}`): MockWorkspace {
-    if ([...this.workspaces.values()].some((w) => w.name === name)) throw new CommandError("unavailable", `a workspace named "${name}" exists`);
-    if (refs.length === 0) throw new CommandError("invalid", "a workspace needs at least one project");
-    const specs = refs.map((ref) => {
-      const [id = "", base = ""] = ref.split(":");
-      const project = this.memberProjectRef(id.trim());
-      return { project, base: base.trim() || (project.remotes.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch) };
-    });
+  addWorkspace(name: string, refs: readonly string[], o: { root?: string; primary?: string; instructions?: string; skills?: readonly string[] } = {}): MockWorkspace {
+    const n = name.trim();
+    if (!n) throw new CommandError("invalid", "argument \"name\": a workspace needs a name");
+    if (n.toLowerCase() === "workspace") throw new CommandError("invalid", "\"workspace\" is reserved: it names a workspace's own folder as a primary");
+    this.nameFree(n, "");
+    const root = (o.root ?? "").trim();
+    const given = refs.map((r) => this.projectRef(r.split(":")[0]?.trim() ?? "").id);
+    if (given.length === 0 && !root) throw new CommandError("invalid", "a workspace needs at least one project or a root folder");
     const w: MockWorkspace = {
       id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
-      name,
-      branch,
-      members: specs.map(({ project, base }) => ({ projectId: project.id, worktreePath: this.addWorktree(project, branch, base).path })),
+      name: n,
+      members: [...new Set(given)].sort(),
+      rootPath: root,
+      defaultPrimary: "workspace",
+      instructions: o.instructions ?? "",
+      skills: [...(o.skills ?? [])].sort(),
       createdAt: new Date(),
     };
+    if (o.primary) w.defaultPrimary = this.primaryOf(w, o.primary);
+    else if (!root && given[0]) w.defaultPrimary = given[0];
     this.workspaces.set(w.id, w);
-    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(w) } });
+    this.publishWorkspace(w);
     return w;
   }
 
+  /** The daemon's nameFree: no other workspace has the name, whatever its case. */
+  private nameFree(name: string, except: string): void {
+    const other = [...this.workspaces.values()].find((w) => w.id !== except && w.name.toLowerCase() === name.toLowerCase());
+    if (other) throw new CommandError("unavailable", `a workspace named "${other.name}" exists`);
+  }
+
+  /** A default primary ref: "workspace", or a member by id or name. */
+  private primaryOf(w: MockWorkspace, ref: string): string {
+    if (ref.trim().toLowerCase() === "workspace") return "workspace";
+    const id = this.projectRef(ref.trim()).id;
+    if (!w.members.includes(id)) throw new CommandError("unavailable", `${ref} is not in workspace ${w.name}`);
+    return id;
+  }
+
   private workspaceRef(ref: string): MockWorkspace {
-    const w = this.workspaces.get(ref) ?? [...this.workspaces.values()].find((x) => x.name === ref);
+    const w = this.workspaces.get(ref) ?? [...this.workspaces.values()].find((x) => x.name.toLowerCase() === ref.trim().toLowerCase());
     if (!w) throw new CommandError("notfound", `workspace ${ref} not found`);
     return w;
   }
 
-  /**
-   * Test control: workspace `name` over code-foundry, ghostty-playground and dotfiles with
-   * mixed member state: code-foundry's member has an open pull request with failing CI,
-   * ghostty-playground's is 2 commits ahead of its upstream, and dotfiles' (local only) has
-   * uncommitted changes. POST /__mock/workspace-mixed.
-   */
-  addMixedWorkspace(name: string): MockWorkspace {
-    const ws = this.addWorkspace(name, ["repo-cf", "repo-gp", "repo-dot"]);
-    const set = (projectId: string, status: Partial<MockWorktree["status"]>) => {
-      const project = this.projects.get(projectId);
-      const path = ws.members.find((m) => m.projectId === projectId)?.worktreePath;
-      const w = project?.worktrees.find((x) => x.path === path);
-      if (!project || !w) return;
-      w.status = { ...w.status, ...status };
-      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
-    };
-    set("repo-cf", { upstream: `origin/${ws.branch}` });
-    set("repo-gp", { upstream: `origin/${ws.branch}`, ahead: 2, baseAhead: 2 });
-    set("repo-dot", { modified: 2, untracked: 1, dirty: true });
-    this.gh.addBranchPullRequest("alexwaumann/code-foundry", ws.branch, 151, `${name}: one change across three projects`);
-    return ws;
+  /** workspace.rename. */
+  renameWorkspace(ref: string, name: string): MockWorkspace {
+    const w = this.workspaceRef(ref);
+    const n = name.trim();
+    if (!n) throw new CommandError("invalid", "argument \"name\": a workspace needs a name");
+    if (n.toLowerCase() === "workspace") throw new CommandError("invalid", "\"workspace\" is reserved: it names a workspace's own folder as a primary");
+    this.nameFree(n, w.id);
+    w.name = n;
+    this.publishWorkspace(w);
+    return w;
+  }
+
+  /** workspace.set-primary. */
+  setWorkspacePrimary(ref: string, primary: string): MockWorkspace {
+    const w = this.workspaceRef(ref);
+    w.defaultPrimary = this.primaryOf(w, primary);
+    this.publishWorkspace(w);
+    return w;
+  }
+
+  /** Test control: what a thread wrote into the workspace's folder (its instructions file, its skills). POST /__mock/workspace-files. */
+  setWorkspaceFiles(ref: string, instructions: string | undefined, skills: readonly string[] | undefined): MockWorkspace {
+    const w = this.workspaceRef(ref);
+    if (instructions !== undefined) w.instructions = instructions;
+    if (skills !== undefined) w.skills = [...skills].sort();
+    this.publishWorkspace(w);
+    return w;
   }
 
   /** Test control: a fresh install, with no projects, workspaces, threads or terminals. POST /__mock/empty. */
@@ -1252,61 +1321,120 @@ export class World {
     return out;
   }
 
-  /** Test control: a connected thread owned by the workspace, running in `project`'s member (else the first). */
+  /**
+   * Test control: a connected worktree-mode thread that references the workspace, its
+   * members as its set, on branch cf/<workspace name> (each git member's worktree made, as
+   * a spawn would), in `project`'s (else the default primary's; "workspace": its folder).
+   * POST /__mock/workspace-thread.
+   */
   addWorkspaceThread(workspace: string, project: string, name: string, status: ThreadStatus = ThreadStatus.IDLE): MockThread {
     const ws = this.workspaceRef(workspace);
-    const member = project ? ws.members.find((m) => m.projectId === this.projectRef(project).id) : ws.members[0];
-    if (!member) throw new CommandError("unavailable", `project ${project} is not a member of workspace ${ws.name}`);
-    const s = this.addThread({ id: `s-ws-${String(this.nextId++)}`, projectId: member.projectId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
+    const primary = project ? (project === "workspace" ? "workspace" : this.projectRef(project).id) : ws.defaultPrimary;
+    if (primary !== "workspace" && !ws.members.includes(primary)) throw new CommandError("unavailable", `project ${project} is not in workspace ${ws.name}`);
+    const branch = `cf/${ws.name}`;
+    let cwd = primary === "workspace" ? this.workspaceDirOf(ws) : "";
+    for (const id of ws.members) {
+      const r = this.projectRef(id);
+      const path = r.git === false ? r.path : (r.worktrees.find((w) => w.branch === branch)?.path ?? this.addWorktree(r, branch, r.remotes.length > 0 ? `origin/${r.defaultBranch}` : r.defaultBranch).path);
+      if (id === primary) cwd = path;
+    }
+    const s = this.addThread({ id: `s-ws-${String(this.nextId++)}`, projectId: primary === "workspace" ? "" : primary, worktreePath: cwd, projectIds: [...ws.members], branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
     this.publishThread(s);
     return s;
   }
 
   /**
-   * thread.run-in: a stopped thread moves at once; a running one gets the target as
-   * pendingWorktreePath and moves ~2s after it stops being busy (MockThread.moveIn).
-   * Asking for the current member cancels a queued move.
+   * Test control: a connected worktree-mode thread over `projects` on `branch`, its
+   * worktrees made in every git project now (the daemon makes them at spawn), running in
+   * `project`'s (else the first's). POST /__mock/multi-thread.
+   */
+  addMultiThread(refs: readonly string[], project: string, branch: string, name: string, workspace = ""): MockThread {
+    const ids = refs.map((r) => this.projectRef(r).id);
+    if (ids.length === 0) throw new CommandError("invalid", "name the projects");
+    const primary = project ? this.projectRef(project).id : (ids[0] ?? "");
+    if (!ids.includes(primary)) throw new CommandError("invalid", `${project} is not one of the projects`);
+    let cwd = "";
+    for (const id of ids) {
+      const r = this.projectRef(id);
+      const path = r.git === false ? r.path : (r.worktrees.find((w) => w.branch === branch)?.path ?? this.addWorktree(r, branch, r.remotes.length > 0 ? `origin/${r.defaultBranch}` : r.defaultBranch).path);
+      if (id === primary) cwd = path;
+    }
+    const ws = workspace ? this.workspaceRef(workspace) : undefined;
+    const s = this.addThread({ id: `s-mp-${String(this.nextId++)}`, projectId: primary, worktreePath: cwd, projectIds: ids, branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws?.id ?? "", createdAt: new Date() });
+    this.publishThread(s);
+    return s;
+  }
+
+  /** Test control: a thread's project set. POST /__mock/thread/project-ids. */
+  setThreadProjectIds(id: string, ids: readonly string[]): MockThread {
+    const s = this.thread(id);
+    s.projectIds = ids.map((r) => this.projectRef(r).id);
+    this.publishThread(s);
+    return s;
+  }
+
+  /** A project's main worktree (its folder without git). */
+  private mainPathOf(projectId: string): string {
+    const r = this.projectRef(projectId);
+    return r.worktrees.find((w) => w.isMain)?.path ?? r.path;
+  }
+
+  /**
+   * thread.run-in like the daemon: the target is one of the thread's checkouts (by project
+   * or path) or "workspace" (its workspace's folder). A stopped thread moves at once; a
+   * running one gets the target as pendingWorktreePath and moves ~2s after it stops being
+   * busy (MockThread.moveIn). Asking for the current checkout cancels a queued move.
    */
   runIn(s: MockThread, projectRef: string, worktree: string): MockThread {
-    if (!s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} does not belong to a workspace`);
-    const ws = this.workspaceRef(s.workspaceId);
-    const member = worktree ? ws.members.find((m) => m.worktreePath === worktree) : ws.members.find((m) => m.projectId === this.projectRef(projectRef).id);
-    if (!member) throw new CommandError("unavailable", `${projectRef || worktree} is not a member of workspace ${ws.name}`);
+    const target = this.runInTarget(s, projectRef, worktree);
     if (s.state === ThreadState.CLOSING) throw new CommandError("unavailable", `thread ${s.id} is closing`);
-    if (s.state === ThreadState.DISCONNECTED || member.worktreePath === s.worktreePath) {
+    if (s.state === ThreadState.DISCONNECTED || target.path === s.worktreePath) {
       s.pendingWorktreePath = "";
-      if (member.worktreePath !== s.worktreePath) {
-        s.worktreePath = member.worktreePath;
-        s.projectId = member.projectId;
-      }
+      s.worktreePath = target.path;
+      s.projectId = target.projectId;
     } else {
-      s.pendingWorktreePath = member.worktreePath;
+      s.pendingWorktreePath = target.path;
       s.moveIn = 2;
     }
     this.publishThread(s);
     return s;
   }
 
+  private runInTarget(s: MockThread, projectRef: string, worktree: string): { projectId: string; path: string } {
+    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
+    if (projectRef === "workspace" || (ws && worktree && worktree === this.workspaceDirOf(ws))) {
+      if (!ws) throw new CommandError("unavailable", `thread ${s.id} has no workspace`);
+      return { projectId: "", path: this.workspaceDirOf(ws) };
+    }
+    const cos = this.checkoutsOf(s).filter((c) => c.path);
+    if (cos.length < 2 && !ws) throw new CommandError("unavailable", `thread ${s.id} has one checkout`);
+    const c = worktree ? cos.find((x) => x.path === worktree) : cos.find((x) => x.projectId === this.projectRef(projectRef).id);
+    if (!c) throw new CommandError("unavailable", `${projectRef || worktree} is not one of thread ${s.id}'s checkouts`);
+    return { projectId: c.projectId, path: c.path };
+  }
+
   private applyMove(s: MockThread): void {
     const path = s.pendingWorktreePath;
-    const ws = this.workspaces.get(s.workspaceId);
-    const member = ws?.members.find((m) => m.worktreePath === path);
     s.pendingWorktreePath = "";
-    if (member) {
-      s.worktreePath = member.worktreePath;
-      s.projectId = member.projectId;
+    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
+    const c = this.checkoutsOf(s).find((x) => x.path === path);
+    if (c) {
+      s.worktreePath = c.path;
+      s.projectId = c.projectId;
+    } else if (ws && path === this.workspaceDirOf(ws)) {
+      s.worktreePath = path;
+      s.projectId = "";
     }
     this.publishThread(s);
   }
 
-  /** workspace.add-project: a worktree on the workspace branch in another project. */
-  addWorkspaceProject(workspace: string, projectRef: string, base: string): MockWorkspace {
+  /** workspace.add-project: nothing on disk changes. */
+  addWorkspaceProject(workspace: string, projectRef: string): MockWorkspace {
     const ws = this.workspaceRef(workspace);
-    const project = this.memberProjectRef(projectRef);
-    if (ws.members.some((m) => m.projectId === project.id)) throw new CommandError("unavailable", `${project.name} is already a member of workspace ${ws.name}`);
-    const w = this.addWorktree(project, ws.branch, base || (project.remotes.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch));
-    ws.members.push({ projectId: project.id, worktreePath: w.path });
-    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(ws) } });
+    const project = this.projectRef(projectRef);
+    if (ws.members.includes(project.id)) throw new CommandError("unavailable", `${project.name} is already in workspace ${ws.name}`);
+    ws.members = [...ws.members, project.id].sort();
+    this.publishWorkspace(ws);
     return ws;
   }
 
@@ -1326,30 +1454,20 @@ export class World {
     this.actions.stopBackground((r) => r.worktreePath === path);
   }
 
-  /** workspace.remove-project: refused while a thread's Claude runs there or with changes (unless force). */
-  removeWorkspaceProject(workspace: string, projectRef: string, force: boolean): MockWorkspace {
+  /** workspace.remove-project: nothing on disk changes; a default primary that was the project becomes "workspace". */
+  removeWorkspaceProject(workspace: string, projectRef: string): MockWorkspace {
     const ws = this.workspaceRef(workspace);
-    const member = ws.members.find((m) => m.worktreePath === projectRef) ?? ws.members.find((m) => m.projectId === this.projectRef(projectRef).id);
-    if (!member) throw new CommandError("unavailable", `${projectRef} is not a member of workspace ${ws.name}`);
-    const busy = this.threadsIn([member.worktreePath])[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) is on ${member.worktreePath}; archive it first`);
-    const wt = [...this.projects.values()].flatMap((r) => r.worktrees).find((w) => w.path === member.worktreePath);
-    if (wt?.status.dirty && !force) throw new CommandError("unavailable", `remove worktree ${member.worktreePath}: it has uncommitted changes; use --force`);
-    this.dropWorktree(member.worktreePath);
-    ws.members = ws.members.filter((m) => m !== member);
-    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(ws) } });
+    const id = this.projectRef(projectRef).id;
+    if (!ws.members.includes(id)) throw new CommandError("unavailable", `${projectRef} is not in workspace ${ws.name}`);
+    ws.members = ws.members.filter((m) => m !== id);
+    if (ws.defaultPrimary === id) ws.defaultPrimary = "workspace";
+    this.publishWorkspace(ws);
     return ws;
   }
 
-  /** workspace.remove: every member worktree, then the workspace. */
-  removeWorkspace(workspace: string, force: boolean): void {
+  /** workspace.remove: the workspace (a synthetic one's managed dir with it); threads keep their projects. */
+  removeWorkspace(workspace: string): void {
     const ws = this.workspaceRef(workspace);
-    const busy = this.threadsIn(ws.members.map((m) => m.worktreePath))[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) is on ${busy.worktreePath}; archive them first`);
-    const paths = new Set(ws.members.map((m) => m.worktreePath));
-    const dirty = [...this.projects.values()].flatMap((r) => r.worktrees).find((w) => paths.has(w.path) && w.status.dirty);
-    if (dirty && !force) throw new CommandError("unavailable", `worktree ${dirty.path} has uncommitted changes; use --force`);
-    for (const m of ws.members) this.dropWorktree(m.worktreePath);
     this.workspaces.delete(ws.id);
     this.workspaceEvents.publish({ event: { case: "removedId", value: ws.id } });
   }
@@ -1380,6 +1498,7 @@ export class World {
       baseRef: "",
       createdWorktree: false,
       projectIds: [],
+      branch: "",
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
@@ -1411,13 +1530,49 @@ export class World {
     return s;
   }
 
-  /** Thread.project_ids: the set, the primary and a workspace thread's members, sorted. */
+  /** Thread.project_ids: the set and the primary, sorted (a workspace's members are copied into the set when the thread is made). */
   projectIdsOf(s: MockThread): string[] {
     const ids = new Set(s.projectIds);
     if (s.projectId) ids.add(s.projectId);
-    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
-    for (const m of ws?.members ?? []) ids.add(m.projectId);
     return [...ids].sort();
+  }
+
+  /**
+   * ThreadService.Checkouts' derivation (the daemon's CheckoutsOf): per project of the set,
+   * by id, the primary at the thread's cwd; a plain folder the folder; in worktree mode a
+   * git member's worktree on the thread's branch (missing when not made yet, at the path
+   * the daemon would make it); otherwise its main worktree.
+   */
+  checkoutsOf(s: MockThread): MockCheckout[] {
+    return this.projectIdsOf(s).map((id) => {
+      const project = this.projects.get(id);
+      if (!project) return { projectId: id, projectName: "", path: "", branch: "", primary: false, missing: false, git: false, derived: false };
+      const base = { projectId: id, projectName: project.name, git: project.git !== false, derived: false, missing: false };
+      if (id === s.projectId && project.worktrees.some((w) => s.worktreePath === w.path || s.worktreePath.startsWith(`${w.path}/`))) {
+        const wt = project.worktrees.find((w) => s.worktreePath === w.path || s.worktreePath.startsWith(`${w.path}/`));
+        return { ...base, path: wt?.path ?? s.worktreePath, branch: wt?.branch ?? "", primary: true, derived: s.createdWorktree && project.git !== false };
+      }
+      if (project.git === false) return { ...base, path: project.path, branch: "", primary: false };
+      if (s.createdWorktree && s.branch) {
+        const wt = project.worktrees.find((w) => w.branch === s.branch);
+        return { ...base, path: wt?.path ?? this.worktreePathFor(project, s.branch), branch: s.branch, primary: false, missing: !wt, derived: true };
+      }
+      const main = project.worktrees.find((w) => w.isMain);
+      return { ...base, path: main?.path ?? project.path, branch: main?.branch ?? "", primary: false };
+    });
+  }
+
+  /** ThreadService.Checkouts for a thread by id. */
+  checkoutsMsg(id: string) {
+    const s = this.thread(id);
+    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
+    return {
+      thread: this.threadMsg(s),
+      checkouts: this.checkoutsOf(s).map((c) => ({ ...c, current: c.primary, instructions: "" })),
+      workspaceId: s.workspaceId,
+      workspaceName: ws?.name ?? "",
+      workspaceDir: ws ? this.managedDirOf(ws) : "",
+    };
   }
 
   threadMsg(s: MockThread): ThreadInit {
@@ -1448,6 +1603,7 @@ export class World {
       permissionMode: s.permissionMode,
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
+      branch: s.branch,
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
@@ -2315,16 +2471,16 @@ export class World {
   }
 
   /**
-   * thread.new with `workspace` (a thread owned by it, in the member `worktree` or
-   * `project` names, else the first) or `projects` with new-worktree (a new workspace named
-   * from the prompt with cf/<slug> in every project, the thread in `project`'s member).
+   * thread.new with `workspace` or `projects` like the daemon (workspaces v2): the set is
+   * `projects` (refs, ":base" ignored), else the workspace's members; the primary is
+   * `project` ("workspace": the workspace's folder), else the workspace's default primary,
+   * else the first project. With new-worktree every git project gets a worktree on the new
+   * branch (`branch`, else cf/<slug>); otherwise each runs in its own checkout.
    */
   private async newWorkspaceThread(args: Record<string, string>): Promise<InvokeOut> {
     const created = args["new-worktree"] === "true";
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
-    if (args.workspace && created) throw new CommandError("invalid", "a workspace thread runs in an existing member; for a new workspace use new-worktree with projects");
-    if (args.projects && !created) throw new CommandError("invalid", "projects only applies with new-worktree");
     const first = firstMessageOf(args);
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
@@ -2334,45 +2490,37 @@ export class World {
       await sleep(ms);
       if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
     };
+    const ws = args.workspace ? this.workspaceRef(args.workspace) : undefined;
+    const refs = (args.projects ?? "").split(",").map((r) => r.trim().split(":")[0] ?? "").filter(Boolean);
+    const ids = refs.length > 0 ? [...new Set(refs.map((r) => this.projectRef(r).id))] : [...(ws?.members ?? [])];
+    let primary = args.project ? (args.project === "workspace" ? "workspace" : this.projectRef(args.project).id) : ws && (ws.defaultPrimary === "workspace" || ids.includes(ws.defaultPrimary)) ? ws.defaultPrimary : (ids[0] ?? "");
+    if (!primary && ws) primary = "workspace";
+    if (primary === "workspace" && !ws) throw new CommandError("invalid", "project workspace needs a workspace");
+    if (primary !== "workspace" && !ids.includes(primary)) ids.push(primary);
+    await settle(created ? this.worktreeDelayMs : 150);
+    if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     const slug = promptSlug(prompt);
-    let ws: MockWorkspace;
-    let baseRef = "";
-    if (args.workspace) {
-      ws = this.workspaceRef(args.workspace);
-      await settle(150);
-      if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
-    } else {
-      const refs = (args.projects ?? "").split(",").map((r) => r.trim()).filter(Boolean);
-      for (const ref of refs) this.memberProjectRef(ref.split(":")[0] ?? "");
-      await settle(this.worktreeDelayMs);
-      if (prompt.includes("FAIL")) throw new CommandError("unavailable", "create workspace: git worktree add: invalid reference: origin/nope");
-      let name = slug || `s-new-${String(this.nextId)}`;
-      for (let i = 2; [...this.workspaces.values()].some((w) => w.name === name); i++) name = `${slug}-${String(i)}`;
-      ws = this.addWorkspace(name, refs);
-      const own = refs.find((r) => this.projectRef(r.split(":")[0] ?? "").id === (args.project ? this.projectRef(args.project).id : ws.members[0]?.projectId));
-      baseRef = own?.split(":")[1] ?? "";
+    const branch = created ? args.branch || `cf/${slug || `s-new-${String(this.nextId)}`}` : "";
+    let cwd = ws && primary === "workspace" ? this.workspaceDirOf(ws) : "";
+    for (const id of ids) {
+      const r = this.projectRef(id);
+      const path = !created || r.git === false ? this.mainPathOf(id) : (r.worktrees.find((w) => w.branch === branch)?.path ?? this.addWorktree(r, branch, r.remotes.length > 0 ? `origin/${r.defaultBranch}` : r.defaultBranch).path);
+      if (id === primary) cwd = path;
     }
-    const byPath = args.worktree ? ws.members.find((m) => m.worktreePath === args.worktree) : undefined;
-    if (args.worktree && !byPath) throw new CommandError("unavailable", `${args.worktree} is not a member worktree of workspace ${ws.name}`);
-    const projectId = args.project ? this.projectRef(args.project).id : "";
-    if (byPath && projectId && byPath.projectId !== projectId) throw new CommandError("invalid", `worktree ${byPath.worktreePath} belongs to project ${byPath.projectId}, not ${projectId}`);
-    const member = byPath ?? (projectId ? ws.members.find((m) => m.projectId === projectId) : ws.members[0]);
-    if (!member) throw new CommandError("unavailable", `project ${projectId} is not a member of workspace ${ws.name}`);
-    const project = this.projectRef(member.projectId);
-    if (created && !baseRef) baseRef = project.remotes.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch;
-    const s = this.createThread(member.projectId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+    const s = this.createThread(primary === "workspace" ? "" : primary, cwd, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
       pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
-      baseRef,
       createdWorktree: created,
-      workspaceId: ws.id,
+      branch,
+      projectIds: [...ids].sort(),
+      workspaceId: ws?.id ?? "",
       firstMessage: first,
     });
     if (args.focus !== "false") this.focusThread(s.id);
-    return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
+    return { message: `created thread ${s.id} in ${cwd}${ws ? ` (workspace ${ws.name})` : ""}`, resultJson: JSON.stringify({ id: s.id, worktreePath: cwd, workspaceId: ws?.id ?? "" }) };
   }
 
   /**
@@ -2424,6 +2572,18 @@ export class World {
       if (!w) continue;
       w.branch = branch;
       w.detached = branch === "";
+      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
+      return true;
+    }
+    return false;
+  }
+
+  /** Test control: the worktree at `path` has `modified` modified files (0: clean). POST /__mock/worktree/dirty. */
+  setDirty(path: string, modified: number): boolean {
+    for (const project of this.projects.values()) {
+      const w = project.worktrees.find((x) => x.path === path);
+      if (!w) continue;
+      w.status = { ...w.status, modified, dirty: modified > 0 || w.status.staged > 0 || w.status.untracked > 0 };
       this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
       return true;
     }
@@ -2515,11 +2675,13 @@ export class World {
     const w: MockWorkspace = {
       id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
       name,
-      branch: "",
-      members: ids.map((projectId) => ({ projectId, worktreePath: "" })),
-      createdAt: new Date(),
+      members: [...ids].sort(),
       rootPath: info.path,
       defaultPrimary: "workspace",
+      // The mock's folders hold no files: a real root's CLAUDE.md and skills show once linked.
+      instructions: "",
+      skills: [],
+      createdAt: new Date(),
     };
     this.workspaces.set(w.id, w);
     this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(w) } });
@@ -2893,15 +3055,15 @@ export class World {
           name: "thread.run-in",
           title: "Run Thread In…",
           category: "Thread",
-          description: "Move a workspace thread to another member worktree of its workspace.",
+          description: "Move a thread to another of its checkouts (or its workspace's folder).",
           keybindings: [],
           args: [
-            { name: "project", type: ArgType.STRING, required: false, description: "Member project (id or name)" },
-            { name: "worktree", type: ArgType.PATH, required: false, description: "Member worktree path" },
+            { name: "project", type: ArgType.STRING, required: false, description: "A project of the thread's set (id or name), or workspace" },
+            { name: "worktree", type: ArgType.PATH, required: false, description: "A checkout's path" },
           ],
         },
-        // Like the daemon: the GUI passes the thread's workspace; the CLI (no view) names the thread.
-        when: (ctx) => activeThread(ctx) !== undefined && Boolean(ctx?.activeWorkspaceId || !ctx?.activeView),
+        // Like the daemon since workspaces v2: offered for every thread; Run refuses one with a single checkout.
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
@@ -2953,22 +3115,73 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.add-project",
-          title: "Add Project to Workspace",
+          name: "workspace.new",
+          title: "New Workspace",
           category: "Workspace",
-          description: "Create a worktree on the workspace branch in another project and add it to the workspace.",
+          description: "Save a set of projects as a workspace, with a folder of its own for the instructions and skills that span them. Nothing else is created.",
           keybindings: [],
           args: [
-            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or absolute path" },
-            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
-            { name: "base", type: ArgType.STRING, required: false, description: "Ref to branch from" },
+            { name: "name", type: ArgType.STRING, required: true, description: "Workspace name" },
+            { name: "projects", type: ArgType.STRING, required: false, description: "Comma-separated projects (id, name, or absolute path)" },
+            { name: "root", type: ArgType.PATH, required: false, description: "A folder the workspace comes from" },
+            { name: "primary", type: ArgType.STRING, required: false, description: "Where new threads start: a project, or workspace" },
           ],
         },
         when: always,
         run: (_ctx, args) => {
-          const ws = this.addWorkspaceProject(args.workspace ?? "", args.project ?? "", args.base ?? "");
-          const last = ws.members[ws.members.length - 1];
-          return `added ${args.project ?? ""} to workspace ${ws.name}: ${last?.worktreePath ?? ""} on ${ws.branch}`;
+          const ws = this.addWorkspace(args.name ?? "", (args.projects ?? "").split(",").map((r) => r.trim()).filter(Boolean), { root: args.root ?? "", primary: args.primary ?? "" });
+          return Promise.resolve({ message: `created workspace ${ws.name} (${ws.id})`, resultJson: JSON.stringify({ id: ws.id, name: ws.name, members: ws.members, defaultPrimary: ws.defaultPrimary }) });
+        },
+      },
+      {
+        cmd: {
+          name: "workspace.rename",
+          title: "Rename Workspace",
+          category: "Workspace",
+          description: "Rename a workspace (names are unique, whatever their case).",
+          keybindings: [],
+          args: [
+            { name: "name", type: ArgType.STRING, required: true, description: "New name" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
+          ],
+        },
+        when: always,
+        run: (ctx, args) => `renamed workspace ${this.renameWorkspace(args.workspace || ctx?.activeWorkspaceId || "", args.name ?? "").name}`,
+      },
+      {
+        cmd: {
+          name: "workspace.set-primary",
+          title: "Set Workspace Default Primary",
+          category: "Workspace",
+          description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder).",
+          keybindings: [],
+          args: [
+            { name: "primary", type: ArgType.STRING, required: true, description: "A project of the workspace (id or name), or workspace" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
+          ],
+        },
+        when: always,
+        run: (ctx, args) => {
+          const ws = this.setWorkspacePrimary(args.workspace || ctx?.activeWorkspaceId || "", args.primary ?? "");
+          return `workspace ${ws.name} starts in ${ws.defaultPrimary}`;
+        },
+      },
+      {
+        cmd: {
+          name: "workspace.add-project",
+          title: "Add Project to Workspace",
+          category: "Workspace",
+          description: "Add a project to a workspace. Nothing on disk changes.",
+          keybindings: [],
+          args: [
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or absolute path" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
+          ],
+        },
+        when: always,
+        run: (ctx, args) => {
+          const ws = this.addWorkspaceProject(args.workspace || ctx?.activeWorkspaceId || "", args.project ?? "");
+          return `added ${args.project ?? ""} to workspace ${ws.name} (${String(ws.members.length)} projects)`;
         },
       },
       {
@@ -2976,18 +3189,16 @@ export class World {
           name: "workspace.remove-project",
           title: "Remove Project from Workspace",
           category: "Workspace",
-          description: "Delete a member project's worktree and drop it from the workspace.",
+          description: "Drop a project from a workspace. Nothing on disk changes; threads keep their projects.",
           keybindings: [],
           args: [
-            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or path" },
-            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
-            { name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id or name" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" },
           ],
-          confirm: (_ctx, args) => `Remove project ${args.project ?? ""} from its workspace? This deletes its worktree from disk.`,
         },
         when: always,
-        run: (_ctx, args) => {
-          const ws = this.removeWorkspaceProject(args.workspace ?? "", args.project ?? "", args.force === "true");
+        run: (ctx, args) => {
+          const ws = this.removeWorkspaceProject(args.workspace || ctx?.activeWorkspaceId || "", args.project ?? "");
           return `removed ${args.project ?? ""} from workspace ${ws.name} (${String(ws.members.length)} left)`;
         },
       },
@@ -2996,19 +3207,33 @@ export class World {
           name: "workspace.remove",
           title: "Remove Workspace",
           category: "Workspace",
-          description: "Delete every member worktree and forget the workspace.",
+          description: "Forget a workspace. Its folder goes with its instructions and skills; for a workspace with a root, only the links. Projects, worktrees and threads stay.",
           keybindings: [],
-          args: [
-            { name: "workspace", type: ArgType.STRING, required: true, description: "Workspace id or name" },
-            { name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" },
-          ],
-          confirm: (_ctx, args) => `Remove workspace ${args.workspace ?? ""}? This deletes every member worktree from disk.`,
+          args: [{ name: "workspace", type: ArgType.STRING, required: true, description: "Workspace id or name" }],
+          // Like the daemon's DynamicConfirm: what goes depends on the kind.
+          confirm: (_ctx, args) => {
+            const ws = [...this.workspaces.values()].find((w) => w.id === args.workspace || w.name.toLowerCase() === (args.workspace ?? "").toLowerCase());
+            if (ws?.rootPath) return `Remove workspace ${ws.name}? Its root folder ${ws.rootPath} and everything in it stay; only the workspace and its links go.`;
+            return `Remove workspace ${ws?.name ?? args.workspace ?? ""}? Its instructions and skills are deleted too.`;
+          },
         },
         when: always,
         run: (_ctx, args) => {
-          this.removeWorkspace(args.workspace ?? "", args.force === "true");
+          this.removeWorkspace(args.workspace ?? "");
           return `removed workspace ${args.workspace ?? ""}`;
         },
+      },
+      {
+        cmd: {
+          name: "workspace.reveal",
+          title: "Reveal Workspace in Finder",
+          category: "Workspace",
+          description: "Show a workspace's folder in Finder: its root when it has one, else its own folder.",
+          keybindings: [],
+          args: [{ name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name (default: the active workspace)" }],
+        },
+        when: (ctx) => Boolean(ctx?.activeWorkspaceId || !ctx?.activeView || ctx.activeView === "projects"),
+        run: (ctx, args) => `revealed ${this.workspaceDirOf(this.workspaceRef(args.workspace || ctx?.activeWorkspaceId || ""))}`,
       },
       {
         cmd: {
@@ -3245,7 +3470,7 @@ export class World {
         when: always,
         run: (_ctx, args) => {
           const w = this.addFolderWorkspace(args.folder ?? "");
-          const json = { id: w.id, name: w.name, rootPath: w.rootPath, members: w.members.map((m) => m.projectId).sort(), defaultPrimary: w.defaultPrimary };
+          const json = { id: w.id, name: w.name, rootPath: w.rootPath, members: [...w.members].sort(), defaultPrimary: w.defaultPrimary };
           return Promise.resolve({ message: `created workspace ${w.name} (${w.id})`, resultJson: JSON.stringify(json) });
         },
       },
@@ -3509,19 +3734,6 @@ export class World {
         cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: ["cmd+shift+]"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.next" } } }))}`,
-      },
-      {
-        cmd: {
-          name: "view.panel.workspace",
-          title: "Show Workspace in Side Panel",
-          category: "View",
-          description: "Open the workspace surface in the selected workspace thread's side panel: its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
-          keybindings: [],
-          args: panelThreadArgs,
-        },
-        // Like the daemon: a thread is active and it belongs to a workspace.
-        when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeWorkspaceId),
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.workspace", args),
       },
       {
         cmd: {

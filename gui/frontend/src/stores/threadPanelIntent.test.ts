@@ -80,7 +80,6 @@ describe("a ShowView scoped to a thread", () => {
 
   it("a surface the thread cannot show changes nothing and says nothing", () => {
     expect(showThreadView("panel.worktree", "home")).toBe(false); // in no worktree
-    expect(showThreadView("panel.workspace", "b")).toBe(false); // in no workspace
     expect(showThreadView("panel.linked-prs", "b")).toBe(false); // no linked pull requests
     expect(showThreadView("panel.agents", "b")).toBe(false); // no subagent runs
     expect(usePanelStore.getState().byKey).toEqual({});

@@ -18,7 +18,6 @@ import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
 import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
-import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
@@ -145,10 +144,6 @@ export function showView(name: string): boolean {
     case "panel.split":
       // view.panel.split: splits or joins the current selection's panel's tab groups.
       splitPanelCommand();
-      return true;
-    case "panel.workspace":
-      // view.panel.workspace: the workspace surface in the current workspace thread's panel.
-      workspacePanelCommand();
       return true;
     case "panel.linked-prs":
       // view.panel.linked-prs: the Linked PRs surface in the current thread's panel.
@@ -367,31 +362,14 @@ export function splitPanelCommand(): boolean {
 }
 
 /**
- * view.panel.workspace for the current selection: opens (or activates) the workspace
- * surface's tab in the selected workspace thread's panel and shows the panel. A no-op
- * while the settings or usage page is up and when the selection is no workspace thread (a window
- * reached through the CLI's ShowView may have anything selected).
+ * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
+ * the selected thread's own worktree in its panel and shows the panel. A no-op while the
+ * settings or usage page is up (a window reached through the CLI's ShowView may have
+ * anything selected) and when the selection is not in a registered worktree (a page, a
+ * composer, a thread whose cwd is elsewhere).
  *
  * Focus moves to the panel, like toggling it on; with the palette open, its return target
  * moves there instead.
- */
-export function workspacePanelCommand(): boolean {
-  if (pageOpen()) return false;
-  const key = openWorkspaceSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
- * the selected thread's own worktree in its panel and shows the panel,
- * like view.panel.workspace. A no-op while the settings or usage page is up and when the selection
- * is not in a registered worktree (a page, a composer, a thread whose cwd is elsewhere).
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function worktreePanelCommand(): boolean {
   if (pageOpen()) return false;
@@ -405,7 +383,7 @@ export function worktreePanelCommand(): boolean {
 
 /**
  * view.panel.linked-prs for the current selection: opens (or activates) the Linked PRs tab
- * in the selected thread's panel and shows the panel, like view.panel.workspace. A thread
+ * in the selected thread's panel and shows the panel, like view.panel.worktree. A thread
  * without linked pull requests gets a brief "No linked PRs yet" toast instead. A no-op
  * while the settings or usage page is up and when the selection is no thread.
  *
@@ -428,7 +406,7 @@ export function linkedPrsPanelCommand(): boolean {
 
 /**
  * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
- * selected thread's panel and shows the panel, like view.panel.workspace. A thread
+ * selected thread's panel and shows the panel, like view.panel.worktree. A thread
  * without usage opens it too (the surface says "No usage yet"). A no-op while the
  * settings or usage page is up and when the selection is no thread.
  *

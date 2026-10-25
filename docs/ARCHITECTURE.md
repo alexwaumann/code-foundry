@@ -720,16 +720,18 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   ancestor: `docs/notes/hidden-children-2-gui.md`; nothing in the GUI shows whether a thread's
   Claude runs: its composer always sends, starting looks like working, a stopped thread
   reads as its status: `docs/notes/hide-connection-state.md`), content (a thread's conversation, the Pull Requests
-  page, the Projects page with each project's worktrees and each workspace's members, or
-  the composer; a worktree's overview is a side panel tab, not a page; a shell is never
+  page, the Projects page with each project's worktrees and a card per workspace (its
+  name edited in place, root, projects with where new threads start, add and remove, its
+  instructions file opening as a File tab, its skills, Edit instructions starting or
+  steering a thread in the workspace's folder, Reveal in Finder, Remove; a New workspace
+  dialog: `docs/notes/workspaces-v2-4-projects-page.md`), or the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects
   page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
   empty one starts a shell, and a panel hides when its last shell goes:
   `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner
   labels (`thread` for a thread's, none for the Projects page's worktree shells). Every
   way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
-  terminal here, the Projects page's rows, a workspace member (in a thread's side panel
-  the thread owns it), the panel's own "+", a code block's Run in terminal, and `terminal new` on the CLI; the
+  terminal here, the Projects page's rows, the panel's own "+", a code block's Run in terminal, and `terminal new` on the CLI; the
   focusTerminal intent reveals a shell there (threads have no terminal of their own)
   (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
@@ -742,13 +744,13 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   opened from the worktree overview's Changes rows, the Diff tab's Open file, and path
   chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
   tab per file; `docs/notes/file-viewer-3-tabs.md`), Pull request, whose menu starts threads about the pull
-  request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Workspace (a workspace
-  thread's members with their git, PR and CI state, add/remove, Run in; opened by W,
-  `view.panel.workspace`, the sidebar's workspace badge, the thread header and the
-  Projects page), Worktree (one worktree's overview as a tab: a thread's own worktree
-  by T or `view.panel.worktree`, a project or worktree row on the Projects page by Enter
-  or double-click into the page's own panel, a member from the Workspace surface;
-  `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
+  request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Worktree (one worktree's
+  overview as a tab: a thread's own worktree by T or `view.panel.worktree`, a project,
+  worktree or workspace project row on the Projects page by Enter or double-click into the
+  page's own panel; under its facts an "Also in" list of the thread's other checkouts from
+  one `ThreadService.Checkouts` read per visible tab, each opening as its own Worktree tab;
+  `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-v2-4-projects-page.md`; the
+  v1 Workspace surface and `view.panel.workspace` are gone) and Linked PRs (the
   thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
   `view.panel.linked-prs`, the thread header and the sidebar's PR tag, which shows one
   pull request's state and number or a count, closed ones left out;

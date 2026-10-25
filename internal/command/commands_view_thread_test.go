@@ -22,7 +22,6 @@ var panelVerbs = map[string]string{
 	"view.panel.expand":     command.ViewPanelExpand,
 	"view.panel.new-tab":    command.ViewPanelNewTab,
 	"view.panel.split":      command.ViewPanelSplit,
-	"view.panel.workspace":  command.ViewPanelWorkspace,
 	"view.panel.linked-prs": command.ViewPanelLinkedPRs,
 	"view.panel.usage":      command.ViewPanelUsage,
 	"view.panel.threads":    command.ViewPanelThreads,
@@ -226,7 +225,6 @@ func TestPanelVerbsCheckTheThread(t *testing.T) {
 	}{
 		{name: "unknown thread", verb: "view.panel.usage", thread: notFound, code: connect.CodeNotFound},
 		{name: "unknown thread with --focus", verb: "view.panel.toggle", thread: notFound, code: connect.CodeNotFound},
-		{name: "workspace surface for a project thread", verb: "view.panel.workspace", thread: plain(), code: connect.CodeFailedPrecondition, msg: "is in no workspace"},
 		{name: "worktree surface for a thread in no project", verb: "view.panel.worktree", thread: &commandtest.Thread{Current: &v1.Thread{WorktreePath: "/home"}},
 			code: connect.CodeFailedPrecondition, msg: "runs in no project worktree"},
 		{name: "linked PRs without links", verb: "view.panel.linked-prs", thread: plain(), code: connect.CodeFailedPrecondition,

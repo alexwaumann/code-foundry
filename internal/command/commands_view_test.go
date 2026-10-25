@@ -27,7 +27,6 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.forward", view: command.ViewForward},
 		{command: "thread.previous", view: command.ViewThreadPrevious},
 		{command: "thread.next", view: command.ViewThreadNext},
-		{command: "view.panel.workspace", view: command.ViewPanelWorkspace},
 		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
 		{command: "view.panel.usage", view: command.ViewPanelUsage},
 		{command: "view.panel.threads", view: command.ViewPanelThreads},
@@ -40,7 +39,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Thread: &commandtest.Thread{}}); err != nil {
 				t.Fatal(err)
 			}
-			// A workspace thread in a worktree, so view.panel.workspace and view.panel.worktree are available too.
+			// A thread in a worktree, so view.panel.worktree is available too.
 			uctx := command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread"}
 			res, err := reg.Invoke(context.Background(), uctx, tt.command, nil)
 			if err != nil {
@@ -52,41 +51,6 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 			got := emit.Intents()
 			if len(got) != 1 || got[0].GetShowView().GetName() != tt.view {
 				t.Errorf("intents = %v, want one ShowView %q", got, tt.view)
-			}
-		})
-	}
-}
-
-func TestViewPanelWorkspaceAvailability(t *testing.T) {
-	tests := []struct {
-		name string
-		ctx  command.Context
-		want bool
-	}{
-		{name: "workspace thread in the GUI", ctx: command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1", ActiveView: "thread"}, want: true},
-		{name: "workspace thread with its terminal", ctx: command.Context{ActiveThreadID: "s1", ActiveTerminalID: "t1", ActiveWorkspaceID: "w1", ActiveView: "thread"}, want: true},
-		{name: "project thread", ctx: command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, want: false},
-		{name: "workspace composer (no thread)", ctx: command.Context{ActiveProjectID: "r1", ActiveWorkspaceID: "w1", ActiveView: "compose"}, want: false},
-		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
-		{name: "CLI without context", ctx: command.Context{}, want: false},
-		{name: "CLI with --context-thread and --context-workspace", ctx: command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1"}, want: true},
-		// Run reads the thread's workspace (commands_view_thread.go).
-		{name: "CLI in a thread ($CODE_FOUNDRY_THREAD)", ctx: command.Context{ActiveThreadID: "s1"}, want: true},
-	}
-	reg := command.NewRegistry()
-	if err := command.RegisterView(reg, command.ViewDeps{Emitter: &commandtest.Emitter{Delivered: 1, OpenWindows: 1}, Thread: &commandtest.Thread{}}); err != nil {
-		t.Fatal(err)
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := false
-			for _, c := range reg.List(tt.ctx, false) {
-				if c.Name == "view.panel.workspace" {
-					got = true
-				}
-			}
-			if got != tt.want {
-				t.Errorf("available = %v, want %v", got, tt.want)
 			}
 		})
 	}

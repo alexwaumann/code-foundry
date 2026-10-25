@@ -6,7 +6,7 @@
  * view.panel.worktree (worktreePanelCommand in stores/views.ts). Workspace member tabs
  * are stores/workspacePanel.ts openMemberTab.
  */
-import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
+import { selectionWorktree, worktreeTab } from "@/surfaces/worktreeTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { findWorktree, mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";

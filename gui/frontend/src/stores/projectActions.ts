@@ -4,7 +4,6 @@
  * reach the same code), or a selection change.
  */
 import { startCommandNamed } from "@/keys/bindings";
-import { projectRef } from "@/lib/projects";
 import { openAddProject } from "./addProject";
 import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
@@ -12,7 +11,6 @@ import { projectContext, worktreeContext } from "./context";
 import { openPublishDialog } from "./publish";
 import { mainWorktreePath, useProjectsStore } from "./projects";
 import { useUiStore } from "./ui";
-import { useWorkspacesStore } from "./workspaces";
 
 /** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
 export function newTerminalIn(projectId: string, path: string): Promise<boolean> {
@@ -83,21 +81,3 @@ export function addProject(): void {
   if (!startCommandNamed("project.add")) openAddProject();
 }
 
-function wsName(workspaceId: string): string {
-  return useWorkspacesStore.getState().byId[workspaceId]?.name ?? workspaceId;
-}
-
-/** workspace.add-project: a worktree on the workspace branch in another project. */
-export function addToWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.add-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
-}
-
-/** workspace.remove-project (confirmed; refused while a thread runs there; uncommitted changes are asked about again). */
-export function removeFromWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.remove-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
-}
-
-/** workspace.remove (confirmed): every member worktree is deleted. Named by name, which reads better in the prompt. */
-export function removeWorkspace(workspaceId: string): Promise<boolean> {
-  return runCommand("workspace.remove", { workspace: wsName(workspaceId) });
-}

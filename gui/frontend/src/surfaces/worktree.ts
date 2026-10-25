@@ -6,7 +6,7 @@ import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { worktreeTabTitle } from "@/stores/worktreePanel";
 import type { SurfaceSpec } from "./types";
-import { selectionWorktree, WORKTREE_KIND, worktreeOfTab, worktreeTab, type WorktreeTarget } from "./workspaceTarget";
+import { selectionWorktree, WORKTREE_KIND, worktreeOfTab, worktreeTab, type WorktreeTarget } from "./worktreeTarget";
 
 function worktree(sel: Selection): WorktreeTarget | null {
   return selectionWorktree(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });

@@ -44,6 +44,11 @@ type Workspace struct {
 	// ManagedDir is <Options.Dir>/<ID>.
 	ManagedDir string
 	CreatedAt  time.Time
+	// Instructions and Skills are what the managed dir holds (contents.go), read from
+	// disk, never persisted: refreshed when the workspace is saved and at every
+	// EnsureDirs. Skills is copy on write.
+	Instructions string
+	Skills       []string
 }
 
 // Member reports whether projectID is a member.
@@ -142,6 +147,8 @@ type Store interface {
 	// EnsureDirs makes the managed dir of workspace id (every workspace when id is "")
 	// and, for a rooted one, re-checks its symlinks: missing ones added, dangling ones
 	// removed. The thread store calls it at every spawn of a thread that references the
-	// workspace; the daemon at start.
+	// workspace; the daemon at start and when such a thread ends a turn. It also reads
+	// the managed dir's instructions file and skills again and publishes Updated when
+	// they changed.
 	EnsureDirs(ctx context.Context, id string) error
 }

@@ -22,7 +22,6 @@ import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
-import { openWorkspaceSurface } from "@/stores/workspacePanel";
 import { LinkedPrsBadge } from "./LinkedPrsBadge";
 
 interface RowProps {
@@ -95,15 +94,8 @@ function WorkspaceBadge({ id }: { id: string }) {
   const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_PROJECTS, st).workspace);
   if (workspace === null) return null;
   return (
-    // A click opens the workspace surface in the thread's side panel; the click goes on
-    // to the row, which selects the thread (and so shows that panel).
-    <span
-      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text hover:bg-cf-highlight/30"
-      data-testid="row-workspace"
-      onClick={() => {
-        openWorkspaceSurface({ kind: "thread", id });
-      }}
-    >
+    // The workspace surface it opened is gone (workspaces v2); the composer PR reshapes the row.
+    <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text" data-testid="row-workspace">
       <Layers className="size-2.5 shrink-0" aria-hidden />
       <span className="truncate">{workspace}</span>
     </span>
