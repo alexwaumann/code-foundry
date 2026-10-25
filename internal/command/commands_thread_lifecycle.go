@@ -95,7 +95,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Name:  "thread.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree, else where the thread this runs in runs), or in a new worktree. " +
-				"With projects it also works in the others (thread checkouts lists them). Inside a thread it copies that thread's projects, branch and mode unless told otherwise. " +
+				"Inside a thread it copies that thread's projects, branch and mode. " +
 				"With workspace it runs in one of that workspace's member worktrees. With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
@@ -103,14 +103,14 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id or name it runs in (with projects or like: one of them)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
-				{Name: "projects", Type: String, Description: "Comma-separated projects (id, name or path; project:base with new-worktree) it works in; it runs in project, else the first"},
+				{Name: "projects", Type: String, Description: "Comma-separated projects it works in (project:base with new-worktree); it runs in project, else the first"},
 				{Name: "like", Type: String, ID: ThreadID, Description: "Thread to copy projects, branch and mode from"},
 				{Name: "new-branch", Type: Bool, Description: "With like or inside a thread: a new branch in new worktrees"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: supervisedHelp + ", accept-edits (edits allowed) or auto"},
-				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (its branch named from the prompt by settings projects.branch_naming, e.g. feat/add-filter; cf/<thread id> when naming fails); without it the thread works in the given worktree, else the project's own checkout (the GUI's threads.default_worktree does not apply)"},
+				{Name: "new-worktree", Type: Bool, Description: "New worktrees on a new branch (named from the prompt by settings projects.branch_naming, e.g. feat/add-filter; cf/<thread id> when naming fails); =false: each project's own checkout (threads.default_worktree does not apply)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless base-from-origin is no or projects.base_from_origin is off); needs new-worktree; ignored when branch exists"},
 				baseFromOriginArg,
 				{Name: "branch", Type: String, Description: "The new worktree's branch: with a / it is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); an existing branch is checked out, not suffixed; needs new-worktree"},

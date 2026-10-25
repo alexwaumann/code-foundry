@@ -23,13 +23,13 @@ func threadCheckouts(b CheckoutsBackend) Command {
 		Name:         "thread.checkouts",
 		ReadOnly:     true,
 		Title:        "Thread Checkouts",
-		Description:  "List a thread's projects: each one's path, branch and CLAUDE.md, then its workspace.",
+		Description:  "List a thread's projects with path, branch and CLAUDE.md.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "id", Type: String, DefaultToThreadEnv: true, ID: ThreadID, Positional: true,
-				Description: "Thread id (default: your own, else the one whose checkout holds cwd)"},
-			{Name: "cwd", Type: Path, DefaultToCwd: true, Description: "A path in one of its checkouts (default: the working directory)"},
+				Description: "Thread id (default: yours, else the one holding cwd)"},
+			{Name: "cwd", Type: Path, DefaultToCwd: true, Description: "A path in one of its checkouts"},
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			id := strings.TrimSpace(a.String("id"))
