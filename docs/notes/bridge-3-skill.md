@@ -105,12 +105,36 @@ board rendered live with the user's threads; Snooze on C3 snoozed it ("snoozed u
 - **A project that is the app's own repository** contaminates the baseline: the first A
   run used a clone of code-foundry and Haiku read `docs/notes/bridge-*.md` from it. The A/B
   used a scratch repository instead.
+- **`code-foundry help <verb>` auto-starts a daemon.** Run from the worktree without
+  `CODE_FOUNDRY_HOME` while reading verbs, it started one on the real home (none was
+  running). Found at the end and stopped (no threads were connected or busy). Scope every
+  CLI call, `help` included.
+- Two baseline threads left shell loops polling `code-foundry thread.list` into a JSON
+  file for their "live" page; they would have restarted the test daemon. Killed.
 - A `python -m http.server` from another session raised a macOS firewall prompt over the
   test window; it was left alone.
 
-## End to end
+## End to end (2026-10-25, built app, isolated home)
 
-PENDING
+`make build`, `make gui-build`; `gui/bin/Code Foundry` with `CODE_FOUNDRY_HOME=~/cf-b3/home-b`
+and `CODE_FOUNDRY_BIN` the branch binary, CLAUDE* unset; clicks through CGEvents.
+
+- **Triage board (C2)**: rendered the user's threads live. Snooze on C3 → snoozed
+  until 02:19 (`thread get`), its card left at once, the sidebar showed "Snoozed 1".
+  Archive on C4 → archived (idle, so no question), "Archived 1".
+- **PR page (C1)**: after this PR was opened and its checks passed, the page showed
+  "1 open · 1 green" with this PR, `success` and Merge, from `cf.on("gh")`. Merge opened
+  the app's own dialog ("Merge … Asked by … a page in C1", Merge Pull Request); Escape
+  cancelled it, the page put the button back (the `declined` path) and the PR stayed open.
+  Merging for real was not tried: the only open PR was this one.
+- **Checks watcher (D6)**: "All 5 checks finished", a row per check from `pr.checks`
+  through the bridge.
+- **Linear page (D7)**: shown, asking for a key in a password field. No key was entered,
+  so Linear itself was not called.
+
+The test threads, scratch project, homes and their Claude transcripts were removed
+afterwards. The isolated GUI shares the installed app's WebKit localStorage, so its panel
+state wrote there (as in earlier notes).
 
 ## Daemon restart
 
