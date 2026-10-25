@@ -66,7 +66,7 @@ func TestScriptNamesTheContract(t *testing.T) {
 	want := []string{
 		`"cf:run"`, `"cf:on"`, `"cf:off"`, `"cf:resize"`, `"cf:theme:ack"`, `"cf:hello"`,
 		`"cf:ready"`, `"cf:result"`, `"cf:event"`, `"cf:theme"`,
-		`"cf:store"`, `"cf:storage"`, `"cf:cancel"`, `"cf:pending"`, `"cf:resume"`, `"cf:bye"`, "msg.nonce",
+		`"cf:store"`, `"cf:storage"`, `"cf:cancel"`, `"cf:pending"`, `"cf:resume"`, `"cf:bye"`, `"cf:fetch"`, "msg.nonce",
 		"var VERSION = 1;", "navigator.userActivation", "ResizeObserver", `"*"`,
 	}
 	for _, code := range ErrorCodes {

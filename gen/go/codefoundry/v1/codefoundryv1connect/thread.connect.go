@@ -132,6 +132,9 @@ const (
 	// ThreadServiceSetPageStorageProcedure is the fully-qualified name of the ThreadService's
 	// SetPageStorage RPC.
 	ThreadServiceSetPageStorageProcedure = "/codefoundry.v1.ThreadService/SetPageStorage"
+	// ThreadServiceProxyFetchProcedure is the fully-qualified name of the ThreadService's ProxyFetch
+	// RPC.
+	ThreadServiceProxyFetchProcedure = "/codefoundry.v1.ThreadService/ProxyFetch"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -353,6 +356,17 @@ type ThreadServiceClient interface {
 	// storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
 	// not JSON, or a storage that would grow over 256 KiB (nothing is written then).
 	SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error)
+	// ProxyFetch makes one HTTP request for a page of the thread (the bridge's cf.fetch,
+	// docs/notes/bridge-fetch.md): the daemon is not subject to the browser's CORS check, so
+	// a page reaches an API that does not allow the pages origin. No cookies, no Origin, no
+	// Code Foundry token; up to 5 redirects of the same scheme; a request body of 1 MiB and a
+	// response body of 8 MiB at most; at most 8 at once per thread (more wait). A non-2xx
+	// status is a response, not an error. InvalidArgument for a bad URL, a scheme other than
+	// http(s), a header the daemon does not send, a body too big or a destination it refuses
+	// (loopback, link-local, unspecified, the daemon's own ports); DeadlineExceeded after
+	// timeout_ms; ResourceExhausted for a response too big; Unavailable for a network error;
+	// NotFound for an unknown thread. Cancelling the call aborts the request.
+	ProxyFetch(context.Context, *connect.Request[v1.ProxyFetchRequest]) (*connect.Response[v1.ProxyFetchResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -624,6 +638,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetPageStorage")),
 			connect.WithClientOptions(opts...),
 		),
+		proxyFetch: connect.NewClient[v1.ProxyFetchRequest, v1.ProxyFetchResponse](
+			httpClient,
+			baseURL+ThreadServiceProxyFetchProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ProxyFetch")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -672,6 +692,7 @@ type threadServiceClient struct {
 	showTheme         *connect.Client[v1.ShowThreadThemeRequest, v1.ShowThreadThemeResponse]
 	pageStorage       *connect.Client[v1.PageStorageRequest, v1.PageStorageResponse]
 	setPageStorage    *connect.Client[v1.SetPageStorageRequest, v1.SetPageStorageResponse]
+	proxyFetch        *connect.Client[v1.ProxyFetchRequest, v1.ProxyFetchResponse]
 }
 
 // Create calls codefoundry.v1.ThreadService.Create.
@@ -887,6 +908,11 @@ func (c *threadServiceClient) PageStorage(ctx context.Context, req *connect.Requ
 // SetPageStorage calls codefoundry.v1.ThreadService.SetPageStorage.
 func (c *threadServiceClient) SetPageStorage(ctx context.Context, req *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error) {
 	return c.setPageStorage.CallUnary(ctx, req)
+}
+
+// ProxyFetch calls codefoundry.v1.ThreadService.ProxyFetch.
+func (c *threadServiceClient) ProxyFetch(ctx context.Context, req *connect.Request[v1.ProxyFetchRequest]) (*connect.Response[v1.ProxyFetchResponse], error) {
+	return c.proxyFetch.CallUnary(ctx, req)
 }
 
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
@@ -1108,6 +1134,17 @@ type ThreadServiceHandler interface {
 	// storage after. InvalidArgument for an empty or too long key (1 KiB), a value that is
 	// not JSON, or a storage that would grow over 256 KiB (nothing is written then).
 	SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error)
+	// ProxyFetch makes one HTTP request for a page of the thread (the bridge's cf.fetch,
+	// docs/notes/bridge-fetch.md): the daemon is not subject to the browser's CORS check, so
+	// a page reaches an API that does not allow the pages origin. No cookies, no Origin, no
+	// Code Foundry token; up to 5 redirects of the same scheme; a request body of 1 MiB and a
+	// response body of 8 MiB at most; at most 8 at once per thread (more wait). A non-2xx
+	// status is a response, not an error. InvalidArgument for a bad URL, a scheme other than
+	// http(s), a header the daemon does not send, a body too big or a destination it refuses
+	// (loopback, link-local, unspecified, the daemon's own ports); DeadlineExceeded after
+	// timeout_ms; ResourceExhausted for a response too big; Unavailable for a network error;
+	// NotFound for an unknown thread. Cancelling the call aborts the request.
+	ProxyFetch(context.Context, *connect.Request[v1.ProxyFetchRequest]) (*connect.Response[v1.ProxyFetchResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1375,6 +1412,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetPageStorage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceProxyFetchHandler := connect.NewUnaryHandler(
+		ThreadServiceProxyFetchProcedure,
+		svc.ProxyFetch,
+		connect.WithSchema(threadServiceMethods.ByName("ProxyFetch")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceCreateProcedure:
@@ -1463,6 +1506,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServicePageStorageHandler.ServeHTTP(w, r)
 		case ThreadServiceSetPageStorageProcedure:
 			threadServiceSetPageStorageHandler.ServeHTTP(w, r)
+		case ThreadServiceProxyFetchProcedure:
+			threadServiceProxyFetchHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1642,4 +1687,8 @@ func (UnimplementedThreadServiceHandler) PageStorage(context.Context, *connect.R
 
 func (UnimplementedThreadServiceHandler) SetPageStorage(context.Context, *connect.Request[v1.SetPageStorageRequest]) (*connect.Response[v1.SetPageStorageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetPageStorage is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ProxyFetch(context.Context, *connect.Request[v1.ProxyFetchRequest]) (*connect.Response[v1.ProxyFetchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ProxyFetch is not implemented"))
 }

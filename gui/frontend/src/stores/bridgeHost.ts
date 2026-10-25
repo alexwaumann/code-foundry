@@ -26,6 +26,11 @@
  * so the page's clock stops until the answer (`cf:resume`); a page that gives up
  * (`cf:cancel`), or goes, takes its question with it, declined, and the command never runs.
  *
+ * A `cf:fetch` (docs/notes/bridge-fetch.md) goes to ThreadService.ProxyFetch under the
+ * page's thread: the daemon makes the request, so the API's CORS rules do not apply. It
+ * counts with the runs, `cf:cancel` and a new document abort it, and only its `invalid`,
+ * `failed` and `timeout` answers reach the error strip.
+ *
  * Page storage (docs/notes/bridge-fix-storage.md): `cf:ready` carries the thread's stored
  * map and every `cf:store` goes to the daemon (ThreadService.SetPageStorage), one at a time
  * per thread in the order sent; every other frame of the thread hears the map after.
@@ -33,9 +38,12 @@
 import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
 import { getPageStorage, setPageStorage, type PageStorageValues } from "@/api/pageStorage";
+import { proxyFetch } from "@/api/proxyFetch";
 import {
   BRIDGE_LIMITS,
   errorResult,
+  fetchCall,
+  fetchResult,
   fillPageArgs,
   isBridgeSource,
   jsonSafe,
@@ -44,8 +52,10 @@ import {
   parsePageMessage,
   readyMessage,
   type BridgeError,
+  type BridgeErrorCode,
   type CallId,
   type EventMessage,
+  type PageMessage,
   type PendingMessage,
   type ReadyMessage,
   type ResultMessage,
@@ -85,6 +95,9 @@ export const BRIDGE_DEBOUNCE_MS = 50;
 export function pageContext(threadId: string): UiContextView {
   return { ...emptyContext, activeView: "", activeThreadId: threadId };
 }
+
+/** The codes of a fetch's answer the strip reports: not `unavailable` (no thread, which the page shows itself). */
+const FETCH_REPORTED: ReadonlySet<BridgeErrorCode> = new Set(["invalid", "failed", "timeout"]);
 
 export type HostMessage = ReadyMessage | ResultMessage | EventMessage | PendingMessage | ResumeMessage | StorageMessage;
 
@@ -160,10 +173,17 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   if (dev) dev.hosts++;
 
   /** Answers a call with an error, and reports it when the strip shows such errors. */
-  const fail = (forDoc: number, id: CallId, call: string, error: BridgeError, declined?: { message: string; resultJson: string } | null) => {
+  const fail = (
+    forDoc: number,
+    id: CallId,
+    call: string,
+    error: BridgeError,
+    declined?: { message: string; resultJson: string } | null,
+    reported: ReadonlySet<BridgeErrorCode> = REPORTED_CODES,
+  ) => {
     if (disposed || forDoc !== doc) return;
     post(forDoc, errorResult(id, error, declined));
-    if (REPORTED_CODES.has(error.code)) frame.onError?.({ call, code: error.code, message: error.message, atMs: Date.now() });
+    if (reported.has(error.code)) frame.onError?.({ call, code: error.code, message: error.message, atMs: Date.now() });
   };
 
   const listed = (): Promise<readonly CommandView[]> => {
@@ -261,17 +281,21 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     return next;
   };
 
+  /** Why a call in flight cannot start now (a duplicate id, past the cap), or null. */
+  const refusal = (id: CallId): BridgeError | null => {
+    if (running.has(id)) return { code: "invalid", message: `a call with id ${String(id)} is already running` };
+    if (running.size >= BRIDGE_LIMITS.runs) return { code: "invalid", message: `too many calls at once (${String(BRIDGE_LIMITS.runs)}); wait for one to finish` };
+    return null;
+  };
+
   const run = async (forDoc: number, id: CallId, verb: string, args: Record<string, string>) => {
     if (threadId === null) {
       fail(forDoc, id, verb, NO_THREAD);
       return;
     }
-    if (running.has(id)) {
-      fail(forDoc, id, verb, { code: "invalid", message: `a call with id ${String(id)} is already running` });
-      return;
-    }
-    if (running.size >= BRIDGE_LIMITS.runs) {
-      fail(forDoc, id, verb, { code: "invalid", message: `too many calls at once (${String(BRIDGE_LIMITS.runs)}); wait for one to finish` });
+    const refused = refusal(id);
+    if (refused) {
+      fail(forDoc, id, verb, refused);
       return;
     }
     const abort = new AbortController();
@@ -301,6 +325,29 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       if (!(abort.signal.aborted && isAbort(err))) fail(forDoc, id, verb, bridgeErrorOf(err));
     } finally {
       if (running.get(id) === abort) running.delete(id);
+    }
+  };
+
+  const fetch = async (forDoc: number, m: Extract<PageMessage, { kind: "fetch" }>) => {
+    const call = fetchCall(m.url);
+    if (threadId === null) {
+      fail(forDoc, m.id, call, NO_THREAD, null, FETCH_REPORTED);
+      return;
+    }
+    const refused = refusal(m.id);
+    if (refused) {
+      fail(forDoc, m.id, call, refused, null, FETCH_REPORTED);
+      return;
+    }
+    const abort = new AbortController();
+    running.set(m.id, abort);
+    try {
+      const res = await proxyFetch(threadId, { url: m.url, method: m.method, headers: m.headers, body: m.body, timeoutMs: m.timeout }, { signal: abort.signal });
+      post(forDoc, fetchResult(m.id, res));
+    } catch (err) {
+      if (!(abort.signal.aborted && isAbort(err))) fail(forDoc, m.id, call, bridgeErrorOf(err), null, FETCH_REPORTED);
+    } finally {
+      if (running.get(m.id) === abort) running.delete(m.id);
     }
   };
 
@@ -407,6 +454,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
           return;
         case "cancel":
           cancel(m.id);
+          return;
+        case "fetch":
+          void fetch(forDoc, m);
           return;
         case "bad":
           fail(forDoc, m.id, m.call, { code: "invalid", message: m.message });

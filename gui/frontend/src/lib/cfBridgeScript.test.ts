@@ -30,6 +30,7 @@ interface Cf {
   onTheme(fn: (t: unknown) => void): () => void;
   resize(height?: number): void;
   sources: string[];
+  fetch(url: unknown, init?: unknown): Promise<{ status: number; statusText: string; ok: boolean; url: string; headers: Record<string, string>; text(): string; json(): unknown }>;
   storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown> };
 }
 
@@ -357,6 +358,100 @@ describe("bridge.js", () => {
     await expect(runs[0]).resolves.toMatchObject({ text: "0" });
     expect(h.sent("cf:run")).toHaveLength(33);
     expect(h.sent("cf:run").at(-1)?.args).toEqual({ n: "32" });
+  });
+
+  it("fetches through the app: the request as sent, any status resolves with text() and json()", async () => {
+    const h = load();
+    h.ready();
+    const p = h.cf.fetch("https://tracker.example.com/api/issues?state=open", { method: "post", headers: { Authorization: "Bearer t" }, body: { q: 1 }, timeout: 5000 });
+    await flush();
+    const [f] = h.sent("cf:fetch");
+    expect(f).toEqual({
+      type: "cf:fetch", cf: 1, nonce: N, id: f?.id, url: "https://tracker.example.com/api/issues?state=open", method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" }, body: '{"q":1}', timeout: 5000,
+    });
+    h.send({ type: "cf:result", id: f?.id, ok: true, result: { status: 404, statusText: "Not Found", url: "https://tracker.example.com/x", headers: { "content-type": "application/json" }, body: '{"error":"no"}' } });
+    const res = await p;
+    expect(res).toMatchObject({ status: 404, statusText: "Not Found", ok: false, headers: { "content-type": "application/json" } });
+    expect(res.text()).toBe('{"error":"no"}');
+    expect(res.json()).toEqual({ error: "no" });
+  });
+
+  it("sends a GET by default, keeps a page's own content-type, and sends URLSearchParams as a form", async () => {
+    const h = load();
+    h.ready();
+    void h.cf.fetch(new URL("https://a.example/x"));
+    void h.cf.fetch("https://a.example/y", { method: "PUT", headers: [["content-type", "text/plain"]], body: { a: 1 } });
+    void h.cf.fetch("https://a.example/z", { method: "POST", body: new URLSearchParams({ a: "1 2" }) });
+    await flush();
+    const [a, b, c] = h.sent("cf:fetch");
+    expect(a).toMatchObject({ method: "GET", headers: {}, body: "", timeout: 30000 });
+    expect(b).toMatchObject({ method: "PUT", headers: { "content-type": "text/plain" }, body: '{"a":1}' });
+    expect(c).toMatchObject({ headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: "a=1+2" });
+  });
+
+  it("answers a json() that is not JSON with a SyntaxError naming the host", async () => {
+    const h = load();
+    h.ready();
+    const p = h.cf.fetch("https://a.example/");
+    await flush();
+    h.send({ type: "cf:result", id: h.sent("cf:fetch")[0]?.id, ok: true, result: { status: 502, body: "<html>Bad gateway</html>" } });
+    const res = await p;
+    expect(() => res.json()).toThrow(/a\.example's answer \(502\) is not JSON: <html>/);
+  });
+
+  it("refuses a bad fetch as invalid without sending it, and a page with no thread as unavailable", async () => {
+    const h = load();
+    h.ready();
+    for (const [url, init] of [
+      ["/api/issues", undefined],
+      ["ftp://a.example/", undefined],
+      ["https://a.example/", { body: "x" }],
+      ["https://a.example/", { method: "POST", body: "é".repeat(512 * 1024 + 1) }],
+      ["https://a.example/", { method: "POST", body: new Uint8Array(2) }],
+      [42, undefined],
+    ] as const) {
+      await expect(h.cf.fetch(url, init)).rejects.toMatchObject({ code: "invalid" });
+    }
+    expect(h.sent("cf:fetch")).toHaveLength(0);
+    const lone = load();
+    lone.ready({ thread: null });
+    await expect(lone.cf.fetch("https://a.example/")).rejects.toMatchObject({ code: "unavailable" });
+    expect(lone.sent("cf:fetch")).toHaveLength(0);
+  });
+
+  it("rejects with the app's error, and gives up (cf:cancel) a while after its own timeout", async () => {
+    vi.useFakeTimers();
+    const h = load();
+    h.ready();
+    const failed = h.cf.fetch("https://a.example/1");
+    const silent = h.cf.fetch("https://a.example/2", { timeout: 1000 });
+    const check = expect(silent).rejects.toMatchObject({ code: "timeout", message: "cf.fetch a.example did not answer in 1 s" });
+    await vi.advanceTimersByTimeAsync(0);
+    const [one, two] = h.sent("cf:fetch");
+    h.send({ type: "cf:result", id: one?.id, ok: false, error: { code: "failed", message: "GET a.example failed: no such host" } });
+    await expect(failed).rejects.toMatchObject({ code: "failed", message: "GET a.example failed: no such host" });
+    // The app's own timeout answers first; the page's clock is the backstop.
+    await vi.advanceTimersByTimeAsync(1001);
+    expect(h.sent("cf:cancel")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(5000);
+    await check;
+    expect(h.sent("cf:cancel")).toEqual([expect.objectContaining({ id: two?.id })]);
+  });
+
+  it("counts fetches with runs against the 32 at the app", async () => {
+    vi.useFakeTimers();
+    const h = load();
+    h.ready();
+    for (let i = 0; i < 32; i++) void h.cf.run("thread.get", { n: String(i) }, { timeout: 0 });
+    const f = h.cf.fetch("https://a.example/");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.sent("cf:fetch")).toHaveLength(0);
+    h.send({ type: "cf:result", id: h.sent("cf:run")[0]?.id, ok: true, result: { text: "" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.sent("cf:fetch")).toHaveLength(1);
+    h.send({ type: "cf:result", id: h.sent("cf:fetch")[0]?.id, ok: true, result: { status: 200, body: "ok" } });
+    await expect(f).resolves.toMatchObject({ status: 200, ok: true });
   });
 
   it("refuses a call or a stored value past 256 KiB without sending it", async () => {

@@ -386,3 +386,44 @@ test("the lightbox's copy of a page has its thread's bridge, under a nonce of it
   await inner.locator("#notify").click();
   await expect(inner.locator("#notify-out")).toHaveText("ok");
 });
+
+const mockFetchList = async (): Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]> =>
+  (await fetch(`${mockUrl}/__mock/fetches`)).json() as Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]>;
+
+test("cf.fetch goes through the daemon: the upstream's answer, a 401 as a response, loopback refused invalid; a timeout aborts it", async ({ page }) => {
+  await openBridgeThread(page);
+  const out = doc(page).locator("#fetch-out");
+  await doc(page).locator("#fetch").click();
+  await expect(out).toHaveText("200 3 issues");
+  await expect(out).toHaveClass(/ok/);
+  await doc(page).locator("#fetch-token").click();
+  await expect(out).toHaveText("401 bad token");
+  const sent = await mockFetchList();
+  expect(sent.map((f) => [f.url, f.method, f.headers.Authorization])).toEqual([
+    ["https://upstream.test/issues", "GET", "Bearer good"],
+    ["https://upstream.test/issues", "GET", "Bearer bad"],
+  ]);
+  await doc(page).locator("#fetch-local").click();
+  await expect(out).toHaveText(/^invalid: 127\.0\.0\.1 is a loopback address/);
+  // The strip counts the refusal, by host; a 401 is no error.
+  await expect(card(page).getByTestId("page-errors")).toHaveText("1");
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(400);
+      await card(page).screenshot({ path: `${shots}/bridge-fetch-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
+  // A page's timeout gives up (cf:cancel, 5 s past its own), which aborts the daemon's request.
+  const code = await doc(page)
+    .locator("body")
+    .evaluate(() =>
+      (window as unknown as { cf: { fetch: (u: string, i: object) => Promise<unknown> } }).cf.fetch("https://upstream.test/slow", { timeout: 200 }).then(
+        () => "ok",
+        (e: unknown) => (e as { code: string }).code,
+      ),
+    );
+  expect(code).toBe("timeout");
+  await expect.poll(async () => (await mockFetchList()).find((f) => f.url.endsWith("/slow"))?.aborted).toBe(true);
+});

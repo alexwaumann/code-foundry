@@ -3,10 +3,11 @@ import type { BridgeError } from "@/lib/bridge";
 import { errorMessage } from "./stream";
 
 /**
- * A failed CommandService.Invoke as a page's bridge reports it (docs/notes/bridge-2-gui.md):
- * NotFound (no such command) and FailedPrecondition (not available in the thread's
- * context) are `unavailable`, InvalidArgument is `invalid`, DeadlineExceeded `timeout`,
- * anything else `failed`. A confirmation (also FailedPrecondition) never gets here:
+ * A failed CommandService.Invoke (or ThreadService.ProxyFetch, docs/notes/bridge-fetch.md)
+ * as a page's bridge reports it (docs/notes/bridge-2-gui.md): NotFound (no such command or
+ * thread) and FailedPrecondition (not available in the thread's context) are
+ * `unavailable`, InvalidArgument is `invalid`, DeadlineExceeded `timeout`, anything else
+ * (a fetch's network error, a response too big) `failed`. A confirmation (also FailedPrecondition) never gets here:
  * invokeConfirmed asks the user first.
  */
 export function bridgeErrorOf(err: unknown): BridgeError {

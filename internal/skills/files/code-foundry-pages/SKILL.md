@@ -11,7 +11,7 @@ A page is one `.html` file in `$CODE_FOUNDRY_PAGES` (this thread's folder: read 
 other threads' folders or the app's home), shown with `code-foundry view.inline <path>`:
 interactive, in this conversation, in the user's theme. With `/cf/bridge.js` it reads the app
 live and runs the CLI's commands as this thread. Beside this file: `reference/examples.md`
-(complete pages), `reference/sources.md` (`cf.on` fields, storage and sign-in details).
+(complete pages), `reference/sources.md` (`cf.on` fields, storage, `cf.fetch` and tokens).
 
 ## Page, wake, plugin or reply
 
@@ -32,11 +32,10 @@ live and runs the CLI's commands as this thread. Beside this file: `reference/ex
 1. Find the verbs ("Verbs pages use" below, `daemon.capabilities --group commands`) and their
    args (`code-foundry help <verb>`); a setting's range is in the code-foundry-help skill's
    `reference/settings.md`: never try values on the user's real settings to find a limit.
-2. Two shapes, never mixed. `cf.run` resolves `json`: what the verb prints with `--json`
-   (run it in Bash to see it: THREAD_STATUS_IDLE, ISO times, zero fields left out).
-   `cf.on` sends the app's view models: lower-case values (idle), times as epoch ms in
-   `…AtMs` (`new Date(ms)`), every field there. Use only names from `--json` or
-   `reference/sources.md`; never guess.
+2. Two shapes, never mixed. `cf.run` resolves `json`: what the verb prints with `--json` (run
+   it in Bash: THREAD_STATUS_IDLE, ISO times, zero fields left out). `cf.on` sends the app's
+   view models: lower-case values (idle), times as epoch ms in `…AtMs` (`new Date(ms)`), every
+   field there. Use only names from `--json` or `reference/sources.md`; never guess.
 3. One file, no build step, no framework, no CDN: plain DOM, `<script type="module">`
    (top-level `await` works), inline CSS. Paint only with `--cf-*` variables and the
    type-role classes (the code-foundry skill names them), never fixed colours.
@@ -89,8 +88,7 @@ live and runs the CLI's commands as this thread. Beside this file: `reference/ex
   Catch every call and show `e.message` where it happened (that row, that button):
   - `gesture`: called outside a click or key press: move the call into the handler.
   - `declined`: the user said no: not an error. Button back, at most a muted "Not merged".
-  - `unavailable`: no such verb, the page is not shown in its thread, or (from `cf.on`)
-    the app does not hold that source now: show the message.
+  - `unavailable`: no such verb, no thread, or (from `cf.on`) a source the app lacks now.
   - `invalid`: a wrong or missing arg: fix the call (`code-foundry help <verb>`).
   - `failed`: the command ran and failed: show the message, keep the rest working.
   - `timeout`: no answer in 60 s (`{timeout: ms}` as a third arg, 0 waits): offer a retry.
@@ -137,12 +135,13 @@ what you did not write. Plain `localStorage` is cleared when the app quits: keep
 
 - **On screen only.** A closed card, a scrolled-away row or another thread stops the page;
   shown again it reloads. Background or repeated work is a plugin.
-- **No sign-in.** SSO and OAuth redirects fail in the frame (no browser cookies). For an
-  external API ask the user to paste an API token, keep it in `cf.storage`, never in the
-  file (`reference/sources.md`, "Tokens"); no cross-origin calls: say a plugin is needed.
+- **No sign-in.** SSO and OAuth redirects fail in the frame. For an external API ask the user
+  to paste an API token into a password field, keep it in `cf.storage` (never in the file),
+  send it in a header with `cf.fetch`: CORS never blocks it, any status resolves (check
+  `res.ok`), localhost is refused. Plain `fetch` only for an API known to allow any origin.
 - **No API of its own.** The page holds no Code Foundry token: everything goes through `cf.run`.
 - **Data a source lacks** (closed PRs, another repo): a read verb through `cf.run`, else the
-  service's API with a pasted token (GitHub's works). A plugin cannot feed a page: never offer it.
+  service's API through `cf.fetch` with a pasted token. A plugin cannot feed a page: never offer it.
 
 ## Show it, then say what it does
 

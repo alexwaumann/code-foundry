@@ -36,6 +36,13 @@ same).
 - **`cf:bye`** (new, page → host): the script posts it on `pagehide`, in place of one `cf:off`
   per subscription. The host ends the document: its runs are aborted, its subscriptions
   stop, its confirmation is cancelled.
+- **`cf:fetch`** (added by `bridge-fetch.md`, page → host): `{type: "cf:fetch", id, nonce,
+  url, method, headers, body, timeout}` for `cf.fetch`; the host sends it to
+  `ThreadService.ProxyFetch` under the page's thread and answers `{type: "cf:result", id, ok:
+  true, result: {status, statusText, headers, body, url}}` for any status, or the usual
+  error result. It is a run for every limit below (the 32 in flight, a unique id, `cf:cancel`
+  and a new document abort it); its own size cap is `BRIDGE_LIMITS.fetchChars` (a 1 MiB body
+  and 64 Ki characters more).
 
 ## Documents
 

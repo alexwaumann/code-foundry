@@ -31,6 +31,9 @@ vi.mock("@/api/pageStorage", () => ({
     return Promise.resolve({ ...vals });
   },
 }));
+// The daemon's ProxyFetch: what each call asked, answered by the test.
+const proxyFetch = vi.hoisted(() => vi.fn());
+vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
 const { createBridgeHost, BRIDGE_DEBOUNCE_MS } = await import("./bridgeHost");
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
@@ -78,6 +81,7 @@ function hanging() {
 }
 
 beforeEach(() => {
+  proxyFetch.mockReset();
   invokeCommand.mockReset();
   listCommands.mockReset();
   listCommands.mockResolvedValue(commands);
@@ -493,6 +497,81 @@ describe("bridge host", () => {
     const refused = posts.filter((p) => p.type === "cf:result");
     expect(refused).toEqual([{ type: "cf:result", id: "s16", ok: false, error: { code: "invalid", message: "too many subscriptions (16); end one with cf.off first" } }]);
     h.dispose();
+  });
+
+  it("sends a fetch to the daemon under the page's thread and answers what came back, any status", async () => {
+    proxyFetch.mockResolvedValue({ status: 404, statusText: "Not Found", headers: { "content-type": "text/plain" }, body: "nope", url: "https://a.example/x" });
+    const { h, posts, errors } = host();
+    h.receive({ cf: 1, type: "cf:fetch", id: "f", url: "https://a.example/x?token=s", method: "GET", headers: { Authorization: "t" }, body: "", timeout: 5000 });
+    await vi.waitFor(() => {
+      expect(posts).toEqual([{ type: "cf:result", id: "f", ok: true, result: { status: 404, statusText: "Not Found", headers: { "content-type": "text/plain" }, body: "nope", url: "https://a.example/x" } }]);
+    });
+    expect(proxyFetch).toHaveBeenCalledWith("t-1", { url: "https://a.example/x?token=s", method: "GET", headers: { Authorization: "t" }, body: "", timeoutMs: 5000 }, { signal: expect.any(AbortSignal) as unknown });
+    expect(errors).toEqual([]);
+  });
+
+  it("maps a fetch's errors, and reports invalid, failed and timeout only, by host", async () => {
+    const { h, posts, errors } = host();
+    const cases: [ConnectError, string][] = [
+      [new ConnectError("127.0.0.1 is a loopback address", Code.InvalidArgument), "invalid"],
+      [new ConnectError("GET a.example failed: no such host", Code.Unavailable), "failed"],
+      [new ConnectError("a.example answered more than 8 MiB", Code.ResourceExhausted), "failed"],
+      [new ConnectError("a.example did not answer in 30 s", Code.DeadlineExceeded), "timeout"],
+      [new ConnectError("no thread t-1", Code.NotFound), "unavailable"],
+    ];
+    for (const [i, [err]] of cases.entries()) {
+      proxyFetch.mockRejectedValueOnce(err);
+      h.receive({ cf: 1, type: "cf:fetch", id: `f${String(i)}`, url: "https://a.example/secret/path" });
+      await vi.waitFor(() => {
+        expect(posts).toHaveLength(i + 1);
+      });
+    }
+    expect(posts.map((p) => (p.error as { code: string }).code)).toEqual(cases.map(([, c]) => c));
+    expect(errors.map((e) => [e.call, e.code])).toEqual([
+      ["cf.fetch a.example", "invalid"],
+      ["cf.fetch a.example", "failed"],
+      ["cf.fetch a.example", "failed"],
+      ["cf.fetch a.example", "timeout"],
+    ]);
+  });
+
+  it("aborts a fetch the page gave up on, or whose page went, and answers nothing for it", async () => {
+    const aborted: string[] = [];
+    proxyFetch.mockImplementation((_t: string, call: { url: string }, opts: { signal: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        opts.signal.addEventListener("abort", () => {
+          aborted.push(call.url);
+          reject(new ConnectError("the operation was aborted", Code.Canceled));
+        });
+      }),
+    );
+    const { h, posts, errors } = host();
+    h.receive({ cf: 1, type: "cf:fetch", id: "a", url: "https://a.example/1" });
+    h.receive({ cf: 1, type: "cf:fetch", id: "a", url: "https://a.example/dup" });
+    h.receive({ cf: 1, type: "cf:fetch", id: "b", url: "https://a.example/2" });
+    await vi.waitFor(() => {
+      expect(proxyFetch).toHaveBeenCalledTimes(2);
+    });
+    // The duplicate id is refused, as for a run.
+    expect(posts).toEqual([{ type: "cf:result", id: "a", ok: false, error: { code: "invalid", message: "a call with id a is already running" } }]);
+    h.receive({ cf: 1, type: "cf:cancel", id: "a" });
+    h.receive({ cf: 1, type: "cf:bye" });
+    await vi.waitFor(() => {
+      expect(aborted).toEqual(["https://a.example/1", "https://a.example/2"]);
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(posts).toHaveLength(1);
+    expect(errors).toHaveLength(1);
+  });
+
+  it("refuses a fetch without a thread, unreported", async () => {
+    const { h, posts, errors } = host(null);
+    h.receive({ cf: 1, type: "cf:fetch", id: "f", url: "https://a.example/" });
+    await vi.waitFor(() => {
+      expect(posts).toEqual([{ type: "cf:result", id: "f", ok: false, error: { code: "unavailable", message: "this page is not shown in a thread" } }]);
+    });
+    expect(proxyFetch).not.toHaveBeenCalled();
+    expect(errors).toEqual([]);
   });
 
   it("ignores a message past 256 KiB", async () => {

@@ -235,6 +235,7 @@ import { retiredUsage, utcDay } from "./usage";
 import { ageMcp, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
+import { mockFetches, mockProxyFetch, resetFetches } from "./proxyFetch";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
@@ -532,6 +533,8 @@ function routes(router: ConnectRouter): void {
     // What a thread's pages keep with cf.storage (mock/pageStorage.ts).
     pageStorage: (req) => guard(() => (world.thread(req.threadId), { values: pageStorageOf(req.threadId) })),
     setPageStorage: (req) => guard(() => (world.thread(req.threadId), { values: setPageStorage(req.threadId, req.key, req.value) })),
+    // A page's cf.fetch, against a fake upstream (mock/proxyFetch.ts).
+    proxyFetch: (req, ctx) => (guard(() => world.thread(req.threadId)), mockProxyFetch(req, ctx.signal)),
     interrupt: (req) => guard(() => (world.logs.finish(req.threadId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {
@@ -1448,6 +1451,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/waits":
       json(res, 200, mockWaits());
       break;
+    case "GET /__mock/fetches":
+      json(res, 200, mockFetches());
+      break;
     case "GET /__mock/settings":
       json(res, 200, { raw: world.settings.raw, values: world.settings.values(), loadError: world.settings.loadError });
       break;
@@ -1485,6 +1491,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       mockFiles.reset();
       resetPageStorage();
       resetWaits();
+      resetFetches();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {

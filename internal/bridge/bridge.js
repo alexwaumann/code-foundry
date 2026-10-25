@@ -11,12 +11,13 @@
  *   cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
  *   cf.storage(prefix?)           the thread's page storage, kept across app restarts
+ *   cf.fetch(url, init?)          Promise of {status, ok, headers, text(), json()}; the app makes it: no CORS
  *
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
  * Every call is a postMessage to the app, which runs it as the page's thread would. A call
  * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
- * At most 32 runs are at the app at once (more wait here, their timeouts running) and 16
- * subscriptions; a call's args, or a stored value, may be up to 256 KiB.
+ * At most 32 runs and fetches are at the app at once (more wait here, their timeouts running)
+ * and 16 subscriptions; a call's args, or a stored value, may be up to 256 KiB.
  *
  * The app opens the page with a nonce in its URL's fragment (#cf=<nonce>), sent back on
  * every message (docs/notes/bridge-fix-frames.md): a page reached any other way (a link
@@ -32,6 +33,11 @@
   var RUN_MS = 60000; // cf.run's default timeout; opts.timeout overrides it, 0 waits forever
   var MAX_RUNS = 32; // runs at the app at once; the app refuses more
   var MAX_CHARS = 256 * 1024; // the largest call the app hears
+  var FETCH_MS = 30000; // cf.fetch's default timeout; init.timeout overrides it
+  var FETCH_MAX_MS = 120000; // the longest a fetch may take
+  var FETCH_GRACE_MS = 5000; // how long past its timeout a fetch waits for the app's own timeout
+  var FETCH_BODY = 1024 * 1024; // the largest request body, in UTF-8 bytes
+  var FETCH_CHARS = FETCH_BODY + 64 * 1024; // the largest cf:fetch the app hears
   // The sources a page may subscribe to, until cf:ready names them (internal/bridge Sources).
   var SOURCES = ["thread-list", "thread", "gh", "action", "plugin", "terminal", "project", "workspace", "settings", "update", "ui", "ember"];
 
@@ -44,7 +50,7 @@
   var bridged = embedded && NONCE !== "";
   var seq = 0;
   var idBase = "cf" + Math.random().toString(36).slice(2, 10) + "-";
-  var pending = {}; // run id -> {resolve, reject, timer, left, until, verb, total, msg, sent}
+  var pending = {}; // run id -> {resolve, reject, timer, left, until, verb, total, msg, sent, fetch}
   var queue = []; // run ids waiting for one of the MAX_RUNS places, oldest first
   var sending = 0; // runs posted and not answered
   var stores = {}; // storage write id -> {key, resolve, reject}
@@ -218,6 +224,102 @@
     p.left = Math.max(1, p.until - Date.now());
   }
 
+  function hasHeader(headers, name) {
+    return Object.keys(headers).some(function (k) { return k.toLowerCase() === name; });
+  }
+
+  // The cf:fetch for cf.fetch(url, init), shaped like the Fetch API's: a body that is not a
+  // string is sent as JSON (or a form, for URLSearchParams) with its content-type.
+  function fetchMessage(url, init) {
+    if (url && typeof url === "object" && typeof url.href === "string") url = url.href;
+    if (typeof url !== "string") throw cfError("invalid", "cf.fetch(url, init?): url must be a string");
+    var u;
+    try {
+      u = new URL(url);
+    } catch (e) {
+      throw cfError("invalid", "cf.fetch: " + url.slice(0, 80) + " is not an absolute URL");
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") throw cfError("invalid", "cf.fetch: only http and https URLs, not " + u.protocol);
+    if (init === undefined || init === null) init = {};
+    if (typeof init !== "object") throw cfError("invalid", "cf.fetch(url, init?): init must be an object");
+    var method = init.method === undefined ? "GET" : String(init.method).toUpperCase();
+    var headers = {};
+    var h = init.headers;
+    if (Array.isArray(h)) h.forEach(function (pair) { headers[String(pair[0])] = String(pair[1]); });
+    else if (h && typeof h.forEach === "function") h.forEach(function (v, k) { headers[k] = String(v); });
+    else if (h && typeof h === "object") Object.keys(h).forEach(function (k) { if (h[k] !== undefined && h[k] !== null) headers[k] = String(h[k]); });
+    else if (h !== undefined && h !== null) throw cfError("invalid", "cf.fetch: headers must be an object of strings");
+    var body = init.body;
+    var type = null;
+    if (body === undefined || body === null) body = "";
+    else if (typeof URLSearchParams === "function" && body instanceof URLSearchParams) {
+      body = body.toString();
+      type = "application/x-www-form-urlencoded;charset=UTF-8";
+    } else if (typeof body === "object") {
+      var kind = Object.prototype.toString.call(body);
+      if (kind !== "[object Object]" && kind !== "[object Array]") throw cfError("invalid", "cf.fetch: body must be a string, or an object sent as JSON (not " + kind.slice(8, -1) + ")");
+      body = JSON.stringify(body);
+      type = "application/json";
+    } else if (typeof body !== "string") throw cfError("invalid", "cf.fetch: body must be a string, or an object sent as JSON");
+    if (type && !hasHeader(headers, "content-type")) headers["Content-Type"] = type;
+    if (body !== "" && (method === "GET" || method === "HEAD")) throw cfError("invalid", "cf.fetch: a " + method + " request has no body");
+    if (new TextEncoder().encode(body).length > FETCH_BODY) throw cfError("invalid", "cf.fetch: the body is too large (1 MiB at most)");
+    var n = u.href.length + method.length + body.length;
+    Object.keys(headers).forEach(function (k) { n += k.length + headers[k].length; });
+    if (n > FETCH_CHARS) throw cfError("invalid", "cf.fetch: the request is too large");
+    var t = init.timeout;
+    var timeout = typeof t === "number" && t > 0 ? Math.min(t, FETCH_MAX_MS) : FETCH_MS;
+    return { type: "cf:fetch", id: "", url: u.href, method: method, headers: headers, body: body, timeout: timeout, host: u.host };
+  }
+
+  // cf.fetch: the app makes the request (ThreadService.ProxyFetch), so the API's CORS rules
+  // do not apply. Any status resolves; no gesture needed: it changes nothing in the app.
+  function fetchVia(url, init) {
+    var msg;
+    try {
+      msg = fetchMessage(url, init);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+    return whenReady(READY_MS).then(function () {
+      if (!cf.thread) throw cfError("unavailable", "cf.fetch needs the page's thread: this page is not shown in one");
+      return new Promise(function (resolve, reject) {
+        var id = nextId();
+        var host = msg.host;
+        delete msg.host;
+        msg.id = id;
+        var p = { resolve: resolve, reject: reject, timer: 0, left: msg.timeout + FETCH_GRACE_MS, until: 0, verb: "cf.fetch " + host, total: msg.timeout, msg: msg, sent: false, fetch: host };
+        pending[id] = p;
+        arm(id, p);
+        queue.push(id);
+        pump();
+      });
+    });
+  }
+
+  // A fetch's answer: text() and json() read the body, which came back whole.
+  function fetched(host, r) {
+    var text = typeof r.body === "string" ? r.body : "";
+    var status = typeof r.status === "number" ? r.status : 0;
+    return {
+      status: status,
+      statusText: typeof r.statusText === "string" ? r.statusText : "",
+      ok: status >= 200 && status < 300,
+      url: typeof r.url === "string" ? r.url : "",
+      headers: r.headers && typeof r.headers === "object" ? r.headers : {},
+      text: function () {
+        return text;
+      },
+      json: function () {
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          throw new SyntaxError("cf.fetch: " + host + "'s answer (" + status + ") is not JSON: " + text.slice(0, 80));
+        }
+      },
+    };
+  }
+
   function on(source, fn, onError) {
     if (typeof source !== "string" || source === "" || typeof fn !== "function") {
       throw cfError("invalid", "cf.on(source, fn): a source name and a function");
@@ -373,7 +475,9 @@
     var p = pending[id];
     if (p && p.sent) {
       done(id, p);
-      if (msg.ok) {
+      if (msg.ok && p.fetch) {
+        p.resolve(fetched(p.fetch, msg.result || {}));
+      } else if (msg.ok) {
         var r = msg.result || {};
         var json = r.json;
         if (typeof json === "string" && json !== "") {
@@ -485,6 +589,7 @@
     onTheme: onTheme,
     resize: resize,
     storage: storage,
+    fetch: fetchVia,
   };
   window.cf = cf;
 
