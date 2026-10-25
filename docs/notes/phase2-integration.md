@@ -96,7 +96,7 @@ Recipe (also in the spec header):
 
 ```
 export CODE_FOUNDRY_HOME=$(mktemp -d)
-make build && ./bin/code-foundry daemon --dev &
+make build && CODE_FOUNDRY_DEV_ORIGINS=9247 ./bin/code-foundry daemon --dev &
 ./bin/code-foundry repo register --path "$PWD"
 cd gui/frontend
 VITE_DAEMON_URL=http://127.0.0.1:$(cat $CODE_FOUNDRY_HOME/daemon.port) \

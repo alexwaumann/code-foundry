@@ -27,7 +27,7 @@ type subcommand struct {
 }
 
 var subcommands = []subcommand{
-	{"daemon", "Run the daemon in the foreground (--dev for text logs on stderr)", runDaemon},
+	{"daemon", "Run the daemon in the foreground (--dev for text logs on stderr and the browser dev frontend)", runDaemon},
 	{"status", "Show daemon status, starting it if needed", runStatus},
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},

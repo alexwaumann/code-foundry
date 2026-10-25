@@ -17,7 +17,7 @@ Verified: `make check` green (144 unit tests), `pnpm run e2e` 20/20 (WebKit + Ch
 |---|---|
 | Mock daemon | `make gui-mock` or `cd gui/frontend && pnpm run mock` (port 7788, token `dev-mock-token`; `MOCK_PORT`, `MOCK_TOKEN` override) |
 | Frontend against the mock (browser) | `pnpm run dev:mock`, then open http://127.0.0.1:9245 (reads `.env.mock`) |
-| Any dev frontend against any daemon | `http://127.0.0.1:9245/?daemon=<baseUrl>&token=<token>` (`pnpm run mock` prints this URL) |
+| Any dev frontend against any daemon | `http://127.0.0.1:9245/?daemon=<baseUrl>&token=<token>` (`pnpm run mock` prints this URL). A real daemon lets a browser page call its API only in dev mode: `make dev` (`daemon --dev`) allows `http://127.0.0.1:9245` and `http://localhost:9245`; another port or origin goes in `CODE_FOUNDRY_DEV_ORIGINS` (comma separated, e.g. `CODE_FOUNDRY_DEV_ORIGINS=9247 ./bin/code-foundry daemon --dev`). A daemon the GUI or CLI auto-starts has no dev origins (docs/notes/bridge-fix-crosshome.md) |
 | Wails window against the mock | `cd gui && VITE_DAEMON_URL=http://127.0.0.1:7788 VITE_DAEMON_TOKEN=dev-mock-token wails3 dev` |
 | Wails window against the real daemon | `make gui-dev` (unchanged from Phase 0) |
 | Push an intent | `pnpm run mock:emit focus-terminal t-top`, `… focus-repo repo-cf [path]`, `… palette [query]`, `… notify warning "Title" "body"` |

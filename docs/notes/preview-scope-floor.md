@@ -32,12 +32,27 @@ with the shipped sandbox attributes; reproduced again on main before this change
   project does not leak the token. `Grants.Grant`/`GrantFile` also refuse anything the
   floor forbids (`ErrGuarded`), so no caller can mint a home-wide grant by mistake.
 
+**Every Code Foundry home, not only this daemon's (2026-10-25, `bridge-fix-crosshome.md`).**
+A test daemon under its own `CODE_FOUNDRY_HOME` runs beside the real one every day, and its
+pages must not read the other daemon's token, so the config-home rule above applies to each
+home the floor can know: the current one, the default `~/.code-foundry` (always, even when
+it is not the current one or does not exist), and any directory holding a `daemon.token` or
+`pages.port` (`homeMarkers`). Those last are found when asked, not at start: `Guarded`
+stats the markers in the path's ancestors up to home (unresolved, so a link into another
+home is found through the link, and again on the resolved path at the route), and
+`ScopeOK` also in the tree's direct children, so `~/dev` is no scope beside `~/dev/cf`. Each
+home keeps its `worktrees/`, `projects/` and `pages/` open. A home deeper in a tree than its
+direct children does not refuse the grant, but every path inside it is 404. The API's CORS
+is the other half: it no longer reflects any loopback origin outside dev mode, so a page on
+another daemon's pages origin cannot call this one's API even holding its token.
+
 ## CORS
 
 * `cors` now wraps only the bearer-protected side (`loopbackHandler`) and reflects only
   `wails://localhost` (any port: production and `wails3 dev`) and `http(s)://` pages on
   `localhost`, `127.0.0.1`, `[::1]` (the dev frontend in a browser,
-  `?daemon=…&token=…`). Anything else, `null` above all, gets no CORS headers; its
+  `?daemon=…&token=…`; since 2026-10-25 only for `daemon --dev` and the origins it lists,
+  `bridge-fix-crosshome.md`). Anything else, `null` above all, gets no CORS headers; its
   preflight falls through to the bearer check and is 401, so the browser blocks the call
   even when the page holds the token.
 * The preview route sets `Access-Control-Allow-Origin: *` itself, on every response
