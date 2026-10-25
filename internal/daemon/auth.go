@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -60,17 +61,16 @@ func requireBearer(token string, next http.Handler) http.Handler {
 	})
 }
 
-// loopbackHandler is what the TCP listener serves: the open routes, keyed by path prefix,
-// and behind CORS and the bearer token everything else. The open routes are what a page in
-// the HTML preview loads, which cannot send a header: the preview (preview.Prefix), whose
-// credential is the grant in its URL (package preview), and the frame stylesheet
-// (theme.FramePrefix), which reveals only colours. Each sets its own CORS header.
-func loopbackHandler(token string, open map[string]http.Handler, rest http.Handler) http.Handler {
+// loopbackHandler is what the API's TCP listener serves: everything behind CORS and the
+// bearer token. The paths the pages listener serves (pagesHandler) are 404 here, token or
+// not: a page loads them from its own origin, never the API's. pagesPort is that
+// listener's port, whose origin CORS refuses (allowedOrigin).
+func loopbackHandler(token string, pagePrefixes []string, pagesPort int, rest http.Handler) http.Handler {
 	m := http.NewServeMux()
-	for prefix, h := range open {
-		m.Handle(prefix, h)
+	for _, prefix := range pagePrefixes {
+		m.Handle(prefix, http.NotFoundHandler())
 	}
-	m.Handle("/", cors(requireBearer(token, rest)))
+	m.Handle("/", cors(pagesPort, requireBearer(token, rest)))
 	return m
 }
 
@@ -92,14 +92,16 @@ var (
 // http://127.0.0.1:<port>, docs/notes/phase1e-gui.md) call the bearer-protected API.
 // The bearer token is the boundary, but no other origin is reflected, `null` least of
 // all: the HTML preview's pages run with an opaque origin and must not be able to call
-// the API even with a token in hand (docs/notes/preview-scope-floor.md). A request from
+// the API even with a token in hand (docs/notes/preview-scope-floor.md), and neither may
+// the pages origin (loopback on pagesPort), which a page has once its frame is
+// same-origin with its own URL (docs/notes/bridge-1-daemon.md). A request from
 // another origin gets no CORS headers, so the browser blocks it (a preflight falls
 // through to the bearer check and is 401). Preflights are answered before auth because
 // browsers never attach Authorization to them.
-func cors(next http.Handler) http.Handler {
+func cors(pagesPort int, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if !allowedOrigin(origin) {
+		if !allowedOrigin(origin, pagesPort) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -121,8 +123,10 @@ func cors(next http.Handler) http.Handler {
 }
 
 // allowedOrigin reports whether a browser page at origin may call the API: the Wails
-// webview (wails://localhost, any port) or a page served from loopback over http(s).
-func allowedOrigin(origin string) bool {
+// webview (wails://localhost, any port) or a page served from loopback over http(s), but
+// never one on the pages listener's port, whatever loopback name it uses (a page may
+// navigate its frame to http://localhost:<pages port>/preview/...).
+func allowedOrigin(origin string, pagesPort int) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.User != nil || (u.Path != "" && u.Path != "/") {
 		return false
@@ -133,8 +137,24 @@ func allowedOrigin(origin string) bool {
 	case "http", "https":
 		switch u.Hostname() {
 		case "localhost", "127.0.0.1", "::1":
-			return true
+			return pagesPort == 0 || originPort(u) != pagesPort
 		}
 	}
 	return false
+}
+
+// originPort is u's port, the scheme's default when it names none; 0 when malformed.
+func originPort(u *url.URL) int {
+	p := u.Port()
+	if p == "" {
+		if u.Scheme == "https" {
+			return 443
+		}
+		return 80
+	}
+	n, err := strconv.Atoi(p)
+	if err != nil {
+		return 0
+	}
+	return n
 }

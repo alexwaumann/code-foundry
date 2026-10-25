@@ -126,24 +126,55 @@ func TestWriteFileAtomicPerms(t *testing.T) {
 	}
 }
 
-func TestLoopbackHandlerOpenRoutesNeedNoBearer(t *testing.T) {
-	previewH := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
+func TestLoopbackHandlerServesNoPageRoutes(t *testing.T) {
 	rest := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	themeH := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
-	h := loopbackHandler("secret", map[string]http.Handler{"/preview/": previewH, "/cf/": themeH}, rest)
+	h := loopbackHandler("secret", []string{"/preview/", "/cf/", "/cf/bridge.js"}, 4242, rest)
 	tests := []struct {
 		name, path, auth string
 		want             int
 	}{
-		{"preview without token", "/preview/abc/index.html", "", http.StatusTeapot},
-		{"preview root without token", "/preview/", "", http.StatusTeapot},
 		{"rpc without token", "/codefoundry.v1.ThreadService/List", "", http.StatusUnauthorized},
 		{"rpc with token", "/codefoundry.v1.ThreadService/List", "Bearer secret", http.StatusOK},
+		// The pages listener's paths are 404 on the API's, token or not.
+		{"preview without token", "/preview/abc/index.html", "", http.StatusNotFound},
+		{"preview with token", "/preview/abc/index.html", "Bearer secret", http.StatusNotFound},
+		{"theme stylesheet", "/cf/theme.css", "", http.StatusNotFound},
+		{"bridge script", "/cf/bridge.js", "Bearer secret", http.StatusNotFound},
 		{"preview-ish path outside the prefix", "/previewx", "", http.StatusUnauthorized},
-		{"theme stylesheet without token", "/cf/theme.css", "", http.StatusAccepted},
-		{"theme json without token", "/cf/theme.json", "", http.StatusAccepted},
-		{"unknown /cf/ path reaches the theme handler", "/cf/x", "", http.StatusAccepted},
 		{"cf-ish path outside the prefix", "/cfx/theme.css", "", http.StatusUnauthorized},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.auth != "" {
+				req.Header.Set("Authorization", tc.auth)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Errorf("status %d, want %d", rec.Code, tc.want)
+			}
+		})
+	}
+}
+
+func TestPagesHandlerServesOnlyPageRoutes(t *testing.T) {
+	routes := map[string]http.Handler{
+		"/preview/":     http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }),
+		"/cf/":          http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) }),
+		"/cf/bridge.js": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusCreated) }),
+	}
+	h := pagesHandler(routes)
+	tests := []struct {
+		name, path, auth string
+		want             int
+	}{
+		{"preview", "/preview/abc/index.html", "", http.StatusTeapot},
+		{"theme", "/cf/theme.css", "", http.StatusAccepted},
+		{"bridge, the more specific route", "/cf/bridge.js", "", http.StatusCreated},
+		{"rpc", "/codefoundry.v1.ThreadService/List", "", http.StatusNotFound},
+		{"rpc with a token", "/codefoundry.v1.CommandService/Invoke", "Bearer secret", http.StatusNotFound},
+		{"root", "/", "", http.StatusNotFound},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -163,7 +194,7 @@ func TestLoopbackHandlerOpenRoutesNeedNoBearer(t *testing.T) {
 func TestRequireBearerAndCORS(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
 	// Through loopbackHandler, so the test covers CORS being mounted on the API side.
-	h := loopbackHandler("secret", map[string]http.Handler{"/preview/": http.NotFoundHandler()}, ok)
+	h := loopbackHandler("secret", []string{"/preview/"}, 9300, ok)
 	tests := []struct {
 		name       string
 		method     string
@@ -200,6 +231,20 @@ func TestRequireBearerAndCORS(t *testing.T) {
 			map[string]string{"Origin": "wails://evil.example", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
 		{"file origin", http.MethodOptions,
 			map[string]string{"Origin": "file://", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		// The pages origin (a same-origin page frame), under any loopback name, is never let
+		// in either (docs/notes/bridge-1-daemon.md).
+		{"pages origin preflight", http.MethodOptions,
+			map[string]string{"Origin": "http://127.0.0.1:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"pages origin with token", http.MethodPost,
+			map[string]string{"Authorization": "Bearer secret", "Origin": "http://127.0.0.1:9300"}, http.StatusTeapot, ""},
+		{"pages port as localhost", http.MethodOptions,
+			map[string]string{"Origin": "http://localhost:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"pages port as ::1", http.MethodOptions,
+			map[string]string{"Origin": "http://[::1]:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"pages port over https", http.MethodOptions,
+			map[string]string{"Origin": "https://127.0.0.1:9300", "Access-Control-Request-Method": "POST"}, http.StatusUnauthorized, ""},
+		{"another loopback port is the dev frontend", http.MethodOptions,
+			map[string]string{"Origin": "http://127.0.0.1:9301", "Access-Control-Request-Method": "POST"}, http.StatusNoContent, "http://127.0.0.1:9301"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

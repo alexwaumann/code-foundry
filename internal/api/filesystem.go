@@ -26,7 +26,10 @@ type Filesystem struct {
 	projects project.Store
 	files    *fsx.FileIndex
 	grants   *preview.Grants
-	log      *slog.Logger
+	// pagesOrigin is where the preview route is served (the daemon's pages listener);
+	// PreviewFile's URLs are on it. Empty: root-relative URLs.
+	pagesOrigin string
+	log         *slog.Logger
 }
 
 var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
@@ -39,6 +42,13 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 func NewFilesystem(root string, projects project.Store, grants *preview.Grants) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
 	return &Filesystem{root: root, projects: projects, files: fsx.NewFileIndex(log), grants: grants, log: log}
+}
+
+// WithPagesOrigin makes PreviewFile's URLs absolute on origin
+// ("http://127.0.0.1:<port>"), the listener that serves the preview route.
+func (h *Filesystem) WithPagesOrigin(origin string) *Filesystem {
+	h.pagesOrigin = origin
+	return h
 }
 
 // Route mounts the service.
@@ -225,7 +235,8 @@ func (h *Filesystem) PreviewFile(_ context.Context, req *connect.Request[v1.Prev
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("preview %s: %w", f.Path, err))
 	}
-	return connect.NewResponse(&v1.PreviewFileResponse{Url: preview.URL(grant, filepath.ToSlash(rel)), Scope: scope, SingleFile: single}), nil
+	url := h.pagesOrigin + preview.URL(grant, filepath.ToSlash(rel))
+	return connect.NewResponse(&v1.PreviewFileResponse{Url: url, Scope: scope, SingleFile: single}), nil
 }
 
 // previewScope is what a preview of file may read: the deepest registered project or
