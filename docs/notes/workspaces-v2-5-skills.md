@@ -15,7 +15,7 @@ behaviour changes. Needs a daemon restart (the prompt and skills are compiled in
 | `internal/skills/files/code-foundry-help/SKILL.md` | "Workspaces": what one is, the Projects page card, Save as workspace, `workspace new`, its folder (`workspace list`) and files; "Remembering preferences" names the workspace's `CLAUDE.md`; "workspaces" in the description |
 | `.../code-foundry-plugin/reference/host-api.md` | an environment's `Projects` scope matches any project of a multi-project thread (it said "workspace thread … member") |
 | `internal/store/thread/workspace.go` | `ThreadPrompt`: "a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo" after the memory add clause; cuts to stay at 1,549 of 1,550 bytes (below) |
-| `internal/command/commands_thread_checkouts.go` | description: "List a thread's projects (path, branch, CLAUDE.md) and its workspace's folder." |
+| `internal/command/commands_thread_checkouts.go` | description: "List a thread's projects (path, branch, CLAUDE.md) and workspace folder." |
 | `internal/skills/skills_test.go`, `internal/store/thread/prompt_test.go` | the new text pinned; the help cap 105 → 109 |
 
 ## Decisions
@@ -50,7 +50,7 @@ behaviour changes. Needs a daemon restart (the prompt and skills are compiled in
   branch. "6. Clean up only after merge" folded into the Cleanup section it pointed at.
 * **Caps.** Entry 83 of 83 lines, description 399 of 400; orchestrate 138 of 138 (the
   brief's "205 lines, rules 6 KB" are Ember's caps; the orchestrate test's cap is 138);
-  the guide 25,473 of the 25,500 split cap; `ThreadPrompt` 1,549 of 1,550. **The help
+  the guide 25,496 of the 25,500 split cap (after PR 6's `project.add-workspace` joined the topic list); `ThreadPrompt` 1,549 of 1,550. **The help
   skill's cap went 105 → 109** (still under the 120 it had before control-7): the
   workspaces answer is 7 lines and the reflows found only 3. Recorded in the test.
 * **What was trimmed for room.** Entry: the intro to three lines, "Showing things" lost
