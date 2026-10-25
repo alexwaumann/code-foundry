@@ -78,6 +78,7 @@ export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode,
 
 /** The page's frame, or its source; a page that cannot be rendered says why over its source. */
 function CardBody({
+  threadId,
   page,
   grant,
   source,
@@ -85,6 +86,7 @@ function CardBody({
   version,
   onResize,
 }: {
+  threadId: string;
   page: InlinePage;
   grant: PreviewGrant;
   source: boolean;
@@ -110,7 +112,7 @@ function CardBody({
       </>
     );
   if (source) return <SourceView page={page} height={height} version={version} />;
-  return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} style={{ height }} onResize={onResize} testId="thread-html-frame" />;
+  return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} testId="thread-html-frame" />;
 }
 
 /** The file read-only as code (the File tab's code view), or why it cannot be read. */
@@ -234,7 +236,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   return (
     <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised" data-testid="thread-html-card">
       <Strip page={page}>{actions(false)}</Strip>
-      <CardBody page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} />
+      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} />
       {lightbox && (
         <Lightbox onClose={close} returnFocus={() => ref.current?.querySelector<HTMLElement>('[data-testid="thread-html-expand"]') ?? null}>
           <Strip page={page} big>
@@ -245,10 +247,10 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
             </Button>
           </Strip>
           {grant.preview && !source ? (
-            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} className="min-h-0 flex-1" testId="thread-html-lightbox-frame" />
+            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" testId="thread-html-lightbox-frame" />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-              <CardBody page={page} grant={grant} source={source} height={Math.max(height, 2000)} version={version} />
+              <CardBody threadId={threadId} page={page} grant={grant} source={source} height={Math.max(height, 2000)} version={version} />
             </div>
           )}
         </Lightbox>

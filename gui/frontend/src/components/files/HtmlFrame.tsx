@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { isThemeAck, resizeHeight } from "./previewGrant";
 
 /**
  * The frame's sandbox: scripts, forms, dialogs, downloads and popups (a target=_blank link
- * opens in the browser), but never `allow-same-origin`, so the page has an opaque origin
- * and cannot reach Code Foundry's window or the daemon's authenticated routes, and never
+ * opens in the browser), and `allow-same-origin`, so a page keeps its localStorage and
+ * IndexedDB (docs/notes/bridge-2-gui.md). That origin is the daemon's pages listener
+ * (`/preview/` and `/cf/` on a port of their own), never the app's and never the API's,
+ * whose CORS refuses it: the page still cannot reach Code Foundry's window or the
+ * daemon's authenticated routes, and reaches Code Foundry only through the bridge. Never
  * `allow-top-navigation`, so a link cannot replace the app.
  */
-export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
+export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
 
 /**
  * How long a frame waits, after a new theme reached the daemon, for the page to answer
@@ -22,8 +26,8 @@ export const THEME_ACK_MS = 300;
  * preview and a thread's inline page are this one frame (docs/notes/
  * html-preview-interactive.md, inline-html.md). A page that links `/cf/theme.css` paints in
  * the user's theme; the frame is also posted `{ type: "cf:theme", id, scheme, vars }` on
- * load and on every theme change (docs/notes/theme-css-route.md). The target is "*": the
- * frame is opaque-origin.
+ * load and on every theme change (docs/notes/theme-css-route.md), to "*" as before the
+ * bridge (a page holds nothing secret in it).
  *
  * Theme changes (inline-html-2-fixes.md):
  * - The iframe element's own `color-scheme` is the app's scheme, which WebKit hands the page
@@ -38,6 +42,11 @@ export const THEME_ACK_MS = 300;
  *
  * `onResize` hears this frame's own `{ type: "cf:resize", height }` messages (a page asking
  * for its height). A white canvas, as in a browser.
+ *
+ * The bridge (stores/bridgeHost.ts): a page loading `/cf/bridge.js` runs verbs and
+ * subscribes to the app's state as `thread`, the thread that shows it; without one (a File
+ * tab on any other HTML file) it gets a bridge that refuses every call. Only this frame's
+ * own window, at the origin its URL names, is heard; replies go to that window and origin.
  */
 export function HtmlFrame({
   url,
@@ -46,9 +55,12 @@ export function HtmlFrame({
   style,
   onResize,
   testId,
+  thread = null,
 }: {
   url: string;
   name: string;
+  /** The thread that shows the page, whose verbs and state its bridge may use; null for none. */
+  thread?: string | null;
   className?: string;
   style?: CSSProperties;
   onResize?: (height: number) => void;
@@ -104,6 +116,27 @@ export function HtmlFrame({
       clearTimeout(timer.current);
     };
   }, []);
+  // The bridge's host for this frame: one per owning thread and page; gone on unmount.
+  const origin = useMemo(() => originOf(url), [url]);
+  const host = useRef<BridgeHost | null>(null);
+  const hasLoaded = useRef(false);
+  useEffect(() => {
+    const h = createBridgeHost({
+      threadId: thread,
+      pageName: name,
+      post: (msg) => {
+        const win = frameRef.current?.contentWindow;
+        if (win && origin) win.postMessage(msg, origin);
+      },
+    });
+    host.current = h;
+    // A page already up (its thread was learnt after it loaded) hears a new ready now.
+    if (hasLoaded.current) h.loaded();
+    return () => {
+      h.dispose();
+      if (host.current === h) host.current = null;
+    };
+  }, [thread, name, origin]);
   const resizeRef = useRef(onResize);
   useEffect(() => {
     resizeRef.current = onResize;
@@ -117,23 +150,30 @@ export function HtmlFrame({
         return;
       }
       const h = resizeHeight(e.data);
-      if (h !== null) resizeRef.current?.(h);
+      if (h !== null) {
+        resizeRef.current?.(h);
+        return;
+      }
+      if (origin && e.origin === origin) host.current?.receive(e.data);
     };
     window.addEventListener("message", onMessage);
     return () => {
       window.removeEventListener("message", onMessage);
     };
-  }, []);
+  }, [origin]);
   return (
     <iframe
       key={load}
       ref={frameRef}
       onLoad={() => {
         post();
+        hasLoaded.current = true;
+        host.current?.loaded();
       }}
       aria-label={`${name} (rendered)`}
       src={url}
       sandbox={HTML_PREVIEW_SANDBOX}
+      allow="clipboard-write"
       referrerPolicy="no-referrer"
       className={cn("w-full border-0 bg-white", className)}
       style={{ ...style, colorScheme: scheme }}
@@ -141,4 +181,13 @@ export function HtmlFrame({
       data-load={load}
     />
   );
+}
+
+/** The origin a frame URL names; null for one that does not parse. */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }

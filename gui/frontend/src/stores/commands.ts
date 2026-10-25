@@ -92,13 +92,15 @@ const MAX_CONFIRM_STAGES = 3;
  * (the digest of the consent text shown) are merged too. Resolves null when the
  * user declines (or a declined second stage's result: what the command already did);
  * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
- * intent), shown in the dialog.
+ * intent), shown in the dialog. `around` runs each question (a page's bridge queues them
+ * per frame and learns the answer: stores/bridgeHost.ts).
  */
 export async function invokeConfirmed(
   name: string,
   args: Record<string, string> = {},
   ctx: UiContextView = getUiContext(),
   caller?: string,
+  opts: { around?: (ask: () => Promise<boolean>) => Promise<boolean> } = {},
 ): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
   let callArgs = args;
   let confirmed = false;
@@ -113,7 +115,8 @@ export async function invokeConfirmed(
       const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
       const ask = (confirm.args ? undefined : confirmPresenter(name)) ?? requestConfirm;
       const confirmLabel = confirmButtonLabel(title, confirm.confirmLabel);
-      const yes = await ask({ title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) });
+      const req = { title, message: confirm.message, confirmLabel, command: name, args: callArgs, ...(caller ? { caller } : {}) };
+      const yes = await (opts.around ? opts.around(() => ask(req)) : ask(req));
       if (!yes) return confirm.declined ?? null;
       confirmed = true;
       if (confirm.args) callArgs = { ...callArgs, ...confirm.args };

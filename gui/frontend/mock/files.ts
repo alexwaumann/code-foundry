@@ -13,6 +13,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
+import { readFileSync } from "node:fs";
 import { HOME } from "./filesystem";
 import { testPdf } from "./pdf";
 
@@ -188,6 +189,9 @@ addEventListener("load", () => parent.postMessage({ type: "cf:resize", height: M
 </body></html>
 `;
 
+/** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
+export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
+
 interface Entry {
   data: Uint8Array;
   mime: string;
@@ -209,6 +213,7 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/hello.html`, text(INLINE_PAGE_HTML, "text/html")],
     [`${CF}/docs/plain.html`, text(PLAIN_PAGE_HTML, "text/html")],
     [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
+    [`${CF}/docs/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],

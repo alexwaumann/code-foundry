@@ -93,8 +93,22 @@ const handlers: Handlers = {
   theme: applyThemeEvent,
 };
 
+const taps = new Set<(ev: EventView) => void>();
+
+/**
+ * Hears every event after its slice applied it (a page's bridge forwards the ui source's
+ * intents, which no slice keeps: stores/bridgeSources.ts). Returns the unsubscribe.
+ */
+export function onDaemonEvent(cb: (ev: EventView) => void): () => void {
+  taps.add(cb);
+  return () => {
+    taps.delete(cb);
+  };
+}
+
 export function dispatchEvent(ev: EventView): void {
   (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
+  for (const tap of taps) tap(ev);
 }
 
 /** True when the error means the daemon does not serve the RPC (older daemon). */
