@@ -90,7 +90,7 @@ Their args by name (values after them in plain text); `code-foundry help <verb>`
 | Verb | Args |
 |---|---|
 | `pr.merge` (asks first) | `repo-slug`, `number`, `method` merge, squash or rebase, `head-sha` the PR's `headSha` |
-| `pr.checks` (read) | `repo-slug`, `number` |
+| `pr.checks` (read) | `repo-slug`, `number`; watch one PR: run it again in `cf.on("gh", …)` |
 | `thread.archive` (asks when busy) | `id`; `archived` false unarchives |
 | `thread.snooze` | `id`, `until` 1h, 3h, tomorrow, next-week, mon…sun or a date; or `clear` true |
 | `thread.pin`, `thread.send` | `id`; `pinned` true or false; `text` the message |
