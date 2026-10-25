@@ -109,8 +109,10 @@ export function RowMenu({ id }: { id: string }) {
       data-testid="row-menu"
       data-thread={id}
       onCloseAutoFocus={(e) => {
-        // Rename puts an input in the row; closing must not move focus back to the list.
-        if (useUiStore.getState().renamingThreadId === id) e.preventDefault();
+        // Rename puts an input in the row, and New thread on this branch focuses the
+        // composer's prompt: closing must not move focus back to the list.
+        const ui = useUiStore.getState();
+        if (ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id)) e.preventDefault();
       }}
     >
       <ContextMenuItem
