@@ -27,6 +27,7 @@ import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
+import { canRunElsewhere } from "../src/lib/threadRow";
 import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
@@ -3186,8 +3187,11 @@ export class World {
             { name: "worktree", type: ArgType.PATH, required: false, description: "A checkout's path" },
           ],
         },
-        // Like the daemon since workspaces v2: offered for every thread; Run refuses one with a single checkout.
-        when: (ctx) => activeThread(ctx) !== undefined,
+        // Like the daemon (runElsewhere): in the GUI only for a thread with somewhere else to run; from the CLI any, Run refuses one with a single checkout.
+        when: (ctx) => {
+          const s = activeThread(ctx);
+          return s !== undefined && (!ctx?.activeView || canRunElsewhere({ projectIds: this.projectIdsOf(s), workspaceId: s.workspaceId }));
+        },
         run: (ctx, args) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
@@ -3295,7 +3299,8 @@ export class World {
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
           ],
         },
-        when: (ctx) => activeThread(ctx) !== undefined,
+        // Like the daemon (canNewLike): in the GUI only for a thread with a project or a workspace.
+        when: (ctx) => activeThread(ctx) !== undefined && (!ctx?.activeView || Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: (ctx, args) => this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args),
       },
       {

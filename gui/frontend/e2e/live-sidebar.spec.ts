@@ -44,11 +44,20 @@ async function shot(page: Page, name: string): Promise<void> {
 
 test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");
 
+/** The workspace by name, with its first two members' names and own checkouts (workspaces v2: members are project ids). */
+function liveWorkspace(name: string) {
+  const w = ((JSON.parse(cli("workspace", "list", "--json")) as { workspaces?: { id: string; name: string; members?: string[] }[] }).workspaces ?? []).find((x) => x.name === name);
+  if (!w) throw new Error(`no workspace ${name}`);
+  const projects = (JSON.parse(cli("project", "list", "--json")) as { projects?: { id: string; name: string; path: string }[] }).projects ?? [];
+  const members = (w.members ?? []).flatMap((id) => {
+    const p = projects.find((x) => x.id === id);
+    return p ? [{ projectId: id, projectName: p.name, worktreePath: p.path }] : [];
+  });
+  return { workspace: { id: w.id, name: w.name }, members };
+}
+
 test("flat sidebar, Projects page and Run in… with real threads", async ({ page }) => {
-  const ws = JSON.parse(cli("workspace", "members", WORKSPACE, "--json")) as {
-    workspace: { id: string; name: string };
-    members: { projectId: string; projectName: string; worktreePath: string }[];
-  };
+  const ws = liveWorkspace(WORKSPACE);
   const [first, second] = ws.members;
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const start = (...args: string[]) =>
@@ -61,12 +70,12 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
     const wsRow = list.locator(`[data-row-key="s:${wsThread}"]`);
     const projRow = list.locator(`[data-row-key="s:${projThread}"]`);
 
-    await test.step("flat list: both threads, the badge on the workspace thread, no worktree rows", async () => {
+    await test.step("flat list: both threads, the workspace thread's line 2 names the workspace (no badge), no worktree rows", async () => {
       await expect(wsRow).toBeVisible({ timeout: 20_000 });
       await expect(projRow).toBeVisible();
-      await expect(wsRow.getByTestId("row-workspace")).toHaveText(ws.workspace.name);
-      await expect(wsRow.getByTestId("row-project")).toHaveText(first.projectName);
-      await expect(projRow.getByTestId("row-workspace")).toHaveCount(0);
+      // Workspaces v2: no badge; a thread of the workspace's members reads "<workspace> @ <branch>".
+      await expect(page.getByTestId("row-workspace")).toHaveCount(0);
+      await expect(wsRow.getByTestId("row-project")).toHaveText(ws.workspace.name);
       await expect(projRow.getByTestId("row-project")).toHaveText(second.projectName);
       await expect(list.locator('[data-row-kind="project"], [data-row-kind="worktree"]')).toHaveCount(0);
       // Both turns end (the unwatched ones then wait under Needs attention, "finished").
@@ -81,7 +90,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(page.getByTestId("project-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b)));
       const block = page.locator(`[data-testid="workspace"][data-workspace="${ws.workspace.id}"]`);
       await expect(block.getByTestId("workspace-name")).toHaveText(ws.workspace.name);
-      await expect(block.getByTestId("member-name")).toHaveText([first.projectName, second.projectName]);
+      await expect(block.getByTestId("member-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
       await page.waitForTimeout(300);
       await shot(page, "live-projects-page");
     });
@@ -100,7 +109,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.projectName}…`, { timeout: 5000 });
       await shot(page, "live-sidebar-moving");
       await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
-      await expect(wsRow.getByTestId("row-project")).toHaveText(second.projectName);
+      await expect(wsRow.getByTestId("row-project")).toHaveText(ws.workspace.name);
       expect(threadInfo(wsThread)).toMatchObject({ projectId: second.projectId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");
