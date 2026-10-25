@@ -92,6 +92,26 @@ record: `workspaces-v2-handoff.md` (§3 Workspace, the rooted managed dir; §6 l
   reused children, a taken name, a repo and a plain folder refused, a failing child,
   outside home), `TestFreeWorkspaceName`, the CLI e2e rows (missing folder, outside home),
   `TestAllRegistersEveryDomain`. Vitest: `folderChoice.test.ts`.
-* `make gui-e2e` (WebKit, 4 workers) green, including `e2e/addproject-workspace.spec.ts`.
-* Live, isolated (`CODE_FOUNDRY_HOME=/tmp/cfv2-gui6`): see the PR body for the run and
-  the screenshots (dark and light) of the dialog's two-choice state.
+* `make gui-e2e` (WebKit, 4 workers): 568 passed, 16 failed, all 16 in workspace specs
+  (`workspaces`, `workspace-panel`, `projects`, `sidebar`, `composer-switch`,
+  `terminal-routing`, `worktree-panel`) that fail the same way on `main` with this
+  branch's frontend swapped out: the v1 GUI flows PR 2 left for PRs 3 and 4. The new spec
+  and `addproject`, `paths`, `start`, `nogit` pass.
+* Live, built app on an isolated home (`CODE_FOUNDRY_HOME=/tmp/cfv2-gui6`), scratch
+  `~/cfv2-scratch-gui6/product` (web, api, docs-site as git repos, `notes` plain,
+  `CLAUDE.md`, `.claude/skills/demo`): the dialog showed "~/cfv2-scratch-gui6/product has
+  3 git repositories inside." with both choices (screenshots dark and light in the PR
+  body); Add as workspace made the three projects (not `notes`), workspace `product`
+  (starts in workspace, root the folder), the managed dir with `CLAUDE.md` and `.claude`
+  links (no `AGENTS.md` link: none in the root), toast "Added workspace product", and the
+  Projects page listed it. `~/cfv2-scratch-gui6/suite/plain` (no repos inside) was added at
+  once as a No git project, no question.
+* CLI against the same home: `project add-workspace ~/cfv2-scratch-gui6/suite` (alpha,
+  beta, `AGENTS.md`): workspace `suite`, an `AGENTS.md` link only; again on `product`:
+  `product 2`, every project reused; a repo and a plain folder refused with the
+  `project add` hint; a relative `suite` from its parent folder resolved, `suite 2`, JSON
+  with the id.
+* Driving the app: keystrokes went to a system password prompt that had taken focus
+  over the window, so the run used accessibility actions instead (AXPress on buttons, the
+  path field's AXValue, which WebKit turns into an input event React sees) and
+  `screencapture -l <window id>` (overlapping windows do not show).

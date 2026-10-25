@@ -166,7 +166,10 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 	}
 	w := res.Msg.GetWorkspace()
 	msg := "created workspace " + describeWorkspace(w)
-	if len(reused) > 0 {
+	switch {
+	case len(reused) > 0 && len(added) == 0:
+		msg += "; every project was already added"
+	case len(reused) > 0:
 		msg += fmt.Sprintf("; added %s, %d already added (%s)", plural(len(added), "project"), len(reused), strings.Join(reused, ", "))
 	}
 	return Result{Message: msg, JSON: w}, nil
