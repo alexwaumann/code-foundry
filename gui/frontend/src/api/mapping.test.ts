@@ -565,6 +565,7 @@ describe("workspace mapping", () => {
       managedDir: "/Users/me/.code-foundry/workspaces/w-1",
       instructions: "/Users/me/shop/CLAUDE.md",
       skills: ["demo", "release"],
+      rootMissing: true,
       createdAt: timestampFromMs(7000),
     };
     const want = {
@@ -576,6 +577,7 @@ describe("workspace mapping", () => {
         { projectId: "web", worktreePath: "" },
       ],
       rootPath: "/Users/me/shop",
+      rootMissing: true,
       defaultPrimary: "workspace",
       managedDir: "/Users/me/.code-foundry/workspaces/w-1",
       instructions: "/Users/me/shop/CLAUDE.md",

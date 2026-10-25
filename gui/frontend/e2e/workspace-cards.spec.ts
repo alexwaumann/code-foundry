@@ -62,6 +62,12 @@ test("a card shows its name, root, projects by id with where threads start, the 
   await mockPost(`workspace-files?workspace=${shop}&instructions=AGENTS.md&skills=lint`);
   await expect(s.getByTestId("workspace-instructions-open")).toHaveText("AGENTS.md");
   await expect(s.getByTestId("workspace-skill")).toHaveText(["lint"]);
+
+  // A root that moved is marked missing (workspace set-root repairs it).
+  await expect(m.getByTestId("workspace-root-missing")).toHaveCount(0);
+  await mockPost(`workspace-files?workspace=${mono}&rootMissing=1`);
+  await expect(m.getByTestId("workspace-root-missing")).toHaveText("missing");
+  await expect(m.getByTestId("workspace-root")).toHaveAttribute("data-missing", "true");
 });
 
 test("rename in place: double-click or Rename…, Enter renames, Escape keeps, a taken name is refused", async ({ page }) => {

@@ -287,6 +287,7 @@ function NameEditor({ workspaceId, name, onDone }: { workspaceId: string; name: 
 export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collapsed: boolean; filtering: boolean }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const root = useWorkspacesStore((s) => s.byId[id]?.rootPath ?? "");
+  const rootMissing = useWorkspacesStore((s) => s.byId[id]?.rootMissing === true);
   const summary = useWorkspacesStore((s) => {
     const w = s.byId[id];
     return w ? workspaceSummary(w) : "";
@@ -328,11 +329,16 @@ export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collap
           </span>
         )}
         {root && (
-          <Tip label={root}>
-            <span className="min-w-0 truncate text-caption font-mono" data-testid="workspace-root">
+          <Tip label={rootMissing ? `${root} is missing (moved or renamed?): workspace set-root points the workspace at its new place` : root}>
+            <span className="min-w-0 truncate text-caption font-mono" data-testid="workspace-root" data-missing={rootMissing || undefined}>
               {tildify(root)}
             </span>
           </Tip>
+        )}
+        {root && rootMissing && (
+          <span className="shrink-0 text-caption text-cf-error-text" data-testid="workspace-root-missing">
+            missing
+          </span>
         )}
         {collapsed && (
           <span className="shrink-0 text-caption tabular-nums" data-testid="workspace-collapsed-summary">
