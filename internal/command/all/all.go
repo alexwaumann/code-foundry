@@ -159,6 +159,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
 		command.RegisterProject(r, d.Project, d.NotGit),
 		command.RegisterProjectAdd(r, d.Project, d.Clone),
+		command.RegisterProjectAddWorkspace(r, d.Project, d.Workspace),
 		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterNewProjects(r, d.NewProjects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),

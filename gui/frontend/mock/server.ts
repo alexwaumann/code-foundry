@@ -334,6 +334,7 @@ function routes(router: ConnectRouter): void {
     },
     // The Add Project dialog's Local folder tab and an existing clone destination.
     register: (req) => guard(() => ({ project: world.projectMsg(world.registerFolder(req.path)) })),
+    inspectFolder: (req) => guard(() => world.inspectFolder(req.path)),
     unregister: () => {
       throw new ConnectError("use the project.unregister command in the mock", Code.Unimplemented);
     },

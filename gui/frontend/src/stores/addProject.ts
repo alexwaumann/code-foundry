@@ -1,10 +1,11 @@
 import { toast } from "sonner";
 import { create } from "zustand";
-import { registerProject, type AddedProjectView } from "@/api/addProject";
+import { inspectFolder, registerProject, type AddedProjectView, type FolderInfoView } from "@/api/addProject";
 import { errorMessage } from "@/api/stream";
-import { refreshCommands } from "./commands";
+import { invokeConfirmed, refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
 import { useProjectsStore } from "./projects";
+import { useUiStore } from "./ui";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
 /** The Add Project dialog's tabs, in display order. */
@@ -87,10 +88,57 @@ export function setAddProjectTab(tab: AddProjectTab): void {
  */
 export async function registerFolder(path: string): Promise<AddedProjectView> {
   try {
-    return await registerProject(path.length > 1 ? path.replace(/\/+$/, "") : path);
+    return await registerProject(trimSlash(path));
   } finally {
     void refreshCommands();
   }
+}
+
+function trimSlash(path: string): string {
+  return path.length > 1 ? path.replace(/\/+$/, "") : path;
+}
+
+/**
+ * The folder-of-repos scan (docs/notes/workspaces-v2-6-scan.md): the folder when it is not a
+ * git repository but has git repositories directly inside it, so the dialog offers to add it
+ * as a workspace; null otherwise. Null too when the daemon cannot say (a path it refuses):
+ * the dialog then adds the folder as before, and Register reports the error.
+ */
+export async function folderOfRepos(path: string): Promise<FolderInfoView | null> {
+  try {
+    const f = await inspectFolder(trimSlash(path));
+    return !f.isRepo && f.childRepos.length > 0 ? f : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A workspace project.add-workspace made. */
+export interface AddedWorkspaceView {
+  id: string;
+  name: string;
+}
+
+/**
+ * Adds a folder of repositories as a workspace (project.add-workspace): each repository
+ * inside becomes a project, and a rooted workspace named after the folder holds them.
+ * Errors reject with the daemon's message; nothing is toasted (the dialog shows them).
+ */
+export async function addFolderAsWorkspace(path: string): Promise<AddedWorkspaceView> {
+  try {
+    const res = await invokeConfirmed("project.add-workspace", { folder: trimSlash(path) });
+    if (!res) throw new Error("cancelled");
+    const w = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string };
+    if (!w.id) throw new Error(res.message || "the daemon did not say which workspace it made");
+    return { id: w.id, name: w.name ?? w.id };
+  } finally {
+    void refreshCommands();
+  }
+}
+
+/** Shows a workspace just added: the Projects page, which lists the workspaces. */
+export function showAddedWorkspace(): void {
+  useUiStore.getState().select({ kind: "view", name: "projects" });
 }
 
 /**

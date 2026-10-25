@@ -245,7 +245,11 @@ Services (v1):
   the exit, remove; shells only).
 * `ProjectService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
-  it directly, the CLI through `project add <folder>`),
+  it directly, the CLI through `project add <folder>`), InspectFolder (what Register would
+  make of a folder: a repository, else the git repositories directly inside it; the Add
+  Project dialog asks first and offers a folder of repos as a rooted workspace through
+  the `project.add-workspace` command, which registers each repository and creates the
+  workspace with the folder as its root; `docs/notes/workspaces-v2-6-scan.md`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   DeleteBranch (a branch no worktree has checked out, `-d` unless forced, origin's on
   request; `docs/notes/orch-cli-batch.md`), CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,

@@ -11,6 +11,13 @@ service ProjectService {
   // repository (its main worktree); any other existing directory registers as a
   // project without git (Project.git false).
   rpc Register(RegisterProjectRequest) returns (RegisterProjectResponse) {}
+  // InspectFolder says what Register would make of a folder before the Add Project
+  // dialog adds it: whether it is (or is inside) a git repository, and, when it is not,
+  // the git repositories directly inside it (immediate children with a .git directory or
+  // file; hidden and symlinked children are skipped), sorted by name. A folder of repos
+  // can be added as a rooted workspace instead (the project.add-workspace command).
+  // InvalidArgument for a path Register would refuse (outside home, not a directory).
+  rpc InspectFolder(InspectFolderRequest) returns (InspectFolderResponse) {}
   // Unregister forgets a project. Worktrees on disk are not touched.
   rpc Unregister(UnregisterProjectRequest) returns (UnregisterProjectResponse) {}
   // List returns registered projects with their worktrees.
@@ -180,6 +187,28 @@ message RegisterProjectRequest {
 
 message RegisterProjectResponse {
   Project project = 1;
+}
+
+message InspectFolderRequest {
+  // A folder under home; "~" expands like Register's path.
+  string path = 1;
+}
+
+message InspectFolderResponse {
+  // The folder, absolute with symlinks resolved.
+  string path = 1;
+  // Register would add a git repository: the folder is one, or is inside one.
+  bool is_repo = 2;
+  // When is_repo is false: the git repositories directly inside the folder.
+  repeated ChildRepo child_repos = 3;
+}
+
+// ChildRepo is a git repository directly inside an inspected folder.
+message ChildRepo {
+  // Absolute, under the inspected folder.
+  string path = 1;
+  // The folder's name.
+  string name = 2;
 }
 
 message UnregisterProjectRequest {

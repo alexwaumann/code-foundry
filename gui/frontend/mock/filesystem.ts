@@ -39,6 +39,10 @@ const tree: Dir = {
       },
     },
     dotfiles: { git: true },
+    // A folder of repos (the Add Project dialog's workspace choice): three repos and a plain folder.
+    product: { children: { web: { git: true }, api: { git: true }, "docs-site": { git: true }, notes: {} } },
+    // A folder of repos whose "broken" child the mock's project.add-workspace refuses.
+    mixed: { children: { ok: { git: true }, broken: { git: true } } },
     Documents: { children: { Projects: { children: { "side-project": { git: true } } } } },
     Downloads: {},
     Library: {},
@@ -136,6 +140,23 @@ export function projectFolder(abs: string): { path: string; git: boolean } | und
     if (dir === HOME) break;
   }
   return { path: abs, git: false };
+}
+
+/**
+ * ProjectService.InspectFolder over the tree: whether abs is (inside) a repository, else its
+ * child repositories (immediate, not hidden), sorted by name case-insensitively. Undefined
+ * when abs does not exist.
+ */
+export function folderInfo(abs: string): { path: string; isRepo: boolean; childRepos: { path: string; name: string }[] } | undefined {
+  const node = lookup(abs);
+  const folder = projectFolder(abs);
+  if (!node || !folder) return undefined;
+  if (folder.git) return { path: abs, isRepo: true, childRepos: [] };
+  const childRepos = Object.entries(node.children ?? {})
+    .filter(([name, d]) => !name.startsWith(".") && d.git)
+    .map(([name]) => ({ path: `${abs}/${name}`, name }))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  return { path: abs, isRepo: false, childRepos };
 }
 
 // ---- composer completion: ListSkills and SearchFiles -------------------------------------
