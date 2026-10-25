@@ -1,14 +1,16 @@
 /**
  * The worktree surface's targets: which worktree a thread runs in (the surface's default
  * tab and availability) and a worktree's tab. Pure: callers feed it the stores' current
- * state. (The workspace surface that shared this file is gone since workspaces v2; a
- * thread's other checkouts are the Worktree tab's Also in list.)
+ * state. A thread whose primary is its workspace's folder gets the same tab with a folder
+ * head (selectionFolder, folderTab); a thread's other checkouts are the tab's Also in list.
  */
+import { samePath, workspaceFolder } from "@/lib/workspaceCard";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ProjectsData } from "@/stores/projects";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
+import type { WorkspacesData } from "@/stores/workspaces";
 
 export const WORKTREE_KIND = "worktree";
 
@@ -48,4 +50,38 @@ export function worktreeOfTab(tab: Pick<Tab, "params">): WorktreeTarget | null {
   const projectId = tab.params.project ?? "";
   const path = tab.params.path ?? "";
   return projectId && path ? { projectId, path } : null;
+}
+
+/**
+ * A workspace's own folder as a Worktree tab's "folder head" (no git facts): where a
+ * thread whose primary is the workspace runs (its root, else its managed dir).
+ */
+export interface FolderTarget {
+  workspaceId: string;
+  path: string;
+}
+
+/**
+ * The workspace folder the selection's thread runs in: a thread with a workspace, no
+ * primary project, and its cwd the workspace's folder. Null otherwise (a thread in a
+ * worktree has selectionWorktree; a removed workspace has no folder to show).
+ */
+export function selectionFolder(sel: Selection, s: { threads: ThreadsData; workspaces: Pick<WorkspacesData, "byId"> }): FolderTarget | null {
+  if (sel.kind !== "thread") return null;
+  const t = s.threads.byId[sel.id];
+  if (!t?.workspaceId || t.projectId) return null;
+  const ws = s.workspaces.byId[t.workspaceId];
+  return ws && samePath(t.worktreePath, workspaceFolder(ws)) ? { workspaceId: ws.id, path: t.worktreePath } : null;
+}
+
+/** A workspace folder's Worktree tab: params { workspace, path } (no project), titled with the workspace's name. */
+export function folderTab(workspaceId: string, path: string, title: string): Tab {
+  return makeTab(WORKTREE_KIND, title, { workspace: workspaceId, path });
+}
+
+/** The workspace folder a Worktree tab names; null for a worktree's tab or bad params. */
+export function folderOfTab(tab: Pick<Tab, "params">): FolderTarget | null {
+  const workspaceId = tab.params.workspace ?? "";
+  const path = tab.params.path ?? "";
+  return workspaceId && path && !tab.params.project ? { workspaceId, path } : null;
 }

@@ -82,6 +82,11 @@ describe("projectsModel", () => {
       memberKey("w-1", "web"),
     ]);
   });
+  it("pageItems: members by project name, as the card shows them (case-insensitive), the stored order by id", () => {
+    const names: Record<string, string> = { api: "zeta", web: "Alpha" };
+    const keys = pageItems(projectsModel(projects, workspaces), workspaces, undefined, (id) => names[id]).filter((i) => i.kind === "member").map((i) => i.key);
+    expect(keys).toEqual([memberKey("w-1", "web"), memberKey("w-1", "api")]);
+  });
   it("pageItems: a collapsed project or workspace keeps its header row only", () => {
     const keys = pageItems(projectsModel(projects, workspaces), workspaces, { projects: new Set(["web", "api"]), workspaces: new Set(["w-1"]) }).map((i) => i.key);
     expect(keys).toEqual([projectKey("api"), projectKey("dot"), projectWorktreeKey("dot", "/src/dot"), projectKey("web"), workspaceKey("w-1")]);
@@ -132,14 +137,15 @@ describe("filterProjects", () => {
       dot: { name: "dotfiles", githubSlug: "", branches: { "/Users/dev/dotfiles": "main" } },
       wr: { name: "writing", githubSlug: "", branches: { "/Users/dev/Documents/writing": "" } },
     },
-    workspaces: { "w-login": { name: "login" }, "w-pay": { name: "payments-split" } },
+    workspaces: { "w-login": { name: "login", members: ["dot"] }, "w-pay": { name: "payments-split", members: ["cf", "gone"] } },
   };
   const shape = (m: ProjectsModel) => ({ projects: Object.fromEntries(m.projects.map((p) => [p.projectId, p.worktrees.length])), workspaces: m.workspaces });
   it.each<[string, string, { projects: Record<string, number>; workspaces: string[] }]>([
     ["empty keeps everything", "", { projects: { cf: 3, dot: 1, wr: 1 }, workspaces: ["w-login", "w-pay"] }],
     ["blank keeps everything", "  ", { projects: { cf: 3, dot: 1, wr: 1 }, workspaces: ["w-login", "w-pay"] }],
-    ["a project name shows all its rows", "Foundry", { projects: { cf: 3 }, workspaces: [] }],
-    ["a GitHub slug shows all its rows", "alexwaumann/", { projects: { cf: 3 }, workspaces: [] }],
+    ["a project name shows all its rows, and the workspaces it is in", "Foundry", { projects: { cf: 3 }, workspaces: ["w-pay"] }],
+    ["a member's name shows its workspace", "dotfiles", { projects: { dot: 1 }, workspaces: ["w-login"] }],
+    ["a GitHub slug shows all its rows (a member matches by name only)", "alexwaumann/", { projects: { cf: 3 }, workspaces: [] }],
     ["a branch shows only its rows", "SIDEBAR", { projects: { cf: 1 }, workspaces: [] }],
     ["a branch in several projects", "main", { projects: { cf: 1, dot: 1 }, workspaces: [] }],
     ["a tildified path", "~/documents", { projects: { wr: 1 }, workspaces: [] }],

@@ -244,8 +244,8 @@ export function markTerminalNewFromHere(): void {
 
 /**
  * terminal.new for a thread from elsewhere: its sidebar row's menu (in the thread's
- * worktree), or a member row of its side panel's Workspace surface (`cwd`: that member's
- * worktree). Either way the thread owns the shell, so it opens in the thread's panel.
+ * worktree, or `cwd`: another of its checkouts). The thread owns the shell, so it opens in
+ * the thread's panel.
  */
 export function newThreadTerminal(threadId: string, cwd?: string): Promise<boolean> {
   return startShell(getUiContext({ kind: "thread", id: threadId }), cwd ? { cwd } : {});

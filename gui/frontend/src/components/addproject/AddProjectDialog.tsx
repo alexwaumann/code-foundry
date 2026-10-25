@@ -2,7 +2,7 @@ import { CloudDownload, FolderOpen, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { closeAddProject, setAddProjectTab, useAddProjectStore, type AddProjectTab } from "@/stores/addProject";
+import { addProjectEscapeBack, closeAddProject, setAddProjectTab, useAddProjectStore, type AddProjectTab } from "@/stores/addProject";
 import { GitHubTab } from "./GitHubTab";
 import { LocalFolderTab } from "./LocalFolderTab";
 import { NewTab } from "./NewTab";
@@ -31,7 +31,15 @@ export function AddProjectDialog() {
         if (!o) closeAddProject();
       }}
     >
-      <DialogContent className="max-w-xl p-4" data-testid="add-project-dialog" data-tab={tab}>
+      <DialogContent
+        className="max-w-xl p-4"
+        data-testid="add-project-dialog"
+        data-tab={tab}
+        onEscapeKeyDown={(e) => {
+          // A step inside the tab (the Local folder tab's two choices) goes back first.
+          if (addProjectEscapeBack()) e.preventDefault();
+        }}
+      >
         <DialogTitle>Add Project</DialogTitle>
         <DialogDescription className="sr-only">Start a new project, add a folder on this Mac, or clone a repository from GitHub.</DialogDescription>
         <DialogClose asChild>

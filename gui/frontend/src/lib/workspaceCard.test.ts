@@ -5,7 +5,10 @@ import {
   editInstructionsPrompt,
   instructionsName,
   instructionsTarget,
+  instructionsStep,
   instructionsThread,
+  membersByName,
+  skillChips,
   workspaceFolder,
   workspaceNameError,
   workspaceSummary,
@@ -62,6 +65,49 @@ describe("instructionsThread (steer, else start)", () => {
   it("a synthetic workspace's folder is its managed dir; /private/tmp matches /tmp", () => {
     const ws = { ...synthetic, managedDir: "/tmp/cf/workspaces/w-1" };
     expect(instructionsThread(of(t("a", { workspaceId: "w-1", worktreePath: "/private/tmp/cf/workspaces/w-1" })), ws)).toBe("a");
+  });
+});
+
+describe("instructionsStep (a press steers once; while that thread is live, presses only focus it)", () => {
+  const t = (id: string, o: Partial<ThreadView> = {}) =>
+    ({ id, workspaceId: "w-2", worktreePath: "/Users/me/mono", archivedAtMs: null, createdBy: "", lastActivityAtMs: null, createdAtMs: 1, status: "idle", state: "connected", ...o }) as ThreadView;
+  const of = (...list: ThreadView[]) => ({ order: list.map((x) => x.id), byId: Object.fromEntries(list.map((x) => [x.id, x])) });
+  it.each<[string, ThreadView[], string, ReturnType<typeof instructionsStep>]>([
+    ["no thread there, no press yet: start", [], "", { kind: "start" }],
+    ["a thread there, no press yet: steer it (busy or not, the steer queues)", [t("a", { status: "busy" })], "", { kind: "steer", id: "a" }],
+    ["the last press sent to it and it is busy: focus only", [t("a", { status: "busy" })], "a", { kind: "focus", id: "a" }],
+    ["the last press sent to it and it is starting: focus only", [t("a", { state: "starting" })], "a", { kind: "focus", id: "a" }],
+    ["the last press sent to it and it is idle again: steer", [t("a", { status: "idle" })], "a", { kind: "steer", id: "a" }],
+    ["the last press went to another thread: steer this one", [t("a", { status: "busy" })], "b", { kind: "steer", id: "a" }],
+    ["the thread the last press started is not in the slice yet: focus it", [], "n", { kind: "focus", id: "n" }],
+    ["the thread the last press started is idle and elsewhere now: start", [t("n", { worktreePath: "/elsewhere" })], "n", { kind: "start" }],
+  ])("%s", (_n, list, last, want) => {
+    expect(instructionsStep(of(...list), rooted, last)).toEqual(want);
+  });
+});
+
+describe("membersByName", () => {
+  const names: Record<string, string> = { "p-1": "web", "p-2": "Api", "p-3": "api", "p-4": "billing" };
+  it("by name, case-insensitive, id as the tiebreak; an unregistered member by its id", () => {
+    expect(membersByName(["p-4", "p-1", "p-3", "p-2", "a-gone"], (id) => names[id])).toEqual(["a-gone", "p-2", "p-3", "p-4", "p-1"]);
+  });
+  it("keeps the input untouched", () => {
+    const ids = ["p-1", "p-2"];
+    membersByName(ids, (id) => names[id]);
+    expect(ids).toEqual(["p-1", "p-2"]);
+  });
+});
+
+describe("skillChips", () => {
+  const many = Array.from({ length: 11 }, (_, i) => `s${String(i).padStart(2, "0")}`);
+  it.each<[string, string[], number, number]>([
+    ["none", [], 0, 0],
+    ["exactly the cap: all shown", many.slice(0, 8), 8, 0],
+    ["over the cap: eight, then the rest", many, 8, 3],
+  ])("%s", (_n, skills, shown, rest) => {
+    const c = skillChips(skills);
+    expect([c.shown.length, c.rest.length]).toEqual([shown, rest]);
+    expect([...c.shown, ...c.rest]).toEqual(skills);
   });
 });
 

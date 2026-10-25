@@ -180,6 +180,19 @@ describe("ui persistence", () => {
     expect(ui().collapsedProjects).toEqual([]);
     useUiStore.setState({ collapsedWorkspaces: [] });
   });
+
+  it("prunes collapsed workspaces that no longer exist", () => {
+    useUiStore.setState({ collapsedWorkspaces: ["w-1", "w-gone", "w-2"] });
+    const before = useUiStore.getState().collapsedWorkspaces;
+    useUiStore.getState().pruneCollapsedWorkspaces((id) => id !== "w-gone");
+    expect(useUiStore.getState().collapsedWorkspaces).toEqual(["w-1", "w-2"]);
+    // Nothing gone: the same array (no persisted write).
+    const kept = useUiStore.getState().collapsedWorkspaces;
+    useUiStore.getState().pruneCollapsedWorkspaces(() => true);
+    expect(useUiStore.getState().collapsedWorkspaces).toBe(kept);
+    expect(before).not.toBe(kept);
+    useUiStore.setState({ collapsedWorkspaces: [] });
+  });
 });
 
 describe("bottomMax and clampBottomHeight", () => {

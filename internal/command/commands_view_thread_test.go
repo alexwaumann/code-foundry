@@ -267,6 +267,16 @@ func TestPanelThreadsLineage(t *testing.T) {
 	}
 }
 
+// view.panel.worktree opens for a thread whose primary is its workspace's folder (no
+// project, a workspace): the Worktree tab shows the folder head and the member checkouts.
+func TestPanelWorktreeWorkspaceFolder(t *testing.T) {
+	reg, emit := panelRegistry(t, &commandtest.Thread{Current: &v1.Thread{WorkspaceId: "w-1", WorktreePath: "/Users/me/mono"}})
+	if _, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.worktree", nil); err != nil {
+		t.Fatal(err)
+	}
+	sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(command.ViewPanelWorktree, "s-aaaaaaaaaaa1")})
+}
+
 // The page verbs move every window: from a thread's CLI they refuse while no window
 // shows that thread, unless --focus says the user asked. The app, the CLI outside a
 // thread and a viewed thread are unchanged; with no window open nothing is taken over.

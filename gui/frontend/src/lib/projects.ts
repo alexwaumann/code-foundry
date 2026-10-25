@@ -9,6 +9,7 @@ import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
+import { membersByName } from "./workspaceCard";
 
 export interface ProjectsSlice {
   /** `git` false: a project without git (a plain folder); absent counts as git. */
@@ -79,10 +80,11 @@ export const NONE_COLLAPSED: Collapsed = { projects: new Set(), workspaces: new 
 
 /**
  * Every navigable row of the page in display order: projects and their worktrees, then
- * workspace cards and their members (sorted by id). A collapsed project or workspace
+ * workspace cards and their members (by project name, as the card shows them: nameOf;
+ * without it, or for an unregistered member, by id). A collapsed project or workspace
  * keeps its header row only.
  */
-export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED): PageItem[] {
+export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED, nameOf: (projectId: string) => string | undefined = () => undefined): PageItem[] {
   const out: PageItem[] = [];
   for (const p of model.projects) {
     out.push({ key: projectKey(p.projectId), kind: "project", projectId: p.projectId });
@@ -92,7 +94,8 @@ export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, 
   for (const id of model.workspaces) {
     out.push({ key: workspaceKey(id), kind: "workspace", workspaceId: id });
     if (collapsed.workspaces.has(id)) continue;
-    for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.projectId), kind: "member", workspaceId: id, projectId: m.projectId });
+    const members = membersByName((workspaces.byId[id]?.members ?? []).map((m) => m.projectId), nameOf);
+    for (const projectId of members) out.push({ key: memberKey(id, projectId), kind: "member", workspaceId: id, projectId });
   }
   return out;
 }
@@ -129,14 +132,15 @@ export function projectKind(r: Pick<ProjectView, "githubSlug" | "remotes"> & { g
 /** What the page's filter matches against, per project and per workspace (only built while filtering). */
 export interface ProjectsSearch {
   projects: Readonly<Record<string, { name: string; githubSlug: string; branches: Readonly<Record<string, string>> } | undefined>>;
-  workspaces: Readonly<Record<string, { name: string } | undefined>>;
+  /** A workspace's name and its member project ids (matched by their names in `projects`). */
+  workspaces: Readonly<Record<string, { name: string; members?: readonly string[] } | undefined>>;
 }
 
 /**
  * The model narrowed to what the filter matches, case-insensitive substring: a project by
  * its name or GitHub slug (then all its rows show), else by any of its worktrees' branch or
- * tildified path (then only those rows show); a workspace by its name. An empty query
- * keeps everything.
+ * tildified path (then only those rows show); a workspace by its name or one of its
+ * projects' names (then the whole card shows). An empty query keeps everything.
  */
 export function filterProjects(model: ProjectsModel, query: string, search: ProjectsSearch): ProjectsModel {
   const q = query.trim().toLowerCase();
@@ -149,7 +153,10 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
       const worktrees = p.worktrees.filter((path) => hit(r?.branches[path]) || hit(tildify(path)));
       return worktrees.length > 0 ? [{ ...p, worktrees }] : [];
     }),
-    workspaces: model.workspaces.filter((id) => hit(search.workspaces[id]?.name)),
+    workspaces: model.workspaces.filter((id) => {
+      const w = search.workspaces[id];
+      return hit(w?.name) || (w?.members ?? []).some((p) => hit(search.projects[p]?.name));
+    }),
   };
 }
 

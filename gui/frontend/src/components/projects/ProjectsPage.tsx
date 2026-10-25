@@ -48,6 +48,7 @@ import {
   unregisterProject,
 } from "@/stores/projectActions";
 import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/projects";
+import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useUiStore } from "@/stores/ui";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";
@@ -62,9 +63,12 @@ import { RowAction, WorktreeState } from "./WorktreeState";
 const ROW_H = 32;
 const SEP = "\u0001";
 
-/** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
+/**
+ * The page's structure inputs as strings, so it rebuilds on membership changes only (not
+ * git status). A project's name is in it: a workspace card's rows are ordered by it.
+ */
 function useStructure(): { projects: string[]; workspaces: string[] } {
-  const projects = useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
+  const projects = useProjectsStore(useShallow((s) => s.order.map((id) => [id, s.byId[id]?.name ?? "", ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
   const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.map((m) => m.projectId) ?? [])].join(SEP))));
   return { projects, workspaces };
 }
@@ -74,8 +78,8 @@ function decode(projectKeys: readonly string[], wsKeys: readonly string[]) {
     order: projectKeys.map((k) => k.split(SEP)[0] ?? ""),
     byId: Object.fromEntries(
       projectKeys.map((k) => {
-        const [id = "", ...paths] = k.split(SEP);
-        return [id, { id, name: id, worktrees: paths.map((path) => ({ path, isMain: false })) }];
+        const [id = "", name = "", ...paths] = k.split(SEP);
+        return [id, { id, name, worktrees: paths.map((path) => ({ path, isMain: false })) }];
       }),
     ),
   };
@@ -102,7 +106,7 @@ function useSearchInputs(active: boolean): { projects: string[]; workspaces: str
       return [id, r?.name ?? "", r?.githubSlug ?? "", ...(r?.worktrees.flatMap((w) => [w.path, w.branch]) ?? [])].join(SEP);
     }) : [])),
   );
-  const workspaces = useWorkspacesStore(useShallow((s) => (active ? s.order.map((id) => [id, s.byId[id]?.name ?? ""].join(SEP)) : [])));
+  const workspaces = useWorkspacesStore(useShallow((s) => (active ? s.order.map((id) => [id, s.byId[id]?.name ?? "", ...(s.byId[id]?.members.map((m) => m.projectId) ?? [])].join(SEP)) : [])));
   return { projects, workspaces };
 }
 
@@ -118,8 +122,8 @@ function decodeSearch(projectKeys: readonly string[], wsKeys: readonly string[])
     ),
     workspaces: Object.fromEntries(
       wsKeys.map((k) => {
-        const [id = "", name = ""] = k.split(SEP);
-        return [id, { name }];
+        const [id = "", name = "", ...members] = k.split(SEP);
+        return [id, { name, members }];
       }),
     ),
   };
@@ -328,7 +332,7 @@ export function ProjectsPage() {
     // While filtering, every match shows expanded; the saved collapsed sets stay as they are.
     const shown = filtering ? filterProjects(m, query, decodeSearch(search.projects, search.workspaces)) : m;
     const c: Collapsed = filtering ? NONE_COLLAPSED : { projects: new Set(collapsedProjects), workspaces: new Set(collapsedWorkspaces) };
-    return { all: m, model: shown, collapsed: c, items: pageItems(shown, workspaces, c) };
+    return { all: m, model: shown, collapsed: c, items: pageItems(shown, workspaces, c, (id) => projects.byId[id]?.name || undefined) };
   }, [structure.projects, structure.workspaces, filtering, query, search.projects, search.workspaces, collapsedProjects, collapsedWorkspaces]);
   const navItems = useMemo<NavItem[]>(
     () =>
@@ -343,9 +347,15 @@ export function ProjectsPage() {
             };
           case "worktree":
             return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, it.path); } };
-          // A workspace member: its project's main worktree.
+          // A workspace member: its project's main worktree; an unregistered one (no worktree to show) opens nothing.
           case "member":
-            return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, mainWorktreePath(useProjectsStore.getState(), it.projectId)); } };
+            return {
+              key: it.key,
+              activate: () => {
+                const at = mainWorktreePath(useProjectsStore.getState(), it.projectId);
+                if (at) showWorktreeInPanel(it.projectId, at);
+              },
+            };
           case "workspace":
             return {
               key: it.key,
@@ -357,6 +367,14 @@ export function ProjectsPage() {
     [items, filtering],
   );
   const nav = useNav(navItems);
+  // A row asked for from elsewhere (a workspace just added): the cursor goes there once it shows.
+  const reveal = useProjectsPageStore((s) => s.reveal);
+  const setCursor = nav.ctx.setCursor;
+  useEffect(() => {
+    if (reveal === null || !items.some((it) => it.key === reveal)) return;
+    setCursor(reveal);
+    clearProjectsPageReveal(reveal);
+  }, [reveal, items, setCursor]);
   const loaded = useProjectsStore((s) => s.loaded);
   const rootRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);

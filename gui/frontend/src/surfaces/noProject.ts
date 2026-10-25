@@ -1,7 +1,7 @@
 /**
  * Whether a selection is about no project: a thread without one (lib/threadRow
- * isNoProject) or the no-project composer. Its side panel lists no git, worktree, pull
- * request or workspace surface (they are "hidden"); thread-scoped ones (Linked PRs, Usage,
+ * isNoProject) or the no-project composer. Its side panel lists no git, worktree or pull
+ * request surface (they are "hidden"); thread-scoped ones (Linked PRs, Usage,
  * MCP) stay. Pure over the stores' state; specs that use it watch the projects and threads
  * stores.
  */

@@ -12,6 +12,7 @@ import {
   addFolderAsWorkspace,
   finishAddProject,
   folderOfRepos,
+  onAddProjectEscape,
   registerFolder,
   selectAddedProject,
   showAddedWorkspace,
@@ -110,7 +111,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
         const w = await addFolderAsWorkspace(choice.typed);
         toast.success(`Added workspace ${w.name}`);
         finishAddProject();
-        showAddedWorkspace();
+        showAddedWorkspace(w.id);
       } else {
         const project = await registerFolder(choice.typed);
         toast.success(`Added ${project.name}`);
@@ -126,6 +127,17 @@ export function LocalFolderTab({ active }: { active: boolean }) {
   const focusInput = () => {
     rootRef.current?.querySelector("input")?.focus();
   };
+
+  // Escape on the two choices goes back to the path (as typed), not out of the dialog.
+  const asking = choice !== null && choiceBusy === null;
+  useEffect(() => {
+    if (!asking) return;
+    return onAddProjectEscape(() => {
+      setChoice(null);
+      setError(null);
+      rootRef.current?.querySelector("input")?.focus();
+    });
+  }, [asking]);
 
   const open = (name: string) => {
     setPath(homeRelative(descendInto(path, name)));

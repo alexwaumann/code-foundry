@@ -30,9 +30,11 @@ export function openAlsoIn(row: Pick<AlsoInRow, "projectId" | "path">): void {
  * The other checkouts of the thread whose panel shows the Worktree tab of `path` (the
  * selected thread: a panel always shows the selection's), from one ThreadService.Checkouts
  * read keyed by what they follow. Empty, and no read, for a single-project thread, the
- * Projects page's panel and anything else that is no thread.
+ * Projects page's panel and anything else that is no thread. `folder`: the tab is the
+ * workspace folder the thread runs in (a folder head), so every checkout is listed and a
+ * one-project thread reads them too.
  */
-export function useAlsoIn(path: string): AlsoInRow[] {
+export function useAlsoIn(path: string, folder = false): AlsoInRow[] {
   const threadId = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
   const thread = useThreadsStore(
     useShallow((s) => {
@@ -43,7 +45,7 @@ export function useAlsoIn(path: string): AlsoInRow[] {
   const idsKey = thread?.projectIds ?? "";
   const ids = useMemo(() => (idsKey ? idsKey.split(",") : []), [idsKey]);
   const worktrees = useProjectsStore((s) => memberWorktrees(s, ids).join(SEP));
-  const key = thread ? checkoutsKey({ ...thread, projectIds: ids }, worktrees ? worktrees.split(SEP) : []) : null;
+  const key = thread ? checkoutsKey({ ...thread, projectIds: ids }, worktrees ? worktrees.split(SEP) : [], folder ? 1 : 2) : null;
   const data = useResource(checkoutsResource, key)?.data;
-  return useMemo(() => alsoInRows(data, path), [data, path]);
+  return useMemo(() => alsoInRows(data, path, folder), [data, path, folder]);
 }

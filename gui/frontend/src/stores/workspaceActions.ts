@@ -4,9 +4,12 @@
  * args and the page's context, so the palette and the CLI reach the same code; opening
  * the instructions file is a File tab (GUI state, like a path chip).
  */
+import { toast } from "sonner";
 import { create } from "zustand";
 import type { UiContextView } from "@/api/command";
-import { editInstructionsPrompt, instructionsThread, PRIMARY_WORKSPACE, workspaceFolder } from "@/lib/workspaceCard";
+import { createdThreadId } from "@/lib/compose";
+import { threadLabel } from "@/lib/prompt";
+import { editInstructionsPrompt, instructionsStep, PRIMARY_WORKSPACE, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
 import { runCommand, runCommandForResult } from "./commands";
 import { emptyContext } from "./context";
@@ -31,19 +34,23 @@ export function renameWorkspace(workspaceId: string, name: string): Promise<bool
   return runCommand("workspace.rename", { name: name.trim(), workspace: workspaceId }, workspaceContext(workspaceId));
 }
 
-/** workspace.set-primary: a member project, or the workspace's own folder (PRIMARY_WORKSPACE). */
+/**
+ * workspace.set-primary: a member project by its id, or the workspace's own folder
+ * (PRIMARY_WORKSPACE). Never the project's name: the daemon reads "workspace" in any case
+ * as the folder, so a project named so would set the folder (ids never collide with it).
+ */
 export function setWorkspacePrimary(workspaceId: string, primary: string): Promise<boolean> {
-  return runCommand("workspace.set-primary", { primary: primary === PRIMARY_WORKSPACE ? PRIMARY_WORKSPACE : ref(primary), workspace: workspaceId }, workspaceContext(workspaceId));
+  return runCommand("workspace.set-primary", { primary, workspace: workspaceId }, workspaceContext(workspaceId));
 }
 
-/** workspace.add-project: nothing on disk changes. */
+/** workspace.add-project, by the project's id: nothing on disk changes. */
 export function addWorkspaceProject(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.add-project", { project: ref(projectId), workspace: workspaceId }, workspaceContext(workspaceId));
+  return runCommand("workspace.add-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId));
 }
 
-/** workspace.remove-project: nothing on disk changes; threads keep their projects. */
+/** workspace.remove-project, by the project's id (an unregistered member too): nothing on disk changes; threads keep their projects. */
 export function removeWorkspaceProject(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.remove-project", { project: ref(projectId), workspace: workspaceId }, workspaceContext(workspaceId));
+  return runCommand("workspace.remove-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId));
 }
 
 /** workspace.remove (the daemon confirms: a synthetic workspace's instructions and skills go too). Named by name, which reads better in the prompt. */
@@ -66,23 +73,43 @@ export function openWorkspaceInstructions(workspaceId: string): boolean {
   return true;
 }
 
+/** Per workspace, the thread the last "Edit instructions" press sent to or started (lib/workspaceCard.ts instructionsStep). */
+const lastEdit = new Map<string, string>();
+
+/** Test hook: forget every press. */
+export function resetInstructionsPresses(): void {
+  lastEdit.clear();
+}
+
+function selectThread(id: string): void {
+  useUiStore.getState().select({ kind: "thread", id });
+}
+
 /**
- * "Edit instructions": steers the user's thread already in the workspace's folder
- * (lib/workspaceCard.ts instructionsThread) and selects it, else starts one there
- * (thread.new --workspace <id> --project workspace, in the members' own checkouts: it
- * edits instructions, not code, so no worktrees are made) with the file as context.
- * The daemon focuses a new thread itself.
+ * "Edit instructions" (lib/workspaceCard.ts instructionsStep): steers the user's thread
+ * already in the workspace's folder and selects it, else starts one there (thread.new
+ * --workspace <id> --project workspace, in the members' own checkouts: it edits
+ * instructions, not code, so no worktrees are made) with the file as context; the daemon
+ * focuses a new thread itself. While the thread a press sent to is still live, a press
+ * only selects it (no second copy of the prompt). The steer's toast names the thread:
+ * thread.send's own message is the CLI's ("wait with: code-foundry thread wait …").
  */
 export async function editWorkspaceInstructions(workspaceId: string): Promise<boolean> {
   const ws = useWorkspacesStore.getState().byId[workspaceId];
   if (!ws) return false;
+  const step = instructionsStep(useThreadsStore.getState(), ws, lastEdit.get(workspaceId) ?? "");
+  if (step.kind === "focus") {
+    selectThread(step.id);
+    return true;
+  }
   const prompt = editInstructionsPrompt(ws);
-  const existing = instructionsThread(useThreadsStore.getState(), ws);
-  if (existing) {
-    const sel = { kind: "thread" as const, id: existing };
-    const ok = await runCommand("thread.send", { text: prompt }, { ...emptyContext, activeView: "thread", activeThreadId: existing, activeWorkspaceId: workspaceId });
-    if (ok) useUiStore.getState().select(sel);
-    return ok;
+  if (step.kind === "steer") {
+    const res = await runCommandForResult("thread.send", { text: prompt }, { ctx: { ...emptyContext, activeView: "thread", activeThreadId: step.id, activeWorkspaceId: workspaceId }, quiet: true });
+    if (!res) return false;
+    lastEdit.set(workspaceId, step.id);
+    selectThread(step.id);
+    toast.success(`Sent to ${threadLabel(useThreadsStore.getState().byId[step.id]?.name ?? "", step.id)}`);
+    return true;
   }
   const res = await runCommandForResult(
     "thread.new",
@@ -90,7 +117,10 @@ export async function editWorkspaceInstructions(workspaceId: string): Promise<bo
     // The composer's context (thread.new is offered there with no project, as for a workspace without one).
     { ctx: { ...emptyContext, activeView: "compose", activeWorkspaceId: workspaceId }, quiet: true },
   );
-  return res !== null;
+  if (!res) return false;
+  const id = createdThreadId(res.resultJson);
+  if (id) lastEdit.set(workspaceId, id);
+  return true;
 }
 
 /**

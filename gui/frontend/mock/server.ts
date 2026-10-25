@@ -1105,6 +1105,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/project/rename":
+      // id=repo-dot&name=workspace: the project's name.
+      try {
+        const r = world.renameProject(q.get("id") ?? "", q.get("name") ?? "");
+        json(res, 200, { id: r.id, name: r.name });
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/workspace-thread":
       // workspace=login[&project=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
       try {

@@ -1,17 +1,16 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { FileText, Folder, FolderGit2, FolderOpen, Layers, Pencil, Plus, SquarePen, Star, Trash2, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "@/components/compose/ComposerPicker";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
 import { memberKey, projectKind, workspaceKey, type ProjectKind } from "@/lib/projects";
 import { cn } from "@/lib/utils";
-import { addableProjects, instructionsName, PRIMARY_WORKSPACE, workspaceNameError, workspaceSummary } from "@/lib/workspaceCard";
+import { addableProjects, instructionsName, membersByName, PRIMARY_WORKSPACE, skillChips, workspaceSummary } from "@/lib/workspaceCard";
 import { composeInWorkspace } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useUiStore } from "@/stores/ui";
@@ -21,7 +20,6 @@ import {
   openWorkspaceInstructions,
   removeWorkspace,
   removeWorkspaceProject,
-  renameWorkspace,
   revealWorkspace,
   setWorkspacePrimary,
 } from "@/stores/workspaceActions";
@@ -29,6 +27,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { CollapseToggle } from "./CollapseToggle";
 import { OverflowMenu } from "./OverflowMenu";
 import { RowAction } from "./WorktreeState";
+import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
 
 export const MEMBER_ROW_HEIGHT = 32;
 
@@ -87,7 +86,21 @@ function FolderRow({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-/** One member project: its kind, name, the default mark, then make default and remove. Enter or a double-click shows its main worktree in the page's panel. */
+/** A workspace's member ids as the card shows them: by project name (lib/workspaceCard.ts membersByName); the stored order is by id. */
+function useMembersByName(workspaceId: string): string[] {
+  const ids = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId)));
+  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? "")));
+  return useMemo(() => {
+    const byId = new Map(ids.map((p, i) => [p, names[i] || undefined]));
+    return membersByName(ids, (p) => byId.get(p));
+  }, [ids, names]);
+}
+
+/**
+ * One member project: its kind, name, the default mark, then make default and remove.
+ * Enter or a double-click shows its main worktree in the page's panel; an unregistered
+ * one (its id, "not registered") opens nothing (ProjectsPage's member activate).
+ */
 function MemberRow({ workspaceId, projectId }: { workspaceId: string; projectId: string }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const known = useProjectsStore((s) => s.byId[projectId] !== undefined);
@@ -96,7 +109,7 @@ function MemberRow({ workspaceId, projectId }: { workspaceId: string; projectId:
   const Icon = KIND_ICON[kind];
   return (
     <NavRow navKey={memberKey(workspaceId, projectId)} className="group/m flex h-full items-center gap-2 rounded-md pr-2 pl-6 text-body">
-      <span className="flex min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-project={projectId} data-default={isDefault || undefined}>
+      <span className="flex min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-project={projectId} data-default={isDefault || undefined} data-unregistered={!known || undefined}>
         <Icon className={cn("size-3.5 shrink-0", kind === "github" ? "text-cf-info-text/90" : "text-cf-text-muted")} />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
@@ -183,23 +196,39 @@ function InstructionsLine({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-/** The skills in the workspace's .claude/skills, by name, or "none yet". */
+const SKILL_CHIP = "inline-flex h-5 max-w-48 items-center rounded-sm border px-1.5 text-caption font-mono";
+
+/**
+ * The skills in the workspace's .claude/skills, by name, or "none yet": at most
+ * SKILL_CHIPS chips, then "+N more" whose tooltip lists the rest. The label sits on the
+ * first row of chips.
+ */
 function SkillsLine({ workspaceId }: { workspaceId: string }) {
   const skills = useWorkspacesStore(useShallow((s) => [...(s.byId[workspaceId]?.skills ?? [])]));
+  const { shown, rest } = skillChips(skills);
   return (
-    <div className="flex min-h-7 items-center gap-2" data-testid="workspace-skills">
-      <span className="w-28 shrink-0 text-overline">Skills</span>
+    <div className="flex min-h-7 items-start gap-2" data-testid="workspace-skills">
+      <span className="flex h-7 w-28 shrink-0 items-center text-overline">Skills</span>
       {skills.length === 0 ? (
-        <span className="text-caption" data-testid="workspace-skills-none">
+        <span className="flex h-7 items-center text-caption" data-testid="workspace-skills-none">
           none yet
         </span>
       ) : (
-        <span className="flex min-w-0 flex-wrap gap-1">
-          {skills.map((n) => (
-            <span key={n} className="rounded-sm border px-1.5 text-caption font-mono" data-testid="workspace-skill">
-              {n}
-            </span>
+        <span className="flex min-w-0 flex-wrap gap-1 py-1">
+          {shown.map((n) => (
+            <Tip key={n} label={n} whenTruncated>
+              <span className={SKILL_CHIP} data-testid="workspace-skill">
+                <span className="truncate">{n}</span>
+              </span>
+            </Tip>
           ))}
+          {rest.length > 0 && (
+            <Tip label={rest.join(", ")}>
+              <span className={cn(SKILL_CHIP, "text-cf-text-muted")} data-testid="workspace-skills-more" data-count={rest.length}>
+                +{rest.length} more
+              </span>
+            </Tip>
+          )}
         </span>
       )}
     </div>
@@ -207,79 +236,9 @@ function SkillsLine({ workspaceId }: { workspaceId: string }) {
 }
 
 /**
- * The name, edited in place: Enter (or leaving the field) renames (workspace.rename),
- * Escape keeps the old one. Names are unique whatever their case; the daemon says so too.
- * Keys stay in the field (the page's list must not move meanwhile).
- */
-function NameEditor({ workspaceId, name, onDone }: { workspaceId: string; name: string; onDone: () => void }) {
-  const [value, setValue] = useState(name);
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Enter and Escape give the keyboard back to the page's list (the field unmounts).
-  const backToList = () => {
-    inputRef.current?.closest<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
-  };
-  const others = useWorkspacesStore(useShallow((s) => s.order.filter((x) => x !== workspaceId).map((x) => s.byId[x]?.name ?? "")));
-  const changed = value.trim() !== name;
-  const error = changed ? workspaceNameError(value, others) : "";
-  const commit = () => {
-    onDone();
-    if (changed && !error) void renameWorkspace(workspaceId, value);
-  };
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      <Input
-        ref={inputRef}
-        autoFocus
-        value={value}
-        aria-label="Workspace name"
-        aria-invalid={error ? true : undefined}
-        spellCheck={false}
-        autoComplete="off"
-        data-testid="workspace-name-input"
-        className="h-6 w-48 px-1.5 text-body font-medium"
-        onFocus={(e) => {
-          e.currentTarget.select();
-        }}
-        onChange={(e) => {
-          setValue(e.target.value);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-        }}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Escape") {
-            e.preventDefault();
-            backToList();
-            onDone();
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            if (error) return;
-            backToList();
-            commit();
-          }
-        }}
-        onBlur={() => {
-          if (error) onDone();
-          else commit();
-        }}
-      />
-      {error && (
-        <span className="truncate text-caption text-cf-error-text" data-testid="workspace-name-error">
-          {error}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/**
  * A workspace on the Projects page (docs/notes/workspaces-v2-4-projects-page.md): its
  * name (double-click or Rename… to edit in place), root when it has one, its projects by
- * id with where new threads start marked (and the workspace's own folder as a choice),
+ * name with where new threads start marked (and the workspace's own folder as a choice),
  * add and remove a project, the instructions file and skills, Edit instructions (a thread
  * in the workspace's folder does the editing: panels read, the agent acts), Reveal in
  * Finder and Remove. Collapses like a project.
@@ -292,7 +251,7 @@ export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collap
     const w = s.byId[id];
     return w ? workspaceSummary(w) : "";
   });
-  const members = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
+  const members = useMembersByName(id);
   const [renaming, setRenaming] = useState(false);
   return (
     <section className="group/card rounded-lg border" data-testid="workspace" data-workspace={id} data-rooted={root ? true : undefined} data-collapsed={collapsed}>
@@ -308,7 +267,7 @@ export function WorkspaceCard({ id, collapsed, filtering }: { id: string; collap
         />
         <Layers className="size-4 shrink-0 text-cf-highlight-text/90" aria-hidden />
         {renaming ? (
-          <NameEditor
+          <WorkspaceNameEditor
             workspaceId={id}
             name={name}
             onDone={() => {
