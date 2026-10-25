@@ -175,11 +175,12 @@ test("a TypeScript file at a line, the HTML sandbox, an image, a binary, a folde
   await openFile(page, "docs/preview.html");
   await expect(file(page)).toHaveAttribute("data-mode", "rendered");
   const frame = file(page).getByTestId("file-html-frame");
-  // Served by the daemon at a granted URL, in a sandbox with its own origin (the pages listener's) and no top navigation.
-  await expect(frame).toHaveAttribute("src", /\/preview\/mock-preview-\d+\/docs\/preview\.html$/);
+  // Served by the daemon at a granted URL (with the frame's nonce: docs/notes/bridge-fix-frames.md), in a
+  // sandbox with an opaque origin (no thread showed it) and no top navigation.
+  await expect(frame).toHaveAttribute("src", /\/preview\/mock-preview-\d+\/docs\/preview\.html#cf=[0-9a-f]{32}$/);
   const sandbox = (await frame.getAttribute("sandbox")) ?? "";
   expect(sandbox).toContain("allow-scripts");
-  expect(sandbox).toContain("allow-same-origin");
+  expect(sandbox).not.toContain("allow-same-origin");
   expect(sandbox).not.toContain("allow-top-navigation");
   await expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
   await expect(file(page).getByTestId("file-html-footer")).toHaveText("Sandboxed from Code Foundry · scripts and network on · loads files under ~/src/code-foundry");

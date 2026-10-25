@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArgSpecView } from "@/api/command";
-import { BRIDGE_SOURCES, errorResult, fillPageArgs, jsonSafe, okResult, parsePageMessage, readyMessage, resultJson, type PageMessage } from "./bridge";
+import { BRIDGE_LIMITS, BRIDGE_SOURCES, errorResult, fillPageArgs, frameNonce, jsonSafe, nonceMatches, okResult, parsePageMessage, readyMessage, resultJson, withNonce, type PageMessage } from "./bridge";
 
 describe("parsePageMessage", () => {
   const cases: { name: string; data: unknown; want: PageMessage | null }[] = [
@@ -13,6 +13,10 @@ describe("parsePageMessage", () => {
     { name: "a subscription without a source", data: { cf: 1, type: "cf:on", id: "s1" }, want: { kind: "bad", id: "s1", call: "cf.on", message: "cf:on needs a source" } },
     { name: "an off", data: { cf: 1, type: "cf:off", id: "s1" }, want: { kind: "off", id: "s1" } },
     { name: "a hello", data: { cf: 1, type: "cf:hello" }, want: { kind: "hello" } },
+    { name: "a bye", data: { cf: 1, type: "cf:bye", nonce: "n" }, want: { kind: "bye" } },
+    { name: "a run at the size cap", data: { cf: 1, type: "cf:run", id: "r", verb: "x", args: { b: "y".repeat(BRIDGE_LIMITS.messageChars - 12) } }, want: { kind: "run", id: "r", verb: "x", args: { b: "y".repeat(BRIDGE_LIMITS.messageChars - 12) } } },
+    { name: "a run past the size cap is ignored", data: { cf: 1, type: "cf:run", id: "r", verb: "x", args: { b: "y".repeat(BRIDGE_LIMITS.messageChars) } }, want: null },
+    { name: "a store past the size cap is ignored", data: { cf: 1, type: "cf:store", id: "w", key: "k", value: "y".repeat(BRIDGE_LIMITS.messageChars) }, want: null },
     { name: "a store", data: { cf: 1, type: "cf:store", id: "w1", key: "todo:items", value: "[1,2]" }, want: { kind: "store", id: "w1", key: "todo:items", value: "[1,2]" } },
     { name: "a removal", data: { cf: 1, type: "cf:store", id: "w1", key: "k", value: null }, want: { kind: "store", id: "w1", key: "k", value: null } },
     { name: "a store without a key", data: { cf: 1, type: "cf:store", id: "w1", value: "1" }, want: { kind: "bad", id: "w1", call: "cf.storage", message: "cf:store needs a key" } },
@@ -31,6 +35,34 @@ describe("parsePageMessage", () => {
       expect(parsePageMessage(c.data)).toEqual(c.want);
     });
   }
+});
+
+describe("the frame's nonce", () => {
+  it("is 128 random bits in hex, new each time", () => {
+    const a = frameNonce();
+    expect(a).toMatch(/^[0-9a-f]{32}$/);
+    expect(frameNonce()).not.toBe(a);
+  });
+
+  it.each([
+    ["a URL without a fragment", "http://h/preview/g/a.html", "http://h/preview/g/a.html#cf=n1"],
+    ["after the URL's own fragment", "http://h/preview/g/a.html#top", "http://h/preview/g/a.html#top&cf=n1"],
+    ["an empty fragment", "http://h/preview/g/a.html#", "http://h/preview/g/a.html#cf=n1"],
+  ])("goes in the fragment of %s", (_name, url, want) => {
+    expect(withNonce(url, "n1")).toBe(want);
+  });
+
+  it.each([
+    ["the frame's", { type: "cf:run", nonce: "n1" }, false, true],
+    ["another frame's", { type: "cf:run", nonce: "n2" }, false, false],
+    ["none", { type: "cf:run" }, false, false],
+    ["none, where it is optional", { type: "cf:resize" }, true, true],
+    ["another frame's, where it is optional", { type: "cf:resize", nonce: "n2" }, true, false],
+    ["a number", { type: "cf:run", nonce: 1 }, false, false],
+    ["not an object", "cf:run", true, false],
+  ])("matches a message carrying %s", (_name, data, optional, want) => {
+    expect(nonceMatches(data, "n1", optional)).toBe(want);
+  });
 });
 
 describe("fillPageArgs", () => {

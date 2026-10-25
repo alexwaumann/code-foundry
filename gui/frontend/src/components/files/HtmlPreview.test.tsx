@@ -24,11 +24,12 @@ describe("HtmlPreview", () => {
     render(<HtmlPreview path="/Users/me/proj/docs/a.html" text="<p>1</p>" name="a.html" />);
     const frame = await screen.findByTestId("file-html-frame");
     expect(previewFile).toHaveBeenCalledWith("", "/Users/me/proj/docs/a.html", undefined, expect.any(AbortSignal));
-    expect(frame.getAttribute("src")).toBe("http://127.0.0.1:1/preview/g/docs/a.html");
+    // The frame's nonce in the fragment (docs/notes/bridge-fix-frames.md).
+    expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:1\/preview\/g\/docs\/a\.html#cf=[0-9a-f]{32}$/);
+    // No owning thread (no thread's panel): an opaque origin, so it cannot reach another page's frame.
     expect(frame.getAttribute("sandbox")).toBe(HTML_PREVIEW_SANDBOX);
     expect(frame.hasAttribute("srcdoc")).toBe(false);
-    // Same-origin for the page's storage: its origin is the daemon's pages listener (docs/notes/bridge-2-gui.md).
-    expect(HTML_PREVIEW_SANDBOX).toContain("allow-same-origin");
+    expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-same-origin");
     expect(frame.getAttribute("allow")).toBe("clipboard-write");
     expect(HTML_PREVIEW_SANDBOX).not.toContain("allow-top-navigation");
     expect(screen.getByTestId("file-html-footer").textContent).toContain("loads files under ~/proj");
@@ -103,14 +104,14 @@ describe("HtmlPreview", () => {
       fireEvent.load(next);
       act(() => {
         setThemeSlots({ dark: "dracula" });
-        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: next.contentWindow }));
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: next.contentWindow, origin: "null" }));
       });
       await new Promise((r) => setTimeout(r, THEME_ACK_MS + 100));
       expect(screen.getByTestId("file-html-frame").dataset.load).toBe("1");
       // An ack from another window does not count.
       act(() => {
         setThemeSlots({ dark: "nord" });
-        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: window }));
+        window.dispatchEvent(new MessageEvent("message", { data: { type: "cf:theme:ack" }, source: window, origin: "null" }));
       });
       await waitFor(() => {
         expect(screen.getByTestId("file-html-frame").dataset.load).toBe("2");

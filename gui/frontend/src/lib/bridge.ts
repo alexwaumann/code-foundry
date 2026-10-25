@@ -3,10 +3,16 @@
  * shown in a thread posts to its parent through `/cf/bridge.js`, and what the host
  * (lib/bridgeHost.ts) posts back. Parsing, arg filling and the reply shapes; pure.
  *
- * Page → host (every message carries `cf: 1`):
+ * Every frame's src carries a nonce in its fragment (`#cf=<nonce>`, withNonce), and the
+ * script sends it back on every message: the host hears only its own frame's window, at
+ * its origin, with its nonce (docs/notes/bridge-fix-frames.md). A frame navigated to any
+ * other URL (another page's grant included) loses the fragment, so it gets no bridge.
+ *
+ * Page → host (every message carries `cf: 1` and `nonce`):
  * - `{ type: "cf:run", id, verb, args }`, args an object of strings
  * - `{ type: "cf:on", id, source }`, `{ type: "cf:off", id }`
- * - `{ type: "cf:hello" }`
+ * - `{ type: "cf:hello" }`: the script started; the only message `cf:ready` answers
+ * - `{ type: "cf:bye" }`: the document goes (pagehide); its calls and subscriptions stop
  * - `{ type: "cf:store", id, key, value }`, value a JSON text or null to remove
  *   (docs/notes/bridge-fix-storage.md)
  * - `{ type: "cf:cancel", id }`: the page gave up on a run (its timeout)
@@ -54,6 +60,7 @@ export type PageMessage =
   | { kind: "on"; id: CallId; source: string }
   | { kind: "off"; id: CallId }
   | { kind: "hello" }
+  | { kind: "bye" }
   | { kind: "store"; id: CallId; key: string; value: string | null }
   | { kind: "cancel"; id: CallId }
   | { kind: "bad"; id: CallId; call: string; message: string };
@@ -64,12 +71,67 @@ function callId(v: unknown): CallId | null {
   return null;
 }
 
-/** A bridge message from a page, or null for anything else (cf:resize, cf:theme:ack and stray messages included). */
+/**
+ * What one page may hold at the host at once, and the largest message it hears
+ * (docs/notes/bridge-fix-frames.md). The page script queues runs past `runs` itself.
+ */
+export const BRIDGE_LIMITS = { runs: 32, subscriptions: 16, messageChars: 256 * 1024 } as const;
+
+/** The fragment key of a frame's nonce. */
+const NONCE_KEY = "cf";
+
+/** A fresh nonce for one frame: 128 random bits, URL-safe. */
+export function frameNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** The frame's src: `url` with `cf=<nonce>` in its fragment (after the URL's own fragment, if it has one). */
+export function withNonce(url: string, nonce: string): string {
+  const hash = url.indexOf("#");
+  if (hash < 0) return `${url}#${NONCE_KEY}=${nonce}`;
+  return hash === url.length - 1 ? `${url}${NONCE_KEY}=${nonce}` : `${url}&${NONCE_KEY}=${nonce}`;
+}
+
+/**
+ * Whether a message from the frame's window may be heard by its host: it carries the
+ * frame's nonce or, when `optional` (a page's own `cf:resize` and `cf:theme:ack`, which a
+ * page without the script posts with no nonce), none at all. A wrong nonce never passes.
+ */
+export function nonceMatches(data: unknown, nonce: string, optional = false): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const got = (data as { nonce?: unknown }).nonce;
+  if (got === undefined) return optional;
+  return got === nonce;
+}
+
+/** The characters of a message's own fields the host would pass on, stopping once past the cap. */
+function messageChars(m: Record<string, unknown>): number {
+  let n = 0;
+  for (const k of ["type", "verb", "source", "key", "value"]) if (typeof m[k] === "string") n += m[k].length;
+  if (typeof m.id === "string") n += m.id.length;
+  const args = m.args;
+  if (typeof args === "object" && args !== null && !Array.isArray(args)) {
+    for (const [k, v] of Object.entries(args)) {
+      n += k.length + (typeof v === "string" ? v.length : 0);
+      if (n > BRIDGE_LIMITS.messageChars) break;
+    }
+  }
+  return n;
+}
+
+/**
+ * A bridge message from a page, or null for anything else (cf:resize, cf:theme:ack, stray
+ * messages, and any message whose fields pass BRIDGE_LIMITS.messageChars: ignored, not
+ * answered). The caller checked the nonce.
+ */
 export function parsePageMessage(data: unknown): PageMessage | null {
   if (typeof data !== "object" || data === null) return null;
   const m = data as Record<string, unknown>;
   if (m.cf !== 1 || typeof m.type !== "string") return null;
   if (m.type === "cf:hello") return { kind: "hello" };
+  if (m.type === "cf:bye") return { kind: "bye" };
+  if (messageChars(m) > BRIDGE_LIMITS.messageChars) return null;
   if (m.type !== "cf:run" && m.type !== "cf:on" && m.type !== "cf:off" && m.type !== "cf:store" && m.type !== "cf:cancel") return null;
   const id = callId(m.id);
   if (id === null) return null;

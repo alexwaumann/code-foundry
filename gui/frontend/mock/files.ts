@@ -192,6 +192,31 @@ addEventListener("load", () => parent.postMessage({ type: "cf:resize", height: M
 /** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
 export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
 
+/**
+ * A page with no thread that tries every other frame on screen (docs/notes/bridge-fix-frames.md):
+ * body[data-probe] lists "blocked" or "reached" per sibling, from an opaque origin always "blocked".
+ */
+export const PROBE_PAGE_HTML = `<!doctype html>
+<html><head><title>Probe</title></head>
+<body><p id="probe">?</p>
+<script>
+const out = [];
+for (let i = 0; i < parent.frames.length; i++) {
+  const w = parent.frames[i];
+  if (w === window) continue;
+  try {
+    void w.document.title;
+    out.push("reached");
+  } catch (e) {
+    out.push("blocked");
+  }
+}
+document.body.dataset.probe = out.join(",");
+document.getElementById("probe").textContent = out.join(", ") || "no siblings";
+</script>
+</body></html>
+`;
+
 interface Entry {
   data: Uint8Array;
   mime: string;
@@ -214,6 +239,9 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/plain.html`, text(PLAIN_PAGE_HTML, "text/html")],
     [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
     [`${CF}/docs/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
+    [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
+    // Outside the checkout, so it is served under a grant of its own.
+    [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],

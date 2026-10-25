@@ -9,6 +9,7 @@
  * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
  *
  *   GET  /__mock/invocations | writes | resizes | threads | streams
+ *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
  *   POST /__mock/reset
  *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a project named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
@@ -213,7 +214,7 @@ import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
 import { publishMockTheme, themeRoute } from "./theme";
-import { bridgeRoute } from "./bridge";
+import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
@@ -413,7 +414,9 @@ function routes(router: ConnectRouter): void {
   router.service(CommandService, {
     list: (req) => ({ commands: world.listCommands(req.context, req.includeUnavailable) }),
     // Git operations resolve when the fake op finishes (mock/gitops.ts), like the daemon.
-    invoke: async (req) => {
+    invoke: async (req, ctx) => {
+      // Held until the caller aborts it (mock/bridge.ts holdWait).
+      if (req.name === "thread.wait") return holdWait(req.args, ctx.signal);
       try {
         const out = await world.invoke(req.name, req.context, req.args, req.confirmed);
         return typeof out === "string" ? { message: out, resultJson: "" } : out;
@@ -1371,6 +1374,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);
       break;
+    case "GET /__mock/waits":
+      json(res, 200, mockWaits());
+      break;
     case "GET /__mock/settings":
       json(res, 200, { raw: world.settings.raw, values: world.settings.values(), loadError: world.settings.loadError });
       break;
@@ -1407,6 +1413,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       resetCompletion();
       mockFiles.reset();
       resetPageStorage();
+      resetWaits();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {

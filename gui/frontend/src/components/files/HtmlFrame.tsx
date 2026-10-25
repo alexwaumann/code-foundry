@@ -1,22 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
+import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { isThemeAck, resizeHeight } from "./previewGrant";
 
 /**
- * The frame's sandbox: scripts, forms, dialogs, downloads and popups (a target=_blank link
- * opens in the browser), and `allow-same-origin`, so a page has localStorage and IndexedDB
- * (docs/notes/bridge-2-gui.md), for the app's session only: WebKit never writes a
- * cross-site frame's storage to disk, so cf.storage is the daemon's
- * (docs/notes/bridge-fix-storage.md). That origin is the daemon's pages listener
+ * The sandbox of a frame with no owning thread (a File tab on an arbitrary HTML file):
+ * scripts, forms, dialogs, downloads and popups (a target=_blank link opens in the
+ * browser), and an opaque origin, so it cannot reach another page's frame (a thread's,
+ * whose bridge it would otherwise drive through `parent.frames`) nor keep any storage
+ * (docs/notes/bridge-fix-frames.md). Never `allow-top-navigation`, so a link cannot
+ * replace the app.
+ */
+export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
+
+/**
+ * The sandbox of a page a thread showed: HTML_PREVIEW_SANDBOX and `allow-same-origin`, so
+ * it has localStorage and IndexedDB (docs/notes/bridge-2-gui.md), for the app's session
+ * only: WebKit never writes a cross-site frame's storage to disk, so cf.storage is the
+ * daemon's (docs/notes/bridge-fix-storage.md). That origin is the daemon's pages listener
  * (`/preview/` and `/cf/` on a port of their own), never the app's and never the API's,
  * whose CORS refuses it: the page still cannot reach Code Foundry's window or the
- * daemon's authenticated routes, and reaches Code Foundry only through the bridge. Never
- * `allow-top-navigation`, so a link cannot replace the app.
+ * daemon's authenticated routes, and reaches Code Foundry only through the bridge. Every
+ * thread's pages share that origin, so two of them on screen can reach each other's
+ * window (accepted: both are the user's own threads).
  */
-export const HTML_PREVIEW_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
+export const THREAD_PAGE_SANDBOX = `${HTML_PREVIEW_SANDBOX} allow-same-origin`;
 
 /**
  * How long a frame waits, after a new theme reached the daemon, for the page to answer
@@ -48,8 +59,14 @@ export const THEME_ACK_MS = 300;
  *
  * The bridge (stores/bridgeHost.ts): a page loading `/cf/bridge.js` runs verbs and
  * subscribes to the app's state as `thread`, the thread that shows it; without one (a File
- * tab on any other HTML file) it gets a bridge that refuses every call. Only this frame's
- * own window, at the origin its URL names, is heard; replies go to that window and origin.
+ * tab on any other HTML file) it gets a bridge that refuses every call, in an opaque
+ * origin (HTML_PREVIEW_SANDBOX). The frame's src carries a nonce of its own in its fragment
+ * (lib/bridge.ts withNonce), which the script sends back on every message. Only this
+ * frame's own window, at the origin its URL names ("null" without a thread), with that
+ * nonce is heard; `cf:resize` and `cf:theme:ack` may come without one (a page without the
+ * script), never with another. A frame navigated to another URL, another page's grant
+ * included, loses the fragment and with it the bridge. Replies go to that window and
+ * origin. A change of owning thread reloads the frame (its sandbox changes with it).
  * `onPageErrors` hears the errors the bridge answered the frame's document with
  * (lib/pageErrors.ts; deduped, the latest few), and [] again on each load and on unmount.
  */
@@ -140,30 +157,40 @@ export function HtmlFrame({
     },
     [report],
   );
-  // The bridge's host for this frame: one per owning thread and page; gone on unmount.
-  const origin = useMemo(() => originOf(url), [url]);
+  // The bridge's host for this frame: one per owning thread and page; gone on unmount. A
+  // page without a thread is in an opaque origin, which messages name "null" and a post
+  // cannot target.
+  const opaque = thread === null;
+  const pageOrigin = useMemo(() => originOf(url), [url]);
+  const origin = opaque ? "null" : pageOrigin;
+  const target = opaque ? "*" : pageOrigin;
+  const [nonce] = useState(frameNonce);
+  const src = useMemo(() => withNonce(url, nonce), [url, nonce]);
   const host = useRef<BridgeHost | null>(null);
-  const hasLoaded = useRef(false);
+  const nameRef = useRef(name);
+  useEffect(() => {
+    nameRef.current = name;
+  });
   useEffect(() => {
     const h = createBridgeHost({
       threadId: thread,
-      pageName: name,
+      get pageName() {
+        return nameRef.current;
+      },
       post: (msg) => {
         const win = frameRef.current?.contentWindow;
-        if (win && origin) win.postMessage(msg, origin);
+        if (win && target) win.postMessage(msg, target);
       },
       onError: (e) => {
         report(addPageError(errors.current, e));
       },
     });
     host.current = h;
-    // A page already up (its thread was learnt after it loaded) hears a new ready now.
-    if (hasLoaded.current) h.loaded();
     return () => {
       h.dispose();
       if (host.current === h) host.current = null;
     };
-  }, [thread, name, origin, report]);
+  }, [thread, target, report]);
   const resizeRef = useRef(onResize);
   useEffect(() => {
     resizeRef.current = onResize;
@@ -171,36 +198,35 @@ export function HtmlFrame({
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const win = frameRef.current?.contentWindow;
-      if (!win || e.source !== win) return;
+      if (!win || e.source !== win || !origin || e.origin !== origin) return;
       if (isThemeAck(e.data)) {
-        acked.current = posted.current;
+        if (nonceMatches(e.data, nonce, true)) acked.current = posted.current;
         return;
       }
       const h = resizeHeight(e.data);
       if (h !== null) {
-        resizeRef.current?.(h);
+        if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h);
         return;
       }
-      if (origin && e.origin === origin) host.current?.receive(e.data);
+      if (nonceMatches(e.data, nonce)) host.current?.receive(e.data);
     };
     window.addEventListener("message", onMessage);
     return () => {
       window.removeEventListener("message", onMessage);
     };
-  }, [origin]);
+  }, [origin, nonce]);
   return (
     <iframe
-      key={load}
+      key={`${String(load)}:${thread ?? ""}`}
       ref={frameRef}
       onLoad={() => {
         post();
-        hasLoaded.current = true;
         if (errors.current.length > 0) report([]);
         host.current?.loaded();
       }}
       aria-label={`${name} (rendered)`}
-      src={url}
-      sandbox={HTML_PREVIEW_SANDBOX}
+      src={src}
+      sandbox={opaque ? HTML_PREVIEW_SANDBOX : THREAD_PAGE_SANDBOX}
       allow="clipboard-write"
       referrerPolicy="no-referrer"
       className={cn("w-full border-0 bg-white", className)}

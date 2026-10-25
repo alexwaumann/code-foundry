@@ -59,6 +59,23 @@ function host(threadId: string | null = "t-1") {
 }
 
 const run = (id: string, verb: string, args: Record<string, string> = {}) => ({ cf: 1, type: "cf:run", id, verb, args });
+const hello = { cf: 1, type: "cf:hello" };
+/** invokeCommand's last two args for a page's call: the default connection and the call's abort signal. */
+const signalled: unknown[] = [undefined, expect.objectContaining({ signal: expect.any(AbortSignal) as unknown })];
+/** A call the daemon holds until its signal aborts, as a thread.wait does; resolves `aborted` then. */
+function hanging() {
+  let aborted!: () => void;
+  const gone = new Promise<void>((r) => (aborted = r));
+  invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { signal?: AbortSignal }) =>
+    new Promise((_resolve, reject) => {
+      opts?.signal?.addEventListener("abort", () => {
+        aborted();
+        reject(new ConnectError("the operation was aborted", Code.Canceled));
+      });
+    }),
+  );
+  return gone;
+}
 
 beforeEach(() => {
   invokeCommand.mockReset();
@@ -75,9 +92,12 @@ afterEach(() => {
 });
 
 describe("bridge host", () => {
-  it("says ready with the thread and its read-only verbs on load", async () => {
+  it("says ready with the thread and its read-only verbs in reply to hello, not on a bare load", async () => {
     const { h, posts } = host();
     h.loaded();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(posts).toEqual([]);
+    h.receive(hello);
     await vi.waitFor(() => {
       expect(posts).toHaveLength(1);
     });
@@ -94,7 +114,7 @@ describe("bridge host", () => {
       expect(posts.find((p) => p.type === "cf:result")).toEqual({ type: "cf:result", id: "r1", ok: true, result: { text: "started", json: { id: "t-2" } } });
     });
     // focus=false: a page's thread.new does not move the view (unless the page passes focus).
-    expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "t-1" }), { prompt: "hi", "created-by": "t-1", focus: "false" });
+    expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "t-1" }), { prompt: "hi", "created-by": "t-1", focus: "false" }, ...signalled);
   });
 
   it("sends the thread's checkout for an arg that defaults to the CLI's cwd", async () => {
@@ -105,7 +125,7 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts.find((p) => p.type === "cf:result")).toMatchObject({ ok: true });
     });
-    expect(invokeCommand).toHaveBeenCalledWith("workspace.members", expect.anything(), { cwd: "/wt/app" });
+    expect(invokeCommand).toHaveBeenCalledWith("workspace.members", expect.anything(), { cwd: "/wt/app" }, ...signalled);
   });
 
   it("reports the errors the strip counts, not a decline", async () => {
@@ -284,7 +304,7 @@ describe("bridge host", () => {
     const one = host();
     const two = host();
     const other = host("t-2");
-    one.h.loaded();
+    one.h.receive(hello);
     await vi.waitFor(() => {
       expect(one.posts.find((p) => p.type === "cf:ready")).toMatchObject({ storage: { visits: "2" } });
     });
@@ -324,7 +344,7 @@ describe("bridge host", () => {
 
   it("refuses every call without a thread", async () => {
     const { h, posts } = host(null);
-    h.loaded();
+    h.receive(hello);
     h.receive(run("r", "thread.list"));
     h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread-list" });
     await vi.waitFor(() => {
@@ -359,17 +379,129 @@ describe("bridge host", () => {
     expect(posts).toHaveLength(2);
   });
 
-  it("a new document drops the last one's subscriptions; an unknown source is invalid", () => {
-    vi.useFakeTimers();
+  it("an unknown source is invalid", () => {
     const { h, posts } = host();
     h.receive({ cf: 1, type: "cf:on", id: "s", source: "nope" });
     expect(posts).toEqual([{ type: "cf:result", id: "s", ok: false, error: { code: "invalid", message: "no source nope" } }]);
+  });
+
+  // How each new document announces itself: a hello, the last one's bye, or a load with no hello since the one before.
+  it.each([
+    ["the next document's hello", (h: ReturnType<typeof host>["h"]) => {
+      h.receive(hello);
+    }],
+    ["this document's bye", (h: ReturnType<typeof host>["h"]) => {
+      h.receive({ cf: 1, type: "cf:bye" });
+    }],
+    ["a load with no hello since the last", (h: ReturnType<typeof host>["h"]) => {
+      h.loaded();
+      h.loaded();
+    }],
+  ])("a new document (%s) drops the last one's subscriptions and aborts its calls", async (_name, next) => {
+    const gone = hanging();
+    const { h, posts } = host();
+    h.receive(hello);
+    h.receive(run("w", "thread.wait"));
     h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread" });
     expect(posts.at(-1)).toMatchObject({ type: "cf:event", source: "thread", event: { thread: { id: "t-1" }, pending: [] } });
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalled();
+    });
+    next(h);
+    await gone;
+    const n = posts.length;
+    useThreadsStore.setState({ byId: { "t-1": thread("t-1", "Renamed") }, order: ["t-1"] });
+    await new Promise((r) => setTimeout(r, BRIDGE_DEBOUNCE_MS + 10));
+    expect(posts.slice(n).filter((p) => p.type !== "cf:ready")).toEqual([]);
+  });
+
+  it("keeps the document that said hello across its own load", () => {
+    vi.useFakeTimers();
+    const { h, posts } = host();
+    h.receive(hello);
+    h.receive({ cf: 1, type: "cf:on", id: "s", source: "thread" });
     h.loaded();
     const n = posts.length;
     useThreadsStore.setState({ byId: { "t-1": thread("t-1", "Renamed") }, order: ["t-1"] });
     vi.advanceTimersByTime(BRIDGE_DEBOUNCE_MS);
-    expect(posts.slice(n).filter((p) => p.type === "cf:event")).toEqual([]);
+    expect(posts.slice(n)).toMatchObject([{ type: "cf:event", event: { thread: { name: "Renamed" } } }]);
+  });
+
+  it("aborts a run the page gave up on, and answers nothing for it", async () => {
+    const gone = hanging();
+    const { h, posts, errors } = host();
+    h.receive(run("w", "thread.wait", { id: "t-2" }));
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalledWith("thread.wait", expect.anything(), { id: "t-2" }, ...signalled);
+    });
+    h.receive({ cf: 1, type: "cf:cancel", id: "w" });
+    await gone;
+    await new Promise((r) => setTimeout(r, 10));
+    expect(posts).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("aborts every run in flight once disposed", async () => {
+    const gone = hanging();
+    const { h } = host();
+    h.receive(run("w", "thread.wait"));
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalled();
+    });
+    h.dispose();
+    await gone;
+  });
+
+  it("refuses a run whose id is in flight, and takes it again once that one is answered", async () => {
+    let answer!: (v: unknown) => void;
+    invokeCommand.mockImplementationOnce(() => new Promise((r) => (answer = r)));
+    const { h, posts } = host();
+    h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalledTimes(1);
+    });
+    h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts).toEqual([{ type: "cf:result", id: "r", ok: false, error: { code: "invalid", message: "a call with id r is already running" } }]);
+    });
+    answer({ message: "one", resultJson: "" });
+    await vi.waitFor(() => {
+      expect(posts).toHaveLength(2);
+    });
+    invokeCommand.mockResolvedValueOnce({ message: "two", resultJson: "" });
+    h.receive(run("r", "thread.list"));
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ id: "r", ok: true, result: { text: "two" } });
+    });
+    expect(invokeCommand).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds at most 32 runs and 16 subscriptions per document", async () => {
+    void hanging();
+    const { h, posts } = host();
+    for (let i = 0; i < 33; i++) h.receive(run(`r${String(i)}`, "thread.wait"));
+    await vi.waitFor(() => {
+      expect(posts).toEqual([{ type: "cf:result", id: "r32", ok: false, error: { code: "invalid", message: "too many calls at once (32); wait for one to finish" } }]);
+    });
+    await vi.waitFor(() => {
+      expect(invokeCommand).toHaveBeenCalledTimes(32);
+    });
+    posts.length = 0;
+    for (let i = 0; i < 17; i++) h.receive({ cf: 1, type: "cf:on", id: `s${String(i)}`, source: "thread" });
+    // The same id again replaces its subscription, so it is not one more.
+    h.receive({ cf: 1, type: "cf:on", id: "s0", source: "thread-list" });
+    const refused = posts.filter((p) => p.type === "cf:result");
+    expect(refused).toEqual([{ type: "cf:result", id: "s16", ok: false, error: { code: "invalid", message: "too many subscriptions (16); end one with cf.off first" } }]);
+    h.dispose();
+  });
+
+  it("ignores a message past 256 KiB", async () => {
+    const { h, posts } = host();
+    h.receive(run("r", "ui.notify", { body: "x".repeat(256 * 1024) }));
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "k", value: "y".repeat(256 * 1024 + 1) });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(posts).toEqual([]);
+    expect(invokeCommand).not.toHaveBeenCalled();
+    expect(pageStore.sets).toEqual([]);
   });
 });

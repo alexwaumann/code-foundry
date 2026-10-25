@@ -46,13 +46,20 @@ const show = (el, p) =>
     (r) => { el.className = "out ok"; el.textContent = r.json ? JSON.stringify(r.json).slice(0, 80) : r.text || "ok"; },
     (e) => { el.className = "out err"; el.textContent = e.code + ": " + e.message; },
   );
-cf.ready.then((r) => {
-  $("thread").textContent = r.thread ? r.thread.name : "no thread";
-  $("theme").textContent = r.theme.scheme;
-  document.body.dataset.ready = "1";
-  document.body.dataset.readonly = String(r.readOnly.length);
-  document.body.dataset.sources = r.sources.join(",");
-});
+cf.ready.then(
+  (r) => {
+    $("thread").textContent = r.thread ? r.thread.name : "no thread";
+    $("theme").textContent = r.theme.scheme;
+    document.body.dataset.ready = "1";
+    document.body.dataset.readonly = String(r.readOnly.length);
+    document.body.dataset.sources = r.sources.join(",");
+  },
+  (e) => {
+    // No bridge here (a frame that followed a link to this page): docs/notes/bridge-fix-frames.md.
+    $("thread").textContent = e.code + ": " + e.message;
+    document.body.dataset.ready = "no";
+  },
+);
 cf.onTheme((t) => {
   document.documentElement.style.colorScheme = t.scheme;
   for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);

@@ -173,9 +173,9 @@ export async function invokeCommand(
   ctx: UiContextView,
   args: Record<string, string>,
   conn: DaemonConnection = daemon,
-  opts: { confirmed?: boolean } = {},
+  opts: { confirmed?: boolean; signal?: AbortSignal } = {},
 ): Promise<InvokeResultView> {
   const c = await conn.client(CommandService);
-  const res = await c.invoke({ name, context: toUiContext(ctx), args, confirmed: opts.confirmed ?? false });
+  const res = await c.invoke({ name, context: toUiContext(ctx), args, confirmed: opts.confirmed ?? false }, { signal: opts.signal });
   return { message: res.message, resultJson: res.resultJson };
 }

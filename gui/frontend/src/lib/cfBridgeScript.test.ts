@@ -33,7 +33,10 @@ interface Cf {
   storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown> };
 }
 
-function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean } = {}) {
+/** The nonce the fake frame's URL carries (HtmlFrame's `#cf=<nonce>`). */
+const N = "n0nce";
+
+function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; hash?: string } = {}) {
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const posted: { m: Msg; origin: string }[] = [];
   const parent = {
@@ -84,8 +87,8 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
   }
   // The script under test, as a page would run it, with these globals.
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const run = new Function("window", "navigator", "document", "localStorage", "ResizeObserver", SRC) as (...globals: unknown[]) => void;
-  run(win, nav, doc, localStorage, ResizeObserver);
+  const run = new Function("window", "navigator", "document", "localStorage", "ResizeObserver", "location", SRC) as (...globals: unknown[]) => void;
+  run(win, nav, doc, localStorage, ResizeObserver, { hash: opts.hash ?? `#cf=${N}` });
   const cf = win.cf as Cf;
   const send = (data: unknown, source: unknown = parent) => {
     for (const fn of listeners.message ?? []) fn({ data, source });
@@ -96,7 +99,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
   const ready = (extra: Record<string, unknown> = {}) => {
     send({
       type: "cf:ready",
-      cf: 1,
+      cf: 1, nonce: N,
       thread: { id: "t-1", name: "Thread one" },
       theme: { id: "github-dark", scheme: "dark", vars: { "--cf-text": "#fff" } },
       readOnly: ["thread.get"],
@@ -115,9 +118,9 @@ afterEach(() => {
 });
 
 describe("bridge.js", () => {
-  it("says hello to its parent with the protocol version, to any origin", () => {
+  it("says hello to its parent with the protocol version and its frame's nonce, to any origin", () => {
     const h = load();
-    expect(h.posted[0]).toEqual({ m: { type: "cf:hello", cf: 1 }, origin: "*" });
+    expect(h.posted[0]).toEqual({ m: { type: "cf:hello", cf: 1, nonce: N }, origin: "*" });
   });
 
   it("fills thread, theme and ready from cf:ready", async () => {
@@ -135,7 +138,7 @@ describe("bridge.js", () => {
     const p = h.cf.run("thread.get", { id: "t-2", json: true, last: 3, skip: undefined });
     await flush();
     const [run] = h.sent("cf:run");
-    expect(run).toEqual({ type: "cf:run", cf: 1, id: run?.id, verb: "thread.get", args: { id: "t-2", json: "true", last: "3" } });
+    expect(run).toEqual({ type: "cf:run", cf: 1, nonce: N, id: run?.id, verb: "thread.get", args: { id: "t-2", json: "true", last: "3" } });
     h.send({ type: "cf:result", id: run?.id, ok: true, result: { text: "ok", json: '{"a":1}' } });
     await expect(p).resolves.toEqual({ text: "ok", json: { a: 1 } });
   });
@@ -237,12 +240,12 @@ describe("bridge.js", () => {
     const got: unknown[] = [];
     const off = h.cf.on("thread-list", (e, source) => got.push([e, source]));
     const [on] = h.sent("cf:on");
-    expect(on).toMatchObject({ type: "cf:on", cf: 1, source: "thread-list" });
+    expect(on).toMatchObject({ type: "cf:on", cf: 1, nonce: N, source: "thread-list" });
     h.send({ type: "cf:event", id: on?.id, source: "thread-list", event: { threads: [] } });
     h.send({ type: "cf:event", id: "someone-else", source: "thread-list", event: 1 });
     expect(got).toEqual([[{ threads: [] }, "thread-list"]]);
     off();
-    expect(h.sent("cf:off")).toEqual([{ type: "cf:off", cf: 1, id: on?.id }]);
+    expect(h.sent("cf:off")).toEqual([{ type: "cf:off", cf: 1, nonce: N, id: on?.id }]);
     h.send({ type: "cf:event", id: on?.id, source: "thread-list", event: 2 });
     expect(got).toHaveLength(1);
   });
@@ -291,7 +294,7 @@ describe("bridge.js", () => {
     await vi.advanceTimersByTimeAsync(2);
     await check;
     // The app hears the page gave up, so a question still waiting is never asked.
-    expect(h.sent("cf:cancel")).toEqual([{ type: "cf:cancel", cf: 1, id }]);
+    expect(h.sent("cf:cancel")).toEqual([{ type: "cf:cancel", cf: 1, nonce: N, id }]);
   });
 
   it("settles a run that was waiting on the user when its result comes", async () => {
@@ -305,12 +308,67 @@ describe("bridge.js", () => {
     await expect(p).resolves.toEqual({ text: "archived", json: null });
   });
 
-  it("ends its subscriptions as the page goes", () => {
+  it("says bye as the page goes, and hears no event after", () => {
     const h = load();
-    h.cf.on("gh", () => {});
-    h.cf.on("ui", () => {});
+    const got: unknown[] = [];
+    h.cf.on("gh", (e) => got.push(e));
+    const [on] = h.sent("cf:on");
     h.fire("pagehide");
-    expect(h.sent("cf:off")).toHaveLength(2);
+    expect(h.sent("cf:bye")).toEqual([{ type: "cf:bye", cf: 1, nonce: N }]);
+    h.send({ type: "cf:event", id: on?.id, source: "gh", event: 1 });
+    expect(got).toEqual([]);
+  });
+
+  it.each([
+    ["no fragment", ""],
+    ["a fragment of the page's own", "#section"],
+    ["an empty nonce", "#cf="],
+  ])("has no bridge in a frame whose URL carries no nonce (%s): only its height and theme ack go out", async (_name, hash) => {
+    const h = load({ hash });
+    await expect(h.cf.ready).rejects.toMatchObject({ code: "unavailable", message: /not opened by Code Foundry in this frame/ });
+    await expect(h.cf.run("thread.get")).rejects.toMatchObject({ code: "unavailable" });
+    h.cf.on("gh", () => {});
+    h.cf.resize(200);
+    h.send({ type: "cf:theme", id: "github-light", scheme: "light", vars: {} });
+    expect(h.posted.map((p) => p.m)).toEqual([
+      { type: "cf:resize", cf: 1, height: 200 },
+      { type: "cf:theme:ack", cf: 1 },
+    ]);
+  });
+
+  it("finds its nonce after the page's own fragment", () => {
+    const h = load({ hash: `#top&cf=${N}` });
+    expect(h.posted[0]?.m).toEqual({ type: "cf:hello", cf: 1, nonce: N });
+  });
+
+  it("keeps at most 32 runs at the app, the rest waiting here with their clocks running", async () => {
+    vi.useFakeTimers();
+    const h = load();
+    h.ready();
+    const runs = Array.from({ length: 34 }, (_, i) => h.cf.run("thread.get", { n: String(i) }, { timeout: i === 33 ? 500 : 0 }));
+    const late = expect(runs[33]).rejects.toMatchObject({ code: "timeout" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.sent("cf:run")).toHaveLength(32);
+    // The last one gives up while it waits: the app never heard of it, so no cancel.
+    await vi.advanceTimersByTimeAsync(501);
+    await late;
+    expect(h.sent("cf:cancel")).toEqual([]);
+    h.send({ type: "cf:result", id: h.sent("cf:run")[0]?.id, ok: true, result: { text: "0" } });
+    await expect(runs[0]).resolves.toMatchObject({ text: "0" });
+    expect(h.sent("cf:run")).toHaveLength(33);
+    expect(h.sent("cf:run").at(-1)?.args).toEqual({ n: "32" });
+  });
+
+  it("refuses a call or a stored value past 256 KiB without sending it", async () => {
+    const h = load();
+    h.ready();
+    await h.cf.ready;
+    const big = "x".repeat(256 * 1024);
+    await expect(h.cf.run("thread.get", { body: big })).rejects.toMatchObject({ code: "invalid", message: /too large/ });
+    await expect(h.cf.storage().set("k", big)).rejects.toMatchObject({ code: "invalid", message: /too large/ });
+    expect(h.cf.storage().get("k")).toBeNull();
+    expect(h.sent("cf:run")).toEqual([]);
+    expect(h.sent("cf:store")).toEqual([]);
   });
 
   it("applies cf:theme, tells onTheme, and acks it", () => {
@@ -320,7 +378,7 @@ describe("bridge.js", () => {
     h.send({ type: "cf:theme", id: "github-light", scheme: "light", vars: { "--cf-text": "#000" } });
     expect(seen).toEqual([{ id: "github-light", scheme: "light", vars: { "--cf-text": "#000" } }]);
     expect(h.rootStyle).toEqual({ "--cf-text": "#000", "color-scheme": "light" });
-    expect(h.sent("cf:theme:ack")).toEqual([{ type: "cf:theme:ack", cf: 1 }]);
+    expect(h.sent("cf:theme:ack")).toEqual([{ type: "cf:theme:ack", cf: 1, nonce: N }]);
   });
 
   it("leaves color-scheme alone on a page without the stylesheet", () => {
@@ -333,12 +391,12 @@ describe("bridge.js", () => {
     const h = load();
     for (const cb of h.observed) cb();
     await flush();
-    expect(h.sent("cf:resize")).toEqual([{ type: "cf:resize", cf: 1, height: 136 }]);
+    expect(h.sent("cf:resize")).toEqual([{ type: "cf:resize", cf: 1, nonce: N, height: 136 }]);
     for (const cb of h.observed) cb();
     await flush();
     expect(h.sent("cf:resize")).toHaveLength(1); // the same height is not posted again
     h.cf.resize(300.2);
-    expect(h.sent("cf:resize").at(-1)).toEqual({ type: "cf:resize", cf: 1, height: 301 });
+    expect(h.sent("cf:resize").at(-1)).toEqual({ type: "cf:resize", cf: 1, nonce: N, height: 301 });
   });
 
   it("reads storage from cf:ready and writes it through to the app, under a prefix", async () => {
@@ -354,7 +412,7 @@ describe("bridge.js", () => {
     const done = s.set("items", [1, 2, 3]);
     expect(s.get("items")).toEqual([1, 2, 3]);
     const [w] = h.sent("cf:store");
-    expect(w).toEqual({ type: "cf:store", cf: 1, id: w?.id, key: "todo:items", value: "[1,2,3]" });
+    expect(w).toEqual({ type: "cf:store", cf: 1, nonce: N, id: w?.id, key: "todo:items", value: "[1,2,3]" });
     h.send({ type: "cf:result", id: w?.id, ok: true, result: { text: "" } });
     await expect(done).resolves.toBeUndefined();
     expect(s.keys()).toEqual(["items"]);

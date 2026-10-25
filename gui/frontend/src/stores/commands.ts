@@ -93,20 +93,21 @@ const MAX_CONFIRM_STAGES = 3;
  * user declines (or a declined second stage's result: what the command already did);
  * other errors reject. `caller` names who asked for it (a plugin's InvokeCommand
  * intent), shown in the dialog. `around` runs each question (a page's bridge queues them
- * per frame and learns the answer: stores/bridgeHost.ts).
+ * per frame and learns the answer: stores/bridgeHost.ts); `signal` aborts the call.
  */
 export async function invokeConfirmed(
   name: string,
   args: Record<string, string> = {},
   ctx: UiContextView = getUiContext(),
   caller?: string,
-  opts: { around?: (ask: () => Promise<boolean>) => Promise<boolean> } = {},
+  opts: { around?: (ask: () => Promise<boolean>) => Promise<boolean>; signal?: AbortSignal } = {},
 ): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
   let callArgs = args;
   let confirmed = false;
   for (let stage = 0; ; stage++) {
     try {
-      return await (confirmed ? invokeCommand(name, ctx, callArgs, undefined, { confirmed: true }) : invokeCommand(name, ctx, callArgs));
+      const sent = confirmed || opts.signal ? invokeCommand(name, ctx, callArgs, undefined, { confirmed, ...(opts.signal ? { signal: opts.signal } : {}) }) : invokeCommand(name, ctx, callArgs);
+      return await sent;
     } catch (err) {
       const confirm = confirmationOf(err);
       if (!confirm || stage >= MAX_CONFIRM_STAGES) throw err;
