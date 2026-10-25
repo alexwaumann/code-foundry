@@ -23,7 +23,7 @@ func threadCheckouts(b CheckoutsBackend) Command {
 		Name:         "thread.checkouts",
 		ReadOnly:     true,
 		Title:        "Thread Checkouts",
-		Description:  "List a thread's projects with path, branch and CLAUDE.md.",
+		Description:  "List a thread's projects (path, branch, CLAUDE.md) and workspace folder.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{

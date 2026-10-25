@@ -134,6 +134,43 @@ from that branch as it is now, without a fetch (without the flag, a branch origi
 has starts from origin's copy, under the default `projects.base_from_origin`). Later
 commits on it do not reach the new branch: rebase onto it once it is pushed.
 
+## 2c. A change across several projects
+
+A thread can work in several projects at once (a product's repos), often with a workspace
+that holds their shared instructions and skills. `code-foundry thread checkouts` lists
+yours: one row per project with its checkout, branch and `CLAUDE.md`, then the workspace.
+
+```
+code-foundry thread checkouts
+# thread Checkout v2 (s-0a1b2c3d4e5f): worktrees on branch feat/checkout-v2
+# PROJECT  PATH                                             BRANCH                      INSTRUCTIONS
+# api      ~/.code-foundry/worktrees/acme/api/checkout-v2   feat/checkout-v2 (current)  ~/.code-foundry/worktrees/acme/api/checkout-v2/CLAUDE.md
+# web      ~/.code-foundry/worktrees/acme/web/checkout-v2   feat/checkout-v2            ~/.code-foundry/worktrees/acme/web/checkout-v2/CLAUDE.md
+# WORKSPACE Shop  ~/.code-foundry/workspaces/w-3c4d5e6f7a8b
+```
+
+A child inherits the whole set, the workspace and your branch. Split the change by
+project: each child gets `--projects` with only the projects its task touches and
+`--new-worktree` for a branch of its own (a worktree in each of its projects); `--project`
+picks where it starts when it has more than one.
+
+```
+code-foundry thread new --projects api --new-worktree --name "Checkout API: totals" \
+  --labels checkout-v2 --notify --request-id checkout-v2-api --prompt "..."
+code-foundry thread new --projects web --new-worktree --name "Checkout page: totals" \
+  --labels checkout-v2 --notify --request-id checkout-v2-web --prompt "..."
+code-foundry thread new --projects api,web --project web --new-worktree \
+  --name "Checkout e2e test" --labels checkout-v2 --notify --request-id checkout-v2-e2e --prompt "..."
+```
+
+Each keeps the workspace's instructions. Without `--projects`, a `--new-worktree` child
+gets a worktree in every project of the set; without `--new-worktree`, it works in your
+worktrees, and `thread new` warns "<project> @ <branch> is also open in <thread>": two
+threads editing one checkout collide. A child whose task needs another's change first
+builds on its branch (§2b) or waits for it. Tell a child with several projects to read each
+one's `CLAUDE.md` (the INSTRUCTIONS column) before it edits there: only the one where it
+starts loads by itself.
+
 Merge order is then first branch, second branch. Stack only when the work depends on
 the sibling's branch or the user agreed; for line-level overlap, assign anchors (§0)
 instead. When the first branch changes after the second was started (a review fix),
@@ -262,8 +299,8 @@ code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/b
 `thread remove` stops a working child itself: no `thread interrupt` first. The path
 names the project (`--project` only for a path no project has). Add `--delete-branch
 --force` to the second command when the user said yes: without `--force` a branch with
-commits not in the default branch is kept (the command says so), and a worktree a thread,
-terminal or workspace still uses is refused. A pushed branch stays on origin until
+commits not in the default branch is kept (the command says so), and a worktree a thread
+or terminal still uses is refused. A pushed branch stays on origin until
 `code-foundry project branch delete <project> <branch> --remote --yes` (`--force` for
 unmerged work: without it nothing is deleted), again only on the user's say-so; the same
 command deletes a branch whose worktree is already gone. Never `git worktree remove` or

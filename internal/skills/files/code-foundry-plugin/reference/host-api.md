@@ -169,7 +169,7 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
   `~/` paths under the home directory, at most 16 each.
 - `Scope`: nil means threads of every project but not threads without a project;
   `&pluginsdk.EnvironmentScope{NoProject: true}` is everywhere; `Projects` (project ids)
-  limits it to their threads (a workspace thread counts if any member is listed), and
+  limits it to their threads (a thread with several projects counts if any is listed), and
   `NoProject` adds threads without a project.
 - What breaks a rule is dropped with an issue in `res.Issues`; the rest applies
   (`res.Applied`). Plugins apply in name order: a variable an earlier plugin sets is

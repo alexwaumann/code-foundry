@@ -1,25 +1,23 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, threads, worktrees, settings, keybindings, pull requests, actions. Use when the user asks how to do something in it or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), asks to see something, or before you show something in the app's side panel."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, workspaces, threads, worktrees, settings, keybindings, PRs, actions. Use when the user asks how to do something or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), asks to see something, or before you show something in the app's side panel."
 ---
 
 # Answering questions about Code Foundry
 
 {{cf.provenance}}
 
-What the app is and which skill covers what: the code-foundry skill. Commands you run
-(the `code-foundry` CLI, with your Bash tool) change the user's real app.
+What the app is and which skill covers what: the code-foundry skill. Commands change the real app.
 
 ## Where to look
 
 Read these (next to this file) with your Read tool instead of answering from memory:
 
-- `reference/getting-started.md`: the user guide (Help › Getting Started in the app).
-  Find the topic here first and use its words for buttons, pages and shortcuts.
-- `reference/settings.md`: every setting: key, title (the Settings page's label), what
-  it does, allowed values, default, and whether it needs a daemon restart.
-- `reference/commands.md`: the commands, also in the command palette (⌘K).
-  `code-foundry help <command>` prints every flag of one.
+- `reference/getting-started.md`: the user guide (Help › Getting Started in the app). Find the
+  topic here first and use its words for buttons, pages and shortcuts.
+- `reference/settings.md`: every setting: key, title (the Settings page's label), what it does,
+  allowed values, default, and whether it needs a daemon restart.
+- `reference/commands.md`: the commands, also in the palette (⌘K); `code-foundry help <command>`.
 
 None covers it: read the source (below); still unanswered, say so rather than guess.
 
@@ -46,36 +44,42 @@ no `/tree/<ref>`, use `main`). Read files at that ref with your own tools:
    by its Settings page label (Settings › Threads › New threads work in), not its key.
 2. Offer the action in the user's words, as a question: "Want me to make Fresh copy the
    default?" Show the command only if they ask for it.
-3. Run it only after the user says yes. Then say what changed, and that it applies after
-   a daemon restart when the setting needs one.
+3. Run it only after the user says yes. Then say what changed (and if it needs a daemon restart).
 
 ## Settings
 
-- `code-foundry settings set <key> <value>` validates and writes a value; `settings reset
-  <key>` restores the default; `settings get [<key>] --json` reads values with each one's
-  title, description, type and default.
-- Values: an enum takes one of the values in `reference/settings.md` (quote model ids in
-  the shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its
-  bounds; a keybinding a chord such as `cmd+shift+n`, or `none` to unbind
-  (`keybindings.<command>`, for example `keybindings.thread.new`).
+- `code-foundry settings set <key> <value>` validates and writes a value; `settings reset <key>`
+  restores the default; `settings get [<key>] --json` reads values with each one's title,
+  description, type and default.
+- Values: an enum takes one of the values in `reference/settings.md` (quote model ids in the
+  shell: `'claude-opus-4-8[1m]'`); a bool `true` or `false`; an int within its bounds; a
+  keybinding a chord such as `cmd+shift+n`, or `none` to unbind (`keybindings.thread.new`).
 - Never edit settings or theme files by hand: `settings set`; colours, `theme save` (the code-foundry skill).
 
 ## Remembering preferences
 
 The app memory holds how you behave in every project ("keep your answers short", "always
 open PRs as drafts"). Not a one-off request, nor a fact about the user, a project or its
-code ("this repo uses pnpm"): facts go in your own memory files. When the user states one:
+code ("this repo uses pnpm"): facts go in your own memory files. What holds across a
+workspace's projects goes in its `CLAUDE.md` (Workspaces, below). When the user states one:
 
 1. Check `reference/settings.md` first. When a setting covers it, offer that instead.
 2. Otherwise save it in the user's words, one line, without asking, and follow it too:
    `code-foundry memory add "<preference>"`, not your own memory files.
 3. Confirm in one line, as the command does: "Remembered: …". New threads follow it;
    threads already open get it on their next message after a restart.
-4. When it contradicts a saved one, remove the old entry first:
-   `code-foundry memory remove <number>` (or text only that entry has).
+4. When it contradicts a saved one, remove the old entry first: `code-foundry memory remove <number or its text>`.
 
 "What do you remember?" is `code-foundry memory show` plus your own memory files, each
 labelled; "forget X" acts on whichever holds X; `memory clear --yes` only when asked for.
+
+## Workspaces
+
+A workspace is a saved set of projects (a product's repos) with a folder for the instructions and
+skills that span them. The Projects page has a card per workspace (projects, instructions file,
+skills); Save as workspace in a thread's header menu makes one (`code-foundry workspace new <name>
+--projects a,b`). Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and
+`.claude/skills/<name>/SKILL.md`: offer to write them (the code-foundry skill's "Scopes").
 
 ## Showing things in the app
 

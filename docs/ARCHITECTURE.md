@@ -474,8 +474,14 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
   `--add-dir`, before the attachments dir, a workspace's managed dir, the other members' checkouts and grants
-  (`docs/notes/agent-skills.md`). Every skill file carries a provenance line under its
-  title (`version.Info.Provenance`: the build, and its source on GitHub at the release
+  (`docs/notes/agent-skills.md`). The entry skill's Scopes say where a standing rule goes:
+  the app memory (every project), the workspace's folder that `thread checkouts` prints
+  (`CLAUDE.md`, `.claude/skills/<name>/SKILL.md`: a set of projects; `ThreadPrompt` says
+  so too) or a repo's own `CLAUDE.md`, and that a member's `CLAUDE.md` is read before
+  editing there (only the primary's loads); the orchestrate skill's children inherit
+  the creator's projects, workspace, branch and mode, narrowed per worker with
+  `--projects` (`docs/notes/workspaces-v2-5-skills.md`). Every skill file carries a
+  provenance line under its title (`version.Info.Provenance`: the build, and its source on GitHub at the release
   tag or commit), and the help skill sends internals questions to that source
   (`docs/notes/control-2-skill-provenance.md`).
 * **App memory** (`internal/store/memory`): the user's standing preferences about the app
