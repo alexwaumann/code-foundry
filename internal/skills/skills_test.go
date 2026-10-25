@@ -139,8 +139,9 @@ func TestRender(t *testing.T) {
 		// verbs, the contrast floors and how to lower contrast, --replace and the scheme.
 		{skills.Entry, "false", 400, 83},
 		// Its routing and the app's description moved to the entry skill (control-4);
-		// the cap came down from 120 with them.
-		{skills.Help, "", 400, 105},   // both: no invocation keys
+		// the cap came down from 120 with them. 109 for the workspaces answer path
+		// (workspaces-v2-5-skills): what a workspace is, its card, where its files go.
+		{skills.Help, "", 400, 109},   // both: no invocation keys
 		{skills.Plugin, "", 600, 122}, // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
@@ -221,7 +222,12 @@ func TestRender(t *testing.T) {
 		"nor a fact about the user, a project or its\ncode", "facts go in your own memory files", "plus your own memory files, each\nlabelled",
 		// The memory verbs' own wording (control-6-memory-fixes).
 		"\"Remembered: …\". New threads follow it;\n   threads already open get it on their next message after a restart",
-		"remove the old entry first", "`code-foundry memory show`"} {
+		"remove the old entry first", "`code-foundry memory show`",
+		// Workspaces v2 (workspaces-v2-5-skills): the scope beside the app memory, and the
+		// answer path for what a workspace is and where its instructions and skills go.
+		"What holds across a\nworkspace's projects goes in its `CLAUDE.md`", "\n## Workspaces\n",
+		"The Projects page has a card per workspace", "Save as workspace", "`code-foundry workspace new <name>",
+		"Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and\n`.claude/skills/<name>/SKILL.md`"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}
@@ -304,7 +310,15 @@ func TestRender(t *testing.T) {
 		"never Claude Code's cron or a background `--watch`",
 		// "show me what's running" listed the Mac's processes in testing (bridge-fix-wording).
 		"| What's running or going on, their work |", "\"running\" here means this app's threads, actions and terminals, never the Mac's processes",
-		"a to-do to tick off"} {
+		"a to-do to tick off",
+		// Scopes (workspaces-v2-5-skills): app memory, the workspace's folder from thread
+		// checkouts, a repo's own CLAUDE.md; a member's CLAUDE.md before editing there; how
+		// a workspace skill is laid out; new files load at the next start.
+		"\n## Scopes\n", "one for a set of projects or one repo, or a skill for them: \"Scopes\" below",
+		"How you act in the app everywhere is app memory (`memory add`)", "the folder after `WORKSPACE` in `code-foundry thread\ncheckouts`",
+		"`CLAUDE.md` (else `AGENTS.md`; a new file is `CLAUDE.md`)", "`.claude/skills/<name>/SKILL.md` (frontmatter `name`, `description`)",
+		"One repo's is its own `CLAUDE.md`", "Only your primary checkout's `CLAUDE.md` loads",
+		"before you edit there", "at its next start"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}
@@ -377,6 +391,8 @@ func TestRender(t *testing.T) {
 		{"reference/wakes.md", "\n## Plugin wake sources\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/patterns.md", "\n## 8. Checking a batch before the roll-up\n", "SKILL.md", "`reference/patterns.md` §8"},
 		{"reference/patterns.md", "\n## 0. The child's prompt\n", "SKILL.md", "`reference/patterns.md` §0"},
+		{"reference/patterns.md", "\n## 2c. A change across several projects\n", "SKILL.md", "`reference/patterns.md` §2c"},
+		{"reference/patterns.md", "`--projects` with only the projects its task touches", "SKILL.md", "`reference/patterns.md` §2c"},
 		{"reference/wakes.md", "\n## Interrupted\n", "SKILL.md", "`reference/wakes.md`"},
 		{"reference/wakes.md", "\n## A child you handed over\n", "reference/sidebar.md", "`reference/wakes.md`"},
 		{"reference/leads.md", "# Leads (children that orchestrate)\n", "SKILL.md", "`reference/leads.md`"},
@@ -392,6 +408,23 @@ func TestRender(t *testing.T) {
 		}
 		if !strings.Contains(string(files[skills.Orchestrate+"/"+tt.from]), tt.pointer) {
 			t.Errorf("the orchestrate %s does not point at %s", tt.from, tt.pointer)
+		}
+	}
+
+	// Workspaces v2 (workspaces-v2-5-skills): a child inherits its creator's projects,
+	// workspace, branch and mode; --projects narrows a worker, one worker per checkout,
+	// archiving removes clean worktrees. Nothing says a new worktree is in one project.
+	orch := string(files[skills.Orchestrate+"/SKILL.md"])
+	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`),\n   workspace, branch and mode",
+		"collide (`thread new` warns): one worker per checkout", "`--projects <a,b>` for only those its task touches", "`--new-branch`",
+		"removes clean worktrees no other thread uses, never a branch"} {
+		if !strings.Contains(orch, want) {
+			t.Errorf("orchestrate SKILL.md lacks %q", want)
+		}
+	}
+	for _, gone := range []string{"It keeps the\n   worktree and branch", "terminal or workspace on"} {
+		if strings.Contains(orch, gone) || strings.Contains(string(files[skills.Orchestrate+"/reference/patterns.md"]), gone) {
+			t.Errorf("the orchestrate skill still says %q", gone)
 		}
 	}
 
