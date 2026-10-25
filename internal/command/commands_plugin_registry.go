@@ -42,9 +42,8 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 	refreshArg := ArgSpec{Name: "refresh", Type: Bool, Description: "Read the registries again instead of their cached indexes (kept 1 hour)"}
 	return r.RegisterAll(
 		Command{
-			Name:     "plugin.browse",
-			ReadOnly: true,
-			Title:    "Browse Plugins",
+			Name:  "plugin.browse",
+			Title: "Browse Plugins",
 			Description: "List the plugins the registries offer (settings plugins.registries; the first registry listing a " +
 				"name wins): version, what is installed, the permissions each asks for, and each registry's state.",
 			Category:     "Plugin",

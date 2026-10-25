@@ -12,20 +12,37 @@ import (
 // decision: it must create, change, send, run, open or write nothing and move no window.
 // A refresh (project.refresh, pr.refresh, app.update.check, skill.refresh) is not here:
 // it makes the daemon do work. A new verb is a change until it is added.
+//
+// The marker is per verb, not per call, so a verb with a flag that does work is not
+// read-only (docs/notes/bridge-fix-floor.md): thread.mcp (it can start a stopped Claude,
+// asks Claude when nothing is cached, writes the database and publishes the change),
+// skill.browse (--refresh is skill.refresh) and plugin.browse (--refresh, or an index
+// older than an hour, fetches the registries and writes the cache). A page lists them
+// from a click. Kept on purpose:
+//   - pr.checks reads the gh store's cache and asks GitHub only after about 30 s or once
+//     the poll saw the pull request move, through the store's one queue, which coalesces
+//     the same request: a page polling a pull request costs what its PR panel does. A
+//     page looping over many pull requests spends the shared GraphQL budget, and a rate
+//     limit pauses the poller; the daemon cannot tell one page's calls from the CLI's
+//     (they share a context), so there is no per-caller rate.
+//   - thread.wait and action.wait can block for up to 24 h (action.wait without a
+//     limit). Both end with the request's context, and an aborted Connect call ends that
+//     (api.TestInvokeCancelReachesTheCommand): the GUI aborts a page's call when the page
+//     cancels it, times out or goes. action.wait may record a lost terminal run as
+//     finished, which is the end it already had, not one it causes.
 var readOnly = []string{
 	"action.list", "action.runs", "action.wait",
 	"app.version",
 	"daemon.capabilities", "daemon.status", "daemon.version",
 	"ember.board", "ember.status", "ember.task.list", "ember.task.show",
 	"memory.show",
-	"plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.secrets.list", "plugin.terminals", "plugin.threads", "plugin.wakes",
+	"plugin.env", "plugin.list", "plugin.logs", "plugin.secrets.list", "plugin.terminals", "plugin.threads", "plugin.wakes",
 	"pr.checks",
 	"project.list",
 	"settings.get", "settings.path",
-	"skill.browse",
 	"terminal.list",
 	"theme.check", "theme.list", "theme.show",
-	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.read",
+	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.read",
 	"thread.reports", "thread.subscriptions", "thread.wait",
 	"ui.presence",
 	"usage.show",
@@ -63,6 +80,7 @@ func TestReadOnlyMarker(t *testing.T) {
 		{"thread.get", true},
 		{"thread.items", true},
 		{"thread.wait", true},
+		{"action.wait", true},
 		{"pr.checks", true},
 		{"settings.get", true},
 		{"daemon.capabilities", true},
@@ -79,7 +97,10 @@ func TestReadOnlyMarker(t *testing.T) {
 		{"theme.save", false},
 		{"pr.merge", false},
 		{"ember.task.add", false},
-		// Refreshes make the daemon work.
+		// Refreshes make the daemon work, and so do verbs with a refreshing flag.
+		{"thread.mcp", false},
+		{"skill.browse", false},
+		{"plugin.browse", false},
 		{"project.refresh", false},
 		{"pr.refresh", false},
 		{"app.update.check", false},

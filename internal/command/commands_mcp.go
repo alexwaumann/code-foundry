@@ -42,9 +42,8 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
-			Name:     "thread.mcp",
-			ReadOnly: true,
-			Title:    "Show Thread MCP Servers",
+			Name:  "thread.mcp",
+			Title: "Show Thread MCP Servers",
 			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
 				"status, scope, transport, version and tool count; --full adds each server's tools.",
 			Category:     "Thread",
