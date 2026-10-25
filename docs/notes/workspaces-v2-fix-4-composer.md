@@ -113,3 +113,29 @@ decisions differed from the report's suggested fixes, the decisions were built.
   `TestThreadWorkspaceAndNewLike`.
 * e2e: `composer-fixes.spec.ts` (findings 1-16 but 13's truncation), `project-sets.spec.ts`
   updated (labels, heading, hints no longer toasted twice).
+* **Live** (isolated `CODE_FOUNDRY_HOME`, scratch repos `web`, `api` and a plain folder
+  `notes` under the home directory, workspaces `shop` (web, api) and `folders` (notes),
+  Haiku 5.5 at medium effort, "say hi and stop"; all removed afterwards):
+  * CLI: `thread new-like <shop thread> --project workspace` and `thread new --like …
+    --project workspace` start in the workspace's managed dir with both projects; the same
+    for a thread without a workspace says "project "workspace" (the workspace's folder)
+    needs a workspace; thread <id> has none".
+  * The built Wails app (`make gui-build`), dark and light: a thread in shop's folder, line
+    2 `shop`, the header's workspace chip.
+  * WebKit (Playwright) on the Vite dev server against the same daemon restarted with
+    `--dev` (synthetic input to the native window was not used): the like composer of an
+    in-place shop thread reads "What's next in shop?", Runs in lists "Workspace folder /
+    shop's folder", api, web; sent with the folder, the new thread runs in the managed dir
+    (`thread checkouts`). The `folders` workspace's composer: In place, one Work in option,
+    the note. `live-sidebar.spec.ts` passed against it (with `LIVE_WORKSPACE=shop`).
+
+## Follow-ups
+
+* The CLI keeps `--project workspace` meaning the folder whenever a workspace is in play
+  (finding 14's CLI half): a project named "workspace" needs its id there.
+* The header now shows the workspace twice for a thread whose location already names it
+  (a workspace-folder thread or a set with a workspace: the location reads `shop`, the chip
+  `shop`). Either the chip shows only where the location does not name the workspace, or
+  the location itself opens the card; left as decided (the chip always shows).
+* `thread new-like` from the CLI does not apply `threads.default_model` (a CLI like ran on
+  the Claude default, `thread new --like` on Haiku): pre-existing, not changed here.
