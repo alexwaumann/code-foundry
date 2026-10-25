@@ -659,20 +659,13 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
-	var members []workspace.Member // a workspace thread's, for file references
-	var made []madeWorktree        // the worktrees placement made, for the hook
-	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
-		return Thread{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
-	}
-	if (o.WorkspaceID != "" || o.NewWorkspace != nil) && (len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
-		return Thread{}, fmt.Errorf("%w: projects, like, new branch and checkout mode do not apply to a workspace or a new workspace", ErrInvalidArgument)
-	}
+	var made []madeWorktree // the worktrees placement made, for the hook
 	if o.Cwd != "" && !o.NoProject {
 		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
 	}
-	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil ||
+	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" ||
 		len(o.ProjectIDs) > 0 || o.Like != "" || o.NewBranch || o.CheckoutMode) {
-		return Thread{}, fmt.Errorf("%w: no_project excludes a project, projects, worktree, new worktree, like, workspace and new workspace", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: no_project excludes a project, projects, worktree, new worktree, like and workspace", ErrInvalidArgument)
 	}
 	switch {
 	case o.NoProject:
@@ -681,30 +674,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		if s.WorktreePath, err = m.noProjectCwd(o.Cwd); err != nil {
 			return Thread{}, err
 		}
-	case o.NewWorkspace != nil:
-		cw, err := m.newWorkspace(ctx, id, name, o)
-		if err != nil {
-			return Thread{}, err
-		}
-		s.WorkspaceID, s.ProjectID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.projectID, cw.path, cw.baseRef, true
-		s.Branch = cw.branch
-		members = cw.members
-		s.ProjectIDs = memberProjectIDs(cw.projectID, cw.members)
-		if cw.name != "" {
-			s.Name, s.AutoNamed = cw.name, true
-		}
-		namingTried = namingTried || cw.namerCalled
-		late = cw.late
-	case o.WorkspaceID != "":
-		w, mem, err := m.workspaceMember(o.WorkspaceID, o.ProjectID, o.WorktreePath)
-		if err != nil {
-			return Thread{}, err
-		}
-		s.WorkspaceID, s.ProjectID, s.WorktreePath = w.ID, mem.ProjectID, mem.WorktreePath
-		// The workspace's members are the set, in worktree mode on its branch: their
-		// derived checkouts are its member worktrees.
-		s.ProjectIDs, s.Branch, s.CreatedWorktree = memberProjectIDs(mem.ProjectID, w.Members), w.Branch, w.Branch != ""
-		members = w.Members
 	default:
 		p, err := m.placeThread(ctx, id, name, creatorID, o)
 		if err != nil {
@@ -724,13 +693,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)
 	}
 	// The worktrees exist now: point file references at them (see filerefs.go).
-	roots := m.fileRefRoots(s)
-	prompt, dropped := rewriteFileRefs(prompt, func(projectID string) (string, bool) {
-		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
-			return members[i].WorktreePath, true
-		}
-		return roots(projectID)
-	})
+	prompt, dropped := rewriteFileRefs(prompt, m.fileRefRoots(s))
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
 			"thread", id, "project", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
@@ -996,10 +959,10 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, --add-dir for the skills dir, the spawn extras' dirs
-// (plugins), the attachments dir, its pages dir, the workspace members and the granted dirs (in that
-// order, every spawn), the system prompt (ThreadPrompt, the workspace's line, the app
-// memory read now, the thread's own append), the
-// workspace env, then the extras' env and PATH entries. The prompt is never in argv (it
+// (plugins), the attachments dir, its pages dir, a referenced workspace's managed dir,
+// the other members' checkouts and the granted dirs (in that order, every spawn), the
+// system prompt (ThreadPrompt, the workspace's instructions, the app memory read now,
+// the thread's own append), then the extras' env and PATH entries. The prompt is never in argv (it
 // is the first user message). g is what the conversation's allow-for-thread answers
 // granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
 // briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
@@ -1026,26 +989,12 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	if pages != "" {
 		env = append(env, paths.EnvPages+"="+pages)
 	}
-	var wl wsLaunch
 	members := m.memberProjects(s) // the plugins' scope (spawnextras.go)
-	if s.WorkspaceID != "" {
-		// The current members, every spawn (create, reconnect, fork): a project added to
-		// the workspace since the row was written is included.
-		var ws *workspace.Snapshot
-		if m.opts.Workspaces != nil {
-			ws = m.opts.Workspaces.Snapshot()
-		}
-		var ok bool
-		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.appendSystemPrompt = systemPrompt(wl.prompt, entries, s.SystemPromptAppend)
-			env = append(slices.Clip(env), wl.env...)
-			if len(wl.missing) > 0 {
-				m.log.Warn("workspace member worktrees missing; not passed to claude", "thread", s.ID,
-					"workspace", s.WorkspaceID, "paths", wl.missing)
-			}
-		} else {
-			m.log.Warn("workspace of thread not found; starting without its members", "thread", s.ID, "workspace", s.WorkspaceID)
-		}
+	// A referenced workspace: its managed dir (links re-checked) and its instructions,
+	// read now (workspace.go).
+	ws := m.workspaceSpawn(ctx, s)
+	if ws.prompt != "" {
+		sa.appendSystemPrompt = systemPrompt(ws.prompt, entries, s.SystemPromptAppend)
 	}
 	x = m.extras(ctx, spawnInfoOf(s, members, wait))
 	sa.addDirs = append(sa.addDirs, x.AddDirs...)
@@ -1062,16 +1011,13 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	if pages != "" {
 		sa.addDirs = append(sa.addDirs, pages)
 	}
-	// Every other member's checkout (checkouts.go), then a referenced workspace's member
-	// worktrees it does not already have.
+	// The workspace's managed dir, then every other member's checkout (checkouts.go).
+	if ws.addDir != "" {
+		sa.addDirs = append(sa.addDirs, ws.addDir)
+	}
 	dirs, missing := m.memberDirs(s)
 	if len(missing) > 0 && wait {
 		m.log.Warn("member checkouts missing; not passed to claude", "thread", s.ID, "projects", len(missing))
-	}
-	for _, d := range wl.addDirs {
-		if !slices.ContainsFunc(dirs, func(x string) bool { return samePath(x, d) }) {
-			dirs = append(dirs, d)
-		}
 	}
 	sa.addDirs = append(sa.addDirs, dirs...)
 	sa.addDirs = append(sa.addDirs, g.dirs...)

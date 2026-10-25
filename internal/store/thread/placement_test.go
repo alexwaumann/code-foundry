@@ -21,6 +21,8 @@ func TestDecidePlacement(t *testing.T) {
 	coParent := Thread{ID: "q", ProjectID: "web", ProjectIDs: []string{"web"}, WorktreePath: "/src/web-hotfix"}
 	coCheckouts := []Checkout{{ProjectID: "web", Path: "/src/web-hotfix", Primary: true}}
 	home := Thread{ID: "h", WorktreePath: "/home/u"}
+	// A parent running in its workspace's folder (no project is its primary).
+	wsParent := Thread{ID: "w", ProjectIDs: []string{"api", "web"}, WorktreePath: "/cf/workspaces/w-2", WorkspaceID: "w-2"}
 
 	tests := []struct {
 		name     string
@@ -79,6 +81,22 @@ func TestDecidePlacement(t *testing.T) {
 			req: placeRequest{projectIDs: []string{"api"}, primary: "web"}, wantErr: ErrInvalidArgument},
 		{name: "like: a thread without a project", src: &home, explicit: true, req: placeRequest{},
 			want: placement{noProject: true, primaryPath: "/home/u", from: "h"}},
+		{name: "workspace: its members, its default primary", src: &wtParent, cos: wtCheckouts,
+			req:  placeRequest{workspaceID: "w-2", wsMembers: []string{"web", "docs"}, wsDefault: "web"},
+			want: placement{projectIDs: []string{"docs", "web"}, primary: "web", workspaceID: "w-2"}},
+		{name: "workspace: its folder by default", req: placeRequest{workspaceID: "w-2", wsMembers: []string{"web"}, wsDefault: "workspace"},
+			want: placement{projectIDs: []string{"web"}, workspacePrimary: true, workspaceID: "w-2"}},
+		{name: "workspace: its folder asked for, in worktree mode", req: placeRequest{workspaceID: "w-2", wsMembers: []string{"web", "api"}, wsDefault: "web", wsPrimary: true, newBranch: true},
+			want: placement{projectIDs: []string{"api", "web"}, workspacePrimary: true, workspaceID: "w-2", worktreeMode: true, newBranch: true}},
+		{name: "workspace: projects narrow; a default outside them gives way", req: placeRequest{workspaceID: "w-2", wsMembers: []string{"web", "api"}, wsDefault: "web", projectIDs: []string{"api"}},
+			want: placement{projectIDs: []string{"api"}, primary: "api", workspaceID: "w-2"}},
+		{name: "workspace: no members runs in its folder", req: placeRequest{workspaceID: "w-2", wsDefault: "workspace"},
+			want: placement{workspacePrimary: true, workspaceID: "w-2"}},
+		{name: "workspace: a primary outside the set", req: placeRequest{workspaceID: "w-2", wsMembers: []string{"web"}, primary: "api"}, wantErr: ErrInvalidArgument},
+		{name: "inherit: a parent in its workspace's folder", src: &wsParent, req: placeRequest{},
+			want: placement{projectIDs: []string{"api", "web"}, workspacePrimary: true, workspaceID: "w-2", from: "w"}},
+		{name: "inherit: a parent in its workspace's folder, project picks a member", src: &wsParent, req: placeRequest{primary: "api"},
+			want: placement{projectIDs: []string{"api", "web"}, primary: "api", workspaceID: "w-2", from: "w"}},
 		{name: "like: a thread without a project has no branch", src: &home, explicit: true, req: placeRequest{newBranch: true},
 			wantErr: ErrInvalidArgument},
 	}
@@ -104,5 +122,5 @@ func TestDecidePlacement(t *testing.T) {
 func samePlacement(a, b placement) bool {
 	return slices.Equal(a.projectIDs, b.projectIDs) && a.noProject == b.noProject && a.primary == b.primary &&
 		a.primaryPath == b.primaryPath && a.worktreeMode == b.worktreeMode && a.branch == b.branch &&
-		a.newBranch == b.newBranch && a.workspaceID == b.workspaceID && a.from == b.from
+		a.newBranch == b.newBranch && a.workspaceID == b.workspaceID && a.from == b.from && a.workspacePrimary == b.workspacePrimary
 }

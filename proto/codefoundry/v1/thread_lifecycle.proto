@@ -496,16 +496,16 @@ message CreateThreadRequest {
   NewWorktree new_worktree = 8;
   // Paths returned by StageAttachment, appended to initial_prompt.
   repeated string attachments = 9;
-  // Workspace (id or name) the thread belongs to. project_id or worktree_path then pick
-  // the member worktree it runs in (default: the first member); a worktree_path must
-  // be a member's worktree. Not with new_worktree or new_workspace.
+  // Workspace (id or name) the thread references (Thread.workspace_id): its instructions
+  // and skills reach the thread. Without project_ids its members are the set. The primary
+  // is project_id, else the workspace's default_primary, else the first member;
+  // "workspace" as project_id (or as the default) runs the thread in the workspace's
+  // managed dir, or its root when it has one, with every member as an --add-dir.
   string workspace_id = 10;
-  // When set, Create makes a new workspace for the thread before claude starts: a
-  // worktree on branch cf/<slug> in every project listed (the slug as for
-  // new_worktree, after the same single bounded wait), then runs the thread in the
-  // member project_id names (default: the first). worktree_path is ignored. Not with
-  // new_worktree or workspace_id.
-  NewWorkspace new_workspace = 11;
+  // 11 was new_workspace (a v1 branch-set workspace made with the thread) until the
+  // workspace reshape (docs/notes/workspaces-v2-2-workspaces.md).
+  reserved 11;
+  reserved "new_workspace";
   // 12 was render until 2026-10-12.
   reserved 12;
   reserved "render";
@@ -514,7 +514,7 @@ message CreateThreadRequest {
   string composer_prompt = 13;
   // When set, the thread has no project: it runs in the daemon's home directory with an
   // empty project_id and workspace_id (see the ownership rule on Thread). Exclusive with
-  // project_id, worktree_path, new_worktree, workspace_id and new_workspace
+  // project_id, worktree_path, new_worktree and workspace_id
   // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
   bool no_project = 14;
   // The thread whose agent asks for this one (Thread.created_by); it must exist
@@ -561,7 +561,7 @@ message CreateThreadRequest {
   // member's checkout is derived (Thread): with new_worktree, a worktree on one new
   // branch in every git member, made in parallel (one failure fails the Create, naming
   // the project). Empty: project_id's alone, or a copied thread's (like_thread_id, or the
-  // creating thread). Not with workspace_id, new_workspace or no_project.
+  // creating thread, or workspace_id's members). Not with no_project.
   repeated string project_ids = 25;
   // Copy the project set, branch, primary, workspace reference and mode from this
   // thread ("New thread on this branch"): project_ids narrows the set, project_id picks
@@ -592,23 +592,6 @@ message NewWorktree {
   // Overrides projects.base_from_origin for this worktree, as
   // CreateWorktreeRequest.base_from_origin. Unset: the setting.
   optional bool base_from_origin = 3;
-}
-
-message NewWorkspace {
-  // Projects (id, name when unique, or an absolute path inside one), in member
-  // order. At least one. "<project>:<base ref>" gives that member its own base.
-  repeated string projects = 1;
-  // Ref every member without its own base branches from. Defaults to each project's
-  // default branch, resolved as NewWorktree.base_ref.
-  string base_ref = 2;
-  // Workspace name. Default: the branch's last component (feat/add-filter ->
-  // add-filter).
-  string name = 3;
-  // Steers the one branch of every member, as NewWorktree.branch.
-  string branch = 4;
-  // Overrides projects.base_from_origin for every member, as
-  // NewWorktree.base_from_origin. Unset: the setting.
-  optional bool base_from_origin = 5;
 }
 
 message StageAttachmentRequest {

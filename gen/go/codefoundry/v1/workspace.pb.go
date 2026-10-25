@@ -26,13 +26,21 @@ type Workspace struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "w-" + 12 hex digits.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Unique display name.
-	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// The branch every member worktree was created on.
-	Branch string `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
-	// In the order they were added.
-	Members       []*WorkspaceMember     `protobuf:"bytes,4,rep,name=members,proto3" json:"members,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Unique display name (case-insensitively); editable.
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Member project ids, sorted by id.
+	Members []string `protobuf:"bytes,6,rep,name=members,proto3" json:"members,omitempty"`
+	// A real folder the workspace came from (its CLAUDE.md, AGENTS.md and .claude are
+	// symlinked into the managed dir); empty for a synthetic workspace.
+	RootPath string `protobuf:"bytes,7,opt,name=root_path,json=rootPath,proto3" json:"root_path,omitempty"`
+	// Where new threads start: a member project id, or "workspace" (managed_dir, or
+	// root_path when set).
+	DefaultPrimary string `protobuf:"bytes,8,opt,name=default_primary,json=defaultPrimary,proto3" json:"default_primary,omitempty"`
+	// <config home>/workspaces/<id>: given to every thread that references the workspace
+	// as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
+	// .claude/skills.
+	ManagedDir    string `protobuf:"bytes,9,opt,name=managed_dir,json=managedDir,proto3" json:"managed_dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81,20 +89,6 @@ func (x *Workspace) GetName() string {
 	return ""
 }
 
-func (x *Workspace) GetBranch() string {
-	if x != nil {
-		return x.Branch
-	}
-	return ""
-}
-
-func (x *Workspace) GetMembers() []*WorkspaceMember {
-	if x != nil {
-		return x.Members
-	}
-	return nil
-}
-
 func (x *Workspace) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -102,200 +96,30 @@ func (x *Workspace) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type WorkspaceMember struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	WorktreePath  string                 `protobuf:"bytes,2,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorkspaceMember) Reset() {
-	*x = WorkspaceMember{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorkspaceMember) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorkspaceMember) ProtoMessage() {}
-
-func (x *WorkspaceMember) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[1]
+func (x *Workspace) GetMembers() []string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.Members
 	}
-	return mi.MessageOf(x)
+	return nil
 }
 
-// Deprecated: Use WorkspaceMember.ProtoReflect.Descriptor instead.
-func (*WorkspaceMember) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *WorkspaceMember) GetProjectId() string {
+func (x *Workspace) GetRootPath() string {
 	if x != nil {
-		return x.ProjectId
+		return x.RootPath
 	}
 	return ""
 }
 
-func (x *WorkspaceMember) GetWorktreePath() string {
+func (x *Workspace) GetDefaultPrimary() string {
 	if x != nil {
-		return x.WorktreePath
+		return x.DefaultPrimary
 	}
 	return ""
 }
 
-// MemberInfo is a member joined with the project store's current state.
-type WorkspaceMemberInfo struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	// Empty when the project is no longer registered.
-	ProjectName  string `protobuf:"bytes,2,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
-	WorktreePath string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
-	// The branch checked out in the worktree now; the workspace branch when unknown.
-	Branch string `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
-	// The worktree is not among the project's worktrees (deleted by hand, or the
-	// project is unregistered or not reconciled yet).
-	Missing bool `protobuf:"varint,5,opt,name=missing,proto3" json:"missing,omitempty"`
-	// The request's cwd is inside this worktree.
-	Current       bool `protobuf:"varint,6,opt,name=current,proto3" json:"current,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorkspaceMemberInfo) Reset() {
-	*x = WorkspaceMemberInfo{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorkspaceMemberInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorkspaceMemberInfo) ProtoMessage() {}
-
-func (x *WorkspaceMemberInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[2]
+func (x *Workspace) GetManagedDir() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorkspaceMemberInfo.ProtoReflect.Descriptor instead.
-func (*WorkspaceMemberInfo) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *WorkspaceMemberInfo) GetProjectId() string {
-	if x != nil {
-		return x.ProjectId
-	}
-	return ""
-}
-
-func (x *WorkspaceMemberInfo) GetProjectName() string {
-	if x != nil {
-		return x.ProjectName
-	}
-	return ""
-}
-
-func (x *WorkspaceMemberInfo) GetWorktreePath() string {
-	if x != nil {
-		return x.WorktreePath
-	}
-	return ""
-}
-
-func (x *WorkspaceMemberInfo) GetBranch() string {
-	if x != nil {
-		return x.Branch
-	}
-	return ""
-}
-
-func (x *WorkspaceMemberInfo) GetMissing() bool {
-	if x != nil {
-		return x.Missing
-	}
-	return false
-}
-
-func (x *WorkspaceMemberInfo) GetCurrent() bool {
-	if x != nil {
-		return x.Current
-	}
-	return false
-}
-
-// WorkspaceMemberSpec names a project to add and the ref its branch starts from.
-type WorkspaceMemberSpec struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Project id, name (when unique), or a path inside it.
-	Project string `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
-	// Ref to branch from when the branch does not exist yet. Empty: the request's
-	// base_ref, else the default branch (resolved as CreateWorktreeRequest.base_ref).
-	BaseRef       string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorkspaceMemberSpec) Reset() {
-	*x = WorkspaceMemberSpec{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorkspaceMemberSpec) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorkspaceMemberSpec) ProtoMessage() {}
-
-func (x *WorkspaceMemberSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorkspaceMemberSpec.ProtoReflect.Descriptor instead.
-func (*WorkspaceMemberSpec) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *WorkspaceMemberSpec) GetProject() string {
-	if x != nil {
-		return x.Project
-	}
-	return ""
-}
-
-func (x *WorkspaceMemberSpec) GetBaseRef() string {
-	if x != nil {
-		return x.BaseRef
+		return x.ManagedDir
 	}
 	return ""
 }
@@ -308,7 +132,7 @@ type ListWorkspacesRequest struct {
 
 func (x *ListWorkspacesRequest) Reset() {
 	*x = ListWorkspacesRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +144,7 @@ func (x *ListWorkspacesRequest) String() string {
 func (*ListWorkspacesRequest) ProtoMessage() {}
 
 func (x *ListWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +157,7 @@ func (x *ListWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{1}
 }
 
 type ListWorkspacesResponse struct {
@@ -345,7 +169,7 @@ type ListWorkspacesResponse struct {
 
 func (x *ListWorkspacesResponse) Reset() {
 	*x = ListWorkspacesResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +181,7 @@ func (x *ListWorkspacesResponse) String() string {
 func (*ListWorkspacesResponse) ProtoMessage() {}
 
 func (x *ListWorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +194,7 @@ func (x *ListWorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListWorkspacesResponse) GetWorkspaces() []*Workspace {
@@ -383,20 +207,21 @@ func (x *ListWorkspacesResponse) GetWorkspaces() []*Workspace {
 type CreateWorkspaceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Branch for every member. Empty: cf/<name as a slug>.
-	Branch  string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	Members []*WorkspaceMemberSpec `protobuf:"bytes,3,rep,name=members,proto3" json:"members,omitempty"`
-	// Default base ref for members without their own.
-	BaseRef string `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Fetch each remote-tracking base first (bounded; a failed fetch uses the local copy).
-	Fetch         bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Projects (id, name when unique, or an absolute path inside one). At least one unless
+	// root_path is set.
+	Members []string `protobuf:"bytes,6,rep,name=members,proto3" json:"members,omitempty"`
+	// An absolute folder under home; empty for a synthetic workspace.
+	RootPath string `protobuf:"bytes,7,opt,name=root_path,json=rootPath,proto3" json:"root_path,omitempty"`
+	// A member (id or name) or "workspace". Empty: "workspace" for a rooted workspace,
+	// else the first member given.
+	DefaultPrimary string `protobuf:"bytes,8,opt,name=default_primary,json=defaultPrimary,proto3" json:"default_primary,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateWorkspaceRequest) Reset() {
 	*x = CreateWorkspaceRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +233,7 @@ func (x *CreateWorkspaceRequest) String() string {
 func (*CreateWorkspaceRequest) ProtoMessage() {}
 
 func (x *CreateWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +246,7 @@ func (x *CreateWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*CreateWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateWorkspaceRequest) GetName() string {
@@ -431,32 +256,25 @@ func (x *CreateWorkspaceRequest) GetName() string {
 	return ""
 }
 
-func (x *CreateWorkspaceRequest) GetBranch() string {
-	if x != nil {
-		return x.Branch
-	}
-	return ""
-}
-
-func (x *CreateWorkspaceRequest) GetMembers() []*WorkspaceMemberSpec {
+func (x *CreateWorkspaceRequest) GetMembers() []string {
 	if x != nil {
 		return x.Members
 	}
 	return nil
 }
 
-func (x *CreateWorkspaceRequest) GetBaseRef() string {
+func (x *CreateWorkspaceRequest) GetRootPath() string {
 	if x != nil {
-		return x.BaseRef
+		return x.RootPath
 	}
 	return ""
 }
 
-func (x *CreateWorkspaceRequest) GetFetch() bool {
+func (x *CreateWorkspaceRequest) GetDefaultPrimary() string {
 	if x != nil {
-		return x.Fetch
+		return x.DefaultPrimary
 	}
-	return false
+	return ""
 }
 
 type CreateWorkspaceResponse struct {
@@ -468,7 +286,7 @@ type CreateWorkspaceResponse struct {
 
 func (x *CreateWorkspaceResponse) Reset() {
 	*x = CreateWorkspaceResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +298,7 @@ func (x *CreateWorkspaceResponse) String() string {
 func (*CreateWorkspaceResponse) ProtoMessage() {}
 
 func (x *CreateWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +311,7 @@ func (x *CreateWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*CreateWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateWorkspaceResponse) GetWorkspace() *Workspace {
@@ -505,20 +323,17 @@ func (x *CreateWorkspaceResponse) GetWorkspace() *Workspace {
 
 type AddWorkspaceProjectRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Workspace id or name. Empty: the workspace whose member contains cwd.
+	// Workspace id or name.
 	Workspace string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	Cwd       string `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
 	// Project id, name (when unique), or a path inside it.
 	Project       string `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	BaseRef       string `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	Fetch         bool   `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AddWorkspaceProjectRequest) Reset() {
 	*x = AddWorkspaceProjectRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +345,7 @@ func (x *AddWorkspaceProjectRequest) String() string {
 func (*AddWorkspaceProjectRequest) ProtoMessage() {}
 
 func (x *AddWorkspaceProjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,19 +358,12 @@ func (x *AddWorkspaceProjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddWorkspaceProjectRequest.ProtoReflect.Descriptor instead.
 func (*AddWorkspaceProjectRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AddWorkspaceProjectRequest) GetWorkspace() string {
 	if x != nil {
 		return x.Workspace
-	}
-	return ""
-}
-
-func (x *AddWorkspaceProjectRequest) GetCwd() string {
-	if x != nil {
-		return x.Cwd
 	}
 	return ""
 }
@@ -567,20 +375,6 @@ func (x *AddWorkspaceProjectRequest) GetProject() string {
 	return ""
 }
 
-func (x *AddWorkspaceProjectRequest) GetBaseRef() string {
-	if x != nil {
-		return x.BaseRef
-	}
-	return ""
-}
-
-func (x *AddWorkspaceProjectRequest) GetFetch() bool {
-	if x != nil {
-		return x.Fetch
-	}
-	return false
-}
-
 type AddWorkspaceProjectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
@@ -590,7 +384,7 @@ type AddWorkspaceProjectResponse struct {
 
 func (x *AddWorkspaceProjectResponse) Reset() {
 	*x = AddWorkspaceProjectResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +396,7 @@ func (x *AddWorkspaceProjectResponse) String() string {
 func (*AddWorkspaceProjectResponse) ProtoMessage() {}
 
 func (x *AddWorkspaceProjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +409,7 @@ func (x *AddWorkspaceProjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddWorkspaceProjectResponse.ProtoReflect.Descriptor instead.
 func (*AddWorkspaceProjectResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AddWorkspaceProjectResponse) GetWorkspace() *Workspace {
@@ -627,22 +421,17 @@ func (x *AddWorkspaceProjectResponse) GetWorkspace() *Workspace {
 
 type RemoveWorkspaceProjectRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Workspace id or name. Empty: the workspace whose member contains cwd.
+	// Workspace id or name.
 	Workspace string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	Cwd       string `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	// Project id, name, or a path inside it (or the member worktree path).
-	Project string `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	// Remove the worktree even with uncommitted changes.
-	Force bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
-	// Also delete the member's branch.
-	DeleteBranch  bool `protobuf:"varint,5,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
+	// Project id or name (a member).
+	Project       string `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoveWorkspaceProjectRequest) Reset() {
 	*x = RemoveWorkspaceProjectRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +443,7 @@ func (x *RemoveWorkspaceProjectRequest) String() string {
 func (*RemoveWorkspaceProjectRequest) ProtoMessage() {}
 
 func (x *RemoveWorkspaceProjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,19 +456,12 @@ func (x *RemoveWorkspaceProjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveWorkspaceProjectRequest.ProtoReflect.Descriptor instead.
 func (*RemoveWorkspaceProjectRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RemoveWorkspaceProjectRequest) GetWorkspace() string {
 	if x != nil {
 		return x.Workspace
-	}
-	return ""
-}
-
-func (x *RemoveWorkspaceProjectRequest) GetCwd() string {
-	if x != nil {
-		return x.Cwd
 	}
 	return ""
 }
@@ -691,20 +473,6 @@ func (x *RemoveWorkspaceProjectRequest) GetProject() string {
 	return ""
 }
 
-func (x *RemoveWorkspaceProjectRequest) GetForce() bool {
-	if x != nil {
-		return x.Force
-	}
-	return false
-}
-
-func (x *RemoveWorkspaceProjectRequest) GetDeleteBranch() bool {
-	if x != nil {
-		return x.DeleteBranch
-	}
-	return false
-}
-
 type RemoveWorkspaceProjectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
@@ -714,7 +482,7 @@ type RemoveWorkspaceProjectResponse struct {
 
 func (x *RemoveWorkspaceProjectResponse) Reset() {
 	*x = RemoveWorkspaceProjectResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +494,7 @@ func (x *RemoveWorkspaceProjectResponse) String() string {
 func (*RemoveWorkspaceProjectResponse) ProtoMessage() {}
 
 func (x *RemoveWorkspaceProjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,10 +507,205 @@ func (x *RemoveWorkspaceProjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveWorkspaceProjectResponse.ProtoReflect.Descriptor instead.
 func (*RemoveWorkspaceProjectResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RemoveWorkspaceProjectResponse) GetWorkspace() *Workspace {
+	if x != nil {
+		return x.Workspace
+	}
+	return nil
+}
+
+type RenameWorkspaceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Workspace id or name.
+	Workspace     string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameWorkspaceRequest) Reset() {
+	*x = RenameWorkspaceRequest{}
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameWorkspaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameWorkspaceRequest) ProtoMessage() {}
+
+func (x *RenameWorkspaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameWorkspaceRequest.ProtoReflect.Descriptor instead.
+func (*RenameWorkspaceRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RenameWorkspaceRequest) GetWorkspace() string {
+	if x != nil {
+		return x.Workspace
+	}
+	return ""
+}
+
+func (x *RenameWorkspaceRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type RenameWorkspaceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameWorkspaceResponse) Reset() {
+	*x = RenameWorkspaceResponse{}
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameWorkspaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameWorkspaceResponse) ProtoMessage() {}
+
+func (x *RenameWorkspaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameWorkspaceResponse.ProtoReflect.Descriptor instead.
+func (*RenameWorkspaceResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RenameWorkspaceResponse) GetWorkspace() *Workspace {
+	if x != nil {
+		return x.Workspace
+	}
+	return nil
+}
+
+type SetWorkspaceDefaultPrimaryRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Workspace id or name.
+	Workspace string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
+	// A member project (id or name), or "workspace".
+	DefaultPrimary string `protobuf:"bytes,2,opt,name=default_primary,json=defaultPrimary,proto3" json:"default_primary,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetWorkspaceDefaultPrimaryRequest) Reset() {
+	*x = SetWorkspaceDefaultPrimaryRequest{}
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetWorkspaceDefaultPrimaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetWorkspaceDefaultPrimaryRequest) ProtoMessage() {}
+
+func (x *SetWorkspaceDefaultPrimaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetWorkspaceDefaultPrimaryRequest.ProtoReflect.Descriptor instead.
+func (*SetWorkspaceDefaultPrimaryRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SetWorkspaceDefaultPrimaryRequest) GetWorkspace() string {
+	if x != nil {
+		return x.Workspace
+	}
+	return ""
+}
+
+func (x *SetWorkspaceDefaultPrimaryRequest) GetDefaultPrimary() string {
+	if x != nil {
+		return x.DefaultPrimary
+	}
+	return ""
+}
+
+type SetWorkspaceDefaultPrimaryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetWorkspaceDefaultPrimaryResponse) Reset() {
+	*x = SetWorkspaceDefaultPrimaryResponse{}
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetWorkspaceDefaultPrimaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetWorkspaceDefaultPrimaryResponse) ProtoMessage() {}
+
+func (x *SetWorkspaceDefaultPrimaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetWorkspaceDefaultPrimaryResponse.ProtoReflect.Descriptor instead.
+func (*SetWorkspaceDefaultPrimaryResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SetWorkspaceDefaultPrimaryResponse) GetWorkspace() *Workspace {
 	if x != nil {
 		return x.Workspace
 	}
@@ -753,15 +716,13 @@ type RemoveWorkspaceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Workspace id or name.
 	Workspace     string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	Force         bool   `protobuf:"varint,2,opt,name=force,proto3" json:"force,omitempty"`
-	DeleteBranch  bool   `protobuf:"varint,3,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoveWorkspaceRequest) Reset() {
 	*x = RemoveWorkspaceRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +734,7 @@ func (x *RemoveWorkspaceRequest) String() string {
 func (*RemoveWorkspaceRequest) ProtoMessage() {}
 
 func (x *RemoveWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +747,7 @@ func (x *RemoveWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*RemoveWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RemoveWorkspaceRequest) GetWorkspace() string {
@@ -794,20 +755,6 @@ func (x *RemoveWorkspaceRequest) GetWorkspace() string {
 		return x.Workspace
 	}
 	return ""
-}
-
-func (x *RemoveWorkspaceRequest) GetForce() bool {
-	if x != nil {
-		return x.Force
-	}
-	return false
-}
-
-func (x *RemoveWorkspaceRequest) GetDeleteBranch() bool {
-	if x != nil {
-		return x.DeleteBranch
-	}
-	return false
 }
 
 type RemoveWorkspaceResponse struct {
@@ -818,7 +765,7 @@ type RemoveWorkspaceResponse struct {
 
 func (x *RemoveWorkspaceResponse) Reset() {
 	*x = RemoveWorkspaceResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +777,7 @@ func (x *RemoveWorkspaceResponse) String() string {
 func (*RemoveWorkspaceResponse) ProtoMessage() {}
 
 func (x *RemoveWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,113 +790,7 @@ func (x *RemoveWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*RemoveWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{13}
-}
-
-type WorkspaceMembersRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Workspace id or name. Empty: the workspace whose member contains cwd.
-	Workspace string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	// An absolute path; marks the member it is in as current.
-	Cwd           string `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorkspaceMembersRequest) Reset() {
-	*x = WorkspaceMembersRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorkspaceMembersRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorkspaceMembersRequest) ProtoMessage() {}
-
-func (x *WorkspaceMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorkspaceMembersRequest.ProtoReflect.Descriptor instead.
-func (*WorkspaceMembersRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *WorkspaceMembersRequest) GetWorkspace() string {
-	if x != nil {
-		return x.Workspace
-	}
-	return ""
-}
-
-func (x *WorkspaceMembersRequest) GetCwd() string {
-	if x != nil {
-		return x.Cwd
-	}
-	return ""
-}
-
-type WorkspaceMembersResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	Members       []*WorkspaceMemberInfo `protobuf:"bytes,2,rep,name=members,proto3" json:"members,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorkspaceMembersResponse) Reset() {
-	*x = WorkspaceMembersResponse{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorkspaceMembersResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorkspaceMembersResponse) ProtoMessage() {}
-
-func (x *WorkspaceMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorkspaceMembersResponse.ProtoReflect.Descriptor instead.
-func (*WorkspaceMembersResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *WorkspaceMembersResponse) GetWorkspace() *Workspace {
-	if x != nil {
-		return x.Workspace
-	}
-	return nil
-}
-
-func (x *WorkspaceMembersResponse) GetMembers() []*WorkspaceMemberInfo {
-	if x != nil {
-		return x.Members
-	}
-	return nil
 }
 
 type WatchWorkspacesRequest struct {
@@ -960,7 +801,7 @@ type WatchWorkspacesRequest struct {
 
 func (x *WatchWorkspacesRequest) Reset() {
 	*x = WatchWorkspacesRequest{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +813,7 @@ func (x *WatchWorkspacesRequest) String() string {
 func (*WatchWorkspacesRequest) ProtoMessage() {}
 
 func (x *WatchWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +826,7 @@ func (x *WatchWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*WatchWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{15}
 }
 
 type WorkspaceEvent struct {
@@ -1002,7 +843,7 @@ type WorkspaceEvent struct {
 
 func (x *WorkspaceEvent) Reset() {
 	*x = WorkspaceEvent{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1014,7 +855,7 @@ func (x *WorkspaceEvent) String() string {
 func (*WorkspaceEvent) ProtoMessage() {}
 
 func (x *WorkspaceEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1027,7 +868,7 @@ func (x *WorkspaceEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceEvent.ProtoReflect.Descriptor instead.
 func (*WorkspaceEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *WorkspaceEvent) GetEvent() isWorkspaceEvent_Event {
@@ -1095,7 +936,7 @@ type WorkspaceSnapshot struct {
 
 func (x *WorkspaceSnapshot) Reset() {
 	*x = WorkspaceSnapshot{}
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1107,7 +948,7 @@ func (x *WorkspaceSnapshot) String() string {
 func (*WorkspaceSnapshot) ProtoMessage() {}
 
 func (x *WorkspaceSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_workspace_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_workspace_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1120,7 +961,7 @@ func (x *WorkspaceSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceSnapshot.ProtoReflect.Descriptor instead.
 func (*WorkspaceSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_workspace_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *WorkspaceSnapshot) GetWorkspaces() []*Workspace {
@@ -1134,69 +975,52 @@ var File_codefoundry_v1_workspace_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_workspace_proto_rawDesc = "" +
 	"\n" +
-	"\x1ecodefoundry/v1/workspace.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbd\x01\n" +
+	"\x1ecodefoundry/v1/workspace.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xff\x01\n" +
 	"\tWorkspace\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
-	"\x06branch\x18\x03 \x01(\tR\x06branch\x129\n" +
-	"\amembers\x18\x04 \x03(\v2\x1f.codefoundry.v1.WorkspaceMemberR\amembers\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"U\n" +
-	"\x0fWorkspaceMember\x12\x1d\n" +
-	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
-	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\"\xc8\x01\n" +
-	"\x13WorkspaceMemberInfo\x12\x1d\n" +
-	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\x12!\n" +
-	"\fproject_name\x18\x02 \x01(\tR\vprojectName\x12#\n" +
-	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\x12\x16\n" +
-	"\x06branch\x18\x04 \x01(\tR\x06branch\x12\x18\n" +
-	"\amissing\x18\x05 \x01(\bR\amissing\x12\x18\n" +
-	"\acurrent\x18\x06 \x01(\bR\acurrent\"J\n" +
-	"\x13WorkspaceMemberSpec\x12\x18\n" +
-	"\aproject\x18\x01 \x01(\tR\aproject\x12\x19\n" +
-	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\"\x17\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x18\n" +
+	"\amembers\x18\x06 \x03(\tR\amembers\x12\x1b\n" +
+	"\troot_path\x18\a \x01(\tR\brootPath\x12'\n" +
+	"\x0fdefault_primary\x18\b \x01(\tR\x0edefaultPrimary\x12\x1f\n" +
+	"\vmanaged_dir\x18\t \x01(\tR\n" +
+	"managedDirJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x06branch\"\x17\n" +
 	"\x15ListWorkspacesRequest\"S\n" +
 	"\x16ListWorkspacesResponse\x129\n" +
 	"\n" +
 	"workspaces\x18\x01 \x03(\v2\x19.codefoundry.v1.WorkspaceR\n" +
-	"workspaces\"\xb4\x01\n" +
+	"workspaces\"\xbd\x01\n" +
 	"\x16CreateWorkspaceRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\x12=\n" +
-	"\amembers\x18\x03 \x03(\v2#.codefoundry.v1.WorkspaceMemberSpecR\amembers\x12\x19\n" +
-	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\x12\x14\n" +
-	"\x05fetch\x18\x05 \x01(\bR\x05fetch\"R\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\amembers\x18\x06 \x03(\tR\amembers\x12\x1b\n" +
+	"\troot_path\x18\a \x01(\tR\brootPath\x12'\n" +
+	"\x0fdefault_primary\x18\b \x01(\tR\x0edefaultPrimaryJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x06branchR\bbase_refR\x05fetch\"R\n" +
 	"\x17CreateWorkspaceResponse\x127\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"\x97\x01\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"|\n" +
 	"\x1aAddWorkspaceProjectRequest\x12\x1c\n" +
-	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x10\n" +
-	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x12\x18\n" +
-	"\aproject\x18\x03 \x01(\tR\aproject\x12\x19\n" +
-	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\x12\x14\n" +
-	"\x05fetch\x18\x05 \x01(\bR\x05fetch\"V\n" +
+	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x18\n" +
+	"\aproject\x18\x03 \x01(\tR\aprojectJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x03cwdR\bbase_refR\x05fetch\"V\n" +
 	"\x1bAddWorkspaceProjectResponse\x127\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"\xa4\x01\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"\x84\x01\n" +
 	"\x1dRemoveWorkspaceProjectRequest\x12\x1c\n" +
-	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x10\n" +
-	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x12\x18\n" +
-	"\aproject\x18\x03 \x01(\tR\aproject\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\x12#\n" +
-	"\rdelete_branch\x18\x05 \x01(\bR\fdeleteBranch\"Y\n" +
+	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x18\n" +
+	"\aproject\x18\x03 \x01(\tR\aprojectJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x03cwdR\x05forceR\rdelete_branch\"Y\n" +
 	"\x1eRemoveWorkspaceProjectResponse\x127\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"q\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"J\n" +
+	"\x16RenameWorkspaceRequest\x12\x1c\n" +
+	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"R\n" +
+	"\x17RenameWorkspaceResponse\x127\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"j\n" +
+	"!SetWorkspaceDefaultPrimaryRequest\x12\x1c\n" +
+	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12'\n" +
+	"\x0fdefault_primary\x18\x02 \x01(\tR\x0edefaultPrimary\"]\n" +
+	"\"SetWorkspaceDefaultPrimaryResponse\x127\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\"X\n" +
 	"\x16RemoveWorkspaceRequest\x12\x1c\n" +
-	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05force\x12#\n" +
-	"\rdelete_branch\x18\x03 \x01(\bR\fdeleteBranch\"\x19\n" +
-	"\x17RemoveWorkspaceResponse\"I\n" +
-	"\x17WorkspaceMembersRequest\x12\x1c\n" +
-	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x10\n" +
-	"\x03cwd\x18\x02 \x01(\tR\x03cwd\"\x92\x01\n" +
-	"\x18WorkspaceMembersResponse\x127\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x19.codefoundry.v1.WorkspaceR\tworkspace\x12=\n" +
-	"\amembers\x18\x02 \x03(\v2#.codefoundry.v1.WorkspaceMemberInfoR\amembers\"\x18\n" +
+	"\tworkspace\x18\x01 \x01(\tR\tworkspaceJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x05forceR\rdelete_branch\"\x19\n" +
+	"\x17RemoveWorkspaceResponse\"\x18\n" +
 	"\x16WatchWorkspacesRequest\"\xb2\x01\n" +
 	"\x0eWorkspaceEvent\x12?\n" +
 	"\bsnapshot\x18\x01 \x01(\v2!.codefoundry.v1.WorkspaceSnapshotH\x00R\bsnapshot\x125\n" +
@@ -1207,15 +1031,16 @@ const file_codefoundry_v1_workspace_proto_rawDesc = "" +
 	"\x11WorkspaceSnapshot\x129\n" +
 	"\n" +
 	"workspaces\x18\x01 \x03(\v2\x19.codefoundry.v1.WorkspaceR\n" +
-	"workspaces2\xb5\x05\n" +
+	"workspaces2\xb0\x06\n" +
 	"\x10WorkspaceService\x12W\n" +
 	"\x04List\x12%.codefoundry.v1.ListWorkspacesRequest\x1a&.codefoundry.v1.ListWorkspacesResponse\"\x00\x12[\n" +
 	"\x06Create\x12&.codefoundry.v1.CreateWorkspaceRequest\x1a'.codefoundry.v1.CreateWorkspaceResponse\"\x00\x12g\n" +
 	"\n" +
 	"AddProject\x12*.codefoundry.v1.AddWorkspaceProjectRequest\x1a+.codefoundry.v1.AddWorkspaceProjectResponse\"\x00\x12p\n" +
 	"\rRemoveProject\x12-.codefoundry.v1.RemoveWorkspaceProjectRequest\x1a..codefoundry.v1.RemoveWorkspaceProjectResponse\"\x00\x12[\n" +
-	"\x06Remove\x12&.codefoundry.v1.RemoveWorkspaceRequest\x1a'.codefoundry.v1.RemoveWorkspaceResponse\"\x00\x12^\n" +
-	"\aMembers\x12'.codefoundry.v1.WorkspaceMembersRequest\x1a(.codefoundry.v1.WorkspaceMembersResponse\"\x00\x12S\n" +
+	"\x06Rename\x12&.codefoundry.v1.RenameWorkspaceRequest\x1a'.codefoundry.v1.RenameWorkspaceResponse\"\x00\x12|\n" +
+	"\x11SetDefaultPrimary\x121.codefoundry.v1.SetWorkspaceDefaultPrimaryRequest\x1a2.codefoundry.v1.SetWorkspaceDefaultPrimaryResponse\"\x00\x12[\n" +
+	"\x06Remove\x12&.codefoundry.v1.RemoveWorkspaceRequest\x1a'.codefoundry.v1.RemoveWorkspaceResponse\"\x00\x12S\n" +
 	"\x05Watch\x12&.codefoundry.v1.WatchWorkspacesRequest\x1a\x1e.codefoundry.v1.WorkspaceEvent\"\x000\x01B\xc6\x01\n" +
 	"\x12com.codefoundry.v1B\x0eWorkspaceProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
@@ -1231,61 +1056,60 @@ func file_codefoundry_v1_workspace_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_workspace_proto_rawDescData
 }
 
-var file_codefoundry_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_codefoundry_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_codefoundry_v1_workspace_proto_goTypes = []any{
-	(*Workspace)(nil),                      // 0: codefoundry.v1.Workspace
-	(*WorkspaceMember)(nil),                // 1: codefoundry.v1.WorkspaceMember
-	(*WorkspaceMemberInfo)(nil),            // 2: codefoundry.v1.WorkspaceMemberInfo
-	(*WorkspaceMemberSpec)(nil),            // 3: codefoundry.v1.WorkspaceMemberSpec
-	(*ListWorkspacesRequest)(nil),          // 4: codefoundry.v1.ListWorkspacesRequest
-	(*ListWorkspacesResponse)(nil),         // 5: codefoundry.v1.ListWorkspacesResponse
-	(*CreateWorkspaceRequest)(nil),         // 6: codefoundry.v1.CreateWorkspaceRequest
-	(*CreateWorkspaceResponse)(nil),        // 7: codefoundry.v1.CreateWorkspaceResponse
-	(*AddWorkspaceProjectRequest)(nil),     // 8: codefoundry.v1.AddWorkspaceProjectRequest
-	(*AddWorkspaceProjectResponse)(nil),    // 9: codefoundry.v1.AddWorkspaceProjectResponse
-	(*RemoveWorkspaceProjectRequest)(nil),  // 10: codefoundry.v1.RemoveWorkspaceProjectRequest
-	(*RemoveWorkspaceProjectResponse)(nil), // 11: codefoundry.v1.RemoveWorkspaceProjectResponse
-	(*RemoveWorkspaceRequest)(nil),         // 12: codefoundry.v1.RemoveWorkspaceRequest
-	(*RemoveWorkspaceResponse)(nil),        // 13: codefoundry.v1.RemoveWorkspaceResponse
-	(*WorkspaceMembersRequest)(nil),        // 14: codefoundry.v1.WorkspaceMembersRequest
-	(*WorkspaceMembersResponse)(nil),       // 15: codefoundry.v1.WorkspaceMembersResponse
-	(*WatchWorkspacesRequest)(nil),         // 16: codefoundry.v1.WatchWorkspacesRequest
-	(*WorkspaceEvent)(nil),                 // 17: codefoundry.v1.WorkspaceEvent
-	(*WorkspaceSnapshot)(nil),              // 18: codefoundry.v1.WorkspaceSnapshot
-	(*timestamppb.Timestamp)(nil),          // 19: google.protobuf.Timestamp
+	(*Workspace)(nil),                          // 0: codefoundry.v1.Workspace
+	(*ListWorkspacesRequest)(nil),              // 1: codefoundry.v1.ListWorkspacesRequest
+	(*ListWorkspacesResponse)(nil),             // 2: codefoundry.v1.ListWorkspacesResponse
+	(*CreateWorkspaceRequest)(nil),             // 3: codefoundry.v1.CreateWorkspaceRequest
+	(*CreateWorkspaceResponse)(nil),            // 4: codefoundry.v1.CreateWorkspaceResponse
+	(*AddWorkspaceProjectRequest)(nil),         // 5: codefoundry.v1.AddWorkspaceProjectRequest
+	(*AddWorkspaceProjectResponse)(nil),        // 6: codefoundry.v1.AddWorkspaceProjectResponse
+	(*RemoveWorkspaceProjectRequest)(nil),      // 7: codefoundry.v1.RemoveWorkspaceProjectRequest
+	(*RemoveWorkspaceProjectResponse)(nil),     // 8: codefoundry.v1.RemoveWorkspaceProjectResponse
+	(*RenameWorkspaceRequest)(nil),             // 9: codefoundry.v1.RenameWorkspaceRequest
+	(*RenameWorkspaceResponse)(nil),            // 10: codefoundry.v1.RenameWorkspaceResponse
+	(*SetWorkspaceDefaultPrimaryRequest)(nil),  // 11: codefoundry.v1.SetWorkspaceDefaultPrimaryRequest
+	(*SetWorkspaceDefaultPrimaryResponse)(nil), // 12: codefoundry.v1.SetWorkspaceDefaultPrimaryResponse
+	(*RemoveWorkspaceRequest)(nil),             // 13: codefoundry.v1.RemoveWorkspaceRequest
+	(*RemoveWorkspaceResponse)(nil),            // 14: codefoundry.v1.RemoveWorkspaceResponse
+	(*WatchWorkspacesRequest)(nil),             // 15: codefoundry.v1.WatchWorkspacesRequest
+	(*WorkspaceEvent)(nil),                     // 16: codefoundry.v1.WorkspaceEvent
+	(*WorkspaceSnapshot)(nil),                  // 17: codefoundry.v1.WorkspaceSnapshot
+	(*timestamppb.Timestamp)(nil),              // 18: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_workspace_proto_depIdxs = []int32{
-	1,  // 0: codefoundry.v1.Workspace.members:type_name -> codefoundry.v1.WorkspaceMember
-	19, // 1: codefoundry.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: codefoundry.v1.ListWorkspacesResponse.workspaces:type_name -> codefoundry.v1.Workspace
-	3,  // 3: codefoundry.v1.CreateWorkspaceRequest.members:type_name -> codefoundry.v1.WorkspaceMemberSpec
-	0,  // 4: codefoundry.v1.CreateWorkspaceResponse.workspace:type_name -> codefoundry.v1.Workspace
-	0,  // 5: codefoundry.v1.AddWorkspaceProjectResponse.workspace:type_name -> codefoundry.v1.Workspace
-	0,  // 6: codefoundry.v1.RemoveWorkspaceProjectResponse.workspace:type_name -> codefoundry.v1.Workspace
-	0,  // 7: codefoundry.v1.WorkspaceMembersResponse.workspace:type_name -> codefoundry.v1.Workspace
-	2,  // 8: codefoundry.v1.WorkspaceMembersResponse.members:type_name -> codefoundry.v1.WorkspaceMemberInfo
-	18, // 9: codefoundry.v1.WorkspaceEvent.snapshot:type_name -> codefoundry.v1.WorkspaceSnapshot
-	0,  // 10: codefoundry.v1.WorkspaceEvent.updated:type_name -> codefoundry.v1.Workspace
-	0,  // 11: codefoundry.v1.WorkspaceSnapshot.workspaces:type_name -> codefoundry.v1.Workspace
-	4,  // 12: codefoundry.v1.WorkspaceService.List:input_type -> codefoundry.v1.ListWorkspacesRequest
-	6,  // 13: codefoundry.v1.WorkspaceService.Create:input_type -> codefoundry.v1.CreateWorkspaceRequest
-	8,  // 14: codefoundry.v1.WorkspaceService.AddProject:input_type -> codefoundry.v1.AddWorkspaceProjectRequest
-	10, // 15: codefoundry.v1.WorkspaceService.RemoveProject:input_type -> codefoundry.v1.RemoveWorkspaceProjectRequest
-	12, // 16: codefoundry.v1.WorkspaceService.Remove:input_type -> codefoundry.v1.RemoveWorkspaceRequest
-	14, // 17: codefoundry.v1.WorkspaceService.Members:input_type -> codefoundry.v1.WorkspaceMembersRequest
-	16, // 18: codefoundry.v1.WorkspaceService.Watch:input_type -> codefoundry.v1.WatchWorkspacesRequest
-	5,  // 19: codefoundry.v1.WorkspaceService.List:output_type -> codefoundry.v1.ListWorkspacesResponse
-	7,  // 20: codefoundry.v1.WorkspaceService.Create:output_type -> codefoundry.v1.CreateWorkspaceResponse
-	9,  // 21: codefoundry.v1.WorkspaceService.AddProject:output_type -> codefoundry.v1.AddWorkspaceProjectResponse
-	11, // 22: codefoundry.v1.WorkspaceService.RemoveProject:output_type -> codefoundry.v1.RemoveWorkspaceProjectResponse
-	13, // 23: codefoundry.v1.WorkspaceService.Remove:output_type -> codefoundry.v1.RemoveWorkspaceResponse
-	15, // 24: codefoundry.v1.WorkspaceService.Members:output_type -> codefoundry.v1.WorkspaceMembersResponse
-	17, // 25: codefoundry.v1.WorkspaceService.Watch:output_type -> codefoundry.v1.WorkspaceEvent
-	19, // [19:26] is the sub-list for method output_type
-	12, // [12:19] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	18, // 0: codefoundry.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 1: codefoundry.v1.ListWorkspacesResponse.workspaces:type_name -> codefoundry.v1.Workspace
+	0,  // 2: codefoundry.v1.CreateWorkspaceResponse.workspace:type_name -> codefoundry.v1.Workspace
+	0,  // 3: codefoundry.v1.AddWorkspaceProjectResponse.workspace:type_name -> codefoundry.v1.Workspace
+	0,  // 4: codefoundry.v1.RemoveWorkspaceProjectResponse.workspace:type_name -> codefoundry.v1.Workspace
+	0,  // 5: codefoundry.v1.RenameWorkspaceResponse.workspace:type_name -> codefoundry.v1.Workspace
+	0,  // 6: codefoundry.v1.SetWorkspaceDefaultPrimaryResponse.workspace:type_name -> codefoundry.v1.Workspace
+	17, // 7: codefoundry.v1.WorkspaceEvent.snapshot:type_name -> codefoundry.v1.WorkspaceSnapshot
+	0,  // 8: codefoundry.v1.WorkspaceEvent.updated:type_name -> codefoundry.v1.Workspace
+	0,  // 9: codefoundry.v1.WorkspaceSnapshot.workspaces:type_name -> codefoundry.v1.Workspace
+	1,  // 10: codefoundry.v1.WorkspaceService.List:input_type -> codefoundry.v1.ListWorkspacesRequest
+	3,  // 11: codefoundry.v1.WorkspaceService.Create:input_type -> codefoundry.v1.CreateWorkspaceRequest
+	5,  // 12: codefoundry.v1.WorkspaceService.AddProject:input_type -> codefoundry.v1.AddWorkspaceProjectRequest
+	7,  // 13: codefoundry.v1.WorkspaceService.RemoveProject:input_type -> codefoundry.v1.RemoveWorkspaceProjectRequest
+	9,  // 14: codefoundry.v1.WorkspaceService.Rename:input_type -> codefoundry.v1.RenameWorkspaceRequest
+	11, // 15: codefoundry.v1.WorkspaceService.SetDefaultPrimary:input_type -> codefoundry.v1.SetWorkspaceDefaultPrimaryRequest
+	13, // 16: codefoundry.v1.WorkspaceService.Remove:input_type -> codefoundry.v1.RemoveWorkspaceRequest
+	15, // 17: codefoundry.v1.WorkspaceService.Watch:input_type -> codefoundry.v1.WatchWorkspacesRequest
+	2,  // 18: codefoundry.v1.WorkspaceService.List:output_type -> codefoundry.v1.ListWorkspacesResponse
+	4,  // 19: codefoundry.v1.WorkspaceService.Create:output_type -> codefoundry.v1.CreateWorkspaceResponse
+	6,  // 20: codefoundry.v1.WorkspaceService.AddProject:output_type -> codefoundry.v1.AddWorkspaceProjectResponse
+	8,  // 21: codefoundry.v1.WorkspaceService.RemoveProject:output_type -> codefoundry.v1.RemoveWorkspaceProjectResponse
+	10, // 22: codefoundry.v1.WorkspaceService.Rename:output_type -> codefoundry.v1.RenameWorkspaceResponse
+	12, // 23: codefoundry.v1.WorkspaceService.SetDefaultPrimary:output_type -> codefoundry.v1.SetWorkspaceDefaultPrimaryResponse
+	14, // 24: codefoundry.v1.WorkspaceService.Remove:output_type -> codefoundry.v1.RemoveWorkspaceResponse
+	16, // 25: codefoundry.v1.WorkspaceService.Watch:output_type -> codefoundry.v1.WorkspaceEvent
+	18, // [18:26] is the sub-list for method output_type
+	10, // [10:18] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_workspace_proto_init() }
@@ -1293,7 +1117,7 @@ func file_codefoundry_v1_workspace_proto_init() {
 	if File_codefoundry_v1_workspace_proto != nil {
 		return
 	}
-	file_codefoundry_v1_workspace_proto_msgTypes[17].OneofWrappers = []any{
+	file_codefoundry_v1_workspace_proto_msgTypes[16].OneofWrappers = []any{
 		(*WorkspaceEvent_Snapshot)(nil),
 		(*WorkspaceEvent_Updated)(nil),
 		(*WorkspaceEvent_RemovedId)(nil),
@@ -1304,7 +1128,7 @@ func file_codefoundry_v1_workspace_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_workspace_proto_rawDesc), len(file_codefoundry_v1_workspace_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

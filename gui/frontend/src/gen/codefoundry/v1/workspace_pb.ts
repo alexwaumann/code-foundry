@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/workspace.proto.
  */
 export const file_codefoundry_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIpcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIOCgZicmFuY2gYAyABKAkSMAoHbWVtYmVycxgEIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlchIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI8Cg9Xb3Jrc3BhY2VNZW1iZXISEgoKcHJvamVjdF9pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJIogBChNXb3Jrc3BhY2VNZW1iZXJJbmZvEhIKCnByb2plY3RfaWQYASABKAkSFAoMcHJvamVjdF9uYW1lGAIgASgJEhUKDXdvcmt0cmVlX3BhdGgYAyABKAkSDgoGYnJhbmNoGAQgASgJEg8KB21pc3NpbmcYBSABKAgSDwoHY3VycmVudBgGIAEoCCI4ChNXb3Jrc3BhY2VNZW1iZXJTcGVjEg8KB3Byb2plY3QYASABKAkSEAoIYmFzZV9yZWYYAiABKAkiFwoVTGlzdFdvcmtzcGFjZXNSZXF1ZXN0IkcKFkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USLQoKd29ya3NwYWNlcxgBIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSKNAQoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJEg4KBmJyYW5jaBgCIAEoCRI0CgdtZW1iZXJzGAMgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyU3BlYxIQCghiYXNlX3JlZhgEIAEoCRINCgVmZXRjaBgFIAEoCCJHChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UibgoaQWRkV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIPCgdwcm9qZWN0GAMgASgJEhAKCGJhc2VfcmVmGAQgASgJEg0KBWZldGNoGAUgASgIIksKG0FkZFdvcmtzcGFjZVByb2plY3RSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UidgodUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIPCgdwcm9qZWN0GAMgASgJEg0KBWZvcmNlGAQgASgIEhUKDWRlbGV0ZV9icmFuY2gYBSABKAgiTgoeUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJRChZSZW1vdmVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRINCgVmb3JjZRgCIAEoCBIVCg1kZWxldGVfYnJhbmNoGAMgASgIIhkKF1JlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIjkKF1dvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRILCgNjd2QYAiABKAkifgoYV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZRI0CgdtZW1iZXJzGAIgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVySW5mbyIYChZXYXRjaFdvcmtzcGFjZXNSZXF1ZXN0IpQBCg5Xb3Jrc3BhY2VFdmVudBI1CghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZVNuYXBzaG90SAASLAoHdXBkYXRlZBgCIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUgAEhQKCnJlbW92ZWRfaWQYAyABKAlIAEIHCgVldmVudCJCChFXb3Jrc3BhY2VTbmFwc2hvdBItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlMrUFChBXb3Jrc3BhY2VTZXJ2aWNlElcKBExpc3QSJS5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1Jlc3BvbnNlIgASWwoGQ3JlYXRlEiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgASZwoKQWRkUHJvamVjdBIqLmNvZGVmb3VuZHJ5LnYxLkFkZFdvcmtzcGFjZVByb2plY3RSZXF1ZXN0GisuY29kZWZvdW5kcnkudjEuQWRkV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgAScAoNUmVtb3ZlUHJvamVjdBItLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVByb2plY3RSZXF1ZXN0Gi4uY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgASWwoGUmVtb3ZlEiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIgASXgoHTWVtYmVycxInLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlIgASUwoFV2F0Y2gSJi5jb2RlZm91bmRyeS52MS5XYXRjaFdvcmtzcGFjZXNSZXF1ZXN0Gh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnQiADABQsYBChJjb20uY29kZWZvdW5kcnkudjFCDldvcmtzcGFjZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIrsBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdtZW1iZXJzGAYgAygJEhEKCXJvb3RfcGF0aBgHIAEoCRIXCg9kZWZhdWx0X3ByaW1hcnkYCCABKAkSEwoLbWFuYWdlZF9kaXIYCSABKAlKBAgDEARKBAgEEAVSBmJyYW5jaCIXChVMaXN0V29ya3NwYWNlc1JlcXVlc3QiRwoWTGlzdFdvcmtzcGFjZXNSZXNwb25zZRItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlIpQBChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0EgwKBG5hbWUYASABKAkSDwoHbWVtYmVycxgGIAMoCRIRCglyb290X3BhdGgYByABKAkSFwoPZGVmYXVsdF9wcmltYXJ5GAggASgJSgQIAhADSgQIAxAESgQIBBAFSgQIBRAGUgZicmFuY2hSCGJhc2VfcmVmUgVmZXRjaCJHChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UiaAoaQWRkV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEg8KB3Byb2plY3QYAyABKAlKBAgCEANKBAgEEAVKBAgFEAZSA2N3ZFIIYmFzZV9yZWZSBWZldGNoIksKG0FkZFdvcmtzcGFjZVByb2plY3RSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UicAodUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEg8KB3Byb2plY3QYAyABKAlKBAgCEANKBAgEEAVKBAgFEAZSA2N3ZFIFZm9yY2VSDWRlbGV0ZV9icmFuY2giTgoeUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSI5ChZSZW5hbWVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRIMCgRuYW1lGAIgASgJIkcKF1JlbmFtZVdvcmtzcGFjZVJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJPCiFTZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEhcKD2RlZmF1bHRfcHJpbWFyeRgCIAEoCSJSCiJTZXRXb3Jrc3BhY2VEZWZhdWx0UHJpbWFyeVJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJNChZSZW1vdmVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCUoECAIQA0oECAMQBFIFZm9yY2VSDWRlbGV0ZV9icmFuY2giGQoXUmVtb3ZlV29ya3NwYWNlUmVzcG9uc2UiGAoWV2F0Y2hXb3Jrc3BhY2VzUmVxdWVzdCKUAQoOV29ya3NwYWNlRXZlbnQSNQoIc25hcHNob3QYASABKAsyIS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VTbmFwc2hvdEgAEiwKB3VwZGF0ZWQYAiABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VIABIUCgpyZW1vdmVkX2lkGAMgASgJSABCBwoFZXZlbnQiQgoRV29ya3NwYWNlU25hcHNob3QSLQoKd29ya3NwYWNlcxgBIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZTKwBgoQV29ya3NwYWNlU2VydmljZRJXCgRMaXN0EiUuY29kZWZvdW5kcnkudjEuTGlzdFdvcmtzcGFjZXNSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuTGlzdFdvcmtzcGFjZXNSZXNwb25zZSIAElsKBkNyZWF0ZRImLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3Jrc3BhY2VSZXNwb25zZSIAEmcKCkFkZFByb2plY3QSKi5jb2RlZm91bmRyeS52MS5BZGRXb3Jrc3BhY2VQcm9qZWN0UmVxdWVzdBorLmNvZGVmb3VuZHJ5LnYxLkFkZFdvcmtzcGFjZVByb2plY3RSZXNwb25zZSIAEnAKDVJlbW92ZVByb2plY3QSLS5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3Jrc3BhY2VQcm9qZWN0UmVxdWVzdBouLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVByb2plY3RSZXNwb25zZSIAElsKBlJlbmFtZRImLmNvZGVmb3VuZHJ5LnYxLlJlbmFtZVdvcmtzcGFjZVJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5SZW5hbWVXb3Jrc3BhY2VSZXNwb25zZSIAEnwKEVNldERlZmF1bHRQcmltYXJ5EjEuY29kZWZvdW5kcnkudjEuU2V0V29ya3NwYWNlRGVmYXVsdFByaW1hcnlSZXF1ZXN0GjIuY29kZWZvdW5kcnkudjEuU2V0V29ya3NwYWNlRGVmYXVsdFByaW1hcnlSZXNwb25zZSIAElsKBlJlbW92ZRImLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3Jrc3BhY2VSZXNwb25zZSIAElMKBVdhdGNoEiYuY29kZWZvdW5kcnkudjEuV2F0Y2hXb3Jrc3BhY2VzUmVxdWVzdBoeLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUV2ZW50IgAwAULGAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg5Xb3Jrc3BhY2VQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Workspace
@@ -26,30 +26,48 @@ export type Workspace = Message<"codefoundry.v1.Workspace"> & {
   id: string;
 
   /**
-   * Unique display name.
+   * Unique display name (case-insensitively); editable.
    *
    * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * The branch every member worktree was created on.
-   *
-   * @generated from field: string branch = 3;
-   */
-  branch: string;
-
-  /**
-   * In the order they were added.
-   *
-   * @generated from field: repeated codefoundry.v1.WorkspaceMember members = 4;
-   */
-  members: WorkspaceMember[];
-
-  /**
    * @generated from field: google.protobuf.Timestamp created_at = 5;
    */
   createdAt?: Timestamp | undefined;
+
+  /**
+   * Member project ids, sorted by id.
+   *
+   * @generated from field: repeated string members = 6;
+   */
+  members: string[];
+
+  /**
+   * A real folder the workspace came from (its CLAUDE.md, AGENTS.md and .claude are
+   * symlinked into the managed dir); empty for a synthetic workspace.
+   *
+   * @generated from field: string root_path = 7;
+   */
+  rootPath: string;
+
+  /**
+   * Where new threads start: a member project id, or "workspace" (managed_dir, or
+   * root_path when set).
+   *
+   * @generated from field: string default_primary = 8;
+   */
+  defaultPrimary: string;
+
+  /**
+   * <config home>/workspaces/<id>: given to every thread that references the workspace
+   * as an --add-dir (unless it runs there), the place for its CLAUDE.md, AGENTS.md and
+   * .claude/skills.
+   *
+   * @generated from field: string managed_dir = 9;
+   */
+  managedDir: string;
 };
 
 /**
@@ -58,110 +76,6 @@ export type Workspace = Message<"codefoundry.v1.Workspace"> & {
  */
 export const WorkspaceSchema: GenMessage<Workspace> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 0);
-
-/**
- * @generated from message codefoundry.v1.WorkspaceMember
- */
-export type WorkspaceMember = Message<"codefoundry.v1.WorkspaceMember"> & {
-  /**
-   * @generated from field: string project_id = 1;
-   */
-  projectId: string;
-
-  /**
-   * @generated from field: string worktree_path = 2;
-   */
-  worktreePath: string;
-};
-
-/**
- * Describes the message codefoundry.v1.WorkspaceMember.
- * Use `create(WorkspaceMemberSchema)` to create a new message.
- */
-export const WorkspaceMemberSchema: GenMessage<WorkspaceMember> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 1);
-
-/**
- * MemberInfo is a member joined with the project store's current state.
- *
- * @generated from message codefoundry.v1.WorkspaceMemberInfo
- */
-export type WorkspaceMemberInfo = Message<"codefoundry.v1.WorkspaceMemberInfo"> & {
-  /**
-   * @generated from field: string project_id = 1;
-   */
-  projectId: string;
-
-  /**
-   * Empty when the project is no longer registered.
-   *
-   * @generated from field: string project_name = 2;
-   */
-  projectName: string;
-
-  /**
-   * @generated from field: string worktree_path = 3;
-   */
-  worktreePath: string;
-
-  /**
-   * The branch checked out in the worktree now; the workspace branch when unknown.
-   *
-   * @generated from field: string branch = 4;
-   */
-  branch: string;
-
-  /**
-   * The worktree is not among the project's worktrees (deleted by hand, or the
-   * project is unregistered or not reconciled yet).
-   *
-   * @generated from field: bool missing = 5;
-   */
-  missing: boolean;
-
-  /**
-   * The request's cwd is inside this worktree.
-   *
-   * @generated from field: bool current = 6;
-   */
-  current: boolean;
-};
-
-/**
- * Describes the message codefoundry.v1.WorkspaceMemberInfo.
- * Use `create(WorkspaceMemberInfoSchema)` to create a new message.
- */
-export const WorkspaceMemberInfoSchema: GenMessage<WorkspaceMemberInfo> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 2);
-
-/**
- * WorkspaceMemberSpec names a project to add and the ref its branch starts from.
- *
- * @generated from message codefoundry.v1.WorkspaceMemberSpec
- */
-export type WorkspaceMemberSpec = Message<"codefoundry.v1.WorkspaceMemberSpec"> & {
-  /**
-   * Project id, name (when unique), or a path inside it.
-   *
-   * @generated from field: string project = 1;
-   */
-  project: string;
-
-  /**
-   * Ref to branch from when the branch does not exist yet. Empty: the request's
-   * base_ref, else the default branch (resolved as CreateWorktreeRequest.base_ref).
-   *
-   * @generated from field: string base_ref = 2;
-   */
-  baseRef: string;
-};
-
-/**
- * Describes the message codefoundry.v1.WorkspaceMemberSpec.
- * Use `create(WorkspaceMemberSpecSchema)` to create a new message.
- */
-export const WorkspaceMemberSpecSchema: GenMessage<WorkspaceMemberSpec> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 3);
 
 /**
  * @generated from message codefoundry.v1.ListWorkspacesRequest
@@ -174,7 +88,7 @@ export type ListWorkspacesRequest = Message<"codefoundry.v1.ListWorkspacesReques
  * Use `create(ListWorkspacesRequestSchema)` to create a new message.
  */
 export const ListWorkspacesRequestSchema: GenMessage<ListWorkspacesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 4);
+  messageDesc(file_codefoundry_v1_workspace, 1);
 
 /**
  * @generated from message codefoundry.v1.ListWorkspacesResponse
@@ -191,7 +105,7 @@ export type ListWorkspacesResponse = Message<"codefoundry.v1.ListWorkspacesRespo
  * Use `create(ListWorkspacesResponseSchema)` to create a new message.
  */
 export const ListWorkspacesResponseSchema: GenMessage<ListWorkspacesResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 5);
+  messageDesc(file_codefoundry_v1_workspace, 2);
 
 /**
  * @generated from message codefoundry.v1.CreateWorkspaceRequest
@@ -203,30 +117,27 @@ export type CreateWorkspaceRequest = Message<"codefoundry.v1.CreateWorkspaceRequ
   name: string;
 
   /**
-   * Branch for every member. Empty: cf/<name as a slug>.
+   * Projects (id, name when unique, or an absolute path inside one). At least one unless
+   * root_path is set.
    *
-   * @generated from field: string branch = 2;
+   * @generated from field: repeated string members = 6;
    */
-  branch: string;
+  members: string[];
 
   /**
-   * @generated from field: repeated codefoundry.v1.WorkspaceMemberSpec members = 3;
+   * An absolute folder under home; empty for a synthetic workspace.
+   *
+   * @generated from field: string root_path = 7;
    */
-  members: WorkspaceMemberSpec[];
+  rootPath: string;
 
   /**
-   * Default base ref for members without their own.
+   * A member (id or name) or "workspace". Empty: "workspace" for a rooted workspace,
+   * else the first member given.
    *
-   * @generated from field: string base_ref = 4;
+   * @generated from field: string default_primary = 8;
    */
-  baseRef: string;
-
-  /**
-   * Fetch each remote-tracking base first (bounded; a failed fetch uses the local copy).
-   *
-   * @generated from field: bool fetch = 5;
-   */
-  fetch: boolean;
+  defaultPrimary: string;
 };
 
 /**
@@ -234,7 +145,7 @@ export type CreateWorkspaceRequest = Message<"codefoundry.v1.CreateWorkspaceRequ
  * Use `create(CreateWorkspaceRequestSchema)` to create a new message.
  */
 export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 6);
+  messageDesc(file_codefoundry_v1_workspace, 3);
 
 /**
  * @generated from message codefoundry.v1.CreateWorkspaceResponse
@@ -251,23 +162,18 @@ export type CreateWorkspaceResponse = Message<"codefoundry.v1.CreateWorkspaceRes
  * Use `create(CreateWorkspaceResponseSchema)` to create a new message.
  */
 export const CreateWorkspaceResponseSchema: GenMessage<CreateWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 7);
+  messageDesc(file_codefoundry_v1_workspace, 4);
 
 /**
  * @generated from message codefoundry.v1.AddWorkspaceProjectRequest
  */
 export type AddWorkspaceProjectRequest = Message<"codefoundry.v1.AddWorkspaceProjectRequest"> & {
   /**
-   * Workspace id or name. Empty: the workspace whose member contains cwd.
+   * Workspace id or name.
    *
    * @generated from field: string workspace = 1;
    */
   workspace: string;
-
-  /**
-   * @generated from field: string cwd = 2;
-   */
-  cwd: string;
 
   /**
    * Project id, name (when unique), or a path inside it.
@@ -275,16 +181,6 @@ export type AddWorkspaceProjectRequest = Message<"codefoundry.v1.AddWorkspacePro
    * @generated from field: string project = 3;
    */
   project: string;
-
-  /**
-   * @generated from field: string base_ref = 4;
-   */
-  baseRef: string;
-
-  /**
-   * @generated from field: bool fetch = 5;
-   */
-  fetch: boolean;
 };
 
 /**
@@ -292,7 +188,7 @@ export type AddWorkspaceProjectRequest = Message<"codefoundry.v1.AddWorkspacePro
  * Use `create(AddWorkspaceProjectRequestSchema)` to create a new message.
  */
 export const AddWorkspaceProjectRequestSchema: GenMessage<AddWorkspaceProjectRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 8);
+  messageDesc(file_codefoundry_v1_workspace, 5);
 
 /**
  * @generated from message codefoundry.v1.AddWorkspaceProjectResponse
@@ -309,44 +205,25 @@ export type AddWorkspaceProjectResponse = Message<"codefoundry.v1.AddWorkspacePr
  * Use `create(AddWorkspaceProjectResponseSchema)` to create a new message.
  */
 export const AddWorkspaceProjectResponseSchema: GenMessage<AddWorkspaceProjectResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 9);
+  messageDesc(file_codefoundry_v1_workspace, 6);
 
 /**
  * @generated from message codefoundry.v1.RemoveWorkspaceProjectRequest
  */
 export type RemoveWorkspaceProjectRequest = Message<"codefoundry.v1.RemoveWorkspaceProjectRequest"> & {
   /**
-   * Workspace id or name. Empty: the workspace whose member contains cwd.
+   * Workspace id or name.
    *
    * @generated from field: string workspace = 1;
    */
   workspace: string;
 
   /**
-   * @generated from field: string cwd = 2;
-   */
-  cwd: string;
-
-  /**
-   * Project id, name, or a path inside it (or the member worktree path).
+   * Project id or name (a member).
    *
    * @generated from field: string project = 3;
    */
   project: string;
-
-  /**
-   * Remove the worktree even with uncommitted changes.
-   *
-   * @generated from field: bool force = 4;
-   */
-  force: boolean;
-
-  /**
-   * Also delete the member's branch.
-   *
-   * @generated from field: bool delete_branch = 5;
-   */
-  deleteBranch: boolean;
 };
 
 /**
@@ -354,7 +231,7 @@ export type RemoveWorkspaceProjectRequest = Message<"codefoundry.v1.RemoveWorksp
  * Use `create(RemoveWorkspaceProjectRequestSchema)` to create a new message.
  */
 export const RemoveWorkspaceProjectRequestSchema: GenMessage<RemoveWorkspaceProjectRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 10);
+  messageDesc(file_codefoundry_v1_workspace, 7);
 
 /**
  * @generated from message codefoundry.v1.RemoveWorkspaceProjectResponse
@@ -371,7 +248,91 @@ export type RemoveWorkspaceProjectResponse = Message<"codefoundry.v1.RemoveWorks
  * Use `create(RemoveWorkspaceProjectResponseSchema)` to create a new message.
  */
 export const RemoveWorkspaceProjectResponseSchema: GenMessage<RemoveWorkspaceProjectResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 8);
+
+/**
+ * @generated from message codefoundry.v1.RenameWorkspaceRequest
+ */
+export type RenameWorkspaceRequest = Message<"codefoundry.v1.RenameWorkspaceRequest"> & {
+  /**
+   * Workspace id or name.
+   *
+   * @generated from field: string workspace = 1;
+   */
+  workspace: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.RenameWorkspaceRequest.
+ * Use `create(RenameWorkspaceRequestSchema)` to create a new message.
+ */
+export const RenameWorkspaceRequestSchema: GenMessage<RenameWorkspaceRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 9);
+
+/**
+ * @generated from message codefoundry.v1.RenameWorkspaceResponse
+ */
+export type RenameWorkspaceResponse = Message<"codefoundry.v1.RenameWorkspaceResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.Workspace workspace = 1;
+   */
+  workspace?: Workspace | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.RenameWorkspaceResponse.
+ * Use `create(RenameWorkspaceResponseSchema)` to create a new message.
+ */
+export const RenameWorkspaceResponseSchema: GenMessage<RenameWorkspaceResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 10);
+
+/**
+ * @generated from message codefoundry.v1.SetWorkspaceDefaultPrimaryRequest
+ */
+export type SetWorkspaceDefaultPrimaryRequest = Message<"codefoundry.v1.SetWorkspaceDefaultPrimaryRequest"> & {
+  /**
+   * Workspace id or name.
+   *
+   * @generated from field: string workspace = 1;
+   */
+  workspace: string;
+
+  /**
+   * A member project (id or name), or "workspace".
+   *
+   * @generated from field: string default_primary = 2;
+   */
+  defaultPrimary: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetWorkspaceDefaultPrimaryRequest.
+ * Use `create(SetWorkspaceDefaultPrimaryRequestSchema)` to create a new message.
+ */
+export const SetWorkspaceDefaultPrimaryRequestSchema: GenMessage<SetWorkspaceDefaultPrimaryRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 11);
+
+/**
+ * @generated from message codefoundry.v1.SetWorkspaceDefaultPrimaryResponse
+ */
+export type SetWorkspaceDefaultPrimaryResponse = Message<"codefoundry.v1.SetWorkspaceDefaultPrimaryResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.Workspace workspace = 1;
+   */
+  workspace?: Workspace | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetWorkspaceDefaultPrimaryResponse.
+ * Use `create(SetWorkspaceDefaultPrimaryResponseSchema)` to create a new message.
+ */
+export const SetWorkspaceDefaultPrimaryResponseSchema: GenMessage<SetWorkspaceDefaultPrimaryResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_workspace, 12);
 
 /**
  * @generated from message codefoundry.v1.RemoveWorkspaceRequest
@@ -383,16 +344,6 @@ export type RemoveWorkspaceRequest = Message<"codefoundry.v1.RemoveWorkspaceRequ
    * @generated from field: string workspace = 1;
    */
   workspace: string;
-
-  /**
-   * @generated from field: bool force = 2;
-   */
-  force: boolean;
-
-  /**
-   * @generated from field: bool delete_branch = 3;
-   */
-  deleteBranch: boolean;
 };
 
 /**
@@ -400,7 +351,7 @@ export type RemoveWorkspaceRequest = Message<"codefoundry.v1.RemoveWorkspaceRequ
  * Use `create(RemoveWorkspaceRequestSchema)` to create a new message.
  */
 export const RemoveWorkspaceRequestSchema: GenMessage<RemoveWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 12);
+  messageDesc(file_codefoundry_v1_workspace, 13);
 
 /**
  * @generated from message codefoundry.v1.RemoveWorkspaceResponse
@@ -413,55 +364,7 @@ export type RemoveWorkspaceResponse = Message<"codefoundry.v1.RemoveWorkspaceRes
  * Use `create(RemoveWorkspaceResponseSchema)` to create a new message.
  */
 export const RemoveWorkspaceResponseSchema: GenMessage<RemoveWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 13);
-
-/**
- * @generated from message codefoundry.v1.WorkspaceMembersRequest
- */
-export type WorkspaceMembersRequest = Message<"codefoundry.v1.WorkspaceMembersRequest"> & {
-  /**
-   * Workspace id or name. Empty: the workspace whose member contains cwd.
-   *
-   * @generated from field: string workspace = 1;
-   */
-  workspace: string;
-
-  /**
-   * An absolute path; marks the member it is in as current.
-   *
-   * @generated from field: string cwd = 2;
-   */
-  cwd: string;
-};
-
-/**
- * Describes the message codefoundry.v1.WorkspaceMembersRequest.
- * Use `create(WorkspaceMembersRequestSchema)` to create a new message.
- */
-export const WorkspaceMembersRequestSchema: GenMessage<WorkspaceMembersRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 14);
-
-/**
- * @generated from message codefoundry.v1.WorkspaceMembersResponse
- */
-export type WorkspaceMembersResponse = Message<"codefoundry.v1.WorkspaceMembersResponse"> & {
-  /**
-   * @generated from field: codefoundry.v1.Workspace workspace = 1;
-   */
-  workspace?: Workspace | undefined;
-
-  /**
-   * @generated from field: repeated codefoundry.v1.WorkspaceMemberInfo members = 2;
-   */
-  members: WorkspaceMemberInfo[];
-};
-
-/**
- * Describes the message codefoundry.v1.WorkspaceMembersResponse.
- * Use `create(WorkspaceMembersResponseSchema)` to create a new message.
- */
-export const WorkspaceMembersResponseSchema: GenMessage<WorkspaceMembersResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 15);
 
 /**
  * @generated from message codefoundry.v1.WatchWorkspacesRequest
@@ -474,7 +377,7 @@ export type WatchWorkspacesRequest = Message<"codefoundry.v1.WatchWorkspacesRequ
  * Use `create(WatchWorkspacesRequestSchema)` to create a new message.
  */
 export const WatchWorkspacesRequestSchema: GenMessage<WatchWorkspacesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 16);
+  messageDesc(file_codefoundry_v1_workspace, 15);
 
 /**
  * @generated from message codefoundry.v1.WorkspaceEvent
@@ -509,7 +412,7 @@ export type WorkspaceEvent = Message<"codefoundry.v1.WorkspaceEvent"> & {
  * Use `create(WorkspaceEventSchema)` to create a new message.
  */
 export const WorkspaceEventSchema: GenMessage<WorkspaceEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 17);
+  messageDesc(file_codefoundry_v1_workspace, 16);
 
 /**
  * @generated from message codefoundry.v1.WorkspaceSnapshot
@@ -526,18 +429,20 @@ export type WorkspaceSnapshot = Message<"codefoundry.v1.WorkspaceSnapshot"> & {
  * Use `create(WorkspaceSnapshotSchema)` to create a new message.
  */
 export const WorkspaceSnapshotSchema: GenMessage<WorkspaceSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_workspace, 18);
+  messageDesc(file_codefoundry_v1_workspace, 17);
 
 /**
- * WorkspaceService manages workspaces: one branch checked out as a worktree in each of
- * several projects (a branch set), for changes that span projects. See
- * docs/notes/workspaces-handoff.md and docs/notes/workspaces-1-store.md.
+ * WorkspaceService manages workspaces: saved sets of projects with a place for the
+ * instructions and skills that span them (the managed dir). A workspace has no branch
+ * and no worktrees: a thread's project set and branch decide those
+ * (ThreadService.Checkouts). See docs/notes/workspaces-v2-handoff.md and
+ * docs/notes/workspaces-v2-2-workspaces.md.
  *
  * @generated from service codefoundry.v1.WorkspaceService
  */
 export const WorkspaceService: GenService<{
   /**
-   * List returns every workspace.
+   * List returns every workspace, sorted by name.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.List
    */
@@ -547,9 +452,8 @@ export const WorkspaceService: GenService<{
     output: typeof ListWorkspacesResponseSchema;
   },
   /**
-   * Create makes a workspace and one worktree per member project on its branch
-   * (fetching each base first). All or nothing: on failure, worktrees it made are
-   * removed again.
+   * Create saves a workspace and makes its managed dir (for a rooted one, the symlinks
+   * to the root's CLAUDE.md, AGENTS.md and .claude).
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Create
    */
@@ -559,7 +463,7 @@ export const WorkspaceService: GenService<{
     output: typeof CreateWorkspaceResponseSchema;
   },
   /**
-   * AddProject creates a worktree on the workspace branch in another project.
+   * AddProject adds a member project.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.AddProject
    */
@@ -569,8 +473,8 @@ export const WorkspaceService: GenService<{
     output: typeof AddWorkspaceProjectResponseSchema;
   },
   /**
-   * RemoveProject removes a member's worktree (refused while a live thread runs in it, or
-   * when it has uncommitted changes and force is not set) and drops the member.
+   * RemoveProject drops a member project (nothing on disk changes). The default primary
+   * moves to "workspace" when it was the removed project.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.RemoveProject
    */
@@ -580,8 +484,30 @@ export const WorkspaceService: GenService<{
     output: typeof RemoveWorkspaceProjectResponseSchema;
   },
   /**
-   * Remove removes every member worktree (same guards as RemoveProject) and forgets the
-   * workspace.
+   * Rename renames a workspace (names are unique, case-insensitively).
+   *
+   * @generated from rpc codefoundry.v1.WorkspaceService.Rename
+   */
+  rename: {
+    methodKind: "unary";
+    input: typeof RenameWorkspaceRequestSchema;
+    output: typeof RenameWorkspaceResponseSchema;
+  },
+  /**
+   * SetDefaultPrimary sets where new threads in the workspace start: a member project id,
+   * or "workspace" (the managed dir, or the root of a rooted workspace).
+   *
+   * @generated from rpc codefoundry.v1.WorkspaceService.SetDefaultPrimary
+   */
+  setDefaultPrimary: {
+    methodKind: "unary";
+    input: typeof SetWorkspaceDefaultPrimaryRequestSchema;
+    output: typeof SetWorkspaceDefaultPrimaryResponseSchema;
+  },
+  /**
+   * Remove forgets a workspace. A synthetic one's managed dir is deleted with its
+   * instructions and skills; a rooted one loses only the symlinks (the root is the
+   * user's). Threads that reference it keep running without it.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Remove
    */
@@ -589,17 +515,6 @@ export const WorkspaceService: GenService<{
     methodKind: "unary";
     input: typeof RemoveWorkspaceRequestSchema;
     output: typeof RemoveWorkspaceResponseSchema;
-  },
-  /**
-   * Members resolves a workspace by id, name, or a path inside one of its member
-   * worktrees, and lists its members with project names and checked-out branches.
-   *
-   * @generated from rpc codefoundry.v1.WorkspaceService.Members
-   */
-  members: {
-    methodKind: "unary";
-    input: typeof WorkspaceMembersRequestSchema;
-    output: typeof WorkspaceMembersResponseSchema;
   },
   /**
    * Watch sends a snapshot, then every change. A client that falls behind gets a new

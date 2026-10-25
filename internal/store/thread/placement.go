@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // Where a new thread goes (docs/notes/workspaces-v2-handoff.md §4,
@@ -39,6 +40,12 @@ type placeRequest struct {
 	// newBranch: NewWorktree or NewBranch.
 	newBranch    bool
 	checkoutMode bool
+	// workspaceID is WorkspaceID resolved, with the workspace's members and default
+	// primary; wsPrimary: ProjectID is workspace.PrimaryWorkspace.
+	workspaceID string
+	wsMembers   []string
+	wsDefault   string
+	wsPrimary   bool
 }
 
 // placement is where a new thread goes.
@@ -56,6 +63,9 @@ type placement struct {
 	branch      string
 	newBranch   bool
 	workspaceID string
+	// workspacePrimary: the thread runs in its workspace's folder (its root, else its
+	// managed dir); primary is "".
+	workspacePrimary bool
 	// from is the thread the placement copied (Like or the creator); "" when none.
 	from string
 }
@@ -63,7 +73,10 @@ type placement struct {
 // decidePlacement is the placement for req, copying from src when it is set (Like when
 // explicit, else the creator). srcCheckouts are src's checkouts (checkoutsOf). Pure.
 func decidePlacement(src *Thread, explicit bool, req placeRequest, srcCheckouts []Checkout) (placement, error) {
-	if src != nil && len(src.Projects()) == 0 {
+	if req.workspaceID != "" {
+		return workspacePlacement(req) // told where: the workspace, not the copied thread
+	}
+	if src != nil && len(src.Projects()) == 0 && src.WorkspaceID == "" {
 		if !explicit {
 			src = nil // a creator without a project has nothing to pass on
 		} else if req.primary == "" && req.worktree == "" && len(req.projectIDs) == 0 {
@@ -115,10 +128,12 @@ func copyPlacement(src Thread, req placeRequest, primary string) (placement, err
 	if pl.primary == "" && slices.Contains(pl.projectIDs, src.ProjectID) {
 		pl.primary = src.ProjectID
 	}
-	if pl.primary == "" {
+	if pl.primary == "" && src.ProjectID == "" && src.WorkspaceID != "" {
+		pl.workspacePrimary = true // the copied thread runs in its workspace's folder
+	} else if pl.primary == "" {
 		pl.primary = pl.projectIDs[0]
 	}
-	if !slices.Contains(pl.projectIDs, pl.primary) {
+	if !pl.workspacePrimary && !slices.Contains(pl.projectIDs, pl.primary) {
 		return placement{}, fmt.Errorf("%w: project %s is not among the thread's projects (%s)", ErrInvalidArgument, pl.primary, strings.Join(pl.projectIDs, ", "))
 	}
 	switch {
@@ -132,9 +147,42 @@ func copyPlacement(src Thread, req placeRequest, primary string) (placement, err
 		switch {
 		case req.worktree != "":
 			pl.primaryPath = req.worktree
-		case pl.primary == src.ProjectID && !src.worktreeMode():
+		case !pl.workspacePrimary && pl.primary == src.ProjectID && !src.worktreeMode():
 			pl.primaryPath = src.WorktreePath // the copied thread's own cwd (a user's worktree)
 		}
+	}
+	return pl, nil
+}
+
+// workspacePlacement is req's placement with a workspace (WorkspaceID): its members are
+// the set unless ProjectIDs gives one; the primary is ProjectID
+// (workspace.PrimaryWorkspace for its folder), else the worktree's project, else the
+// workspace's default primary when it is the folder or in the set, else the first project
+// given; a workspace without projects runs in its folder.
+func workspacePlacement(req placeRequest) (placement, error) {
+	pl := placement{worktreeMode: req.newBranch, newBranch: req.newBranch, workspaceID: req.workspaceID}
+	given := req.projectIDs
+	if len(given) == 0 {
+		given = req.wsMembers
+	}
+	pl.projectIDs = CleanProjectIDs("", given)
+	pl.primary = cmp.Or(req.primary, req.worktreeProject)
+	switch {
+	case req.wsPrimary:
+		pl.primary, pl.workspacePrimary = "", true
+	case pl.primary != "":
+		if !slices.Contains(pl.projectIDs, pl.primary) {
+			return placement{}, fmt.Errorf("%w: project %s is not among the thread's projects (%s)", ErrInvalidArgument, pl.primary, strings.Join(pl.projectIDs, ", "))
+		}
+	case req.wsDefault == workspace.PrimaryWorkspace, len(given) == 0:
+		pl.workspacePrimary = true
+	case slices.Contains(pl.projectIDs, req.wsDefault):
+		pl.primary = req.wsDefault
+	default:
+		pl.primary = given[0]
+	}
+	if !pl.worktreeMode && !pl.workspacePrimary {
+		pl.primaryPath = req.worktree
 	}
 	return pl, nil
 }
@@ -220,7 +268,7 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 			src = &t
 		}
 	}
-	if o.NewBranch && (src == nil || len(src.Projects()) == 0) {
+	if o.NewBranch && req.workspaceID == "" && (src == nil || len(src.Projects()) == 0) {
 		return p, fmt.Errorf("%w: new branch needs like (or a creating thread with a project) to branch from", ErrInvalidArgument)
 	}
 	var srcCheckouts []Checkout
@@ -241,6 +289,17 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 		return p, err
 	}
 	p.projectIDs, p.projectID, p.workspaceID = pl.projectIDs, pl.primary, pl.workspaceID
+	if pl.workspacePrimary {
+		// The workspace's folder: its root, else its managed dir (made by workspaceDir).
+		w, err := m.workspaceDir(pl.workspaceID)
+		if err != nil {
+			return p, err
+		}
+		p.path = w.Dir()
+		if !pl.worktreeMode {
+			return p, nil
+		}
+	}
 	if !pl.worktreeMode {
 		p.path = pl.primaryPath
 		if p.path == "" {
@@ -293,6 +352,19 @@ func (m *Manager) placeRequest(o CreateOptions) (placeRequest, map[string]string
 			bases[pid] = base
 		}
 	}
+	if ref := strings.TrimSpace(o.WorkspaceID); ref != "" {
+		w, err := m.workspaceDir(ref)
+		if err != nil {
+			return req, nil, err
+		}
+		req.workspaceID, req.wsMembers, req.wsDefault = w.ID, w.Members, w.DefaultPrimary
+		if strings.EqualFold(strings.TrimSpace(o.ProjectID), workspace.PrimaryWorkspace) {
+			req.wsPrimary = true
+			o.ProjectID = ""
+		}
+	} else if strings.EqualFold(strings.TrimSpace(o.ProjectID), workspace.PrimaryWorkspace) {
+		return req, nil, fmt.Errorf("%w: project %q (the workspace's folder) needs a workspace", ErrInvalidArgument, o.ProjectID)
+	}
 	if o.ProjectID != "" {
 		pid, err := resolve(o.ProjectID)
 		if err != nil {
@@ -338,6 +410,9 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 		} else if plain == nil || r.ID == pl.primary {
 			plain = &r
 		}
+	}
+	if len(git) == 0 && plain == nil {
+		return p, fmt.Errorf("%w: new worktrees need a project with git; the thread has none", ErrFailedPrecondition)
 	}
 	if len(git) == 0 {
 		// Before the namer: a project without git runs threads in its one checkout.
@@ -517,7 +592,7 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 	snap := m.opts.Projects.Snapshot()
 	var todo []project.Project
 	for _, c := range m.checkouts(s) {
-		if c.Primary || !c.Derived || !c.Missing || !c.Registered || c.FromWorkspace {
+		if c.Primary || !c.Derived || !c.Missing || !c.Registered {
 			continue
 		}
 		if r, ok := snap.Project(c.ProjectID); ok {

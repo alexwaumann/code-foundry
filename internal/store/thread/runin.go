@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // Run in another member ("Run in…", RunIn).
@@ -51,6 +53,9 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 		return Thread{}, fmt.Errorf("%w: checkout %s of project %s does not exist", ErrFailedPrecondition, c.Path, cmp.Or(c.ProjectName, c.ProjectID))
 	}
 	mem := struct{ ProjectID, WorktreePath string }{c.ProjectID, c.Path}
+	if mem.ProjectID == workspace.PrimaryWorkspace {
+		mem.ProjectID = "" // the workspace's folder: no project is the primary
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -95,6 +100,13 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 // project that is not one of cur's checkouts is refused.
 func (m *Manager) runInTarget(cur Thread, t RunInTarget) (Checkout, error) {
 	cos := m.checkouts(cur)
+	if w, ok := m.workspaceOf(cur); ok && isDir(w.Dir()) {
+		// The workspace's folder is a place too ("workspace" as the project).
+		cos = append(cos, Checkout{ProjectID: workspace.PrimaryWorkspace, ProjectName: w.Name, Path: w.Dir(), Primary: cur.ProjectID == ""})
+	}
+	if len(cos) < 2 {
+		return Checkout{}, fmt.Errorf("%w: thread %s has no other checkout to run in", ErrFailedPrecondition, cur.ID)
+	}
 	list := func() string {
 		parts := make([]string, 0, len(cos))
 		for _, c := range cos {

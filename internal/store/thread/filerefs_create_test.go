@@ -38,13 +38,11 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 			want: func(s Thread, e *wsEnv) string {
 				return "read @" + e.wt + "/README.md and @" + e.wt2 + "/docs/a b.md and @x.go"
 			}},
-		{name: "new workspace: the new members' worktrees",
-			o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}}},
+		{name: "new worktrees in two projects: each member's worktree",
+			o: CreateOptions{ProjectIDs: []string{"r1", "r2"}, NewWorktree: &NewWorktree{}},
 			want: func(s Thread, e *wsEnv) string {
-				w, _ := e.ws.Snapshot().Workspace(s.WorkspaceID)
-				m1, _ := w.Member("r1")
-				m2, _ := w.Member("r2")
-				return "read @" + m1.WorktreePath + "/README.md and @" + m2.WorktreePath + "/docs/a b.md and @x.go"
+				tc, _ := e.m.Checkouts(e.ctx(), CheckoutsRef{ID: s.ID})
+				return "read @" + tc.Checkouts[0].Path + "/README.md and @" + tc.Checkouts[1].Path + "/docs/a b.md and @x.go"
 			}},
 	}
 	for _, tt := range tests {

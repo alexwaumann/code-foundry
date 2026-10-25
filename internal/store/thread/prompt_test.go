@@ -49,12 +49,12 @@ func TestSystemPrompt(t *testing.T) {
 			t.Errorf("the thread new clause recommends a placement (%q): %q", sway, placementClause(t))
 		}
 	}
-	ws := workspacePrompt("login")
-	if got := systemPrompt(ws, nil, ""); got != ThreadPrompt+" "+ws {
+	ws := workspaceBlock("login", "Use tabs.")
+	if got := systemPrompt(ws, nil, ""); got != ThreadPrompt+"\n\n"+ws {
 		t.Errorf("workspace thread: %q", got)
 	}
 	// A reseed's (or a resident's) append comes last, after a blank line.
-	if got := systemPrompt(ws, nil, "You are Ember."); got != ThreadPrompt+" "+ws+"\n\nYou are Ember." {
+	if got := systemPrompt(ws, nil, "You are Ember."); got != ThreadPrompt+"\n\n"+ws+"\n\nYou are Ember." {
 		t.Errorf("seeded thread: %q", got)
 	}
 	if strings.ContainsAny(ThreadPrompt, "\n$`") {

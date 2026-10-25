@@ -181,10 +181,10 @@ type Thread struct {
 	// it are filled in from the project store at startup while their worktree exists
 	// (backfillBranches).
 	Branch string
-	// WorkspaceID is an optional reference to a workspace (its instructions and skills),
-	// independent of ProjectIDs. Until the workspace store's reshape a workspace still
-	// has member worktrees, and a spawn of a thread that references one also reads them
-	// from the workspace store (workspace.go).
+	// WorkspaceID is an optional reference to a workspace (its managed dir and
+	// instructions reach every spawn; workspace.go), independent of ProjectIDs. A thread
+	// whose primary is the workspace has an empty ProjectID and runs in its root, or its
+	// managed dir.
 	WorkspaceID string
 	// PendingWorktreePath is the checkout a queued RunIn moves the thread to once it is
 	// idle at its prompt; empty when nothing is queued. Not persisted.
@@ -386,8 +386,8 @@ func (*Snapshot) isThreadListEvent()    {}
 type CreateOptions struct {
 	// ProjectID and WorktreePath select the primary (placement.go). Either may be empty:
 	// a project alone means its checkout (in worktree mode its worktree on the branch); a
-	// path alone is looked up among registered projects. With WorkspaceID or NewWorkspace
-	// they pick the member worktree instead.
+	// path alone is looked up among registered projects. With WorkspaceID, ProjectID may be
+	// workspace.PrimaryWorkspace: the thread runs in the workspace's folder.
 	ProjectID    string
 	WorktreePath string
 	// ProjectIDs is the project set (refs: an id, a name when unique, or an absolute
@@ -406,17 +406,13 @@ type CreateOptions struct {
 	// CheckoutMode runs every member in its own checkout even when Like or the inherited
 	// thread is in worktree mode (thread new --new-worktree=false).
 	CheckoutMode bool
-	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
-	// The thread runs in the member WorktreePath or ProjectID names, else the first
-	// member. Exclusive with NewWorktree and NewWorkspace.
+	// WorkspaceID (an id or a name) is the workspace the thread references. Without
+	// ProjectIDs its members are the set; the primary is ProjectID, else the workspace's
+	// default primary, else the first member (placement.go).
 	WorkspaceID string
-	// NewWorkspace, when set, makes Create make a workspace (a worktree on one new
-	// branch in every repository, named as for NewWorktree) and run the thread in the
-	// member ProjectID names, else the first. Exclusive with NewWorktree and WorkspaceID.
-	NewWorkspace *NewWorkspace
 	// NoProject, when set, starts a thread without a project: it runs in Options.Home
 	// with an empty ProjectID and WorkspaceID. Exclusive with ProjectID, WorktreePath,
-	// NewWorktree, WorkspaceID and NewWorkspace.
+	// NewWorktree and WorkspaceID.
 	NoProject bool
 	// Model is a claude --model value (registry id like "claude-opus-4-8[1m]", or any full model name).
 	Model string

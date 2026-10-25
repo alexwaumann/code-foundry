@@ -7,10 +7,11 @@ import (
 	"time"
 )
 
-// Persistence for the workspaces and workspace_members tables (migration 0007).
+// Persistence for the workspaces and workspace_members tables (migrations 0007, 0026,
+// 0048). Members are kept sorted in memory; the table order does not matter.
 
 func loadWorkspaces(ctx context.Context, db *sql.DB) ([]Workspace, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id, name, branch, created_at FROM workspaces`)
+	rows, err := db.QueryContext(ctx, `SELECT id, name, root_path, default_primary, created_at FROM workspaces`)
 	if err != nil {
 		return nil, fmt.Errorf("workspace: load: %w", err)
 	}
@@ -20,7 +21,7 @@ func loadWorkspaces(ctx context.Context, db *sql.DB) ([]Workspace, error) {
 	for rows.Next() {
 		var w Workspace
 		var created int64
-		if err := rows.Scan(&w.ID, &w.Name, &w.Branch, &created); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &w.RootPath, &w.DefaultPrimary, &created); err != nil {
 			return nil, fmt.Errorf("workspace: load: %w", err)
 		}
 		w.CreatedAt = time.UnixMilli(created)
@@ -30,20 +31,18 @@ func loadWorkspaces(ctx context.Context, db *sql.DB) ([]Workspace, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("workspace: load: %w", err)
 	}
-	mrows, err := db.QueryContext(ctx, `SELECT workspace_id, project_id, worktree_path FROM workspace_members
-		ORDER BY added_at, rowid`)
+	mrows, err := db.QueryContext(ctx, `SELECT workspace_id, project_id FROM workspace_members`)
 	if err != nil {
 		return nil, fmt.Errorf("workspace: load members: %w", err)
 	}
 	defer func() { _ = mrows.Close() }()
 	for mrows.Next() {
-		var id string
-		var m Member
-		if err := mrows.Scan(&id, &m.ProjectID, &m.WorktreePath); err != nil {
+		var id, pid string
+		if err := mrows.Scan(&id, &pid); err != nil {
 			return nil, fmt.Errorf("workspace: load members: %w", err)
 		}
 		if w := byID[id]; w != nil {
-			w.Members = append(w.Members, m)
+			w.Members = append(w.Members, pid)
 		}
 	}
 	if err := mrows.Err(); err != nil {
@@ -51,13 +50,15 @@ func loadWorkspaces(ctx context.Context, db *sql.DB) ([]Workspace, error) {
 	}
 	out := make([]Workspace, 0, len(order))
 	for _, id := range order {
-		out = append(out, *byID[id])
+		w := *byID[id]
+		w.Members = sortedMembers(w.Members)
+		out = append(out, w)
 	}
 	return out, nil
 }
 
-// insertWorkspace stores a new workspace and its members in one transaction.
-func insertWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
+// saveWorkspace writes w and replaces its members, in one transaction.
+func saveWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("workspace: save %s: %w", w.ID, err)
@@ -67,14 +68,19 @@ func insertWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
 			_ = tx.Rollback()
 		}
 	}()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO workspaces (id, name, branch, created_at) VALUES (?, ?, ?, ?)`,
-		w.ID, w.Name, w.Branch, w.CreatedAt.UnixMilli()); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO workspaces (id, name, root_path, default_primary, created_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET name = excluded.name, root_path = excluded.root_path, default_primary = excluded.default_primary`,
+		w.ID, w.Name, w.RootPath, w.DefaultPrimary, w.CreatedAt.UnixMilli()); err != nil {
 		return fmt.Errorf("workspace: save %s: %w", w.ID, err)
 	}
-	for _, m := range w.Members {
-		if _, err = tx.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, project_id, worktree_path, added_at)
-			VALUES (?, ?, ?, ?)`, w.ID, m.ProjectID, m.WorktreePath, w.CreatedAt.UnixMilli()); err != nil {
-			return fmt.Errorf("workspace: save %s member %s: %w", w.ID, m.ProjectID, err)
+	if _, err = tx.ExecContext(ctx, `DELETE FROM workspace_members WHERE workspace_id = ?`, w.ID); err != nil {
+		return fmt.Errorf("workspace: save %s members: %w", w.ID, err)
+	}
+	now := time.Now().UnixMilli()
+	for _, pid := range w.Members {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, project_id, added_at) VALUES (?, ?, ?)`,
+			w.ID, pid, now); err != nil {
+			return fmt.Errorf("workspace: save %s member %s: %w", w.ID, pid, err)
 		}
 	}
 	if err = tx.Commit(); err != nil {
@@ -83,22 +89,10 @@ func insertWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
 	return nil
 }
 
-func insertMember(ctx context.Context, db *sql.DB, id string, m Member, at time.Time) error {
-	if _, err := db.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, project_id, worktree_path, added_at)
-		VALUES (?, ?, ?, ?)`, id, m.ProjectID, m.WorktreePath, at.UnixMilli()); err != nil {
-		return fmt.Errorf("workspace: add member %s to %s: %w", m.ProjectID, id, err)
-	}
-	return nil
-}
-
-func deleteMember(ctx context.Context, db *sql.DB, id, projectID string) error {
-	if _, err := db.ExecContext(ctx, `DELETE FROM workspace_members WHERE workspace_id = ? AND project_id = ?`, id, projectID); err != nil {
-		return fmt.Errorf("workspace: remove member %s from %s: %w", projectID, id, err)
-	}
-	return nil
-}
-
 func deleteWorkspace(ctx context.Context, db *sql.DB, id string) error {
+	if _, err := db.ExecContext(ctx, `DELETE FROM workspace_members WHERE workspace_id = ?`, id); err != nil {
+		return fmt.Errorf("workspace: delete %s members: %w", id, err)
+	}
 	if _, err := db.ExecContext(ctx, `DELETE FROM workspaces WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("workspace: delete %s: %w", id, err)
 	}

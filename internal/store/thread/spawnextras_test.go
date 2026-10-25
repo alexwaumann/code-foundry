@@ -62,10 +62,10 @@ func TestSpawnExtras(t *testing.T) {
 	})
 	e.m.SetSpawnExtras(rec.fn)
 
-	// A workspace thread: skills, plugin dirs, attachments, members.
+	// A workspace thread: skills, plugin dirs, attachments, the managed dir, members.
 	w := e.connected(CreateOptions{WorkspaceID: "login", InitialPrompt: "hi"})
 	spec := e.spec(w.ID)
-	if got, want := addDirs(spec.Argv), []string{skills, plug, att, e.wt2}; !slices.Equal(got, want) {
+	if got, want := addDirs(spec.Argv), []string{skills, plug, att, e.managed(), e.wt2}; !slices.Equal(got, want) {
 		t.Errorf("workspace --add-dir = %q, want %q", got, want)
 	}
 	if v, _ := envValue(spec.Env, "CF_HELLO"); v != "1" {

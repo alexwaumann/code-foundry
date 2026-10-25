@@ -1,37 +1,31 @@
 package thread
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// Workspace threads (docs/notes/workspaces-2-launch.md).
+// Workspace references (docs/notes/workspaces-v2-handoff.md §4,
+// docs/notes/workspaces-v2-2-workspaces.md).
 //
-// A thread's owner is one field: Thread.WorkspaceID when set, else the project
-// ProjectID. The cwd (ProjectID, WorktreePath) is a separate fact: the member worktree the
-// thread runs in. The thread store reads workspaces from the workspace store (never
-// the other way round: the workspace store learns about live threads from a function
-// the daemon hands it).
+// A thread may reference a workspace (Thread.WorkspaceID), independent of its project
+// set. Every spawn of such a thread re-checks the workspace's managed dir (EnsureDirs:
+// a rooted workspace's symlinks), gives Claude the managed dir as an --add-dir and
+// appends the workspace's instructions (its CLAUDE.md, else AGENTS.md, read through the
+// managed dir) under one heading after ThreadPrompt, unless the thread runs in the
+// managed dir or the workspace's root, where Claude loads them itself. The thread store
+// reads workspaces from the workspace store, never the other way round.
 
-// AdditionalDirsClaudeMDEnv makes claude load CLAUDE.md and .claude/rules from
-// --add-dir directories too (without it, added directories give file access and
-// skills/commands/agents only). Set for every workspace thread.
-const AdditionalDirsClaudeMDEnv = "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1"
-
-// workspacePrompt is the one line a workspace thread's system prompt gets. It must stay
-// small and static: claude records the system prompt on the first request and reuses
-// it until compaction, so the member list itself is looked up with the CLI instead.
-func workspacePrompt(name string) string {
-	return "This thread belongs to workspace " + name + ". Run `code-foundry workspace members` for the current worktrees."
-}
+// MaxWorkspaceInstructions caps the workspace instructions a spawn appends; longer
+// files are cut there (logged).
+const MaxWorkspaceInstructions = 32 << 10
 
 // ThreadPrompt is the paragraph every thread's system prompt gets. It points at the
 // skills the daemon ships to every thread (Options.SkillsDir, internal/skills), the
@@ -44,7 +38,7 @@ func workspacePrompt(name string) string {
 // file (absolute or against the cwd, which the chip resolves against:
 // docs/notes/model-paths.md), and where thread new puts a thread, stated without a
 // recommendation: the model's call (docs/notes/thread-new-base-origin.md). Its last
-// sentence holds the orchestration rule (docs/notes/orch-skill-v2.md). Static for the same reason as workspacePrompt: it
+// sentence holds the orchestration rule (docs/notes/orch-skill-v2.md). Static: it
 // never varies per spawn. Every request of every thread carries it: keep it short.
 const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-foundry says what the app can do and which of its other skills to read (code-foundry-help to answer questions about the app, code-foundry-orchestrate to delegate work to other threads, code-foundry-plugin to build plugins). " +
 	"In this app: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
@@ -58,13 +52,13 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"say what you will do, not command or skill names. " +
 	"Work the user wants split up, run in parallel or landed on several branches goes through code-foundry-orchestrate (child threads in new worktrees), never the Agent tool, hand-made worktrees or hand-made cf/ branches; the Agent tool is for read-only research."
 
-// systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
-// (workspacePrompt) for a workspace thread, then the app memory's entries (memoryPrompt)
-// when there are any, then the thread's own append.
-func systemPrompt(workspaceLine string, memory []string, threadAppend string) string {
+// systemPrompt is --append-system-prompt: ThreadPrompt, then a referenced workspace's
+// instructions (workspaceBlock) when there are any, then the app memory's entries
+// (memoryPrompt) when there are any, then the thread's own append.
+func systemPrompt(workspaceInstructions string, memory []string, threadAppend string) string {
 	p := ThreadPrompt
-	if workspaceLine != "" {
-		p += " " + workspaceLine
+	if workspaceInstructions != "" {
+		p += "\n\n" + workspaceInstructions
 	}
 	if mp := memoryPrompt(memory); mp != "" {
 		p += "\n\n" + mp
@@ -76,47 +70,111 @@ func systemPrompt(workspaceLine string, memory []string, threadAppend string) st
 	return p
 }
 
-// wsLaunch is what a workspace thread's spawn adds to claude's.
-type wsLaunch struct {
-	addDirs []string // the other members' worktrees, in member order
-	missing []string // other members' worktrees that do not exist (claude refuses them)
-	env     []string
-	prompt  string
-	// projects are every member's project, the cwd's included, in member order.
-	projects []string
+// WorkspaceSource is the part of the workspace store threads need: the workspace a
+// thread references, and its managed dir made and its links re-checked at every spawn.
+// *workspace.Manager implements it.
+type WorkspaceSource interface {
+	Snapshot() *workspace.Snapshot
+	EnsureDirs(ctx context.Context, id string) error
 }
 
-// workspaceLaunch reads workspace id's current members from snap for a thread running
-// in cwd: --add-dir for every other member whose worktree exists, the CLAUDE.md env,
-// and the prompt line. ok is false when the workspace is gone.
-func workspaceLaunch(snap *workspace.Snapshot, id, cwd string, exists func(string) bool) (l wsLaunch, ok bool) {
-	w, ok := snap.Workspace(id)
-	if !ok {
-		return l, false
+// wsSpawn is what a referenced workspace adds to a spawn.
+type wsSpawn struct {
+	// addDir is the managed dir; "" when the thread runs there or in the root.
+	addDir string
+	// prompt is the instructions block; "" when there are none or the thread runs there.
+	prompt string
+}
+
+// workspaceSpawn is what s's workspace reference adds to its spawn now. A workspace
+// that is gone adds nothing (logged).
+func (m *Manager) workspaceSpawn(ctx context.Context, s Thread) wsSpawn {
+	if s.WorkspaceID == "" || m.opts.Workspaces == nil {
+		return wsSpawn{}
 	}
-	for _, mem := range w.Members {
-		l.projects = append(l.projects, mem.ProjectID)
+	w, ok := m.opts.Workspaces.Snapshot().Workspace(s.WorkspaceID)
+	if !ok {
+		m.log.Warn("workspace of thread not found; starting without it", "thread", s.ID, "workspace", s.WorkspaceID)
+		return wsSpawn{}
+	}
+	if err := m.opts.Workspaces.EnsureDirs(ctx, w.ID); err != nil {
+		m.log.Warn("workspace managed dir", "thread", s.ID, "workspace", w.ID, "err", err)
+	}
+	if samePath(s.WorktreePath, w.ManagedDir) || (w.RootPath != "" && samePath(s.WorktreePath, w.RootPath)) {
+		return wsSpawn{} // Claude loads the files from its cwd itself
+	}
+	out := wsSpawn{}
+	if isDir(w.ManagedDir) {
+		out.addDir = w.ManagedDir
+	}
+	text, path, err := readInstructions(w.ManagedDir)
+	switch {
+	case err != nil:
+		m.log.Warn("workspace instructions not read", "thread", s.ID, "workspace", w.ID, "err", err)
+	case text != "":
+		if len(text) > MaxWorkspaceInstructions {
+			m.log.Warn("workspace instructions cut", "thread", s.ID, "workspace", w.ID, "path", path,
+				"bytes", len(text), "limit", MaxWorkspaceInstructions)
+			text = cutUTF8(text, MaxWorkspaceInstructions)
+		}
+		out.prompt = workspaceBlock(w.Name, text)
+	}
+	return out
+}
+
+// workspaceBlock is the instructions block of workspace name.
+func workspaceBlock(name, text string) string {
+	return "Workspace " + name + " instructions\n\n" + strings.TrimSpace(text)
+}
+
+// readInstructions reads dir/CLAUDE.md, else dir/AGENTS.md (through the symlinks of a
+// rooted workspace); "" when neither exists.
+func readInstructions(dir string) (text, path string, err error) {
+	if dir == "" {
+		return "", "", nil
+	}
+	for _, name := range []string{"CLAUDE.md", "AGENTS.md"} {
+		p := filepath.Join(dir, name)
+		b, err := os.ReadFile(p)
 		switch {
-		case samePath(mem.WorktreePath, cwd):
-		case exists(mem.WorktreePath):
-			l.addDirs = append(l.addDirs, mem.WorktreePath)
+		case err == nil:
+			return string(b), p, nil
+		case errors.Is(err, os.ErrNotExist):
+			continue
 		default:
-			l.missing = append(l.missing, mem.WorktreePath)
+			return "", p, fmt.Errorf("read %s: %w", p, err)
 		}
 	}
-	l.env = []string{AdditionalDirsClaudeMDEnv}
-	l.prompt = workspacePrompt(w.Name)
-	return l, true
+	return "", "", nil
 }
 
-// memberProjectIDs is the project set of a thread in a workspace's members (with the
-// cwd's project).
-func memberProjectIDs(primary string, members []workspace.Member) []string {
-	ids := make([]string, len(members))
-	for i, mem := range members {
-		ids[i] = mem.ProjectID
+// cutUTF8 is s cut to at most n bytes on a rune boundary.
+func cutUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
 	}
-	return CleanProjectIDs(primary, ids)
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
+// workspaceDir is where a thread whose primary is workspace ref runs (Workspace.Dir).
+func (m *Manager) workspaceDir(ref string) (workspace.Workspace, error) {
+	if m.opts.Workspaces == nil {
+		return workspace.Workspace{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
+	}
+	w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), ref)
+	if err != nil {
+		return workspace.Workspace{}, workspaceError("workspace", err)
+	}
+	if err := m.opts.Workspaces.EnsureDirs(context.Background(), w.ID); err != nil {
+		m.log.Warn("workspace managed dir", "workspace", w.ID, "err", err)
+	}
+	if !isDir(w.Dir()) {
+		return workspace.Workspace{}, fmt.Errorf("%w: workspace %s has no folder at %s", ErrFailedPrecondition, w.Name, w.Dir())
+	}
+	return w, nil
 }
 
 // isDir reports whether path is an existing directory.
@@ -125,220 +183,9 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// WorkspaceSource is the part of the workspace store threads need: the current
-// members at every spawn, and making a workspace for a new workspace thread.
-// *workspace.Manager implements it.
-type WorkspaceSource interface {
-	Snapshot() *workspace.Snapshot
-	Create(ctx context.Context, opts workspace.CreateOptions) (workspace.Workspace, error)
-}
-
-// NewWorkspace configures the workspace Create makes for a new workspace thread.
-type NewWorkspace struct {
-	// Projects are project refs (id, name when unique, or an absolute path inside
-	// one), in member order, each optionally followed by ":<base ref>" for that member
-	// (as `workspace new --projects`). CreateOptions.ProjectID picks the member the thread
-	// runs in (default: the first).
-	Projects []string
-	// BaseRef every member without its own base branches from. Empty: each
-	// repository's default.
-	BaseRef string
-	// Name of the workspace. Empty: the branch's last component (feat/add-filter ->
-	// add-filter).
-	Name string
-	// Branch steers the one branch of every member, as NewWorktree.Branch.
-	Branch string
-	// BaseFromOrigin overrides projects.base_from_origin for every member, as
-	// NewWorktree.BaseFromOrigin.
-	BaseFromOrigin *bool
-}
-
-// createdWorkspace is what newWorkspace made.
-type createdWorkspace struct {
-	workspaceID, projectID, path, baseRef, branch string
-	// members of the new workspace, in member order.
-	members []workspace.Member
-	// name, namerCalled, late: as createdWorktree.
-	name        string
-	namerCalled bool
-	late        <-chan namingResult
-}
-
-// workspaceMember resolves the member a thread of workspace ref (id or name) runs in;
-// see pickMember. projectID may also be a project name.
-func (m *Manager) workspaceMember(ref, projectID, path string) (workspace.Workspace, workspace.Member, error) {
-	if m.opts.Workspaces == nil {
-		return workspace.Workspace{}, workspace.Member{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
-	}
-	if path != "" && !filepath.IsAbs(path) {
-		return workspace.Workspace{}, workspace.Member{}, fmt.Errorf("%w: worktree path %q must be absolute", ErrInvalidArgument, path)
-	}
-	w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), workspace.Ref{Workspace: ref})
-	if err != nil {
-		return workspace.Workspace{}, workspace.Member{}, workspaceError("workspace", err)
-	}
-	if _, ok := w.Member(projectID); projectID != "" && !ok && m.opts.Projects != nil {
-		// A repository name (or path) instead of the id.
-		if r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), projectID); err == nil {
-			projectID = r.ID
-		}
-	}
-	mem, err := pickMember(w, projectID, path)
-	return w, mem, err
-}
-
-// pickMember chooses the member of w a thread runs in: the one whose worktree is path,
-// else the one for projectID, else the first. When both are given they must name the same
-// member. A path inside a member worktree but not the worktree itself is not a member.
-func pickMember(w workspace.Workspace, projectID, path string) (workspace.Member, error) {
-	if len(w.Members) == 0 {
-		return workspace.Member{}, fmt.Errorf("%w: workspace %s has no members", ErrFailedPrecondition, w.Name)
-	}
-	if path != "" {
-		i := slices.IndexFunc(w.Members, func(mem workspace.Member) bool { return samePath(mem.WorktreePath, path) })
-		if i < 0 {
-			return workspace.Member{}, fmt.Errorf("%w: %s is not a member worktree of workspace %s (members: %s)",
-				ErrFailedPrecondition, path, w.Name, memberPaths(w))
-		}
-		if projectID != "" && w.Members[i].ProjectID != projectID {
-			return workspace.Member{}, fmt.Errorf("%w: worktree %s belongs to project %s, not %s", ErrInvalidArgument, path, w.Members[i].ProjectID, projectID)
-		}
-		return w.Members[i], nil
-	}
-	if projectID != "" {
-		mem, ok := w.Member(projectID)
-		if !ok {
-			return workspace.Member{}, fmt.Errorf("%w: project %s is not a member of workspace %s (members: %s)",
-				ErrFailedPrecondition, projectID, w.Name, memberPaths(w))
-		}
-		return mem, nil
-	}
-	return w.Members[0], nil
-}
-
 // samePath compares two absolute paths cleaned and with symlinks resolved.
 func samePath(a, b string) bool {
 	return filepath.Clean(a) == filepath.Clean(b) || realPath(a) == realPath(b)
-}
-
-func memberPaths(w workspace.Workspace) string {
-	out := make([]string, len(w.Members))
-	for i, mem := range w.Members {
-		out[i] = mem.ProjectID + " " + mem.WorktreePath
-	}
-	return strings.Join(out, ", ")
-}
-
-// newWorkspace makes the workspace of a new workspace thread: after the single naming
-// wait (as for a new worktree), a worktree on the one branch in every repository
-// through the workspace store, which creates all or none.
-func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOptions) (createdWorkspace, error) {
-	var cw createdWorkspace
-	nw := o.NewWorkspace
-	switch {
-	case m.opts.Workspaces == nil:
-		return cw, fmt.Errorf("%w: creating a workspace needs the workspace store", ErrFailedPrecondition)
-	case m.opts.Projects == nil:
-		return cw, fmt.Errorf("%w: creating a workspace needs the project store", ErrFailedPrecondition)
-	case len(nw.Projects) == 0:
-		return cw, fmt.Errorf("%w: a new workspace needs at least one project", ErrInvalidArgument)
-	}
-	base := strings.TrimSpace(nw.BaseRef)
-	if err := validateRef(base); err != nil {
-		return cw, err
-	}
-	bc, err := m.newBranchChoice(nw.Branch)
-	if err != nil {
-		return cw, err
-	}
-	// Resolve every repository before waiting for a name, so a typo fails fast.
-	snap := m.opts.Projects.Snapshot()
-	var ids, paths, bases []string
-	for _, item := range nw.Projects {
-		ref, own, _ := strings.Cut(item, ":")
-		ref, own = strings.TrimSpace(ref), strings.TrimSpace(own)
-		if err := validateRef(own); err != nil {
-			return cw, err
-		}
-		r, err := workspace.ResolveProject(snap, ref)
-		if err != nil {
-			return cw, workspaceError("project", err)
-		}
-		if err := workspace.RequireGit(r); err != nil {
-			return cw, workspaceError("project", err)
-		}
-		if slices.Contains(ids, r.ID) {
-			return cw, fmt.Errorf("%w: project %s is listed twice", ErrInvalidArgument, r.Name)
-		}
-		ids, paths, bases = append(ids, r.ID), append(paths, r.Path), append(bases, own)
-	}
-	cwdProject := ids[0]
-	if o.ProjectID != "" {
-		// An id, or a name or path like the repository refs.
-		cwdProject = o.ProjectID
-		if r, err := workspace.ResolveProject(snap, o.ProjectID); err == nil {
-			cwdProject = r.ID
-		}
-	}
-	if !slices.Contains(ids, cwdProject) {
-		return cw, fmt.Errorf("%w: project %s is not among the new workspace's projects", ErrInvalidArgument, cwdProject)
-	}
-	wsName := strings.TrimSpace(nw.Name)
-
-	sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
-	if err != nil {
-		return cw, err
-	}
-	cw.name, cw.namerCalled, cw.late = sl.name, sl.namerCalled, sl.late
-	var nameTaken func(string) bool
-	if wsName == "" {
-		// The workspace is named after its branch, so a suffix that frees the branch
-		// must also free the name.
-		existing := m.opts.Workspaces.Snapshot()
-		nameTaken = func(n string) bool {
-			_, err := workspace.ResolveWorkspace(existing, workspace.Ref{Workspace: n})
-			return err == nil
-		}
-	}
-	branch, existing := m.pickBranch(ctx, paths, bc, sl.branch, id, nameTaken)
-	if existing {
-		// The workspace store checks it out in each member that has it.
-		m.log.Info("branch exists; checking it out where it exists", "thread", id, "branch", branch)
-	}
-	if wsName == "" {
-		wsName = slugPart(branch)
-	}
-	specs := make([]workspace.MemberSpec, len(ids))
-	cwdBase := base
-	for i, rid := range ids {
-		specs[i] = workspace.MemberSpec{Project: rid, BaseRef: bases[i]}
-		if rid == cwdProject && bases[i] != "" {
-			cwdBase = bases[i]
-		}
-	}
-	w, err := m.opts.Workspaces.Create(ctx, workspace.CreateOptions{
-		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true, BaseFromOrigin: nw.BaseFromOrigin,
-	})
-	if err != nil {
-		return cw, workspaceError("create workspace "+wsName, err)
-	}
-	mem, ok := w.Member(cwdProject)
-	if !ok { // the store made every member or failed; this is a broken fake
-		return cw, fmt.Errorf("%w: workspace %s has no member for project %s", ErrFailedPrecondition, w.ID, cwdProject)
-	}
-	cw.workspaceID, cw.projectID, cw.path, cw.members, cw.branch = w.ID, mem.ProjectID, mem.WorktreePath, w.Members, branch
-	cw.baseRef = cmp.Or(mem.StartPoint, cwdBase)
-	if cw.baseRef == "" {
-		if r, ok := m.opts.Projects.Snapshot().Project(cwdProject); ok {
-			cw.baseRef = r.DefaultBranch
-			if wt, ok := m.opts.Projects.Snapshot().Worktree(cwdProject, mem.WorktreePath); ok {
-				cw.baseRef = cmp.Or(wt.Status.BaseRef, cw.baseRef)
-			}
-		}
-	}
-	m.log.Info("workspace created for thread", "thread", id, "workspace", w.ID, "name", w.Name,
-		"branch", branch, "members", len(w.Members), "cwd", mem.WorktreePath)
-	return cw, nil
 }
 
 // workspaceError wraps a workspace store error in the thread error class with the

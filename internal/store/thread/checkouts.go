@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // Derived checkouts (docs/notes/workspaces-v2-handoff.md §3,
@@ -49,10 +50,6 @@ type Checkout struct {
 	Missing bool
 	// Instructions is Path/CLAUDE.md when that file exists.
 	Instructions string
-	// FromWorkspace: Path is the member worktree of the v1 workspace (a branch set) the
-	// thread references, as the workspace store has it. A missing one is skipped at
-	// spawn, as before. Goes with the workspace store's reshape.
-	FromWorkspace bool
 }
 
 // CleanProjectIDs is ids sorted, without blanks and duplicates, with primary added when
@@ -174,37 +171,15 @@ func fileExists(p string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
+
 // checkouts is CheckoutsOf over the project store; with none (tests), only the primary.
-// A member of the v1 workspace t references (until the workspace store's reshape) has
-// the member worktree the workspace store records, which is the derived path for the
-// workspace's branch anyway.
 func (m *Manager) checkouts(t Thread) []Checkout {
 	var snap *project.Snapshot
 	pathFor := func(string, string) string { return "" }
 	if m.opts.Projects != nil {
 		snap, pathFor = m.opts.Projects.Snapshot(), m.opts.Projects.DefaultWorktreePath
 	}
-	cos := CheckoutsOf(t, snap, pathFor, isDir)
-	if t.WorkspaceID == "" || m.opts.Workspaces == nil {
-		return cos
-	}
-	w, ok := m.opts.Workspaces.Snapshot().Workspace(t.WorkspaceID)
-	if !ok {
-		return cos
-	}
-	for i, c := range cos {
-		mem, ok := w.Member(c.ProjectID)
-		if !ok || c.Primary || mem.WorktreePath == "" {
-			continue
-		}
-		c.Path, c.FromWorkspace, c.Missing, c.Instructions = mem.WorktreePath, true, !isDir(mem.WorktreePath), ""
-		c.Branch = branchAt(snap, c.ProjectID, c.Path, w.Branch, true)
-		if p := filepath.Join(c.Path, "CLAUDE.md"); !c.Missing && fileExists(p) {
-			c.Instructions = p
-		}
-		cos[i] = c
-	}
-	return cos
+	return CheckoutsOf(t, snap, pathFor, isDir)
 }
 
 // CheckoutsOf implements the daemon's view of a thread's checkouts over the store's
@@ -239,7 +214,7 @@ func (m *Manager) requireCheckouts(t Thread) error {
 			m.log.Warn("project of a thread is no longer registered; starting without it", "thread", t.ID, "project", c.ProjectID)
 			continue
 		}
-		if c.Missing && !c.FromWorkspace {
+		if c.Missing {
 			return fmt.Errorf("%w: the checkout of project %s (%s) is missing: %s", ErrFailedPrecondition,
 				cmp.Or(c.ProjectName, c.ProjectID), c.ProjectID, cmp.Or(c.Path, "no path"))
 		}
@@ -257,9 +232,10 @@ type CheckoutsRef struct {
 type ThreadCheckouts struct {
 	Thread    Thread
 	Checkouts []Checkout
-	// Workspace is the thread's workspace reference's id and name; empty without one
-	// (or when it is gone: the name is then "").
-	WorkspaceID, WorkspaceName string
+	// WorkspaceID, WorkspaceName and WorkspaceDir are the thread's workspace reference:
+	// its id, name and managed dir; empty without one (the name and dir also when it is
+	// gone).
+	WorkspaceID, WorkspaceName, WorkspaceDir string
 	// Current is the index in Checkouts of the checkout holding the ref's cwd (the
 	// deepest), else of the primary; -1 when neither.
 	Current int
@@ -288,10 +264,8 @@ func (m *Manager) Checkouts(_ context.Context, ref CheckoutsRef) (ThreadCheckout
 		return ThreadCheckouts{}, fmt.Errorf("%w: a thread id or a path inside one of its checkouts is required", ErrInvalidArgument)
 	}
 	out := ThreadCheckouts{Thread: t, Checkouts: m.checkouts(t), WorkspaceID: t.WorkspaceID, Current: -1}
-	if t.WorkspaceID != "" && m.opts.Workspaces != nil {
-		if w, ok := m.opts.Workspaces.Snapshot().Workspace(t.WorkspaceID); ok {
-			out.WorkspaceName = w.Name
-		}
+	if w, ok := m.workspaceOf(t); ok {
+		out.WorkspaceName, out.WorkspaceDir = w.Name, w.ManagedDir
 	}
 	depth := -1
 	for i, c := range out.Checkouts {
@@ -303,6 +277,24 @@ func (m *Manager) Checkouts(_ context.Context, ref CheckoutsRef) (ThreadCheckout
 		out.Current = slices.IndexFunc(out.Checkouts, func(c Checkout) bool { return c.Primary })
 	}
 	return out, nil
+}
+
+// workspaceOf is the workspace t references, when it still exists.
+func (m *Manager) workspaceOf(t Thread) (workspace.Workspace, bool) {
+	if t.WorkspaceID == "" || m.opts.Workspaces == nil {
+		return workspace.Workspace{}, false
+	}
+	return m.opts.Workspaces.Snapshot().Workspace(t.WorkspaceID)
+}
+
+// cwdCandidates are the paths that find t from a cwd (threadAt): its checkouts, and the
+// workspace folder a thread whose primary is its workspace runs in (as a primary).
+func (m *Manager) cwdCandidates(t Thread) []Checkout {
+	cos := m.checkouts(t)
+	if t.ProjectID == "" && t.WorkspaceID != "" && t.WorktreePath != "" {
+		cos = append(cos, Checkout{Path: t.WorktreePath, Primary: true})
+	}
+	return cos
 }
 
 // threadAt is the thread one of whose checkouts holds path, the deepest checkout
@@ -322,7 +314,7 @@ func (m *Manager) threadAt(path string) (Thread, bool) {
 	}
 	bestPrimary := false
 	for _, t := range m.Snapshot().Threads {
-		for _, c := range m.checkouts(t) {
+		for _, c := range m.cwdCandidates(t) {
 			if c.Path == "" || !within(path, c.Path) {
 				continue
 			}
