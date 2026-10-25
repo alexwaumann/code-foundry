@@ -86,10 +86,16 @@ func (m *Manager) pagesDir(id string) string {
 	return m.makeThreadDir(m.opts.PagesRoot, id, "pages directory")
 }
 
-// removeThreadTmp removes thread id's TMPDIR and pages directory (Remove, once its
-// process is gone).
+// threadDirRoots are the roots that hold a directory per thread: its TMPDIR, its pages
+// and its page storage (pagestorage.go).
+func (m *Manager) threadDirRoots() []string {
+	return []string{m.opts.TmpRoot, m.opts.PagesRoot, m.opts.PageStorageRoot}
+}
+
+// removeThreadTmp removes thread id's TMPDIR, pages directory and page storage (Remove,
+// once its process is gone).
 func (m *Manager) removeThreadTmp(id string) {
-	for _, root := range []string{m.opts.TmpRoot, m.opts.PagesRoot} {
+	for _, root := range m.threadDirRoots() {
 		dir := threadTmp(root, id)
 		if dir == "" {
 			continue
@@ -100,10 +106,11 @@ func (m *Manager) removeThreadTmp(id string) {
 	}
 }
 
-// reapThreadTmps removes the TMPDIRs and pages directories of threads that no longer
-// exist (removed while the daemon was down, or a removal that failed to delete it), at New.
+// reapThreadTmps removes the TMPDIRs, pages directories and page storage of threads that
+// no longer exist (removed while the daemon was down, or a removal that failed to delete
+// it), at New.
 func (m *Manager) reapThreadTmps() {
-	for _, root := range []string{m.opts.TmpRoot, m.opts.PagesRoot} {
+	for _, root := range m.threadDirRoots() {
 		m.reapThreadDirs(root)
 	}
 }

@@ -10,9 +10,18 @@
  * its predecessor's subscriptions stop, a confirmation it opened is cancelled and answers
  * still on their way to it are dropped. dispose (the frame unmounts) does the same for good. A frame with no owning thread (a File tab on an arbitrary HTML file) gets a
  * ready with no thread, no verbs and no sources, and every call refused.
+ *
+ * A run that has to ask the user tells the page (`cf:pending`) as its question is queued,
+ * so the page's clock stops until the answer (`cf:resume`); a page that gives up
+ * (`cf:cancel`), or goes, takes its question with it, declined, and the command never runs.
+ *
+ * Page storage (docs/notes/bridge-fix-storage.md): `cf:ready` carries the thread's stored
+ * map and every `cf:store` goes to the daemon (ThreadService.SetPageStorage), one at a time
+ * per thread in the order sent; every other frame of the thread hears the map after.
  */
 import { listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { bridgeErrorOf } from "@/api/bridge";
+import { getPageStorage, setPageStorage, type PageStorageValues } from "@/api/pageStorage";
 import {
   errorResult,
   fillPageArgs,
@@ -25,8 +34,11 @@ import {
   type BridgeError,
   type CallId,
   type EventMessage,
+  type PendingMessage,
   type ReadyMessage,
   type ResultMessage,
+  type ResumeMessage,
+  type StorageMessage,
 } from "@/lib/bridge";
 import { REPORTED_CODES, type PageError } from "@/lib/pageErrors";
 import { publishedTheme } from "@/lib/theme";
@@ -61,7 +73,22 @@ export function pageContext(threadId: string): UiContextView {
   return { ...emptyContext, activeView: "", activeThreadId: threadId };
 }
 
-export type HostMessage = ReadyMessage | ResultMessage | EventMessage;
+export type HostMessage = ReadyMessage | ResultMessage | EventMessage | PendingMessage | ResumeMessage | StorageMessage;
+
+/** Each thread's page storage calls, chained so the daemon sees writes and reads in the order sent. */
+const storageChains = new Map<string, Promise<unknown>>();
+/** The live hosts of each thread, told the thread's storage after another one wrote. */
+const storageFrames = new Map<string, Set<(values: PageStorageValues) => void>>();
+
+function onStorageChain<T>(threadId: string, call: () => Promise<T>): Promise<T> {
+  const next = (storageChains.get(threadId) ?? Promise.resolve()).then(call);
+  const tail = next.catch(() => undefined);
+  storageChains.set(threadId, tail);
+  void tail.then(() => {
+    if (storageChains.get(threadId) === tail) storageChains.delete(threadId);
+  });
+  return next;
+}
 
 export interface BridgeHost {
   /** A new document loaded in the frame: forget the last one's calls and subscriptions, and say ready. */
@@ -97,6 +124,16 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   let confirms: Promise<unknown> = Promise.resolve();
   /** The confirmation this frame has open, to cancel on dispose. */
   let open: unknown = null;
+  /** The runs whose question is open or queued, by call id: cancel declines it. */
+  const asking = new Map<CallId, { cancelled: boolean; dialog: unknown }>();
+  const hearStorage = (values: PageStorageValues) => {
+    post(doc, { type: "cf:storage", values });
+  };
+  if (threadId !== null) {
+    let frames = storageFrames.get(threadId);
+    if (!frames) storageFrames.set(threadId, (frames = new Set()));
+    frames.add(hearStorage);
+  }
 
   const post = (forDoc: number, msg: HostMessage) => {
     if (disposed || forDoc !== doc) return;
@@ -127,12 +164,36 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
 
   const ready = (forDoc: number) => {
     const thread = threadId === null ? null : { id: threadId, name: useThreadsStore.getState().byId[threadId]?.name ?? "" };
-    const send = (cmds: readonly CommandView[]) => {
-      post(forDoc, readyMessage(thread, publishedTheme(), cmds.filter((c) => c.readOnly).map((c) => c.name)));
-    };
-    listed().then(send, () => {
-      send([]);
+    const verbs = listed().then(
+      (cmds) => cmds.filter((c) => c.readOnly).map((c) => c.name),
+      () => [],
+    );
+    const id = threadId;
+    // A storage the daemon cannot read now reads as empty; a write still goes through.
+    const storage = id === null ? Promise.resolve({}) : onStorageChain(id, () => getPageStorage(id)).catch(() => ({}));
+    void Promise.all([verbs, storage]).then(([readOnly, values]) => {
+      post(forDoc, readyMessage(thread, publishedTheme(), readOnly, values));
     });
+  };
+
+  const store = (forDoc: number, id: CallId, key: string, value: string | null) => {
+    if (threadId === null) {
+      post(forDoc, errorResult(id, NO_THREAD));
+      return;
+    }
+    const tid = threadId;
+    void onStorageChain(tid, () => setPageStorage(tid, key, value)).then(
+      (values) => {
+        post(forDoc, okResult(id, { message: "", resultJson: "" }));
+        for (const hear of storageFrames.get(tid) ?? []) if (hear !== hearStorage) hear(values);
+      },
+      async (err: unknown) => {
+        post(forDoc, errorResult(id, bridgeErrorOf(err)));
+        // The page applied the write already: put back what is stored.
+        const values = await onStorageChain(tid, () => getPageStorage(tid)).catch(() => null);
+        if (values) post(forDoc, { type: "cf:storage", values });
+      },
+    );
   };
 
   /** Stops the document's subscriptions and cancels a confirmation it has open. */
@@ -142,20 +203,38 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     subs.clear();
     if (open !== null && useConfirmStore.getState().pending === open) answerConfirm(false);
     open = null;
+    asking.clear();
   };
 
-  /** Runs ask after this frame's earlier confirmations; never once its document is gone. */
-  const queued = (forDoc: number, ask: () => Promise<boolean>): Promise<boolean> => {
+  /** A page gave up on a run: its question, open or queued, is declined. */
+  const cancel = (id: CallId) => {
+    const call = asking.get(id);
+    if (!call) return;
+    call.cancelled = true;
+    if (call.dialog !== null && useConfirmStore.getState().pending === call.dialog) answerConfirm(false);
+  };
+
+  /**
+   * Runs ask after this frame's earlier confirmations; never once its document is gone or
+   * the page gave up on the call.
+   */
+  const queued = (forDoc: number, id: CallId, ask: () => Promise<boolean>): Promise<boolean> => {
+    const call = { cancelled: false, dialog: null as unknown };
+    asking.set(id, call);
+    post(forDoc, { type: "cf:pending", id, reason: "confirm" });
     const next = confirms.then(async () => {
-      if (disposed || forDoc !== doc) return false;
+      if (disposed || forDoc !== doc || call.cancelled) return false;
       const answer = ask();
       // requestConfirm opens its dialog at once; a command's own presenter may not use it.
       const mine = useConfirmStore.getState().pending;
       open = mine;
+      call.dialog = mine;
       try {
-        return await answer;
+        const yes = await answer;
+        return yes && !call.cancelled;
       } finally {
         if (open === mine) open = null;
+        if (asking.get(id) === call) asking.delete(id);
       }
     });
     confirms = next.catch(() => undefined);
@@ -177,8 +256,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       const callArgs = spec ? fillPageArgs(args, spec.args, { threadId, cwd }) : args;
       const res = await invokeConfirmed(verb, callArgs, pageContext(threadId), `${frame.pageName}, a page in ${useThreadsStore.getState().byId[threadId]?.name || threadId}`, {
         around: async (ask) => {
-          const yes = await queued(forDoc, ask);
+          const yes = await queued(forDoc, id, ask);
           if (!yes) asked.declined = true;
+          else post(forDoc, { type: "cf:resume", id });
           return yes;
         },
       });
@@ -270,6 +350,12 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
         case "off":
           unsubscribe(m.id);
           return;
+        case "store":
+          store(forDoc, m.id, m.key, m.value);
+          return;
+        case "cancel":
+          cancel(m.id);
+          return;
         case "bad":
           fail(forDoc, m.id, m.call, { code: "invalid", message: m.message });
           return;
@@ -279,6 +365,11 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       if (disposed) return;
       disposed = true;
       stopAll();
+      if (threadId !== null) {
+        const frames = storageFrames.get(threadId);
+        frames?.delete(hearStorage);
+        if (frames?.size === 0) storageFrames.delete(threadId);
+      }
       if (dev) dev.hosts--;
     },
   };

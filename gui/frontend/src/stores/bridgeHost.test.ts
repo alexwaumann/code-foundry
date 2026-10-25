@@ -18,6 +18,19 @@ vi.mock("@/api/command", async (orig) => ({
   listCommands,
   confirmationOf: (err: unknown) => (err instanceof NeedsConfirm ? err.confirm : null),
 }));
+// The daemon's page storage, in memory; full past 3 keys.
+const pageStore = vi.hoisted(() => ({ values: new Map<string, Record<string, string>>(), sets: [] as string[] }));
+vi.mock("@/api/pageStorage", () => ({
+  getPageStorage: (threadId: string) => Promise.resolve({ ...pageStore.values.get(threadId) }),
+  setPageStorage: (threadId: string, key: string, value: string | null) => {
+    pageStore.sets.push(`${threadId} ${key}`);
+    const vals = Object.fromEntries(Object.entries({ ...pageStore.values.get(threadId) }).filter(([k]) => k !== key));
+    if (value !== null) vals[key] = value;
+    if (Object.keys(vals).length > 3) return Promise.reject(new ConnectError("page storage is full (256 KiB per thread)", Code.InvalidArgument));
+    pageStore.values.set(threadId, vals);
+    return Promise.resolve({ ...vals });
+  },
+}));
 const { createBridgeHost, BRIDGE_DEBOUNCE_MS } = await import("./bridgeHost");
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
@@ -51,6 +64,8 @@ beforeEach(() => {
   invokeCommand.mockReset();
   listCommands.mockReset();
   listCommands.mockResolvedValue(commands);
+  pageStore.values.clear();
+  pageStore.sets = [];
   useThreadsStore.setState({ byId: { "t-1": thread("t-1", "Fix stale badge") }, order: ["t-1"] });
 });
 
@@ -208,7 +223,103 @@ describe("bridge host", () => {
     h.dispose();
     expect(useConfirmStore.getState().pending).toBeNull();
     await new Promise((r) => setTimeout(r, 10));
-    expect(posts).toEqual([]);
+    expect(posts).toEqual([{ type: "cf:pending", id: "a", reason: "confirm" }]);
+  });
+
+  it("tells the page a call waits on the user, open or queued, and when it was answered", async () => {
+    invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
+      opts?.confirmed ? Promise.resolve({ message: "ok", resultJson: "" }) : Promise.reject(archiveConfirm),
+    );
+    const { h, posts } = host();
+    h.receive(run("a", "thread.archive"));
+    h.receive(run("b", "thread.archive"));
+    // Both pending at once: a's dialog is open, b's is queued behind it.
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:pending")).toEqual([
+        { type: "cf:pending", id: "a", reason: "confirm" },
+        { type: "cf:pending", id: "b", reason: "confirm" },
+      ]);
+    });
+    answerConfirm(true);
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type !== "cf:pending").map((p) => [p.type, p.id])).toEqual([
+        ["cf:resume", "a"],
+        ["cf:result", "a"],
+      ]);
+    });
+  });
+
+  it("declines a question the page gave up on, open or queued, and never runs its command", async () => {
+    invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
+      opts?.confirmed ? Promise.resolve({ message: "ok", resultJson: "" }) : Promise.reject(archiveConfirm),
+    );
+    const { h, posts } = host();
+    h.receive(run("a", "thread.archive", { id: "x" }));
+    h.receive(run("b", "thread.archive", { id: "y" }));
+    h.receive(run("c", "thread.archive", { id: "z" }));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.args).toMatchObject({ id: "x" });
+    });
+    // b gives up while queued, then a while its dialog is open.
+    h.receive({ cf: 1, type: "cf:cancel", id: "b" });
+    h.receive({ cf: 1, type: "cf:cancel", id: "a" });
+    // a's dialog went; b is skipped; c asks.
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.args).toMatchObject({ id: "z" });
+    });
+    answerConfirm(true);
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual([
+        ["a", false],
+        ["b", false],
+        ["c", true],
+      ]);
+    });
+    const confirmed = invokeCommand.mock.calls.filter((c) => (c[4] as { confirmed?: boolean } | undefined)?.confirmed).map((c) => (c[2] as Record<string, string>).id);
+    expect(confirmed).toEqual(["z"]);
+  });
+
+  it("hands a page its thread's storage in ready and writes through, telling the thread's other frames", async () => {
+    pageStore.values.set("t-1", { visits: "2" });
+    const one = host();
+    const two = host();
+    const other = host("t-2");
+    one.h.loaded();
+    await vi.waitFor(() => {
+      expect(one.posts.find((p) => p.type === "cf:ready")).toMatchObject({ storage: { visits: "2" } });
+    });
+    one.h.receive({ cf: 1, type: "cf:store", id: "w1", key: "visits", value: "3" });
+    one.h.receive({ cf: 1, type: "cf:store", id: "w2", key: "note", value: '"hi"' });
+    await vi.waitFor(() => {
+      expect(one.posts.filter((p) => p.type === "cf:result").map((p) => [p.id, p.ok])).toEqual([
+        ["w1", true],
+        ["w2", true],
+      ]);
+    });
+    // In the order sent.
+    expect(pageStore.sets).toEqual(["t-1 visits", "t-1 note"]);
+    expect(two.posts.filter((p) => p.type === "cf:storage").at(-1)).toEqual({ type: "cf:storage", values: { visits: "3", note: '"hi"' } });
+    expect(one.posts.filter((p) => p.type === "cf:storage")).toEqual([]);
+    expect(other.posts).toEqual([]);
+    const heard = two.posts.length;
+    two.h.dispose();
+    one.h.receive({ cf: 1, type: "cf:store", id: "w3", key: "note", value: null });
+    await vi.waitFor(() => {
+      expect(pageStore.values.get("t-1")).toEqual({ visits: "3" });
+    });
+    expect(two.posts).toHaveLength(heard);
+  });
+
+  it("answers a refused write with the error and the storage as it is", async () => {
+    pageStore.values.set("t-1", { a: "1", b: "2", c: "3" });
+    const { h, posts } = host();
+    h.receive({ cf: 1, type: "cf:store", id: "w", key: "d", value: "4" });
+    await vi.waitFor(() => {
+      expect(posts).toEqual([
+        { type: "cf:result", id: "w", ok: false, error: { code: "invalid", message: expect.stringMatching(/page storage is full/) as unknown } },
+        { type: "cf:storage", values: { a: "1", b: "2", c: "3" } },
+      ]);
+    });
   });
 
   it("refuses every call without a thread", async () => {
@@ -219,7 +330,7 @@ describe("bridge host", () => {
     await vi.waitFor(() => {
       expect(posts).toHaveLength(3);
     });
-    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], sources: [] });
+    expect(posts).toContainEqual({ type: "cf:ready", cf: 1, thread: null, theme: expect.anything() as unknown, readOnly: [], sources: [], storage: {} });
     const refusal = { ok: false, error: { code: "unavailable", message: "this page is not shown in a thread" } };
     expect(posts).toContainEqual({ type: "cf:result", id: "r", ...refusal });
     expect(posts).toContainEqual({ type: "cf:result", id: "s", ...refusal });

@@ -17,7 +17,9 @@ import (
 // it. The split gives pages an origin of their own, http://127.0.0.1:<pages port>, which
 // CORS on the API listener refuses (allowedOrigin), so a page holding a leaked token still
 // cannot call the API. The port is kept in pages.port and tried again on the next start,
-// so a page's origin, and with it its localStorage and IndexedDB, survives restarts.
+// so a page's origin survives restarts. Its localStorage does not survive the app's: WebKit
+// keeps a cross-site frame's storage in memory for the session, so cf.storage is kept by
+// the daemon instead (docs/notes/bridge-fix-storage.md).
 
 // listenPages binds the pages listener on loopback: the port in file when it is still
 // free, else a new one. A missing, unreadable or taken port is not an error.

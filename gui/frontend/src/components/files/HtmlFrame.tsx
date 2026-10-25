@@ -7,8 +7,10 @@ import { isThemeAck, resizeHeight } from "./previewGrant";
 
 /**
  * The frame's sandbox: scripts, forms, dialogs, downloads and popups (a target=_blank link
- * opens in the browser), and `allow-same-origin`, so a page keeps its localStorage and
- * IndexedDB (docs/notes/bridge-2-gui.md). That origin is the daemon's pages listener
+ * opens in the browser), and `allow-same-origin`, so a page has localStorage and IndexedDB
+ * (docs/notes/bridge-2-gui.md), for the app's session only: WebKit never writes a
+ * cross-site frame's storage to disk, so cf.storage is the daemon's
+ * (docs/notes/bridge-fix-storage.md). That origin is the daemon's pages listener
  * (`/preview/` and `/cf/` on a port of their own), never the app's and never the API's,
  * whose CORS refuses it: the page still cannot reach Code Foundry's window or the
  * daemon's authenticated routes, and reaches Code Foundry only through the bridge. Never

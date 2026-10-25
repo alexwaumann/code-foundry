@@ -46,6 +46,8 @@ type Fake struct {
 	requests map[string]string
 	// removed are Remove's tombstones, by id.
 	removed map[string]thread.RemovedThread
+	// pageStorage is each thread's page storage (pagestorage.go).
+	pageStorage map[string]map[string]string
 	// createDefaults, residentTools and wakeNotes are the resident hooks
 	// (residenthooks.go).
 	createDefaults thread.CreateDefaultsFunc

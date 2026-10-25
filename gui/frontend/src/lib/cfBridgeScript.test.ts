@@ -29,7 +29,8 @@ interface Cf {
   off(source: string, fn?: unknown): void;
   onTheme(fn: (t: unknown) => void): () => void;
   resize(height?: number): void;
-  storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): void; remove(k: string): void; keys(): string[]; clear(): void };
+  sources: string[];
+  storage(prefix?: string): { get(k: string): unknown; set(k: string, v: unknown): Promise<void>; remove(k: string): Promise<void>; keys(): string[]; clear(): Promise<unknown> };
 }
 
 function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean } = {}) {
@@ -44,6 +45,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     addEventListener: (t: string, fn: (e: unknown) => void) => (listeners[t] ??= []).push(fn),
     getComputedStyle: () => ({ marginTop: "8px", marginBottom: "8px" }),
     requestAnimationFrame: (fn: () => void) => setTimeout(fn, 0),
+    console,
   };
   win.parent = opts.embedded === false ? win : parent;
   const rootStyle: Record<string, string> = {};
@@ -245,13 +247,62 @@ describe("bridge.js", () => {
     expect(got).toHaveLength(1);
   });
 
-  it("drops a subscription the host refuses and tells its owner", () => {
+  it("drops a subscription the host refuses and tells its owner, else the console as an error", () => {
     const h = load();
     const errs: CfError[] = [];
-    h.cf.on("nope", () => {}, (e) => errs.push(e));
+    h.cf.on("gh", () => {}, (e) => errs.push(e));
     const [on] = h.sent("cf:on");
-    h.send({ type: "cf:result", id: on?.id, ok: false, error: { code: "invalid", message: "no source nope" } });
-    expect(errs).toMatchObject([{ code: "invalid", message: "no source nope" }]);
+    h.send({ type: "cf:result", id: on?.id, ok: false, error: { code: "unavailable", message: "this page is not shown in a thread" } });
+    expect(errs).toMatchObject([{ code: "unavailable", message: "this page is not shown in a thread" }]);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    h.cf.on("ui", () => {});
+    h.send({ type: "cf:result", id: h.sent("cf:on")[1]?.id, ok: false, error: { code: "unavailable", message: "gone" } });
+    expect(error).toHaveBeenCalledWith("cf.on(ui): gone");
+    error.mockRestore();
+  });
+
+  it("throws at once for a source that is not one, before and after cf:ready", () => {
+    const h = load();
+    expect(() => h.cf.on("threads", () => {})).toThrow(/no source threads; the sources are thread-list, thread, gh/);
+    h.ready();
+    expect(() => h.cf.on("gh", () => {})).toThrow(/no source gh; the sources are thread-list, thread$/);
+    expect(h.sent("cf:on")).toEqual([]);
+    h.cf.on("thread", () => {});
+    expect(h.sent("cf:on")).toHaveLength(1);
+  });
+
+  it("stops a run's clock while the app asks the user, and gives up out loud", async () => {
+    vi.useFakeTimers();
+    const h = load({ userActivation: { isActive: true } });
+    h.ready();
+    const p = h.cf.run("thread.archive", {}, { timeout: 1000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const id = h.sent("cf:run")[0]?.id;
+    await vi.advanceTimersByTimeAsync(400);
+    h.send({ type: "cf:pending", id, reason: "confirm" });
+    // The dialog stays open far longer than the timeout.
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(h.sent("cf:cancel")).toEqual([]);
+    h.send({ type: "cf:resume", id });
+    // What was left of it: 600 ms.
+    await vi.advanceTimersByTimeAsync(599);
+    expect(h.sent("cf:cancel")).toEqual([]);
+    const check = expect(p).rejects.toMatchObject({ code: "timeout", message: "thread.archive did not answer in 1 s" });
+    await vi.advanceTimersByTimeAsync(2);
+    await check;
+    // The app hears the page gave up, so a question still waiting is never asked.
+    expect(h.sent("cf:cancel")).toEqual([{ type: "cf:cancel", cf: 1, id }]);
+  });
+
+  it("settles a run that was waiting on the user when its result comes", async () => {
+    const h = load({ userActivation: { isActive: true } });
+    h.ready();
+    const p = h.cf.run("thread.archive");
+    await flush();
+    const id = h.sent("cf:run")[0]?.id;
+    h.send({ type: "cf:pending", id, reason: "confirm" });
+    h.send({ type: "cf:result", id, ok: true, result: { text: "archived" } });
+    await expect(p).resolves.toEqual({ text: "archived", json: null });
   });
 
   it("ends its subscriptions as the page goes", () => {
@@ -290,18 +341,48 @@ describe("bridge.js", () => {
     expect(h.sent("cf:resize").at(-1)).toEqual({ type: "cf:resize", cf: 1, height: 301 });
   });
 
-  it("keeps storage under the thread's prefix", async () => {
+  it("reads storage from cf:ready and writes it through to the app, under a prefix", async () => {
     const h = load();
     expect(() => h.cf.storage()).toThrow(/await cf.ready/);
-    h.ready();
+    h.ready({ storage: { "todo:items": "[1,2]", visits: "4", odd: "not json" } });
     await h.cf.ready;
     const s = h.cf.storage("todo");
-    s.set("items", [1, 2]);
-    expect(h.store.get("cf:t-1:todo:items")).toBe("[1,2]");
     expect(s.get("items")).toEqual([1, 2]);
-    h.store.set("other", "x");
+    expect(h.cf.storage().get("visits")).toBe(4);
+    expect(h.cf.storage().get("odd")).toBe("not json");
+    expect(s.get("missing")).toBeNull();
+    const done = s.set("items", [1, 2, 3]);
+    expect(s.get("items")).toEqual([1, 2, 3]);
+    const [w] = h.sent("cf:store");
+    expect(w).toEqual({ type: "cf:store", cf: 1, id: w?.id, key: "todo:items", value: "[1,2,3]" });
+    h.send({ type: "cf:result", id: w?.id, ok: true, result: { text: "" } });
+    await expect(done).resolves.toBeUndefined();
     expect(s.keys()).toEqual(["items"]);
-    s.clear();
-    expect([...h.store.keys()]).toEqual(["other"]);
+    void s.clear();
+    expect(h.sent("cf:store").at(-1)).toMatchObject({ key: "todo:items", value: null });
+    expect(s.keys()).toEqual([]);
+    expect(h.cf.storage().keys().sort()).toEqual(["odd", "visits"]);
+    // Raw localStorage is the page's own, untouched.
+    expect(h.store.size).toBe(0);
+  });
+
+  it("takes another frame's writes, but not over its own still on the way, and puts back a refused one", async () => {
+    const h = load();
+    h.ready({ storage: { a: "1", b: "2" } });
+    await h.cf.ready;
+    const s = h.cf.storage();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const refused = s.set("a", "x".repeat(10));
+    h.send({ type: "cf:storage", values: { a: "9", c: "3" } });
+    expect(s.get("a")).toBe("xxxxxxxxxx");
+    expect(s.get("b")).toBeNull();
+    expect(s.get("c")).toBe(3);
+    const [w] = h.sent("cf:store");
+    h.send({ type: "cf:result", id: w?.id, ok: false, error: { code: "invalid", message: "page storage is full (256 KiB per thread)" } });
+    await expect(refused).rejects.toMatchObject({ code: "invalid", message: /full/ });
+    expect(error).toHaveBeenCalledWith("cf.storage: page storage is full (256 KiB per thread)");
+    error.mockRestore();
+    h.send({ type: "cf:storage", values: { a: "1", c: "3" } });
+    expect(s.get("a")).toBe(1);
   });
 });

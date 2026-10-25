@@ -10,10 +10,11 @@
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
  *   cf.on(source, fn) / cf.off    daemon events, fn(event, source); on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
- *   cf.storage(prefix?)           localStorage under "cf:<thread id>:"
+ *   cf.storage(prefix?)           the thread's page storage, kept across app restarts
  *
  * A verb that is not read-only runs only from a user gesture in the page (a click, a key).
- * Every call is a postMessage to the app, which runs it as the page's thread would.
+ * Every call is a postMessage to the app, which runs it as the page's thread would. A call
+ * waiting on the app's confirm dialog does not time out; cf.on throws for an unknown source.
  */
 (function () {
   "use strict";
@@ -23,12 +24,17 @@
   var GESTURE_MS = 5000; // how long after a press, click or key a call counts as the user's
   var READY_MS = 10000; // how long cf.run waits for the app to say hello
   var RUN_MS = 60000; // cf.run's default timeout; opts.timeout overrides it, 0 waits forever
+  // The sources a page may subscribe to, until cf:ready names them (internal/bridge Sources).
+  var SOURCES = ["thread-list", "thread", "gh", "action", "plugin", "terminal", "project", "workspace", "settings", "update", "ui", "ember"];
 
   var host = window.parent;
   var embedded = !!host && host !== window;
   var seq = 0;
   var idBase = "cf" + Math.random().toString(36).slice(2, 10) + "-";
-  var pending = {}; // run id -> {resolve, reject, timer}
+  var pending = {}; // run id -> {resolve, reject, timer, left, until, verb, total}
+  var stores = {}; // storage write id -> {key, resolve, reject}
+  var stored = {}; // the thread's page storage: key -> the value's JSON text
+  var writing = {}; // key -> writes not answered yet; cf:storage leaves those keys alone
   var subs = {}; // subscription id -> {source, fn, onError}
   var themeFns = [];
   var readyMsg = null;
@@ -122,22 +128,43 @@
       }
       return new Promise(function (resolve, reject) {
         var id = nextId();
-        var p = { resolve: resolve, reject: reject, timer: 0 };
-        if (timeout > 0) {
-          p.timer = setTimeout(function () {
-            delete pending[id];
-            reject(cfError("timeout", verb + " did not answer in " + Math.round(timeout / 1000) + " s"));
-          }, timeout);
-        }
+        var p = { resolve: resolve, reject: reject, timer: 0, left: timeout, until: 0, verb: verb, total: timeout };
         pending[id] = p;
+        arm(id, p);
         post({ type: "cf:run", id: id, verb: verb, args: clean });
       });
     });
   }
 
+  // Starts (or, after the app's confirm dialog, resumes) a run's timeout with what is left
+  // of it. Giving up tells the app, which then never runs a command still waiting to ask.
+  function arm(id, p) {
+    if (!(p.left > 0)) return;
+    p.until = Date.now() + p.left;
+    p.timer = setTimeout(function () {
+      if (pending[id] !== p) return;
+      delete pending[id];
+      post({ type: "cf:cancel", id: id });
+      p.reject(cfError("timeout", p.verb + " did not answer in " + Math.round(p.total / 1000) + " s"));
+    }, p.left);
+  }
+
+  // cf:pending: the call waits on the user, so its clock stops until cf:resume.
+  function pause(id) {
+    var p = pending[id];
+    if (!p || !p.timer) return;
+    clearTimeout(p.timer);
+    p.timer = 0;
+    p.left = Math.max(1, p.until - Date.now());
+  }
+
   function on(source, fn, onError) {
     if (typeof source !== "string" || source === "" || typeof fn !== "function") {
       throw cfError("invalid", "cf.on(source, fn): a source name and a function");
+    }
+    var known = readyMsg && cf.thread ? cf.sources : SOURCES;
+    if (known.indexOf(source) < 0) {
+      throw cfError("invalid", "cf.on: no source " + source + "; the sources are " + known.join(", "));
     }
     var id = nextId();
     subs[id] = { source: source, fn: fn, onError: typeof onError === "function" ? onError : null };
@@ -212,21 +239,34 @@
     });
   }
 
+  // One write through to the app (cf:store; text null removes), applied here at once. A
+  // refusal (the storage is full) rejects, and the app's cf:storage after it puts back
+  // what is stored.
+  function write(key, text) {
+    if (text === null) delete stored[key];
+    else stored[key] = text;
+    writing[key] = (writing[key] || 0) + 1;
+    var id = nextId();
+    var done = new Promise(function (resolve, reject) {
+      stores[id] = { key: key, resolve: resolve, reject: reject };
+    });
+    done.catch(function (e) {
+      if (window.console) console.error("cf.storage: " + e.message);
+    });
+    post({ type: "cf:store", id: id, key: key, value: text });
+    return done;
+  }
+
   function storage(prefix) {
     if (!readyMsg || !cf.thread) throw cfError("unavailable", "cf.storage needs the page's thread: await cf.ready first");
-    var base = "cf:" + cf.thread.id + ":" + (prefix ? String(prefix) + ":" : "");
+    var base = prefix ? String(prefix) + ":" : "";
     function own() {
-      var keys = [];
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k !== null && k.indexOf(base) === 0) keys.push(k);
-      }
-      return keys;
+      return Object.keys(stored).filter(function (k) { return k.indexOf(base) === 0; });
     }
     return {
       get: function (key) {
-        var raw = localStorage.getItem(base + key);
-        if (raw === null) return null;
+        var raw = stored[base + key];
+        if (raw === undefined) return null;
         try {
           return JSON.parse(raw);
         } catch (e) {
@@ -234,21 +274,41 @@
         }
       },
       set: function (key, value) {
-        localStorage.setItem(base + key, JSON.stringify(value));
+        var text = JSON.stringify(value);
+        return write(base + key, text === undefined ? null : text);
       },
       remove: function (key) {
-        localStorage.removeItem(base + key);
+        return write(base + key, null);
       },
       keys: function () {
         return own().map(function (k) { return k.slice(base.length); });
       },
       clear: function () {
-        own().forEach(function (k) { localStorage.removeItem(k); });
+        return Promise.all(own().map(function (k) { return write(k, null); }));
       },
     };
   }
 
+  // cf:storage: the thread's whole storage, after another page wrote or a write was refused.
+  function restore(values) {
+    if (!values || typeof values !== "object") return;
+    Object.keys(stored).forEach(function (k) {
+      if (!writing[k] && typeof values[k] !== "string") delete stored[k];
+    });
+    Object.keys(values).forEach(function (k) {
+      if (!writing[k] && typeof values[k] === "string") stored[k] = values[k];
+    });
+  }
+
   function settle(id, msg) {
+    var w = stores[id];
+    if (w) {
+      delete stores[id];
+      if (--writing[w.key] <= 0) delete writing[w.key];
+      if (msg.ok) w.resolve();
+      else w.reject(cfError((msg.error && msg.error.code) || "failed", (msg.error && msg.error.message) || "cannot store " + w.key));
+      return;
+    }
     var p = pending[id];
     if (p) {
       delete pending[id];
@@ -277,7 +337,7 @@
       var e = msg.error || {};
       var ce = cfError(typeof e.code === "string" ? e.code : "failed", typeof e.message === "string" ? e.message : "cannot subscribe to " + s.source);
       if (s.onError) s.onError(ce);
-      else if (window.console) console.warn("cf.on(" + s.source + "): " + ce.message);
+      else if (window.console) console.error("cf.on(" + s.source + "): " + ce.message);
     }
   }
 
@@ -293,6 +353,7 @@
         (Array.isArray(m.readOnly) ? m.readOnly : []).forEach(function (v) { readOnly[v] = true; });
         cf.readOnly = Object.keys(readOnly);
         cf.sources = Array.isArray(m.sources) ? m.sources.slice() : [];
+        restore(m.storage);
         if (m.theme) applyTheme(m.theme);
         readyWaiters.splice(0).forEach(function (w) {
           clearTimeout(w.timer);
@@ -303,6 +364,16 @@
         break;
       case "cf:result":
         settle(m.id, m);
+        break;
+      case "cf:pending":
+        pause(m.id);
+        break;
+      case "cf:resume":
+        var r = pending[m.id];
+        if (r && !r.timer) arm(m.id, r);
+        break;
+      case "cf:storage":
+        restore(m.values);
         break;
       case "cf:event":
         var s = subs[m.id];
