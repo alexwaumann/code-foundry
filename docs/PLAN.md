@@ -37,6 +37,10 @@ with a `workspaces-v2-<n>-*.md` note.
   links, the managed dir and the workspace's instructions at every spawn, `thread new
   --workspace`, `workspace new/list/add-project/remove-project/rename/set-primary/remove`,
   migration 0048) on `cf/workspaces-v2-workspaces`: `docs/notes/workspaces-v2-2-workspaces.md`.
+* PR 6 (Add Project scan: `ProjectService.InspectFolder`, `project.add-workspace` (each
+  repository one level down becomes a project, then a rooted workspace named after the
+  folder), the dialog's Add as workspace / Add as project choice) on
+  `cf/workspaces-v2-scan`: `docs/notes/workspaces-v2-6-scan.md`.
 
 ### Multi-repo workspaces: the five steps are built
 
