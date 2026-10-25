@@ -113,4 +113,38 @@ the migration, §8 step 1). PR 2 (workspace store and managed dirs) follows on
 
 ## Verified
 
-See the PR body for the run; filled in below after the scratch-daemon pass.
+* `make check` green.
+* Tests: `TestDecidePlacement` (the inheritance and like matrix, 23 rows),
+  `TestCheckoutsOf` and `TestCleanProjectIDs` (pure), `TestMultiProjectWorktreeThread`
+  (two worktrees made, the other member an `--add-dir`, Checkouts by id and by a cwd deep
+  in a member, a child inheriting set, branch and mode and sharing the worktrees, hints,
+  a member removed by hand made again at the next start), `TestMultiProjectCreateRollsBack`,
+  `TestRunInCheckouts`, `TestArchivedVerdict`, `TestArchiveCleanup` (held by another
+  thread's checkout or cwd, a terminal, a v1 member, dirty; archived threads hold
+  nothing), `TestThreadProjectIDsMigration`, `TestThreadCheckouts`, `TestThreadNewHints`,
+  and the updated `thread.new` command rows.
+* **Scratch daemon** (`CODE_FOUNDRY_HOME=/tmp/cfv2e2e/home`, two scratch repos `web` and
+  `api` with a `CLAUDE.md` each and a plain folder `notes`, under `~/cfv2-scratch`; real
+  Claude, Haiku 5.5 at medium effort, one-word prompts):
+  * `thread new --projects web,api,notes --project web --new-worktree --branch feat/e2e`:
+    `feat/e2e` worktrees in web and api (made 27 ms apart), `project_ids` all three, cwd
+    the web worktree; the spawn's `--add-dir`s: skills, attachments, pages, the api
+    worktree, the notes folder.
+  * `thread checkouts <id>` and, from inside the api worktree with no id, `thread
+    checkouts`: the table with both CLAUDE.md paths, `(folder)` for notes, `(current)` on
+    api in the second.
+  * `thread new --like <id>`: the same set, branch and cwd, and three warnings on stderr
+    (web and api "@ feat/e2e is also open in e2e-one", notes "is a folder, not a repo").
+  * `CODE_FOUNDRY_THREAD=<id> thread new --project api`: inherited set and branch, cwd the
+    api worktree, `created_by` the parent; `CODE_FOUNDRY_THREAD=<id> thread new
+    --new-branch`: a new branch (`cf/<id>`, the scratch machine's naming model failed) in
+    new web and api worktrees, the folder shared.
+  * Archiving the parent cascaded to its two hidden children: the new-branch child's two
+    worktrees were removed at once ("its branch stays"); the parent's `feat/e2e` ones were
+    kept, "thread e2e-two is on it". Archiving the last live thread on `feat/e2e` removed
+    both; `git branch` still lists `feat/e2e` and `cf/<id>` in both repos; notes untouched.
+  * A message to the archived parent unarchived it, made the web worktree again
+    (`recreate.go`'s note) and the api one (`ensureMembers`' note), and resumed the
+    conversation. With an untracked file in the api worktree, archiving it again removed
+    the web worktree and kept api ("uncommitted changes").
+  * Daemon log: no warnings or errors besides the naming model's.
