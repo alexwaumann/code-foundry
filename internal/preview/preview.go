@@ -144,7 +144,8 @@ func escapeSegment(s string) string {
 
 // Handler serves GET /preview/<grant>/<path> from the grant's directory (only its file,
 // for a one-file grant). A file whose symlinks lead outside the home directory or into a
-// guarded folder (the Floor: the config home's token and database, ~/.ssh), or a path
+// guarded folder (the Floor: the config home's token and database, ~/.ssh, compared by
+// file identity, so a folded spelling or a hard link is no way around it), or a path
 // above the grant's directory, is 404 like a missing one. A directory serves its
 // index.html. Responses are never cached (the thread edits these files), carry no
 // referrer, so the grant does not leak to the sites a page loads from, and allow any
