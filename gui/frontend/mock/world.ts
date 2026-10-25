@@ -27,7 +27,6 @@ import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
-import { canRunElsewhere } from "../src/lib/threadRow";
 import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
@@ -3190,7 +3189,8 @@ export class World {
         // Like the daemon (runElsewhere): in the GUI only for a thread with somewhere else to run; from the CLI any, Run refuses one with a single checkout.
         when: (ctx) => {
           const s = activeThread(ctx);
-          return s !== undefined && (!ctx?.activeView || canRunElsewhere({ projectIds: this.projectIdsOf(s), workspaceId: s.workspaceId }));
+          // Two or more places among its projects and its workspace's folder (src/lib/threadRow canRunElsewhere).
+          return s !== undefined && (!ctx?.activeView || this.projectIdsOf(s).length + (s.workspaceId ? 1 : 0) > 1);
         },
         run: (ctx, args) => {
           const s = activeThread(ctx);
