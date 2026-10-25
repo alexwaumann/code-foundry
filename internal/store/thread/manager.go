@@ -346,6 +346,9 @@ type record struct {
 	// startFails counts the failed starts since the last one that came up: wakes
 	// back off (wakebackoff.go).
 	startFails failedStarts
+	// archiving is set while an archive closes the thread (archive.go markArchiving):
+	// the close's end publishes a cut-off turn as idle "archived" at once.
+	archiving bool
 }
 
 var _ Store = (*Manager)(nil)
@@ -1230,6 +1233,9 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 			rec.s.PluginEnvStale, rec.s.PluginEnvChange = false, ""
 		}
 		fn(&rec.s)
+		if rec.archiving {
+			archivedStatus(&rec.s, m.opts.Now())
+		}
 	})
 }
 

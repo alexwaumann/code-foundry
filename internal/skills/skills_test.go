@@ -301,14 +301,17 @@ func TestRender(t *testing.T) {
 		"offer `theme set-scheme light`, never switch unasked",
 		// Reminders and schedules are wakes, never the session's cron (bridge-fix-c-daemon).
 		"To be told or reminded later, or something done on a schedule", "`code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`",
-		"never Claude Code's cron or a background `--watch`"} {
+		"never Claude Code's cron or a background `--watch`",
+		// "show me what's running" listed the Mac's processes in testing (bridge-fix-wording).
+		"| What's running or going on, their work |", "\"running\" here means this app's threads, actions and terminals, never the Mac's processes",
+		"a to-do to tick off"} {
 		if !strings.Contains(entry, want) {
 			t.Errorf("entry SKILL.md lacks %q", want)
 		}
 	}
 	// Its description names the words of the prompts that loaded no skill.
 	entryDesc := frontmatter(t, skills.Entry+"/SKILL.md", files[skills.Entry+"/SKILL.md"])["description"]
-	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder"} {
+	for _, w := range []string{"version", "model", "effort", "usage", "cost", "worktree", "file, diff, page, HTML, chart or theme", "preference", "remember", "PR", "reminder", "what's running", "their work"} {
 		if !strings.Contains(entryDesc, w) {
 			t.Errorf("entry SKILL.md's description lacks %q", w)
 		}

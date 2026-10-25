@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme, or to change the app's colours; states a preference to remember; wants a PR or a reminder; or before you act in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, what's running, their work, its version, model, effort, usage, cost, worktrees, settings, skills, plugins; asks to see or make a file, diff, page, HTML, chart or theme, or change the app's colours; states a preference to remember; wants a PR or a reminder; or before acting in the app."
 user-invocable: false
 ---
 
@@ -31,7 +31,8 @@ Never tell the user skill or command names: say what you will do, not which comm
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
 | What it cost, token usage | `code-foundry usage.show` (`--all` for every thread), not /cost or ~/.claude |
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
-| A page, chart, form, board, dashboard or tool you make; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) and can read and change the app |
+| A page, chart, form, board, dashboard, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) and can read and change the app |
+| What's running or going on, their work | "running" here means this app's threads, actions and terminals, never the Mac's processes (no `ps`, no killing): `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
 | To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |

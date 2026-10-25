@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
@@ -77,7 +78,9 @@ func TestArchive(t *testing.T) {
 }
 
 // TestArchiveStatus: a turn (or a pending request) the archive cuts off reads idle
-// "archived", not error "interrupted"; a thread interrupted before keeps its status.
+// "archived", not error "interrupted", and is never published as interrupted on the way
+// (a board showed it under errors while the shells stopped); a thread interrupted before
+// keeps its status.
 func TestArchiveStatus(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -101,12 +104,27 @@ func TestArchiveStatus(t *testing.T) {
 			if tt.before != nil {
 				tt.before(e, s)
 			}
+			sub := bus.Subscribe[Event](e.bus, 1024)
+			defer sub.Close()
 			got, err := e.m.Archive(e.ctx(), s.ID, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if got.Status != tt.want || got.StatusReason != tt.wantReason {
 				t.Errorf("archived status %v %q, want %v %q", got.Status, got.StatusReason, tt.want, tt.wantReason)
+			}
+			for drained := false; !drained; {
+				select {
+				case ev := <-sub.C():
+					if u, ok := ev.(Updated); ok && u.Thread.ID == s.ID && u.Thread.StatusReason == ReasonInterrupted {
+						t.Errorf("published %v %q while archiving (archived at %v)", u.Thread.Status, u.Thread.StatusReason, u.Thread.ArchivedAt)
+					}
+				default:
+					drained = true
+				}
+			}
+			if n := sub.Dropped(); n > 0 {
+				t.Errorf("%d events dropped", n)
 			}
 			rows, err := loadThreads(e.ctx(), e.m.opts.DB)
 			if err != nil || len(rows) != 1 {

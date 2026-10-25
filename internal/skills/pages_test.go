@@ -22,6 +22,38 @@ var cfRun = regexp.MustCompile(`cf\.run\("([a-z.-]+)",\s*\{([^}]*)\}`)
 // backticked is a `word` in a table cell.
 var backticked = regexp.MustCompile("`([a-zA-Z.-]+)`")
 
+// cfOn is a cf.on call with a literal source and a function literal.
+var cfOn = regexp.MustCompile(`cf\.on\("[a-z-]+",\s*\(`)
+
+// callArgs counts the top-level arguments of the call whose "(" starts src.
+func callArgs(src string) int {
+	depth, n := 0, 0
+	var quote rune
+	for _, r := range src {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '"' || r == '\'' || r == '`':
+			quote = r
+		case r == '(' || r == '{' || r == '[':
+			depth++
+			if depth == 1 {
+				n = 1
+			}
+		case r == ')' || r == '}' || r == ']':
+			depth--
+			if depth == 0 {
+				return n
+			}
+		case r == ',' && depth == 1:
+			n++
+		}
+	}
+	return n
+}
+
 // argKey is one key of such an args object: a bare name or a quoted one.
 var argKey = regexp.MustCompile(`(?:^|,)\s*(?:"([a-z-]+)"|([a-z][a-zA-Z]*))\s*:`)
 
@@ -53,7 +85,10 @@ func TestRenderPagesSkill(t *testing.T) {
 	if len(desc) >= 400 || strings.Contains(desc, `"`) {
 		t.Errorf("description of %d characters (want under 400, no inner quotes)", len(desc))
 	}
-	for _, w := range []string{"page", "dashboard", "form", "chart", "tool", "checklist", "board", "tracker", "UI", "/cf/bridge.js"} {
+	// "what's running", "my work", "tick off" and "to-do" loaded no skill in testing
+	// (bridge-fix-wording); "never the processes" keeps "what's running" off ps.
+	for _, w := range []string{"page", "dashboard", "form", "chart", "tool", "checklist", "board", "tracker", "UI", "/cf/bridge.js",
+		"to-do", "tick off", "what's running", "what's going on", "their work", "not the Mac's processes"} {
 		if !strings.Contains(desc, w) {
 			t.Errorf("description lacks %q", w)
 		}
@@ -102,11 +137,17 @@ func TestRenderPagesSkill(t *testing.T) {
 		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
 		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
-		"never polling", "Never `setInterval`", "`cf.storage(", "survives\nreloads and app restarts", "Every page of this thread shares it",
-		"`localStorage` is cleared\nwhen the app quits", "another thread\nstarts empty", "only while Ember is open", "show its message",
+		"never polling", "Never `setInterval`", "`cf.storage(", "survives reloads and app\nrestarts", "Every page of this\nthread shares it",
+		"`localStorage` is cleared when the app quits", "another thread starts empty", "only while Ember is open", "show its message",
+		// onError and cf.off; rows that do not move under the pointer (bridge-fix-wording).
+		"`onError(e)` gets a refusal: show `e.message` in the\npage", "`cf.off(source)`", "**Rows stay put**", "acts on its row's id",
+		// Wording from testing: the folder, limits, the verbs table, declines, results.
+		"read nothing in\nother threads' folders or the app's home", "never try values on the user's real settings to find a limit",
+		"A starter list: every verb the CLI runs works", "not an error. Button back, at most a muted", "never print `text`",
+		"`request-id` per row: a second click then resolves with the same thread, a success",
 		// Limits.
 		"**On screen only.**", "SSO and OAuth redirects", "ask the user to paste an API", "a plugin is needed",
-		"**Data a source lacks**", "A plugin cannot\n  feed a page",
+		"**Data a source lacks**", "A plugin cannot feed a page",
 		"reference/examples.md", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
 	} {
 		if !strings.Contains(body, want) {
@@ -213,6 +254,26 @@ func TestRenderPagesSkill(t *testing.T) {
 	}
 	if strings.Contains(ex, "setInterval") || strings.Contains(ex, "cf:resize") {
 		t.Error("examples.md polls or sizes the card by hand")
+	}
+	// Every cf.on in the skeleton and the examples passes an onError: a refusal shown
+	// only in the console left a board empty in testing.
+	ons := 0
+	for _, f := range []string{p, skills.Pages + "/reference/examples.md"} {
+		src := string(files[f])
+		for _, i := range cfOn.FindAllStringIndex(src, -1) {
+			ons++
+			if n := callArgs(src[i[0]+len("cf.on"):]); n < 3 {
+				t.Errorf("%s: %s… passes %d args; pass an onError that shows the message", f, src[i[0]:min(i[1]+40, len(src))], n)
+			}
+		}
+	}
+	if ons < 2 {
+		t.Errorf("found %d cf.on calls in the skeleton and examples; the pattern no longer matches", ons)
+	}
+	for _, want := range []string{`"request-id": `, `json?.name`, `"not merged"`, `"muted"`, "localeCompare"} {
+		if !strings.Contains(ex, want) {
+			t.Errorf("examples.md lacks %q", want)
+		}
 	}
 
 	// The entry and help skills route pages to it; ThreadPrompt is checked in its package.

@@ -1,16 +1,17 @@
 ---
 name: code-foundry-pages
-description: "Build an HTML page that reads Code Foundry live and acts on it through /cf/bridge.js: a dashboard, board, tracker, form, chart, checklist or tool in the conversation (merge PRs, archive or start threads, change a setting). Use when the user wants a page, dashboard, form, chart, tool, checklist, board or tracker, asks to see something as UI, or a page of yours misbehaves."
+description: "Build an HTML page that reads Code Foundry live and acts on it through /cf/bridge.js: merge PRs, archive or start threads, change a setting. Use when the user wants a page, dashboard, board, tracker, form, chart or tool; a checklist or to-do to tick off; to see what's running, what's going on or their work (threads, PRs: not the Mac's processes); something as UI; or a page of yours misbehaves."
 ---
 
 # Pages that use Code Foundry
 
 {{cf.provenance}}
 
-A page is one `.html` file you write in `$CODE_FOUNDRY_PAGES` and show with
-`code-foundry view.inline <path>`: interactive, in this conversation, in the user's theme.
-With `/cf/bridge.js` it reads the app live and runs the CLI's commands as this thread. Beside
-this file: `reference/examples.md` (complete pages), `reference/sources.md` (`cf.on` fields).
+A page is one `.html` file in `$CODE_FOUNDRY_PAGES` (this thread's folder: read nothing in
+other threads' folders or the app's home), shown with `code-foundry view.inline <path>`:
+interactive, in this conversation, in the user's theme. With `/cf/bridge.js` it reads the app
+live and runs the CLI's commands as this thread. Beside this file: `reference/examples.md`
+(complete pages), `reference/sources.md` (`cf.on` fields, storage and sign-in details).
 
 ## Page, wake, plugin or reply
 
@@ -28,8 +29,9 @@ this file: `reference/examples.md` (complete pages), `reference/sources.md` (`cf
 
 ## Before you write it
 
-1. Find the verbs ("Verbs pages use" below, `daemon.capabilities --group commands`) and
-   their args (`code-foundry help <verb>`).
+1. Find the verbs ("Verbs pages use" below, `daemon.capabilities --group commands`) and their
+   args (`code-foundry help <verb>`); a setting's range is in the code-foundry-help skill's
+   `reference/settings.md`: never try values on the user's real settings to find a limit.
 2. Two shapes, never mixed. `cf.run` resolves `json`: what the verb prints with `--json`
    (run it in Bash to see it: THREAD_STATUS_IDLE, ISO times, zero fields left out).
    `cf.on` sends the app's view models: lower-case values (idle), times as epoch ms in
@@ -45,17 +47,16 @@ this file: `reference/examples.md` (complete pages), `reference/sources.md` (`cf
 <!doctype html>
 <meta charset="utf-8">
 <link rel="stylesheet" href="/cf/theme.css">
-<script src="/cf/bridge.js"></script>
+<script src="/cf/bridge.js"></script> <!-- follows theme switches, sizes the card: no cf:theme or cf:resize code -->
 <body class="text-body">
 <div id="out">Loading…</div>
 <script type="module">
   await cf.ready;                       // cf.thread, cf.theme and cf.readOnly are set now
   const out = document.getElementById("out");
-  cf.on("thread-list", (threads) => { out.textContent = threads.length + " threads"; });
+  const shown = (e) => { out.textContent = e.message; };  // a refusal, in the page
+  cf.on("thread-list", (threads) => { out.textContent = threads.length + " threads"; }, shown);
 </script>
 ```
-
-The bridge follows theme switches and sizes the card: no `cf:theme` or `cf:resize` code.
 
 ## The bridge
 
@@ -71,23 +72,23 @@ The bridge follows theme switches and sizes the card: no `cf:theme` or `cf:resiz
   thread.list, usage.show, pr.checks, settings.get…).
 - **Every other verb runs only from a click or key press in the page.** Call `cf.run`
   inside the button's `click` (or a form's `submit`) handler; never on load, from a timer
-  or from `cf.on`. The press, click or key counts for 5 seconds: a quick read awaited
-  first is fine, anything slower first (a long wait, a timer) loses it. For
-  several, start them all in the handler: `await Promise.all(items.map((x) => cf.run(…)))`.
-  A slider acts on `change`, not `input`.
+  or from `cf.on`. The press, click or key counts for 5 seconds: a quick read awaited first
+  is fine, anything slower first (a long wait, a timer) loses it. For several, start them all
+  in the handler: `await Promise.all(items.map((x) => cf.run(…)))`; a slider on `change`, not `input`.
 - **The app asks the user** before a verb that needs it (merging a PR, archiving a busy
   thread): its own dialog opens over the page. Add no `confirm()` of your own.
-- **On success** update that row from the result at once (merged, archived): the sources
-  catch up on their own, `gh` up to a minute later.
+- **On success** update that row from the result at once (merged, archived) in your own
+  words: never print `text`, the CLI's sentence. The sources catch up, `gh` within a minute.
 - **This thread**: pass `id` (`id: cf.thread.id` for the page's own thread: without one,
   archive, remove and snooze refuse it). Leave `cf.thread.id` out of lists of threads to
   act on: archiving the page's own thread closes the page.
 - **Threads a page starts** (`thread.new`) are this thread's children, hidden from the
-  sidebar: pass `sidebar: true` when the user will want to see them, and a `prompt`.
+  sidebar: pass `sidebar: true` when the user will want to see them, a `prompt`, and a
+  `request-id` per row: a second click then resolves with the same thread, a success.
 - **Errors**: `cf.run` rejects with an `Error` whose `code` is one of {{cf.bridgeErrors}}.
   Catch every call and show `e.message` where it happened (that row, that button):
   - `gesture`: called outside a click or key press: move the call into the handler.
-  - `declined`: the user said no in the app's dialog: put the row back, no alarm.
+  - `declined`: the user said no: not an error. Button back, at most a muted "Not merged".
   - `unavailable`: no such verb, the page is not shown in its thread, or (from `cf.on`)
     the app does not hold that source now: show the message.
   - `invalid`: a wrong or missing arg: fix the call (`code-foundry help <verb>`).
@@ -96,7 +97,8 @@ The bridge follows theme switches and sizes the card: no `cf:theme` or `cf:resiz
 
 ## Verbs pages use
 
-Their args by name (values after them in plain text); `code-foundry help <verb>` has the rest.
+A starter list: every verb the CLI runs works the same way (`memory.add`, `view.open.url`…).
+Args by name, values after them in plain text; `code-foundry help <verb>` has the rest.
 
 | Verb | Args |
 |---|---|
@@ -108,41 +110,39 @@ Their args by name (values after them in plain text); `code-foundry help <verb>`
 | `thread.new` | `prompt`, `name`, `project` id, `new-worktree` true, `sidebar` true |
 | `settings.get` (read), `settings.set` | `key`; `value` as a string |
 | `usage.show` (read) | `thread` an id, or `all` true |
-| `view.open.url` | `url`: opens it in the user's browser (a plain link works too) |
 
 ## Live data: cf.on, never polling
 
 `cf.on(source, fn, onError)` calls `fn(value)` with the whole current value at once (when
-there is one) and after every change. Never `setInterval` or reads on a timer: re-run a
-verb's read (`pr.checks`, `usage.show`) inside a `cf.on` callback. Sources (read their
-fields in `reference/sources.md`): `thread-list`, `thread` (this one and what it waits
-on), `gh` (open and recently merged PRs), `action`, `plugin`, `terminal`, `project`,
+there is one) and after every change; `onError(e)` gets a refusal: show `e.message` in the
+page. `cf.off(source)` (or the function `cf.on` returns) stops it. Never `setInterval` or
+reads on a timer: re-run a verb's read (`pr.checks`, `usage.show`) inside a `cf.on` callback.
+Sources (their fields: `reference/sources.md`): `thread-list`, `thread` (this one and what it
+waits on), `gh` (open and recently merged PRs), `action`, `plugin`, `terminal`, `project`,
 `workspace`, `settings`, `update`, `ui` (notices) and `ember` (only while Ember is open in
 the app; else onError gets `unavailable`: show its message, never an empty board).
 
+**Rows stay put** between updates: sort by id or keep the user's order, re-sort on a Refresh
+click or while nothing is hovered. A button acts on its row's id from when it was drawn.
+
 ## State
 
-`cf.storage("<page name>")`, after `await cf.ready`: `get`, `set`, `remove`, `keys`,
-`clear`, JSON values. Code Foundry keeps it for the thread (256 KiB), so it survives
-reloads and app restarts: keep what the user typed or chose (a filter, a token, a draft).
-Every page of this thread shares it (one prefix each; the same file in another thread
-starts empty): never trust what you did not write. `get`/`keys` answer at once; `set`/
-`remove`/`clear` return a Promise (rejects when full). Plain `localStorage` is cleared
-when the app quits, so keep nothing there.
+`cf.storage("<page name>")`, after `await cf.ready`: `get`, `set`, `remove`, `keys`, `clear`,
+JSON values. Code Foundry keeps it for the thread (256 KiB), so it survives reloads and app
+restarts: keep what the user typed or chose (a filter, a token, a draft). Every page of this
+thread shares it (one prefix each; the same file in another thread starts empty): never trust
+what you did not write. Plain `localStorage` is cleared when the app quits: keep nothing there.
 
 ## Limits
 
 - **On screen only.** A closed card, a scrolled-away row or another thread stops the page;
   shown again it reloads. Background or repeated work is a plugin.
-- **No sign-in.** SSO and OAuth redirects fail in the frame, and it has none of the user's
-  browser cookies. For an external API (Linear, Jira, Sentry) ask the user to paste an API
-  token into a password field, keep it in `cf.storage`, send it in `fetch` headers; never
-  in the file. The API must allow cross-origin calls; if not, say a plugin is needed.
+- **No sign-in.** SSO and OAuth redirects fail in the frame (no browser cookies). For an
+  external API ask the user to paste an API token, keep it in `cf.storage`, never in the
+  file (`reference/sources.md`, "Tokens"); no cross-origin calls: say a plugin is needed.
 - **No API of its own.** The page holds no Code Foundry token: everything goes through `cf.run`.
-- **Data a source lacks** (closed PRs, another repository): a read verb that has it
-  (`--group commands`, `help <verb>`) through `cf.run`, else the service's API with a
-  token the user pastes, as above (GitHub's allows cross-origin calls). A plugin cannot
-  feed a page: never offer that.
+- **Data a source lacks** (closed PRs, another repo): a read verb through `cf.run`, else the
+  service's API with a pasted token (GitHub's works). A plugin cannot feed a page: never offer it.
 
 ## Show it, then say what it does
 
