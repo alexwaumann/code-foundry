@@ -14,13 +14,15 @@ export default defineConfig({
     // (components/help/guide.ts). The directory, not the file: Vite checks "file.md?raw"
     // itself against the list, and only a parent directory matches it. The plugin tests read
     // the hello demo's captured views the daemon's tests use (src/test/pluginFixtures.ts), and
-    // the page bridge script's test the daemon's script (src/lib/cfBridgeScript.test.ts).
+    // the page bridge script's test the daemon's script (src/lib/cfBridgeScript.test.ts), and
+    // the bridge sources test the pages skill's field list (src/api/bridgeSourcesDoc.test.ts).
     fs: {
       allow: [
         searchForWorkspaceRoot(process.cwd()),
         path.resolve(import.meta.dirname, "../../docs"),
         path.resolve(import.meta.dirname, "../../internal/store/plugin/testdata/hello-demo"),
         path.resolve(import.meta.dirname, "../../internal/bridge"),
+        path.resolve(import.meta.dirname, "../../internal/skills/files"),
       ],
     },
   },

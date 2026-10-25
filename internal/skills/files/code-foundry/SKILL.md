@@ -1,6 +1,6 @@
 ---
 name: code-foundry
-description: "Start here for anything about Code Foundry, the app this thread runs in: which skill to read. Use when the user asks what you can do, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme, or to change the app's colours; states a preference to remember; wants a PR; or before you act in the app."
+description: "Start here for anything about Code Foundry, the app this thread runs in. Use when the user asks what you can do, about its version, model, effort, usage, cost, worktrees, settings, skills or plugins; asks you to show or make a file, diff, page, HTML, chart or theme, or to change the app's colours; states a preference to remember; wants a PR or a reminder; or before you act in the app."
 user-invocable: false
 ---
 
@@ -25,7 +25,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 
 ## Which skill or command
 
-| The user wants | Read or run |
+| The user wants | Read (your Skill tool, or the SKILL.md `--group skills` lists) or run |
 |---|---|
 | How to do something, a setting or keybinding | the code-foundry-help skill |
 | A standing preference ("keep answers short", "always open PRs as drafts") | `code-foundry memory add <text>` (help: "Remembering preferences") |
@@ -33,13 +33,12 @@ Never tell the user skill or command names: say what you will do, not which comm
 | To see a file, a change or a PR | `view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <n>` |
 | A page, chart, form, board, dashboard or tool you make; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES`, then `code-foundry view.inline <path>`: it shows in this conversation (not markdown) and can read and change the app |
 | The app's colours, in any thread: a theme, "sidebar quieter", "less contrast", the accent | "Making a theme" below |
+| To be told or reminded later, or something done on a schedule ("tell me when #4 passes", "every hour…", "keep an eye on…") | `code-foundry thread subscribe` (`--pr owner/name#4 --until checks_passed`, `--every 1h`, `--at 2h`, `--thread <id> --until attention`, `--note`): the app wakes you, even stopped; never Claude Code's cron or a background `--watch`, which die when the app stops this idle thread |
 | A pull request opened, or the project put on GitHub | `code-foundry pr.create`, `code-foundry project.github.publish` |
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
 | To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`): it reads the running app |
 | How something works inside the app | its source at the ref in the line under this title, as the help skill's "Reading the source" says |
-
-Load a skill with your Skill tool (or Read its SKILL.md: `--group skills` has the paths).
 
 ## Showing things
 

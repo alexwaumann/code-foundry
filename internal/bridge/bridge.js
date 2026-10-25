@@ -8,7 +8,7 @@
  *   cf.thread {id, name}          the thread the page is shown in
  *   cf.theme {id, scheme, vars}   the app's theme; cf.onTheme(fn) on every change
  *   cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}
- *   cf.on(source, fn) / cf.off    daemon events, fn(event, source); on returns an unsubscribe
+ *   cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe
  *   cf.resize(height?)            the card follows the page's height by itself
  *   cf.storage(prefix?)           the thread's page storage, kept across app restarts
  *

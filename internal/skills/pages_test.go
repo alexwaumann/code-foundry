@@ -12,7 +12,8 @@ import (
 )
 
 // pagesSkillFiles are the code-foundry-pages skill's files.
-var pagesSkillFiles = []string{"code-foundry-pages/SKILL.md", "code-foundry-pages/reference/examples.md"}
+var pagesSkillFiles = []string{"code-foundry-pages/SKILL.md", "code-foundry-pages/reference/examples.md",
+	"code-foundry-pages/reference/sources.md"}
 
 // cfRun is a cf.run call in a skill file with a literal verb and an args object:
 // cf.run("verb", { a: x, "b-c": y }).
@@ -69,7 +70,7 @@ func TestRenderPagesSkill(t *testing.T) {
 
 	// The API block is bridge.js's header, verbatim.
 	for _, line := range []string{"cf.run(verb, args?, opts?)    Promise of {text, json}; rejects with {code, message}",
-		"cf.on(source, fn) / cf.off    daemon events, fn(event, source); on returns an unsubscribe",
+		"cf.on(source, fn) / cf.off    live data, fn(value, source): now, then on change; on returns an unsubscribe",
 		"cf.storage(prefix?)           the thread's page storage, kept across app restarts"} {
 		if !strings.Contains(body, "\n"+line+"\n") || !bytes.Contains(bridge.Script(), []byte(line)) {
 			t.Errorf("SKILL.md lacks the header line %q", line)
@@ -86,19 +87,27 @@ func TestRenderPagesSkill(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		// Page, plugin or reply.
-		"## Page, plugin or reply", "the code-foundry-plugin skill", "It runs only while it is on screen",
+		// Page, wake, plugin or reply; a wake for reminders and schedules, never the
+		// session's cron (bridge-fix-c-daemon).
+		"## Page, wake, plugin or reply", "the code-foundry-plugin skill", "It runs only while it is on screen",
+		"`code-foundry thread subscribe --pr owner/name#4 --until checks_passed`", "`--every 1h`", "--until attention --repeat",
+		"Never Claude\n  Code's own cron or a `--watch` loop",
+		// The two shapes and the field reference.
+		"Two shapes, never mixed", "THREAD_STATUS_IDLE", "`…AtMs`", "`reference/sources.md`",
 		// The skeleton.
 		`<link rel="stylesheet" href="/cf/theme.css">`, `<script src="/cf/bridge.js"></script>`, "await cf.ready", "`--cf-*` variables",
 		"no framework", "no build step", "`--json`",
 		// The gesture rule, confirmations, own thread.
-		"runs only from a click or key press in the page", "before any `await`", "`await Promise.all(items.map(", "on `change`, not `input`",
-		"Never pass `yes`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
+		"runs only from a click or key press in the page", "WebKit's user activation, about 5", "`await Promise.all(items.map(", "on `change`, not `input`",
+		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
+		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
-		"never polling", "Never `setInterval`", "`cf.storage(", "persists across reloads and restarts", "Every page shares one\norigin",
+		"never polling", "Never `setInterval`", "`cf.storage(", "persists across reloads and restarts", "Every page shares one origin",
+		"It is per thread", "another thread starts empty", "only while Ember is open", "show its message",
 		// Limits.
 		"**On screen only.**", "SSO and OAuth redirects", "ask the user to paste an API", "a plugin is needed",
-		"reference/examples.md", "`code-foundry view.inline <path>",
+		"**Data a source lacks**", "A plugin cannot\n  feed a page",
+		"reference/examples.md", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("SKILL.md lacks %q", want)
@@ -179,6 +188,20 @@ func TestRenderPagesSkill(t *testing.T) {
 	}
 	if rows < 8 {
 		t.Errorf("verbs table has %d rows", rows)
+	}
+
+	// The field reference has a section per source (its fields are checked against the
+	// GUI's view models by gui/frontend/src/api/bridgeSourcesDoc.test.ts).
+	ref := string(files[skills.Pages+"/reference/sources.md"])
+	for _, s := range bridge.Sources {
+		if !strings.Contains(ref, "\n## "+s+"\n") {
+			t.Errorf("reference/sources.md has no section for %s", s)
+		}
+	}
+	for _, want := range []string{"THREAD_STATUS_IDLE", "AtMs", "`new Date(ms)`", "code unavailable"} {
+		if !strings.Contains(ref, want) {
+			t.Errorf("reference/sources.md lacks %q", want)
+		}
 	}
 
 	ex := string(files[skills.Pages+"/reference/examples.md"])

@@ -689,7 +689,8 @@ export class PrDetailWorld {
             if (!pr?.baseRef) return `Merge #${args.number ?? ""} in ${slug} with ${method}?`;
             let what = `#${args.number ?? ""}`;
             const title = (pr.title ?? "").trim();
-            if (title) what += ` “${[...title].length > 80 ? `${[...title].slice(0, 79).join("").trim()}…` : title}”`;
+            // The daemon cuts at 80 runes; the mock's titles are short and plain.
+            if (title) what += ` “${title.length > 80 ? `${title.slice(0, 79).trim()}…` : title}”`;
             if (!args["head-sha"] && pr.headSha) {
               const c = d?.commitCount ?? 0;
               what += ` (${c === 1 ? "1 commit" : `${String(c)} commits`}, head ${pr.headSha.slice(0, 7)})`;
