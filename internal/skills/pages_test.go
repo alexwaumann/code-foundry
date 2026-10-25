@@ -102,8 +102,8 @@ func TestRenderPagesSkill(t *testing.T) {
 		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
 		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
-		"never polling", "Never `setInterval`", "`cf.storage(", "persists across reloads and restarts", "Every page shares one origin",
-		"It is per thread", "another thread starts empty", "only while Ember is open", "show its message",
+		"never polling", "Never `setInterval`", "`cf.storage(", "survives\nreloads and app restarts", "Every page of this thread shares it",
+		"`localStorage` is cleared\nwhen the app quits", "another thread\nstarts empty", "only while Ember is open", "show its message",
 		// Limits.
 		"**On screen only.**", "SSO and OAuth redirects", "ask the user to paste an API", "a plugin is needed",
 		"**Data a source lacks**", "A plugin cannot\n  feed a page",

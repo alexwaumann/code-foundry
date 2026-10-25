@@ -9,9 +9,8 @@ description: "Build an HTML page that reads Code Foundry live and acts on it thr
 
 A page is one `.html` file you write in `$CODE_FOUNDRY_PAGES` and show with
 `code-foundry view.inline <path>`: interactive, in this conversation, in the user's theme.
-With `/cf/bridge.js` it reads the app live and runs the commands you run with the CLI, as
-this thread. Beside this file: `reference/examples.md` (complete pages) and
-`reference/sources.md` (every field each `cf.on` source sends).
+With `/cf/bridge.js` it reads the app live and runs the CLI's commands as this thread. Beside
+this file: `reference/examples.md` (complete pages), `reference/sources.md` (`cf.on` fields).
 
 ## Page, wake, plugin or reply
 
@@ -24,7 +23,7 @@ this thread. Beside this file: `reference/examples.md` (complete pages) and
   what to do; end your turn and the app wakes this thread, even stopped. Never Claude
   Code's own cron or a `--watch` loop: the app stops idle threads, and those die too.
 - **A plugin** (the code-foundry-plugin skill) when it must work with no thread at all, as
-  a side panel tab of its own, or on every new PR in every project.
+  its own side panel tab, or on every new PR in every project.
 - **A plain reply** when one answer is enough ("which PRs are green?").
 
 ## Before you write it
@@ -124,12 +123,12 @@ the app; else onError gets `unavailable`: show its message, never an empty board
 ## State
 
 `cf.storage("<page name>")`, after `await cf.ready`: `get`, `set`, `remove`, `keys`,
-`clear`, JSON values. Code Foundry keeps it for the thread (up to 256 KiB), so it survives
-reloads and app restarts; keep what the user typed or chose (a filter, a token, a draft),
-not what a source sends. Every page of this thread shares it (one prefix each; the same
-file in another thread starts empty): never trust what you did not write. `get` and `keys`
-answer at once; `set`, `remove`, `clear` return a Promise that rejects when it is full.
-Plain `localStorage` is cleared when the app quits, so keep nothing there.
+`clear`, JSON values. Code Foundry keeps it for the thread (256 KiB), so it survives
+reloads and app restarts: keep what the user typed or chose (a filter, a token, a draft).
+Every page of this thread shares it (one prefix each; the same file in another thread
+starts empty): never trust what you did not write. `get`/`keys` answer at once; `set`/
+`remove`/`clear` return a Promise (rejects when full). Plain `localStorage` is cleared
+when the app quits, so keep nothing there.
 
 ## Limits
 
