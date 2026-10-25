@@ -62,6 +62,9 @@ const (
 	// ThreadServiceSetSidebarProcedure is the fully-qualified name of the ThreadService's SetSidebar
 	// RPC.
 	ThreadServiceSetSidebarProcedure = "/codefoundry.v1.ThreadService/SetSidebar"
+	// ThreadServiceSetWorkspaceProcedure is the fully-qualified name of the ThreadService's
+	// SetWorkspace RPC.
+	ThreadServiceSetWorkspaceProcedure = "/codefoundry.v1.ThreadService/SetWorkspace"
 	// ThreadServiceSnoozeProcedure is the fully-qualified name of the ThreadService's Snooze RPC.
 	ThreadServiceSnoozeProcedure = "/codefoundry.v1.ThreadService/Snooze"
 	// ThreadServiceLabelProcedure is the fully-qualified name of the ThreadService's Label RPC.
@@ -192,6 +195,14 @@ type ThreadServiceClient interface {
 	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
 	// thread the user created (always shown). Persisted; any state.
 	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
+	// SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
+	// the workspace whose instructions and skills reach the thread); workspace is an id or
+	// a name, "" clears it. The project set does not change. Persisted; any state; it
+	// applies from the thread's next spawn (a live process keeps what it started with).
+	// NOT_FOUND for an unknown workspace; FAILED_PRECONDITION to clear or change the
+	// reference of a thread whose primary is its workspace's folder (empty project_id with
+	// a workspace_id), whose cwd is that folder.
+	SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
 	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
@@ -439,6 +450,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
 			connect.WithClientOptions(opts...),
 		),
+		setWorkspace: connect.NewClient[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse](
+			httpClient,
+			baseURL+ThreadServiceSetWorkspaceProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SetWorkspace")),
+			connect.WithClientOptions(opts...),
+		),
 		snooze: connect.NewClient[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceSnoozeProcedure,
@@ -626,6 +643,7 @@ type threadServiceClient struct {
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
 	setSidebar        *connect.Client[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse]
+	setWorkspace      *connect.Client[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
@@ -724,6 +742,11 @@ func (c *threadServiceClient) Archive(ctx context.Context, req *connect.Request[
 // SetSidebar calls codefoundry.v1.ThreadService.SetSidebar.
 func (c *threadServiceClient) SetSidebar(ctx context.Context, req *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
 	return c.setSidebar.CallUnary(ctx, req)
+}
+
+// SetWorkspace calls codefoundry.v1.ThreadService.SetWorkspace.
+func (c *threadServiceClient) SetWorkspace(ctx context.Context, req *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error) {
+	return c.setWorkspace.CallUnary(ctx, req)
 }
 
 // Snooze calls codefoundry.v1.ThreadService.Snooze.
@@ -927,6 +950,14 @@ type ThreadServiceHandler interface {
 	// shown hands it to the user, hidden back to its creator. INVALID_ARGUMENT for a
 	// thread the user created (always shown). Persisted; any state.
 	SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error)
+	// SetWorkspace sets or clears a thread's workspace reference (Thread.workspace_id:
+	// the workspace whose instructions and skills reach the thread); workspace is an id or
+	// a name, "" clears it. The project set does not change. Persisted; any state; it
+	// applies from the thread's next spawn (a live process keeps what it started with).
+	// NOT_FOUND for an unknown workspace; FAILED_PRECONDITION to clear or change the
+	// reference of a thread whose primary is its workspace's folder (empty project_id with
+	// a workspace_id), whose cwd is that folder.
+	SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
 	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
@@ -1170,6 +1201,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetSidebar")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSetWorkspaceHandler := connect.NewUnaryHandler(
+		ThreadServiceSetWorkspaceProcedure,
+		svc.SetWorkspace,
+		connect.WithSchema(threadServiceMethods.ByName("SetWorkspace")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSnoozeHandler := connect.NewUnaryHandler(
 		ThreadServiceSnoozeProcedure,
 		svc.Snooze,
@@ -1368,6 +1405,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceArchiveHandler.ServeHTTP(w, r)
 		case ThreadServiceSetSidebarProcedure:
 			threadServiceSetSidebarHandler.ServeHTTP(w, r)
+		case ThreadServiceSetWorkspaceProcedure:
+			threadServiceSetWorkspaceHandler.ServeHTTP(w, r)
 		case ThreadServiceSnoozeProcedure:
 			threadServiceSnoozeHandler.ServeHTTP(w, r)
 		case ThreadServiceLabelProcedure:
@@ -1487,6 +1526,10 @@ func (UnimplementedThreadServiceHandler) Archive(context.Context, *connect.Reque
 
 func (UnimplementedThreadServiceHandler) SetSidebar(context.Context, *connect.Request[v1.SetThreadSidebarRequest]) (*connect.Response[v1.SetThreadSidebarResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetSidebar is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetWorkspace is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {

@@ -543,6 +543,12 @@ type Store interface {
 	// SetSidebar shows or hides a thread another thread created in the sidebar
 	// (Thread.SidebarOverride); ErrInvalidArgument for the user's own thread. Any state.
 	SetSidebar(ctx context.Context, id string, shown bool) (Thread, error)
+	// SetWorkspace sets the thread's workspace reference (Thread.WorkspaceID) to the
+	// workspace ref names (an id or a name), or clears it for "". The project set stays.
+	// ErrNotFound for an unknown workspace; ErrFailedPrecondition to clear or change it
+	// on a thread that runs in its workspace's folder. Any state; it applies from the
+	// next spawn.
+	SetWorkspace(ctx context.Context, id, ref string) (Thread, error)
 	// Label edits a thread's labels: clear removes every label, then remove's go, then
 	// add's are added (each validated; a label in both is ErrInvalidArgument). Any state.
 	Label(ctx context.Context, id string, add, remove []string, clear bool) (Thread, error)

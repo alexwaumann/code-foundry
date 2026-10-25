@@ -75,6 +75,27 @@ func noProjectAlone(a Args) error {
 	return nil
 }
 
+// createdMessage is the first part of what thread.new and thread.new-like say about the
+// thread s that req made: where it runs, its projects, workspace and mode.
+func createdMessage(s *v1.Thread, req *v1.CreateThreadRequest) string {
+	msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
+	if n := len(s.GetProjectIds()); n > 1 {
+		msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(s.GetProjectIds(), ", "))
+	}
+	if s.GetWorkspaceId() != "" {
+		msg += " (workspace " + s.GetWorkspaceId() + ")"
+	}
+	if req.GetNoProject() {
+		msg += " (no project)"
+	}
+	if s.GetCreatedWorktree() && req.NewWorktree != nil {
+		msg += " (new worktree from " + s.GetBaseRef() + ")"
+	} else if s.GetCreatedWorktree() {
+		msg += " (worktrees on " + s.GetBranch() + ")"
+	}
+	return msg
+}
+
 // threadLabel is "name (id)" or just the id.
 func threadLabel(s *v1.Thread) string {
 	if s.GetName() != "" {
@@ -214,21 +235,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
 				}
 				focusCreated(e, a, s.GetId())
-				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
-				if n := len(s.GetProjectIds()); n > 1 {
-					msg += fmt.Sprintf(" (%d projects: %s; thread checkouts lists them)", n, strings.Join(s.GetProjectIds(), ", "))
-				}
-				if s.GetWorkspaceId() != "" {
-					msg += " (workspace " + s.GetWorkspaceId() + ")"
-				}
-				if req.GetNoProject() {
-					msg += " (no project)"
-				}
-				if s.GetCreatedWorktree() && req.NewWorktree != nil {
-					msg += " (new worktree from " + s.GetBaseRef() + ")"
-				} else if s.GetCreatedWorktree() {
-					msg += " (worktrees on " + s.GetBranch() + ")"
-				}
+				msg := createdMessage(s, req)
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
 				}
@@ -239,6 +246,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil
 			},
 		},
+		threadNewLike(b, e),
 		Command{
 			Name:         "thread.focus",
 			Title:        "Focus Thread",
@@ -332,6 +340,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadFlagClearCmd(b, idArg),
 		threadRestartCmd(b, idArg),
 		threadSidebarCmd(b, idArg),
+		threadWorkspaceCmd(b, idArg),
 		threadReseedCmd(b, idArg),
 	)
 }
