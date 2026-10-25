@@ -378,7 +378,9 @@ func RegisterView(r *Registry, d ViewDeps) error {
 				"the overview of the worktree the thread runs in, with sync state, GitHub activity, changed files and log.",
 			Category: "View",
 			// No default chord, like view.panel.usage (T opens it while the panel has focus).
-			When: func(c Context) bool { return hasWorktreeThreadContext(c) || inWorkspaceFolderContext(c) || cliThread(c) },
+			When: func(c Context) bool {
+				return hasWorktreeThreadContext(c) || inWorkspaceFolderContext(c) || cliThread(c)
+			},
 			Args: panelThreadArgs(),
 			Run:  panel(ViewPanelWorktree, inWorktreeOrFolder),
 		},
