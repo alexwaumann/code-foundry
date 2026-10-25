@@ -563,6 +563,8 @@ describe("workspace mapping", () => {
       rootPath: "/Users/me/shop",
       defaultPrimary: "workspace",
       managedDir: "/Users/me/.code-foundry/workspaces/w-1",
+      instructions: "/Users/me/shop/CLAUDE.md",
+      skills: ["demo", "release"],
       createdAt: timestampFromMs(7000),
     };
     const want = {
@@ -576,6 +578,8 @@ describe("workspace mapping", () => {
       rootPath: "/Users/me/shop",
       defaultPrimary: "workspace",
       managedDir: "/Users/me/.code-foundry/workspaces/w-1",
+      instructions: "/Users/me/shop/CLAUDE.md",
+      skills: ["demo", "release"],
       createdAtMs: 7000,
     };
     expect(toWorkspaceEventView(create(WorkspaceEventSchema, { event: { case: "snapshot", value: { workspaces: [login] } } }))).toEqual({ kind: "snapshot", workspaces: [want] });

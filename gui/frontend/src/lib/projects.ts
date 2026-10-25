@@ -1,8 +1,8 @@
 /**
- * The Projects page's view models: every registered project with its own
- * worktrees, and every workspace with its members. A workspace's member worktrees are
- * listed under the workspace only, never under their project (one change stays in one
- * place). Pure; inputs are the projects and workspaces slices' shapes.
+ * The Projects page's view models: every registered project with its worktrees (all of
+ * them: a workspace has no worktrees since workspaces v2, so a thread's checkouts show
+ * under their projects), and every workspace as a card (lib/workspaceCard.ts). Pure;
+ * inputs are the projects and workspaces slices' shapes.
  */
 import { isRemoteless, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
@@ -11,7 +11,7 @@ import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
 
 export interface ProjectsSlice {
-  /** `git` false: a project without git (never a workspace member); absent counts as git. */
+  /** `git` false: a project without git (a plain folder); absent counts as git. */
   byId: Readonly<Record<string, { id: string; name: string; git?: boolean; worktrees: readonly Pick<WorktreeView, "path" | "isMain">[] } | undefined>>;
   /** Sorted by name. */
   order: readonly string[];
@@ -25,10 +25,8 @@ export interface ProjectsWorkspaces {
 
 export interface ProjectModel {
   projectId: string;
-  /** Its worktrees that belong to no workspace, main first (the projects slice's order). */
+  /** Its worktrees, main first (the projects slice's order). */
   worktrees: string[];
-  /** How many of its worktrees are workspace members (listed under their workspaces). */
-  inWorkspaces: number;
 }
 
 export interface ProjectsModel {
@@ -36,37 +34,14 @@ export interface ProjectsModel {
   workspaces: string[];
 }
 
-/** Worktree paths that are members of some workspace. */
-export function memberPaths(workspaces: ProjectsWorkspaces): Set<string> {
-  const out = new Set<string>();
-  for (const id of workspaces.order) for (const m of workspaces.byId[id]?.members ?? []) out.add(m.worktreePath);
-  return out;
-}
-
-export function projectsModel(projects: ProjectsSlice, workspaces: ProjectsWorkspaces): ProjectsModel {
-  const members = memberPaths(workspaces);
+export function projectsModel(projects: ProjectsSlice, workspaces: Pick<ProjectsWorkspaces, "order" | "byId">): ProjectsModel {
   return {
     projects: projects.order.flatMap((id) => {
       const r = projects.byId[id];
-      if (!r) return [];
-      const own = r.worktrees.filter((w) => !members.has(w.path)).map((w) => w.path);
-      return [{ projectId: id, worktrees: own, inWorkspaces: r.worktrees.length - own.length }];
+      return r ? [{ projectId: id, worktrees: r.worktrees.map((w) => w.path) }] : [];
     }),
     workspaces: workspaces.order.filter((id) => workspaces.byId[id] !== undefined),
   };
-}
-
-/**
- * Projects that can be added to the workspace: registered, git (a member is a worktree on
- * the workspace branch; a repository without a remote is fine), and not yet members, by
- * name.
- */
-export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, projects: ProjectsSlice): string[] {
-  const inWs = new Set(ws?.members.map((m) => m.projectId) ?? []);
-  return projects.order.filter((id) => {
-    const r = projects.byId[id];
-    return !inWs.has(id) && r !== undefined && r.git !== false;
-  });
 }
 
 /**
@@ -81,29 +56,18 @@ export function projectRef(projects: ProjectsSlice, projectId: string): string {
   return n === 1 ? name : projectId;
 }
 
-/**
- * Where a thread is relative to a workspace member (the side panel's member rows): it
- * runs there (its cwd is the member worktree or inside it), a queued "Run in…" moves it
- * there, or neither. No thread (the Projects page) is always neither.
- */
-export function threadAt(thread: { worktreePath: string; pendingWorktreePath: string } | undefined, memberPath: string): "current" | "queued" | null {
-  if (!thread || !memberPath) return null;
-  const cwd = thread.worktreePath;
-  if (cwd === memberPath || cwd.startsWith(`${memberPath}/`)) return "current";
-  return thread.pendingWorktreePath === memberPath && thread.pendingWorktreePath !== cwd ? "queued" : null;
-}
-
 /** Keyboard row keys of the page. */
 export const projectKey = (projectId: string): string => `p:${projectId}`;
 export const projectWorktreeKey = (projectId: string, path: string): string => `pw:${projectId}::${path}`;
 export const workspaceKey = (id: string): string => `ws:${id}`;
+/** A workspace card's member row. */
 export const memberKey = (workspaceId: string, projectId: string): string => `m:${workspaceId}::${projectId}`;
 
 export type PageItem =
   | { key: string; kind: "project"; projectId: string }
   | { key: string; kind: "worktree"; projectId: string; path: string }
   | { key: string; kind: "workspace"; workspaceId: string }
-  | { key: string; kind: "member"; workspaceId: string; projectId: string; path: string };
+  | { key: string; kind: "member"; workspaceId: string; projectId: string };
 
 /** Projects and workspaces whose rows are hidden (the UI store's persisted sets; empty while filtering). */
 export interface Collapsed {
@@ -115,7 +79,8 @@ export const NONE_COLLAPSED: Collapsed = { projects: new Set(), workspaces: new 
 
 /**
  * Every navigable row of the page in display order: projects and their worktrees, then
- * workspaces and their members. A collapsed project or workspace keeps its header row only.
+ * workspace cards and their members (sorted by id). A collapsed project or workspace
+ * keeps its header row only.
  */
 export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED): PageItem[] {
   const out: PageItem[] = [];
@@ -127,22 +92,15 @@ export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, 
   for (const id of model.workspaces) {
     out.push({ key: workspaceKey(id), kind: "workspace", workspaceId: id });
     if (collapsed.workspaces.has(id)) continue;
-    for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.projectId), kind: "member", workspaceId: id, projectId: m.projectId, path: m.worktreePath });
+    for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.projectId), kind: "member", workspaceId: id, projectId: m.projectId });
   }
   return out;
 }
 
-/** What a collapsed project header says about its hidden rows: "3 worktrees · 1 in a workspace". */
-export function collapsedProjectSummary(p: Pick<ProjectModel, "worktrees" | "inWorkspaces">): string {
-  const total = p.worktrees.length + p.inWorkspaces;
-  const head = `${String(total)} ${total === 1 ? "worktree" : "worktrees"}`;
-  if (p.inWorkspaces === 0) return head;
-  return `${head} · ${String(p.inWorkspaces)} ${p.inWorkspaces === 1 ? "in a workspace" : "in workspaces"}`;
-}
-
-/** What a collapsed workspace header says about its hidden rows: "2 members". */
-export function collapsedWorkspaceSummary(members: number): string {
-  return `${String(members)} ${members === 1 ? "member" : "members"}`;
+/** What a collapsed project header says about its hidden rows: "3 worktrees". */
+export function collapsedProjectSummary(p: Pick<ProjectModel, "worktrees">): string {
+  const n = p.worktrees.length;
+  return `${String(n)} ${n === 1 ? "worktree" : "worktrees"}`;
 }
 
 /**
@@ -171,14 +129,14 @@ export function projectKind(r: Pick<ProjectView, "githubSlug" | "remotes"> & { g
 /** What the page's filter matches against, per project and per workspace (only built while filtering). */
 export interface ProjectsSearch {
   projects: Readonly<Record<string, { name: string; githubSlug: string; branches: Readonly<Record<string, string>> } | undefined>>;
-  workspaces: Readonly<Record<string, { name: string; branch: string } | undefined>>;
+  workspaces: Readonly<Record<string, { name: string } | undefined>>;
 }
 
 /**
  * The model narrowed to what the filter matches, case-insensitive substring: a project by
  * its name or GitHub slug (then all its rows show), else by any of its worktrees' branch or
- * tildified path (then only those rows show); a workspace by its name or branch. An empty
- * query keeps everything.
+ * tildified path (then only those rows show); a workspace by its name. An empty query
+ * keeps everything.
  */
 export function filterProjects(model: ProjectsModel, query: string, search: ProjectsSearch): ProjectsModel {
   const q = query.trim().toLowerCase();
@@ -189,12 +147,9 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
       const r = search.projects[p.projectId];
       if (hit(r?.name) || hit(r?.githubSlug)) return [p];
       const worktrees = p.worktrees.filter((path) => hit(r?.branches[path]) || hit(tildify(path)));
-      return worktrees.length > 0 ? [{ ...p, worktrees, inWorkspaces: 0 }] : [];
+      return worktrees.length > 0 ? [{ ...p, worktrees }] : [];
     }),
-    workspaces: model.workspaces.filter((id) => {
-      const w = search.workspaces[id];
-      return hit(w?.name) || hit(w?.branch);
-    }),
+    workspaces: model.workspaces.filter((id) => hit(search.workspaces[id]?.name)),
   };
 }
 
@@ -263,24 +218,16 @@ export function terminalHolds(terminals: CleanupTerminals, path: string): boolea
   });
 }
 
-/** The worktree is (inside) a workspace member. */
-export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boolean {
-  return workspaces.order.some((id) => workspaces.byId[id]?.members.some((m) => inside(path, m.worktreePath)) ?? false);
-}
-
 /**
  * Whether project.worktree.cleanup would remove the worktree now: the daemon's git verdict
  * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a thread on it,
- * a terminal that has not exited, a workspace). The daemon checks again after a fetch.
+ * a terminal that has not exited). The daemon also holds a worktree another thread has as
+ * a checkout (a multi-project thread's member), which only Checkouts knows: it then keeps
+ * the worktree and says why. It checks again after a fetch.
  */
-export function isCleanable(
-  wt: Pick<WorktreeView, "path" | "mergedClean"> | undefined,
-  threads: CleanupThreads,
-  terminals: CleanupTerminals,
-  workspaces: ProjectsWorkspaces,
-): boolean {
+export function isCleanable(wt: Pick<WorktreeView, "path" | "mergedClean"> | undefined, threads: CleanupThreads, terminals: CleanupTerminals): boolean {
   if (!wt?.mergedClean) return false;
-  return !threadHolds(threads, wt.path) && !terminalHolds(terminals, wt.path) && !memberHolds(workspaces, wt.path);
+  return !threadHolds(threads, wt.path) && !terminalHolds(terminals, wt.path);
 }
 
 /** The "in main" tag's tooltip. */

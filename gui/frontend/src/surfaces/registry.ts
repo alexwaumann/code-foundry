@@ -17,12 +17,11 @@ import { pullRequestSurface } from "./pullrequest";
 import { threadsSurface } from "./threads";
 import type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 import { usageSurface } from "./usage";
-import { workspaceSurface } from "./workspace";
 import { worktreeSurface } from "./worktree";
 
 export type { Subscribable, SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
-export const surfaces: readonly SurfaceSpec[] = [emberSurface, filesSurface, diffSurface, pullRequestSurface, linkedPrsSurface, usageSurface, mcpSurface, agentsSurface, threadsSurface, workspaceSurface, worktreeSurface];
+export const surfaces: readonly SurfaceSpec[] = [emberSurface, filesSurface, diffSurface, pullRequestSurface, linkedPrsSurface, usageSurface, mcpSurface, agentsSurface, threadsSurface, worktreeSurface];
 
 const byKind = new Map<SurfaceKind, SurfaceSpec>(surfaces.map((s) => [s.kind, s]));
 const byHotkey = new Map<string, SurfaceSpec>(surfaces.flatMap((s) => (s.hotkey ? [[s.hotkey.toLowerCase(), s] as const] : [])));

@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  addableProjects,
   cleanableTitle,
   collapsedProjectSummary,
-  collapsedWorkspaceSummary,
   filterProjects,
   isCleanable,
   memberKey,
@@ -14,7 +12,6 @@ import {
   projectsModel,
   projectWorktreeKey,
   projectRef,
-  threadAt,
   workspaceKey,
   worktreeThreadCount,
   type ProjectKind,
@@ -47,42 +44,42 @@ const workspaces: ProjectsWorkspaces = {
     "w-1": {
       id: "w-1",
       members: [
-        { projectId: "web", worktreePath: "/wt/web/cf-login" },
-        { projectId: "api", worktreePath: "/wt/api/cf-login" },
+        { projectId: "api", worktreePath: "" },
+        { projectId: "web", worktreePath: "" },
       ],
     },
   },
 };
 
 describe("projectsModel", () => {
-  it("lists each project's own worktrees; workspace members only under their workspace", () => {
+  it("lists every worktree under its project (a workspace has none of its own)", () => {
     expect(projectsModel(projects, workspaces)).toEqual({
       projects: [
-        { projectId: "api", worktrees: ["/src/api"], inWorkspaces: 1 },
-        { projectId: "dot", worktrees: ["/src/dot"], inWorkspaces: 0 },
-        { projectId: "web", worktrees: ["/src/web", "/wt/web/feat"], inWorkspaces: 1 },
+        { projectId: "api", worktrees: ["/src/api", "/wt/api/cf-login"] },
+        { projectId: "dot", worktrees: ["/src/dot"] },
+        { projectId: "web", worktrees: ["/src/web", "/wt/web/feat", "/wt/web/cf-login"] },
       ],
       workspaces: ["w-1"],
     });
   });
-  it("with no workspaces every worktree is the project's", () => {
-    const m = projectsModel(projects, { order: [], byId: {} });
-    expect(m.projects.find((p) => p.projectId === "web")?.worktrees).toEqual(["/src/web", "/wt/web/feat", "/wt/web/cf-login"]);
-    expect(m.workspaces).toEqual([]);
+  it("a workspace the slice does not know is left out", () => {
+    expect(projectsModel(projects, { order: ["w-1", "w-gone"], byId: workspaces.byId }).workspaces).toEqual(["w-1"]);
   });
-  it("pageItems: projects and their worktrees, then workspaces and their members", () => {
+  it("pageItems: projects and their worktrees, then workspace cards and their members by id", () => {
     const keys = pageItems(projectsModel(projects, workspaces), workspaces).map((i) => i.key);
     expect(keys).toEqual([
       projectKey("api"),
       projectWorktreeKey("api", "/src/api"),
+      projectWorktreeKey("api", "/wt/api/cf-login"),
       projectKey("dot"),
       projectWorktreeKey("dot", "/src/dot"),
       projectKey("web"),
       projectWorktreeKey("web", "/src/web"),
       projectWorktreeKey("web", "/wt/web/feat"),
+      projectWorktreeKey("web", "/wt/web/cf-login"),
       workspaceKey("w-1"),
-      memberKey("w-1", "web"),
       memberKey("w-1", "api"),
+      memberKey("w-1", "web"),
     ]);
   });
   it("pageItems: a collapsed project or workspace keeps its header row only", () => {
@@ -92,21 +89,11 @@ describe("projectsModel", () => {
 });
 
 describe("collapsed summaries", () => {
-  it.each<[string, { worktrees: string[]; inWorkspaces: number }, string]>([
-    ["one worktree", { worktrees: ["/a"], inWorkspaces: 0 }, "1 worktree"],
-    ["several", { worktrees: ["/a", "/b", "/c"], inWorkspaces: 0 }, "3 worktrees"],
-    ["one in a workspace counts in the total", { worktrees: ["/a", "/b"], inWorkspaces: 1 }, "3 worktrees · 1 in a workspace"],
-    ["several in workspaces", { worktrees: ["/a"], inWorkspaces: 2 }, "3 worktrees · 2 in workspaces"],
-    ["all in a workspace", { worktrees: [], inWorkspaces: 1 }, "1 worktree · 1 in a workspace"],
+  it.each<[string, { worktrees: string[] }, string]>([
+    ["one worktree", { worktrees: ["/a"] }, "1 worktree"],
+    ["several", { worktrees: ["/a", "/b", "/c"] }, "3 worktrees"],
   ])("project: %s", (_name, p, want) => {
     expect(collapsedProjectSummary(p)).toBe(want);
-  });
-  it.each<[number, string]>([
-    [0, "0 members"],
-    [1, "1 member"],
-    [3, "3 members"],
-  ])("workspace with %d members", (n, want) => {
-    expect(collapsedWorkspaceSummary(n)).toBe(want);
   });
 });
 
@@ -129,9 +116,9 @@ describe("projectKind", () => {
 describe("filterProjects", () => {
   const model: ProjectsModel = {
     projects: [
-      { projectId: "cf", worktrees: ["/Users/dev/src/code-foundry", "/Users/dev/wt/cf/feat-sidebar", "/Users/dev/wt/cf/fix-resize"], inWorkspaces: 1 },
-      { projectId: "dot", worktrees: ["/Users/dev/dotfiles"], inWorkspaces: 0 },
-      { projectId: "wr", worktrees: ["/Users/dev/Documents/writing"], inWorkspaces: 0 },
+      { projectId: "cf", worktrees: ["/Users/dev/src/code-foundry", "/Users/dev/wt/cf/feat-sidebar", "/Users/dev/wt/cf/fix-resize"] },
+      { projectId: "dot", worktrees: ["/Users/dev/dotfiles"] },
+      { projectId: "wr", worktrees: ["/Users/dev/Documents/writing"] },
     ],
     workspaces: ["w-login", "w-pay"],
   };
@@ -145,7 +132,7 @@ describe("filterProjects", () => {
       dot: { name: "dotfiles", githubSlug: "", branches: { "/Users/dev/dotfiles": "main" } },
       wr: { name: "writing", githubSlug: "", branches: { "/Users/dev/Documents/writing": "" } },
     },
-    workspaces: { "w-login": { name: "login", branch: "cf/login" }, "w-pay": { name: "payments-split", branch: "cf/payments-split" } },
+    workspaces: { "w-login": { name: "login" }, "w-pay": { name: "payments-split" } },
   };
   const shape = (m: ProjectsModel) => ({ projects: Object.fromEntries(m.projects.map((p) => [p.projectId, p.worktrees.length])), workspaces: m.workspaces });
   it.each<[string, string, { projects: Record<string, number>; workspaces: string[] }]>([
@@ -158,53 +145,26 @@ describe("filterProjects", () => {
     ["a tildified path", "~/documents", { projects: { wr: 1 }, workspaces: [] }],
     ["the home prefix itself does not match", "/users/dev", { projects: {}, workspaces: [] }],
     ["a workspace name", "payments", { projects: {}, workspaces: ["w-pay"] }],
-    ["a workspace branch", "cf/login", { projects: {}, workspaces: ["w-login"] }],
-    ["the cf/ prefix: both workspaces and the paths under ~/wt/cf", "cf/", { projects: { cf: 2 }, workspaces: ["w-login", "w-pay"] }],
+    ["a workspace has no branch to match", "cf/login", { projects: {}, workspaces: [] }],
+    ["the cf/ prefix: the paths under ~/wt/cf", "cf/", { projects: { cf: 2 }, workspaces: [] }],
     ["nothing", "zzz", { projects: {}, workspaces: [] }],
   ])("%s", (_name, q, want) => {
     expect(shape(filterProjects(model, q, search))).toEqual(want);
   });
-  it("a project matched by a row drops the in-workspaces note; by name it keeps it", () => {
-    expect(filterProjects(model, "fix/", search).projects[0]).toEqual({ projectId: "cf", worktrees: ["/Users/dev/wt/cf/fix-resize"], inWorkspaces: 0 });
-    expect(filterProjects(model, "code", search).projects[0]?.inWorkspaces).toBe(1);
+  it("a project matched by a row keeps only that row; by name all of them", () => {
+    expect(filterProjects(model, "fix/", search).projects[0]).toEqual({ projectId: "cf", worktrees: ["/Users/dev/wt/cf/fix-resize"] });
+    expect(filterProjects(model, "code", search).projects[0]?.worktrees).toHaveLength(3);
   });
 });
 
-describe("addableProjects and projectRef", () => {
-  it("addable: registered projects that are not members, in name order", () => {
-    expect(addableProjects(workspaces.byId["w-1"], projects)).toEqual(["dot"]);
-    expect(addableProjects(undefined, projects)).toEqual(["api", "dot", "web"]);
-  });
-  it("addable: never a project without git", () => {
-    const withNotes: ProjectsSlice = {
-      order: [...projects.order, "notes"],
-      byId: { ...projects.byId, dot: { id: "dot", name: "web", git: true, worktrees: [] }, notes: { id: "notes", name: "notes", git: false, worktrees: [{ path: "/src/notes", isMain: true }] } },
-    };
-    expect(addableProjects(undefined, withNotes)).toEqual(["api", "dot", "web"]);
-  });
-  it("projectRef: the name when unique, else the id", () => {
+describe("projectRef", () => {
+  it("the name when unique, else the id", () => {
     expect(projectRef(projects, "api")).toBe("api");
     // "dot" is named web too: the name is ambiguous, so its id.
     expect(projectRef(projects, "dot")).toBe("dot");
     // Once the other is renamed, the name is unique again.
     expect(projectRef({ ...projects, byId: { ...projects.byId, web: { id: "web", name: "site", worktrees: [] } } }, "dot")).toBe("web");
     expect(projectRef(projects, "nope")).toBe("nope");
-  });
-});
-
-describe("threadAt (the workspace surface's member markers)", () => {
-  const API = "/wt/api/cf-demo";
-  const WEB = "/wt/web/cf-demo";
-  it.each<[string, { worktreePath: string; pendingWorktreePath: string } | undefined, string, "current" | "queued" | null]>([
-    ["the thread's cwd is the member", { worktreePath: API, pendingWorktreePath: "" }, API, "current"],
-    ["a cwd inside the member counts", { worktreePath: `${API}/internal`, pendingWorktreePath: "" }, API, "current"],
-    ["a sibling path with the same prefix does not", { worktreePath: `${API}-old`, pendingWorktreePath: "" }, API, null],
-    ["another member", { worktreePath: WEB, pendingWorktreePath: "" }, API, null],
-    ["a queued Run in marks its target", { worktreePath: WEB, pendingWorktreePath: API }, API, "queued"],
-    ["the source of a queued move is still current", { worktreePath: WEB, pendingWorktreePath: API }, WEB, "current"],
-    ["no thread (the Projects page)", undefined, API, null],
-  ])("%s", (_name, thread, member, want) => {
-    expect(threadAt(thread, member)).toBe(want);
   });
 });
 
@@ -256,9 +216,8 @@ describe("isCleanable", () => {
     order: ["t"],
     byId: { t: { state, cwd, labels: worktree ? { kind: "shell", worktree } : {} } },
   });
-  const member = (path: string): ProjectsWorkspaces => ({ order: ["w"], byId: { w: { id: "w", members: [{ projectId: "r", worktreePath: path }] } } });
   const merged = { path: WT, mergedClean: true };
-  const cases: { name: string; wt: Parameters<typeof isCleanable>[0]; threads?: Threads; terminals?: Terminals; workspaces?: ProjectsWorkspaces; want: boolean }[] = [
+  const cases: { name: string; wt: Parameters<typeof isCleanable>[0]; threads?: Threads; terminals?: Terminals; want: boolean }[] = [
     { name: "merged, nothing holds it", wt: merged, want: true },
     { name: "not merged clean", wt: { path: WT, mergedClean: false }, want: false },
     { name: "an older daemon (no flag)", wt: { path: WT }, want: false },
@@ -270,12 +229,10 @@ describe("isCleanable", () => {
     { name: "a running shell it owns", wt: merged, terminals: term("running", "/elsewhere", WT), want: false },
     { name: "a running terminal inside it", wt: merged, terminals: term("running", `${WT}/src`), want: false },
     { name: "an exited shell does not hold", wt: merged, terminals: term("exited", WT, WT), want: true },
-    { name: "a workspace member", wt: merged, workspaces: member(WT), want: false },
-    { name: "another workspace's member", wt: merged, workspaces: member("/wt/other"), want: true },
   ];
   for (const c of cases) {
     it(c.name, () => {
-      expect(isCleanable(c.wt, c.threads ?? none, c.terminals ?? none, c.workspaces ?? none)).toBe(c.want);
+      expect(isCleanable(c.wt, c.threads ?? none, c.terminals ?? none)).toBe(c.want);
     });
   }
   it("names the base in its tooltip", () => {

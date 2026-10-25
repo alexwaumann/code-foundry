@@ -10,7 +10,6 @@ import { mcpSurface } from "./mcp";
 import { selectionHasNoProject } from "./noProject";
 import { pullRequestSurface } from "./pullrequest";
 import { usageSurface } from "./usage";
-import { workspaceSurface } from "./workspace";
 import { worktreeSurface } from "./worktree";
 
 const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "r1", workspaceId: "", worktreePath: "/src/app", pendingWorktreePath: "", linkedPullRequests: [], ...o }) as ThreadView;
@@ -51,7 +50,7 @@ describe("the side panel of a thread without a project", () => {
     useProjectsStore.setState(projects);
     useThreadsStore.setState(threads);
     const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "thread:home" };
-    for (const spec of [filesSurface, diffSurface, pullRequestSurface, workspaceSurface, worktreeSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
+    for (const spec of [filesSurface, diffSurface, pullRequestSurface, worktreeSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
     for (const spec of [linkedPrsSurface, usageSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "enabled"]);
     const proj = { selection: { kind: "thread", id: "proj" } as Selection, panelKey: "thread:proj" };
     expect(filesSurface.available(proj)).toBe("disabled");

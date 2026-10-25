@@ -26,7 +26,6 @@ import { useThreadsStore } from "./threads";
 import { openThreadsSurface } from "./threadsPanel";
 import type { Selection } from "./ui";
 import { openUsageSurface } from "./usagePanel";
-import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 
 /** A ShowView's params: what an item action opens. */
@@ -79,7 +78,6 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     else splitPanel(key, { focus: false });
     return true;
   },
-  "panel.workspace": surface(openWorkspaceSurface),
   "panel.worktree": surface(openWorktreeSurface),
   "panel.linked-prs": surface(openLinkedPrsSurface),
   "panel.usage": surface(openUsageSurface),

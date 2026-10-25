@@ -30,6 +30,10 @@ export interface WorkspaceView {
   defaultPrimary?: string;
   /** <config home>/workspaces/<id>: its CLAUDE.md, AGENTS.md and .claude/skills (or links). */
   managedDir?: string;
+  /** Its instructions file: CLAUDE.md, else AGENTS.md (a rooted workspace's: the root's real file); "" when neither exists. */
+  instructions?: string;
+  /** The skills in <managedDir>/.claude/skills, sorted. */
+  skills?: readonly string[];
   createdAtMs: number | null;
 }
 
@@ -47,6 +51,8 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     rootPath: w.rootPath,
     defaultPrimary: w.defaultPrimary,
     managedDir: w.managedDir,
+    instructions: w.instructions,
+    skills: [...w.skills],
     createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
   };
 }

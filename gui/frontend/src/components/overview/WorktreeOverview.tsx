@@ -23,9 +23,11 @@ import { useResource } from "@/stores/resource";
 import { useThreadsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
+import { alsoInKey, openAlsoIn, useAlsoIn } from "@/stores/threadCheckouts";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { baseFact, branchPullRequest, operationStrip, originFact, otherThreads, shellsIn, shortRef, upstreamRemote, workingTreeFact, type FactPart, type FactTone } from "./facts";
 import { buildFileRows, fileTotals, statusColor, type FileRow } from "./files";
+import { AlsoIn, StandaloneAlsoIn } from "./AlsoIn";
 
 const FILE_ROW_H = 24;
 const LOG_ROW_H = 24;
@@ -304,6 +306,7 @@ function NoGitBody({ projectId, path }: { projectId: string; path: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex flex-col gap-6" data-testid="overview-nogit">
+      <StandaloneAlsoIn path={path} />
       <section className="rounded-lg border border-dashed px-4 py-3" data-testid="section-nogit">
         <h2 className="flex items-center gap-2 text-heading">
           <Folder className="size-4 text-cf-text-muted" aria-hidden />
@@ -353,9 +356,12 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
   const base = detail?.baseRef ? shortRef(detail.baseRef, project.remotes) : "";
   const showCommits = detail !== null && detail.logTotal > 0;
   const [commitsOpen, setCommitsOpen] = useState(false);
+  const alsoIn = useAlsoIn(wt.path);
 
   const items = useMemo<NavItem[]>(() => {
     const out: NavItem[] = [];
+    // The thread's other checkouts, under the facts: each opens as its own Worktree tab.
+    for (const r of alsoIn) out.push({ key: alsoInKey(r.path), activate: () => { openAlsoIn(r); } });
     // The pull request opens in the side panel; cmd+Enter (and cmd+click) on GitHub.
     if (pr) out.push({ key: "pr", activate: () => void openPullRequestInPanel({ slug: pr.repoSlug || slug, number: pr.number }), secondary: () => void openUrl(pr.url) });
     // A changed file opens its Diff tab in this panel: the working tree when it has uncommitted changes, else the branch.
@@ -375,7 +381,7 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
       if (commitsOpen) for (const e of detail.log) out.push({ key: `l:${e.sha}`, activate: slug ? () => void openUrl(`https://github.com/${slug}/commit/${e.sha}`) : undefined });
     }
     return out;
-  }, [pr, fileRows, showCommits, commitsOpen, detail, slug, project.id, wt.path]);
+  }, [alsoIn, pr, fileRows, showCommits, commitsOpen, detail, slug, project.id, wt.path]);
   const nav = useNav(items);
 
   return (
@@ -391,6 +397,7 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
       >
         <OperationStrip st={st} />
         <Facts st={st} remotes={project.remotes} />
+        <AlsoIn rows={alsoIn} />
         {st.error && (
           <Tip label={st.error} align="start">
             <span className="self-start text-caption text-cf-error-text" data-testid="status-error">
@@ -446,7 +453,7 @@ export function WorktreePanelView({ projectId, path }: { projectId: string; path
           <NoGitBody projectId={projectId} path={path} />
         ) : !wt ? (
           <p className="text-body text-cf-text-muted" data-testid="worktree-surface-missing">
-            This worktree is gone (removed from the workspace, or deleted).
+            This worktree is gone (removed, or not made yet).
           </p>
         ) : (
           <OverviewBody key={wt.path} project={project} wt={wt} />

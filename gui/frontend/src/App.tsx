@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { PaneError } from "@/components/error/fallbacks";
 import { ActionDialog } from "@/components/actions/ActionDialog";
 import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
+import { NewWorkspaceDialog } from "@/components/projects/NewWorkspaceDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
@@ -225,6 +226,7 @@ export function App() {
         <UpdateDialog />
         <AddProjectDialog />
         <PublishDialog />
+        <NewWorkspaceDialog />
         <SnoozeDialog />
         <ActionDialog />
         <ActionRunDialog />

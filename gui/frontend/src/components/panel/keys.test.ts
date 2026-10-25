@@ -106,8 +106,9 @@ describe("surface registry", () => {
     const hotkeys = surfaces.flatMap((s) => (s.hotkey ? [s.hotkey] : []));
     expect(new Set(hotkeys).size).toBe(hotkeys.length);
     for (const k of hotkeys) expect(k).toMatch(/^[a-z]$/);
-    // cmd+w is the panel's; a bare w is the workspace surface's letter.
-    expect(isPanelChord("w")).toBe(true);
+    // cmd+w is the panel's; a bare w is no surface's letter since the workspace surface went.
+    expect(isPanelChord("cmd+w")).toBe(true);
+    expect(isPanelChord("w")).toBe(false);
   });
 
   it("looks surfaces up by kind and hotkey", () => {
@@ -121,12 +122,11 @@ describe("surface registry", () => {
       ["mcp", "m"],
       ["agents", "a"],
       ["threads", "h"],
-      ["workspace", "w"],
       ["worktree", "t"],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");
-    expect(surfaceByHotkey("W")?.kind).toBe("workspace");
+    expect(surfaceByHotkey("W")).toBeUndefined();
     expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
     expect(surfaceByHotkey("U")?.kind).toBe("usage");
     expect(surfaceByHotkey("m")?.kind).toBe("mcp");

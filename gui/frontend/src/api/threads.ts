@@ -64,6 +64,10 @@ export interface ThreadView {
   baseRef: string;
   /** thread.new made the worktree for this thread. */
   createdWorktree: boolean;
+  /** Thread.project_ids: the project set, sorted by id (the primary is projectId); empty for a no-project thread. Absent in older fixtures. */
+  projectIds?: readonly string[];
+  /** Thread.branch: a worktree-mode thread's branch; "" in checkout mode. Absent in older fixtures. */
+  branch?: string;
   /**
    * The workspace that owns the thread; "" for a project thread (owned by projectId).
    * projectId/worktreePath are where it runs either way.
@@ -370,6 +374,8 @@ export function toThreadView(s: Thread): ThreadView {
     permissionMode: permissionMap[s.permissionMode],
     baseRef: s.baseRef,
     createdWorktree: s.createdWorktree,
+    projectIds: [...s.projectIds],
+    branch: s.branch,
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,

@@ -62,6 +62,11 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return sameAgentRuns(a[k], b[k]);
       case "labels":
         return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((l, i) => l === b[k][i]));
+      case "projectIds": {
+        const x = a[k] ?? [];
+        const y = b[k] ?? [];
+        return x === y || (x.length === y.length && x.every((id, i) => id === y[i]));
+      }
       case "report":
         return sameReport(a[k], b[k]);
       case "flags":
