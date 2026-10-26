@@ -53,7 +53,7 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 			{Name: "brief", Type: String, Description: "What the worker is for, at most 500 characters"},
 			{Name: "labels", Type: String, Description: "More comma-separated labels (ember and the task id are always set)"},
 			{Name: "budget", Type: String, Description: "The worker's spending limit in USD, e.g. 2.00"},
-			{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless projects.base_from_origin is off)"},
+			{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless the local branch is ahead of it; the local branch with projects.base_from_origin off)"},
 			{Name: "new-worktree", Type: Bool, Default: "true", Description: "Start the worker in a new worktree (default on; false runs the worker in the project's checkout with no worktree or branch: a lead, or a research task that touches nothing)"},
 			{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 				Description: "The thread woken when the worker settles (default: the thread this runs in, else Ember's)"},

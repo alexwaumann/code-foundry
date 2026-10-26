@@ -161,7 +161,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: supervisedHelp + ", accept-edits (edits allowed) or auto"},
 				{Name: "new-worktree", Type: Bool, Description: "New worktrees on a new branch (named from the prompt by projects.branch_naming, e.g. feat/add-filter, else cf/<thread id>); =false: each project's own checkout"},
-				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless base-from-origin is no or projects.base_from_origin is off); needs new-worktree; ignored when branch exists"},
+				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless the local one is ahead or base-from-origin is no); needs new-worktree; ignored when branch exists"},
 				baseFromOriginArg,
 				{Name: "branch", Type: String, Description: "The new worktree's branch: with a / it is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); an existing branch is checked out, not suffixed; needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},

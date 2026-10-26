@@ -2160,7 +2160,8 @@ type NewWorktree struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Ref to branch from. Defaults to the default branch; projects.base_from_origin
 	// (CreateWorktreeRequest.base_ref) says whether that, or a bare branch name, is
-	// origin's copy. Ignored when branch names an existing branch.
+	// origin's copy unless the local branch is ahead of it. Ignored when branch names an
+	// existing branch.
 	BaseRef string `protobuf:"bytes,1,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Steers the branch. With a "/" it is the branch, verbatim; without one it is the
 	// slug the projects.branch_naming mode wraps (<prefix>/<slug>, <type>/<slug>, or a

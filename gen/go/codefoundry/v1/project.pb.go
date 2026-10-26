@@ -1159,16 +1159,20 @@ type CreateWorktreeRequest struct {
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
 	// Ref to branch from when creating. Defaults to the default branch. With
 	// projects.base_from_origin (default on) the default branch, or a base_ref that is
-	// a bare branch name, is origin's copy when origin has it; off, the local default
-	// branch and base_ref exactly as given.
+	// a bare branch name, is origin's copy (fetched first) unless the local branch is
+	// ahead of it (a diverged one counts), then the local branch; the local branch when
+	// origin has no such branch. Off: the local default branch and base_ref exactly as
+	// given. A remote-tracking ref, tag, sha or expression is used as given.
 	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Fetch the remote branch the new branch starts from first (origin's copy of a
-	// bare name, or a remote-tracking base_ref). Bounded; a failed fetch is logged and
-	// the stale ref is used. Nothing is fetched with projects.base_from_origin off.
+	// Fetch the remote branch the new branch may start from first (origin's copy of a
+	// bare name, before comparing it with the local branch, or a remote-tracking
+	// base_ref). Bounded; a failed fetch is logged and the stale ref is used. Nothing is
+	// fetched with projects.base_from_origin off.
 	Fetch bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
-	// Overrides projects.base_from_origin for this call: true is origin's copy of the
-	// default branch or a bare branch name (fetched with fetch), false the local one,
-	// base_ref used as typed and nothing fetched. Unset: the setting.
+	// Overrides projects.base_from_origin for this call: true is the rule (origin's
+	// copy of the default branch or a bare branch name, fetched with fetch, unless the
+	// local branch is ahead of it), false the local branch, base_ref used as typed and
+	// nothing fetched. Unset: the setting.
 	BaseFromOrigin *bool `protobuf:"varint,6,opt,name=base_from_origin,json=baseFromOrigin,proto3,oneof" json:"base_from_origin,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -1882,10 +1886,17 @@ type ListRefsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Local branch names, then remote-tracking refs ("origin/main"), each sorted.
 	Refs []string `protobuf:"bytes,1,rep,name=refs,proto3" json:"refs,omitempty"`
-	// What CreateWorktree starts from without a base_ref: "origin/<default branch>"
-	// when it exists, else "<default branch>"; always "<default branch>" with
-	// projects.base_from_origin off.
-	DefaultRef    string `protobuf:"bytes,2,opt,name=default_ref,json=defaultRef,proto3" json:"default_ref,omitempty"`
+	// The default branch as a base: "<default branch>", or "origin/<default branch>"
+	// when only origin's copy exists. It names the branch, not which copy: what a new
+	// worktree starts from is decided per repository at creation
+	// (CreateWorktreeRequest.base_ref), so sending it is the same as sending none.
+	DefaultRef string `protobuf:"bytes,2,opt,name=default_ref,json=defaultRef,proto3" json:"default_ref,omitempty"`
+	// Branch short names, local and origin's remote-tracking branches merged by name
+	// ("origin/" stripped, origin/HEAD skipped), the most recent commit first (a name's
+	// newer date of its two copies).
+	Branches []string `protobuf:"bytes,3,rep,name=branches,proto3" json:"branches,omitempty"`
+	// The default branch's short name ("main"); "" when unknown.
+	DefaultBranch string `protobuf:"bytes,4,opt,name=default_branch,json=defaultBranch,proto3" json:"default_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1930,6 +1941,20 @@ func (x *ListRefsResponse) GetRefs() []string {
 func (x *ListRefsResponse) GetDefaultRef() string {
 	if x != nil {
 		return x.DefaultRef
+	}
+	return ""
+}
+
+func (x *ListRefsResponse) GetBranches() []string {
+	if x != nil {
+		return x.Branches
+	}
+	return nil
+}
+
+func (x *ListRefsResponse) GetDefaultBranch() string {
+	if x != nil {
+		return x.DefaultBranch
 	}
 	return ""
 }
@@ -4336,11 +4361,13 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\tworktrees\x18\x01 \x03(\v2\x18.codefoundry.v1.WorktreeR\tworktrees\"0\n" +
 	"\x0fListRefsRequest\x12\x1d\n" +
 	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\"G\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"\x8a\x01\n" +
 	"\x10ListRefsResponse\x12\x12\n" +
 	"\x04refs\x18\x01 \x03(\tR\x04refs\x12\x1f\n" +
 	"\vdefault_ref\x18\x02 \x01(\tR\n" +
-	"defaultRef\" \n" +
+	"defaultRef\x12\x1a\n" +
+	"\bbranches\x18\x03 \x03(\tR\bbranches\x12%\n" +
+	"\x0edefault_branch\x18\x04 \x01(\tR\rdefaultBranch\" \n" +
 	"\x0eInitGitRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"D\n" +
 	"\x0fInitGitResponse\x121\n" +

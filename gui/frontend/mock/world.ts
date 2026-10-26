@@ -2670,14 +2670,23 @@ export class World {
     return this.stageAttachment(path.slice(path.lastIndexOf("/") + 1), mimeType, new Uint8Array(), pages);
   }
 
-  /** ProjectService.ListRefs: local branches, then remote-tracking refs, and the default base. */
-  listRefs(projectId: string): { refs: string[]; defaultRef: string } {
+  /**
+   * ProjectService.ListRefs: local branches, then remote-tracking refs; the branch names
+   * (local and origin's merged; the mock has no commit dates, so the default branch first,
+   * then by name); the default branch, and the default ref naming it ("origin/<default>"
+   * only when there is no local one).
+   */
+  listRefs(projectId: string): { refs: string[]; defaultRef: string; branches: string[]; defaultBranch: string } {
     const project = this.projects.get(projectId);
     if (!project) throw new CommandError("notfound", `project ${projectId} not found`);
     requireGit(project, "listing refs");
     const local = [...new Set([...project.worktrees.map((w) => w.branch), ...(project.branches ?? [])].filter(Boolean))].sort();
     const remote = !project.remotes.includes("origin") ? [] : project.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [`origin/${project.defaultBranch}`];
-    return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch };
+    const def = project.defaultBranch;
+    const names = [...new Set([...local, ...remote.map((r) => r.slice("origin/".length))])].sort();
+    const branches = names.includes(def) ? [def, ...names.filter((n) => n !== def)] : names;
+    const defaultRef = !local.includes(def) && remote.includes(`origin/${def}`) ? `origin/${def}` : def;
+    return { refs: [...local, ...remote], defaultRef, branches, defaultBranch: def };
   }
 
   /** Test control: the worktree at `path` checks out `branch` ("" detaches HEAD). False when there is no such worktree. */

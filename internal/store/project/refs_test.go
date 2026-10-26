@@ -21,23 +21,40 @@ func TestParseRefs(t *testing.T) {
 		{"empty", "", Refs{}},
 		{
 			"locals and remotes sorted, symbolic HEAD dropped",
-			"refs/heads/main \n" +
-				"refs/heads/alex/feat \n" +
-				"refs/remotes/upstream/main \n" +
-				"refs/remotes/origin/HEAD refs/remotes/origin/main\n" +
-				"refs/remotes/origin/main \n" +
-				"refs/remotes/origin/feature/HEAD \n",
+			"refs/heads/main\t\t300\n" +
+				"refs/heads/alex/feat\t\t100\n" +
+				"refs/remotes/upstream/main\t\t900\n" +
+				"refs/remotes/origin/HEAD\trefs/remotes/origin/main\t400\n" +
+				"refs/remotes/origin/main\t\t400\n" +
+				"refs/remotes/origin/feature/HEAD\t\t200\n",
 			Refs{
 				Local:  []string{"alex/feat", "main"},
 				Remote: []string{"origin/feature/HEAD", "origin/main", "upstream/main"},
+				// main's newer copy is origin's (400); upstream's branches are not the
+				// project's; origin/HEAD is a symref.
+				Branches: []string{"main", "feature/HEAD", "alex/feat"},
 			},
 		},
-		{"crlf and unknown namespaces", "refs/heads/x \r\nrefs/tags/v1 \n", Refs{Local: []string{"x"}}},
+		{
+			"branches: deduped by name, newest copy wins, ties by name",
+			"refs/heads/b\t\t500\n" +
+				"refs/remotes/origin/b\t\t100\n" +
+				"refs/heads/a\t\t200\n" +
+				"refs/remotes/origin/c\t\t200\n" +
+				"refs/remotes/origin/d\t\t700\n",
+			Refs{
+				Local:    []string{"a", "b"},
+				Remote:   []string{"origin/b", "origin/c", "origin/d"},
+				Branches: []string{"d", "b", "a", "c"},
+			},
+		},
+		{"crlf and unknown namespaces", "refs/heads/x\t\t1\r\nrefs/tags/v1\t\t2\n", Refs{Local: []string{"x"}, Branches: []string{"x"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := parseRefs([]byte(tt.in))
-			if !slices.Equal(got.Local, tt.want.Local) || !slices.Equal(got.Remote, tt.want.Remote) {
+			if !slices.Equal(got.Local, tt.want.Local) || !slices.Equal(got.Remote, tt.want.Remote) ||
+				!slices.Equal(got.Branches, tt.want.Branches) {
 				t.Fatalf("parseRefs = %+v, want %+v", got, tt.want)
 			}
 		})
@@ -88,8 +105,19 @@ func TestListRefs(t *testing.T) {
 				git(t, f.project, "remote", "add", "upstream", f.origin)
 				git(t, f.project, "fetch", "-q", "upstream")
 			},
-			wantLocal:   []string{"alex/x", "main"},
-			wantRemote:  []string{"origin/feat", "origin/main", "upstream/feat", "upstream/main"},
+			wantLocal:  []string{"alex/x", "main"},
+			wantRemote: []string{"origin/feat", "origin/main", "upstream/feat", "upstream/main"},
+			// The branch, not which copy: CreateWorktree decides that at creation.
+			wantDefault: "main",
+		},
+		{
+			name: "only origin has the default branch: origin's copy",
+			setup: func(t *testing.T, f fixture) {
+				git(t, f.project, "checkout", "-q", "-b", "wip")
+				git(t, f.project, "branch", "-D", "main")
+			},
+			wantLocal:   []string{"wip"},
+			wantRemote:  []string{"origin/main"},
 			wantDefault: "origin/main",
 		},
 		{
@@ -123,6 +151,52 @@ func TestListRefs(t *testing.T) {
 			}
 		})
 	}
+
+	// Branches: local and origin's branches merged by name, the newest commit first.
+	t.Run("branches by recency", func(t *testing.T) {
+		f := newFixture(t)
+		dated := func(date string) string {
+			t.Setenv("GIT_COMMITTER_DATE", date)
+			return git(t, f.project, "commit-tree", "-p", "main", "-m", date, "main^{tree}")
+		}
+		// both: origin's copy is newer than the local one; mine: the local one is.
+		git(t, f.project, "push", "-q", "origin", dated("2032-01-01T00:00:00Z")+":refs/heads/both")
+		git(t, f.project, "branch", "both", dated("2030-01-01T00:00:00Z"))
+		git(t, f.project, "push", "-q", "origin", dated("2000-01-01T00:00:00Z")+":refs/heads/mine")
+		git(t, f.project, "branch", "mine", dated("2033-01-01T00:00:00Z"))
+		// feat only on origin, old only local.
+		git(t, f.project, "push", "-q", "origin", dated("2031-01-01T00:00:00Z")+":refs/heads/feat")
+		git(t, f.project, "branch", "old", dated("2001-01-01T00:00:00Z"))
+		// Another remote's branches are not listed, however new.
+		upstream := filepath.Join(f.base, "upstream.git")
+		git(t, f.base, "init", "-q", "--bare", "-b", "main", upstream)
+		git(t, f.project, "remote", "add", "upstream", upstream)
+		git(t, f.project, "push", "-q", "upstream", dated("2035-01-01T00:00:00Z")+":refs/heads/up-only")
+		git(t, f.project, "fetch", "-q", "origin")
+		git(t, f.project, "fetch", "-q", "upstream")
+
+		h := startHarness(t, "", Options{})
+		ctx := context.Background()
+		r, err := h.store.Register(ctx, f.project)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := h.store.ListRefs(ctx, r.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// main's commit is from the test run (between 2001 and 2030).
+		want := []string{"mine", "both", "feat", "main", "old"}
+		if !slices.Equal(got.Branches, want) {
+			t.Errorf("Branches = %v, want %v", got.Branches, want)
+		}
+		if got.DefaultBranch != "main" || got.DefaultRef != "main" {
+			t.Errorf("DefaultBranch = %q, DefaultRef = %q, want main, main", got.DefaultBranch, got.DefaultRef)
+		}
+		if !slices.Contains(got.Remote, "upstream/up-only") {
+			t.Errorf("Remote = %v, want upstream/up-only listed", got.Remote)
+		}
+	})
 
 	t.Run("unknown project", func(t *testing.T) {
 		isolateGit(t)

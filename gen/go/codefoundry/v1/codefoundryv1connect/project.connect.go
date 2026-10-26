@@ -145,7 +145,8 @@ type ProjectServiceClient interface {
 	// leaves the worktree, FailedPrecondition for a project without git.
 	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
 	// ListRefs returns the refs a worktree can be based on: local branches and
-	// remote-tracking branches (origin/<name>), plus the default base.
+	// remote-tracking branches (origin/<name>), the branch names by recency, plus the
+	// default branch.
 	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
 	// InitGit turns a project without git into a git repository: `git init -b
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
@@ -526,7 +527,8 @@ type ProjectServiceHandler interface {
 	// leaves the worktree, FailedPrecondition for a project without git.
 	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
 	// ListRefs returns the refs a worktree can be based on: local branches and
-	// remote-tracking branches (origin/<name>), plus the default base.
+	// remote-tracking branches (origin/<name>), the branch names by recency, plus the
+	// default branch.
 	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
 	// InitGit turns a project without git into a git repository: `git init -b
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.

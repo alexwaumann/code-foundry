@@ -64,7 +64,8 @@ type Worktree struct {
 	CreatedAt   time.Time
 	CreatedHead string
 	// StartPoint is the ref CreateWorktree created the branch from, after
-	// CreateWorktreeOptions.BaseFromOrigin ("origin/main" for a base typed as "main").
+	// CreateWorktreeOptions.BaseFromOrigin ("origin/main" for a base typed as "main",
+	// or "main" when the local main is ahead of origin's).
 	// Set only on CreateWorktree's return value, never in a snapshot; "" when it
 	// checked out an existing branch.
 	StartPoint string
@@ -198,21 +199,24 @@ type CreateWorktreeOptions struct {
 	// BaseRef is set and the local branch does not exist), it is created from BaseRef.
 	Branch string
 	// BaseRef to branch from. Empty is the default branch; BaseFromOrigin says which
-	// copy of it, and of a base typed as a bare branch name.
+	// copy of it, and of a base typed as a bare branch name, per repository.
 	BaseRef string
-	// BaseFromOrigin is projects.base_from_origin (startpoint.go). On: no BaseRef, or a
-	// bare branch name ("main", "release/2.3"), starts from origin's copy of that branch
-	// when origin has it (fetched first with Fetch), else from the local branch. A
-	// remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an expression
-	// ("HEAD~2") is used as typed. Off: no BaseRef is the local default branch, a
-	// BaseRef is used as typed, and the base is never fetched.
+	// BaseFromOrigin is projects.base_from_origin (startpoint.go), decided per
+	// repository at creation. On: no BaseRef, or a bare branch name ("main",
+	// "release/2.3"), starts from origin's copy of that branch (fetched first with
+	// Fetch) unless the local branch is ahead of it (rev-list --count
+	// origin/<b>..<b> > 0; a diverged branch counts as ahead), in which case from the
+	// local branch; without origin, or when origin has no such branch, from the local
+	// branch. A remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an
+	// expression ("HEAD~2") is used as typed. Off (the kill switch): no BaseRef is the
+	// local default branch, a BaseRef is used as typed, and nothing is fetched.
 	BaseFromOrigin bool
 	// Fetch refreshes the start point before branching from it: when the new branch
-	// starts at a remote branch (origin's copy of a bare name with BaseFromOrigin, a
-	// remote-tracking BaseRef with it, or origin/<Branch> for git's DWIM), that one
-	// remote branch is fetched first. The fetch is bounded; on failure it is logged and
-	// the existing (possibly stale) ref is used. Ignored when Branch already exists
-	// locally.
+	// may start at a remote branch (origin's copy of a bare name with BaseFromOrigin,
+	// fetched before comparing it with the local branch; a remote-tracking BaseRef
+	// with it; or origin/<Branch> for git's DWIM), that one remote branch is fetched
+	// first. The fetch is bounded; on failure it is logged and the existing (possibly
+	// stale) ref is used. Ignored when Branch already exists locally.
 	Fetch bool
 }
 
@@ -223,21 +227,18 @@ type Refs struct {
 	// Remote holds remote-tracking refs as "<remote>/<branch>", sorted, without the
 	// symbolic "<remote>/HEAD".
 	Remote []string
-	// DefaultRef is "origin/<default branch>" when that ref exists, else
-	// "<default branch>": what CreateWorktree branches from without a BaseRef when
-	// BaseFromOrigin is on (Default gives either).
+	// Branches holds branch short names, local and origin's remote-tracking branches
+	// merged by name (origin/HEAD skipped), the most recent commit first (a name's
+	// newer date of the two; ties by name).
+	Branches []string
+	// DefaultRef names the default branch as a base: "<default branch>" when it is a
+	// local branch, else "origin/<default branch>" when only origin's copy exists,
+	// else "<default branch>". Which copy a new worktree starts from is decided per
+	// repository at creation (CreateWorktreeOptions.BaseFromOrigin), so sending it as
+	// the base is the same as sending none.
 	DefaultRef string
-	// DefaultBranch is the local default branch ("main").
+	// DefaultBranch is the default branch's short name ("main").
 	DefaultBranch string
-}
-
-// Default is the ref CreateWorktree branches from without a BaseRef: DefaultRef with
-// fromOrigin (CreateWorktreeOptions.BaseFromOrigin), else the local default branch.
-func (r Refs) Default(fromOrigin bool) string {
-	if fromOrigin || r.DefaultBranch == "" {
-		return r.DefaultRef
-	}
-	return r.DefaultBranch
 }
 
 // RemoveWorktreeOptions configures Store.RemoveWorktree.

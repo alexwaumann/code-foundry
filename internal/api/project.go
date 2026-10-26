@@ -42,8 +42,8 @@ type Project struct {
 	cleanupAbandoned func(project.Worktree) bool
 	// cleanupRemoving backs project.CleanupOptions.Removing; nil is nothing.
 	cleanupRemoving func(context.Context, project.Worktree)
-	// baseFromOrigin reads projects.base_from_origin for CreateWorktree and ListRefs'
-	// default ref; nil is on (WithBaseFromOrigin).
+	// baseFromOrigin reads projects.base_from_origin for CreateWorktree; nil is on
+	// (WithBaseFromOrigin).
 	baseFromOrigin func() bool
 	// beforeUnregister runs before Unregister forgets a project (WithBeforeUnregister);
 	// nil is nothing.
@@ -57,8 +57,8 @@ func NewProject(store project.Store, b *bus.Bus) *Project {
 	return &Project{store: store, bus: b}
 }
 
-// WithBaseFromOrigin sets how CreateWorktree resolves a base and which default ref
-// ListRefs reports (project.CreateWorktreeOptions.BaseFromOrigin), read per call.
+// WithBaseFromOrigin sets how CreateWorktree resolves a base
+// (project.CreateWorktreeOptions.BaseFromOrigin), read per call.
 func (h *Project) WithBaseFromOrigin(f func() bool) *Project {
 	h.baseFromOrigin = f
 	return h
@@ -142,8 +142,9 @@ func (h *Project) CreateWorktree(ctx context.Context, req *connect.Request[v1.Cr
 }
 
 // ListRefs lists the refs a new branch can start from: local branches, then
-// remote-tracking refs. The default ref is what CreateWorktree starts from without a
-// base under projects.base_from_origin, so the composer, which sends it, gets the same.
+// remote-tracking refs, plus the branch names by recency and the default branch.
+// The default ref names the branch; CreateWorktree decides which copy per repository
+// (project.Refs.DefaultRef).
 func (h *Project) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
 	refs, err := h.store.ListRefs(ctx, req.Msg.GetProjectId())
 	if err != nil {
@@ -151,7 +152,9 @@ func (h *Project) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefs
 	}
 	all := make([]string, 0, len(refs.Local)+len(refs.Remote))
 	all = append(append(all, refs.Local...), refs.Remote...)
-	return connect.NewResponse(&v1.ListRefsResponse{Refs: all, DefaultRef: refs.Default(h.fromOrigin())}), nil
+	return connect.NewResponse(&v1.ListRefsResponse{
+		Refs: all, DefaultRef: refs.DefaultRef, Branches: refs.Branches, DefaultBranch: refs.DefaultBranch,
+	}), nil
 }
 
 // RemoveWorktree removes a worktree; without force one the cleanup hold names (a

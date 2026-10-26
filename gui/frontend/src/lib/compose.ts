@@ -374,7 +374,7 @@ export interface PromptArgsInput {
 
 export interface DraftArgsInput extends PromptArgsInput {
   worktree: ProjectWorktree;
-  /** Base ref for a new worktree; "" lets the daemon pick (the default branch, origin's copy unless projects.base_from_origin is off). */
+  /** Base ref for a new worktree; "" lets the daemon pick (the default branch: origin's copy unless the local branch is ahead of it, or projects.base_from_origin is off). */
   base: string;
 }
 

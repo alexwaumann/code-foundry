@@ -2,6 +2,7 @@ package project
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -319,27 +320,54 @@ func defaultWorktreePath(root, key, branch string) string {
 	return filepath.Join(root, filepath.FromSlash(key), worktreeDirName(branch))
 }
 
-// refsFormat is the for-each-ref format parseRefs reads. Ref names cannot contain
-// spaces, so one separates the name from its symbolic-ref target.
-const refsFormat = "--format=%(refname) %(symref)"
+// refsFormat is the for-each-ref format parseRefs reads: the full ref name, its
+// symbolic-ref target and its commit date (unix seconds), tab separated (ref names
+// cannot contain tabs).
+const refsFormat = "--format=%(refname)%09%(symref)%09%(committerdate:unix)"
 
 // parseRefs parses `git for-each-ref <refsFormat> refs/heads refs/remotes` into
-// sorted local branch names and "<remote>/<branch>" names. Symbolic refs (each
-// remote's HEAD) are dropped.
+// sorted local branch names and "<remote>/<branch>" names, and Branches: the local
+// and origin's branch short names merged by name, newest commit first (a name's
+// newest date of the two; ties by name). Symbolic refs (each remote's HEAD) are
+// dropped.
 func parseRefs(out []byte) Refs {
 	var r Refs
+	newest := map[string]int64{}
+	branch := func(name string, date int64) {
+		if d, ok := newest[name]; !ok || date > d {
+			newest[name] = date
+		}
+	}
 	for line := range strings.Lines(string(out)) {
-		name, symref, _ := strings.Cut(strings.TrimRight(line, "\r\n"), " ")
+		name, rest, _ := strings.Cut(strings.TrimRight(line, "\r\n"), "\t")
+		symref, dateField, _ := strings.Cut(rest, "\t")
 		if symref != "" {
 			continue
 		}
+		date, _ := strconv.ParseInt(strings.TrimSpace(dateField), 10, 64)
 		if b, ok := strings.CutPrefix(name, "refs/heads/"); ok && b != "" {
 			r.Local = append(r.Local, b)
+			branch(b, date)
 		} else if rr, ok := strings.CutPrefix(name, "refs/remotes/"); ok && rr != "" {
 			r.Remote = append(r.Remote, rr)
+			if b, ok := strings.CutPrefix(rr, "origin/"); ok && b != "" && b != "HEAD" {
+				branch(b, date)
+			}
 		}
 	}
 	slices.Sort(r.Local)
 	slices.Sort(r.Remote)
+	if len(newest) > 0 {
+		r.Branches = make([]string, 0, len(newest))
+		for name := range newest {
+			r.Branches = append(r.Branches, name)
+		}
+		slices.SortFunc(r.Branches, func(a, b string) int {
+			if c := cmp.Compare(newest[b], newest[a]); c != 0 {
+				return c
+			}
+			return strings.Compare(a, b)
+		})
+	}
 	return r
 }

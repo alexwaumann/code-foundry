@@ -16,8 +16,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
-// projects.base_from_origin reaches CreateWorktree and decides ListRefs' default ref
-// per call; without WithBaseFromOrigin it is on.
+// projects.base_from_origin reaches CreateWorktree per call; without
+// WithBaseFromOrigin it is on. ListRefs' default ref names the branch whatever the
+// setting (the store decides which copy at creation).
 func TestProjectBaseFromOrigin(t *testing.T) {
 	b := bus.New()
 	fake := projecttest.New(b)
@@ -31,22 +32,22 @@ func TestProjectBaseFromOrigin(t *testing.T) {
 	c := codefoundryv1connect.NewProjectServiceClient(srv.Client(), srv.URL)
 	ctx := context.Background()
 	r, _ := fake.Register(ctx, "/code/proj")
-	fake.SetRefs(r.ID, project.Refs{Local: []string{"main"}, Remote: []string{"origin/main"}, DefaultRef: "origin/main", DefaultBranch: "main"})
+	fake.SetRefs(r.ID, project.Refs{Local: []string{"main"}, Remote: []string{"origin/main"}, DefaultRef: "main", DefaultBranch: "main"})
 
 	for _, tt := range []struct {
-		on          bool
-		wantDefault string
-	}{{true, "origin/main"}, {false, "main"}} {
+		on   bool
+		name string
+	}{{true, "on"}, {false, "off"}} {
 		on.Store(tt.on)
 		res, err := c.ListRefs(ctx, connect.NewRequest(&v1.ListRefsRequest{ProjectId: r.ID}))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := res.Msg.GetDefaultRef(); got != tt.wantDefault {
-			t.Errorf("on=%v: default ref = %q, want %q", tt.on, got, tt.wantDefault)
+		if got := res.Msg.GetDefaultRef(); got != "main" {
+			t.Errorf("on=%v: default ref = %q, want main", tt.on, got)
 		}
 		if _, err := c.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
-			ProjectId: r.ID, Branch: "b-" + tt.wantDefault, BaseRef: "main", Fetch: true,
+			ProjectId: r.ID, Branch: "b-" + tt.name, BaseRef: "main", Fetch: true,
 		})); err != nil {
 			t.Fatal(err)
 		}
