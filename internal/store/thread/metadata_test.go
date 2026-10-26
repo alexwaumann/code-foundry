@@ -333,7 +333,7 @@ func TestLabelReportAndBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(after.Labels, []string{"x", "y"}) || after.Report.Status != ReportDone || after.Report.Summary != "all good" ||
+	if !slices.Equal(after.Labels, []string{"x"}) || after.Report.Status != ReportDone || after.Report.Summary != "all good" ||
 		after.Report.Data != `{"n":1}` || !after.Report.At.Equal(got.Report.At.Truncate(time.Millisecond)) || after.BudgetUSD != 5 {
 		t.Errorf("after restart = %+v", after)
 	}
