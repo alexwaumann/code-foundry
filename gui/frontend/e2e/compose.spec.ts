@@ -254,13 +254,12 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   const list = page.getByTestId("composer-worktree-list");
   const options = list.getByRole("option");
   await expect(options).toHaveText([
-    /^Fresh copy\s*Edits land in a new branch with its own worktree\. Run several threads at once; keep or discard each one\.$/,
+    /^Fresh copy\s*Edits land in a new branch with its own worktree\. Multiple threads at a time is safe\.$/,
     /^Project folder\s*Edits land in ~\/src\/code-foundry directly\. One thread at a time is safest\.$/,
     /^feat\/sidebar\s*~\/src\/code-foundry\.worktrees\/feat-sidebar$/,
     /^fix\/resize/,
   ]);
   await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in", "An existing copy"]);
-  await expect(list.getByText("Default for new threads: Settings › Threads › New threads work in")).toBeVisible();
   await options.filter({ hasText: "Project folder" }).click();
   await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
@@ -337,9 +336,8 @@ test("Work in: by default a thread starts in place; a pick applies to its draft 
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await expect(page.getByTestId("composer-checkout-branch")).toHaveText("On main");
 
-  // Picking a fresh copy brings the base back for this draft; the footer names the setting.
+  // Picking a fresh copy brings the base back for this draft.
   await worktree.click();
-  await expect(page.getByText("Default for new threads: Settings › Threads › New threads work in")).toBeVisible();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
   await expect(worktree).toHaveText("Fresh copy");
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");

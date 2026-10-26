@@ -60,9 +60,11 @@ html[data-thread-width="full"] {
   --thread-col: none;
   --thread-dock: none;
 }
+.cf-thread .col {
+  margin: 0 auto;
+}
 .cf-thread .col,
 .cf-thread-col {
-  margin: 0 auto;
   width: 100%;
   max-width: var(--thread-col);
   padding: 0 40px;

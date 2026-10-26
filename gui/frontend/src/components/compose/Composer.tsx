@@ -316,14 +316,13 @@ function cycleStops(e: React.KeyboardEvent<HTMLElement>): void {
  * Work in: where a project's thread runs. The option titles are the pill's words
  * (lib/compose FRESH_COPY…); the copy is docs/notes/onboarding-3-work-in.md's.
  */
-const FRESH_COPY_DETAIL = "Edits land in a new branch with its own worktree. Run several threads at once; keep or discard each one.";
-const WORK_IN_FOOTER = "Default for new threads: Settings › Threads › New threads work in";
+const FRESH_COPY_DETAIL = "Edits land in a new branch with its own worktree. Multiple threads at a time is safe.";
 /**
  * A set's Work in choices: one new branch with a worktree in every repository, or every
  * project's own folder. Singular for a set of one project (a workspace with one member).
  */
-const FRESH_COPIES_DETAIL = "Edits land in a new branch with a worktree for every repository.";
-const FRESH_COPY_OF_ONE_DETAIL = "Edits land in a new branch with a worktree for the repository.";
+const FRESH_COPIES_DETAIL = "Edits land in a new branch with a worktree for every project. Multiple threads at a time is safe.";
+const FRESH_COPY_OF_ONE_DETAIL = "Edits land in a new branch with a worktree for the project. Multiple threads at a time is safe.";
 const PROJECT_FOLDERS_DETAIL = "Edits land in every project's checkout directly. One thread at a time is safest.";
 const PROJECT_FOLDER_OF_ONE_DETAIL = "Edits land in the project's checkout directly. One thread at a time is safest.";
 
@@ -758,7 +757,6 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                     // The pick is this draft's alone; the next draft starts from the setting again.
                     updateDraft(draftKey, { worktree: next });
                   }}
-                  footer={noGitPath === undefined && !(isSet && setGit === 0) ? WORK_IN_FOOTER : undefined}
                   disabled={busy}
                   contentClassName="w-90"
                   listClassName="max-h-96"
