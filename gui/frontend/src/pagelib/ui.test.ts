@@ -34,6 +34,7 @@ describe("the page theme (src/pagelib/theme.ts)", () => {
     for (const role of ["text-body", "text-caption", "text-heading", "text-link", "text-code"]) {
       expect(css).toContain(`@utility ${role} {`);
     }
+    expect(css).toContain("@keyframes cf-indeterminate {");
     expect(css).not.toContain("text-brand");
     expect(css).not.toContain("@layer base");
     expect(css).not.toContain("@custom-variant");

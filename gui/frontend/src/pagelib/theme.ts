@@ -20,7 +20,7 @@ function block(css: string, open: number): { body: string; end: number } {
 /** Roles a page has no use for: the sidebar's app name. */
 const SKIPPED_ROLES = new Set(["text-brand"]);
 
-/** index.css's `@theme inline { … }` and its `@utility text-*` roles, as CSS text. */
+/** index.css's `@theme inline { … }`, its `@utility text-*` roles and its `cf-*` keyframes, as CSS text. */
 export function appTheme(indexCss: string): string {
   const head = "@theme inline {";
   const at = indexCss.indexOf(head);
@@ -34,6 +34,13 @@ export function appTheme(indexCss: string): string {
     if (!SKIPPED_ROLES.has(m[1] ?? "")) out.push(`@utility ${m[1] ?? ""} {${body}}`);
   }
   if (out.length < 2) throw new Error("index.css: no type roles");
+  // The app's own animations (Progress's indeterminate bar reads cf-indeterminate).
+  const kf = /@keyframes (cf-[a-z0-9-]+)\s*\{/g;
+  for (let m = kf.exec(indexCss); m; m = kf.exec(indexCss)) {
+    const { body, end } = block(indexCss, m.index + m[0].length - 1);
+    kf.lastIndex = end;
+    out.push(`@keyframes ${m[1] ?? ""} {${body}}`);
+  }
   return out.join("\n") + "\n";
 }
 
