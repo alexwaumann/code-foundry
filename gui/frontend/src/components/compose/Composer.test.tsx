@@ -48,7 +48,7 @@ describe("Composer without a project", () => {
     expect(screen.getByTestId("composer-heading").textContent).toBe("What should we build in web?");
     // By default a project's thread works in the project folder itself: no base picker,
     // the checkout's branch instead.
-    expect(screen.getByTestId("composer-worktree").textContent).toContain("In place");
+    expect(screen.getByTestId("composer-worktree").textContent).toContain("Project folder");
     expect(screen.queryByTestId("composer-base")).toBeNull();
     expect(screen.getByTestId("composer-checkout-branch").textContent).toBe("On main");
     expect(screen.getByTestId("composer-members")).not.toBeNull();

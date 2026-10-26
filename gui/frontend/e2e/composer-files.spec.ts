@@ -205,7 +205,7 @@ test("a second project: files grouped by project, the primary first; tooltips na
   // Sketches as the primary: its group comes first.
   await page.getByTestId("composer-primary").click();
   await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "sketches" }).click();
-  await expect(page.getByTestId("composer-member").filter({ hasText: "sketches" })).toHaveAttribute("data-primary", "true");
+  await expect(page.getByTestId("composer-primary")).toHaveText("sketches");
   await page.getByTestId("composer-input").click();
   await page.keyboard.press("End");
   await page.keyboard.type("@thread.go");
@@ -287,10 +287,12 @@ test("a failing search: Enter waits for the answer (no match), the next Enter cl
 // The card hangs under the worktree row, out of flow: it moves neither the composer card
 // nor that row, and its height is capped to the window below it (layout px = viewport px
 // over the zoom). 90% takes 100%'s path (the full card fits either way), so it is left out.
+// Zoomed in, the window is 720px tall: the composer sits near the top at the thread column's
+// width, and a 1000px window would still fit the full card at 125%.
 for (const zoom of [100, 125, 150]) {
   test(`at ${String(zoom)}%: the file card hangs under the worktree row, moves nothing and fits the window`, async ({ page }) => {
     await setFiles("repo-cf", MANY);
-    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.setViewportSize({ width: 1280, height: zoom > 100 ? 720 : 1000 });
     await openApp(page);
     await setZoom(page, zoom);
     await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));

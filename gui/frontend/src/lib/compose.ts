@@ -88,21 +88,30 @@ export function setWorkIn(choice: WorktreeChoice | null, setting: string | undef
 }
 
 /**
- * The Work in pill's text. A project: "Fresh copy" (a new worktree), "In place" (the main
- * checkout, or the folder of a project without git), else the worktree's branch (its short
- * head when detached). A set: "Fresh copies" or "In place".
+ * The Work in pill's text, which is also its option's title in the picker. A project:
+ * "Fresh copy" (a new worktree), "Project folder" (the main checkout, or the folder of a
+ * project without git), else the worktree's branch (its short head when detached). A set:
+ * the same words, plural when it has more than one project (`many`).
  */
 export function workInText(p: {
   set: boolean;
+  /** A set of more than one project: plural titles. */
+  many?: boolean;
   noGit: boolean;
   worktree: WorktreeChoice;
   chosen?: { isMain: boolean; branch: string; head: string };
 }): string {
-  if (p.set) return p.worktree.kind === "new" ? "Fresh copies" : "In place";
-  if (p.noGit) return "In place";
-  if (p.worktree.kind !== "existing" || !p.chosen) return "Fresh copy";
-  return p.chosen.isMain ? "In place" : p.chosen.branch || p.chosen.head.slice(0, 7);
+  if (p.set) return p.worktree.kind === "new" ? (p.many ? FRESH_COPIES : FRESH_COPY) : p.many ? PROJECT_FOLDERS : PROJECT_FOLDER;
+  if (p.noGit) return PROJECT_FOLDER;
+  if (p.worktree.kind !== "existing" || !p.chosen) return FRESH_COPY;
+  return p.chosen.isMain ? PROJECT_FOLDER : p.chosen.branch || p.chosen.head.slice(0, 7);
 }
+
+/** The Work in choices' titles: the pill and the picker option show the same words. */
+export const FRESH_COPY = "Fresh copy";
+export const PROJECT_FOLDER = "Project folder";
+export const FRESH_COPIES = "Fresh copies";
+export const PROJECT_FOLDERS = "Project folders";
 
 /**
  * What a composer starts a thread in: a project (and whatever the user adds to its set),
@@ -237,20 +246,6 @@ export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
   const picked: WorktreeChoice = main ? { kind: "existing", path: main } : d.worktree;
   const worktree: ProjectWorktree = picked.kind === "existing" && env.hasWorktree(projectId, picked.path) ? picked : { kind: "new" };
   return { kind: "project", projectId, worktree, base: d.base ?? env.defaultRef };
-}
-
-/** The branch placeholder a new cf/<slug> worktree shows before its name exists. */
-export const NEW_BRANCH = "cf/…";
-
-/**
- * What a project's member chip shows in its branch slot: nothing (and the No git badge)
- * for a project without git, "cf/…" for a new worktree, else the chosen checkout's
- * branch (its short head when detached; "" when it is not known).
- */
-export function projectChipBranch(p: { noGit: boolean; newWorktree: boolean; checkout?: { branch: string; head: string } }): { branch: string; noGit: boolean } {
-  if (p.noGit) return { branch: "", noGit: true };
-  if (p.newWorktree) return { branch: NEW_BRANCH, noGit: false };
-  return { branch: p.checkout ? p.checkout.branch || p.checkout.head.slice(0, 7) : "", noGit: false };
 }
 
 /**

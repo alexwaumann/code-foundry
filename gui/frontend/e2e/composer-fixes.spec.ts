@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { freshCopyByDefault, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Workspaces v2, fuzz round D fixes for the composer and sidebar
@@ -125,7 +125,7 @@ test("2, 7, 8, 14, 15: New thread on this branch in place: heading, Workspace fo
   // In place: no branch form; the workspace's name.
   await expect(page.getByTestId("composer-heading")).toHaveText("What's next in shop?");
   const pill = page.getByTestId("composer-like-mode");
-  await expect(pill).toHaveText("In place");
+  await expect(pill).toHaveText("Project folders");
   await expect(pill).toHaveClass(/\btext-body-sm\b/);
   await expect(pill.locator(".font-mono")).toHaveCount(0);
 
@@ -177,10 +177,11 @@ test("3: a set without a git project offers no fresh copies and says it runs in 
   await page.keyboard.press("Meta+n");
   await page.getByTestId("palette").locator('[data-workspace="w-000000000001"]').click();
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in folders?");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
+  // One member: singular.
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
   await expect(page.getByTestId("composer-nogit-note")).toHaveText("No git repository in this set: it runs in place");
   await page.getByTestId("composer-worktree").click();
-  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^Each project's own folder/]);
+  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^Project folder\s*Edits land in the project's checkout directly/]);
   await page.keyboard.press("Escape");
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Tidy the notes");
@@ -193,7 +194,7 @@ test("3: a set without a git project offers no fresh copies and says it runs in 
   await page.getByTestId("palette").locator('[data-workspace="w-000000000002"]').click();
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in zero?");
   await expect(page.getByTestId("composer-nogit-note")).toBeVisible();
-  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Plan the next quarter");
   await page.keyboard.press("Enter");
@@ -256,7 +257,7 @@ test("9: a like draft whose thread is removed becomes a plain draft with the tex
   await expect(page.getByTestId("composer-input")).toHaveText("Carry on");
   await expect(chips(page)).toHaveCount(2);
   await expect(page.getByTestId("composer-primary")).toHaveText("ghostty-playground");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folders");
 });
 
 test("10: New thread on this branch and Run in… only where they apply, in the menus and the palette", async ({ page }) => {
@@ -297,7 +298,7 @@ test("10: New thread on this branch and Run in… only where they apply, in the 
   await expect(page.getByTestId("row-menu").getByTestId("menu-new-like")).toHaveCount(1);
 });
 
-test("11, 13: the hints shown under the chips are not toasted again; a chip's tooltip is its path", async ({ page }) => {
+test("11, 13: the hints shown under the chips are not toasted again; a chip is the project's name alone", async ({ page }) => {
   await mockPost("set-thread?projects=repo-sk,repo-wr&name=Busy%20one");
   await openApp(page);
   await page.keyboard.press("Meta+n");
@@ -305,7 +306,10 @@ test("11, 13: the hints shown under the chips are not toasted again; a chip's to
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "writing" }).click();
   await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one", "writing is also open in Busy one"]);
-  await expectTooltip(page, chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body"), "~/src/sketches");
+  // Name only: no branch, no path tooltip (the pickers say where it runs).
+  await expect(chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body")).toHaveText("sketches");
+  await chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body").hover();
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Pair on the parser");
   await page.keyboard.press("Enter");

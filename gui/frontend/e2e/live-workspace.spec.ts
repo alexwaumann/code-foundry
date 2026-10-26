@@ -45,8 +45,8 @@ test("composer: pick a workspace, make the second member primary, start a haiku 
   const palette = page.getByTestId("palette");
   await palette.locator(`[data-workspace="${members.workspace.id}"]`).click();
   await expect(page.getByTestId("composer-heading")).toHaveText(`What should we build in ${members.workspace.name}?`);
-  await page.getByTestId("composer-member").nth(1).getByRole("button").first().click();
-  await expect(page.getByTestId("composer-member").nth(1)).toHaveAttribute("data-primary", "true");
+  await page.getByTestId("composer-primary").click();
+  await page.getByTestId("composer-primary-list").getByRole("option").nth(1).click();
   await page.getByTestId("composer-model").click();
   await page.getByTestId("composer-model-list").getByRole("option", { name: /Haiku/ }).click();
   await page.getByTestId("composer-effort").click();
