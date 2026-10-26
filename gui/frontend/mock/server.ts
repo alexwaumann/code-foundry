@@ -125,7 +125,8 @@
  *   POST /__mock/update/disabled?reason=dev%20build
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
- *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
+ *   POST /__mock/gh/update | poll | stale | inbox-zero | auth?ok=false | touch?path=…   (GitHub + detail;
+ *        inbox-zero empties the review queue, leaving the reviews that wait on their authors)
  *   POST /__mock/gh/branch-pr?slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
  *                                                 (that branch's pull request, alone or beside the others)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
@@ -406,7 +407,7 @@ function routes(router: ConnectRouter): void {
 
   router.service(GhService, {
     getViewer: () => ({ viewer: world.gh.dashboard.viewer, authenticated: world.gh.authenticated, fetchedAt: world.gh.dashboard.fetchedAt }),
-    getDashboard: (req) => world.gh.getDashboard(req.includeUntracked, trackedSlugs()),
+    getDashboard: () => world.gh.getDashboard(trackedSlugs()),
     getRepoActivity: (req) => world.gh.getRepoActivity(req.repoSlug.toLowerCase()),
     getBranchPullRequests: (req) => {
       if (!req.headRef) throw new ConnectError("head_ref is required", Code.InvalidArgument);
@@ -1334,6 +1335,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/gh/poll":
       world.gh.poll();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/inbox-zero":
+      world.gh.inboxZero();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/gh/stale":

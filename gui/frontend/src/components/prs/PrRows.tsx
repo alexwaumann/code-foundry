@@ -92,7 +92,7 @@ export function StatusPill({ status }: { status: AuthoredStatus }) {
   return (
     <span
       className={cn("flex h-5 min-w-0 items-center gap-1.5 rounded-sm px-1.5 text-caption font-medium", statusPill[status.tone])}
-      data-testid="pr-status"
+      data-testid="prs-status"
       data-status={status.kind}
     >
       <Icon className="size-3 shrink-0" aria-hidden />
@@ -153,7 +153,7 @@ export function NeedsReviewRow({ row, viewer }: { row: NeedsRow; viewer: string 
       <Lead pr={pr} />
       <Author pr={pr} viewer={viewer} />
       <Title pr={pr} />
-      <IconLabel icon={look.icon} cls={look.cls} label={needsLabel[why]} testId="pr-why" value={why} />
+      <IconLabel icon={look.icon} cls={look.cls} label={needsLabel[why]} testId="prs-why" value={why} />
       <ChecksBadge checks={pr.checks} />
       <Age ms={pr.updatedAtMs} className="text-right" />
     </Row>
@@ -169,7 +169,7 @@ export function ReviewedByYouRow({ row, viewer }: { row: ReviewedRow; viewer: st
       <Lead pr={pr} />
       <Author pr={pr} viewer={viewer} />
       <Title pr={pr} />
-      <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="pr-verdict" value={verdict} />
+      <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="prs-verdict" value={verdict} />
       <ChecksBadge checks={pr.checks} />
       <Age ms={pr.updatedAtMs} className="text-right" />
     </Row>
@@ -185,7 +185,7 @@ export function AuthoredPrRow({ row }: { row: AuthoredRow }) {
       <Title pr={pr} />
       <StatusPill status={status} />
       <ChecksBadge checks={pr.checks} />
-      <span className="flex items-center gap-1 text-body-sm text-cf-text-muted tabular-nums" aria-label={`${String(comments)} comments and reviews`} data-testid="pr-comments">
+      <span className="flex items-center gap-1 text-body-sm text-cf-text-muted tabular-nums" aria-label={`${String(comments)} comments and reviews`} data-testid="prs-comments">
         <MessageCircle className="size-3.5 shrink-0" aria-hidden />
         {comments}
       </span>
