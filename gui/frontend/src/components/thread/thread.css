@@ -46,21 +46,25 @@
 
 /* ---------- column ---------- */
 /* appearance.thread_width (stores/settings.ts sets html[data-thread-width]): the
-   conversation column and the composer. Comfortable is the default. */
-.cf-thread {
+   conversation column and the composer, and the new-thread composer's body
+   (components/compose/Composer.tsx, .cf-thread-col). Comfortable is the default. */
+html {
   --thread-col: 1040px;
   --thread-dock: 960px;
 }
-html[data-thread-width="compact"] .cf-thread {
+html[data-thread-width="compact"] {
   --thread-col: 784px;
   --thread-dock: 720px;
 }
-html[data-thread-width="full"] .cf-thread {
+html[data-thread-width="full"] {
   --thread-col: none;
   --thread-dock: none;
 }
 .cf-thread .col {
   margin: 0 auto;
+}
+.cf-thread .col,
+.cf-thread-col {
   width: 100%;
   max-width: var(--thread-col);
   padding: 0 40px;

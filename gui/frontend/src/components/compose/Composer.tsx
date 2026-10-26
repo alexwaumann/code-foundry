@@ -28,11 +28,13 @@ import {
   defaultWorktree,
   draftKey as keyOf,
   EFFORT_CHOICES,
-  NEW_BRANCH,
+  FRESH_COPIES,
+  FRESH_COPY,
   previewLabel,
   PERMISSION_CHOICES,
   pickDefault,
-  projectChipBranch,
+  PROJECT_FOLDER,
+  PROJECT_FOLDERS,
   setWorkIn,
   WORK_IN_SETTING_KEY,
   workInText,
@@ -171,32 +173,9 @@ function useProjectNames(ids: readonly string[]): (id: string) => string {
   return useCallback((id: string) => names[ids.indexOf(id)] ?? id, [ids, names]);
 }
 
-/**
- * The chips of a set: one per project by id. New worktrees: "cf/…" on every git project,
- * the No git badge on a plain folder. In place: each project's own checkout's branch (the
- * primary's chosen worktree for a lone project). `branchOf` overrides the branch (a like
- * draft's: the thread's branch, or its checkouts').
- */
-function useSetChips(projectIds: readonly string[], newWorktrees: boolean, removable: boolean, branchOf?: (id: string) => string | undefined): MemberChipModel[] {
-  const keys = useProjectsStore(
-    useShallow((s) =>
-      projectIds.map((id) => {
-        const p = s.byId[id];
-        const main = p?.worktrees.find((w) => w.isMain);
-        return [p?.git === false ? "1" : "", main ? main.branch || main.head.slice(0, 7) : ""].join(SEP);
-      }),
-    ),
-  );
-  return useMemo(
-    () =>
-      projectIds.map((projectId, i) => {
-        const [noGit = "", mainBranch = ""] = (keys[i] ?? "").split(SEP);
-        if (noGit === "1") return { projectId, branch: "", noGit: true, removable };
-        const branch = branchOf?.(projectId) ?? (newWorktrees ? NEW_BRANCH : mainBranch);
-        return { projectId, branch, removable };
-      }),
-    [projectIds, keys, newWorktrees, removable, branchOf],
-  );
+/** The chips of a set: one per project by id, by name only (the Work in and Runs in pickers say the rest). */
+function setChips(projectIds: readonly string[], removable: boolean): MemberChipModel[] {
+  return projectIds.map((projectId) => ({ projectId, removable }));
 }
 
 /** The collision hints under the chips (lib/collisionHints): muted, never a blocker. */
@@ -333,16 +312,19 @@ function cycleStops(e: React.KeyboardEvent<HTMLElement>): void {
   next.focus();
 }
 
-/** Work in: where a project's thread runs. The picker's copy (docs/notes/onboarding-3-work-in.md). */
-const FRESH_COPY = "A fresh copy of the project";
-const FRESH_COPY_DETAIL = "Its own folder and branch (cf/…, named from your prompt). Run several threads at once; keep or discard each one.";
-const IN_PLACE = "The project folder itself";
-const WORK_IN_FOOTER = "Default for new threads: Settings › Threads › New threads work in";
-/** A set's Work in choices: one new branch with a worktree in every repository, or every project's own folder. */
-const FRESH_COPIES = "A fresh copy of every project";
-const FRESH_COPIES_DETAIL = "One new branch (cf/…, named from your prompt) with a worktree in every repository; folders are shared.";
-const ALL_IN_PLACE = "Each project's own folder";
-const ALL_IN_PLACE_DETAIL = "Edits land in every project's checkout directly. One thread at a time is safest.";
+/**
+ * Work in: where a project's thread runs. The option titles are the pill's words
+ * (lib/compose FRESH_COPY…); the copy is docs/notes/onboarding-3-work-in.md's.
+ */
+const FRESH_COPY_DETAIL = "Edits land in a new branch with its own worktree. Multiple threads at a time is safe.";
+/**
+ * A set's Work in choices: one new branch with a worktree in every repository, or every
+ * project's own folder. Singular for a set of one project (a workspace with one member).
+ */
+const FRESH_COPIES_DETAIL = "Edits land in a new branch with a worktree for every project. Multiple threads at a time is safe.";
+const FRESH_COPY_OF_ONE_DETAIL = "Edits land in a new branch with a worktree for the project. Multiple threads at a time is safe.";
+const PROJECT_FOLDERS_DETAIL = "Edits land in every project's checkout directly. One thread at a time is safest.";
+const PROJECT_FOLDER_OF_ONE_DETAIL = "Edits land in the project's checkout directly. One thread at a time is safest.";
 
 function inPlaceDetail(path: string): string {
   return `Edits land in ${tildify(path)} directly. One thread at a time is safest.`;
@@ -395,6 +377,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   const primary = like ? (primaryChoice && (primaryChoice === likeSrc.own || likeSrc.sorted.includes(primaryChoice) || (primaryChoice === WORKSPACE_PRIMARY && likeSrc.workspaceId)) ? primaryChoice : likeSrc.own) : set.primary;
   const primaryProject = primary === WORKSPACE_PRIMARY ? "" : primary;
   const isSet = !like && set.isSet;
+  /** A set of more than one project: the Work in titles are plural. */
+  const many = isSet && set.projectIds.length > 1;
   // Every project of its workspace taken out: no set to send until one is picked.
   const empty = !home && !like && isSetEmpty(set);
   const single = !like && !home && !set.isSet ? (set.projectIds[0] ?? "") : "";
@@ -513,26 +497,26 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
 
   const worktreeGroups = useMemo<PickerGroup[]>(() => {
     if (isSet) {
-      const inPlace = { value: "current", label: ALL_IN_PLACE, tag: "in place", detail: ALL_IN_PLACE_DETAIL, wrap: true };
+      const inPlace = { value: "current", label: many ? PROJECT_FOLDERS : PROJECT_FOLDER, detail: many ? PROJECT_FOLDERS_DETAIL : PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true };
       // No git project: fresh copies would have nothing to copy (the note under the picker says so).
       if (setGit === 0) return [{ heading: "Work in", options: [inPlace] }];
       return [
         {
           heading: "Work in",
-          options: [{ value: "new", label: FRESH_COPIES, tag: "new worktrees", detail: FRESH_COPIES_DETAIL, wrap: true }, inPlace],
+          options: [{ value: "new", label: many ? FRESH_COPIES : FRESH_COPY, detail: many ? FRESH_COPIES_DETAIL : FRESH_COPY_OF_ONE_DETAIL, wrap: true }, inPlace],
         },
       ];
     }
     if (noGitPath !== undefined) {
-      return [{ heading: "Work in", options: [{ value: noGitPath, label: IN_PLACE, tag: "no git", detail: inPlaceDetail(noGitPath), wrap: true }] }];
+      return [{ heading: "Work in", options: [{ value: noGitPath, label: PROJECT_FOLDER, detail: inPlaceDetail(noGitPath), wrap: true }] }];
     }
     const main = worktrees.find((w) => w.isMain);
     return [
       {
         heading: "Work in",
         options: [
-          { value: "new", label: FRESH_COPY, tag: "new worktree", detail: FRESH_COPY_DETAIL, wrap: true },
-          ...(main ? [{ value: main.path, label: IN_PLACE, tag: worktreeName(main), detail: inPlaceDetail(main.path), wrap: true }] : []),
+          { value: "new", label: FRESH_COPY, detail: FRESH_COPY_DETAIL, wrap: true },
+          ...(main ? [{ value: main.path, label: PROJECT_FOLDER, detail: inPlaceDetail(main.path), wrap: true }] : []),
         ],
       },
       {
@@ -541,34 +525,23 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         options: worktrees.filter((w) => !w.isMain).map((w) => ({ value: w.path, label: worktreeName(w), detail: tildify(w.path) })),
       },
     ];
-  }, [isSet, setGit, worktrees, noGitPath]);
+  }, [isSet, many, setGit, worktrees, noGitPath]);
 
-  // A like draft: the thread's branch on every git project in worktree mode, else each checkout's.
-  const likeBranches = useProjectsStore(
-    useShallow((s) =>
-      likeSrc.sorted.map((id) => {
-        const path = likeSrc.paths[id] ?? "";
-        const w = s.byId[id]?.worktrees.find((x) => x.path === path);
-        return w ? w.branch || w.head.slice(0, 7) : "";
-      }),
-    ),
-  );
-  const likeBranchOf = useCallback(
-    (id: string) => (likeSrc.worktreeMode && likeSrc.branch ? likeSrc.branch : likeBranches[likeSrc.sorted.indexOf(id)]),
-    [likeSrc.worktreeMode, likeSrc.branch, likeBranches, likeSrc.sorted],
-  );
   // Chips in display order: by name (the set is sent by id).
   const chipIds = useMemo(() => byName(like ? likeSrc.sorted : set.projectIds, projectNames), [like, likeSrc.sorted, set.projectIds, projectNames]);
-  const setChips = useSetChips(chipIds, worktree.kind === "new", !like && (set.projectIds.length > 1 || set.workspaceId !== ""), like ? likeBranchOf : undefined);
-  const singleChip = projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen });
-  const chips: MemberChipModel[] = isSet || like ? setChips : single ? [{ projectId: single, branch: singleChip.branch, noGit: singleChip.noGit, removable: false }] : [];
+  const chips = useMemo<MemberChipModel[]>(
+    () => (isSet || like ? setChips(chipIds, !like && (set.projectIds.length > 1 || set.workspaceId !== "")) : single ? [{ projectId: single, removable: false }] : []),
+    [isSet, like, chipIds, set.projectIds.length, set.workspaceId, single],
+  );
   const worktreeText = like
     ? likeSrc.worktreeMode
       ? likeSrc.branch
         ? `On ${likeSrc.branch}`
         : "Its worktrees"
-      : "In place"
-    : workInText({ set: isSet, noGit: noGitPath !== undefined, worktree, chosen });
+      : likeSrc.sorted.length > 1
+        ? PROJECT_FOLDERS
+        : PROJECT_FOLDER
+    : workInText({ set: isSet, many, noGit: noGitPath !== undefined, worktree, chosen });
   const worktreeIcon = like ? (likeSrc.worktreeMode ? GitBranch : FolderGit2) : noGitPath !== undefined ? Folder : isSet ? (worktree.kind === "new" ? GitBranchPlus : FolderGit2) : !chosen ? GitBranchPlus : chosen.isMain ? FolderGit2 : GitBranch;
 
   // The primary picker: the workspace's folder (WORKSPACE_FOLDER) first when there is one, then the projects by name.
@@ -588,7 +561,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
 
   return (
     <div>
-      {!home && <MemberChips target={target} members={chips} primary={primaryProject} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} disabled={busy} />}
+      {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} disabled={busy} />}
       <Hints hints={hints} />
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
@@ -784,7 +757,6 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                     // The pick is this draft's alone; the next draft starts from the setting again.
                     updateDraft(draftKey, { worktree: next });
                   }}
-                  footer={noGitPath === undefined && !(isSet && setGit === 0) ? WORK_IN_FOOTER : undefined}
                   disabled={busy}
                   contentClassName="w-90"
                   listClassName="max-h-96"
@@ -930,12 +902,12 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
     // The backdrop sits behind the scrolling section, so it stays put when a long draft scrolls.
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <Backdrop />
-      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer" data-like={likeThreadId || undefined}>
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto py-10" data-region="content" aria-label="New thread" data-testid="composer" data-like={likeThreadId || undefined}>
         {name === null ? (
           <p className="m-auto text-body text-cf-text-muted">{loaded ? gone : "Loading…"}</p>
         ) : (
           // The heading's name is the first composer Tab stop, then the chips, the prompt…
-          <div className="m-auto w-full max-w-2xl" data-testid="composer-body" onKeyDown={cycleStops}>
+          <div className="cf-thread-col m-auto" data-testid="composer-body" onKeyDown={cycleStops}>
             <h1 className="mb-6 text-center text-title" data-testid="composer-heading">
               {likeThreadId ? (
                 // "New thread on this branch": the set is the thread's; nothing to switch.

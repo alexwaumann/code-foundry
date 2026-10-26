@@ -84,10 +84,11 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
   await expect(chips(page)).toHaveCount(2);
   await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
   await expect(chips(page).nth(1)).toHaveAttribute("data-project", "repo-gp");
-  await expect(chips(page).nth(0)).toHaveAttribute("data-primary", "true");
-  // In place (threads.default_worktree's default): each project's own checkout's branch.
-  await expect(chips(page).nth(0).getByTestId("composer-member-branch")).toHaveText("main");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
+  // Name only: the primary and the branch are the pickers' to show.
+  await expect(chips(page).nth(0)).toHaveText("code-foundry");
+  await expect(chips(page).nth(0)).not.toHaveAttribute("data-primary");
+  // In place (threads.default_worktree's default).
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Project folders");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
 
   const primary = page.getByTestId("composer-primary");
@@ -96,7 +97,6 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
   await expect(page.getByTestId("composer-primary-list").getByRole("option")).toHaveText([/^code-foundry/, /^ghostty-playground/]);
   await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
   await expect(primary).toHaveText("ghostty-playground");
-  await expect(chips(page).nth(1)).toHaveAttribute("data-primary", "true");
 
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Share the login types");
@@ -134,7 +134,7 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(chips(page)).toHaveCount(2);
   await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
   await expect(chips(page).nth(1)).toHaveAttribute("data-project", "repo-dot");
-  await expect(chips(page).nth(0).getByTestId("composer-member-branch")).toHaveText("cf/…");
+  await expect(chips(page).nth(0)).toHaveText("code-foundry");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copies");
   // The workspace's default primary.
   const primary = page.getByTestId("composer-primary");
@@ -178,7 +178,7 @@ test("collision hints under the chips before send, and the daemon's after", asyn
   await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one"]);
   // A fresh copy shares nothing.
   await page.getByTestId("composer-worktree").click();
-  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "A fresh copy of the project" }).click();
+  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
   await expect(page.getByTestId("composer-hints")).toHaveCount(0);
   // With the writing folder, fresh copies still share the folder: it cannot be isolated.
   await page.getByTestId("composer-add-project").click();
@@ -187,7 +187,7 @@ test("collision hints under the chips before send, and the daemon's after", asyn
   await expect(page.getByTestId("composer-hint")).toHaveText(["writing is a folder, not a repo: thread Busy one also works there"]);
   // In place: both, and never a blocker.
   await page.getByTestId("composer-worktree").click();
-  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Each project's own folder" }).click();
+  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Project folders" }).click();
   await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one", "writing is also open in Busy one"]);
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Pair on the parser");
@@ -250,7 +250,7 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   await expect(page.getByTestId("composer-workspace")).toContainText("shop");
   await expect(page.getByTestId("composer-workspace-remove")).toHaveCount(0);
   await expect(chips(page)).toHaveCount(2);
-  await expect(chips(page).getByTestId("composer-member-branch")).toHaveText(["feat/parser", "feat/parser"]);
+  await expect(chips(page).getByTestId("composer-member-branch")).toHaveCount(0);
   await expect(page.getByTestId("composer-member-remove")).toHaveCount(0);
   await expect(page.getByTestId("composer-add-project")).toHaveCount(0);
   await expect(page.getByTestId("composer-like-mode")).toHaveText("On feat/parser");
@@ -295,7 +295,7 @@ test("New thread on this branch from the header menu and the palette; Escape goe
   // In place on main: the heading names the project; one chip; no primary picker.
   await expect(page.getByTestId("composer-heading")).toHaveText("What's next in code-foundry?");
   await expect(chips(page)).toHaveCount(1);
-  await expect(page.getByTestId("composer-like-mode")).toHaveText("In place");
+  await expect(page.getByTestId("composer-like-mode")).toHaveText("Project folder");
   await expect(page.getByTestId("composer-primary")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);

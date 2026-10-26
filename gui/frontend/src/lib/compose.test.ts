@@ -18,7 +18,6 @@ import {
   isWorkspaceKey,
   movedDraft,
   pickDefault,
-  projectChipBranch,
   projectHue,
   projectInitials,
   projectSource,
@@ -278,14 +277,16 @@ describe("Work in", () => {
   const feat = { isMain: false, branch: "feat/sidebar", head: "abcdef01234" };
   it.each<[string, Parameters<typeof workInText>[0], string]>([
     ["a new worktree", { set: false, noGit: false, worktree: { kind: "new" } }, "Fresh copy"],
-    ["the main checkout", { set: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: main }, "In place"],
-    ["the main checkout, detached", { set: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: { ...main, branch: "" } }, "In place"],
+    ["the main checkout", { set: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: main }, "Project folder"],
+    ["the main checkout, detached", { set: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: { ...main, branch: "" } }, "Project folder"],
     ["another worktree: its branch", { set: false, noGit: false, worktree: { kind: "existing", path: "/wt/x" }, chosen: feat }, "feat/sidebar"],
     ["another worktree, detached: its short head", { set: false, noGit: false, worktree: { kind: "existing", path: "/wt/x" }, chosen: { ...feat, branch: "" } }, "abcdef0"],
     ["an existing worktree not listed: a fresh copy", { set: false, noGit: false, worktree: { kind: "existing", path: "/gone" } }, "Fresh copy"],
-    ["a project without git", { set: false, noGit: true, worktree: { kind: "existing", path: "/docs" } }, "In place"],
-    ["a set in place", { set: true, noGit: false, worktree: { kind: "current" } }, "In place"],
-    ["a set with fresh copies", { set: true, noGit: false, worktree: { kind: "new" } }, "Fresh copies"],
+    ["a project without git", { set: false, noGit: true, worktree: { kind: "existing", path: "/docs" } }, "Project folder"],
+    ["a set in place", { set: true, many: true, noGit: false, worktree: { kind: "current" } }, "Project folders"],
+    ["a set with fresh copies", { set: true, many: true, noGit: false, worktree: { kind: "new" } }, "Fresh copies"],
+    ["a set of one project in place: singular", { set: true, many: false, noGit: false, worktree: { kind: "current" } }, "Project folder"],
+    ["a set of one project with a fresh copy: singular", { set: true, noGit: false, worktree: { kind: "new" } }, "Fresh copy"],
   ])("workInText: %s", (_, input, want) => {
     expect(workInText(input)).toBe(want);
   });
@@ -302,19 +303,6 @@ describe("checkoutBranch", () => {
     [{ branch: "", head: "", detached: true, isMain: false }, "Detached HEAD", "Worktree has a detached HEAD"],
   ])("checkoutBranch(%j)", (w, text, label) => {
     expect(checkoutBranch(w)).toEqual({ text, label });
-  });
-});
-
-describe("projectChipBranch", () => {
-  it.each<[string, Parameters<typeof projectChipBranch>[0], ReturnType<typeof projectChipBranch>]>([
-    ["a project without git: no branch, the badge", { noGit: true, newWorktree: false, checkout: { branch: "", head: "" } }, { branch: "", noGit: true }],
-    ["without git, even if a draft asked for a new worktree", { noGit: true, newWorktree: true }, { branch: "", noGit: true }],
-    ["a new worktree: the cf/… placeholder", { noGit: false, newWorktree: true, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "cf/…", noGit: false }],
-    ["the current checkout: its branch", { noGit: false, newWorktree: false, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "main", noGit: false }],
-    ["an existing worktree, detached: its short head", { noGit: false, newWorktree: false, checkout: { branch: "", head: "9a8b7c6d5e" } }, { branch: "9a8b7c6", noGit: false }],
-    ["an existing checkout not known yet", { noGit: false, newWorktree: false }, { branch: "", noGit: false }],
-  ])("%s", (_name, p, want) => {
-    expect(projectChipBranch(p)).toEqual(want);
   });
 });
 

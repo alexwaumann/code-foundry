@@ -205,7 +205,7 @@ test("a second project: files grouped by project, the primary first; tooltips na
   // Sketches as the primary: its group comes first.
   await page.getByTestId("composer-primary").click();
   await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "sketches" }).click();
-  await expect(page.getByTestId("composer-member").filter({ hasText: "sketches" })).toHaveAttribute("data-primary", "true");
+  await expect(page.getByTestId("composer-primary")).toHaveText("sketches");
   await page.getByTestId("composer-input").click();
   await page.keyboard.press("End");
   await page.keyboard.type("@thread.go");
