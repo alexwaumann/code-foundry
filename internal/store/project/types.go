@@ -64,7 +64,8 @@ type Worktree struct {
 	CreatedAt   time.Time
 	CreatedHead string
 	// StartPoint is the ref CreateWorktree created the branch from, after
-	// CreateWorktreeOptions.BaseFromOrigin ("origin/main" for a base typed as "main").
+	// CreateWorktreeOptions.BaseFromOrigin ("origin/main" for a base typed as "main",
+	// or "main" when the local main is ahead of origin's).
 	// Set only on CreateWorktree's return value, never in a snapshot; "" when it
 	// checked out an existing branch.
 	StartPoint string
@@ -198,21 +199,24 @@ type CreateWorktreeOptions struct {
 	// BaseRef is set and the local branch does not exist), it is created from BaseRef.
 	Branch string
 	// BaseRef to branch from. Empty is the default branch; BaseFromOrigin says which
-	// copy of it, and of a base typed as a bare branch name.
+	// copy of it, and of a base typed as a bare branch name, per repository.
 	BaseRef string
-	// BaseFromOrigin is projects.base_from_origin (startpoint.go). On: no BaseRef, or a
-	// bare branch name ("main", "release/2.3"), starts from origin's copy of that branch
-	// when origin has it (fetched first with Fetch), else from the local branch. A
-	// remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an expression
-	// ("HEAD~2") is used as typed. Off: no BaseRef is the local default branch, a
-	// BaseRef is used as typed, and the base is never fetched.
+	// BaseFromOrigin is projects.base_from_origin (startpoint.go), decided per
+	// repository at creation. On: no BaseRef, or a bare branch name ("main",
+	// "release/2.3"), starts from origin's copy of that branch (fetched first with
+	// Fetch) unless the local branch is ahead of it (rev-list --count
+	// origin/<b>..<b> > 0; a diverged branch counts as ahead), in which case from the
+	// local branch; without origin, or when origin has no such branch, from the local
+	// branch. A remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an
+	// expression ("HEAD~2") is used as typed. Off (the kill switch): no BaseRef is the
+	// local default branch, a BaseRef is used as typed, and nothing is fetched.
 	BaseFromOrigin bool
 	// Fetch refreshes the start point before branching from it: when the new branch
-	// starts at a remote branch (origin's copy of a bare name with BaseFromOrigin, a
-	// remote-tracking BaseRef with it, or origin/<Branch> for git's DWIM), that one
-	// remote branch is fetched first. The fetch is bounded; on failure it is logged and
-	// the existing (possibly stale) ref is used. Ignored when Branch already exists
-	// locally.
+	// may start at a remote branch (origin's copy of a bare name with BaseFromOrigin,
+	// fetched before comparing it with the local branch; a remote-tracking BaseRef
+	// with it; or origin/<Branch> for git's DWIM), that one remote branch is fetched
+	// first. The fetch is bounded; on failure it is logged and the existing (possibly
+	// stale) ref is used. Ignored when Branch already exists locally.
 	Fetch bool
 }
 

@@ -58,7 +58,8 @@ func TestRefsDefault(t *testing.T) {
 }
 
 // TestStartPoint runs projects.base_from_origin on and off against a scratch origin
-// whose main is one commit ahead of the clone's origin/main and main.
+// whose main is one commit ahead of the clone's origin/main and main (setup may move
+// the clone's main level with or ahead of it).
 func TestStartPoint(t *testing.T) {
 	type want struct {
 		head       string // sha the new worktree must be at
@@ -140,11 +141,63 @@ func TestStartPoint(t *testing.T) {
 		// thread new --base <branch> --base-from-origin no|yes, for a lead's branch whose
 		// newer commits are not pushed yet (docs/notes/thread-new-base-origin.md).
 		{
-			name: "on, local branch origin has an older copy of: origin's, fetched", on: true, base: "feat/lead",
+			name: "on, local branch ahead of origin's older copy: the local one, fetched", on: true, base: "feat/lead",
 			setup: leadBranch,
 			expect: func(s map[string]string) want {
-				return want{s["pushed"], "origin/feat/lead", 1, "start_point=origin/feat/lead"}
+				return want{s["lead"], "feat/lead", 1, "start_point=feat/lead ahead=1"}
 			},
+		},
+		// The rule: origin's copy unless the local branch is ahead of it
+		// (docs/notes/base-origin-rule.md).
+		{
+			name: "on, no base, local main ahead of origin's: local main, fetched", on: true,
+			setup: localAhead,
+			expect: func(s map[string]string) want {
+				return want{s["ahead"], "main", 1, "base=main start_point=main ahead=1"}
+			},
+		},
+		{
+			// thread new --base main --base-from-origin yes: the rule, not "always origin".
+			name: "on (--base-from-origin yes), bare main ahead of origin's: local main", on: true, base: "main",
+			setup: localAhead,
+			expect: func(s map[string]string) want {
+				return want{s["ahead"], "main", 1, "base=main start_point=main ahead=1"}
+			},
+		},
+		{
+			name: "on, no base, local main equal to origin's: origin/main", on: true,
+			setup: func(t *testing.T, f fixture, s map[string]string) {
+				git(t, f.project, "pull", "-q", "--ff-only", "origin", "main")
+			},
+			expect: func(s map[string]string) want { return want{s["tip"], "origin/main", 1, ""} },
+		},
+		{
+			name: "on, bare main equal to origin's: origin/main", on: true, base: "main",
+			setup: func(t *testing.T, f fixture, s map[string]string) {
+				git(t, f.project, "pull", "-q", "--ff-only", "origin", "main")
+			},
+			expect: func(s map[string]string) want { return want{s["tip"], "origin/main", 1, "start_point=origin/main"} },
+		},
+		{
+			name: "on, bare main diverged from origin's: local main", on: true, base: "main",
+			setup: func(t *testing.T, f fixture, s map[string]string) {
+				s["diverged"] = localCommit(t, f.project, "mine")
+			},
+			expect: func(s map[string]string) want {
+				return want{s["diverged"], "main", 1, "start_point=main ahead=1"}
+			},
+		},
+		{
+			name: "on, no remote: local main, no fetch", on: true, base: "main",
+			setup: func(t *testing.T, f fixture, s map[string]string) {
+				git(t, f.project, "remote", "remove", "origin")
+			},
+			expect: func(s map[string]string) want { return want{s["local"], "main", 0, ""} },
+		},
+		{
+			name: "off, local main ahead: local main, no fetch", base: "main",
+			setup: localAhead,
+			expect: func(s map[string]string) want { return want{s["ahead"], "main", 0, ""} },
 		},
 		{
 			name: "off, local branch origin has an older copy of: the local one, no fetch", base: "feat/lead",
@@ -219,7 +272,7 @@ func TestStartPoint(t *testing.T) {
 			if strings.Contains(log, "level=WARN") {
 				t.Errorf("unexpected warning: %s", log)
 			}
-			resolved := strings.Contains(log, "base resolved to origin's branch")
+			resolved := strings.Contains(log, "base resolved to")
 			switch {
 			case wt.info == "" && resolved:
 				t.Errorf("unexpected resolution line: %s", log)
@@ -228,6 +281,23 @@ func TestStartPoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+// localAhead brings the project's main up to origin's tip, then commits once more
+// without pushing (s["ahead"]): local main is ahead of origin's, not behind.
+func localAhead(t *testing.T, f fixture, s map[string]string) {
+	t.Helper()
+	git(t, f.project, "pull", "-q", "--ff-only", "origin", "main")
+	s["ahead"] = localCommit(t, f.project, "unpushed")
+}
+
+// localCommit commits a new file in dir without pushing it and returns the sha.
+func localCommit(t *testing.T, dir, name string) string {
+	t.Helper()
+	writeFile(t, filepath.Join(dir, name), name+"\n")
+	git(t, dir, "add", name)
+	git(t, dir, "commit", "-q", "-m", name)
+	return git(t, dir, "rev-parse", "HEAD")
 }
 
 // leadBranch is a lead's branch feat/lead: pushed once (s["pushed"]), then a commit

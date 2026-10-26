@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,13 @@ import (
 // projects.base_from_origin setting). Every caller of CreateWorktree gets the same
 // resolution: the thread store's new worktrees and workspaces, the workspace store's
 // members, a recreated worktree and project.worktree.create.
+//
+// The rule, per repository: a bare branch name (or the default branch when no base is
+// given) is origin's copy, fetched first, unless the local branch is ahead of it
+// (rev-list --count origin/<b>..<b> > 0, so a diverged branch counts as ahead), in
+// which case it is the local branch. Without origin, or when origin has no such branch,
+// it is the local branch. BaseFromOrigin off is the kill switch: always the local
+// branch, nothing fetched.
 
 // baseKind is how startPoint treats a typed base.
 type baseKind int
@@ -23,8 +31,9 @@ const (
 	// baseRemote: "<remote>/<branch>" for a configured remote: used as typed, its
 	// branch fetched first (with Fetch and BaseFromOrigin).
 	baseRemote
-	// baseBranch: a bare branch name ("main", "release/2.3"), local or not: origin's
-	// copy when origin has it (with BaseFromOrigin), else as typed.
+	// baseBranch: a bare branch name ("main", "release/2.3"), local or not: with
+	// BaseFromOrigin, origin's copy when origin has it and the local branch is not
+	// ahead of it, else the local branch (as typed).
 	baseBranch
 )
 
@@ -127,10 +136,33 @@ func (g *Git) startPoint(ctx context.Context, m *projectMeta, opts CreateWorktre
 	if !g.refExists(ctx, m.Path, "refs/remotes/origin/"+name) {
 		return name
 	}
+	if ahead := g.localAhead(ctx, m, name); ahead > 0 {
+		g.log.Info("base resolved to the local branch, ahead of origin's", "project", m.ID, "base", cmp.Or(typed, name),
+			"start_point", name, "ahead", ahead)
+		return name
+	}
 	if typed != "" {
 		g.log.Info("base resolved to origin's branch", "project", m.ID, "base", typed, "start_point", "origin/"+name)
 	}
 	return "origin/" + name
+}
+
+// localAhead counts the commits the local branch has that origin's copy has not
+// (rev-list --count origin/<branch>..<branch>; a diverged branch counts). 0 when there
+// is no local branch, or when the count fails (logged), so origin's copy is used.
+func (g *Git) localAhead(ctx context.Context, m *projectMeta, branch string) int {
+	if !g.refExists(ctx, m.Path, "refs/heads/"+branch) {
+		return 0
+	}
+	out, err := g.runner.Run(ctx, m.Path, "rev-list", "--count", "refs/remotes/origin/"+branch+"..refs/heads/"+branch)
+	if err == nil {
+		var n int
+		if n, err = strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+			return n
+		}
+	}
+	g.log.Warn("comparing the local branch with origin's failed; using origin's", "project", m.ID, "branch", branch, "err", err)
+	return 0
 }
 
 // missingRemoteRef reports whether a fetch failed because the remote has no such
