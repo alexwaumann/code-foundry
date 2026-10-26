@@ -196,7 +196,7 @@ func TestStartPoint(t *testing.T) {
 		},
 		{
 			name: "off, local main ahead: local main, no fetch", base: "main",
-			setup: localAhead,
+			setup:  localAhead,
 			expect: func(s map[string]string) want { return want{s["ahead"], "main", 0, ""} },
 		},
 		{
