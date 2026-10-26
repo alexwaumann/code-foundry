@@ -26,6 +26,14 @@ export const prStateText: Record<PrStateTone, string> = {
   muted: toneText.neutral,
 };
 
+/** A filled status pill (no border) per status tone: the Pull Requests page's authored status. */
+export const statusPill: Record<"error" | "warning" | "success" | "neutral", string> = {
+  error: "bg-cf-error-surface text-cf-error-text",
+  warning: "bg-cf-warning-surface text-cf-warning-text",
+  success: "bg-cf-success-surface text-cf-success-text",
+  neutral: "bg-cf-surface-sunken text-cf-text-muted",
+};
+
 /** Badge (border + tint) per tone. */
 export const toneBadge: Record<Tone, string> = {
   success: "border-cf-success/30 bg-cf-success-surface text-cf-success-text",

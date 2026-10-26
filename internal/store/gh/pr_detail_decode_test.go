@@ -3,6 +3,7 @@ package gh
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -220,6 +221,23 @@ func TestDecodeFullPullRequestShapes(t *testing.T) {
 				want := []string{"kim:team=false:CHANGES_REQUESTED:req=true:stale=true", "acme/core:team=true::req=true:stale=false"}
 				if !slices.Equal(got, want) {
 					t.Errorf("reviewers = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "stale: a review on an older commit or on one GitHub no longer has; fresh on the head",
+			fields: `"reviewers":{"totalCount":3,"nodes":[
+					{"author":{"login":"old"},"state":"APPROVED","submittedAt":"2026-01-02T00:00:00Z","commit":{"oid":"old"}},
+					{"author":{"login":"gone"},"state":"CHANGES_REQUESTED","submittedAt":"2026-01-02T00:00:00Z","commit":null},
+					{"author":{"login":"head"},"state":"COMMENTED","submittedAt":"2026-01-03T00:00:00Z","commit":{"oid":"abc"}}]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				got := map[string]bool{}
+				for _, r := range d.Reviewers {
+					got[r.Login] = r.Stale
+				}
+				want := map[string]bool{"old": true, "gone": true, "head": false}
+				if !maps.Equal(got, want) {
+					t.Errorf("stale = %v, want %v", got, want)
 				}
 			},
 		},

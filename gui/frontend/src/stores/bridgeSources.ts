@@ -11,7 +11,7 @@ import type { BridgeSource } from "@/lib/bridge";
 import { useActionsStore } from "./actions";
 import { emberBoardHeld, useEmberStore } from "./ember";
 import { onDaemonEvent } from "./events";
-import { dashboardResource } from "./gh";
+import { DASHBOARD_KEY, dashboardResource } from "./gh";
 import { usePluginsStore } from "./plugins";
 import { useProjectsStore } from "./projects";
 import { useSettingsStore } from "./settings";
@@ -54,9 +54,6 @@ function onStores(...stores: Subscribable[]): (threadId: string, cb: () => void)
   };
 }
 
-/** The dashboard key the PRs views read: the registered projects' pull requests. */
-const DASHBOARD_KEY = "tracked";
-
 export const bridgeSources: Record<BridgeSource, SourceSpec> = {
   // The user's threads in the sidebar's order (owned ones, a plugin's, left out).
   "thread-list": {
@@ -74,7 +71,7 @@ export const bridgeSources: Record<BridgeSource, SourceSpec> = {
     }),
     subscribe: onStores(useThreadsStore, useThreadStore),
   },
-  // The PR dashboard (registered projects): held while subscribed, as the PRs page holds it.
+  // The PR dashboard (every repository): held while subscribed, as the PRs page holds it.
   gh: {
     snapshot: () => dashboardResource.store.getState().entries[DASHBOARD_KEY]?.data ?? undefined,
     subscribe: (_threadId, cb) => {

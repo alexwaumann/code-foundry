@@ -1,21 +1,19 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { branchPullRequestsResource, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
+import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useThreadsStore } from "@/stores/threads";
 import { newestFirst } from "@/surfaces/linkedprsTarget";
 import { findLinkedPr, fresher, linkedPrState, type LinkedPrFact } from "./linkedPrTag";
 
-/** The dashboard key the tags read: the registered projects' pull requests (as the composer's `#`). */
-const DASHBOARD_KEY = "tracked";
-
 /**
- * Keeps the viewer's dashboard read while any thread has linked pull requests: the tags'
- * main source of state. One watch for the whole list (the dashboard is the daemon's last
- * poll, re-read only when it changed); nothing is fetched per row.
+ * Keeps the viewer's dashboard read while the sidebar is mounted: the Pull Requests row's
+ * needs-review count and the linked PR tags' main source of state. One watch for both
+ * (the dashboard is the daemon's last poll, re-read only when it changed, and the PRs page
+ * shares the key); nothing is fetched per row. It selects nothing, so it never re-renders
+ * its caller.
  */
-export function useLinkedPrsDashboard(): void {
-  const any = useThreadsStore((s) => Object.values(s.byId).some((t) => t.linkedPullRequests.length > 0));
-  useEffect(() => (any ? dashboardResource.watch(DASHBOARD_KEY) : undefined), [any]);
+export function useSidebarDashboard(): void {
+  useEffect(() => dashboardResource.watch(DASHBOARD_KEY), []);
 }
 
 /** The thread's linked pull requests' keys (pullRequestKey), newest first. */

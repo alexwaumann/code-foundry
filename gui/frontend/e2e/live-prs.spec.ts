@@ -37,11 +37,9 @@ test("Pull Requests page with real GitHub data", async ({ page }) => {
   await expect(current).toHaveAttribute("data-value", /^\d+$/, { timeout: 150_000 });
   const commits = Number(await current.getAttribute("data-value"));
   expect(commits).toBeGreaterThanOrEqual(0);
-  // LIVE_ALL=1: show every repository (with CODE_FOUNDRY_GH_SEARCH_AS the searches run
-  // for an account whose PRs live in projects that are not registered here).
+  // LIVE_ALL=1: the account has open pull requests of its own (the page lists every
+  // repository's; CODE_FOUNDRY_GH_SEARCH_AS picks a busy account).
   if (process.env.LIVE_ALL === "1") {
-    await page.getByTestId("prs-list").press("a");
-    await expect(page.getByTestId("prs-scope")).toHaveText("all repositories");
     await expect(page.getByTestId("prs-authored").locator("[data-nav-key]").first()).toBeVisible({ timeout: 150_000 });
   }
   await page.waitForTimeout(500);

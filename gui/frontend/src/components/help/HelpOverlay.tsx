@@ -27,7 +27,6 @@ const extraChords: LocalChord[] = [
   { chord: "enter", title: "Open the highlighted row" },
   { chord: "arrowleft", title: "Fold or unfold a sidebar row" },
   { chord: "arrowright", title: "Fold or unfold a sidebar row" },
-  { chord: "a", title: "Pull Requests: all repositories or registered projects" },
   { chord: "cmd+enter", title: "Pull request rows: open on GitHub (Enter opens them in the side panel)" },
   { chord: "cmd+w", title: "Side panel: close the active tab (hides an empty panel)" },
   { chord: "escape", title: "Side panel, surface list after +: back to the tab" },

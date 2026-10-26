@@ -12,6 +12,7 @@ import {
   CheckStatus,
   Mergeable,
   MergeStateStatus,
+  PullRequestReviewState,
   PullRequestState,
   ReviewDecision,
   type DefaultBranchStatusSchema,
@@ -50,6 +51,8 @@ export interface PrInit {
   commentCount?: number;
   reviewCount?: number;
   reviewRequests?: string[];
+  /** Each reviewer's latest review; commitSha is the head it was submitted on ("" when GitHub has none). */
+  latestReviews?: { author: string; state: PullRequestReviewState; submittedAt?: Timestamp; commitSha: string }[];
 }
 interface DashboardInit {
   viewer: { login: string; name: string; url: string };
@@ -104,6 +107,9 @@ const rollup = (state: CheckRollupState, passed: number, failed = 0, pending = 0
   pending,
   skipped,
 });
+
+/** A 40-character commit id from a short tag ("14a" -> "14a000…"). */
+const sha = (tag: string): string => tag.padEnd(40, "0");
 
 /** All the mock's GitHub-side state; reset() restores it. */
 export class GhWorld {
@@ -189,13 +195,41 @@ export class GhWorld {
       authored: [
         sidebarPr,
         resizePr,
-        this.pr(gp, 12, "renderer: port glyph cache to the new atlas", { headRef: "atlas", checks: rollup(CheckRollupState.PENDING, 9, 0, 4), ageMs: 2 * DAY }),
+        // Awaiting review: one request pending, checks still running.
+        this.pr(gp, 12, "renderer: port glyph cache to the new atlas", { headRef: "atlas", checks: rollup(CheckRollupState.PENDING, 9, 0, 4), reviewRequests: ["teammate-kim"], ageMs: 2 * DAY }),
       ],
+      // The PRs page's review queue (docs/notes/prs-inbox-2-gui.md): two requests (one
+      // naming the viewer, one through a team), a review gone stale (needs review again)
+      // and two that wait on their authors.
       reviewRequested: [
-        this.pr(cf, 139, "feat(thread): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
-        this.pr("other-org/lib", 77, "chore: bump deps", { author: "renovate", checks: rollup(CheckRollupState.SUCCESS, 4), ageMs: 6 * HOUR }),
+        this.pr(cf, 139, "feat(thread): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), reviewRequests: [VIEWER], ageMs: 3 * HOUR }),
+        this.pr("other-org/lib", 77, "chore: bump deps", { author: "renovate", checks: rollup(CheckRollupState.SUCCESS, 4), reviewRequests: ["other-org/maintainers"], ageMs: 6 * HOUR }),
       ],
-      reviewed: [this.pr(cf, 133, "refactor(api): one events stream", { author: "teammate-kim", headRef: "events", ageMs: 9 * HOUR })],
+      reviewed: [
+        this.pr(cf, 133, "refactor(api): one events stream", {
+          author: "teammate-kim",
+          headRef: "events",
+          headSha: sha("133"),
+          latestReviews: [{ author: VIEWER, state: PullRequestReviewState.APPROVED, submittedAt: this.at(10 * HOUR), commitSha: sha("133") }],
+          ageMs: 9 * HOUR,
+        }),
+        this.pr(gp, 14, "renderer: subpixel glyph positioning", {
+          author: "teammate-kim",
+          headRef: "subpixel",
+          headSha: sha("14b"),
+          // Reviewed on 14a; 14b was pushed after.
+          latestReviews: [{ author: VIEWER, state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: this.at(DAY), commitSha: sha("14a") }],
+          ageMs: 4 * HOUR,
+        }),
+        this.pr("other-org/lib", 81, "feat: streaming parser", {
+          author: "someone",
+          headRef: "stream",
+          headSha: sha("81"),
+          checks: rollup(CheckRollupState.FAILURE, 3, 1),
+          latestReviews: [{ author: VIEWER, state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: this.at(2 * DAY), commitSha: sha("81") }],
+          ageMs: 2 * DAY,
+        }),
+      ],
       recentlyMerged: [
         this.pr(cf, 138, "chore(gh): pace requests through one worker", { headRef: "gh-pacing", mergedAgoMs: 1 * DAY, ageMs: 1 * DAY }),
         this.pr(cf, 136, "fix(repo): ignore Chmod-only fs events", { author: "teammate-kim", headRef: "kqueue-chmod", mergedAgoMs: 2 * DAY, ageMs: 2 * DAY }),
@@ -383,19 +417,10 @@ export class GhWorld {
     this.calls[rpc] = (this.calls[rpc] ?? 0) + 1;
   }
 
-  getDashboard(includeUntracked: boolean, tracked: string[]): DashboardInit {
+  /** Like the daemon: every list in full, whatever the projects; `tracked` only fills tracked_slugs. */
+  getDashboard(tracked: string[]): DashboardInit {
     this.count("GetDashboard");
-    const keep = (p: PrInit) => includeUntracked || tracked.includes(p.repoSlug);
-    const d = this.dashboard;
-    return {
-      ...d,
-      authenticated: this.authenticated,
-      authored: d.authored.filter(keep),
-      reviewRequested: d.reviewRequested.filter(keep),
-      reviewed: d.reviewed.filter(keep),
-      recentlyMerged: d.recentlyMerged.filter(keep),
-      trackedSlugs: tracked,
-    };
+    return { ...this.dashboard, authenticated: this.authenticated, trackedSlugs: tracked };
   }
 
   getRepoActivity(slug: string): ActivityInit {
@@ -426,6 +451,18 @@ export class GhWorld {
   update(): void {
     const pr = this.pr("alexwaumann/code-foundry", 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: rollup(CheckRollupState.PENDING, 3, 0, 5), ageMs: 0 });
     this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
+    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+    this.publishGh(this.polledEvent());
+  }
+
+  /**
+   * Inbox zero: no review requests and nothing stale; only the reviews that wait on their
+   * authors are left. Announced like a poll.
+   */
+  inboxZero(): void {
+    const d = this.dashboard;
+    const fresh = (p: PrInit) => (p.latestReviews ?? []).every((r) => r.author !== VIEWER || r.commitSha === p.headSha);
+    this.dashboard = { ...d, reviewRequested: [], reviewed: d.reviewed.filter(fresh), fetchedAt: timestampFromDate(new Date()) };
     this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
     this.publishGh(this.polledEvent());
   }

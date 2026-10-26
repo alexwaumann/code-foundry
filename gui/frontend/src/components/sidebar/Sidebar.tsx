@@ -20,7 +20,7 @@ import { useRowHeight, useShowCreatedThreads } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { HEADER_HEIGHT, ROW_GAP, rowSize } from "./rowSizes";
-import { useLinkedPrsDashboard } from "./useLinkedPrs";
+import { useSidebarDashboard } from "./useLinkedPrs";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
@@ -201,7 +201,6 @@ function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo,
  */
 function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const { rows, main, headers, footers } = useListRows();
-  useLinkedPrsDashboard();
   const listRef = useRef<HTMLDivElement>(null);
   const scrollMain = useRef<ScrollTo>(null);
   const scrollWorking = useRef<ScrollTo>(null);
@@ -468,6 +467,7 @@ export function Sidebar() {
 function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef);
+  useSidebarDashboard();
   return (
     <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />

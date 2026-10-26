@@ -58,7 +58,7 @@ export interface ReviewEntryView {
   /** Lower case GitHub review state ("approved", "changes_requested", ...); "" if unknown. */
   state: string;
   submittedAtMs: number | null;
-  /** The head commit the review was submitted on; "" when unknown (a cache from before it was fetched). */
+  /** The head commit the review was submitted on; "" when GitHub has none (a force-push dropped it). */
   commitSha: string;
 }
 
@@ -127,7 +127,7 @@ export interface DashboardView {
   authenticated: boolean;
   authored: PullRequestView[];
   reviewRequested: PullRequestView[];
-  /** Open PRs the viewer reviewed and did not author (not shown yet). */
+  /** Open PRs the viewer reviewed and did not author. */
   reviewed: PullRequestView[];
   recentlyMerged: PullRequestView[];
   /** github.dashboards_enabled is off: the lists are empty and not polled. */
@@ -439,9 +439,10 @@ export async function getViewer(conn: DaemonConnection = daemon, signal?: AbortS
   return r.viewer ? { login: r.viewer.login, name: r.viewer.name, url: r.viewer.url } : null;
 }
 
-export async function getDashboard(includeUntracked = false, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<DashboardView> {
+/** GetDashboard: the viewer's pull request lists in every repository (the daemon's last poll). */
+export async function getDashboard(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<DashboardView> {
   const c = await conn.client(GhService);
-  const r = await c.getDashboard({ includeUntracked }, { signal });
+  const r = await c.getDashboard({}, { signal });
   return {
     viewer: r.viewer ? { login: r.viewer.login, name: r.viewer.name, url: r.viewer.url } : null,
     authenticated: r.authenticated,

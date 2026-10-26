@@ -1,101 +1,26 @@
 import { useEffect, useMemo, useRef } from "react";
-import { create } from "zustand";
-import { GitPullRequest } from "lucide-react";
+import { Check, GitPullRequest } from "lucide-react";
 import type { DashboardView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
-import { NavProvider, NavRow } from "@/lib/NavRow";
+import { NavProvider } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { dashboardResource, openUrl, useFreshness } from "@/stores/gh";
+import { DASHBOARD_KEY, dashboardResource, openUrl, useFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
-import { prKey, repoName } from "./format";
-import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
-import { RowList } from "./RowList";
+import { authoredRows } from "./authoredStatus";
+import { prKey } from "./format";
+import { InboxZero } from "./InboxZero";
+import { Freshness, SectionTitle } from "./PrBits";
+import { AuthoredPrRow, MergedRow, NeedsReviewRow, PrTable, ReviewedByYouRow, type Section } from "./PrRows";
+import { needsReviewCount, reviewQueue } from "./reviewQueue";
 
 /** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;
-const ROW_H = 28;
-
-/** Page-local, kept across visits: show every repository instead of the registered projects'. */
-const usePrPageStore = create<{ includeAll: boolean; toggle: () => void }>()((set) => ({
-  includeAll: false,
-  toggle: () => {
-    set((s) => ({ includeAll: !s.includeAll }));
-  },
-}));
-
-type Section = "authored" | "review" | "merged";
-
-// Flexible tracks only (fr with a floor): fixed maxima grow before an fr track gets any
-// room, which squeezed the title to nothing beside the side panel.
-const columns: Record<Section, string> = {
-  authored: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(6rem,2.4fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_3rem]",
-  review: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(6.5rem,1fr)_3rem]",
-  merged: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_3rem]",
-};
-
-const headers: Record<Section, string[]> = {
-  authored: ["Repository", "#", "Title", "Checks", "Review", "Age"],
-  review: ["Repository", "#", "Author", "Title", "Checks", "Age"],
-  merged: ["Repository", "#", "Author", "Title", "Merged"],
-};
-
-function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView; viewer: string }) {
-  const author = pr.author && pr.author.toLowerCase() === viewer.toLowerCase() ? "you" : pr.author || "ghost";
-  return (
-    <NavRow
-      navKey={prKey(section, pr)}
-      activateOnClick
-      onCmdClick={() => void openUrl(pr.url)}
-      className={cn("grid h-full items-center gap-3 rounded-md px-2 text-body", columns[section])}>
-      <Tip label={pr.repoSlug}>
-        <span className="truncate text-cf-text-muted">{repoName(pr.repoSlug)}</span>
-      </Tip>
-      <span className="flex items-center gap-1 text-cf-text-muted tabular-nums">
-        <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
-      </span>
-      {section !== "authored" && <span className="truncate text-cf-text-muted">{author}</span>}
-      <Tip label={pr.title}>
-        <span className="truncate">
-          {pr.draft && <span className="mr-1.5 rounded-sm bg-cf-surface-sunken px-1 text-caption-sm uppercase">draft</span>}
-          {pr.title}
-        </span>
-      </Tip>
-      {section !== "merged" && <ChecksBadge checks={pr.checks} />}
-      {section === "authored" && <ReviewBadge review={pr.review} />}
-      <Age ms={section === "merged" ? pr.mergedAtMs : pr.updatedAtMs} className="text-right" />
-    </NavRow>
-  );
-}
-
-function PrTable({ section, title, rows, empty, viewer }: { section: Section; title: string; rows: PullRequestView[]; empty: string; viewer: string }) {
-  return (
-    <section data-testid={`prs-${section}`}>
-      <SectionTitle count={rows.length}>{title}</SectionTitle>
-      {rows.length === 0 ? (
-        <p className="px-2 text-body text-cf-text-muted">{empty}</p>
-      ) : (
-        <div className="rounded-lg border">
-          <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
-            {headers[section].map((h, i) => (
-              <span key={h} className={cn(i === headers[section].length - 1 && "text-right")}>
-                {h}
-              </span>
-            ))}
-          </div>
-          <div className="p-0.5">
-            <RowList rows={rows} rowKey={(p) => prKey(section, p)} rowHeight={ROW_H} render={(p) => <PrRow section={section} pr={p} viewer={viewer} />} />
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
 
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
@@ -105,20 +30,28 @@ function Banner({ tone, children }: { tone: "warn" | "info"; children: React.Rea
   );
 }
 
-function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="px-2 text-body text-cf-text-muted">{children}</p>;
+}
+
+function Body({ d }: { d: DashboardView }) {
   const viewer = d.viewer?.login ?? "";
+  const queue = useMemo(() => reviewQueue(d.reviewRequested, d.reviewed, viewer), [d.reviewRequested, d.reviewed, viewer]);
+  const authored = useMemo(() => authoredRows(d.authored), [d.authored]);
+  // Newest merge first (the daemon's search sorts by update, which a later comment moves).
+  const merged = useMemo(() => d.recentlyMerged.map((pr) => ({ pr })).sort((a, b) => (b.pr.mergedAtMs ?? -Infinity) - (a.pr.mergedAtMs ?? -Infinity)), [d.recentlyMerged]);
   const items = useMemo<NavItem[]>(() => {
-    const mk = (section: Section, list: PullRequestView[]) =>
-      list.map((p) => ({
+    const mk = (section: Section, list: readonly { pr: PullRequestView }[]) =>
+      list.map(({ pr: p }) => ({
         key: prKey(section, p),
         // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
         activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
         secondary: () => void openUrl(p.url),
       }));
-    return [...mk("authored", d.authored), ...mk("review", d.reviewRequested), ...mk("merged", d.recentlyMerged)];
-  }, [d]);
+    // Keyboard order is page order.
+    return [...mk("review", queue.needs), ...mk("reviewed", queue.reviewed), ...mk("authored", authored), ...mk("merged", merged)];
+  }, [queue, authored, merged]);
   const nav = useNav(items);
-  const toggle = usePrPageStore((s) => s.toggle);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     rootRef.current?.focus({ preventScroll: true });
@@ -134,14 +67,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         className="flex flex-col gap-6 outline-none"
         data-testid="prs-list"
         data-focus-root
-        onKeyDown={(e) => {
-          if (e.key === "a" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-            toggle();
-            e.preventDefault();
-            return;
-          }
-          nav.onKeyDown(e);
-        }}
+        onKeyDown={nav.onKeyDown}
       >
         {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
         {d.dashboardsDisabled && (
@@ -149,28 +75,42 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
             Pull request dashboards are turned off (<span className="font-mono">github.dashboards_enabled</span> in Settings), so the lists are empty.
           </Banner>
         )}
-        {!includeAll && d.trackedSlugs.length === 0 && (
-          <Banner tone="info">
-            No registered project has a GitHub remote, so the lists are empty.{" "}
-            <button type="button" className="underline underline-offset-2 hover:text-cf-text" onClick={toggle} data-testid="prs-show-all">
-              Show pull requests from every repository
-            </button>
-          </Banner>
-        )}
+        <section data-testid="prs-review">
+          <SectionTitle count={queue.needs.length}>Needs your review</SectionTitle>
+          {queue.needs.length > 0 ? (
+            <PrTable section="review" rows={queue.needs} render={(r) => <NeedsReviewRow row={r} viewer={viewer} />} />
+          ) : (
+            <InboxZero authored={authored} merged={d.recentlyMerged} viewer={viewer} />
+          )}
+          {queue.reviewed.length > 0 && (
+            <div className="mt-2.5" data-testid="prs-reviewed">
+              <p className="mb-1.5 flex items-center gap-1.5 px-0.5 text-body-sm text-cf-text-muted">
+                <Check className="size-3.5 shrink-0" aria-hidden />
+                <span>Reviewed by you</span>
+                <span className="tabular-nums">({queue.reviewed.length})</span>
+                <span>· open, waiting on the author</span>
+              </p>
+              <PrTable section="reviewed" rows={queue.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
+            </div>
+          )}
+        </section>
+        <section data-testid="prs-authored">
+          <SectionTitle count={authored.length}>Your open pull requests</SectionTitle>
+          {authored.length > 0 ? <PrTable section="authored" rows={authored} render={(r) => <AuthoredPrRow row={r} />} /> : <Empty>No open pull requests of yours.</Empty>}
+        </section>
+        <section data-testid="prs-merged">
+          <SectionTitle count={merged.length}>Merged in the last 7 days</SectionTitle>
+          {merged.length > 0 ? <PrTable section="merged" rows={merged} render={(r) => <MergedRow pr={r.pr} viewer={viewer} />} /> : <Empty>Nothing merged in the last 7 days.</Empty>}
+        </section>
         <ActivityCharts months={d.stats.months} />
-        <PrTable section="authored" title="Open PRs · authored by you" rows={d.authored} empty="No open PRs authored by you." viewer={viewer} />
-        <PrTable section="review" title="PRs awaiting your review" rows={d.reviewRequested} empty="Nothing awaiting your review." viewer={viewer} />
-        <PrTable section="merged" title="Merged PRs · last 7 days" rows={d.recentlyMerged} empty="Nothing merged in the last 7 days." viewer={viewer} />
       </div>
     </NavProvider>
   );
 }
 
-/** The global Pull Requests page: the viewer's GitHub dashboards across registered projects. */
+/** The global Pull Requests page: the viewer's review inbox and own pull requests in every repository. */
 export function PullRequestsPage() {
-  const includeAll = usePrPageStore((s) => s.includeAll);
-  const toggle = usePrPageStore((s) => s.toggle);
-  const entry = useResource(dashboardResource, includeAll ? "all" : "tracked");
+  const entry = useResource(dashboardResource, DASHBOARD_KEY);
   const d = entry?.data ?? null;
   const fresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);
   return (
@@ -178,14 +118,6 @@ export function PullRequestsPage() {
       <PaneHeader className="gap-3 px-5">
         <GitPullRequest className="size-4 text-cf-text-muted" aria-hidden />
         <h1 className="text-heading">Pull Requests</h1>
-        <button
-          type="button"
-          onClick={toggle}
-          className="rounded-sm border px-1.5 py-0.5 text-caption-sm [--wails-draggable:no-drag] hover:bg-cf-control-hover"
-          data-testid="prs-scope"
-        >
-          {includeAll ? "all repositories" : "registered projects"}
-        </button>
         <span className="ml-auto flex items-center gap-2 text-caption">
           {d?.viewer && (
             <span className="font-mono" data-testid="prs-viewer">
@@ -200,7 +132,7 @@ export function PullRequestsPage() {
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {d ? (
           <div className="mx-auto max-w-6xl">
-            <Body d={d} includeAll={includeAll} />
+            <Body d={d} />
           </div>
         ) : entry?.error ? (
           <Banner tone="warn">Cannot load pull requests: {entry.error}</Banner>
@@ -212,9 +144,21 @@ export function PullRequestsPage() {
   );
 }
 
-/** The sidebar's Pull Requests entry. */
+/**
+ * How many pull requests need the viewer's review, from the dashboard the sidebar watches
+ * (useSidebarDashboard); 0 until it loads. A number, so the row re-renders only when it changes.
+ */
+function useNeedsReviewCount(): number {
+  return dashboardResource.store((s) => {
+    const d = s.entries[DASHBOARD_KEY]?.data;
+    return d ? needsReviewCount(d.reviewRequested, d.reviewed, d.viewer?.login ?? "") : 0;
+  });
+}
+
+/** The sidebar's Pull Requests entry, with an amber count of the pull requests that need the viewer's review. */
 export function PullRequestsNav() {
   const active = useUiStore((s) => s.selection.kind === "view" && s.selection.name === "pullrequests");
+  const count = useNeedsReviewCount();
   return (
     <button
       type="button"
@@ -230,6 +174,17 @@ export function PullRequestsNav() {
     >
       <GitPullRequest className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
       <span className="truncate">Pull Requests</span>
+      {count > 0 && (
+        // The pill hides the words, so the tooltip says them.
+        <Tip label={count === 1 ? "1 pull request needs your review" : `${String(count)} pull requests need your review`}>
+          <span
+            className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-cf-warning-surface px-1.5 text-caption-sm font-semibold tabular-nums text-cf-warning-text"
+            data-testid="nav-pullrequests-count"
+          >
+            {count}
+          </span>
+        </Tip>
+      )}
     </button>
   );
 }
