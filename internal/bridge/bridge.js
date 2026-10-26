@@ -353,7 +353,7 @@
   // The scheme a page pinned with /cf/theme.css?scheme=light (or dark), or "".
   function pinnedScheme() {
     var link = document.querySelector('link[href*="/cf/theme.css"]');
-    var m = link && /[?&]scheme=(dark|light)\b/.exec(link.getAttribute("href") || "");
+    var m = /[?&]scheme=(dark|light)\b/.exec(String((link && link.href) || ""));
     return m ? m[1] : "";
   }
 
@@ -408,7 +408,7 @@
     var cs = window.getComputedStyle(b);
     var h = b.scrollHeight + px(cs.marginTop) + px(cs.marginBottom);
     var y = window.scrollY || 0;
-    var kids = b.children;
+    var kids = b.children || [];
     for (var i = 0; i < kids.length; i++) {
       var ks = window.getComputedStyle(kids[i]);
       if (ks.position === "fixed" || ks.position === "absolute" || ks.display === "none") continue;
