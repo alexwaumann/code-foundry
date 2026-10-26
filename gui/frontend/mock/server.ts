@@ -1559,7 +1559,7 @@ const server = createServer((req, res) => {
   // The frame stylesheet, the bridge script and the page library need no credential, like
   // the daemon's (internal/theme/frame.go, internal/bridge, internal/pagelib).
   if (url.pathname.startsWith("/cf/")) {
-    const r = bridgeRoute(url.pathname) ?? themeRoute(url.pathname) ?? pagelibRoute(url.pathname);
+    const r = bridgeRoute(url.pathname) ?? themeRoute(url.pathname, url.searchParams.get("scheme")) ?? pagelibRoute(url.pathname);
     res.writeHead(r ? 200 : 404, { "Content-Type": r?.type ?? "text/plain", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Access-Control-Allow-Origin": "*" });
     res.end(r?.body ?? "404 page not found\n");
     return;

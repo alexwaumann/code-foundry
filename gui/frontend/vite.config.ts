@@ -37,5 +37,7 @@ export default defineConfig({
     // Vitest hands stylesheets back empty; "?raw" ones keep their text so the palette guard
     // (src/lib/palette.test.ts) can read them. Plain CSS imports stay empty.
     css: { include: [/\.css\?raw$/] },
+    // Sucrase's deep ESM modules (src/pagelib/source.ts) import without extensions: run them through Vite.
+    server: { deps: { inline: ["sucrase"] } },
   },
 });

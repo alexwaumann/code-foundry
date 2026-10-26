@@ -24,5 +24,5 @@ export function pagelibRoute(pathname: string): { type: string; body: Buffer } |
 /** The pages e2e/page-library.spec.ts shows (mock/pagelib/*.html), by file name. */
 export function pagelibPages(): Record<string, string> {
   const dir = new URL("./pagelib/", import.meta.url);
-  return Object.fromEntries(["board", "tailwind", "broken", "mockup"].map((n) => [`${n}.html`, readFileSync(new URL(`${n}.html`, dir), "utf8")]));
+  return Object.fromEntries(["board", "tailwind", "broken", "mockup", "roles", "margin", "both", "throw", "mismatch", "pinned"].map((n) => [`${n}.html`, readFileSync(new URL(`${n}.html`, dir), "utf8")]));
 }

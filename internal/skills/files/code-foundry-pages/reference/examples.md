@@ -2,83 +2,130 @@
 
 {{cf.provenance}}
 
-For the code-foundry-pages skill: three complete pages to start from. Each is one file in
+For the code-foundry-pages skill: complete pages to start from. Each is one file in
 `$CODE_FOUNDRY_PAGES`, shown with `code-foundry view.inline <path>`. Check every verb's args
-with `code-foundry help <verb>` and its JSON with `--json` before you change them.
+with `code-foundry help <verb>` and its JSON with `--json` before you change them. A list
+with actions, a dashboard or a board is React with `@cf/ui` (the first, and `react.md`);
+plain HTML is for something small (the others).
 
 What they all do: every `cf.on` passes an `onError` that shows the refusal in the page;
 every `cf.run` is caught and its message shown where it happened; a decline (`declined`)
 is the user's no, shown muted with the button back, never in the error colour; a success
 is said in the page's own words from `json`, never the CLI's `text` sentence.
 
-## A live list with an action: open PRs, merge the green ones
+## A dashboard with an action: open PRs, merge the green ones (React)
 
 The `gh` source sends the dashboard whole, now and after every change: no polling. The
 merge runs from the button's click; the app asks the user before it merges, and `head-sha`
-refuses a PR that moved since the page drew it.
+refuses a PR that moved since the page drew it. Each row keeps its own state, so a merge
+in flight or a decline stays on its row while the list updates.
 
 ```html
 <!doctype html>
 <meta charset="utf-8">
 <link rel="stylesheet" href="/cf/theme.css">
+<link rel="stylesheet" href="/cf/ui.css">
 <script src="/cf/bridge.js"></script>
-<style>
-  body { margin: 0; padding: 12px; }
-  .row { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--cf-border); }
-  .row a { color: var(--cf-link); flex: 1; }
-  .muted { color: var(--cf-text-muted); }
-  .ok { color: var(--cf-success-text); } .bad { color: var(--cf-error-text); }
-  button { background: var(--cf-accent); color: var(--cf-accent-foreground); border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-</style>
+<script src="/cf/jsx.js"></script>
 <body class="text-body">
-<div id="list" class="muted">Loading pull requests…</div>
-<p id="err" class="bad" hidden></p>
-<script type="module">
-  await cf.ready;
-  const list = document.getElementById("list");
-  const err = document.getElementById("err");
-  const green = (pr) => pr.checks.state === "success" && !pr.draft && pr.mergeable !== "conflicting";
+<div id="root"></div>
+<script type="text/tsx">
+  import { useEffect, useState } from "react";
+  import { createRoot } from "react-dom/client";
+  import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Table, TableBody, TableCell,
+    TableHead, TableHeader, TableRow } from "@cf/ui";
+  import { GitMerge } from "@cf/icons";
 
-  function row(pr) {
-    const el = document.createElement("div");
-    el.className = "row";
-    const link = Object.assign(document.createElement("a"), { href: pr.url, target: "_blank", textContent: `${pr.repoSlug}#${pr.number} ${pr.title}` });
-    const state = Object.assign(document.createElement("span"), { textContent: pr.checks.state, className: green(pr) ? "ok" : pr.checks.state === "failure" ? "bad" : "muted" });
-    el.append(link, state);
-    if (green(pr)) {
-      const btn = Object.assign(document.createElement("button"), { textContent: "Merge" });
-      btn.addEventListener("click", () => {
-        btn.disabled = true;
-        // In the click handler, before any await: a merge changes something.
-        cf.run("pr.merge", { "repo-slug": pr.repoSlug, number: pr.number, method: "merge", "head-sha": pr.headSha })
-          .then(() => { state.textContent = "merged"; state.className = "ok"; btn.remove(); })
-          .catch((e) => {
-            btn.disabled = false; // the button back either way
-            state.textContent = e.code === "declined" ? "not merged" : e.message;
-            state.className = e.code === "declined" ? "muted" : "bad";
-          });
-      });
-      el.append(btn);
-    }
-    return el;
+  await cf.ready;
+
+  type PR = { repoSlug: string; number: number; title: string; url: string; draft: boolean; mergeable: string;
+    headSha: string; checks: { state: string } };
+  const green = (pr: PR) => pr.checks.state === "success" && !pr.draft && pr.mergeable !== "conflicting";
+  const tone = (state: string) => (state === "success" ? "default" : state === "failure" ? "destructive" : "secondary");
+
+  function Row({ pr }: { pr: PR }) {
+    const [note, setNote] = useState<{ text: string; tone: string } | null>(null);
+    const [busy, setBusy] = useState(false);
+    const merge = () => {
+      setBusy(true);
+      // In the click handler, before any await: a merge changes something.
+      cf.run("pr.merge", { "repo-slug": pr.repoSlug, number: pr.number, method: "merge", "head-sha": pr.headSha })
+        .then(() => setNote({ text: "merged", tone: "text-cf-success-text" }))
+        .catch((e) => setNote(e.code === "declined" ? { text: "not merged", tone: "muted" } : { text: e.message, tone: "text-cf-error-text" }))
+        .finally(() => setBusy(false)); // the button back either way
+    };
+    return (
+      <TableRow>
+        <TableCell className="max-w-96 truncate"><a className="text-link" href={pr.url} target="_blank">{pr.repoSlug}#{pr.number} {pr.title}</a></TableCell>
+        <TableCell><Badge variant={tone(pr.checks.state)}>{pr.checks.state}</Badge></TableCell>
+        <TableCell className="text-right">
+          {note && <span className={note.tone === "muted" ? "mr-2 text-cf-text-muted" : `mr-2 ${note.tone}`}>{note.text}</span>}
+          {green(pr) && note?.text !== "merged" && <Button size="sm" disabled={busy} onClick={merge}><GitMerge /> Merge</Button>}
+        </TableCell>
+      </TableRow>
+    );
   }
 
   // A stable order (repository, then number): rows never move under the pointer.
-  const byKey = (a, b) => a.repoSlug.localeCompare(b.repoSlug) || a.number - b.number;
-  cf.on("gh", (dash) => {
-    err.hidden = true;
-    if (!dash.authenticated) { list.textContent = "Sign in to GitHub (gh auth login) to see your pull requests."; return; }
-    if (dash.authored.length === 0) { list.textContent = "No open pull requests."; return; }
-    list.className = "";
-    list.replaceChildren(...[...dash.authored].sort(byKey).map(row));
-  }, (e) => { err.textContent = e.message; err.hidden = false; });
+  const byKey = (a: PR, b: PR) => a.repoSlug.localeCompare(b.repoSlug) || a.number - b.number;
+
+  function App() {
+    const [dash, setDash] = useState<{ authenticated: boolean; authored: PR[] } | null>(null);
+    const [error, setError] = useState("");
+    useEffect(() => cf.on("gh", (d) => { setDash(d); setError(""); }, (e) => setError(e.message)), []);
+    const prs = [...(dash?.authored ?? [])].sort(byKey);
+    return (
+      <Card className="m-3">
+        <CardHeader>
+          <CardTitle>My pull requests</CardTitle>
+          <CardDescription>{dash ? `${prs.length} open, ${prs.filter(green).length} ready to merge` : "Loading…"}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && <p className="text-cf-error-text">{error}</p>}
+          {dash && !dash.authenticated && <p className="text-cf-text-muted">Sign in to GitHub (gh auth login) to see your pull requests.</p>}
+          {dash?.authenticated && prs.length === 0 && <p className="text-cf-text-muted">No open pull requests.</p>}
+          {prs.length > 0 && (
+            <Table>
+              <TableHeader><TableRow><TableHead>Pull request</TableHead><TableHead>Checks</TableHead><TableHead /></TableRow></TableHeader>
+              <TableBody>{prs.map((pr) => <Row key={`${pr.repoSlug}#${pr.number}`} pr={pr} />)}</TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  createRoot(document.getElementById("root")!).render(<App />);
 </script>
 ```
 
 To merge every green one with one button, start every `cf.run` inside that one click:
 `await Promise.allSettled(prs.filter(green).map((pr) => cf.run("pr.merge", {...})))`. The
 app asks once per PR.
+
+## Something small in plain HTML: one live figure
+
+A single number that follows the app needs no React: plain DOM and the theme's classes.
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="/cf/theme.css">
+<script src="/cf/bridge.js"></script>
+<body class="text-body">
+<p class="text-overline">Ready to merge</p>
+<p id="n" class="text-display">…</p>
+<p id="err" class="text-caption" hidden></p>
+<script type="module">
+  await cf.ready;
+  const n = document.getElementById("n");
+  const err = document.getElementById("err");
+  cf.on("gh", (dash) => {
+    err.hidden = true;
+    n.textContent = dash.authored.filter((pr) => pr.checks.state === "success" && !pr.draft).length;
+  }, (e) => { err.textContent = e.message; err.hidden = false; });
+</script>
+```
 
 ## A form that creates threads
 

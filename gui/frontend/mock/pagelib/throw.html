@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Render throws</title>
+<link rel="stylesheet" href="/cf/theme.css">
+<script src="/cf/bridge.js"></script>
+<script src="/cf/jsx.js"></script>
+<body class="text-body">
+<div id="root"></div>
+<script type="text/tsx">
+  import { createRoot } from "react-dom/client";
+  function App(): never {
+    throw new Error("render exploded");
+  }
+  createRoot(document.getElementById("root")!).render(<App />);
+</script>

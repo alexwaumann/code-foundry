@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Roles and utilities</title>
+<link rel="stylesheet" href="/cf/theme.css">
+<link rel="stylesheet" href="/cf/ui.css">
+<script src="/cf/bridge.js"></script>
+<script src="/cf/jsx.js"></script>
+<body class="text-body">
+<div id="root"></div>
+<script type="text/tsx">
+  // A role with a colour or weight utility, Badges and Buttons (their text is a colour
+  // utility on a role), an indeterminate Checkbox, and strings that read like imports
+  // (docs/notes/page-library-fixes-a.md); e2e/page-library.spec.ts.
+  import { createRoot } from "react-dom/client";
+  import { Badge, Button, Card, CardContent, Checkbox, Label } from "@cf/ui";
+
+  await cf.ready;
+
+  function App() {
+    return (
+      <Card className="m-3">
+        <CardContent className="flex flex-col gap-3">
+          <p data-testid="err" className="text-body text-cf-error-text">An error in the error colour</p>
+          <p data-testid="ok" className="text-caption text-cf-success-text">A caption in the success colour</p>
+          <p data-testid="normal" className="text-heading font-normal">A heading at normal weight</p>
+          <p data-testid="bold" className="text-body font-semibold">Body text, semibold</p>
+          <div className="flex items-center gap-2">
+            <Badge data-testid="badge">default</Badge>
+            <Badge data-testid="badge-destructive" variant="destructive">destructive</Badge>
+            <Badge variant="secondary">secondary</Badge>
+            <Badge variant="outline">outline</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button data-testid="button">Default</Button>
+            <Button variant="destructive">Destructive</Button>
+            <Button variant="outline">Outline</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id="some" data-testid="mixed" checked="indeterminate" />
+            <Label htmlFor="some">Some of them</Label>
+          </div>
+          <p data-testid="strings" className="text-caption">{'copied from "/tmp/report.txt"'} | {"run: import './setup.js' first"}</p>
+          <span data-testid="ref-error" style={{ color: "var(--cf-error-text)" }} />
+          <span data-testid="ref-success" style={{ color: "var(--cf-success-text)" }} />
+          <span data-testid="ref-muted" style={{ color: "var(--cf-text-muted)" }} />
+          <span data-testid="ref-on-accent" style={{ color: "var(--cf-accent-foreground)" }} />
+        </CardContent>
+      </Card>
+    );
+  }
+  createRoot(document.getElementById("root")!).render(<App />);
+</script>

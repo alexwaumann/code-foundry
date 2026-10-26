@@ -54,8 +54,11 @@ const root = (f: MockFrame, indent = "") =>
     .join("") +
   `${indent}}\n`;
 
-/** GET /cf/theme.css or /cf/theme.json; undefined for any other path (a 404). */
-export function themeRoute(pathname: string): { type: string; body: string } | undefined {
+/** GET /cf/theme.css (?scheme=dark or light pins it, Live.PinnedCSS) or /cf/theme.json; undefined for any other path (a 404). */
+export function themeRoute(pathname: string, scheme: string | null = null): { type: string; body: string } | undefined {
+  if (pathname === "/cf/theme.css" && (scheme === "dark" || scheme === "light")) {
+    return { type: "text/css; charset=utf-8", body: root(published?.scheme === scheme ? published : defaults[scheme]) + frameCss };
+  }
   if (pathname === "/cf/theme.css") {
     const head = published ? root(published) : root(defaults.dark) + "@media (prefers-color-scheme: light) {\n" + root(defaults.light, "  ") + "}\n";
     return { type: "text/css; charset=utf-8", body: head + frameCss };

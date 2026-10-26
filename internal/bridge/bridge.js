@@ -350,12 +350,30 @@
     });
   }
 
+  // The scheme a page pinned with /cf/theme.css?scheme=light (or dark), or "".
+  function pinnedScheme() {
+    var link = document.querySelector('link[href*="/cf/theme.css"]');
+    var m = /[?&]scheme=(dark|light)\b/.exec(String((link && link.href) || ""));
+    return m ? m[1] : "";
+  }
+
   // The new slots on :root, over the stylesheet's, so a page that only links /cf/theme.css
-  // repaints without the reload a missing ack would cost it.
+  // repaints without the reload a missing ack would cost it. A page pinned to a scheme keeps
+  // its stylesheet's slots while the app shows the other (cf.theme still says what it shows).
   function applyTheme(t) {
     if (!t || typeof t !== "object") return;
     cf.theme = { id: t.id, scheme: t.scheme, vars: t.vars || {} };
     var root = document.documentElement;
+    var pinned = pinnedScheme();
+    if (pinned && pinned !== t.scheme) {
+      if (root) {
+        Object.keys(t.vars || {}).forEach(function (k) {
+          if (k.indexOf("--") === 0) root.style.removeProperty(k);
+        });
+        root.style.colorScheme = "";
+      }
+      return;
+    }
     if (root && t.vars && typeof t.vars === "object") {
       Object.keys(t.vars).forEach(function (k) {
         if (k.indexOf("--") === 0) root.style.setProperty(k, String(t.vars[k]));
@@ -375,11 +393,31 @@
     };
   }
 
+  function px(v) {
+    return parseFloat(v) || 0;
+  }
+
+  // The page's height: the body's, with its margins, or further down the margin box of
+  // its last in-flow child. A first or last child's vertical margin collapses out of a body
+  // with no padding or border (ui.css's body has no margin either), and scrollHeight misses
+  // it: `<Card className="m-3">` alone would be cut by 24px. Fixed and absolute children
+  // are left out: an overlay is the frame's height, and scrollHeight counts the rest.
   function measure() {
     var b = document.body;
     if (!b) return 0;
     var cs = window.getComputedStyle(b);
-    var h = b.scrollHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    var h = b.scrollHeight + px(cs.marginTop) + px(cs.marginBottom);
+    var y = window.scrollY || 0;
+    var kids = b.children || [];
+    for (var i = 0; i < kids.length; i++) {
+      var ks = window.getComputedStyle(kids[i]);
+      if (ks.position === "fixed" || ks.position === "absolute" || ks.display === "none") continue;
+      var edge = kids[i].getBoundingClientRect().bottom + y;
+      var below = px(cs.paddingBottom) + px(cs.borderBottomWidth);
+      // With nothing between them, the child's and the body's bottom margins collapse to the larger.
+      var gap = below > 0 ? px(ks.marginBottom) + below + px(cs.marginBottom) : Math.max(px(ks.marginBottom), px(cs.marginBottom));
+      h = Math.max(h, edge + gap);
+    }
     return Math.ceil(h);
   }
 
