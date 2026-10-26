@@ -528,9 +528,9 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   };
   const refocus = () => editorRef.current?.focus();
 
-  // Work in's existing branches (W2): every git project's, merged by name, newest first.
+  // Work in's existing branches (W2): every git project's, merged by name, newest first, minus the default branches.
   const branchGroup = useMemo<PickerGroup>(
-    () => ({ options: mergedBranches(branchLists.lists).map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true })), status: branchLists.status || undefined }),
+    () => ({ options: mergedBranches(branchLists.lists, branchLists.defaults).map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true })), status: branchLists.status || undefined }),
     [branchLists],
   );
   const worktreeGroups = useMemo<PickerGroup[]>(() => {

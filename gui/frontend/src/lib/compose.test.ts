@@ -317,12 +317,17 @@ describe("Work in", () => {
     expect(workInText(input)).toBe(want);
   });
 
-  it.each<[string, string[][], string[]]>([
-    ["one project: its order", [["feat/parser", "main", "develop"]], ["feat/parser", "main", "develop"]],
-    ["two projects: position by position, merged by name", [["feat/parser", "main", "develop"], ["fix/resize", "main", "feat/sidebar", "release/1.4"]], ["feat/parser", "fix/resize", "main", "develop", "feat/sidebar", "release/1.4"]],
-    ["none", [], []],
-  ])("mergedBranches: %s", (_, lists, want) => {
-    expect(mergedBranches(lists)).toEqual(want);
+  it.each<[string, string[][], string[], string[]]>([
+    ["one project: its order, minus its default", [["feat/parser", "main", "develop"]], ["main"], ["feat/parser", "develop"]],
+    [
+      "two projects: position by position, merged by name, minus every default",
+      [["feat/parser", "main", "develop"], ["fix/resize", "trunk", "main", "feat/sidebar", "release/1.4"]],
+      ["main", "trunk"],
+      ["feat/parser", "fix/resize", "develop", "feat/sidebar", "release/1.4"],
+    ],
+    ["none", [], [], []],
+  ])("mergedBranches: %s", (_, lists, defaults, want) => {
+    expect(mergedBranches(lists, defaults)).toEqual(want);
   });
 
   it.each<[string, string[][], string[], string[]]>([

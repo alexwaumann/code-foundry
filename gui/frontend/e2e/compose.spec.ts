@@ -262,11 +262,11 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await page.getByTestId("composer-worktree").click();
   const list = page.getByTestId("composer-worktree-list");
   const options = list.getByRole("option");
-  // The two choices, then the project's branches (newest first) under a search box.
+  // The two choices, then the project's branches (newest first, the default branch left
+  // out: Project folder works on it) under a search box.
   await expect(options).toHaveText([
     /^Fresh copy\s*Edits land in a new branch with its own worktree\. Multiple threads at a time is safe\.$/,
     /^Project folder\s*Edits land in ~\/src\/code-foundry directly\. One thread at a time is safest\.$/,
-    "main",
     "feat/sidebar",
     "fix/resize",
     "release/v0.3",
@@ -327,7 +327,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
 
   // An existing branch: the pill is its name, no indicator and no base (the daemon reuses its worktree).
   await worktree.click();
-  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in ~\/src\/code-foundry/, "main", "feat/sidebar", "fix/resize", "release/v0.3"]);
+  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in ~\/src\/code-foundry/, "feat/sidebar", "fix/resize", "release/v0.3"]);
   await options.filter({ hasText: "feat/sidebar" }).click();
   await expect(worktree).toHaveText("feat/sidebar");
   await expect(worktree).toHaveAccessibleName("Work in: feat/sidebar");

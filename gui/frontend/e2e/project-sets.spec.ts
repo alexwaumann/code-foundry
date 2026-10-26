@@ -132,8 +132,10 @@ test("Work in: an existing branch for a set, from every project's branches; thre
   await worktree.click();
   const list = page.getByTestId("composer-worktree-list");
   const options = list.getByRole("option");
-  // The two choices, then both projects' branches merged by name, newest first.
-  await expect(options).toHaveText([/^Fresh copies\s*Edits land/, /^Project folders\s*Edits land/, "main", "feat/sidebar", "fix/resize", "release/v0.3"]);
+  // The two choices, then both projects' branches merged by name, newest first, without
+  // the default branch (main, both projects'): Project folders works on it.
+  await expect(options).toHaveText([/^Fresh copies\s*Edits land/, /^Project folders\s*Edits land/, "feat/sidebar", "fix/resize", "release/v0.3"]);
+  await expect(options.filter({ hasText: /^main$/ })).toHaveCount(0);
   // The search filters the branches only; the choices stay.
   await expect(list.getByPlaceholder("Find existing branch")).toBeFocused();
   await page.keyboard.type("resize");

@@ -10,7 +10,8 @@ Builds on `docs/notes/base-origin-rule.md` (ListRefs `branches` and `default_bra
   Project folder/folders, wording unchanged) above a "Find existing branch" search and the
   branch rows: short names in monospace with a GitBranch icon, no detail, no heading. The
   source is every git project's `ListRefs.branches` (each newest commit first) merged by
-  name position by position in set order (`lib/compose mergedBranches`). The search filters
+  name position by position in set order, minus the default branches (`lib/compose
+  mergedBranches`). The search filters
   the branch rows only. This replaces the single-project "An existing copy" group
   (worktree paths): a branch that has a worktree is picked by name and the daemon reuses
   the worktree (or makes one).
@@ -74,10 +75,10 @@ Builds on `docs/notes/base-origin-rule.md` (ListRefs `branches` and `default_bra
   projects in the draft rather than the set's size: a set of one repository and one plain
   folder has one default branch.
 - The "Default branch(es)" row is monospace like the branches, as in the sketch.
-- Work in lists every branch, the default branch too. Picking the branch the main
-  checkout is on is refused by the daemon ("a main checkout on the branch", fuzz finding
-  A7) with its error under the composer; filtering such branches out was not part of the
-  design.
+- Work in leaves out every git project's default branch, as Branch from does: Project
+  folder(s) is how to work on it, and a worktree on the branch a main checkout has is
+  refused by the daemon ("a main checkout on the branch", fuzz finding A7). A main
+  checkout on some other branch still lists that branch; picking it gets the same refusal.
 - Branch from intersects by name only; a branch only on origin in one project and local
   in another counts as common (ListRefs merges the two copies).
 
@@ -85,9 +86,14 @@ Builds on `docs/notes/base-origin-rule.md` (ListRefs `branches` and `default_bra
 
 - `threads.default_worktree` and its default; the like draft ("New thread on this
   branch"); a project without git (Project folder only, no search).
-- docs/GETTING-STARTED.md: it never described "An existing copy" or the base picker, so
-  nothing in it stated the old behaviour. (Its "the pill reads **In place**" predates
-  PR #365's "Project folder" wording; left for a docs pass with the skill's bundled copy.)
+
+## Guide
+
+docs/GETTING-STARTED.md's Work in passage: the stale "the pill reads **In place**"
+(PR #365 made it Project folder / Project folders) is fixed, and a bullet says the list
+also offers existing branches. The help skill's `reference/getting-started.md` is the
+same file embedded (`docs/embed.go`, provenance line added at build), so there is no
+second copy to edit; `internal/skills` tests check they match.
 
 ## Verified with
 

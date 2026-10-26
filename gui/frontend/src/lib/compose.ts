@@ -122,10 +122,12 @@ export const PROJECT_FOLDERS = "Project folders";
 /**
  * Work in's existing branches: every git project's ListRefs.branches (each newest commit
  * first) merged by name, position by position in request order, so the newest of every
- * project come first. Stable for the same lists.
+ * project come first, minus every project's default branch (`defaults`: Project
+ * folder(s) is the way to work on it, and the daemon refuses a worktree on a branch a
+ * main checkout has). Stable for the same lists.
  */
-export function mergedBranches(lists: readonly (readonly string[])[]): string[] {
-  const seen = new Set<string>();
+export function mergedBranches(lists: readonly (readonly string[])[], defaults: readonly string[] = []): string[] {
+  const seen = new Set<string>(defaults);
   const out: string[] = [];
   const longest = Math.max(0, ...lists.map((l) => l.length));
   for (let i = 0; i < longest; i++) {
