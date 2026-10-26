@@ -52,8 +52,10 @@ const (
 	WarnNoThemeCSS = "page does not link /cf/theme.css, so it will not follow the user's theme; add " +
 		`<link rel="stylesheet" href="/cf/theme.css"> and use --cf-* variables (--cf-surface, --cf-text, ` +
 		"--cf-text-muted, --cf-accent, --cf-border, …), not fixed colours or prefers-color-scheme"
-	WarnNoResize = "page does not post cf:resize, so its card keeps the default height; on load, post " +
-		`{type: "cf:resize", height: document.body.scrollHeight} to parent`
+	// WarnNoResize points at the bridge, not a hand-posted cf:resize: models that read the
+	// old wording wrote the pre-bridge workaround (docs/notes/page-library-fixes-b.md).
+	WarnNoResize = "page does not load /cf/bridge.js, so its card keeps the default height; add " +
+		`<script src="/cf/bridge.js"></script>` + " (it sizes the card); the code-foundry-pages skill says how pages are made"
 	// WarnNoBridge: the page calls window.cf without the script that defines it
 	// (docs/notes/bridge-3-skill.md). It replaces WarnNoResize: the script sizes the card.
 	WarnNoBridge = "page uses cf.* but does not load /cf/bridge.js, so window.cf is undefined; add " +

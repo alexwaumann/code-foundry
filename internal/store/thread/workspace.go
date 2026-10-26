@@ -51,7 +51,7 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"Here: how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo; what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both; " +
 	"cost: code-foundry usage.show; " +
 	"to show: code-foundry view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked); " +
-	"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line; a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown; " +
+	"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line; a page, mockup, chart or form to fill in is an .html file in $CODE_FOUNDRY_PAGES, not the repo unless asked (skill code-foundry-pages first), shown with view.inline <file>, not markdown; " +
 	"PRs: code-foundry pr.create (project.github.publish off GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
 	"never suggest /model or /cost; " +

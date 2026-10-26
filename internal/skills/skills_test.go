@@ -266,8 +266,9 @@ func TestRender(t *testing.T) {
 		}
 	}
 	// A page shows inline in the conversation (inline-html): both skills name the verb,
-	// --panel and cf:resize.
-	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it beside the thread", "`{type: \"cf:resize\", height}`"} {
+	// --panel and that /cf/bridge.js sizes the card (never a hand-posted cf:resize:
+	// page-library-fixes-b).
+	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it beside the thread", "/cf/bridge.js", "sizes its card"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}

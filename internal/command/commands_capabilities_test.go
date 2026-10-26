@@ -221,7 +221,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 			has: []string{"panel: 9 surfaces.", "--thread (default: the thread you run in)",
 				"  view.panel.worktree      the overview of the worktree the thread runs in", "  view.panel.mcp ", "  view.panel.agents ",
 				"  view.panel.linked-prs ", "  view.panel.usage ", "  view.panel.threads ",
-				"  view.panel.file ", "  view.panel.diff ", "  view.panel.pr ", "renders as a chip", ".html files render there interactively", "view.inline <path> (--title, --panel) shows an .html page inline", "cf:resize",
+				"  view.panel.file ", "  view.panel.diff ", "  view.panel.pr ", "renders as a chip", ".html files render there interactively", "view.inline <path> (--title, --panel) shows an .html page inline", "/cf/bridge.js sizes the card",
 				"Plugin surfaces (their show verb acts on each window's selection, not a thread):\n  plugin.gh-actions.show.runs", "Actions (thread scope, from the plugin gh-actions)\n",
 				"Panel actions (they flip state you cannot see): view.panel.", "view.panel.toggle", "view.panel.split",
 				"`code-foundry ui.presence --json` only tells you whether to mention", "a \"show me\" is asking",
