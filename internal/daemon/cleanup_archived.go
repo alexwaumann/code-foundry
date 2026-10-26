@@ -18,12 +18,16 @@ import (
 // at once when the app made it, its status is clean with no operation in progress
 // (project.ArchivedVerdict), no other thread that is not archived has it as a checkout
 // or its cwd, and no terminal is open in it
-// (cleanupHold). Never its branch. Runs in the background, after the archive.
+// (cleanupHold). Never its branch. Runs in the background, after the archive. A removed
+// thread's go the same way, after the removal (Options.Removed;
+// docs/notes/remove-cleans-worktrees.md): the abandoned sweep (cleanup.go) stays the
+// backstop for what neither reaches.
 
-// archiveCleanupTimeout bounds one archived thread's cleanup (a refresh per member).
+// archiveCleanupTimeout bounds one archived or removed thread's cleanup (a refresh per
+// member).
 const archiveCleanupTimeout = 2 * time.Minute
 
-// archiveCleaner removes archived threads' derived worktrees.
+// archiveCleaner removes archived and removed threads' derived worktrees.
 type archiveCleaner struct {
 	log       *slog.Logger
 	projects  project.Store
@@ -44,32 +48,40 @@ func (c *archiveCleaner) stop() {
 }
 
 // archived is thread.Options.Archived: it starts t's cleanup and returns at once.
-func (c *archiveCleaner) archived(t thread.Thread) {
+func (c *archiveCleaner) archived(t thread.Thread) { c.start(t, "archived") }
+
+// removed is thread.Options.Removed: the same for a thread just removed (t as it was;
+// it is no longer in the snapshot, so it holds nothing itself).
+func (c *archiveCleaner) removed(t thread.Thread) { c.start(t, "removed") }
+
+// start runs t's cleanup in the background; cause ("archived", "removed") goes in the log.
+func (c *archiveCleaner) start(t thread.Thread, cause string) {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		ctx, cancel := context.WithTimeout(c.ctx, archiveCleanupTimeout)
 		defer cancel()
-		c.clean(ctx, t)
+		c.clean(ctx, t, cause)
 	}()
 }
 
 // clean removes t's derived worktrees that nothing else holds.
-func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread) {
+func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread, cause string) {
 	for _, co := range c.checkouts(t) {
 		if !co.Derived || co.Missing || !co.Registered || co.Path == "" {
 			continue
 		}
-		c.cleanOne(ctx, "thread", t.ID, co.ProjectID, co.Path)
+		c.cleanOne(ctx, cause, "thread", t.ID, co.ProjectID, co.Path)
 	}
 }
 
-// cleanOne runs the archived verdict on one worktree (by is "thread" or "project", id
-// its id, for the log). Cleanups of one path run one at a time: threads archived
+// cleanOne runs the archived verdict on one worktree (cause is "archived", "removed" or
+// "unregistering", by "thread" or "project", id its id, for the log). Cleanups of one
+// path run one at a time: threads archived
 // together that share a worktree each start one, and the later ones find it no longer
 // listed (NotFound after Cleanup's refresh) instead of failing on a worktree git just
 // removed.
-func (c *archiveCleaner) cleanOne(ctx context.Context, by, id, projectID, path string) {
+func (c *archiveCleaner) cleanOne(ctx context.Context, cause, by, id, projectID, path string) {
 	v, _ := c.pathLocks.LoadOrStore(filepath.Clean(path), &sync.Mutex{})
 	mu := v.(*sync.Mutex)
 	mu.Lock()
@@ -83,13 +95,13 @@ func (c *archiveCleaner) cleanOne(ctx context.Context, by, id, projectID, path s
 	})
 	switch {
 	case errors.Is(err, project.ErrNotFound):
-		c.log.Debug("worktree already removed", by, id, "project", projectID, "path", path)
+		c.log.Debug("worktree already removed", by, id, "cause", cause, "project", projectID, "path", path)
 	case err != nil:
-		c.log.Warn("worktree not cleaned up", by, id, "project", projectID, "path", path, "err", err)
+		c.log.Warn("worktree not cleaned up", by, id, "cause", cause, "project", projectID, "path", path, "err", err)
 	case len(res.Removed) > 0:
-		c.log.Info("worktree removed (its branch stays)", by, id, "project", projectID, "path", path)
+		c.log.Info("worktree removed (its branch stays)", by, id, "cause", cause, "project", projectID, "path", path)
 	case len(res.Skipped) > 0:
-		c.log.Info("worktree kept", by, id, "project", projectID, "path", path, "reason", res.Skipped[0].Reason)
+		c.log.Info("worktree kept", by, id, "cause", cause, "project", projectID, "path", path, "reason", res.Skipped[0].Reason)
 	}
 }
 
@@ -109,7 +121,7 @@ func (c *archiveCleaner) unregistering(ctx context.Context, projectID string) {
 		if w.IsMain || !w.Managed {
 			continue
 		}
-		c.cleanOne(ctx, "project", projectID, projectID, w.Path)
+		c.cleanOne(ctx, "unregistering", "project", projectID, projectID, w.Path)
 	}
 }
 

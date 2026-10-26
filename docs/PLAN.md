@@ -76,6 +76,10 @@ with a `workspaces-v2-<n>-*.md` note.
   hints, chip paths, the header's place name opens the workspace's card; new-like takes the
   default model and effort) on `cf/workspaces-v2-fix-composer`:
   `docs/notes/workspaces-v2-fix-4-composer.md`.
+* Remove cleans worktrees (`thread.Options.Removed`: a removed thread's derived worktrees
+  go through the archived verdict like an archived thread's, logged `cause=removed`;
+  `thread.remove`'s confirm says so for a thread in a worktree Code Foundry made) on
+  `cf/remove-cleans-worktrees`: `docs/notes/remove-cleans-worktrees.md`.
 
 ### Multi-repo workspaces: the five steps are built
 

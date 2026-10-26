@@ -487,7 +487,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   (`Options.Archived`), which removes each derived worktree the app made that is clean
   and that no other thread or terminal holds (`project.ArchivedVerdict`,
   `internal/daemon/cleanup_archived.go`; cleanups of one path run one at a time), never
-  its branch (`docs/notes/workspaces-v2-1-threads.md`). Unregistering a project runs the
+  its branch (`docs/notes/workspaces-v2-1-threads.md`). A removal does the same with the
+  removed thread (`Options.Removed`, after its row and tombstone; the abandoned sweep stays
+  the backstop; `docs/notes/remove-cleans-worktrees.md`). Unregistering a project runs the
   same verdict first over every worktree the app made for it
   (`api.Project.WithBeforeUnregister`); a member whose project is no longer registered is
   left out of a start with one timeline note.

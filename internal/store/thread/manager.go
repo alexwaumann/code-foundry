@@ -122,6 +122,13 @@ type Options struct {
 	// back into the store. The daemon removes the thread's derived worktrees nobody else
 	// has from it, in the background (docs/notes/workspaces-v2-1-threads.md).
 	Archived func(t Thread)
+	// Removed, when set, is called with the thread Remove just removed, as it was (a
+	// removal does not cascade: its children are adopted, orphans.go), after its
+	// tombstone is in and its row is gone from the snapshot, under the store's lock: it
+	// must return at once and not call back into the store. The daemon removes the
+	// thread's derived worktrees nobody else has from it, as for an archive
+	// (docs/notes/remove-cleans-worktrees.md).
+	Removed func(t Thread)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -1178,6 +1185,9 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	m.removed.add(tomb)
 	m.rebuildLocked()
 	m.log.Info("thread removed", "thread", id, "name", rec.s.Name, "created_by", rec.s.CreatedBy)
+	if m.opts.Removed != nil {
+		m.opts.Removed(rec.s) // its worktrees nobody else has go (the daemon's archiveCleaner)
+	}
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
 	m.fireRemovedLocked(tomb)     // before forgetLocked deletes the subscriptions
 	m.forgetLocked(id, "removed") // wake subscriptions (subscriptions.go)
