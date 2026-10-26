@@ -321,7 +321,7 @@ func TestRenderPagesSkill(t *testing.T) {
 		"`text/jsx` and `text/babel` work too", "types stripped", "in document order", "write the app as one script",
 		"red box at the top of the page", "No charting or other library", "`var(--cf-chart-1)`", "An arbitrary value",
 		"return what `cf.on` returns", "no Dialog that asks before merging or archiving", "`<TooltipProvider>`", "`<Toaster />`",
-		"`min-h-[420px]`", `cf.run("thread.archive", { id: t.id })`, `e.code === "declined"`, "t.id !== cf.thread.id", "localeCompare",
+		"`min-h-112`", "`/cf/theme.css?scheme=light`", `<html style="font-size: 18px">`, `cf.run("thread.archive", { id: t.id })`, `e.code === "declined"`, "t.id !== cf.thread.id", "localeCompare",
 		// The mockup: no theme, its own palette, the runtime's @theme, the bridge for sizing.
 		"## A mockup of another product", "Leave out `/cf/theme.css` and `/cf/ui.css`", "`color-scheme`", `<style type="text/tailwindcss">`,
 		"No `@import` in it", "say in the reply that it is a mockup",

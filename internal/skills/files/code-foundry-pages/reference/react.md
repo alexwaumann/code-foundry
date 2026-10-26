@@ -35,9 +35,11 @@ Imports (`/cf/jsx.js` maps them; nothing else resolves, no other package exists)
 - No charting or other library: draw charts as SVG in JSX (`<rect>`, `<path>`), coloured
   with `var(--cf-chart-1)` … `var(--cf-chart-6)`.
 - `/cf/ui.css` has the components' own classes and everyday utilities (flex, grid, gap,
-  padding, margin, widths, `bg-cf-*`, `text-cf-*`, `border-cf-*`, the type roles, `rounded-*`).
-  An arbitrary value (`w-[217px]`, `grid-cols-[2fr_1fr]`) or a rarer utility needs
-  `/cf/tailwind.js` as well; with it every utility works, `ui.css` still first.
+  padding, margin, `bg-cf-*`, `text-cf-*`, `border-cf-*`, the type roles, `rounded-*`, and
+  `w-`, `h-`, `min-h-`, `max-h-` … in 4px steps up to 160: `min-h-112` is 448px).
+  An arbitrary value (`min-h-[420px]`, `w-[217px]`, `grid-cols-[2fr_1fr]`) does nothing with
+  it alone (view.inline warns): use the scale or a `style={{…}}`, or add `/cf/tailwind.js`
+  for any utility (`ui.css` still first; it compiles in the page, about 130 ms).
 - `dark:` follows the app's scheme. Paint with the cf colours (`bg-cf-surface-raised`,
   `text-cf-text-muted`, `border-cf-border`, `text-cf-success-text`), never `bg-white` or a
   hex: the user's theme decides, dark or light.
@@ -51,8 +53,19 @@ Imports (`/cf/jsx.js` maps them; nothing else resolves, no other package exists)
   no Dialog that asks before merging or archiving: the app's own dialog does.
 - Keep the row's id from when it was drawn, as in plain pages; rows stay put.
 - `Dialog`, `Popover`, menus and toasts draw inside the card, not over the app: give the
-  root a `min-h-[420px]` when a dialog opens. Wrap the app in `<TooltipProvider>` for
+  root a `min-h-112` when a dialog opens. Wrap the app in `<TooltipProvider>` for
   tooltips and render one `<Toaster />` for `toast`.
+
+## Light only, or bigger
+
+- **One scheme always** ("make it light only"): link `/cf/theme.css?scheme=light` (or
+  `dark`). It serves the user's theme when it is of that scheme, else the default one, and
+  the bridge keeps it when the app switches. Never redeclare `--cf-*` slots as hex: a page
+  that sets some keeps the other scheme in the rest (inputs, controls, menus), and the
+  components read names (`--primary`, `--card`) resolved from the slots on `:root`.
+- **Bigger text** ("larger", "for a screen across the room"): `<html style="font-size: 18px">`
+  (16px is normal). The type roles and every size and spacing utility are in rem, so the
+  whole page scales together; never `font-size: … !important` on the roles.
 
 ## A board with actions: threads you can archive
 

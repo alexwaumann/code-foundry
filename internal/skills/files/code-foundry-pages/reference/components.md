@@ -59,7 +59,7 @@ import { Archive } from "@cf/icons";
 
 - `Input`: a text box; `value` + `onChange`, `placeholder`, `type` (password for a token).
 - `Textarea`: a multi-line box, grows with its text.
-- `Checkbox`: `checked` + `onCheckedChange(checked)`; pair with a `Label`.
+- `Checkbox`: `checked` + `onCheckedChange(checked)`; pair with a `Label`; `checked="indeterminate"` draws a dash (some of a list ticked).
 - `Switch`: `checked` + `onCheckedChange(checked)`; `size` default or sm.
 - `RadioGroup`: `value` + `onValueChange`; `variant` default (a column of `RadioGroupItem`s) or segmented (a segmented control of `RadioGroupChoice`s).
 - `RadioGroupItem`: a round radio; `value`.
@@ -79,11 +79,11 @@ import { Archive } from "@cf/icons";
 
 ## Overlays
 
-These draw inside the page's card, never over the app: give the page room (a `min-h-[420px]` root) for a dialog or a long menu.
+These draw inside the page's card, never over the app: give the page room for a dialog or a long menu with a root `min-h-112` (448px; sizes go in 4px steps, `min-h-96` is 384px). An arbitrary value (`min-h-[420px]`) does nothing without `/cf/tailwind.js`.
 
 - `Dialog`: `open` + `onOpenChange`, or a `DialogTrigger` inside it.
 - `DialogTrigger`: what opens it (`asChild` around a `Button`).
-- `DialogContent`: the panel, no padding of its own: `className="max-w-md p-5 flex flex-col gap-4"`.
+- `DialogContent`: the panel, no padding of its own: `className="max-w-md p-5 flex flex-col gap-4"`. In a page it stops at the card's bottom edge and scrolls, so a long one keeps its buttons in reach.
 - `DialogHeader`: title and description, stacked.
 - `DialogTitle`: required for accessibility.
 - `DialogDescription`: muted text under the title.
@@ -92,7 +92,7 @@ These draw inside the page's card, never over the app: give the page room (a `mi
 - `Popover`: `open` + `onOpenChange` or uncontrolled.
 - `PopoverTrigger`: what opens it (`asChild`).
 - `PopoverAnchor`: positions it against another element.
-- `PopoverContent`: the floating panel; `align`, `side`, `sideOffset`.
+- `PopoverContent`: the floating panel, 240px wide, no padding of its own: `className="p-3"` (`w-72` wider); `align`, `side`, `sideOffset`.
 - `DropdownMenu`: a menu on a button.
 - `DropdownMenuTrigger`: what opens it (`asChild` around a `Button`).
 - `DropdownMenuContent`: the menu; `align` start, center or end.
@@ -113,7 +113,7 @@ These draw inside the page's card, never over the app: give the page room (a `mi
 - `TooltipProvider`: wrap the page's root in one, or no tooltip opens.
 - `Tooltip`: `TooltipTrigger` + `TooltipContent` inside.
 - `TooltipTrigger`: what it describes (`asChild`).
-- `TooltipContent`: the tip; `side`.
+- `TooltipContent`: the tip, no padding of its own: `className="px-2.5 py-1.5 text-body-sm"`; `side`. Prefer `Tip`, which has it.
 - `Tip`: the one-liner, `<Tip label="Archive"><Button size="icon" …/></Tip>`; `side`; only for what the trigger hides (an icon button).
 - `Command`: a filterable list (cmdk): `CommandInput`, then a `CommandList` of `CommandGroup`s of `CommandItem`s.
 - `CommandInput`: the search box; `placeholder`.
