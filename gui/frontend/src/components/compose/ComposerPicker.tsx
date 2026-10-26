@@ -261,7 +261,7 @@ export function ComposerPicker({
                 {inList && (
                   // The rules above and below set the filter box apart from both lists; sticky
                   // so it stays in reach while the filtered rows scroll.
-                  <div className="sticky top-0 z-10 border-t border-cf-border bg-popover" data-slot="picker-filter">
+                  <div className="sticky top-0 z-10 border-t border-cf-border bg-cf-surface-overlay" data-slot="picker-filter">
                     {input}
                   </div>
                 )}

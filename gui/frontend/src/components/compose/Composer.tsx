@@ -361,17 +361,19 @@ function inPlaceDetail(path: string): string {
  * The project chips (MemberChips) and the collision hints above the card. The card:
  * attachments, the prompt, the model/effort/permission pickers, attach and send; below it
  * the Work in picker (where the thread runs), the Runs in picker for a set (its primary:
- * a project, or the workspace's folder) and the base-ref picker for new worktrees, or the
- * chosen worktree's branch (read-only, not a Tab stop). Grid placement keeps the send
- * button inside the card while Tab goes textarea → pickers → send; the chips come before
- * the prompt.
+ * a project, or the workspace's folder) and Branch from for a new branch, or the chosen
+ * worktree's branch (read-only, not a Tab stop). Grid placement keeps the send button
+ * inside the card while Tab goes textarea → pickers → send; the chips come before the
+ * prompt.
  *
  * A lone project (no workspace): a fresh copy, the project folder itself, or an existing
- * worktree (the default from stores/compose projectWorktree). A set (several projects, or
- * a workspace): fresh copies on one new branch, or every project's own checkout; the base
- * picker lists the primary's refs and applies to it, the others branch from their
- * defaults. A like draft ("New thread on this branch") shows what thread.new-like copies
- * (the set, branch, workspace and mode, read-only) and lets only the primary change.
+ * branch found by name below the two (the default from stores/compose projectWorktree; an
+ * existing worktree by path from the sidebar's "+"). A set (several projects, or a
+ * workspace): fresh copies on one new branch, every project's own checkout, or an
+ * existing branch from any project's list. Branch from lists the branches every git
+ * project has (ListRefs.branches, loaded when a picker opens) and applies to all of them.
+ * A like draft ("New thread on this branch") shows what thread.new-like copies (the set,
+ * branch, workspace and mode, read-only) and lets only the primary change.
  */
 function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; set: ResolvedSet; workspaceName: string }) {
   const draftKey = keyOf(target);

@@ -3,7 +3,7 @@ import { checkoutBranch } from "@/lib/compose";
 
 /**
  * Which branch an existing worktree (or the current checkout) is on, read-only, in the
- * slot the base-ref picker uses for a new worktree. Shaped like a picker pill without the
+ * slot Branch from uses for a new worktree. Shaped like a picker pill without the
  * chevron; not a button and not a compose stop, so Tab skips it.
  */
 export function BranchIndicator({ worktree }: { worktree: { branch: string; head: string; detached: boolean; isMain: boolean } }) {
