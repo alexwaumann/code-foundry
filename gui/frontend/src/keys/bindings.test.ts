@@ -528,15 +528,10 @@ describe("a bare-key command chord", () => {
 });
 
 describe("inPalette", () => {
-  it.each([
-    ["thread.new", true],
-    ["thread.agent.open", false],
-    ["thread.reseed", false],
-    ["ember.task.add", false],
-    ["ember.status", false],
-    ["embers.x", true],
-  ])("%s -> %s", (name, want) => {
-    expect(inPalette(cmd({ name }))).toBe(want);
+  it("leaves out a command the daemon marks NoPalette", () => {
+    expect(inPalette(cmd({ name: "thread.new" }))).toBe(true);
+    expect(inPalette(cmd({ name: "thread.list", noPalette: true }))).toBe(false);
+    expect(inPalette(cmd({ name: "ember.status", noPalette: true }))).toBe(false);
   });
 
   it("leaves out a command that is not startable here", () => {

@@ -81,8 +81,9 @@ func (d ViewDeps) itemCommands() []Command {
 	}
 	return []Command{
 		{
-			Name:  "view.panel.file",
-			Title: "Show File in Side Panel",
+			Name:      "view.panel.file",
+			NoPalette: true,
+			Title:     "Show File in Side Panel",
 			Description: "Open a file in a File tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively.",
 			Category:     "View",
@@ -97,8 +98,9 @@ func (d ViewDeps) itemCommands() []Command {
 			Run: item(ViewPanelFile, d.fileCheck),
 		},
 		{
-			Name:  "view.panel.diff",
-			Title: "Show Diff in Side Panel",
+			Name:      "view.panel.diff",
+			NoPalette: true,
+			Title:     "Show Diff in Side Panel",
 			Description: "Open a changed file's diff in a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the file against the branch's base, side by side or unified.",
 			Category:     "View",
@@ -113,8 +115,9 @@ func (d ViewDeps) itemCommands() []Command {
 			Run: item(ViewPanelDiff, d.diffCheck),
 		},
 		{
-			Name:  "view.panel.pr",
-			Title: "Show Pull Request in Side Panel",
+			Name:      "view.panel.pr",
+			NoPalette: true,
+			Title:     "Show Pull Request in Side Panel",
 			Description: "Open a pull request in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the pull request's summary, checks, reviews, timeline and changed files, with Merge and Review.",
 			Category:     "View",

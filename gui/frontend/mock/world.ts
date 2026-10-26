@@ -220,6 +220,7 @@ interface ArgDef {
   description: string;
   enumValues?: string[];
   defaultValue?: string;
+  positional?: boolean;
   /** Like the daemon's ArgSpec.default_to_thread_env: the CLI (and a page's bridge) sends the caller's thread. */
   defaultToThreadEnv?: boolean;
 }
@@ -238,7 +239,8 @@ interface CmdDef {
   /** Like the daemon's Command.ConfirmLabel: the confirm button's words. */
   confirmLabel?: string;
   /** Like the daemon's Command.read_only: it changes nothing (a page's bridge runs it without a click). */
-  readOnly?: boolean;
+  /** Like the daemon's Command.no_palette: the palette does not list it. */
+  noPalette?: boolean;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -3028,7 +3030,7 @@ export class World {
     return [
       {
         cmd: {
-          name: "pr.ask",
+          name: "pr.ask", noPalette: true,
           title: "Ask About Pull Request",
           category: "Pull Request",
           description: "Start a thread that answers a question about a pull request without changing code.",
@@ -3043,7 +3045,7 @@ export class World {
       },
       {
         cmd: {
-          name: "pr.explain",
+          name: "pr.explain", noPalette: true,
           title: "Explain Pull Request",
           category: "Pull Request",
           description: "Start a thread that walks through a pull request for a first-time reviewer.",
@@ -3055,7 +3057,7 @@ export class World {
       },
       {
         cmd: {
-          name: "pr.fix.findings",
+          name: "pr.fix.findings", noPalette: true,
           title: "Fix Pull Request Findings",
           category: "Pull Request",
           description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
@@ -3236,7 +3238,7 @@ export class World {
       },
       {
         cmd: {
-          name: "thread.unsubscribe",
+          name: "thread.unsubscribe", noPalette: true,
           title: "Unsubscribe Thread from Wakes",
           category: "Thread",
           description: "Remove a wake subscription by id, or every subscription of a thread (default: the thread this runs in) to a target.",
@@ -3274,7 +3276,7 @@ export class World {
       },
       {
         cmd: {
-          name: "thread.workspace",
+          name: "thread.workspace", noPalette: true,
           title: "Set Thread Workspace",
           category: "Thread",
           description: "Set the workspace a thread references (its instructions and skills), or clear it; it applies from the thread's next start.",
@@ -3331,7 +3333,7 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.set-primary",
+          name: "workspace.set-primary", noPalette: true,
           title: "Set Workspace Default Primary",
           category: "Workspace",
           description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder).",
@@ -3349,7 +3351,7 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.add-project",
+          name: "workspace.add-project", noPalette: true,
           title: "Add Project to Workspace",
           category: "Workspace",
           description: "Add a project to a workspace. Nothing on disk changes.",
@@ -3367,7 +3369,7 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.remove-project",
+          name: "workspace.remove-project", noPalette: true,
           title: "Remove Project from Workspace",
           category: "Workspace",
           description: "Drop a project from a workspace. Nothing on disk changes; threads keep their projects.",
@@ -3385,7 +3387,7 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.remove",
+          name: "workspace.remove", noPalette: true,
           title: "Remove Workspace",
           category: "Workspace",
           description: "Forget a workspace. Its folder goes with its instructions and skills; for a workspace with a root, only the links. Projects, worktrees and threads stay.",
@@ -3418,7 +3420,7 @@ export class World {
       },
       {
         cmd: {
-          name: "thread.flag.clear",
+          name: "thread.flag.clear", noPalette: true,
           title: "Clear Thread Flags",
           category: "Thread",
           description: "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",
@@ -3825,12 +3827,12 @@ export class World {
         },
       },
       {
-        cmd: { name: "ui.palette.open", title: "Open Command Palette", category: "View", description: "Open the command palette in every connected window", keybindings: [], args: [{ name: "query", type: ArgType.STRING, required: false, description: "Text to pre-fill" }] },
+        cmd: { name: "ui.palette.open", noPalette: true, title: "Open Command Palette", category: "View", description: "Open the command palette in every connected window", keybindings: [], args: [{ name: "query", type: ArgType.STRING, required: false, description: "Text to pre-fill" }] },
         when: always,
         run: (_ctx, args) => `delivered=${String(this.emit({ intent: { case: "openPalette", value: { query: args.query ?? "" } } }))}`,
       },
       {
-        cmd: { name: "ui.notify", title: "Send Test Notification", category: "Developer", description: "Emit a Notify intent", keybindings: [], args: [{ name: "level", type: ArgType.ENUM, required: true, description: "Level", enumValues: ["info", "warning", "error"], defaultValue: "info" }] },
+        cmd: { name: "ui.notify", noPalette: true, title: "Send Test Notification", category: "Developer", description: "Emit a Notify intent", keybindings: [], args: [{ name: "level", type: ArgType.ENUM, required: true, description: "Level", enumValues: ["info", "warning", "error"], defaultValue: "info" }] },
         when: always,
         run: (_ctx, args) => {
           const levels: Record<string, UiIntent_Notify_Level> = { info: UiIntent_Notify_Level.INFO, warning: UiIntent_Notify_Level.WARNING, error: UiIntent_Notify_Level.ERROR };
@@ -3847,7 +3849,7 @@ export class World {
         run: (_ctx, args) => `path ${args.path ?? ""}`,
       },
       {
-        cmd: { name: "daemon.status", title: "Daemon Status", category: "Daemon", description: "Show pid and uptime", keybindings: [], args: [] },
+        cmd: { name: "daemon.status", noPalette: true, title: "Daemon Status", category: "Daemon", description: "Show pid and uptime", keybindings: [], args: [] },
         when: always,
         run: () => `mock daemon pid ${String(process.pid)}, up ${String(Math.round((Date.now() - this.startedAt) / 1000))}s`,
       },
@@ -3979,7 +3981,7 @@ export class World {
         run: () => "revealed settings.toml",
       },
       {
-        cmd: { name: "settings.path", title: "Settings File Path", category: "Settings", description: "Print the settings file's path", keybindings: [], args: [] },
+        cmd: { name: "settings.path", noPalette: true, title: "Settings File Path", category: "Settings", description: "Print the settings file's path", keybindings: [], args: [] },
         when: always,
         run: () => this.settings.snapshot().path ?? "",
       },
@@ -4002,7 +4004,7 @@ export class World {
       },
       // Like internal/command/commands_theme.go.
       {
-        cmd: { name: "theme.list", title: "List Themes", category: "Settings", description: "Print every colour theme by scheme, marking the dark and light themes in use.", keybindings: [], args: [] },
+        cmd: { name: "theme.list", noPalette: true, title: "List Themes", category: "Settings", description: "Print every colour theme by scheme, marking the dark and light themes in use.", keybindings: [], args: [] },
         when: always,
         run: () => {
           const v = this.settings.values();

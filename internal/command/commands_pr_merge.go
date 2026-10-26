@@ -27,6 +27,7 @@ var (
 func mergeCommand(b GhBackend, slug, number ArgSpec) Command {
 	return Command{
 		Name:        "pr.merge",
+		NoPalette:   true,
 		Title:       "Merge Pull Request",
 		Description: "Merge an open pull request with a merge commit, squash, or rebase (GitHub's merge button); --delete-branch deletes its branch on GitHub afterwards (never local branches or worktrees).",
 		Category:    "Pull Request",

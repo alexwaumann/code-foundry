@@ -803,7 +803,11 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   `docs/notes/agents-3-lineage-gui.md`; the creator resolved by its id under its current
   name, `docs/notes/lineage-by-id.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
-  invoke the same registry command. Chords are listed only in the palette and the
+  invoke the same registry command. The palette lists the commands the daemon does not
+  mark `NoPalette` (`Command.no_palette`): queries whose only output is a text toast,
+  verbs for the model or the CLI to drive the app, Ember's task board, and verbs whose
+  required arg is an opaque id a page offers on the right row;
+  `internal/command/palette_test.go` keeps that list (`docs/notes/palette-no-palette.md`). Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`), plus the hint on the
   sidebar's New thread button. The native app menu's Settings…, Thread and Help items
   run commands in the window through one host event and carry no key equivalents

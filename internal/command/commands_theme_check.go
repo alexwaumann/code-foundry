@@ -157,9 +157,10 @@ func ratioText(r float64) string {
 // themeCheckCommand is theme.check: the latest report on one of the user's themes.
 func themeCheckCommand(d ThemeDeps, userIDs func() []string, needThemes func() error) Command {
 	return Command{
-		Name:     "theme.check",
-		ReadOnly: true,
-		Title:    "Check Theme Contrast",
+		Name:      "theme.check",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Check Theme Contrast",
 		Description: "Print the app's contrast check of one of your themes: each pair of colours that falls short (the ratio it has and needs) " +
 			"and each pin whose rule the base has moved. The app checks a theme when its file changes; with the app closed nothing is checked.",
 		Category:     "Settings",

@@ -15,7 +15,7 @@ export function bridgeCommands(threads: () => ListedThread[]) {
   return [
     {
       cmd: {
-        name: "thread.list",
+        name: "thread.list", noPalette: true,
         title: "List Threads",
         category: "Thread",
         description: "List threads",

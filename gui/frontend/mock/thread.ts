@@ -1331,7 +1331,7 @@ export class MockThreadLogs {
 
   /** The thread.* commands (mock/world.ts registry): the GUI passes the thread as `id`. */
   commands(): {
-    cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; args: { name: string; type: ArgType; required: boolean; description: string; enumValues?: string[] }[] };
+    cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: { name: string; type: ArgType; required: boolean; description: string; enumValues?: string[] }[] };
     when: (ctx: UiContext | undefined) => boolean;
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
@@ -1342,7 +1342,7 @@ export class MockThreadLogs {
     const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
     const list: ReturnType<MockThreadLogs["commands"]> = [
       {
-        cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
+        cmd: { name: "thread.send", noPalette: true, title: "Send to Thread", category: "Thread", description: "Send a message to a thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
         when,
         run: (_ctx, a) => {
           const atts = (a.attachments ?? "").split(",").filter(Boolean);
@@ -1366,7 +1366,7 @@ export class MockThreadLogs {
       },
       {
         cmd: {
-          name: "thread.respond",
+          name: "thread.respond", noPalette: true,
           title: "Answer Thread Request",
           category: "Thread",
           description: "Answer a pending permission request or question",

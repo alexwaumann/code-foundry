@@ -46,8 +46,9 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:  "ember.task.add",
-			Title: "Ember: Add Task",
+			Name:      "ember.task.add",
+			NoPalette: true,
+			Title:     "Ember: Add Task",
 			Description: "Add a task to Ember's board, at the end (state todo unless given). A subtask names its parent " +
 				"(a top-level task: one level only). Prints the task's id.",
 			Category:     emberCategory,
@@ -75,8 +76,9 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 			},
 		},
 		Command{
-			Name:  "ember.task.update",
-			Title: "Ember: Update Task",
+			Name:      "ember.task.update",
+			NoPalette: true,
+			Title:     "Ember: Update Task",
 			Description: "Change a task: its title, detail, state, worker thread or outcome. Done stamps its done time; " +
 				"leaving done clears it.",
 			Category:     emberCategory,
@@ -104,8 +106,9 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 			},
 		},
 		Command{
-			Name:  "ember.task.done",
-			Title: "Ember: Task Done",
+			Name:      "ember.task.done",
+			NoPalette: true,
+			Title:     "Ember: Task Done",
 			Description: "Mark a task done, with its outcome (what came of it: a PR, a finding). With branch, " +
 				"origin/<branch> must exist in its worker's worktree first; the task records it (the board shows it).",
 			Category:     emberCategory,
@@ -128,6 +131,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		emberTaskStart(r, d),
 		Command{
 			Name:         "ember.task.cancel",
+			NoPalette:    true,
 			Title:        "Ember: Cancel Task",
 			Description:  "Cancel a task, saying why. Its worker thread, if any, is left as it is.",
 			Category:     emberCategory,
@@ -140,6 +144,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.task.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Ember: List Tasks",
 			Description:  "List Ember's open tasks (todo, doing, blocked), one line each with its worker's progress; --all adds done and cancelled ones.",
@@ -166,6 +171,7 @@ func registerEmberTasks(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.task.show",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Ember: Show Task",
 			Description:  "Show one task: its state, detail, outcome, parent and subtasks, and its worker thread's status and report.",

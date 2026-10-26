@@ -284,6 +284,7 @@ type Command = {
     category: string;
     description: string;
     keybindings: string[];
+    noPalette?: boolean;
     args: { name: string; type: ArgType; required: boolean; description: string; enumValues?: string[]; defaultValue?: string }[];
   };
   when: (ctx: UiContext | undefined) => boolean;

@@ -70,8 +70,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 	kindOf := func(a Args) marketplace.Kind { return marketplace.Kind(a.String("kind")) }
 	return r.RegisterAll(
 		Command{
-			Name:  "skill.browse",
-			Title: "Browse Skills",
+			Name:      "skill.browse",
+			NoPalette: true,
+			Title:     "Browse Skills",
 			Description: "Search the plugins and skills of the marketplaces Claude Code has (claude plugin marketplace list): " +
 				"name, description, keywords and author, name matches first; no query lists them by name. " +
 				"Shows what is installed and each marketplace's state.",
@@ -100,8 +101,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			},
 		},
 		Command{
-			Name:  "skill.install",
-			Title: "Install Skill",
+			Name:      "skill.install",
+			NoPalette: true,
+			Title:     "Install Skill",
 			Description: "Install a marketplace plugin (claude plugin install <name>@<marketplace>) or copy a skill into " +
 				"~/.claude/skills/<name>. A skill whose name is taken by a directory Code Foundry did not install is refused. " +
 				"New threads pick it up at once.",
@@ -117,6 +119,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 		},
 		Command{
 			Name:        "skill.enable",
+			NoPalette:   true,
 			Title:       "Enable Skill",
 			Description: "Enable an installed marketplace plugin (claude plugin enable), or move a disabled skill back into ~/.claude/skills.",
 			Category:    "Skill",
@@ -130,8 +133,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			},
 		},
 		Command{
-			Name:  "skill.disable",
-			Title: "Disable Skill",
+			Name:      "skill.disable",
+			NoPalette: true,
+			Title:     "Disable Skill",
 			Description: "Disable an installed marketplace plugin (claude plugin disable), or move a skill out of ~/.claude/skills " +
 				"into Code Foundry's disabled skills (skill enable brings it back). " + RestartWarning,
 			Category: "Skill",
@@ -181,8 +185,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			},
 		},
 		Command{
-			Name:  "skill.uninstall",
-			Title: "Uninstall Skill",
+			Name:      "skill.uninstall",
+			NoPalette: true,
+			Title:     "Uninstall Skill",
 			Description: "Uninstall a marketplace plugin (claude plugin uninstall) or delete a skill Code Foundry installed (from " +
 				"~/.claude/skills or the disabled skills) and its record. A local skill is deleted with skill remove. " + RestartWarning,
 			Category: "Skill",
@@ -197,8 +202,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			},
 		},
 		Command{
-			Name:  "skill.remove",
-			Title: "Remove Local Skill",
+			Name:      "skill.remove",
+			NoPalette: true,
+			Title:     "Remove Local Skill",
 			Description: "Delete a local skill: a directory in ~/.claude/skills Code Foundry did not install (a symlink is removed, " +
 				"not what it points at). " + RestartWarning,
 			Category: "Skill",
@@ -221,8 +227,9 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			},
 		},
 		Command{
-			Name:  "skill.setup",
-			Title: "Run Skill Setup",
+			Name:      "skill.setup",
+			NoPalette: true,
+			Title:     "Run Skill Setup",
 			Description: "Run a skill's setup script (/bin/sh <script> in the skill's directory) in a terminal in the bottom panel " +
 				"of the active thread or worktree; when it exits 0 the skill no longer needs setup.",
 			Category: "Skill",

@@ -43,6 +43,7 @@ interface Spec {
   category: string;
   description: string;
   keybindings: string[];
+  noPalette?: boolean;
   kind: GitOpKind;
   needsGitHub?: boolean;
   needsRemote?: boolean;
@@ -114,7 +115,7 @@ const specs: Spec[] = [
     fail: () => ({ summary: "open: exit 1", output: "$ open -R\n(exit 1)\n" }),
   },
   {
-    name: "view.open.url", title: "Open URL in Browser", category: "View", description: "Open an http(s) URL in the default browser", keybindings: [], kind: GitOpKind.OPEN_URL,
+    name: "view.open.url", noPalette: true, title: "Open URL in Browser", category: "View", description: "Open an http(s) URL in the default browser", keybindings: [], kind: GitOpKind.OPEN_URL,
     args: [{ name: "url", type: ArgType.STRING, description: "http or https URL" }],
     label: (_w, a) => `Open ${a.url ?? ""}`,
     ok: (_w, a) => ({ summary: `opened ${a.url ?? ""}`, url: a.url ?? "", output: `$ open ${a.url ?? ""}\n` }),
@@ -155,7 +156,7 @@ export class MockGitOps {
     const target = (ctx: UiContext | undefined, args: Record<string, string>) => worktreeOf(args.worktree || ctx?.activeWorktreePath || "");
     return specs.map((s) => ({
       cmd: {
-        name: s.name, title: s.title, category: s.category, description: s.description, keybindings: s.keybindings,
+        name: s.name, title: s.title, category: s.category, description: s.description, keybindings: s.keybindings, noPalette: s.noPalette,
         args: [...(s.kind === GitOpKind.OPEN_URL ? [] : [{ ...worktreeArg, required: false }]), ...(s.args ?? []).map((a) => ({ ...a, required: s.kind === GitOpKind.OPEN_URL }))],
       },
       when: (ctx: UiContext | undefined) => {

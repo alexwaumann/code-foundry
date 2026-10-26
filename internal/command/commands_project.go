@@ -83,6 +83,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "project.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Projects",
 			Description:  "List registered projects: name, id and path, one per line. --project and the other project commands take the id or the name.",

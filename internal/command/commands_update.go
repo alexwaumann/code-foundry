@@ -269,6 +269,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "app.version",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Version",
 			Description:  "Show the running version and whether an update is available.",

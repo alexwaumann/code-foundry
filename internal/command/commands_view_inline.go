@@ -194,6 +194,7 @@ func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string 
 func (d ViewDeps) inlineCommand() Command {
 	return Command{
 		Name:         "view.inline",
+		NoPalette:    true,
 		Title:        "Show HTML Page Inline",
 		Description:  "Show an HTML page inline in a thread's conversation; with /cf/bridge.js it can call Code Foundry.",
 		Category:     "Thread",

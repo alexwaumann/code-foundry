@@ -42,8 +42,9 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 	refreshArg := ArgSpec{Name: "refresh", Type: Bool, Description: "Read the registries again instead of their cached indexes (kept 1 hour)"}
 	return r.RegisterAll(
 		Command{
-			Name:  "plugin.browse",
-			Title: "Browse Plugins",
+			Name:      "plugin.browse",
+			NoPalette: true,
+			Title:     "Browse Plugins",
 			Description: "List the plugins the registries offer (settings plugins.registries; the first registry listing a " +
 				"name wins): version, what is installed, the permissions each asks for, and each registry's state.",
 			Category:     "Plugin",
@@ -58,8 +59,9 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 			},
 		},
 		Command{
-			Name:  "plugin.install",
-			Title: "Install Plugin",
+			Name:      "plugin.install",
+			NoPalette: true,
+			Title:     "Install Plugin",
 			Description: "Install a plugin: <name>[@<version>] from the registries, <owner>/<repo>[@vX.Y.Z] from a GitHub " +
 				"release (the tarball <name>-<version>-darwin-<arch>.tar.gz, checked against the release's checksums file: " +
 				"checksums.txt, SHA256SUMS, sha256sums.txt, <name>-<version>-checksums.txt or <tarball>.sha256), " +
@@ -115,8 +117,9 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 			},
 		},
 		Command{
-			Name:  "plugin.uninstall",
-			Title: "Uninstall Plugin",
+			Name:      "plugin.uninstall",
+			NoPalette: true,
+			Title:     "Uninstall Plugin",
 			Description: "Disable a plugin, stop it, remove its threads (as thread remove does) and its package (for a dev " +
 				"plugin only the link, never your folder). Its data, secrets and consent stay for a reinstall; --purge deletes " +
 				"them too.",

@@ -83,8 +83,9 @@ func settleOf(a Args) (time.Duration, error) {
 func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 	return r.RegisterAll(
 		Command{
-			Name:  "plugin.surface",
-			Title: "Show Plugin Surface View",
+			Name:      "plugin.surface",
+			NoPalette: true,
+			Title:     "Show Plugin Surface View",
 			Description: "Open a plugin surface for a context (a thread for a thread scoped one: --context-thread) as the " +
 				"side panel would, wait for its view, and print the view's JSON and the elements that act " +
 				"(code-foundry plugin act). It returns at the first view; --settle 2s waits until no new view has " +
@@ -111,8 +112,9 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 			},
 		},
 		Command{
-			Name:  "plugin.act",
-			Title: "Act on Plugin Surface",
+			Name:      "plugin.act",
+			NoPalette: true,
+			Title:     "Act on Plugin Surface",
 			Description: "Act on an element of a plugin surface's current view as a click would: a button, row, chip, tab, a " +
 				"field's change, or a form's submit with --values '{\"field\": \"value\"}'. Name the element by its event " +
 				"or command (the positional action) or --key (code-foundry plugin surface lists them). An event goes to the " +

@@ -126,6 +126,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "settings.get",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Show Settings",
 			Description:  "Print every setting as key = value, or one setting's value.",
@@ -161,6 +162,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:         "settings.set",
+			NoPalette:    true,
 			Title:        "Change Setting",
 			Description:  "Set one setting. The value is validated against the setting's type and written to the settings file.",
 			Category:     "Settings",
@@ -184,6 +186,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:         "settings.reset",
+			NoPalette:    true,
 			Title:        "Reset Setting",
 			Description:  "Return one setting to its default.",
 			Category:     "Settings",
@@ -206,6 +209,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		},
 		Command{
 			Name:         "settings.path",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Settings File Path",
 			Description:  "Print the settings file's path.",

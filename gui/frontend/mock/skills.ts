@@ -223,7 +223,7 @@ interface ArgDef {
 
 /** A command as World's registry takes it. */
 export interface SkillCommand {
-  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; args: ArgDef[]; confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string; confirmLabel?: string };
+  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: ArgDef[]; confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string; confirmLabel?: string };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 }

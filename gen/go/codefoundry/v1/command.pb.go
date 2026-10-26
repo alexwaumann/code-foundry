@@ -355,7 +355,11 @@ type Command struct {
 	// The command only reads: it creates, changes, sends, runs, opens or writes nothing and
 	// moves no window. A page's bridge runs these freely and any other command only from a
 	// user gesture in the page (docs/notes/bridge-1-daemon.md). A plugin's commands never are.
-	ReadOnly      bool `protobuf:"varint,9,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	ReadOnly bool `protobuf:"varint,9,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	// The GUI palette does not list it: a query whose only output is a text toast, a verb
+	// for the model or the CLI to drive the app, or one whose required arg is an opaque id
+	// the palette can only take as typed text. The CLI, pages and chords still have it.
+	NoPalette     bool `protobuf:"varint,10,opt,name=no_palette,json=noPalette,proto3" json:"no_palette,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -449,6 +453,13 @@ func (x *Command) GetRequiresConfirmation() bool {
 func (x *Command) GetReadOnly() bool {
 	if x != nil {
 		return x.ReadOnly
+	}
+	return false
+}
+
+func (x *Command) GetNoPalette() bool {
+	if x != nil {
+		return x.NoPalette
 	}
 	return false
 }
@@ -888,7 +899,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"repeatable\x12\x0e\n" +
 	"\x02id\x18\f \x01(\bR\x02id\x12#\n" +
 	"\rcontext_bound\x18\r \x01(\bR\fcontextBound\x12\x12\n" +
-	"\x04rest\x18\x0e \x01(\bR\x04rest\"\xb0\x02\n" +
+	"\x04rest\x18\x0e \x01(\bR\x04rest\"\xcf\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -898,7 +909,10 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\vkeybindings\x18\x06 \x03(\tR\vkeybindings\x12\x1c\n" +
 	"\tavailable\x18\a \x01(\bR\tavailable\x123\n" +
 	"\x15requires_confirmation\x18\b \x01(\bR\x14requiresConfirmation\x12\x1b\n" +
-	"\tread_only\x18\t \x01(\bR\breadOnly\"{\n" +
+	"\tread_only\x18\t \x01(\bR\breadOnly\x12\x1d\n" +
+	"\n" +
+	"no_palette\x18\n" +
+	" \x01(\bR\tnoPalette\"{\n" +
 	"\x13ListCommandsRequest\x123\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12/\n" +
 	"\x13include_unavailable\x18\x02 \x01(\bR\x12includeUnavailable\"K\n" +

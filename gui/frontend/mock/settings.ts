@@ -21,6 +21,7 @@ export interface MockCommandInfo {
   category: string;
   description: string;
   keybindings: string[];
+  noPalette?: boolean;
 }
 
 export const PATH = "/Users/dev/.code-foundry/settings.toml";

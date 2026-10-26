@@ -42,9 +42,10 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:     "thread.agents",
-			ReadOnly: true,
-			Title:    "Show Thread Agents",
+			Name:      "thread.agents",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "Show Thread Agents",
 			Description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent: " +
 				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported. " +
 				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",

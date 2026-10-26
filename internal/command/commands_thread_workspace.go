@@ -20,6 +20,7 @@ type WorkspaceRefBackend interface {
 func threadWorkspaceCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:        "thread.workspace",
+		NoPalette:   true,
 		Title:       "Set Thread Workspace",
 		Description: "Make a thread reference a workspace (its instructions and skills), or none; its projects stay. Applies from its next start.",
 		Category:    "Thread",

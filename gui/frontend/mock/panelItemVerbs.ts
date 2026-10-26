@@ -21,7 +21,7 @@ export interface ItemThread {
 }
 
 type Command = {
-  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; args: { name: string; type: ArgType; required: boolean; description: string }[] };
+  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: { name: string; type: ArgType; required: boolean; description: string }[] };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
@@ -44,7 +44,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
   return [
     {
       cmd: {
-        name: "view.panel.file",
+        name: "view.panel.file", noPalette: true,
         title: "Show File in Side Panel",
         category: "View",
         description: `Open a file in a File tab ${lead}text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively.`,
@@ -65,7 +65,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
     },
     {
       cmd: {
-        name: "view.panel.diff",
+        name: "view.panel.diff", noPalette: true,
         title: "Show Diff in Side Panel",
         category: "View",
         description: `Open a changed file's diff in a Diff tab ${lead}the file against the branch's base, side by side or unified.`,
@@ -87,7 +87,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
     },
     {
       cmd: {
-        name: "view.panel.pr",
+        name: "view.panel.pr", noPalette: true,
         title: "Show Pull Request in Side Panel",
         category: "View",
         description: `Open a pull request ${lead}its summary, checks, reviews, timeline and changed files, with Merge and Review.`,

@@ -121,24 +121,17 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /**
- * Commands the palette does not list: thread.agent.open takes a run id the palette cannot
- * pick (the GUI opens runs from their Agent rows, the strip and the Agents tab; the CLI
- * passes the id); thread.reseed is an agent and daemon verb (a resident's epochs,
- * docs/notes/ember-1-primitives.md), never the user's. Every ember.* command is too
- * (Ember's task board: docs/notes/ember-2-store.md).
- */
-const paletteHidden: ReadonlySet<string> = new Set(["thread.agent.open", "thread.reseed"]);
-
-/**
- * Whether the palette lists this command: startable here, and not one it cannot prompt for
- * (paletteHidden). thread.run-in only for a thread with somewhere else to run and
- * thread.new-like only for one with a project or workspace (lib/threadRow; the daemon's
- * availability is the same rule, this keeps a list fetched before the thread changed honest).
+ * Whether the palette lists this command: startable here, and not one the daemon marks
+ * NoPalette (Command.no_palette: queries, model and CLI verbs, opaque-id prompts, Ember's
+ * task board; internal/command/palette_test.go keeps the list). thread.run-in only for a
+ * thread with somewhere else to run and thread.new-like only for one with a project or
+ * workspace (lib/threadRow; the daemon's availability is the same rule, this keeps a list
+ * fetched before the thread changed honest).
  */
 export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.run-in" && !canRunElsewhere(activeThread())) return false;
   if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
-  return isStartable(c) && !paletteHidden.has(c.name) && !c.name.startsWith("ember.");
+  return isStartable(c) && !c.noPalette;
 }
 
 function activeThread() {

@@ -49,6 +49,7 @@ func RegisterDaemon(r *Registry, info DaemonInfo) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "daemon.status",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Daemon Status",
 			Description:  "Show the daemon's pid, version, uptime, and config home.",
@@ -72,6 +73,7 @@ func RegisterDaemon(r *Registry, info DaemonInfo) error {
 		},
 		Command{
 			Name:         "daemon.version",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Daemon Version",
 			Description:  "Show the daemon's build version and commit; --json adds the URL of its source at that build.",

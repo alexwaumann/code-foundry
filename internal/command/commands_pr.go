@@ -52,6 +52,7 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 		mergeCommand(b, slug, number),
 		Command{
 			Name:        "pr.revert",
+			NoPalette:   true,
 			Title:       "Revert Pull Request",
 			Description: "Open a pull request that reverses a merged one (GitHub's Revert button).",
 			Category:    "Pull Request",
@@ -76,6 +77,7 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 		},
 		Command{
 			Name:        "pr.review.request",
+			NoPalette:   true,
 			Title:       "Request Review",
 			Description: "Request a review on a pull request from a user or team, or withdraw the request (--requested=false).",
 			Category:    "Pull Request",
@@ -113,6 +115,7 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 		},
 		Command{
 			Name:        "pr.refresh",
+			NoPalette:   true,
 			Title:       "Refresh Pull Request",
 			Description: "Fetch a pull request's detail from GitHub now instead of from the daemon's cache.",
 			Category:    "Pull Request",

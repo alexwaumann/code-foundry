@@ -177,9 +177,10 @@ func pendingLine(p *v1.ThreadPendingDetail) string {
 func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:     "thread.get",
-		ReadOnly: true,
-		Title:    "Show Thread",
+		Name:      "thread.get",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Show Thread",
 		Description: "Print one thread: its status and pending request, worktree, who created it and why, labels, report " +
 			"(`*`: from before its last message) and cost.",
 		Category:     "Thread",
@@ -206,8 +207,9 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 
 func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.label",
-		Title: "Label Thread",
+		Name:      "thread.label",
+		NoPalette: true,
+		Title:     "Label Thread",
 		Description: "Add or remove a thread's labels (lowercase letters, digits, -, _, . and /; up to 40 characters each). " +
 			"clear removes every label first, then remove's go, then add's are added. Prints the labels.",
 		Category: "Thread",
@@ -233,8 +235,9 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 
 func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.report",
-		Title: "Report on Thread",
+		Name:      "thread.report",
+		NoPalette: true,
+		Title:     "Report on Thread",
 		Description: "Record how a thread's task went: done, blocked, failed or progress, " +
 			"a summary and optional JSON data. A new report replaces the previous one; the thread's creator reads it with thread reports.",
 		Category:     "Thread",
@@ -268,8 +271,9 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 
 func threadBudgetCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.budget",
-		Title: "Set Thread Budget",
+		Name:      "thread.budget",
+		NoPalette: true,
+		Title:     "Set Thread Budget",
 		Description: "Set a thread's spending limit in USD at Claude API rates (0 removes it). When the thread's cost reaches it " +
 			"while Claude works, Claude is interrupted and the thread needs attention (\"budget reached\"); messages can still be sent. " +
 			"A budget above the cost re-arms it.",

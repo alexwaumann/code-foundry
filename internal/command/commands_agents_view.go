@@ -60,8 +60,9 @@ func findAgentRun(runs []*v1.ThreadAgentRun, threadID, ref string) (*v1.ThreadAg
 func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 	return []Command{
 		{
-			Name:  "thread.agent.open",
-			Title: "Open Subagent",
+			Name:      "thread.agent.open",
+			NoPalette: true,
+			Title:     "Open Subagent",
 			Description: "Show one of a thread's own subagent runs read-only in the GUI: its prompt, work log and report, under the thread. " +
 				"The run is its id from thread agents --json, or the start of it.",
 			Category: "Thread",

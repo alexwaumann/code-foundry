@@ -35,8 +35,9 @@ type EmberStartView struct {
 // message stay its own.
 func emberTaskStart(r *Registry, d EmberDeps) Command {
 	return Command{
-		Name:  "ember.task.start",
-		Title: "Ember: Start Task",
+		Name:      "ember.task.start",
+		NoPalette: true,
+		Title:     "Ember: Start Task",
 		Description: "Start a worker thread for a task in one call: thread.new with a new worktree, labels ember,<task id>, " +
 			"notify and request id <task id>, then the task as doing, linked to it. A new task takes its title (and detail, " +
 			"parent); --task <id> starts an existing todo or blocked task instead, with its own title. Nothing is written " +

@@ -94,6 +94,10 @@ message Command {
   // moves no window. A page's bridge runs these freely and any other command only from a
   // user gesture in the page (docs/notes/bridge-1-daemon.md). A plugin's commands never are.
   bool read_only = 9;
+  // The GUI palette does not list it: a query whose only output is a text toast, a verb
+  // for the model or the CLI to drive the app, or one whose required arg is an opaque id
+  // the palette can only take as typed text. The CLI, pages and chords still have it.
+  bool no_palette = 10;
 }
 
 message ListCommandsRequest {

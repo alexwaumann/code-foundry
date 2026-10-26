@@ -38,6 +38,8 @@ export interface CommandView {
   requiresConfirmation?: boolean;
   /** The command only reads (Command.read_only): a page's bridge runs it without a click. */
   readOnly?: boolean;
+  /** The palette does not list it (Command.no_palette): a query, a model/CLI verb, or an opaque-id prompt. */
+  noPalette?: boolean;
 }
 
 /** A destructive command waiting for the user's yes (ConfirmationRequired detail). */
@@ -124,6 +126,7 @@ export function toCommandView(c: Command): CommandView {
     available: c.available,
     requiresConfirmation: c.requiresConfirmation,
     ...(c.readOnly ? { readOnly: true } : {}),
+    ...(c.noPalette ? { noPalette: true } : {}),
   };
 }
 

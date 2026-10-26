@@ -109,9 +109,10 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:     "memory.show",
-			ReadOnly: true,
-			Title:    "Memory: Show Preferences",
+			Name:      "memory.show",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "Memory: Show Preferences",
 			Description: "List the user's standing preferences about Code Foundry and how the model behaves in it, numbered. " +
 				"Every thread's system prompt carries them from its start.",
 			Category:     "Settings",
@@ -129,8 +130,9 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			},
 		},
 		Command{
-			Name:  "memory.add",
-			Title: "Memory: Remember a Preference",
+			Name:      "memory.add",
+			NoPalette: true,
+			Title:     "Memory: Remember a Preference",
 			Description: "Remember a standing preference (\"always open PRs as drafts\") for every thread in every project, " +
 				"in the user's words. New threads follow it; threads already open get it with their next message after a restart. " +
 				"At most 500 characters, 40 entries and 4 KiB in all; text the memory has already is not added again. " +
@@ -159,8 +161,9 @@ func RegisterMemory(r *Registry, d MemoryDeps) error {
 			},
 		},
 		Command{
-			Name:  "memory.remove",
-			Title: "Memory: Forget a Preference",
+			Name:      "memory.remove",
+			NoPalette: true,
+			Title:     "Memory: Forget a Preference",
 			Description: "Forget one remembered preference: by its number in `memory show`, its text, its id, or text found in it alone; " +
 				"--id names it by id only and fails once it is gone, whatever the list looks like then. " +
 				"New threads no longer get it. Refused in a thread another thread started.",

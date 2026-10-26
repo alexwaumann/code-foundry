@@ -201,9 +201,9 @@ describe("commands and intents", () => {
     expect(getViewing()).toBeNull();
   });
 
-  it("the palette does not list thread.agent.open", () => {
+  it("the palette does not list thread.agent.open (the daemon marks it NoPalette)", () => {
     const cmd = (name: string) => ({ name, title: name, available: true, args: [], keybindings: [] }) as unknown as CommandView;
-    expect(inPalette(cmd("thread.agent.open"))).toBe(false);
+    expect(inPalette({ ...cmd("thread.agent.open"), noPalette: true })).toBe(false);
     expect(inPalette(cmd("thread.agent.up"))).toBe(true);
     expect(inPalette({ ...cmd("thread.agent.up"), available: false })).toBe(false);
   });

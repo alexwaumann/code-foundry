@@ -660,7 +660,7 @@ export class PrDetailWorld {
     return [
       {
         cmd: {
-          name: "pr.merge",
+          name: "pr.merge", noPalette: true,
           title: "Merge Pull Request",
           category: "Pull Request",
           description:
@@ -712,7 +712,7 @@ export class PrDetailWorld {
       },
       {
         cmd: {
-          name: "pr.revert",
+          name: "pr.revert", noPalette: true,
           title: "Revert Pull Request",
           category: "Pull Request",
           description: "Open a pull request that reverses a merged one (GitHub's Revert button).",
@@ -729,7 +729,7 @@ export class PrDetailWorld {
       },
       {
         cmd: {
-          name: "pr.review.request",
+          name: "pr.review.request", noPalette: true,
           title: "Request Review",
           category: "Pull Request",
           description: "Request a review on a pull request from a user or team, or withdraw the request (--requested=false).",
@@ -754,7 +754,7 @@ export class PrDetailWorld {
       },
       {
         cmd: {
-          name: "pr.review",
+          name: "pr.review", noPalette: true,
           title: "Review Pull Request",
           category: "Pull Request",
           description: "Submit a review on a pull request: approve, request changes, or comment (a body is required for the last two).",
@@ -780,7 +780,7 @@ export class PrDetailWorld {
       },
       {
         cmd: {
-          name: "pr.comment",
+          name: "pr.comment", noPalette: true,
           title: "Comment on Pull Request",
           category: "Pull Request",
           description: "Post a comment on a pull request's conversation (not a review).",
@@ -796,7 +796,7 @@ export class PrDetailWorld {
       },
       {
         cmd: {
-          name: "pr.refresh",
+          name: "pr.refresh", noPalette: true,
           title: "Refresh Pull Request",
           category: "Pull Request",
           description: "Fetch a pull request's detail from GitHub now instead of from the daemon's cache.",

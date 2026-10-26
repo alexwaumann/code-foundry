@@ -294,6 +294,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:        "pr.ask",
+			NoPalette:   true,
 			Title:       "Ask About Pull Request",
 			Description: "Start a thread that answers a question about a pull request without changing code.",
 			Category:    "Pull Request",
@@ -314,6 +315,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		},
 		Command{
 			Name:        "pr.explain",
+			NoPalette:   true,
 			Title:       "Explain Pull Request",
 			Description: "Start a thread that walks through a pull request for a first-time reviewer.",
 			Category:    "Pull Request",
@@ -327,6 +329,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		},
 		Command{
 			Name:        "pr.fix.findings",
+			NoPalette:   true,
 			Title:       "Fix Pull Request Findings",
 			Description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
 			Category:    "Pull Request",
