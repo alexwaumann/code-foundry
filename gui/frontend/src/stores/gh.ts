@@ -58,8 +58,15 @@ export function useViewerLogin(): string {
   return useResource(viewerResource, VIEWER_KEY)?.data?.login ?? "";
 }
 
-/** Keys: "tracked" (registered projects only) or "all". */
-export const dashboardResource = createResource((key, signal) => getDashboard(key === "all", undefined, signal));
+/**
+ * The one key of dashboardResource. Every reader (the Pull Requests page, the sidebar's
+ * count and linked PR tags, the composer's `#`, the pages bridge) shares it, so the GUI
+ * holds one watch and makes one read per dashboard change.
+ */
+export const DASHBOARD_KEY = "all";
+
+/** Key: DASHBOARD_KEY. The viewer's pull request lists in every repository (GhService.GetDashboard). */
+export const dashboardResource = createResource((_key, signal) => getDashboard(undefined, signal));
 
 const SEP = "\u0000";
 export const branchKey = (slug: string, head: string): string => `${slug}${SEP}${head}`;

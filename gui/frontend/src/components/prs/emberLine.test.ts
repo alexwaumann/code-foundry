@@ -4,7 +4,7 @@ import type { AuthoredRow, AuthoredStatusKind } from "./authoredStatus";
 import { emberLine } from "./emberLine";
 
 const row = (number: number, kind: AuthoredStatusKind, reviewRequests: string[] = []): AuthoredRow =>
-  ({ pr: { number, reviewRequests } as unknown as PullRequestView, status: { kind, label: "", tone: "neutral", rank: 0 } }) as AuthoredRow;
+  ({ pr: { number, reviewRequests } as unknown as PullRequestView, status: { kind, label: "", tone: "neutral", rank: 0 } });
 const merged = (author: string) => ({ author }) as PullRequestView;
 
 // 2026-10-26 is day 299 (299 % 3 = 2); the 27th is day 300 (0).

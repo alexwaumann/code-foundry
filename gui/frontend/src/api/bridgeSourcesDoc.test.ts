@@ -84,7 +84,7 @@ async function samples(): Promise<Record<string, unknown>> {
   return {
     "thread-list": [thread()],
     thread: { thread: thread(), pending: snapshot?.kind === "snapshot" ? snapshot.pending : [] },
-    gh: await getDashboard(false, conn),
+    gh: await getDashboard(conn),
     action: { actions: [toActionView(create(ActionSchema))], runs: [toActionRunView(create(ActionRunSchema))] },
     plugin: [toPluginView(create(PluginSchema, { commands: [{}], surfaces: [{}] }))],
     terminal: [toTerminalView(create(TerminalSchema))],

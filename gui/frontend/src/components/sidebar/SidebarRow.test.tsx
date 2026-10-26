@@ -6,7 +6,7 @@ import type { ThreadView } from "@/api/threads";
 const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promise<boolean>>(() => Promise.resolve(true)));
 vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread }));
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
+import { DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -297,7 +297,7 @@ describe("SidebarRow linked PRs tag", () => {
     ["draft: the draft tone", pr(145, "open", { draft: true }), "draft", "draft", "text-cf-text-muted"],
     ["merged: the merged tone", pr(138, "merged"), "merged", "merged", "text-cf-highlight-text"],
   ])("one %s, the bare number", (_name, p, state, tone, cls) => {
-    dashboardResource.set("tracked", { data: dashboard([p]) });
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([p]) });
     renderRow({ linkedPullRequests: [link(p.number)] });
     const el = tag();
     expect(el?.textContent).toBe(String(p.number));
@@ -315,7 +315,7 @@ describe("SidebarRow linked PRs tag", () => {
   });
 
   it("several: the count without closed ones, in the worst state's tone", () => {
-    dashboardResource.set("tracked", { data: dashboard([pr(1, "open"), pr(2, "open", { draft: true })], [pr(3, "merged")]) });
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(1, "open"), pr(2, "open", { draft: true })], [pr(3, "merged")]) });
     pullRequestDetailResource.set(pullRequestKey(SLUG, 4), { data: { pullRequest: pr(4, "closed") } as PullRequestDetailView });
     renderRow({ linkedPullRequests: [link(1), link(2), link(3), link(4)] });
     expect(tag()?.textContent).toBe("3 PRs");
@@ -324,18 +324,18 @@ describe("SidebarRow linked PRs tag", () => {
   });
 
   it("the fresher read wins: a cached detail newer than the dashboard", () => {
-    dashboardResource.set("tracked", { data: dashboard([pr(142, "open", { updatedAtMs: 1 })]) });
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open", { updatedAtMs: 1 })]) });
     pullRequestDetailResource.set(pullRequestKey(SLUG, 142), { data: { pullRequest: pr(142, "merged", { updatedAtMs: 2 }) } as PullRequestDetailView });
     renderRow({ linkedPullRequests: [link(142)] });
     expect(tag()?.getAttribute("data-state")).toBe("merged");
   });
 
   it("re-renders when the state moves", () => {
-    dashboardResource.set("tracked", { data: dashboard([pr(142, "open")]) });
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open")]) });
     renderRow({ linkedPullRequests: [link(142)] });
     expect(tag()?.getAttribute("data-state")).toBe("open");
     act(() => {
-      dashboardResource.set("tracked", { data: dashboard([], [pr(142, "merged", { updatedAtMs: 2 })]) });
+      dashboardResource.set(DASHBOARD_KEY, { data: dashboard([], [pr(142, "merged", { updatedAtMs: 2 })]) });
     });
     expect(tag()?.getAttribute("data-state")).toBe("merged");
   });

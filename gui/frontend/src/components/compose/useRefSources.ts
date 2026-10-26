@@ -5,7 +5,7 @@ import type { CompletionGroup } from "@/lib/completion";
 import { prCandidates, prEnterPicks, prItems, prPool, threadCandidates, threadItems, type ThreadRow } from "@/lib/tagCandidates";
 import { statusLine, statusText } from "@/lib/statusLine";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { branchPullRequestsResource, dashboardResource } from "@/stores/gh";
+import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { EditorTrigger } from "./PromptEditor";
@@ -94,9 +94,6 @@ export function useProjectSlugs(projectIds: readonly string[]): readonly string[
     useShallow((s) => [...new Set(projectIds.map((id) => s.byId[id]?.githubSlug.toLowerCase() ?? "").filter((slug) => slug !== ""))]),
   );
 }
-
-/** The key of dashboardResource this reads: the registered projects' pull requests. */
-const DASHBOARD_KEY = "tracked";
 
 /**
  * The pull requests the GUI knows in some repositories: the viewer's dashboards
