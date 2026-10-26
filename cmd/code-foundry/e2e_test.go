@@ -37,7 +37,11 @@ func startTestDaemon(t *testing.T) *client.Client {
 		}
 	})
 	c := client.New(p)
-	deadline := time.Now().Add(5 * time.Second)
+	// A daemon start under the race detector takes about four seconds on a laptop (it
+	// writes the skills, opens the DB and its migrations, and brings up three listeners)
+	// and longer on a shared CI runner, so the deadline leaves room: a test that waits
+	// a little more is better than one that fails on a slow machine.
+	deadline := time.Now().Add(60 * time.Second)
 	for {
 		if _, err := c.Ping(ctx); err == nil {
 			return c
