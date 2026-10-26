@@ -26,9 +26,9 @@ import (
 //     only whitespace is replaced and git check-ref-format checks the result.
 //
 // The slug comes from the namer's reply, which also carries the thread's title (one
-// call). A --branch value (NewWorktree.Branch, NewWorkspace.Branch) with a slash is
-// the branch, verbatim; without one it is the slug the mode wraps (in custom mode a
-// hint for the model). An auto-generated branch that is taken gets -2..-9; a --branch
+// call). A --branch value (NewWorktree.Branch, NewWorkspace.Branch) with a slash, or
+// one that names an existing branch (existingBranchChoice), is the branch, verbatim;
+// any other is the slug the mode wraps (in custom mode a hint for the model). An auto-generated branch that is taken gets -2..-9; a --branch
 // one that exists is checked out instead, its base ignored. Whatever has nothing
 // usable (the namer failed, timed out or is off) falls back to cf/<thread id>.
 
@@ -94,6 +94,18 @@ func (m *Manager) newBranchChoice(flag string) (branchChoice, error) {
 		}
 	}
 	return bc, nil
+}
+
+// existingBranchChoice makes a --branch value without a slash verbatim when a branch of
+// that name exists (locally or on origin, on disk; nothing is fetched) in one of the
+// repositories at projectPaths: the composer's existing-branch pick (main, develop) is
+// that branch, not a slug for the naming mode to wrap. Anything else is bc unchanged.
+func (m *Manager) existingBranchChoice(ctx context.Context, projectPaths []string, bc branchChoice, flag string) branchChoice {
+	flag = strings.TrimSpace(flag)
+	if bc.hint == "" || flag == "" || validateRef(flag) != nil || !m.branchExists(ctx, projectPaths, flag) {
+		return bc
+	}
+	return branchChoice{cfg: bc.cfg, verbatim: flag}
 }
 
 // branchRequest is what the namer is asked about the branch, or nil when the branch
