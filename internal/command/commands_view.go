@@ -221,7 +221,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		{
 			Name:        "view.pullrequests",
 			Title:       "Show Pull Requests",
-			Description: "Show the Pull Requests page in every app window: your open pull requests, reviews requested from you, and recent merges across registered projects.",
+			Description: "Show the Pull Requests page in every app window: pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+d"},
 			Args:        pageArgs,
