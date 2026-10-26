@@ -214,7 +214,9 @@ func mapReviewers(p *pullRequestFullJSON) []Reviewer {
 			if r.Login == "" {
 				continue // deleted account
 			}
-			r.Stale = n.Commit != nil && n.Commit.Oid != "" && n.Commit.Oid != p.HeadRefOid
+			// Stale: reviewed on another commit than the head, or on none GitHub still has (a
+			// force-push dropped it), as the Pull Requests page's needs-review rule.
+			r.Stale = p.HeadRefOid != "" && (n.Commit == nil || n.Commit.Oid != p.HeadRefOid)
 			index[strings.ToLower(r.Login)] = len(out)
 			out = append(out, r)
 		}
