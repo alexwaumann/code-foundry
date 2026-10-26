@@ -131,8 +131,8 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/feat
 Before it is pushed (a lead's or a sibling's branch with local commits only), name the
 local branch and keep it local: `--base feat/add-filter --base-from-origin no` starts
 from that branch as it is now, without a fetch (without the flag, a branch origin also
-has starts from origin's copy, under the default `projects.base_from_origin`). Later
-commits on it do not reach the new branch: rebase onto it once it is pushed.
+has starts from origin's copy unless the local one is ahead of it, under the default
+`projects.base_from_origin`). Its later commits reach the new branch only by a rebase.
 
 ## 2c. A change across several projects
 

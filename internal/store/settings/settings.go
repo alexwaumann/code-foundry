@@ -91,7 +91,8 @@ type Projects struct {
 	BranchPrefix string
 	// BranchInstructions are custom mode's instructions to the naming model.
 	BranchInstructions string
-	// BaseFromOrigin branches new worktrees from origin's copy of their base
+	// BaseFromOrigin branches new worktrees from origin's copy of their base unless
+	// the local branch is ahead of it; off, from the local branch
 	// (project.CreateWorktreeOptions.BaseFromOrigin); read at every new worktree.
 	BaseFromOrigin bool
 }

@@ -124,8 +124,9 @@ func (m *Manager) recreateWorktree(ctx context.Context, s Thread) (recreatedWork
 	local := m.opts.RefExists(ctx, r.Path, "refs/heads/"+s.Branch)
 	remote := !local && (m.opts.RefExists(ctx, r.Path, "refs/remotes/origin/"+s.Branch) || m.opts.FetchBranch(ctx, r.Path, s.Branch))
 	if !local && !remote {
-		// No BaseRef: the project store's default base (origin/<default>, fetched, or
-		// the local default with projects.base_from_origin off).
+		// No BaseRef: the project store's default base (origin/<default>, fetched,
+		// unless the local default is ahead of it or projects.base_from_origin is off:
+		// then the local default).
 		opts.BaseRef = s.BaseRef
 	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, opts)

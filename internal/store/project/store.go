@@ -845,7 +845,8 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 		def = g.defaultBranch(ctx, m.Path, "", err == nil)
 	}
 	refs.DefaultRef, refs.DefaultBranch = def, def
-	if _, ok := slices.BinarySearch(refs.Remote, "origin/"+def); ok {
+	_, local := slices.BinarySearch(refs.Local, def)
+	if _, remote := slices.BinarySearch(refs.Remote, "origin/"+def); remote && !local {
 		refs.DefaultRef = "origin/" + def
 	}
 	return refs, nil

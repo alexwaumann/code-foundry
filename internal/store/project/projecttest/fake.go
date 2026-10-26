@@ -315,7 +315,8 @@ func (f *Fake) SetRefs(projectID string, refs project.Refs) {
 }
 
 // ListRefs implements project.Store. Without SetRefs, a known project lists its worktrees'
-// branches as local refs and its default branch as DefaultRef.
+// branches as local refs and Branches (sorted by name, not date) and its default
+// branch as DefaultRef.
 func (f *Fake) ListRefs(_ context.Context, projectID string) (project.Refs, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -337,7 +338,8 @@ func (f *Fake) ListRefs(_ context.Context, projectID string) (project.Refs, erro
 		}
 	}
 	slices.Sort(local)
-	return project.Refs{Local: slices.Compact(local), DefaultRef: r.DefaultBranch, DefaultBranch: r.DefaultBranch}, nil
+	local = slices.Compact(local)
+	return project.Refs{Local: local, Branches: slices.Clone(local), DefaultRef: r.DefaultBranch, DefaultBranch: r.DefaultBranch}, nil
 }
 
 func (f *Fake) rebuild() {

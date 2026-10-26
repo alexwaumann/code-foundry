@@ -302,6 +302,7 @@ func TestProjectListRefsAndCreateFetch(t *testing.T) {
 	r, _ := fake.Register(ctx, "/code/proj")
 	fake.SetRefs(r.ID, project.Refs{
 		Local: []string{"cf/x", "main"}, Remote: []string{"origin/main", "upstream/dev"}, DefaultRef: "origin/main",
+		Branches: []string{"cf/x", "main"}, DefaultBranch: "main",
 	})
 
 	tests := []struct {
@@ -326,7 +327,9 @@ func TestProjectListRefsAndCreateFetch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !slices.Equal(res.Msg.GetRefs(), tt.wantRefs) || res.Msg.GetDefaultRef() != tt.wantDefault {
+			// The handler maps the store's fields as they are.
+			if !slices.Equal(res.Msg.GetRefs(), tt.wantRefs) || res.Msg.GetDefaultRef() != tt.wantDefault ||
+				!slices.Equal(res.Msg.GetBranches(), []string{"cf/x", "main"}) || res.Msg.GetDefaultBranch() != "main" {
 				t.Fatalf("ListRefs = %v", res.Msg)
 			}
 		})

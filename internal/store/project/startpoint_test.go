@@ -44,19 +44,6 @@ func TestClassifyBase(t *testing.T) {
 	}
 }
 
-func TestRefsDefault(t *testing.T) {
-	r := Refs{DefaultRef: "origin/main", DefaultBranch: "main"}
-	if got := r.Default(true); got != "origin/main" {
-		t.Errorf("Default(true) = %q", got)
-	}
-	if got := r.Default(false); got != "main" {
-		t.Errorf("Default(false) = %q", got)
-	}
-	if got := (Refs{DefaultRef: "main"}).Default(false); got != "main" {
-		t.Errorf("Default(false) without DefaultBranch = %q", got)
-	}
-}
-
 // TestStartPoint runs projects.base_from_origin on and off against a scratch origin
 // whose main is one commit ahead of the clone's origin/main and main (setup may move
 // the clone's main level with or ahead of it).

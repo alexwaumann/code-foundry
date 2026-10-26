@@ -1207,7 +1207,8 @@ export type NewWorktree = Message<"codefoundry.v1.NewWorktree"> & {
   /**
    * Ref to branch from. Defaults to the default branch; projects.base_from_origin
    * (CreateWorktreeRequest.base_ref) says whether that, or a bare branch name, is
-   * origin's copy. Ignored when branch names an existing branch.
+   * origin's copy unless the local branch is ahead of it. Ignored when branch names an
+   * existing branch.
    *
    * @generated from field: string base_ref = 1;
    */

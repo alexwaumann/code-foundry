@@ -227,21 +227,18 @@ type Refs struct {
 	// Remote holds remote-tracking refs as "<remote>/<branch>", sorted, without the
 	// symbolic "<remote>/HEAD".
 	Remote []string
-	// DefaultRef is "origin/<default branch>" when that ref exists, else
-	// "<default branch>": what CreateWorktree branches from without a BaseRef when
-	// BaseFromOrigin is on (Default gives either).
+	// Branches holds branch short names, local and origin's remote-tracking branches
+	// merged by name (origin/HEAD skipped), the most recent commit first (a name's
+	// newer date of the two; ties by name).
+	Branches []string
+	// DefaultRef names the default branch as a base: "<default branch>" when it is a
+	// local branch, else "origin/<default branch>" when only origin's copy exists,
+	// else "<default branch>". Which copy a new worktree starts from is decided per
+	// repository at creation (CreateWorktreeOptions.BaseFromOrigin), so sending it as
+	// the base is the same as sending none.
 	DefaultRef string
-	// DefaultBranch is the local default branch ("main").
+	// DefaultBranch is the default branch's short name ("main").
 	DefaultBranch string
-}
-
-// Default is the ref CreateWorktree branches from without a BaseRef: DefaultRef with
-// fromOrigin (CreateWorktreeOptions.BaseFromOrigin), else the local default branch.
-func (r Refs) Default(fromOrigin bool) string {
-	if fromOrigin || r.DefaultBranch == "" {
-		return r.DefaultRef
-	}
-	return r.DefaultBranch
 }
 
 // RemoveWorktreeOptions configures Store.RemoveWorktree.

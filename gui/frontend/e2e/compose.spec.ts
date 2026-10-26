@@ -101,7 +101,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
   await expect(page.getByTestId("composer-worktree")).toHaveAccessibleName("Work in: Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From main");
 
   await page.keyboard.type("Add a dark mode toggle");
   await page.keyboard.press("Shift+Enter");
@@ -130,7 +130,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   expect(last?.args).toEqual({
     project: "repo-cf",
     "new-worktree": "true",
-    base: "origin/main",
+    base: "main",
     model: "claude-sonnet-5[1m]",
     effort: "medium",
     permission: "auto",
@@ -333,7 +333,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await worktree.click();
   await options.filter({ hasText: "Fresh copy" }).click();
   await expect(indicator).toHaveCount(0);
-  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From main");
 });
 
 test("Work in: by default a thread starts in place; a pick applies to its draft only", async ({ page }) => {
@@ -349,12 +349,12 @@ test("Work in: by default a thread starts in place; a pick applies to its draft 
   await worktree.click();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
   await expect(worktree).toHaveText("Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From main");
   await page.getByTestId("composer-input").focus();
   await page.keyboard.type("Tidy the README");
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "origin/main" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "main" });
   await expect.poll(() => promptFocused(page)).toBe(true);
 
   // The next code-foundry draft starts from the setting again, not from the pick.
