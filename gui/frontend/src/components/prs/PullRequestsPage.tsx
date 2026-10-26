@@ -219,7 +219,7 @@ export function PullRequestsNav() {
     <button
       type="button"
       className={cn(
-        "mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
+        "mt-0.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
         active ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground hover:bg-cf-sidebar-row-hover",
       )}
       data-testid="nav-pullrequests"

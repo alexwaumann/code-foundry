@@ -6,8 +6,7 @@ import { cn } from "@/lib/utils"
  * - `size`: `default` (text-caption-sm, 20px tall) for a chord beside a list row or in the shortcut
  *   list; `sm` (text-caption-sm with no leading, 16px tall) for an inline hint in a footer, a field or a button.
  * - `variant="inherit"`: on a filled or outlined button, the chip takes the button's own
- *   text colour for its text and border, dimmed (the permission prompt's buttons, the
- *   sidebar's New thread).
+ *   text colour for its text and border, dimmed (the permission prompt's buttons).
  */
 const kbdVariants = cva(
   "pointer-events-none inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-sm border font-sans whitespace-nowrap select-none [&_svg:not([class*='size-'])]:size-3",
