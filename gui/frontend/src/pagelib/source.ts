@@ -48,19 +48,21 @@ export function absolutize(code: string, from: string): string {
   return out + code.slice(at);
 }
 
-/** "(line:col)" of a position, 1-based line and 0-based column as Sucrase writes them. */
-function loc(source: string, pos: number): string {
+/** "(line:col)" of a position, 1-based line (from firstLine) and 0-based column as Sucrase writes them. */
+function loc(source: string, pos: number, firstLine = 1): string {
   const before = source.slice(0, pos);
-  const line = before.split("\n").length;
+  const line = before.split("\n").length + firstLine - 1;
   return `(${String(line)}:${String(pos - before.lastIndexOf("\n") - 1)})`;
 }
 
 /**
  * The first closing tag that does not close the element open there, as a Sucrase-style
  * message ending "(line:col)" at the closing tag, or "" when every tag matches (or the
- * tokens stop before a mismatch: Sucrase's own error then says what is wrong).
+ * tokens stop before a mismatch: Sucrase's own error then says what is wrong). The
+ * trailing location counts from the script (locate numbers it as the file); "opened at"
+ * from firstLine, the file's line the script starts on.
  */
-export function tagMismatch(source: string): string {
+export function tagMismatch(source: string, firstLine = 1): string {
   const toks = tokens(source, true);
   const open: { name: string; pos: number; head: boolean }[] = [];
   // The element name from token i: a.b.c or a:b, "" for a fragment.
@@ -79,7 +81,7 @@ export function tagMismatch(source: string): string {
       if (top && top.name !== name) {
         const what = (n: string) => (n ? `<${n}>` : "<>");
         const closing = name ? `</${name}>` : "</>";
-        return `${closing} closes ${what(top.name)}, opened at ${loc(source, top.pos).slice(1, -1)}; expected ${top.name ? `</${top.name}>` : "</>"} ${loc(source, t.start)}`;
+        return `${closing} closes ${what(top.name)}, opened at ${loc(source, top.pos, firstLine).slice(1, -1)}; expected ${top.name ? `</${top.name}>` : "</>"} ${loc(source, t.start)}`;
       }
       i = next;
       continue;

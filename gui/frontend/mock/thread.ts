@@ -839,9 +839,13 @@ export class MockThreadLogs {
     }
     if (state === "pagelib") {
       // Pages built on the page library (docs/notes/page-library.md; mock/pagelib/): a React
-      // board with @cf/ui, the Tailwind runtime, a TSX syntax error and a free-styled mockup.
+      // board with @cf/ui, the Tailwind runtime, a TSX syntax error and a free-styled mockup;
+      // then what the fixes cover (docs/notes/page-library-fixes-a.md).
       it({ case: "userMessage", value: { text: "Show me what pages can be made of.", attachments: [] } }, { at: ago(1) });
-      for (const [name, title] of [["tailwind", "Tailwind runtime"], ["broken", "Broken TSX"], ["mockup", "Streaks mockup"], ["board", "Thread board"]] as const) {
+      for (const [name, title] of [
+        ["tailwind", "Tailwind runtime"], ["broken", "Broken TSX"], ["mockup", "Streaks mockup"], ["roles", "Roles and utilities"], ["margin", "Margins"],
+        ["both", "ui.css and the runtime"], ["throw", "Render throws"], ["mismatch", "Mismatched tag"], ["pinned", "Light only"], ["board", "Thread board"],
+      ] as const) {
         it({ case: "html", value: { path: `docs/pagelib/${name}.html`, title, baseDir: cwd } }, { at: ago(0, 48) });
       }
       it({ case: "assistantText", value: { text: "Here they are." } }, { at: ago(0, 46), streaming: true });

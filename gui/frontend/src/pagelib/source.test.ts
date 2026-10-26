@@ -29,6 +29,8 @@ describe("tagMismatch", () => {
   it("names the closing tag that closes the wrong element, at its line", () => {
     const src = "function App() {\n  return (\n    <div>\n      <b>hello</div>\n    </div>\n  );\n}\n";
     expect(tagMismatch(src)).toBe("</div> closes <b>, opened at 4:6; expected </b> (4:14)");
+    // Opened at the file's line; the trailing location stays the script's, for locate.
+    expect(tagMismatch(src, 10)).toBe("</div> closes <b>, opened at 13:6; expected </b> (4:14)");
   });
 
   it("finds it before the parser's own error further down", () => {

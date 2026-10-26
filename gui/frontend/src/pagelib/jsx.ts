@@ -133,7 +133,7 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
   const where = (msg: string) => locate(source, msg, first || 1);
   // Sucrase compiles a closing tag that names another element (`<b>…</div>`) without a word,
   // or fails much further down: say which tag it is first.
-  const mismatch = tagMismatch(source);
+  const mismatch = tagMismatch(source, first || 1);
   if (mismatch) {
     const at = where(mismatch);
     report(`Syntax error in ${name}`, at.message + at.frame);
