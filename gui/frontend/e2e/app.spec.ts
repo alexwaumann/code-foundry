@@ -100,9 +100,9 @@ test("invoking a command sends the current context", async ({ page }) => {
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("daemon status");
+  await page.keyboard.type("reveal settings");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("daemon.status");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("settings.reveal");
   expect((await invocations()).at(-1)?.context).toEqual({
     activeTerminalId: "",
     activeThreadId: "s-1",
@@ -136,13 +136,13 @@ test("required args are prompted inline before invoking", async ({ page }) => {
 
   // Enum args list their values, the default highlighted.
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("test notification");
+  await page.keyboard.type("set dark theme");
   await page.keyboard.press("Enter");
-  await expect(palette.getByRole("option", { name: /^info/ })).toBeVisible();
-  await palette.getByRole("option", { name: /^warning/ }).click();
+  await expect(palette.getByRole("option", { name: /^nord/ })).toBeVisible();
+  await palette.getByRole("option", { name: /^catppuccin-mocha/ }).click();
   await expect(palette).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("ui.notify");
-  expect((await invocations()).at(-1)?.args).toEqual({ level: "warning" });
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("theme.set-dark");
+  expect((await invocations()).at(-1)?.args).toEqual({ theme: "catppuccin-mocha" });
 });
 
 // An unknown id's expiry toast is src/stores/intents.test.ts (it waits out the pending-focus window).

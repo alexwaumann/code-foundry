@@ -770,7 +770,7 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
   await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
-  for (const title of ["Send to Thread", "Answer Thread Request", "Set Thread Effort"]) {
+  for (const title of ["Set Thread Model", "Fork Thread", "Set Thread Effort"]) {
     await page.getByTestId("palette").getByRole("combobox").fill(title);
     await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
   }
@@ -779,8 +779,8 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
   await row(page, "s:s-3").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Send to Thread");
-  await expect(page.getByRole("option", { name: /Send to Thread/ })).toBeVisible();
+  await page.keyboard.type("Set Thread Effort");
+  await expect(page.getByRole("option", { name: /Set Thread Effort/ })).toBeVisible();
   await page.keyboard.press("Escape");
   // A page has none of them.
   await page.getByTestId("nav-projects").click();
@@ -788,7 +788,7 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Thread");
   await expect(page.getByRole("option", { name: /New Thread/ })).toBeVisible();
-  for (const title of ["Interrupt Thread", "Send to Thread", "Answer Thread Request", "Set Thread Model"]) {
+  for (const title of ["Interrupt Thread", "Fork Thread", "Set Thread Effort", "Set Thread Model"]) {
     await expect(page.getByRole("option", { name: new RegExp(title) })).toHaveCount(0);
   }
 });
