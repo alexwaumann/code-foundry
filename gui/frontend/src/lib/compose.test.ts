@@ -25,6 +25,11 @@ import {
   threadArgs,
   threadPlace,
   setWorkIn,
+  baseText,
+  baseRuleText,
+  commonBranches,
+  defaultBranchLabel,
+  mergedBranches,
   defaultWorktree,
   workInText,
   type DraftArgsInput,
@@ -117,7 +122,13 @@ describe("threadNewArgs", () => {
       ["/a/1.png", "/a/2.png"],
       { project: "r", "new-worktree": "true", base: "origin/main", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle", attachments: "/a/1.png,/a/2.png" },
     ],
-    ["new worktree without a known base lets the daemon pick", { base: "" }, [], { project: "r", "new-worktree": "true", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle" }],
+    ["new worktree without a picked base lets the daemon pick", { base: "" }, [], { project: "r", "new-worktree": "true", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle" }],
+    [
+      "an existing branch: new-worktree and the branch, no base",
+      { worktree: { kind: "branch", name: "feat/parser" }, base: "develop" },
+      [],
+      { project: "r", "new-worktree": "true", branch: "feat/parser", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle" },
+    ],
     [
       "existing worktree: its path, no base",
       { worktree: { kind: "existing", path: "/src/app" }, model: "", effort: "", text: "" },
@@ -135,7 +146,6 @@ describe("project sets", () => {
     isGitProject: (id) => projects.has(id),
     hasWorktree: (projectId, path) => projectId === "web" && (path === "/src/web-fix" || path === "/src/web"),
     mainPath: (id) => (id === "web" ? "/src/web" : undefined),
-    defaultRef: "origin/main",
   };
   const one = { projectIds: ["web"], workspaceId: "", primary: "web", isSet: false };
   const two = { projectIds: ["api", "web"], workspaceId: "", primary: "web", isSet: true };
@@ -152,27 +162,35 @@ describe("project sets", () => {
   });
 
   it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([
-    ["a project, new worktree, default base", project, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" }],
-    ["a project, existing worktree", { ...project, worktree: { kind: "existing", path: "/src/web-fix" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/main" }],
-    ["a project in place: its main checkout", { ...project, worktree: { kind: "current" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "existing", path: "/src/web" }, base: "origin/main" }],
-    ["a project whose chosen worktree is gone: a new one", { ...project, worktree: { kind: "existing", path: "/gone" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" }],
+    ["a project, new worktree, nothing picked: no base (the daemon's default)", project, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "" }],
+    ["a project, new worktree from a picked branch", { ...project, base: "develop" }, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "develop" }],
+    ["a project, existing worktree: no base", { ...project, base: "develop", worktree: { kind: "existing", path: "/src/web-fix" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "existing", path: "/src/web-fix" }, base: "" }],
+    ["a project, an existing branch: no base", { ...project, base: "develop", worktree: { kind: "branch", name: "feat/parser" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "branch", name: "feat/parser" }, base: "" }],
+    ["a project in place: its main checkout", { ...project, worktree: { kind: "current" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "existing", path: "/src/web" }, base: "" }],
+    ["a project whose chosen worktree is gone: a new one", { ...project, worktree: { kind: "existing", path: "/gone" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "" }],
     [
       "a set in place: every project's own checkout, no base",
-      { ...project, worktree: { kind: "current" }, base: "origin/dev", set: two },
+      { ...project, worktree: { kind: "current" }, base: "develop", set: two },
       {},
-      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: false, base: "" },
+      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: false, branch: "", base: "", baseFor: [] },
     ],
     [
-      "a set with fresh copies and a picked base for the primary",
-      { ...project, base: "origin/dev", set: { ...two, primary: "api" } },
+      "a set with fresh copies and a picked base: every git project's",
+      { ...project, base: "develop", set: { projectIds: ["api", "notes", "web"], workspaceId: "", primary: "api", isSet: true } },
       {},
-      { kind: "set", projectIds: ["api", "web"], primary: "api", workspaceId: "", newWorktree: true, base: "origin/dev" },
+      { kind: "set", projectIds: ["api", "notes", "web"], primary: "api", workspaceId: "", newWorktree: true, branch: "", base: "develop", baseFor: ["api", "web"] },
     ],
     [
-      "a workspace with one project is a set, its folder the primary: no base",
-      { ...project, target: { kind: "workspace", workspaceId: "w-1" }, base: "origin/dev", set: { projectIds: ["web"], workspaceId: "w-1", primary: "workspace", isSet: true } },
+      "a set on an existing branch: worktrees on it, no base",
+      { ...project, worktree: { kind: "branch", name: "feat/parser" }, base: "develop", set: two },
       {},
-      { kind: "set", projectIds: ["web"], primary: "workspace", workspaceId: "w-1", newWorktree: true, base: "" },
+      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: true, branch: "feat/parser", base: "", baseFor: [] },
+    ],
+    [
+      "a workspace with one project is a set, its folder the primary: the base still applies to the project",
+      { ...project, target: { kind: "workspace", workspaceId: "w-1" }, base: "develop", set: { projectIds: ["web"], workspaceId: "w-1", primary: "workspace", isSet: true } },
+      {},
+      { kind: "set", projectIds: ["web"], primary: "workspace", workspaceId: "w-1", newWorktree: true, branch: "", base: "develop", baseFor: ["web"] },
     ],
     ["nothing left to start in", { ...project, set: { projectIds: [], workspaceId: "", primary: "", isSet: false } }, {}, null],
     [
@@ -185,7 +203,7 @@ describe("project sets", () => {
       "a git project is unaffected by noGitCheckout",
       project,
       { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
-      { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" },
+      { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "" },
     ],
     ["a like draft keeps the thread's primary", { ...project, target: { kind: "like", threadId: "s-1" } }, {}, { kind: "like", threadId: "s-1", primary: "" }],
     ["a like draft with another primary", { ...project, target: { kind: "like", threadId: "s-1" }, likePrimary: "api" }, {}, { kind: "like", threadId: "s-1", primary: "api" }],
@@ -197,17 +215,22 @@ describe("project sets", () => {
   it.each<[string, ThreadPlace, Record<string, string>]>([
     [
       "a set in place",
-      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: false, base: "" },
+      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: false, branch: "", base: "", baseFor: [] },
       { project: "web", projects: "api,web", "new-worktree": "false", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
-      "a set with fresh copies, the primary's own base",
-      { kind: "set", projectIds: ["api", "web"], primary: "api", workspaceId: "", newWorktree: true, base: "origin/dev" },
-      { project: "api", projects: "api:origin/dev,web", "new-worktree": "true", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+      "a set with fresh copies from a picked branch: every git project's",
+      { kind: "set", projectIds: ["api", "notes", "web"], primary: "api", workspaceId: "", newWorktree: true, branch: "", base: "develop", baseFor: ["api", "web"] },
+      { project: "api", projects: "api:develop,notes,web:develop", "new-worktree": "true", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+    ],
+    [
+      "a set on an existing branch: the branch, no bases",
+      { kind: "set", projectIds: ["api", "web"], primary: "web", workspaceId: "", newWorktree: true, branch: "feat/parser", base: "", baseFor: [] },
+      { project: "web", projects: "api,web", "new-worktree": "true", branch: "feat/parser", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
       "a workspace's set in its folder",
-      { kind: "set", projectIds: ["api", "web"], primary: "workspace", workspaceId: "w-1", newWorktree: true, base: "" },
+      { kind: "set", projectIds: ["api", "web"], primary: "workspace", workspaceId: "w-1", newWorktree: true, branch: "", base: "", baseFor: [] },
       { project: "workspace", projects: "api,web", workspace: "w-1", "new-worktree": "true", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     ["like, the thread's own primary", { kind: "like", threadId: "s-1", primary: "" }, { id: "s-1", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" }],
@@ -217,7 +240,7 @@ describe("project sets", () => {
   });
 
   it("threadArgs passes the composer's text with a prompt only", () => {
-    const place: ThreadPlace = { kind: "set", projectIds: ["api", "web"], primary: "api", workspaceId: "", newWorktree: false, base: "" };
+    const place: ThreadPlace = { kind: "set", projectIds: ["api", "web"], primary: "api", workspaceId: "", newWorktree: false, branch: "", base: "", baseFor: [] };
     expect(threadArgs(place, { ...prompt, text: "/tdd go", composerText: " [/tdd](cf-skill://~/tdd) go " }, [])).toMatchObject({ prompt: "/tdd go", "composer-prompt": "[/tdd](cf-skill://~/tdd) go" });
     expect(threadArgs(place, { ...prompt, text: " ", composerText: "x" }, [])).not.toHaveProperty("composer-prompt");
     expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
@@ -243,6 +266,7 @@ describe("project sets", () => {
     ["no pick, setting new", null, "new", "new"],
     ["no pick, setting current", null, "current", "current"],
     ["a pick of fresh copies wins over the setting", { kind: "new" }, "current", "new"],
+    ["an existing branch picked is worktrees on it", { kind: "branch", name: "develop" }, "current", "new"],
     ["an existing worktree picked for a lone project counts as in place", { kind: "existing", path: "/src/web-fix" }, "new", "current"],
   ])("setWorkIn: %s", (_name, choice, setting, want) => {
     expect(setWorkIn(choice, setting)).toBe(want);
@@ -255,7 +279,7 @@ describe("project sets", () => {
   });
 
   it("threadArgs: a workspace without projects sends no projects list (never an empty one)", () => {
-    const place: ThreadPlace = { kind: "set", projectIds: [], primary: "workspace", workspaceId: "w-0", newWorktree: false, base: "" };
+    const place: ThreadPlace = { kind: "set", projectIds: [], primary: "workspace", workspaceId: "w-0", newWorktree: false, branch: "", base: "", baseFor: [] };
     expect(threadArgs(place, prompt, [])).toEqual({ project: "workspace", workspace: "w-0", "new-worktree": "false", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" });
   });
 });
@@ -287,8 +311,38 @@ describe("Work in", () => {
     ["a set with fresh copies", { set: true, many: true, noGit: false, worktree: { kind: "new" } }, "Fresh copies"],
     ["a set of one project in place: singular", { set: true, many: false, noGit: false, worktree: { kind: "current" } }, "Project folder"],
     ["a set of one project with a fresh copy: singular", { set: true, noGit: false, worktree: { kind: "new" } }, "Fresh copy"],
+    ["a project on an existing branch: the branch alone", { set: false, noGit: false, worktree: { kind: "branch", name: "feat/parser" } }, "feat/parser"],
+    ["a set on an existing branch: the branch alone", { set: true, many: true, noGit: false, worktree: { kind: "branch", name: "develop" } }, "develop"],
   ])("workInText: %s", (_, input, want) => {
     expect(workInText(input)).toBe(want);
+  });
+
+  it.each<[string, string[][], string[]]>([
+    ["one project: its order", [["feat/parser", "main", "develop"]], ["feat/parser", "main", "develop"]],
+    ["two projects: position by position, merged by name", [["feat/parser", "main", "develop"], ["fix/resize", "main", "feat/sidebar", "release/1.4"]], ["feat/parser", "fix/resize", "main", "develop", "feat/sidebar", "release/1.4"]],
+    ["none", [], []],
+  ])("mergedBranches: %s", (_, lists, want) => {
+    expect(mergedBranches(lists)).toEqual(want);
+  });
+
+  it.each<[string, string[][], string[], string[]]>([
+    ["one project: its branches minus the default", [["feat/x", "main", "develop"]], ["main"], ["feat/x", "develop"]],
+    [
+      "a set: the names all have, in the first's order, minus every default",
+      [["develop", "feat/x", "trunk", "release/1.4", "main"], ["main", "release/1.4", "develop", "trunk"]],
+      ["main", "trunk"],
+      ["develop", "release/1.4"],
+    ],
+    ["no git project", [], [], []],
+  ])("commonBranches: %s", (_, lists, defaults, want) => {
+    expect(commonBranches(lists, defaults)).toEqual(want);
+  });
+
+  it("Branch from words", () => {
+    expect([defaultBranchLabel(true), defaultBranchLabel(false)]).toEqual(["Default branches", "Default branch"]);
+    expect([baseText("", true), baseText("", false), baseText("develop", true)]).toEqual(["From defaults", "From default", "From develop"]);
+    expect(baseRuleText(true)).toBe("Each project takes origin's copy of the branch, or its own when that is ahead.");
+    expect(baseRuleText(false)).toBe("The project takes origin's copy of the branch, or its own when that is ahead.");
   });
 });
 

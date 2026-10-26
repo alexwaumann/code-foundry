@@ -2404,8 +2404,9 @@ export class World {
       if (prompt.includes("FAIL")) {
         throw new CommandError("unavailable", project.remotes.length > 0 ? `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128` : `create worktree: git worktree add: invalid reference: ${baseRef}`);
       }
-      const branch = `cf/${slug || `s-new-${String(this.nextId)}`}`;
-      path = this.addWorktree(project, branch, baseRef).path;
+      // An existing branch (thread new --branch) reuses its worktree, like the daemon.
+      const branch = args.branch || `cf/${slug || `s-new-${String(this.nextId)}`}`;
+      path = (args.branch ? project.worktrees.find((w) => !w.isMain && w.branch === args.branch)?.path : undefined) ?? this.addWorktree(project, branch, baseRef).path;
     } else {
       path ||= project.worktrees.find((w) => w.isMain)?.path ?? project.path;
       if (!project.worktrees.some((w) => w.path === path)) throw new CommandError("invalid", `worktree ${path} is not in ${project.name}`);
@@ -3139,6 +3140,7 @@ export class World {
             { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },
             { name: "no-project", type: ArgType.BOOL, required: false, description: "Start the thread without a project, in the home directory" },
             { name: "base", type: ArgType.STRING, required: false, description: "Base ref for the new worktree" },
+            { name: "branch", type: ArgType.STRING, required: false, description: "The new worktree's branch; an existing one is checked out" },
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },

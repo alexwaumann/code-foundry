@@ -3,7 +3,7 @@
  * by draftKey in lib/compose.ts: the project id, "ws:<workspace id>", or "home:"), so switching the selection away
  * and back keeps what was typed and attached. Kept in memory only (not persisted): the
  * files behind the attachments do not survive a reload anyway. Also caches each project's
- * base refs (ProjectService.ListRefs) for the base-ref picker.
+ * branches (ProjectService.ListRefs) for the Work in and Branch from pickers.
  *
  * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: attachment
  * chips, skills, files); the attachments are the images and PDFs themselves (the tiles).
@@ -109,7 +109,10 @@ export interface Draft {
    * a single project, lib/compose setWorkIn for a set).
    */
   worktree: WorktreeChoice | null;
-  /** null: the primary project's default base ref (ListRefs.default_ref). */
+  /**
+   * The branch new worktrees branch from (Branch from): a name every git project of the
+   * set has; null: each project's default branch (no base sent: the daemon's rule).
+   */
   base: string | null;
   /**
    * The projects the thread works in, in the order they were picked (lib/projectSet);
@@ -133,10 +136,11 @@ export interface Draft {
   citations: Readonly<Record<string, Citation>>;
 }
 
+/** A project's branches (ListRefs.branches, newest commit first) and default branch. */
 export interface RefsState {
   status: "loading" | "ready" | "error";
-  refs: readonly string[];
-  defaultRef: string;
+  branches: readonly string[];
+  defaultBranch: string;
   error: string | null;
   /** The daemon predates ListRefs (error is the restart hint). */
   outdated: boolean;
@@ -194,12 +198,12 @@ export function updateDraft(key: string, patch: Partial<Draft>): void {
 
 /**
  * Runs the thread in another project of its set (or "workspace", the workspace's folder).
- * The base picker lists that project's refs, so its choice resets.
+ * The base stays: it is a branch every git project of the set has, whichever runs it.
  */
 export function setPrimary(key: string, primary: string): void {
   const d = getDraft(key);
   if (d.primary === primary) return;
-  updateDraft(key, { primary, base: null, error: null });
+  updateDraft(key, { primary, error: null });
 }
 
 /** The set a target starts with: its project, or its workspace's members and the workspace. */
@@ -239,7 +243,7 @@ function goneTagsConfirm(text: string, gone: readonly string[], title: string, c
 /**
  * Writes a new set into the draft: the picked projects (and the workspace, when given),
  * with the tags of the projects that leave removed from the text (after a confirm when
- * there are any). The base resets when the primary changes. Resolves false when the user
+ * there are any). The base resets when the projects change. Resolves false when the user
  * cancelled or the draft is busy.
  */
 async function writeSet(target: ComposeTarget, picked: readonly string[], workspace: string | undefined, title: string): Promise<boolean> {
@@ -255,7 +259,8 @@ async function writeSet(target: ComposeTarget, picked: readonly string[], worksp
   for (const id of gone) text = removeProjectTags(text, id);
   const patch: Partial<Draft> = { projects: picked, text, error: null, ...(workspace === undefined ? {} : { workspace }) };
   const next = draftSet(target, { ...d, ...patch });
-  if (next.primary !== was.primary) patch.base = null;
+  // The base is a branch the old set's git projects have in common: another set starts from the defaults.
+  if (next.projectIds.length !== was.projectIds.length || next.projectIds.some((id) => !was.projectIds.includes(id))) patch.base = null;
   // A pick that left the set (or a workspace folder without its workspace) goes back to the default.
   if (d.primary !== null && d.primary !== next.primary) patch.primary = null;
   updateDraft(key, patch);
@@ -789,30 +794,51 @@ export function composeSelection(target: ComposeTarget, place: ThreadPlace): Sel
   }
 }
 
-/** Loads the project's base refs (once per composer mount; the previous list shows meanwhile). */
-export async function loadRefs(projectId: string): Promise<void> {
+/** The ListRefs calls in flight, by project: a picker opened twice in a row asks once. */
+const refsInFlight = new Map<string, Promise<void>>();
+
+/**
+ * Loads a project's branches (ListRefs; on each opening of a picker that lists them, the
+ * previous list showing meanwhile).
+ */
+export function loadRefs(projectId: string): Promise<void> {
+  const running = refsInFlight.get(projectId);
+  if (running) return running;
   const prev = useComposeStore.getState().refs[projectId];
   const set = (r: RefsState) => {
     useComposeStore.setState((s) => ({ refs: { ...s.refs, [projectId]: r } }));
   };
-  if (!prev) set({ status: "loading", refs: [], defaultRef: "", error: null, outdated: false });
-  try {
-    const res = await listRefs(projectId);
-    set({ status: "ready", refs: res.refs, defaultRef: res.defaultRef, error: null, outdated: false });
-  } catch (err) {
-    if (prev?.status === "ready") return;
-    set({ status: "error", refs: [], defaultRef: "", error: errorMessage(err), outdated: isOutdatedDaemon(err) });
-  }
+  if (!prev || prev.status === "error") set({ status: "loading", branches: [], defaultBranch: "", error: null, outdated: false });
+  const p = (async () => {
+    try {
+      const res = await listRefs(projectId);
+      set({ status: "ready", branches: res.branches, defaultBranch: res.defaultBranch, error: null, outdated: false });
+    } catch (err) {
+      if (prev?.status === "ready") return;
+      set({ status: "error", branches: [], defaultBranch: "", error: errorMessage(err), outdated: isOutdatedDaemon(err) });
+    } finally {
+      refsInFlight.delete(projectId);
+    }
+  })();
+  refsInFlight.set(projectId, p);
+  return p;
+}
+
+/** Loads the branches of every project of `projectIds` in parallel (loadRefs). */
+export async function loadBranches(projectIds: readonly string[]): Promise<void> {
+  await Promise.all(projectIds.map((id) => loadRefs(id)));
 }
 
 /**
  * The worktree choice a draft's set starts in: its pick, else the setting (projectWorktree
- * for one project); in place for a set without a git project (lib/compose setWorkIn).
+ * for one project); in place for a set without a git project (lib/compose setWorkIn). An
+ * existing branch picked for a set with a git project stays that branch.
  */
 export function draftWorktree(set: Pick<ResolvedSet, "isSet" | "projectIds">, d: Pick<Draft, "worktree">): WorktreeChoice {
   if (set.isSet) {
     const projects = useProjectsStore.getState().byId;
     const hasGit = set.projectIds.some((id) => projects[id]?.git === true);
+    if (hasGit && d.worktree?.kind === "branch") return d.worktree;
     return { kind: setWorkIn(d.worktree, useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY], hasGit) === "new" ? "new" : "current" };
   }
   return d.worktree ?? projectWorktree(set.projectIds[0] ?? "");
@@ -828,7 +854,6 @@ export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null 
       isGitProject: (id) => projects[id]?.git === true,
       hasWorktree: (projectId, path) => projects[projectId]?.worktrees.some((w) => w.path === path) ?? false,
       mainPath: mainCheckout,
-      defaultRef: useComposeStore.getState().refs[set.primary]?.defaultRef ?? "",
       noGitCheckout: (projectId) => noGitCheckout(projects[projectId]),
     },
   );

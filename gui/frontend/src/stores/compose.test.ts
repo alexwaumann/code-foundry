@@ -156,13 +156,10 @@ describe("compose drafts", () => {
     expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1" });
   });
 
-  it("a new primary resets the base (its refs differ)", () => {
-    updateDraft("ws:w-1", { base: "origin/feat" });
+  it("a new primary keeps the base (a branch every git project has)", () => {
+    updateDraft("ws:w-1", { base: "develop" });
     setPrimary("ws:w-1", "repo-gp");
-    expect(getDraft("ws:w-1")).toMatchObject({ primary: "repo-gp", base: null });
-    updateDraft("ws:w-1", { base: "origin/feat" });
-    setPrimary("ws:w-1", "repo-gp"); // same primary: the base stays
-    expect(getDraft("ws:w-1").base).toBe("origin/feat");
+    expect(getDraft("ws:w-1")).toMatchObject({ primary: "repo-gp", base: "develop" });
   });
 });
 
@@ -241,12 +238,12 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
     const target = { kind: "project", projectId: "repo-cf" } as const;
     updateDraft("repo-cf", { projects: ["repo-cf", "repo-gp"] });
     setting("current");
-    expect(draftPlace(target, getDraft("repo-cf"))).toEqual({ kind: "set", projectIds: ["repo-cf", "repo-gp"], primary: "repo-cf", workspaceId: "", newWorktree: false, base: "" });
+    expect(draftPlace(target, getDraft("repo-cf"))).toEqual({ kind: "set", projectIds: ["repo-cf", "repo-gp"], primary: "repo-cf", workspaceId: "", newWorktree: false, branch: "", base: "", baseFor: [] });
     setting("new");
     expect(draftPlace(target, getDraft("repo-cf"))).toMatchObject({ kind: "set", newWorktree: true });
     updateDraft("repo-cf", { worktree: { kind: "current" } });
     expect(draftPlace(target, getDraft("repo-cf"))).toMatchObject({ kind: "set", newWorktree: false });
-    expect(draftPlace({ kind: "workspace", workspaceId: "w-1" }, getDraft("ws:w-1"))).toEqual({ kind: "set", projectIds: ["repo-gp"], primary: "repo-gp", workspaceId: "w-1", newWorktree: true, base: "" });
+    expect(draftPlace({ kind: "workspace", workspaceId: "w-1" }, getDraft("ws:w-1"))).toEqual({ kind: "set", projectIds: ["repo-gp"], primary: "repo-gp", workspaceId: "w-1", newWorktree: true, branch: "", base: "", baseFor: [] });
   });
 });
 
