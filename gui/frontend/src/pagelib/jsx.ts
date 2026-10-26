@@ -14,6 +14,7 @@
  * "running", then "ready" or "error".
  */
 import { transform } from "sucrase";
+import { absolutize, locate, scriptLine, tagMismatch } from "./source";
 
 /** The script types the loader runs. */
 const TYPES = ["text/tsx", "text/jsx", "text/babel"];
@@ -75,22 +76,30 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** The source line a Sucrase error points at (its "(line:col)"), with a caret under it. */
-function codeFrame(source: string, err: unknown): string {
-  const loc = /\((\d+):(\d+)\)\s*$/.exec(message(err));
-  if (!loc) return "";
-  const line = Number(loc[1]);
-  const col = Number(loc[2]);
-  const text = source.split("\n")[line - 1];
-  if (text === undefined) return "";
-  return `\n${String(line)} | ${text}\n${" ".repeat(String(line).length + 3 + col)}^`;
+/** The page's file name, as errors and stack frames name an inline script. */
+const pageFile = decodeURIComponent(location.pathname.split("/").pop() || "") || "page.html";
+
+/** The page's own HTML, fetched once, to number an inline script's lines as the file does. */
+let pageHtml: Promise<string> | null = null;
+function ownHtml(): Promise<string> {
+  pageHtml ??= fetch(location.href)
+    .then((r) => (r.ok ? r.text() : ""))
+    .catch(() => "");
+  return pageHtml;
 }
 
-/** Relative and root-relative specifiers, made absolute: a blob module has no base of its own. */
-function absolutize(code: string, from: string): string {
-  const fix = (spec: string) => (/^(\.{1,2})?\//.test(spec) ? new URL(spec, from).href : spec);
-  return code
-    .replace(/(\bfrom\s*|\bimport\s*\(?\s*)(["'])([^"'\n]+)\2/g, (_m, pre: string, q: string, spec: string) => pre + q + fix(spec) + q);
+/** Where the last inline script was found in the page's HTML: the next is searched after it. */
+let htmlAt = 0;
+
+/** Blob module URLs, by the name a stack frame should show instead (WebKit ignores sourceURL there). */
+const blobNames = new Map<string, string>();
+
+/** An error's message and stack (WebKit's stack has no message line), blob URLs named. */
+function detail(err: Error): string {
+  const stack = err.stack ?? "";
+  let out = stack.includes(err.message) ? stack : err.message + (stack ? "\n" + stack : "");
+  for (const [url, name] of blobNames) out = out.split(url).join(name);
+  return out;
 }
 
 /** The scripts to run, in document order. */
@@ -100,8 +109,16 @@ function pageScripts(): HTMLScriptElement[] {
 
 async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
   const src = script.getAttribute("src");
-  const name = src ? new URL(src, document.baseURI).href : `${location.pathname.split("/").pop() || "page"} script ${String(n)}`;
   let source = script.textContent;
+  // An inline script's first line in the file: errors, frames and stacks say page.html:18,
+  // not line 6 of the script. 0 when the page's HTML cannot be read (then "script 2").
+  let first = 1;
+  if (!src) {
+    const at = scriptLine(await ownHtml(), source, htmlAt);
+    first = at.line;
+    htmlAt = at.end;
+  }
+  const name = src ? new URL(src, document.baseURI).href : first ? pageFile : `${pageFile} script ${String(n)}`;
   if (src) {
     try {
       const res = await fetch(name);
@@ -113,6 +130,15 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
     }
   }
   let code: string;
+  const where = (msg: string) => locate(source, msg, first || 1);
+  // Sucrase compiles a closing tag that names another element (`<b>…</div>`) without a word,
+  // or fails much further down: say which tag it is first.
+  const mismatch = tagMismatch(source);
+  if (mismatch) {
+    const at = where(mismatch);
+    report(`Syntax error in ${name}`, at.message + at.frame);
+    return false;
+  }
   try {
     code = transform(source, {
       transforms: ["jsx", "typescript"],
@@ -122,18 +148,21 @@ async function run(script: HTMLScriptElement, n: number): Promise<boolean> {
       filePath: name,
     }).code;
   } catch (err) {
-    report(`Syntax error in ${name}`, message(err) + codeFrame(source, err), err);
+    const at = where(message(err).replace(/^Error transforming .*?: /, ""));
+    report(`Syntax error in ${name}`, at.message + at.frame, err);
     return false;
   }
-  const url = URL.createObjectURL(
-    new Blob([absolutize(code, src ? name : document.baseURI) + `\n//# sourceURL=${name.replace(/\s/g, "-")}\n`], { type: "text/javascript" }),
-  );
+  // Sucrase keeps line numbers, so blank lines before the code make the module's lines the
+  // file's: a stack frame reads page.html:18 (sourceURL, and blobNames for WebKit).
+  const padded = "\n".repeat(Math.max(0, first - 1)) + absolutize(code, src ? name : document.baseURI);
+  const url = URL.createObjectURL(new Blob([padded + `\n//# sourceURL=${name.replace(/\s/g, "-")}\n`], { type: "text/javascript" }));
+  blobNames.set(url, name.replace(/\s/g, "-"));
   try {
     await import(/* @vite-ignore */ url);
     return true;
   } catch (err) {
     const what = err instanceof SyntaxError || /import|module|specifier|export/i.test(message(err)) ? "Could not import in" : "Error in";
-    report(`${what} ${name}`, message(err), err);
+    report(`${what} ${name}`, err instanceof Error && !(err instanceof SyntaxError) ? detail(err) : message(err), err);
     return false;
   } finally {
     URL.revokeObjectURL(url);
@@ -154,10 +183,10 @@ async function runAll(): Promise<void> {
 function watchErrors(): void {
   window.addEventListener("error", (e) => {
     if (e.message.startsWith("ResizeObserver loop")) return;
-    report("Uncaught error", e.error instanceof Error ? (e.error.stack ?? e.error.message) : e.message, e.error);
+    report("Uncaught error", e.error instanceof Error ? detail(e.error) : e.message, e.error);
   });
   window.addEventListener("unhandledrejection", (e) => {
-    report("Unhandled rejection", e.reason instanceof Error ? (e.reason.stack ?? e.reason.message) : String(e.reason), e.reason);
+    report("Unhandled rejection", e.reason instanceof Error ? detail(e.reason) : String(e.reason), e.reason);
   });
 }
 
