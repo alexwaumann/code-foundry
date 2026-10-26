@@ -158,7 +158,7 @@ page with `@cf/ui` loads about 860 KB, plus 750 KB for icons. Revalidation keeps
 - vitest: `src/pagelib/ui.test.ts` (every `components/ui` file's exports re-exported
   unchanged, `cn` and `toast`, the extracted theme and safelist).
 - Playwright (WebKit): `e2e/page-library.spec.ts`, 4 tests, plus bridge, inline-html and
-  file-tabs (40 passed together):
+  file-tabs (41 passed together):
   - the board renders Tabs, a Table filled from `cf.on("thread-list")`, a Dialog and an
     icon, and a theme switch repaints it;
   - the Tailwind runtime builds `w-[217px]`, `p-[13px]`, `rounded-pane`, `bg-cf-accent`, the
