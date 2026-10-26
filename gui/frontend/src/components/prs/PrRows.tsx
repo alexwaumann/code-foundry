@@ -36,12 +36,12 @@ export type Section = "review" | "reviewed" | "authored" | "merged";
 // Flexible tracks only (fr with a floor): fixed maxima grow before an fr track gets any
 // room, which squeezed the title to nothing beside the side panel. Review and reviewed
 // share a template, so the reviewed sub-card's columns line up under the queue's.
-const REVIEW_COLS = "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(8.5rem,1.3fr)_minmax(6.5rem,1fr)_3rem]";
+const REVIEW_COLS = "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(8.5rem,1.3fr)_minmax(6.5rem,1fr)_3rem]";
 const columns: Record<Section, string> = {
   review: REVIEW_COLS,
   reviewed: REVIEW_COLS,
-  authored: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(6rem,2.4fr)_minmax(8.5rem,1.2fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.5fr)_3rem]",
-  merged: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_3rem]",
+  authored: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(6rem,2.4fr)_minmax(8.5rem,1.2fr)_minmax(6.5rem,1fr)_minmax(4.5rem,0.5fr)_3rem]",
+  merged: "grid-cols-[minmax(5rem,0.8fr)_5rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_3rem]",
 };
 
 const headers: Record<Section, string[]> = {

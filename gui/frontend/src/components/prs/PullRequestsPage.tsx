@@ -38,7 +38,8 @@ function Body({ d }: { d: DashboardView }) {
   const viewer = d.viewer?.login ?? "";
   const queue = useMemo(() => reviewQueue(d.reviewRequested, d.reviewed, viewer), [d.reviewRequested, d.reviewed, viewer]);
   const authored = useMemo(() => authoredRows(d.authored), [d.authored]);
-  const merged = useMemo(() => d.recentlyMerged.map((pr) => ({ pr })), [d.recentlyMerged]);
+  // Newest merge first (the daemon's search sorts by update, which a later comment moves).
+  const merged = useMemo(() => d.recentlyMerged.map((pr) => ({ pr })).sort((a, b) => (b.pr.mergedAtMs ?? -Infinity) - (a.pr.mergedAtMs ?? -Infinity)), [d.recentlyMerged]);
   const items = useMemo<NavItem[]>(() => {
     const mk = (section: Section, list: readonly { pr: PullRequestView }[]) =>
       list.map(({ pr: p }) => ({
