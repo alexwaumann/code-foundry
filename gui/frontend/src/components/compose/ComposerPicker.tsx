@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { defaultFilter } from "cmdk";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,6 @@ export function ComposerPicker({
   const [search, setSearch] = useState("");
   // The highlighted row, controlled so a search does not land on a fixed row (below).
   const [active, setActive] = useState(value);
-  const searched = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +115,39 @@ export function ComposerPicker({
       cancelAnimationFrame(id);
     };
   }, [open]);
+  // cmdk highlights the first row after each search; with fixed rows on top that is one of
+  // them, so Enter would not pick the first match. The best match among the filtered rows
+  // instead (cmdk's own scoring), and cmdk's first-row pick that follows is turned away.
+  const searchPick = useRef<string | null>(null);
+  const searchChanged = (s: string) => {
+    setSearch(s);
+    if (fixed.length === 0 || !s) return;
+    let best: string | null = null;
+    let top = 0;
+    for (const g of filtered) {
+      for (const o of g.options) {
+        const score = defaultFilter(o.value, s, [o.label, o.tag ?? "", o.detail ?? ""]);
+        if (score > top) {
+          top = score;
+          best = o.value;
+        }
+      }
+    }
+    if (best === null) return;
+    searchPick.current = best;
+    setActive(best);
+  };
+  const highlight = (v: string) => {
+    const keep = searchPick.current;
+    searchPick.current = null;
+    if (keep !== null && fixed.some((g) => g.options.some((o) => o.value === v))) {
+      // cmdk has taken its pick already and syncs a controlled value only when the prop
+      // changes: a trailing space (cmdk trims it) makes the same pick a new prop.
+      setActive((a) => (a === keep ? `${keep} ` : keep));
+      return;
+    }
+    setActive(v);
+  };
   const pick = (v: string) => {
     onChange(v);
     setOpen(false);
@@ -162,28 +195,9 @@ export function ComposerPicker({
       ref={inputRef}
       placeholder={filterPlaceholder}
       value={search}
-      onValueChange={(s) => {
-        searched.current = true;
-        setSearch(s);
-      }}
+      onValueChange={searchChanged}
     />
   ) : null;
-  // cmdk highlights the first row after each search; with fixed rows on top that would be
-  // one of them, so Enter would not pick the first match. The first filtered row instead.
-  const highlight = (v: string) => {
-    if (searched.current) {
-      searched.current = false;
-      if (fixed.length > 0 && inputRef.current?.value) {
-        const first = rootRef.current?.querySelector('[cmdk-item=""]:not([data-fixed]):not([aria-disabled="true"])');
-        const firstValue = first?.getAttribute("data-value");
-        if (firstValue) {
-          setActive(firstValue);
-          return;
-        }
-      }
-    }
-    setActive(v);
-  };
   const inList = fixed.length > 0 && input !== null;
   return (
     <Popover

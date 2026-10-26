@@ -94,14 +94,15 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer")).toContainText("Describe what to build…");
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
-  // Defaults: settings (Sonnet 5 / medium), Auto, a new worktree (pinned above) from
-  // ListRefs' default ref.
+  // Defaults: settings (Sonnet 5 / medium), Auto, a new worktree (pinned above) from the
+  // default branch (no base sent: the daemon's rule picks origin's copy or the local one).
   await expect(page.getByTestId("composer-model")).toHaveText("Sonnet 5");
   await expect(page.getByTestId("composer-effort")).toHaveText("Medium");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
   await expect(page.getByTestId("composer-worktree")).toHaveAccessibleName("Work in: Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From default");
+  await expect(page.getByTestId("composer-base")).toHaveAccessibleName("Branch from: From default");
 
   await page.keyboard.type("Add a dark mode toggle");
   await page.keyboard.press("Shift+Enter");
@@ -130,7 +131,6 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   expect(last?.args).toEqual({
     project: "repo-cf",
     "new-worktree": "true",
-    base: "main",
     model: "claude-sonnet-5[1m]",
     effort: "medium",
     permission: "auto",
@@ -220,10 +220,10 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-base")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByPlaceholder("Filter refs…")).toBeFocused();
+  await expect(page.getByPlaceholder("Filter branches…")).toBeFocused();
   await page.keyboard.type("release");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-base")).toHaveText("From origin/release/v0.3");
+  await expect(page.getByTestId("composer-base")).toHaveText("From release/v0.3");
 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-send")).toBeFocused();
@@ -232,7 +232,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   expect((await invocations()).at(-1)?.args).toEqual({
     project: "repo-cf",
     "new-worktree": "true",
-    base: "origin/release/v0.3",
+    base: "release/v0.3",
     model: "claude-sonnet-4-6[1m]",
     effort: "high",
     permission: "supervised",
@@ -262,13 +262,17 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await page.getByTestId("composer-worktree").click();
   const list = page.getByTestId("composer-worktree-list");
   const options = list.getByRole("option");
+  // The two choices, then the project's branches (newest first) under a search box.
   await expect(options).toHaveText([
     /^Fresh copy\s*Edits land in a new branch with its own worktree\. Multiple threads at a time is safe\.$/,
     /^Project folder\s*Edits land in ~\/src\/code-foundry directly\. One thread at a time is safest\.$/,
-    /^feat\/sidebar\s*~\/src\/code-foundry\.worktrees\/feat-sidebar$/,
-    /^fix\/resize/,
+    "main",
+    "feat/sidebar",
+    "fix/resize",
+    "release/v0.3",
   ]);
-  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in", "An existing copy"]);
+  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in"]);
+  await expect(list.getByPlaceholder("Find existing branch")).toBeFocused();
   await options.filter({ hasText: "Project folder" }).click();
   await expect(page.getByTestId("composer-worktree")).toHaveText("Project folder");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
@@ -321,19 +325,20 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(indicator).toHaveText("Detached at 3c3c465");
   await expect(indicator).toHaveAccessibleName("Current checkout is detached at 3c3c465");
 
-  // An existing worktree: its branch. The option labels keep branch + path.
+  // An existing branch: the pill is its name, no indicator and no base (the daemon reuses its worktree).
   await worktree.click();
-  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in ~\/src\/code-foundry/, /^feat\/sidebar/, /^fix\/resize/]);
+  await expect(options).toHaveText([/^Fresh copy/, /^Project folder\s*Edits land in ~\/src\/code-foundry/, "main", "feat/sidebar", "fix/resize", "release/v0.3"]);
   await options.filter({ hasText: "feat/sidebar" }).click();
   await expect(worktree).toHaveText("feat/sidebar");
-  await expect(indicator).toHaveText("On feat/sidebar");
-  await expect(indicator).toHaveAccessibleName("Worktree is on feat/sidebar");
+  await expect(worktree).toHaveAccessibleName("Work in: feat/sidebar");
+  await expect(indicator).toHaveCount(0);
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
 
   // Back to a new worktree: the base picker returns in the same slot.
   await worktree.click();
   await options.filter({ hasText: "Fresh copy" }).click();
   await expect(indicator).toHaveCount(0);
-  await expect(page.getByTestId("composer-base")).toHaveText("From main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From default");
 });
 
 test("Work in: by default a thread starts in place; a pick applies to its draft only", async ({ page }) => {
@@ -349,12 +354,13 @@ test("Work in: by default a thread starts in place; a pick applies to its draft 
   await worktree.click();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
   await expect(worktree).toHaveText("Fresh copy");
-  await expect(page.getByTestId("composer-base")).toHaveText("From main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From default");
   await page.getByTestId("composer-input").focus();
   await page.keyboard.type("Tidy the README");
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "main" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true" });
+  expect((await invocations()).at(-1)?.args).not.toHaveProperty("base");
   await expect.poll(() => promptFocused(page)).toBe(true);
 
   // The next code-foundry draft starts from the setting again, not from the pick.
@@ -570,21 +576,25 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
   expect(args?.attachments).toBe(up?.path);
 });
 
-test("a local-only repository: local refs from main, no remote git commands", async ({ page }) => {
+test("a local-only repository: local branches, no remote git commands", async ({ page }) => {
   await freshCopyByDefault();
   await openApp(page);
   await compose(page, 4);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in sketches?");
-  await expect(page.getByTestId("composer-base")).toHaveText("From main");
+  await expect(page.getByTestId("composer-base")).toHaveText("From default");
   await page.getByTestId("composer-base").click();
-  const refs = page.getByTestId("composer-base-list").getByRole("option");
-  await expect(refs).toHaveText([/^main\s*default$/, /^experiment\/shaders$/]);
-  await page.keyboard.press("Escape");
+  const list = page.getByTestId("composer-base-list");
+  // One project: "Default branch", then its other branches (main is the default row).
+  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Branch from"]);
+  await expect(list.getByRole("option")).toHaveText(["Default branch", "experiment/shaders"]);
+  await expect(list.locator('[data-slot="picker-footer"]')).toHaveText("The project takes origin's copy of the branch, or its own when that is ahead.");
+  await list.getByRole("option").filter({ hasText: "experiment/shaders" }).click();
+  await expect(page.getByTestId("composer-base")).toHaveText("From experiment/shaders");
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Try a new shader");
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-sk", "new-worktree": "true", base: "main" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-sk", "new-worktree": "true", base: "experiment/shaders" });
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 
   // The new thread is selected: fetch/pull/push/PR are not offered for a project without git.
