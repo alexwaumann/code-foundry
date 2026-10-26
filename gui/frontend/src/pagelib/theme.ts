@@ -17,6 +17,15 @@ function block(css: string, open: number): { body: string; end: number } {
   throw new Error("index.css: unbalanced braces");
 }
 
+/**
+ * A role's px font-size and line-height in rem (16px each), for pages only: the app's roles
+ * stay px, a page's follow the root font-size, so `html { font-size: 18px }` scales its type
+ * with Tailwind's rem spacing. The same at the default 16px.
+ */
+export function remRole(css: string): string {
+  return css.replace(/\b(font-size|line-height):\s*(\d+(?:\.\d+)?)px\b/g, (_m, prop: string, px: string) => `${prop}: ${String(Number(px) / 16)}rem`);
+}
+
 /** Roles a page has no use for: the sidebar's app name. */
 const SKIPPED_ROLES = new Set(["text-brand"]);
 
@@ -31,7 +40,7 @@ export function appTheme(indexCss: string): string {
   for (let m = re.exec(indexCss); m; m = re.exec(indexCss)) {
     const { body, end } = block(indexCss, m.index + m[0].length - 1);
     re.lastIndex = end;
-    if (!SKIPPED_ROLES.has(m[1] ?? "")) out.push(`@utility ${m[1] ?? ""} {${body}}`);
+    if (!SKIPPED_ROLES.has(m[1] ?? "")) out.push(`@utility ${m[1] ?? ""} {${remRole(body)}}`);
   }
   if (out.length < 2) throw new Error("index.css: no type roles");
   // The app's own animations (Progress's indeterminate bar reads cf-indeterminate).
@@ -55,6 +64,7 @@ export function typeRoleNames(indexCss: string): string[] {
 }
 
 const SPACE = "0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16";
+const SIZES = "0,1,2,3,4,5,6,7,8,9,10,11,12,14,16,20,24,28,32,36,40,44,48,52,56,60,64,72,80,88,96,104,112,120,128,144,160";
 
 /**
  * Utilities /cf/ui.css carries beyond what the components use, so a React page's own layout
@@ -77,9 +87,10 @@ export function pageSafelist(indexCss: string): string {
     `{p,px,py,pt,pb,pl,pr}-{${SPACE}}`,
     `{m,mx,my,mt,mb,ml,mr}-{${SPACE},auto}`,
     "{space-x,space-y}-{1,2,3,4,6}",
-    "{w,h}-{full,auto,fit,screen,px,0,1,2,3,4,5,6,8,10,12,16,20,24,32,40,48,64,80,96}",
-    "{min-w,min-h}-{0,full,fit} max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,full,prose,none} max-h-{full,screen,64,80,96}",
-    "{min-w,max-w,min-h,max-h}-{8,12,16,20,24,32,40,48,56,64,72,80,96}",
+    // Sizes on the spacing scale (4px steps; min-h-112 is 448px), so a page needs no
+    // arbitrary value (min-h-[420px] is not here: only /cf/tailwind.js makes those).
+    `{w,h,min-w,min-h,max-w,max-h}-{${SIZES}}`,
+    "{w,h}-{full,auto,fit,screen,px} {min-w,min-h}-{full,fit} max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,full,prose,none} max-h-{full,screen}",
     "size-{3,3.5,4,5,6,8,10,12}",
     "{,sm:,md:,lg:}grid-cols-{1,2,3,4,5,6,12} {,sm:,md:,lg:}col-span-{1,2,3,4,6,full} {sm:,md:,lg:}{flex,hidden,block,flex-row,flex-col}",
     "overflow-{auto,hidden,visible,x-auto,y-auto} truncate whitespace-{nowrap,normal,pre-wrap} break-{words,all} line-clamp-{1,2,3}",
