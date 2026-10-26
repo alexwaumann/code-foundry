@@ -15,6 +15,7 @@ import type { PreviewFileResponseSchema, ReadFileResponseSchema } from "../src/g
 import { DiffScope, type GetWorktreeFileDiffResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { HOME } from "./filesystem";
+import { pagelibPages } from "./pagelib";
 import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
@@ -240,6 +241,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
     [`${CF}/docs/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
+    // The page library's pages (mock/pagelib/; e2e/page-library.spec.ts).
+    ...Object.entries(pagelibPages()).map(([name, html]): [string, Entry] => [`${CF}/docs/pagelib/${name}`, text(html, "text/html")]),
     // Outside the checkout, so it is served under a grant of its own.
     [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],

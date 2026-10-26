@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tailwind runtime</title>
+<link rel="stylesheet" href="/cf/theme.css">
+<script src="/cf/bridge.js"></script>
+<script src="/cf/tailwind.js"></script>
+<style type="text/tailwindcss">
+  @theme { --color-brand: #ff6b35; }
+</style>
+<body class="p-4 text-body">
+  <!-- Arbitrary values and the app's tokens, generated in the page (docs/notes/page-library.md). -->
+  <div id="box" class="w-[217px] rounded-pane bg-cf-accent p-[13px] text-heading text-cf-accent-foreground">The app's accent</div>
+  <div id="brand" class="mt-3 w-fit rounded-md bg-brand px-3 py-1 text-white">A colour of the page's own</div>
+</body>

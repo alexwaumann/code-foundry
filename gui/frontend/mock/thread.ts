@@ -137,8 +137,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "theme" | "bridge";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "theme", "bridge"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -833,6 +833,18 @@ export class MockThreadLogs {
       tool("Bash", { command: "code-foundry view.inline docs/bridge.html" }, { output: `shown docs/bridge.html in thread Fix stale PR badge` }, { at: ago(0, 48) });
       it({ case: "html", value: { path: "docs/bridge.html", title: "Bridge check", baseDir: cwd } }, { at: ago(0, 48) });
       it({ case: "assistantText", value: { text: "Here it is." } }, { at: ago(0, 46), streaming: true });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.BUSY, "working");
+      return;
+    }
+    if (state === "pagelib") {
+      // Pages built on the page library (docs/notes/page-library.md; mock/pagelib/): a React
+      // board with @cf/ui, the Tailwind runtime, a TSX syntax error and a free-styled mockup.
+      it({ case: "userMessage", value: { text: "Show me what pages can be made of.", attachments: [] } }, { at: ago(1) });
+      for (const [name, title] of [["tailwind", "Tailwind runtime"], ["broken", "Broken TSX"], ["mockup", "Streaks mockup"], ["board", "Thread board"]] as const) {
+        it({ case: "html", value: { path: `docs/pagelib/${name}.html`, title, baseDir: cwd } }, { at: ago(0, 48) });
+      }
+      it({ case: "assistantText", value: { text: "Here they are." } }, { at: ago(0, 46), streaming: true });
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.BUSY, "working");
       return;

@@ -226,6 +226,7 @@ import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
 import { publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
+import { pagelibRoute } from "./pagelib";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
@@ -1555,10 +1556,10 @@ const server = createServer((req, res) => {
     res.end("404 page not found\n");
     return;
   }
-  // The frame stylesheet and the bridge script need no credential, like the daemon's
-  // (internal/theme/frame.go, internal/bridge).
+  // The frame stylesheet, the bridge script and the page library need no credential, like
+  // the daemon's (internal/theme/frame.go, internal/bridge, internal/pagelib).
   if (url.pathname.startsWith("/cf/")) {
-    const r = bridgeRoute(url.pathname) ?? themeRoute(url.pathname);
+    const r = bridgeRoute(url.pathname) ?? themeRoute(url.pathname) ?? pagelibRoute(url.pathname);
     res.writeHead(r ? 200 : 404, { "Content-Type": r?.type ?? "text/plain", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Access-Control-Allow-Origin": "*" });
     res.end(r?.body ?? "404 page not found\n");
     return;
