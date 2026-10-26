@@ -1301,9 +1301,11 @@ func (x *PullRequest) GetBaseSha() string {
 type PullRequestReview struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Reviewer login; empty for deleted accounts.
-	Author        string                 `protobuf:"bytes,1,opt,name=author,proto3" json:"author,omitempty"`
-	State         PullRequestReviewState `protobuf:"varint,2,opt,name=state,proto3,enum=codefoundry.v1.PullRequestReviewState" json:"state,omitempty"`
-	SubmittedAt   *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	Author      string                 `protobuf:"bytes,1,opt,name=author,proto3" json:"author,omitempty"`
+	State       PullRequestReviewState `protobuf:"varint,2,opt,name=state,proto3,enum=codefoundry.v1.PullRequestReviewState" json:"state,omitempty"`
+	SubmittedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	// The head commit the review was submitted on; empty in a cache written before it was fetched.
+	CommitSha     string `protobuf:"bytes,4,opt,name=commit_sha,json=commitSha,proto3" json:"commit_sha,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1357,6 +1359,13 @@ func (x *PullRequestReview) GetSubmittedAt() *timestamppb.Timestamp {
 		return x.SubmittedAt
 	}
 	return nil
+}
+
+func (x *PullRequestReview) GetCommitSha() string {
+	if x != nil {
+		return x.CommitSha
+	}
+	return ""
 }
 
 type CheckRun struct {
@@ -2583,7 +2592,8 @@ func (x *ActivityStats) GetLastError() string {
 
 type GetDashboardRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Keep pull requests from every repository, not only tracked ones.
+	// Deprecated: ignored. The lists always hold every repository (they were filtered to
+	// tracked ones unless this was set).
 	IncludeUntracked bool `protobuf:"varint,1,opt,name=include_untracked,json=includeUntracked,proto3" json:"include_untracked,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -2643,7 +2653,7 @@ type GetDashboardResponse struct {
 	// When the dashboards were last fetched; unset if never.
 	FetchedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
 	LastError string                 `protobuf:"bytes,8,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
-	// The tracked repositories the lists were filtered to (lower case).
+	// The tracked repositories (lower case). The lists are not filtered to them.
 	TrackedSlugs []string `protobuf:"bytes,9,rep,name=tracked_slugs,json=trackedSlugs,proto3" json:"tracked_slugs,omitempty"`
 	// Open pull requests the viewer reviewed and did not author, except those in
 	// review_requested, most recently updated first.
@@ -5533,11 +5543,13 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x0elatest_reviews\x18\x19 \x03(\v2!.codefoundry.v1.PullRequestReviewR\rlatestReviews\x12'\n" +
 	"\x0freview_requests\x18\x1a \x03(\tR\x0ereviewRequests\x12\x18\n" +
 	"\apartial\x18\x1b \x01(\bR\apartial\x12\x19\n" +
-	"\bbase_sha\x18\x1c \x01(\tR\abaseSha\"\xa8\x01\n" +
+	"\bbase_sha\x18\x1c \x01(\tR\abaseSha\"\xc7\x01\n" +
 	"\x11PullRequestReview\x12\x16\n" +
 	"\x06author\x18\x01 \x01(\tR\x06author\x12<\n" +
 	"\x05state\x18\x02 \x01(\x0e2&.codefoundry.v1.PullRequestReviewStateR\x05state\x12=\n" +
-	"\fsubmitted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vsubmittedAt\"\xf0\x02\n" +
+	"\fsubmitted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vsubmittedAt\x12\x1d\n" +
+	"\n" +
+	"commit_sha\x18\x04 \x01(\tR\tcommitSha\"\xf0\x02\n" +
 	"\bCheckRun\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bworkflow\x18\x02 \x01(\tR\bworkflow\x123\n" +

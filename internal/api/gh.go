@@ -253,6 +253,7 @@ func pullRequestToProto(slug string, p *gh.PullRequest) *v1.PullRequest {
 			Author:      r.Author,
 			State:       enumOf[v1.PullRequestReviewState](v1.PullRequestReviewState_value, "PULL_REQUEST_REVIEW_STATE_", r.State),
 			SubmittedAt: timestamp(r.SubmittedAt),
+			CommitSha:   r.CommitSHA,
 		})
 	}
 	return out

@@ -58,6 +58,8 @@ export interface ReviewEntryView {
   /** Lower case GitHub review state ("approved", "changes_requested", ...); "" if unknown. */
   state: string;
   submittedAtMs: number | null;
+  /** The head commit the review was submitted on; "" when unknown (a cache from before it was fetched). */
+  commitSha: string;
 }
 
 export interface PullRequestView {
@@ -384,7 +386,7 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
     changedFiles: p.changedFiles,
     comments: p.commentCount,
     reviews: p.reviewCount,
-    latestReviews: p.latestReviews.map((r) => ({ author: r.author, state: enumName(PullRequestReviewState, r.state), submittedAtMs: ms(r.submittedAt) })),
+    latestReviews: p.latestReviews.map((r) => ({ author: r.author, state: enumName(PullRequestReviewState, r.state), submittedAtMs: ms(r.submittedAt), commitSha: r.commitSha })),
     reviewRequests: p.reviewRequests,
     isCrossRepository: p.isCrossRepository,
     headRepoSlug: p.headRepoSlug,

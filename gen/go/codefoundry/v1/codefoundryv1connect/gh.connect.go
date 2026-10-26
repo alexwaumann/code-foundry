@@ -111,7 +111,7 @@ type GhServiceClient interface {
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
-	// lists hold only tracked repositories unless include_untracked.
+	// lists are viewer-wide: every repository, tracked or not.
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -449,7 +449,7 @@ type GhServiceHandler interface {
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
-	// lists hold only tracked repositories unless include_untracked.
+	// lists are viewer-wide: every repository, tracked or not.
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
