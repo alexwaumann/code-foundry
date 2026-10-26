@@ -26,8 +26,9 @@ A parallel PR has the library, CSS, loader and skill-reference findings.
     The skills tests and the capabilities test pin the new wording.
 - **11, thread.label.** The store now does what the help said: clear, then remove, then
   add. A label in both remove and add ends up on the thread, which is how a page's kanban
-  moves a card (remove every column's label, add the new one). The proto comment and the
-  help say so. `TestEditLabels` has the move as a table case. The API test moves a card
+  moves a card (remove every column's label, add the new one). The proto comment says
+  so; the help's own words were already right and stay as they were (the guide is at its
+  25,500-byte topic-split limit). `TestEditLabels` has the move as a table case. The API test moves a card
   between columns where it used to expect INVALID_ARGUMENT. Checked through the daemon
   and CLI: `thread.label --id … kanban/review --remove kanban/todo,kanban/review,kanban/done`
   leaves `kanban/review`.

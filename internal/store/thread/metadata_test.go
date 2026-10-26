@@ -287,8 +287,9 @@ func TestLabelReportAndBudget(t *testing.T) {
 	if err != nil || !slices.Equal(got.Labels, []string{"x", "y"}) {
 		t.Fatalf("Label = %+v, %v", got.Labels, err)
 	}
-	if _, err := e.m.Label(e.ctx(), s.ID, []string{"x"}, []string{"x"}, false); !errors.Is(err, ErrInvalidArgument) {
-		t.Errorf("add and remove one label: %v", err)
+	// Remove goes before add: a label in both is on the thread after (a kanban move).
+	if got, err := e.m.Label(e.ctx(), s.ID, []string{"x"}, []string{"x", "y"}, false); err != nil || !slices.Equal(got.Labels, []string{"x"}) {
+		t.Errorf("add and remove one label = %+v, %v", got.Labels, err)
 	}
 	if _, err := e.m.Label(e.ctx(), "s-nope", nil, nil, true); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown thread: %v", err)
@@ -321,7 +322,7 @@ func TestLabelReportAndBudget(t *testing.T) {
 		case ev := <-e.events.C():
 			u, ok := ev.(Updated)
 			published = ok && u.Thread.ID == s.ID && u.Thread.BudgetUSD == 5 && u.Thread.Report.Status == ReportDone &&
-				slices.Equal(u.Thread.Labels, []string{"x", "y"})
+				slices.Equal(u.Thread.Labels, []string{"x"})
 		case <-time.After(5 * time.Second):
 			t.Fatal("no Updated with the labels, the report and the budget")
 		}

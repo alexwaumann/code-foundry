@@ -209,7 +209,7 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.label",
 		Title: "Label Thread",
 		Description: "Add or remove a thread's labels (lowercase letters, digits, -, _, . and /; up to 40 characters each). " +
-			"clear removes every label first, then remove's go, then add's are added, so a label in both ends up on. Prints the labels.",
+			"clear removes every label first, then remove's go, then add's are added. Prints the labels.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
