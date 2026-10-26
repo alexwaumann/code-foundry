@@ -129,7 +129,10 @@ func CleanLabels(labels []string) ([]string, error) {
 	return out, nil
 }
 
-// EditLabels is Label's result for a thread with labels cur.
+// EditLabels is Label's result for a thread with labels cur: clear, then remove, then
+// add, so a label in both remove and add ends up on the thread (a page's kanban moves a
+// card by removing every column's label and adding the new one:
+// docs/notes/page-library-fixes-b.md).
 func EditLabels(cur, add, remove []string, clear bool) ([]string, error) {
 	add, err := CleanLabels(add)
 	if err != nil {
@@ -138,11 +141,6 @@ func EditLabels(cur, add, remove []string, clear bool) ([]string, error) {
 	remove, err = CleanLabels(remove)
 	if err != nil {
 		return nil, err
-	}
-	for _, l := range add {
-		if slices.Contains(remove, l) {
-			return nil, fmt.Errorf("%w: label %q is both added and removed", ErrInvalidArgument, l)
-		}
 	}
 	var out []string
 	if !clear {

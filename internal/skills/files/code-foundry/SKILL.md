@@ -47,7 +47,7 @@ with its `--cf-*` variables: `--cf-canvas`, `--cf-surface`, `--cf-surface-raised
 `--cf-text`, `--cf-text-muted`, `--cf-accent`, `--cf-border` and the status fills
 `--cf-success`, `--cf-warning`, `--cf-error` (their text `-text`, tint `-surface`), or the
 type-role classes (`text-title`, `text-body`…); never fixed colours or `prefers-color-scheme`.
-`/cf/bridge.js` lets it call the app and fits its card (else post `{type: "cf:resize", height}`).
+`/cf/bridge.js` lets it call the app and sizes its card: load it in every page.
 `view.inline` warns about what a page misses. More: code-foundry-pages.
 
 ## Scopes

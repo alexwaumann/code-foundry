@@ -21,6 +21,14 @@ export function useThreadCtx(): ThreadCtx {
 export const KeepRowContext = createContext<(rowKey: string) => void>(() => undefined);
 
 /**
+ * Holds an element's top where it is on screen while it resizes (lib/timelineHold.ts): a page
+ * card calls it with itself just before it takes a new height its frame asked for while the
+ * pointer or focus is in that frame, so the card does not slide under the pointer as the
+ * timeline follows its bottom (docs/notes/page-library-fixes-b.md). A no-op outside a Timeline.
+ */
+export const HoldTopContext = createContext<(el: HTMLElement) => void>(() => undefined);
+
+/**
  * Where path chips (PathChip) resolve relative paths, when not the enclosing thread's: the
  * File tab's rendered markdown provides its tab's project and base (the thread checkout the
  * tab was opened from); Ember's chat a function that resolves only absolute paths under a

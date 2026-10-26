@@ -97,8 +97,8 @@ one that reads or changes the app: the code-foundry-pages skill. Have it link
 type-role classes (`text-title`, `text-body`…), never fixed colours or
 `prefers-color-scheme`. To follow a theme switch live, set each var of the
 message `{type: "cf:theme", id, scheme, vars}` on `<html>`, then reply
-`{type: "cf:theme:ack"}` to its parent to keep your state (else the frame reloads). Post
-`{type: "cf:resize", height}` to its parent on load with `document.body`'s height to fit the card.
+`{type: "cf:theme:ack"}` to its parent to keep your state (else the frame reloads).
+`<script src="/cf/bridge.js"></script>` does that for the page and sizes its card.
 
 After you do something worth seeing on your own (a page you wrote, a pull request you
 opened), open it in your own panel too unless a saved preference says not to, and say so

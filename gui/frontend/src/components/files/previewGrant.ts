@@ -11,6 +11,16 @@ export function resizeHeight(data: unknown): number | null {
   return m.height;
 }
 
+/**
+ * The key a page's bridge forwards, `{ type: "cf:key", key: "Escape" }`: Escape pressed in the
+ * page that nothing there consumed (docs/notes/page-library-fixes-b.md); null for any other message.
+ */
+export function pageKey(data: unknown): "Escape" | null {
+  if (typeof data !== "object" || data === null) return null;
+  const m = data as { type?: unknown; key?: unknown };
+  return m.type === "cf:key" && m.key === "Escape" ? "Escape" : null;
+}
+
 /** A page's answer to `cf:theme`, `{ type: "cf:theme:ack" }`: it applied the theme itself, so its frame need not reload. */
 export function isThemeAck(data: unknown): boolean {
   return typeof data === "object" && data !== null && (data as { type?: unknown }).type === "cf:theme:ack";

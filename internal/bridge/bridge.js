@@ -615,3 +615,26 @@
 
   post({ type: "cf:hello" });
 })();
+
+// Escape the page left alone goes to the app (docs/notes/page-library-fixes-b.md): keys in
+// the frame never reach the app's document, so the lightbox could not close on Escape
+// once the page had focus. A keydown Escape that nothing in the page consumed (default
+// not prevented: an open dialog or menu prevents it) posts {type: "cf:key", key:
+// "Escape"} with the frame's nonce; the app closes the lightbox showing this frame and
+// ignores it anywhere else. Its own block, apart from the bridge above.
+(function () {
+  "use strict";
+  var host = window.parent;
+  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  if (!host || host === window || !nonceMatch || window.__cfKeys) return;
+  window.__cfKeys = true;
+  // Bubble phase on the window: every handler in the page has had the event by then.
+  window.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || e.defaultPrevented || e.isComposing || e.repeat) return;
+    try {
+      host.postMessage({ type: "cf:key", key: "Escape", cf: 1, nonce: nonceMatch[1] }, "*");
+    } catch (err) {
+      // The app is gone.
+    }
+  });
+})();

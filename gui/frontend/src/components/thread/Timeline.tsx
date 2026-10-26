@@ -4,7 +4,8 @@ import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { registerTimeline } from "@/stores/cite";
-import { KeepRowContext } from "./context";
+import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
+import { HoldTopContext, KeepRowContext } from "./context";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
 
@@ -12,6 +13,8 @@ import { TimelineRowView } from "./rows";
 const PIN_SLACK = 48;
 /** A scroll this soon (ms) after the user's wheel, touch or key input is theirs. */
 const USER_SCROLL_MS = 400;
+/** How long (ms) after a card asks for it its top is held (HoldTopContext): the resize's layout passes. */
+const HOLD_MS = 400;
 /** Keys that scroll the list. */
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 
@@ -149,11 +152,48 @@ export function TimelineList<R extends ListRow>({
     getItemKey: (i) => rows[i]?.key ?? i,
   });
 
+  // A row whose top is held on screen while it resizes (holdTop), and the spacer under the
+  // rows that lets a held card at the bottom shrink without moving (lib/timelineHold.ts).
+  const held = useRef<{ el: HTMLElement; top: number; until: number } | null>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
+  // The spacer's height and the rows' height when it was last set.
+  const spacer = useRef({ px: 0, rows: 0 });
+  const setSpacer = useCallback((px: number) => {
+    spacer.current = { px, rows: innerRef.current?.offsetHeight ?? 0 };
+    if (spacerRef.current) spacerRef.current.style.height = `${String(px)}px`;
+  }, []);
+  const holdTop = useCallback((el: HTMLElement) => {
+    held.current = { el, top: el.getBoundingClientRect().top, until: performance.now() + HOLD_MS };
+  }, []);
+  /** Puts a held row's top back where it was; false when no row is held. */
+  const restoreHeld = useCallback((): boolean => {
+    const h = held.current;
+    const el = scrollRef.current;
+    if (!h || !el) return false;
+    if (performance.now() > h.until || !h.el.isConnected) {
+      held.current = null;
+      return false;
+    }
+    const moved = h.el.getBoundingClientRect().top - h.top;
+    if (Math.abs(moved) < 0.5) return true;
+    const next = heldScroll({ scrollTop: el.scrollTop, contentHeight: innerRef.current?.offsetHeight ?? 0, clientHeight: el.clientHeight }, moved);
+    setSpacer(next.spacer);
+    el.scrollTop = next.scrollTop;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
+    pinned.current = bottom;
+    setAtBottom(bottom);
+    return true;
+  }, [setSpacer]);
+
   const toBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (restoreHeld()) return;
+    // Rows growing under a held card's spacer take its place, so their end stays put.
+    const s = spacer.current;
+    if (s.px > 0) setSpacer(spacerAfterGrowth(s.px, s.rows, innerRef.current?.offsetHeight ?? 0));
     el.scrollTop = el.scrollHeight;
-  }, []);
+  }, [restoreHeld, setSpacer]);
 
   // The cite layer brings a quoted item's row into view (stores/cite.ts): the thread's
   // own timeline (its rows are the turns) or Ember's chat, not a subagent's.
@@ -194,14 +234,14 @@ export function TimelineList<R extends ListRow>({
     if (!inner) return;
     if (pinned.current) toBottom();
     const ro = new ResizeObserver(() => {
-      if (pinned.current) toBottom();
+      if (!restoreHeld() && pinned.current) toBottom();
     });
     ro.observe(inner);
     if (scrollRef.current) ro.observe(scrollRef.current);
     return () => {
       ro.disconnect();
     };
-  }, [toBottom]);
+  }, [toBottom, restoreHeld]);
   // Away from the bottom, the row at the top of the viewport (and how far it starts above
   // the viewport's top) is the anchor a change of rows keeps in place.
   const anchor = useRef<{ index: number; offset: number; rows: readonly R[] } | null>(null);
@@ -264,85 +304,98 @@ export function TimelineList<R extends ListRow>({
       }
     }
     if (pinned.current) toBottom();
+    else restoreHeld();
     captureAnchor();
-  }, [rows, bottomInset, toBottom, v, captureAnchor, pin]);
+  }, [rows, bottomInset, toBottom, restoreHeld, v, captureAnchor, pin]);
 
   return (
     <KeepRowContext.Provider value={keepRow}>
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto"
-        data-testid="thread-timeline"
-        data-at-bottom={atBottom || undefined}
-        onWheel={markInput}
-        onTouchMove={markInput}
-        onKeyDown={(e) => {
-          if (SCROLL_KEYS.has(e.key)) markInput();
-        }}
-        onPointerDown={() => {
-          userInput.current = Infinity;
-          const up = () => {
-            userInput.current = performance.now();
-            window.removeEventListener("pointerup", up);
-            window.removeEventListener("pointercancel", up);
-          };
-          window.addEventListener("pointerup", up);
-          window.addEventListener("pointercancel", up);
-        }}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
-          if (bottom) pin();
-          else if (performance.now() - userInput.current < USER_SCROLL_MS) pinned.current = false;
-          else if (pinned.current) toBottom();
-          if (bottom !== atBottom) setAtBottom(bottom);
-          captureAnchor();
-        }}
-      >
-        <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>
-          {v.getVirtualItems().map((vi) => {
-            const row = rows[vi.index];
-            if (!row) return null;
-            // The last row of a turn before the next one gets the space between turns.
-            const next = rows[vi.index + 1];
-            const turnEnd = row.type !== "user" && row.type !== "system" && (next?.type === "user" || next?.type === "system");
-            return (
-              <div
-                key={vi.key}
-                data-index={vi.index}
-                data-row-type={row.type}
-                data-turn-end={turnEnd || undefined}
-                ref={v.measureElement}
-                style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
-              >
-                <RowBoundary threadId={threadId} row={row}>
-                  {renderRow(row)}
-                </RowBoundary>
-              </div>
-            );
-          })}
+      <HoldTopContext.Provider value={holdTop}>
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+          data-testid="thread-timeline"
+          data-at-bottom={atBottom || undefined}
+          onWheel={markInput}
+          onTouchMove={markInput}
+          onKeyDown={(e) => {
+            if (SCROLL_KEYS.has(e.key)) markInput();
+          }}
+          onPointerDown={() => {
+            userInput.current = Infinity;
+            const up = () => {
+              userInput.current = performance.now();
+              window.removeEventListener("pointerup", up);
+              window.removeEventListener("pointercancel", up);
+            };
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
+          }}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            // The user's own scroll ends a hold; one nobody asked for (the browser clamping a
+            // list a held card shrank) is put back.
+            const theirs = performance.now() - userInput.current < USER_SCROLL_MS;
+            if (theirs) held.current = null;
+            else if (restoreHeld()) {
+              captureAnchor();
+              return;
+            }
+            const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
+            if (bottom) pin();
+            else if (theirs) pinned.current = false;
+            else if (pinned.current) toBottom();
+            if (bottom !== atBottom) setAtBottom(bottom);
+            captureAnchor();
+          }}
+        >
+          <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>
+            {v.getVirtualItems().map((vi) => {
+              const row = rows[vi.index];
+              if (!row) return null;
+              // The last row of a turn before the next one gets the space between turns.
+              const next = rows[vi.index + 1];
+              const turnEnd = row.type !== "user" && row.type !== "system" && (next?.type === "user" || next?.type === "system");
+              return (
+                <div
+                  key={vi.key}
+                  data-index={vi.index}
+                  data-row-type={row.type}
+                  data-turn-end={turnEnd || undefined}
+                  ref={v.measureElement}
+                  style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
+                >
+                  <RowBoundary threadId={threadId} row={row}>
+                    {renderRow(row)}
+                  </RowBoundary>
+                </div>
+              );
+            })}
+          </div>
+          <div ref={spacerRef} aria-hidden data-testid="thread-timeline-spacer" style={{ height: 0 }} />
         </div>
-      </div>
-      {/* Outside the scroller: it floats over the list's bottom, just above the composer. */}
-      <button
-        type="button"
-        className="jump-bottom"
-        data-testid="thread-jump-bottom"
-        data-shown={!atBottom || undefined}
-        aria-hidden={atBottom || undefined}
-        tabIndex={atBottom ? -1 : undefined}
-        style={{ bottom: Math.max(bottomInset - 20, 12) }}
-        onMouseDown={(e) => {
-          e.preventDefault();
-        }}
-        onClick={() => {
-          pin();
-          toBottom();
-        }}
-      >
-        <ArrowDown aria-hidden />
-        Jump to bottom
-      </button>
+        {/* Outside the scroller: it floats over the list's bottom, just above the composer. */}
+        <button
+          type="button"
+          className="jump-bottom"
+          data-testid="thread-jump-bottom"
+          data-shown={!atBottom || undefined}
+          aria-hidden={atBottom || undefined}
+          tabIndex={atBottom ? -1 : undefined}
+          style={{ bottom: Math.max(bottomInset - 20, 12) }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+          }}
+          onClick={() => {
+            pin();
+            setSpacer(0);
+            toBottom();
+          }}
+        >
+          <ArrowDown aria-hidden />
+          Jump to bottom
+        </button>
+      </HoldTopContext.Provider>
     </KeepRowContext.Provider>
   );
 }

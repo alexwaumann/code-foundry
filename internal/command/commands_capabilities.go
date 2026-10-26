@@ -342,8 +342,8 @@ const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, -
 const inlinePage = "view.inline <path> (--title, --panel) shows an .html page inline in your own conversation, at your place in the " +
 	"turn: the File tab's sandboxed frame in a card the user can expand, view as source or open in the panel; --panel also opens it " +
 	"in the File tab. Write the page in $CODE_FOUNDRY_PAGES (your thread's own folder, removed with it), never the repository or the " +
-	"home folder's root. The page may post {type: \"cf:resize\", height} to set its height (the card caps it at 60% of the pane); " +
-	"view.inline warns when it does not, when a page that uses the app's look or calls (cf.*, @cf/ui, --cf-* variables) does not " +
+	"home folder's root. Its /cf/bridge.js sizes the card to the page (capped at 60% of the pane); " +
+	"view.inline warns when it is missing, when a page that uses the app's look or calls (cf.*, @cf/ui, --cf-* variables) does not " +
 	"link /cf/theme.css, and when React or TSX lacks /cf/jsx.js (the rendering group's react pages line)."
 
 // surfaceWhat is what a surface verb's description says the surface shows: what follows

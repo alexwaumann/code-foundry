@@ -387,6 +387,102 @@ test("the lightbox's copy of a page has its thread's bridge, under a nonce of it
   await expect(inner.locator("#notify-out")).toHaveText("ok");
 });
 
+// Keys in the frame never reach the app; the bridge forwards an Escape the page left alone
+// (cf:key with the frame's nonce), and only the lightbox closes on it (page-library-fixes-b).
+test("Escape inside the lightbox's page closes the lightbox unless the page consumed it; the card stays", async ({ page }) => {
+  await openBridgeThread(page);
+  await card(page).getByTestId("thread-html-expand").click();
+  const box = page.getByTestId("thread-html-lightbox");
+  const inner = box.frameLocator('[data-testid="thread-html-lightbox-frame"]');
+  await expect(inner.locator("body")).toHaveAttribute("data-ready", "1");
+  // Focus in the page, as after a click into it.
+  await inner.locator("#task").click();
+  await expect(inner.locator("#task")).toBeFocused();
+  // A page overlay that handles Escape prevents its default: the lightbox stays.
+  await inner.locator("body").evaluate(() => {
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape") e.preventDefault();
+      },
+      { once: true },
+    );
+  });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await expect(box).toBeVisible();
+  // Without the nonce, or from the card's frame, cf:key is not heard.
+  await inner.locator("body").evaluate(() => {
+    parent.postMessage({ type: "cf:key", key: "Escape", cf: 1 }, "*");
+  });
+  await doc(page)
+    .locator("body")
+    .evaluate(() => {
+      const nonce = /cf=([\w-]+)/.exec(location.hash)?.[1];
+      parent.postMessage({ type: "cf:key", key: "Escape", cf: 1, nonce }, "*");
+    });
+  await page.waitForTimeout(300);
+  await expect(box).toBeVisible();
+  // Escape nothing consumed closes the lightbox, and only it.
+  await page.keyboard.press("Escape");
+  await expect(box).toHaveCount(0);
+  await expect(card(page)).toBeVisible();
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  // In the card's frame, Escape does nothing to the card.
+  await doc(page).locator("#task").click();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await expect(card(page)).toBeVisible();
+  await expect(card(page).getByTestId("thread-html-frame")).toBeVisible();
+});
+
+// The timeline follows its bottom; a card resizing under the pointer keeps its top instead
+// (a filtered list shrinking slid the card ~130 px under the pointer: page-library-fixes-b).
+test("a card that shrinks under the pointer keeps its top; without the pointer the timeline keeps its bottom", async ({ page }) => {
+  await openBridgeThread(page);
+  const top = async () => (await card(page).boundingBox())?.y ?? NaN;
+  const height = async () => (await card(page).boundingBox())?.height ?? NaN;
+  const short = await height();
+  // A 300 px block the page adds or drops from a script, or drops with a click on Shrink.
+  const block = (add: boolean) =>
+    doc(page)
+      .locator("body")
+      .evaluate((body, add) => {
+        if (!add) document.getElementById("tall")?.remove();
+        else if (!document.getElementById("tall")) {
+          const tall = document.createElement("div");
+          tall.id = "tall";
+          tall.style.height = "300px";
+          body.appendChild(tall);
+        }
+        if (!document.getElementById("shrink")) {
+          const b = document.createElement("button");
+          b.id = "shrink";
+          b.textContent = "Shrink";
+          b.onclick = () => document.getElementById("tall")?.remove();
+          body.prepend(b);
+        }
+      }, add);
+  // The pointer elsewhere: the timeline keeps its bottom, so a shrink moves the card down.
+  await page.mouse.move(5, 450);
+  await block(true);
+  await expect.poll(height).toBeGreaterThan(short + 100);
+  const tall = await height();
+  const grownTop = await top();
+  await block(false);
+  await expect.poll(height).toBeLessThan(tall - 100);
+  await expect.poll(top).toBeGreaterThan(grownTop + 50);
+  // The pointer in the page: the same shrink keeps the card's top.
+  await block(true);
+  await expect.poll(height).toBeGreaterThan(tall - 2);
+  await expect.poll(top).toBeLessThan(grownTop + 2);
+  const before = await top();
+  await doc(page).locator("#shrink").click();
+  await expect.poll(height).toBeLessThan(tall - 100);
+  await page.waitForTimeout(500);
+  expect(Math.abs((await top()) - before)).toBeLessThan(2);
+});
+
 const mockFetchList = async (): Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]> =>
   (await fetch(`${mockUrl}/__mock/fetches`)).json() as Promise<{ url: string; method: string; headers: Record<string, string>; aborted: boolean }[]>;
 

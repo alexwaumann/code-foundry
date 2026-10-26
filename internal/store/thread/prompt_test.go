@@ -36,7 +36,7 @@ func TestSystemPrompt(t *testing.T) {
 		"a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo; " +
 		"what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both",
 		"code-foundry usage.show", "view.panel.file, diff, pr, usage or worktree (your own thread's panel; --focus only if asked)",
-		"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line", "a page, chart or form to fill in is an .html file shown with view.inline <file>, not markdown", "code-foundry pr.create (project.github.publish",
+		"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line", "a page, mockup, chart or form to fill in is an .html file in $CODE_FOUNDRY_PAGES, not the repo unless asked (skill code-foundry-pages first), shown with view.inline <file>, not markdown", "code-foundry pr.create (project.github.publish",
 		"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call",
 		"/model or /cost", "page verbs (view.*) move every window: prefer panel verbs", "not command or skill names"} {
 		if !strings.Contains(ThreadPrompt, want) {
@@ -46,9 +46,12 @@ func TestSystemPrompt(t *testing.T) {
 	// It is paid on every request of every thread (about 260 tokens over the
 	// orchestration-only line, measured with claude -p; the thread new clause added 12
 	// more, thread-new-base-origin; how to write a path so its chip opens, 124 bytes,
-	// model-paths): grow it only by cutting.
-	if n := len(ThreadPrompt); n > 1550 {
-		t.Errorf("ThreadPrompt has %d bytes; keep it under 1550", n)
+	// model-paths): grow it only by cutting. The page clause naming the pages skill, its
+	// folder and "not the repo unless asked", 92 bytes, moved the cap from 1550: without it
+	// page prompts in a project thread wrote unthemed pages into the repo (1 of 15 routed;
+	// 14 of 20 with it: page-library-fixes-b).
+	if n := len(ThreadPrompt); n > 1641 {
+		t.Errorf("ThreadPrompt has %d bytes; keep it under 1641", n)
 	}
 	for _, sway := range []string{"In place", "Fresh copy", "prefer", "unless the user"} {
 		if strings.Contains(placementClause(t), sway) {
@@ -63,7 +66,8 @@ func TestSystemPrompt(t *testing.T) {
 	if got := systemPrompt(ws, nil, "You are Ember."); got != ThreadPrompt+"\n\n"+ws+"\n\nYou are Ember." {
 		t.Errorf("seeded thread: %q", got)
 	}
-	if strings.ContainsAny(ThreadPrompt, "\n$`") {
+	// The one $ is the pages folder's variable, which the model expands in its shell.
+	if strings.ContainsAny(strings.ReplaceAll(ThreadPrompt, "$CODE_FOUNDRY_PAGES", ""), "\n$`") {
 		t.Errorf("ThreadPrompt is one static line: %q", ThreadPrompt)
 	}
 }

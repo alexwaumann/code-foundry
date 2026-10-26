@@ -63,7 +63,10 @@ func TestEditLabels(t *testing.T) {
 		{"add and remove", []string{"x"}, []string{"b"}, false, []string{"a", "x"}, false},
 		{"clear", nil, nil, true, nil, false},
 		{"clear then add", []string{"x"}, nil, true, []string{"x"}, false},
-		{"both add and remove", []string{"x"}, []string{"X"}, false, nil, true},
+		// Remove goes before add, so a label in both is on the thread after.
+		{"both add and remove", []string{"x"}, []string{"X"}, false, []string{"a", "b", "x"}, false},
+		{"move between columns", []string{"kanban/review"}, []string{"kanban/todo", "kanban/review", "kanban/done"}, false, []string{"a", "b", "kanban/review"}, false},
+		{"re-add a present label", []string{"a"}, []string{"a"}, false, []string{"a", "b"}, false},
 		{"invalid add", []string{"no way"}, nil, false, nil, true},
 		{"invalid remove", nil, []string{"no way"}, false, nil, true},
 	} {
@@ -284,8 +287,9 @@ func TestLabelReportAndBudget(t *testing.T) {
 	if err != nil || !slices.Equal(got.Labels, []string{"x", "y"}) {
 		t.Fatalf("Label = %+v, %v", got.Labels, err)
 	}
-	if _, err := e.m.Label(e.ctx(), s.ID, []string{"x"}, []string{"x"}, false); !errors.Is(err, ErrInvalidArgument) {
-		t.Errorf("add and remove one label: %v", err)
+	// Remove goes before add: a label in both is on the thread after (a kanban move).
+	if got, err := e.m.Label(e.ctx(), s.ID, []string{"x"}, []string{"x", "y"}, false); err != nil || !slices.Equal(got.Labels, []string{"x"}) {
+		t.Errorf("add and remove one label = %+v, %v", got.Labels, err)
 	}
 	if _, err := e.m.Label(e.ctx(), "s-nope", nil, nil, true); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown thread: %v", err)
@@ -318,7 +322,7 @@ func TestLabelReportAndBudget(t *testing.T) {
 		case ev := <-e.events.C():
 			u, ok := ev.(Updated)
 			published = ok && u.Thread.ID == s.ID && u.Thread.BudgetUSD == 5 && u.Thread.Report.Status == ReportDone &&
-				slices.Equal(u.Thread.Labels, []string{"x", "y"})
+				slices.Equal(u.Thread.Labels, []string{"x"})
 		case <-time.After(5 * time.Second):
 			t.Fatal("no Updated with the labels, the report and the budget")
 		}
@@ -329,7 +333,7 @@ func TestLabelReportAndBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(after.Labels, []string{"x", "y"}) || after.Report.Status != ReportDone || after.Report.Summary != "all good" ||
+	if !slices.Equal(after.Labels, []string{"x"}) || after.Report.Status != ReportDone || after.Report.Summary != "all good" ||
 		after.Report.Data != `{"n":1}` || !after.Report.At.Equal(got.Report.At.Truncate(time.Millisecond)) || after.BudgetUSD != 5 {
 		t.Errorf("after restart = %+v", after)
 	}
