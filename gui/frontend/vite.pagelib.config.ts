@@ -89,7 +89,14 @@ function tailwindRuntime(): Plugin {
     name: "cf-pagelib-tailwind",
     generateBundle() {
       const runtime = readFileSync(require.resolve("@tailwindcss/browser"), "utf8");
-      const css = '@import "tailwindcss";\n' + appTheme(readFileSync(path.resolve(here, "src/index.css"), "utf8"));
+      // The base after the runtime's preflight (`border: 0 solid`, placeholders at half the
+      // text colour), which comes after ui.css's in the base layer: ui.css's border and
+      // placeholder colours again, so the components look the same with the runtime. A
+      // mockup without theme.css keeps the preflight's (the fallbacks).
+      const base =
+        "@layer base {\n  *, ::before, ::after, ::backdrop { border-color: var(--cf-border, currentColor); }\n" +
+        "  ::placeholder { color: var(--cf-placeholder, color-mix(in oklab, currentColor 50%, transparent)); }\n}\n";
+      const css = '@import "tailwindcss";\n' + appTheme(readFileSync(path.resolve(here, "src/index.css"), "utf8")) + base;
       const prelude = [
         "/* Code Foundry's Tailwind runtime (/cf/tailwind.js, docs/notes/page-library.md): the app's @theme and",
         " * type roles as the first text/tailwindcss style, then @tailwindcss/browser " + (require("@tailwindcss/browser/package.json") as { version: string }).version + ". */",
