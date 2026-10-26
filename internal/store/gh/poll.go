@@ -644,8 +644,9 @@ func knownPullRequests(d Dashboard, b *branchStates) map[string]PullRequest {
 
 // needsDetail reports whether a pull request must be (re)fetched: it is new or only a
 // placeholder, its updatedAt, state, or head moved, its check rollup state changed
-// (mergeStateStatus depends on it), it is open but was stored with the summary only,
-// or GitHub was still computing its mergeability.
+// (mergeStateStatus depends on it), it is open but was stored with the summary only or
+// with reviews lacking their commits (a cache from before they were fetched), or GitHub
+// was still computing its mergeability.
 func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 	switch {
 	case !ok || k.Partial:
@@ -656,6 +657,8 @@ func (s *Store) needsDetail(k PullRequest, ok bool, f prFingerprint) bool {
 		return true
 	case f.State == PullRequestOpen && k.Mergeable == "" && k.MergeStateStatus == "":
 		return true // summary only (it was closed when fetched)
+	case f.State == PullRequestOpen && len(k.LatestReviews) > 0 && !k.ReviewCommits:
+		return true // reviews cached before their commits were fetched
 	case s.recheck[f.ID] > 0:
 		s.recheck[f.ID]--
 		return true

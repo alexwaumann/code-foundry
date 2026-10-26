@@ -1,0 +1,313 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4969,
+      "resetAt": "2026-10-26T10:40:05Z"
+    },
+    "open": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABKJ9v7Q",
+        "number": 14815,
+        "title": "libghostty-vt: add ghostty_formatter_screen_new to format a screen independent of whether its active",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14815",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-10-23T01:35:25Z",
+        "updatedAt": "2026-10-26T05:37:02Z",
+        "mergedAt": null,
+        "author": {
+          "login": "robmorgan"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "c-api-screen-formatter",
+        "headRefOid": "3085c8ea685bfcfffaa06c6d0e7a287bb0696da5",
+        "baseRefName": "main",
+        "baseRefOid": "08a9518340e19487bd5fdf96963583fb32f0c41f",
+        "isCrossRepository": true,
+        "additions": 1487,
+        "deletions": 45,
+        "changedFiles": 12,
+        "statusCheckRollup": null,
+        "headRepository": {
+          "nameWithOwner": "robmorgan/ghostty"
+        },
+        "reviewDecision": "CHANGES_REQUESTED",
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "BLOCKED",
+        "totalCommentsCount": 13,
+        "reviews": {
+          "totalCount": 3
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "mitchellh"
+              },
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-10-26T03:03:35Z",
+              "commit": {
+                "oid": "fece54e14b936559065ff957ef3283ee41e75d9a"
+              }
+            },
+            {
+              "author": {
+                "login": "jcollie"
+              },
+              "state": "APPROVED",
+              "submittedAt": "2026-10-26T02:51:22Z",
+              "commit": {
+                "oid": "fece54e14b936559065ff957ef3283ee41e75d9a"
+              }
+            }
+          ]
+        },
+        "reviewRequests": {
+          "nodes": []
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABIS8BwQ",
+        "number": 14693,
+        "title": "cli/list-fonts: add an interactive font picker to +list-fonts",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14693",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-10-14T01:34:12Z",
+        "updatedAt": "2026-10-18T04:44:23Z",
+        "mergedAt": null,
+        "author": {
+          "login": "davidsanchez222"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "list-fonts-tui",
+        "headRefOid": "09bd8e5591677ca3a3508a569dded3c8c5578c6a",
+        "baseRefName": "main",
+        "baseRefOid": "81598385d608dda4946093d6d6a234d204a2f225",
+        "isCrossRepository": true,
+        "additions": 865,
+        "deletions": 0,
+        "changedFiles": 2,
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 1,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 0
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 1
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        },
+        "headRepository": {
+          "nameWithOwner": "davidsanchez222/ghostty"
+        },
+        "reviewDecision": "CHANGES_REQUESTED",
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "BLOCKED",
+        "totalCommentsCount": 3,
+        "reviews": {
+          "totalCount": 1
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "jcollie"
+              },
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-10-18T04:44:23Z",
+              "commit": {
+                "oid": "09bd8e5591677ca3a3508a569dded3c8c5578c6a"
+              }
+            }
+          ]
+        },
+        "reviewRequests": {
+          "nodes": []
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABESLwlQ",
+        "number": 14318,
+        "title": "gtk: context menu \"Copy Link\" option",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14318",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-09-20T05:10:54Z",
+        "updatedAt": "2026-10-26T01:30:53Z",
+        "mergedAt": null,
+        "author": {
+          "login": "thomasfedb"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "gtk-context-menu-copy-link",
+        "headRefOid": "687307d71c10b9bfef286664e06b7d07b4e78106",
+        "baseRefName": "main",
+        "baseRefOid": "cec8b92f1ecd176a20a56aa405021e7ae991b996",
+        "isCrossRepository": true,
+        "additions": 1334,
+        "deletions": 1105,
+        "changedFiles": 38,
+        "statusCheckRollup": null,
+        "headRepository": {
+          "nameWithOwner": "thomasfedb/ghostty"
+        },
+        "reviewDecision": "CHANGES_REQUESTED",
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "BLOCKED",
+        "totalCommentsCount": 7,
+        "reviews": {
+          "totalCount": 4
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "jcollie"
+              },
+              "state": "COMMENTED",
+              "submittedAt": "2026-09-20T05:25:25Z",
+              "commit": {
+                "oid": "b09721d1b0e124c4bd05f38ee1bbb0b3c962089d"
+              }
+            },
+            {
+              "author": {
+                "login": "trag1c"
+              },
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-09-20T09:30:04Z",
+              "commit": {
+                "oid": "00a28201b3ed63a61d4065c8e98318d065c1bac4"
+              }
+            }
+          ]
+        },
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": null
+            }
+          ]
+        }
+      }
+    ],
+    "closed": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABHOg8hA",
+        "number": 14588,
+        "title": "formatter: write the cursor position relative to the margins in origin mode",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14588",
+        "state": "MERGED",
+        "isDraft": false,
+        "createdAt": "2026-10-08T00:02:30Z",
+        "updatedAt": "2026-10-08T15:23:07Z",
+        "mergedAt": "2026-10-08T15:22:40Z",
+        "author": {
+          "login": "robmorgan"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "formatter-origin-cursor",
+        "headRefOid": "23c7a3e5a68aefee51b30a780e706771f80b5f97",
+        "baseRefName": "main",
+        "baseRefOid": "a60e9e2a57f73e1eef2bd1cf2995a467f69e7fb0",
+        "isCrossRepository": true,
+        "additions": 98,
+        "deletions": 2,
+        "changedFiles": 1,
+        "statusCheckRollup": null
+      }
+    ]
+  }
+}

@@ -121,6 +121,7 @@ type pullRequestJSON struct {
 			Author      *loginJSON `json:"author"`
 			State       string     `json:"state"`
 			SubmittedAt time.Time  `json:"submittedAt"`
+			Commit      *oidJSON   `json:"commit"`
 		} `json:"nodes"`
 	} `json:"latestReviews"`
 	ReviewRequests *struct {
@@ -257,8 +258,12 @@ func mapPullRequest(p *pullRequestJSON) PullRequest {
 			if n.Author != nil {
 				r.Author = n.Author.Login
 			}
+			if n.Commit != nil {
+				r.CommitSHA = n.Commit.Oid
+			}
 			pr.LatestReviews = append(pr.LatestReviews, r)
 		}
+		pr.ReviewCommits = true
 	}
 	if p.ReviewRequests != nil {
 		for _, n := range p.ReviewRequests.Nodes {
