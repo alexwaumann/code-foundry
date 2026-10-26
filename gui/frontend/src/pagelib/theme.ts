@@ -79,6 +79,7 @@ export function pageSafelist(indexCss: string): string {
     "{space-x,space-y}-{1,2,3,4,6}",
     "{w,h}-{full,auto,fit,screen,px,0,1,2,3,4,5,6,8,10,12,16,20,24,32,40,48,64,80,96}",
     "{min-w,min-h}-{0,full,fit} max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,full,prose,none} max-h-{full,screen,64,80,96}",
+    "{min-w,max-w,min-h,max-h}-{8,12,16,20,24,32,40,48,56,64,72,80,96}",
     "size-{3,3.5,4,5,6,8,10,12}",
     "{,sm:,md:,lg:}grid-cols-{1,2,3,4,5,6,12} {,sm:,md:,lg:}col-span-{1,2,3,4,6,full} {sm:,md:,lg:}{flex,hidden,block,flex-row,flex-col}",
     "overflow-{auto,hidden,visible,x-auto,y-auto} truncate whitespace-{nowrap,normal,pre-wrap} break-{words,all} line-clamp-{1,2,3}",

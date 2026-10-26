@@ -138,9 +138,9 @@ func TestRenderPagesSkill(t *testing.T) {
 		// The two shapes (page-library): plain HTML for something small, React with @cf/ui
 		// for state, dialogs, tabs or tables, the exact tags and imports; a mockup brings its
 		// own look.
-		"## Plain HTML or React", "**Plain HTML** for something small", "**React with `@cf/ui`** for anything with state, dialogs, tabs or tables",
+		"## Plain HTML or React", "**Plain HTML** only for something tiny and static", "**React with `@cf/ui`** for the rest: a board, a list with actions, a dashboard",
 		`<link rel="stylesheet" href="/cf/ui.css">`, `<script src="/cf/jsx.js"></script>`, `<script type="text/tsx">`,
-		`import { createRoot } from "react-dom/client";`, `from "@cf/ui";`, `from "@cf/icons";`, "`reference/components.md`, read it first",
+		`import { createRoot } from "react-dom/client";`, `from "@cf/ui";`, `from "@cf/icons";`, "`reference/components.md`, read it and `reference/react.md` first",
 		"A **mockup of another product**", "leave out both\nstylesheets", "`/cf/tailwind.js`", "keep `/cf/bridge.js`, it sizes the card",
 		"`react.md`", "`components.md`", "`verbs.md`",
 		// The gesture rule, confirmations, own thread.

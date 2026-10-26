@@ -37,14 +37,14 @@ storage, `cf.fetch`), `react.md` (React, mockups, Tailwind), `components.md` (`@
    it in Bash: THREAD_STATUS_IDLE, ISO times, zero fields left out). `cf.on` sends the app's
    view models: lower-case values (idle), times as epoch ms in `…AtMs` (`new Date(ms)`), every
    field there. Use only names from `--json` or `reference/sources.md`; never guess.
-3. One file, no build step, no CDN: plain HTML or React (below). Paint only with
+3. One file, no build step, no CDN: React (below) unless it is tiny. Paint only with
    `--cf-*` variables, the type-role classes (the code-foundry skill names them) or `@cf/ui`,
    never fixed colours, unless it mocks up another product.
 
 ## Plain HTML or React
 
-**Plain HTML** for something small (a list, a form, a chart): plain DOM, inline CSS,
-`<script type="module">` (top-level `await` works).
+**Plain HTML** only for something tiny and static (one figure, a chart, a short form): plain
+DOM, inline CSS, `<script type="module">` (top-level `await` works).
 
 ```html
 <!doctype html>
@@ -61,9 +61,9 @@ storage, `cf.fetch`), `react.md` (React, mockups, Tailwind), `components.md` (`@
 </script>
 ```
 
-**React with `@cf/ui`** for anything with state, dialogs, tabs or tables: the app's own
-components (only the names in `reference/components.md`, read it first), `@cf/icons` (all of
-lucide-react), TSX compiled in the page by `/cf/jsx.js`. Patterns and gotchas: `reference/react.md`.
+**React with `@cf/ui`** for the rest: a board, a list with actions, a dashboard, anything with
+state, filters, dialogs, tabs or tables. The app's own components (only the names in
+`reference/components.md`, read it and `reference/react.md` first), `@cf/icons` (lucide), TSX via `/cf/jsx.js`.
 
 ```html
 <!doctype html>
