@@ -1,0 +1,3 @@
+# The page library, built by `make pagelib` (docs/notes/page-library.md): minified output,
+# committed like generated code.
+internal/pagelib/dist/** linguist-generated=true -diff

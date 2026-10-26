@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/bridge"
+	"github.com/alexwaumann/code-foundry/internal/pagelib"
 	"github.com/alexwaumann/code-foundry/internal/skills"
 )
 
 // pagesSkillFiles are the code-foundry-pages skill's files.
 var pagesSkillFiles = []string{"code-foundry-pages/SKILL.md", "code-foundry-pages/reference/examples.md",
-	"code-foundry-pages/reference/sources.md"}
+	"code-foundry-pages/reference/sources.md", "code-foundry-pages/reference/verbs.md", "code-foundry-pages/reference/react.md",
+	"code-foundry-pages/reference/components.md"}
 
 // cfRun is a cf.run call in a skill file with a literal verb and an args object:
 // cf.run("verb", { a: x, "b-c": y }).
@@ -127,30 +129,38 @@ func TestRenderPagesSkill(t *testing.T) {
 		// session's cron (bridge-fix-c-daemon).
 		"## Page, wake, plugin or reply", "the code-foundry-plugin skill", "It runs only while it is on screen",
 		"`code-foundry thread subscribe --pr owner/name#4 --until checks_passed`", "`--every 1h`", "--until attention --repeat",
-		"Never Claude\n  Code's own cron or a `--watch` loop",
+		"Never Claude Code's own cron or a `--watch`\n  loop",
 		// The two shapes and the field reference.
 		"Two shapes, never mixed", "THREAD_STATUS_IDLE", "`…AtMs`", "`reference/sources.md`",
 		// The skeleton.
 		`<link rel="stylesheet" href="/cf/theme.css">`, `<script src="/cf/bridge.js"></script>`, "await cf.ready", "`--cf-*` variables",
-		"no framework", "no build step", "`--json`",
+		"no build step", "`--json`",
+		// The two shapes (page-library): plain HTML for something small, React with @cf/ui
+		// for state, dialogs, tabs or tables, the exact tags and imports; a mockup brings its
+		// own look.
+		"## Plain HTML or React", "**Plain HTML** only for something tiny and static", "**React with `@cf/ui`** for the rest: a board, a list with actions, a dashboard",
+		`<link rel="stylesheet" href="/cf/ui.css">`, `<script src="/cf/jsx.js"></script>`, `<script type="text/tsx">`,
+		`import { createRoot } from "react-dom/client";`, `from "@cf/ui";`, `from "@cf/icons";`, "`reference/components.md`, read it and `reference/react.md` first",
+		"A **mockup of another product**", "leave out both\nstylesheets", "`/cf/tailwind.js`", "keep `/cf/bridge.js`, it sizes the card",
+		"`react.md`", "`components.md`", "`verbs.md`",
 		// The gesture rule, confirmations, own thread.
 		"runs only from a click or key press in the page", "counts for 5 seconds", "`await Promise.all(items.map(", "on `change`, not `input`",
 		"Never pass `yes` or `force`", "its own dialog opens over the page", "`id: cf.thread.id`", "`sidebar: true`",
 		"update that row from the result at once", "a wrong or missing arg",
 		// Live data and state.
-		"never polling", "Never `setInterval`", "`cf.storage(", "survives reloads and app\nrestarts", "Every page of this\nthread shares it",
+		"never polling", "Never `setInterval`", "`cf.storage(", "survives reloads and\n  app restarts", "Every page of this thread shares it",
 		"`localStorage` is cleared when the app quits", "another thread starts empty", "only while Ember is open", "show its message",
 		// onError and cf.off; rows that do not move under the pointer (bridge-fix-wording).
-		"`onError(e)` gets a refusal: show `e.message` in the\npage", "`cf.off(source)`", "**Rows stay put**", "acts on its row's id",
+		"`onError(e)` gets a refusal: show `e.message` in the page", "`cf.off(source)`", "**Rows stay put**", "acts on its row's id",
 		// Wording from testing: the folder, limits, the verbs table, declines, results.
 		"read nothing in\nother threads' folders or the app's home", "never try values on the user's real settings to find a limit",
-		"A starter list: every verb the CLI runs works", "not an error. Button back, at most a muted", "never print `text`",
+		"not an error. Button back, at most a muted", "never print `text`",
 		"`request-id` per row: a second click then resolves with the same thread, a success",
 		// Limits.
-		"**On screen only.**", "SSO and OAuth redirects", "to paste an API token into a password field", "send it in a header with `cf.fetch`",
-		"Plain `fetch` only for an API known to allow any origin", "CORS never blocks it", "localhost is refused", "any status resolves",
+		"**On screen only.**", "SSO and OAuth redirects", "to paste an API token into a password field", "send it in a header\n  with `cf.fetch`",
+		"Plain `fetch` only for an API known to allow any origin", "CORS never blocks it",
 		"**Data a source lacks**", "A plugin cannot feed a page",
-		"reference/examples.md", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
+		"in `reference/`:\n`examples.md`", "`code-foundry view.inline <path>", "once per file", "never\nrun view.inline for that file again",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("SKILL.md lacks %q", want)
@@ -200,8 +210,12 @@ func TestRenderPagesSkill(t *testing.T) {
 	for _, c := range src.Commands {
 		confirms[c.GetName()] = c.GetRequiresConfirmation()
 	}
-	_, table, _ := strings.Cut(body, "## Verbs pages use\n")
-	table, _, _ = strings.Cut(table, "\n## ")
+	// In reference/verbs.md (page-library: moved out of SKILL.md for the React skeleton).
+	verbsRef := string(files[skills.Pages+"/reference/verbs.md"])
+	if !strings.Contains(verbsRef, "A starter list: every verb the CLI runs works") {
+		t.Error("reference/verbs.md lacks its starter-list line")
+	}
+	_, table, _ := strings.Cut(verbsRef, "| Verb | Args |\n")
 	rows := 0
 	for _, line := range strings.Split(table, "\n") {
 		cols := strings.Split(line, " | ")
@@ -280,6 +294,49 @@ func TestRenderPagesSkill(t *testing.T) {
 		if !strings.Contains(ex, want) {
 			t.Errorf("examples.md lacks %q", want)
 		}
+	}
+
+	// reference/components.md names every @cf/ui export, as built (internal/pagelib's
+	// ui-exports.json), one line each with what it is, and no name that is not one.
+	comps := string(files[skills.Pages+"/reference/components.md"])
+	exports := pagelib.UIExports()
+	if len(exports) < 50 {
+		t.Fatalf("pagelib.UIExports() has %d names; run make pagelib", len(exports))
+	}
+	for _, name := range exports {
+		if !strings.Contains(comps, "\n- `"+name+"`: ") {
+			t.Errorf("reference/components.md has no line for @cf/ui's %s", name)
+		}
+	}
+	for _, m := range regexp.MustCompile("\n- `([A-Za-z]+)`: ").FindAllStringSubmatch(comps, -1) {
+		if !slices.Contains(exports, m[1]) {
+			t.Errorf("reference/components.md lists %s, which @cf/ui does not export", m[1])
+		}
+	}
+	react := string(files[skills.Pages+"/reference/react.md"])
+	for _, want := range []string{
+		// What a page loads and the import map, from pagelib.
+		pagelib.JSXPath, pagelib.UICSSPath, pagelib.TailwindPath, "/cf/theme.css", "/cf/bridge.js",
+		// How the loader runs a page; the bridge in React; overlays in the card.
+		"`text/jsx` and `text/babel` work too", "types stripped", "in document order", "write the app as one script",
+		"red box at the top of the page", "No charting or other library", "`var(--cf-chart-1)`", "An arbitrary value",
+		"return what `cf.on` returns", "no Dialog that asks before merging or archiving", "`<TooltipProvider>`", "`<Toaster />`",
+		"`min-h-[420px]`", `cf.run("thread.archive", { id: t.id })`, `e.code === "declined"`, "t.id !== cf.thread.id", "localeCompare",
+		// The mockup: no theme, its own palette, the runtime's @theme, the bridge for sizing.
+		"## A mockup of another product", "Leave out `/cf/theme.css` and `/cf/ui.css`", "`color-scheme`", `<style type="text/tailwindcss">`,
+		"No `@import` in it", "say in the reply that it is a mockup",
+	} {
+		if !strings.Contains(react, want) {
+			t.Errorf("reference/react.md lacks %q", want)
+		}
+	}
+	for _, im := range pagelib.ImportMap {
+		if !strings.Contains(react, "`"+im.Specifier+"`") {
+			t.Errorf("reference/react.md does not name the import %s", im.Specifier)
+		}
+	}
+	if regexp.MustCompile(`(src|href)="https?:`).MatchString(react) {
+		t.Error("reference/react.md loads something from the internet")
 	}
 
 	// The entry and help skills route pages to it; ThreadPrompt is checked in its package.

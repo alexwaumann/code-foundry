@@ -61,16 +61,31 @@ plugins:
 		cp "$$dir/bin/$$name" "bin/plugins/$$name/bin/$$name"; \
 	done
 
-.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub \
+.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub pagelib pagelib-check \
         dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean fuzz
 
 all: build
 
-## gen: regenerate protobuf/Connect code (Go + TS) and Wails bindings. Commit the result.
-gen:
+## gen: regenerate protobuf/Connect code (Go + TS), Wails bindings and the page library.
+## Commit the result.
+gen: pagelib
 	$(BUF) lint
 	$(BUF) generate
 	cd gui && $(WAILS3) generate bindings -clean=true -ts -i
+
+## pagelib: build the page library (React, @cf/ui, @cf/icons, the TSX loader, the Tailwind
+## runtime) from the GUI's sources into internal/pagelib/dist, which the daemon embeds.
+## Committed like generated code (docs/notes/page-library.md).
+pagelib: frontend-deps
+	$(PNPM) run pagelib
+
+# pagelib-check: rebuild the page library and fail when it differs from what git has (a
+# component, index.css or a dependency changed without `make pagelib`). Staged counts.
+pagelib-check: pagelib
+	@if ! git diff --quiet -- internal/pagelib/dist || [ -n "$$(git ls-files --others --exclude-standard -- internal/pagelib/dist)" ]; then \
+		echo "internal/pagelib/dist differs from its rebuild: run make pagelib and commit it"; \
+		git status --short -- internal/pagelib/dist; exit 1; \
+	fi
 
 ## build: build the CLI/daemon binary to ./bin/code-foundry.
 build: ghostty-vt
@@ -139,7 +154,7 @@ go-test: gui-dist-stub ghostty-vt
 frontend-deps:
 	$(PNPM) install --frozen-lockfile
 
-frontend-check: frontend-deps
+frontend-check: frontend-deps pagelib-check
 	$(PNPM) run typecheck
 	$(PNPM) run lint
 	$(PNPM) run test

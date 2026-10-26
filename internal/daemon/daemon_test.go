@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/preview"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 func TestLockIsExclusive(t *testing.T) {
@@ -141,6 +146,7 @@ func TestLoopbackHandlerServesNoPageRoutes(t *testing.T) {
 		{"preview with token", "/preview/abc/index.html", "Bearer secret", http.StatusNotFound},
 		{"theme stylesheet", "/cf/theme.css", "", http.StatusNotFound},
 		{"bridge script", "/cf/bridge.js", "Bearer secret", http.StatusNotFound},
+		{"page library", "/cf/ui.js", "Bearer secret", http.StatusNotFound},
 		{"preview-ish path outside the prefix", "/previewx", "", http.StatusUnauthorized},
 		{"cf-ish path outside the prefix", "/cfx/theme.css", "", http.StatusUnauthorized},
 	}
@@ -312,6 +318,47 @@ func TestParseDevOrigins(t *testing.T) {
 			}
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// The real page routes: the page library's files on the pages listener, typed and
+// revalidated, beside the theme and the bridge; none on the API listener.
+func TestPageLibraryRoutes(t *testing.T) {
+	routes := newPageRoutes(preview.NewGrants(preview.Floor{}), theme.NewLive(), slog.New(slog.DiscardHandler))
+	pages := pagesHandler(routes)
+	api := loopbackHandler("secret", slices.Collect(maps.Keys(routes)), 4242, nil,
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	tests := []struct {
+		name, path string
+		h          http.Handler
+		want       int
+		ctype      string
+	}{
+		{"ui.js", "/cf/ui.js", pages, http.StatusOK, "text/javascript; charset=utf-8"},
+		{"react.js", "/cf/react.js", pages, http.StatusOK, "text/javascript; charset=utf-8"},
+		{"jsx.js", "/cf/jsx.js", pages, http.StatusOK, "text/javascript; charset=utf-8"},
+		{"tailwind.js", "/cf/tailwind.js", pages, http.StatusOK, "text/javascript; charset=utf-8"},
+		{"ui.css", "/cf/ui.css", pages, http.StatusOK, "text/css; charset=utf-8"},
+		{"theme still", "/cf/theme.css", pages, http.StatusOK, "text/css; charset=utf-8"},
+		{"bridge still", "/cf/bridge.js", pages, http.StatusOK, "text/javascript; charset=utf-8"},
+		{"the export list is not served", "/cf/ui-exports.json", pages, http.StatusNotFound, ""},
+		{"unknown file", "/cf/vue.js", pages, http.StatusNotFound, ""},
+		{"ui.js on the API listener", "/cf/ui.js", api, http.StatusNotFound, ""},
+		{"jsx.js on the API listener", "/cf/jsx.js", api, http.StatusNotFound, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer secret")
+			rec := httptest.NewRecorder()
+			tc.h.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("status %d, want %d", rec.Code, tc.want)
+			}
+			if got := rec.Header().Get("Content-Type"); tc.ctype != "" && got != tc.ctype {
+				t.Errorf("Content-Type %q, want %q", got, tc.ctype)
 			}
 		})
 	}

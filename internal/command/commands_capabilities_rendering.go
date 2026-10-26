@@ -1,9 +1,11 @@
 package command
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/bridge"
+	"github.com/alexwaumann/code-foundry/internal/pagelib"
 )
 
 // Rendering is one thing the thread view (or the side panel's File tab, reached from it)
@@ -19,7 +21,9 @@ type Rendering struct {
 // components/pr/Markdown.tsx, lib/inlineHtml.ts, lib/codeActions.ts, lib/pathChips.ts,
 // components/thread/ToolDetail.tsx, components/files/) before adding or changing a line,
 // and say what does not render too. docs/notes/control-4-capabilities.md.
-var Renderings = []Rendering{
+var Renderings = slices.Concat(renderings, pageLibrary(), renderingsAfter)
+
+var renderings = []Rendering{
 	{"markdown", "GitHub-flavoured markdown in replies: headings, lists, task lists, tables (scroll sideways), " +
 		"strikethrough, links (absolute ones open in the browser). Raw HTML shows as text, except the inline " +
 		"tags kbd, sub, sup, mark, small, ins, del, s, u and br."},
@@ -69,6 +73,30 @@ var Renderings = []Rendering{
 		"or timeout (30 s by default, 120 s at most); bodies up to 1 MiB out and 8 MiB back; no cookies or Origin are sent. " +
 		"Sign-in redirects (SSO, OAuth) do not work in the frame: ask the user for a token instead, keep it in cf.storage and send it " +
 		"in a header with cf.fetch."},
+}
+
+// pageLibrary is the page library (docs/notes/page-library.md): React pages with the app's
+// components, a line per import specifier and per file a page names.
+func pageLibrary() []Rendering {
+	out := []Rendering{{"react pages", "A page shown with view.inline can be a React app with the app's own components and no build step: " +
+		"<script src=\"" + pagelib.JSXPath + "\"></script> in <head>, then the code in <script type=\"text/tsx\"> (modules, run in order) importing " +
+		"the specifiers below; link /cf/theme.css then " + pagelib.UICSSPath + " for the app's look. A mockup of another product skips both " +
+		"stylesheets and brings its own CSS. The code-foundry-pages skill has the skeletons and reference/components.md every component."}}
+	for _, im := range pagelib.ImportMap {
+		out = append(out, Rendering{im.Specifier, im.Path + ": " + im.What + "."})
+	}
+	return append(out,
+		Rendering{pagelib.JSXPath, "the loader: installs that import map (unless the page has its own), transforms text/tsx, text/jsx and " +
+			"text/babel scripts (TypeScript and JSX, Sucrase) and runs them as modules in document order; a syntax, import or uncaught " +
+			"error shows in a box in the page."},
+		Rendering{pagelib.UICSSPath, "@cf/ui's stylesheet, after /cf/theme.css: the app's Tailwind utilities (bg-cf-*, text-cf-*, the type " +
+			"roles, rounded-pane…) and everyday layout and spacing classes."},
+		Rendering{pagelib.TailwindPath, "optional: the Tailwind v4 browser runtime with the app's theme, so any utility works (arbitrary " +
+			"values too), generated in the page; <style type=\"text/tailwindcss\"> adds rules (no @import)."},
+	)
+}
+
+var renderingsAfter = []Rendering{
 	{"themes", "theme save run from your thread adds a theme card to your conversation: the theme's swatches, its contrast check, " +
 		"Undo (back to what the slot showed just before: another theme, or the colours the save replaced) and Edit (the Themes page's editor). When the save changes what a slot shows (--apply onto " +
 		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +

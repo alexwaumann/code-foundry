@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Streaks mockup</title>
+<script src="/cf/bridge.js"></script>
+<script src="/cf/jsx.js"></script>
+<style>
+  /* A mockup of another product (docs/notes/page-library.md): its own look, no theme.css. */
+  html { color-scheme: light; background: #fbf7f0; color: #1d1b16; font-family: "Avenir Next", system-ui, sans-serif; }
+  body { margin: 0; }
+  main { padding: 24px 28px; }
+  h1 { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; font-size: 26px; }
+  .habits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .habit { background: #fff; border-radius: 18px; padding: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+  .habit b { display: block; font-size: 15px; }
+  .streak { color: #ff6b35; font-weight: 700; font-size: 28px; }
+</style>
+<body>
+<div id="root"></div>
+<script type="text/tsx">
+  import { createRoot } from "react-dom/client";
+  import { Flame } from "@cf/icons";
+  const habits = [{ name: "Read", days: 12 }, { name: "Run", days: 4 }, { name: "Meditate", days: 31 }];
+  createRoot(document.getElementById("root")!).render(
+    <main>
+      <h1><Flame data-testid="flame" color="#ff6b35" /> Streaks</h1>
+      <div className="habits">{habits.map((h) => <div key={h.name} className="habit"><b>{h.name}</b><span className="streak">{h.days}</span> days</div>)}</div>
+    </main>,
+  );
+</script>
