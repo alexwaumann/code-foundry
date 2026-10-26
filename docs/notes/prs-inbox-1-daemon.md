@@ -115,6 +115,11 @@ exercised live; a dismissal is a timeline event and bumps `updatedAt` like a rev
   been empty. `include_untracked: true` returned the same counts. Of 51 latest reviews,
   41 had `commitSha` and 24 of those were on an older commit than the head. The other
   10 have no commit on GitHub (checked with `gh api graphql`).
+* No projects: a scratch daemon (`CODE_FOUNDRY_HOME=$(mktemp -d)`, the real account,
+  `project.list` says "no projects"). Its first poll ran the 4 dashboard searches
+  (`searches=4 default_branches=0`, 57 details). GetDashboard returned authored 7 and
+  recently_merged 50 across 3 repositories, with no tracked slugs. Before this change
+  that poll had `searches=0` and the lists were empty.
 * Old-cache heal: stopped the daemon, stripped `commitSha` and `reviewCommits` from the
   cached dashboard row in SQLite, and restarted it. GetDashboard served 51 reviews with
   0 commits. The next poll fetched details for exactly the 38 open PRs with reviews and
