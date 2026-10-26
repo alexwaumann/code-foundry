@@ -37,11 +37,13 @@ classifier decide. You can change all three in a running thread too.
 
 **Work in**, under the prompt, decides where the thread edits files:
 
-* **The project folder itself** (the pill reads **In place**) edits your files where
-  they are. This is the default.
+* **The project folder itself** (the pill reads **Project folder**, or **Project
+  folders** for several projects) edits your files where they are. This is the default.
 * **A fresh copy of the project** (**Fresh copy**) gives the thread its own folder and
   branch, so several threads can work at once and you keep or discard each one. The app
   keeps these copies under `~/.code-foundry/worktrees`.
+* **An existing branch**, found by name below the two, puts the thread on that branch
+  in its own copy (the one it already has, if any).
 
 A choice applies to that thread only; the next one starts from the default again. Set
 the default for every project under Settings › Threads › **New threads work in**.

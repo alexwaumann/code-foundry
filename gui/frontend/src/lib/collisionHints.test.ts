@@ -75,6 +75,16 @@ describe("draftCheckouts", () => {
     ],
     ["fresh copies: only the plain folders", { projectIds: ["api", "notes", "web"], primary: "web", worktreeMode: true }, [{ projectId: "notes", path: "/Users/dev/notes" }]],
     [
+      "an existing branch: the plain folders and each listed worktree on it",
+      { projectIds: ["api", "notes", "web"], primary: "web", worktreeMode: true, branch: "feat/x" },
+      [
+        { projectId: "api", path: "/wt/api/feat-x" },
+        { projectId: "notes", path: "/Users/dev/notes" },
+        { projectId: "web", path: "/wt/web/feat-x" },
+      ],
+    ],
+    ["an existing branch no project has a worktree of: only the plain folders", { projectIds: ["api", "notes"], primary: "api", worktreeMode: true, branch: "fix/y" }, [{ projectId: "notes", path: "/Users/dev/notes" }]],
+    [
       "the workspace's folder as the primary takes no project's checkout",
       { projectIds: ["api", "web"], primary: "workspace", worktreeMode: false, primaryPath: "/x" },
       [

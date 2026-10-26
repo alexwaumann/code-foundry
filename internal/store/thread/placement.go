@@ -485,15 +485,16 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 		if err != nil {
 			return p, err
 		}
+		paths := make([]string, len(git))
+		for i, r := range git {
+			paths[i] = r.Path
+		}
+		bc = m.existingBranchChoice(ctx, paths, bc, nw.Branch)
 		sl, err := m.waitNaming(ctx, id, name, o.InitialPrompt, bc)
 		if err != nil {
 			return p, err
 		}
 		p.name, p.namerCalled, p.late = sl.name, sl.namerCalled, sl.late
-		paths := make([]string, len(git))
-		for i, r := range git {
-			paths[i] = r.Path
-		}
 		var existing bool
 		var release func()
 		branch, existing, release = m.pickBranch(ctx, paths, bc, sl.branch, id)

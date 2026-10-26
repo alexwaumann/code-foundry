@@ -177,6 +177,10 @@ export interface RefsView {
   refs: string[];
   /** The default branch as a base: "<default branch>", or "origin/<default branch>" when only origin's copy exists. The daemon decides which copy at creation (projects.base_from_origin: origin's unless the local branch is ahead). */
   defaultRef: string;
+  /** Branch short names, local and origin's merged by name, newest commit first (the composer's pickers). */
+  branches: string[];
+  /** The default branch's short name; "" when unknown. */
+  defaultBranch: string;
 }
 
 /**
@@ -187,7 +191,7 @@ export async function listRefs(projectId: string, conn: DaemonConnection = daemo
   const c = await conn.client(ProjectService);
   try {
     const res = await c.listRefs({ projectId }, { signal });
-    return { refs: [...res.refs], defaultRef: res.defaultRef };
+    return { refs: [...res.refs], defaultRef: res.defaultRef, branches: [...res.branches], defaultBranch: res.defaultBranch };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

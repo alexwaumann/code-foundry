@@ -70,17 +70,24 @@ export function threadCheckouts(t: HintThread, projects: HintProjects): Checkout
 /**
  * The checkouts a draft's thread would have that the GUI knows already: in place (not
  * worktree mode), every member's own checkout, the primary's at `primaryPath` when the
- * user picked a worktree; in worktree mode only the plain folders (git members get new
- * worktrees). A primary of WORKSPACE_PRIMARY runs in the workspace's folder, which no
- * project owns.
+ * user picked a worktree; in worktree mode the plain folders, and with an existing
+ * `branch` picked each git member's listed worktree on it (the daemon reuses it; a new
+ * branch gets new worktrees). A primary of WORKSPACE_PRIMARY runs in the workspace's
+ * folder, which no project owns.
  */
-export function draftCheckouts(d: { projectIds: readonly string[]; primary: string; worktreeMode: boolean; primaryPath?: string }, projects: HintProjects): Checkout[] {
+export function draftCheckouts(
+  d: { projectIds: readonly string[]; primary: string; worktreeMode: boolean; primaryPath?: string; branch?: string },
+  projects: HintProjects,
+): Checkout[] {
   const out: Checkout[] = [];
   for (const id of d.projectIds) {
     const p = projects[id];
     if (!p) continue;
     if (!p.git) out.push({ projectId: id, path: mainCheckout(p) });
-    else if (d.worktreeMode) continue;
+    else if (d.worktreeMode) {
+      const w = d.branch ? p.worktrees.find((x) => x.branch === d.branch) : undefined;
+      if (w) out.push({ projectId: id, path: w.path });
+    }
     else if (id === d.primary && d.primary !== WORKSPACE_PRIMARY && d.primaryPath) out.push({ projectId: id, path: d.primaryPath });
     else out.push({ projectId: id, path: mainCheckout(p) });
   }

@@ -163,7 +163,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "new-worktree", Type: Bool, Description: "New worktrees on a new branch (named from the prompt by projects.branch_naming, e.g. feat/add-filter, else cf/<thread id>); =false: each project's own checkout"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: the default branch; a branch name means origin's copy, fetched, unless the local one is ahead or base-from-origin is no); needs new-worktree; ignored when branch exists"},
 				baseFromOriginArg,
-				{Name: "branch", Type: String, Description: "The new worktree's branch: with a / it is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); an existing branch is checked out, not suffixed; needs new-worktree"},
+				{Name: "branch", Type: String, Description: "The new worktree's branch: an existing one is checked out; a new one with a / is used as given, else it is the slug the naming mode wraps (feat/<slug>, <prefix>/<slug>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, FileOrStdin: true, Description: "The first message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},

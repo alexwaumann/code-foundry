@@ -114,6 +114,99 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("main");
 });
 
+/** The composer for code-foundry with ghostty-playground added: a set of two git projects. */
+async function composeTwo(page: Page): Promise<void> {
+  await composeIn(page, 1);
+  const list = await openSetPicker(page);
+  await list.locator('[data-project="repo-gp"]').click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in 2 projects?");
+}
+
+test("Work in: an existing branch for a set, from every project's branches; thread.new gets it, no base", async ({ page }) => {
+  await freshCopyByDefault();
+  await openApp(page);
+  await composeTwo(page);
+  const worktree = page.getByTestId("composer-worktree");
+  await expect(worktree).toHaveText("Fresh copies");
+  await worktree.click();
+  const list = page.getByTestId("composer-worktree-list");
+  const options = list.getByRole("option");
+  // The two choices, then both projects' branches merged by name, newest first, without
+  // the default branch (main, both projects'): Project folders works on it.
+  await expect(options).toHaveText([/^Fresh copies\s*Edits land/, /^Project folders\s*Edits land/, "feat/sidebar", "fix/resize", "release/v0.3"]);
+  await expect(options.filter({ hasText: /^main$/ })).toHaveCount(0);
+  // The search filters the branches only; the choices stay.
+  await expect(list.getByPlaceholder("Find existing branch")).toBeFocused();
+  await page.keyboard.type("resize");
+  await expect(options).toHaveText([/^Fresh copies/, /^Project folders/, "fix/resize"]);
+  // Enter picks the first match, not a choice above the search.
+  await page.keyboard.press("Enter");
+  await expect(worktree).toHaveText("fix/resize");
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.type("Fix the resize glitch");
+  await page.keyboard.press("Enter");
+  expect(await lastInvoked("thread.new")).toEqual({
+    project: "repo-cf",
+    projects: "repo-cf,repo-gp",
+    "new-worktree": "true",
+    branch: "fix/resize",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
+    permission: "auto",
+    prompt: "Fix the resize glitch",
+  });
+  const id = await selectedThreadId(page);
+  expect((await threads()).find((t) => t.id === id)).toMatchObject({ branch: "fix/resize", createdWorktree: true });
+});
+
+test("Branch from: Default branches first, the branches every project has, the rule as a footer; every project gets the pick", async ({ page }) => {
+  await freshCopyByDefault();
+  await openApp(page);
+  await composeTwo(page);
+  const base = page.getByTestId("composer-base");
+  await expect(base).toHaveText("From defaults");
+  await base.click();
+  const list = page.getByTestId("composer-base-list");
+  const options = list.getByRole("option");
+  // fix/resize is code-foundry's only; main is both projects' default branch (the first row).
+  await expect(options).toHaveText(["Default branches", "feat/sidebar", "release/v0.3"]);
+  await expect(options.first()).toHaveAttribute("aria-selected", "true");
+  await expect(list.locator('[data-slot="picker-footer"]')).toHaveText("Each project takes origin's copy of the branch, or its own when that is ahead.");
+  // The filter box filters the whole list.
+  await expect(list.getByPlaceholder("Filter branches…")).toBeFocused();
+  await page.keyboard.type("release");
+  await expect(options).toHaveText(["release/v0.3"]);
+  await page.keyboard.press("Enter");
+  await expect(base).toHaveText("From release/v0.3");
+
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.type("Backport the fix");
+  await page.keyboard.press("Enter");
+  expect(await lastInvoked("thread.new")).toEqual({
+    project: "repo-cf",
+    projects: "repo-cf:release/v0.3,repo-gp:release/v0.3",
+    "new-worktree": "true",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
+    permission: "auto",
+    prompt: "Backport the fix",
+  });
+});
+
+test("Branch from: no footer while projects.base_from_origin is off", async ({ page }) => {
+  await freshCopyByDefault();
+  await mockPost("settings/external?projects.base_from_origin=false");
+  await openApp(page);
+  await composeTwo(page);
+  await page.getByTestId("composer-base").click();
+  const list = page.getByTestId("composer-base-list");
+  await expect(list.getByRole("option")).toHaveText(["Default branches", "feat/sidebar", "release/v0.3"]);
+  await expect(list.locator('[data-slot="picker-footer"]')).toHaveCount(0);
+});
+
 test("a workspace row selects its members and the reference; Workspace as the primary; fresh copies", async ({ page }) => {
   await freshCopyByDefault();
   await mockPost("workspace?name=shop&projects=repo-cf,repo-dot&primary=repo-dot");
@@ -141,8 +234,8 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(options).toHaveText([/^Workspace folder\s*shop's folder/, /^code-foundry/, /^dotfiles/]);
   await options.first().click();
   await expect(primary).toHaveText("Workspace folder");
-  // The workspace's folder is no project: no base to pick.
-  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+  // A base applies to every git project, whichever runs the thread: Branch from stays.
+  await expect(page.getByTestId("composer-base")).toHaveText("From defaults");
 
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Ship the shop banner");
