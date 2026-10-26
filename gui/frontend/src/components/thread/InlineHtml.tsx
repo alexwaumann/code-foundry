@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, TriangleAlert, X, type LucideIcon } from "lucide-react";
 import { readFile } from "@/api/files";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { openFileInPanel } from "@/stores/filePanel";
 import { setRowExpanded, useRowExpanded, useThreadItem } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
-import { useThreadCtx } from "./context";
+import { HoldTopContext, useThreadCtx } from "./context";
 
 /**
  * A page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md),
@@ -203,6 +203,15 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
     };
   }, []);
   const height = frameHeight(asked, pane);
+  // A page resizing under the pointer or with focus (a list it filters) keeps the card's top
+  // where it is, not the timeline's bottom (docs/notes/page-library-fixes-b.md).
+  const holdTop = useContext(HoldTopContext);
+  const onResize = (h: number) => {
+    const card = ref.current;
+    const frame = card?.querySelector('[data-testid="thread-html-frame"]');
+    if (card && frame && frameHeight(h, pane) !== height && (frame.matches(":hover") || document.activeElement === frame)) holdTop(card);
+    setAsked(h);
+  };
   const failed = !grant.loading && !grant.preview;
   const close = () => {
     setLightbox(false);
@@ -245,7 +254,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
   return (
     <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised" data-testid="thread-html-card">
       <Strip page={page}>{actions(false)}</Strip>
-      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={setAsked} onPageErrors={setErrors} />
+      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={onResize} onPageErrors={setErrors} />
       {lightbox && (
         <Lightbox onClose={close} returnFocus={() => ref.current?.querySelector<HTMLElement>('[data-testid="thread-html-expand"]') ?? null}>
           <Strip page={page} big>
@@ -256,7 +265,7 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
             </Button>
           </Strip>
           {grant.preview && !source ? (
-            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setBoxErrors} testId="thread-html-lightbox-frame" />
+            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setBoxErrors} onKey={close} testId="thread-html-lightbox-frame" />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">
               <CardBody threadId={threadId} page={page} grant={grant} source={source} height={Math.max(height, 2000)} version={version} />
@@ -272,9 +281,12 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
  * The page over the whole window (sidebar, thread and side panel), below the title band so
  * the traffic lights stay clear, dimming the rest; Esc, Close or a click on the dimmed edge
  * closes it, and its frame goes with it. Opening moves focus to Close, not the frame: keys
- * inside the frame never reach the app (it is another document), so Esc and ⌘[ work only
- * while focus is outside it; Close stays one click or Tab away. Closing hands focus back to
- * the card's Expand button (returnFocus). docs/notes/inline-html-2-fixes.md.
+ * inside the frame never reach the app (it is another document), so ⌘[ works only while
+ * focus is outside it; Close stays one click or Tab away. Esc inside the frame closes it
+ * too when the page loads /cf/bridge.js and nothing in the page consumed it: the bridge
+ * forwards it as `cf:key` and the lightbox's frame (never the card's) hears it
+ * (docs/notes/page-library-fixes-b.md). Closing hands focus back to the card's Expand
+ * button (returnFocus). docs/notes/inline-html-2-fixes.md.
  */
 function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; returnFocus: () => HTMLElement | null; children: ReactNode }) {
   const close = useRef(onClose);

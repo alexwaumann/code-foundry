@@ -4,7 +4,7 @@ import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { isThemeAck, resizeHeight } from "./previewGrant";
+import { isThemeAck, pageKey, resizeHeight } from "./previewGrant";
 
 /**
  * The sandbox of a frame with no owning thread (a File tab on an arbitrary HTML file):
@@ -67,6 +67,8 @@ export const THEME_ACK_MS = 300;
  * script), never with another. A frame navigated to another URL, another page's grant
  * included, loses the fragment and with it the bridge. Replies go to that window and
  * origin. A change of owning thread reloads the frame (its sandbox changes with it).
+ * `onKey` hears this frame's own `{ type: "cf:key", key: "Escape" }`, with its nonce only:
+ * Escape the page left alone (the lightbox closes on it; docs/notes/page-library-fixes-b.md).
  * `onPageErrors` hears the errors the bridge answered the frame's document with
  * (lib/pageErrors.ts; deduped, the latest few), and [] again on each load and on unmount.
  */
@@ -79,6 +81,7 @@ export function HtmlFrame({
   testId,
   thread = null,
   onPageErrors,
+  onKey,
 }: {
   url: string;
   name: string;
@@ -89,6 +92,8 @@ export function HtmlFrame({
   onResize?: (height: number) => void;
   /** The errors the page's bridge answered, for its strip (components/files/PageErrors.tsx). */
   onPageErrors?: (errors: readonly PageError[]) => void;
+  /** Escape pressed in the page and not consumed there (its bridge forwards it). */
+  onKey?: (key: "Escape") => void;
   testId: string;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -192,8 +197,10 @@ export function HtmlFrame({
     };
   }, [thread, target, report]);
   const resizeRef = useRef(onResize);
+  const keyRef = useRef(onKey);
   useEffect(() => {
     resizeRef.current = onResize;
+    keyRef.current = onKey;
   });
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -206,6 +213,11 @@ export function HtmlFrame({
       const h = resizeHeight(e.data);
       if (h !== null) {
         if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h);
+        return;
+      }
+      const key = pageKey(e.data);
+      if (key !== null) {
+        if (nonceMatches(e.data, nonce)) keyRef.current?.(key);
         return;
       }
       if (nonceMatches(e.data, nonce)) host.current?.receive(e.data);
