@@ -15,9 +15,13 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await row(page, "s:s-2").click();
   await button.click();
 
-  // The selected thread's project is highlighted first; Enter picks it.
+  // No project is highlighted first, not the selected thread's project; a search
+  // highlights its top hit and Enter picks it.
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
+  await expect(palette.getByTestId("picker-no-project")).toHaveAttribute("data-selected", "true");
+  await expect(palette.locator('[data-project="repo-gp"]')).toHaveAttribute("data-selected", "false");
+  await page.keyboard.type("ghostty");
   await expect(palette.locator('[data-project="repo-gp"]')).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("Enter");
   await expect(palette).toHaveCount(0);

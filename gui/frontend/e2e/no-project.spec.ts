@@ -9,24 +9,23 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("No project: picker row last, composer without worktree, thread placed nowhere", async ({ page }) => {
+test("No project: picker row first, composer without worktree, thread placed nowhere", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
-  const items = palette.locator("[cmdk-item]");
+  const items = palette.getByTestId("picker-rows").locator("[cmdk-item]");
   const noProject = page.getByTestId("picker-no-project");
-  // After the projects (only "Add a project…" follows), with ~ and no cmd+number
-  // shortcut; the first row stays highlighted.
-  await expect(items.last()).toHaveAttribute("data-testid", "picker-add-project");
-  await expect(items.nth(-2)).toHaveAttribute("data-testid", "picker-no-project");
-  await expect(noProject).toHaveText("No project~");
-  await expect(items.first()).toHaveAttribute("aria-selected", "true");
-  // Searchable by name ("Add a project…" always shows).
-  await page.keyboard.type("no proj");
-  await expect(items).toHaveCount(2);
+  // The list's first row, with ~ and cmd+1, highlighted; "Add a project…" is pinned below the list.
+  await expect(items.first()).toHaveAttribute("data-testid", "picker-no-project");
+  await expect(noProject).toHaveText("No project~⌘1");
   await expect(noProject).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Enter");
+  await expect(palette.locator("[cmdk-item]").last()).toHaveAttribute("data-testid", "picker-add-project");
+  // Searchable by name; cmd+1 is the top hit.
+  await page.keyboard.type("no proj");
+  await expect(items).toHaveCount(1);
+  await expect(noProject).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Meta+1");
   await expect(palette).toHaveCount(0);
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
@@ -65,7 +64,12 @@ test("No project: picker row last, composer without worktree, thread placed nowh
   expect(shell?.context).toMatchObject({ activeProjectId: "", activeWorktreePath: "" });
   expect(shell?.context?.activeThreadId).toMatch(/^s-new-/);
 
-  // cmd+N from the thread still opens the picker (home is never sent as a worktree).
+  // cmd+N from the thread still opens the picker (home is never sent as a worktree), and
+  // Enter right away starts another no-project thread.
   await page.keyboard.press("Meta+n");
   await expect(palette).toHaveAttribute("data-mode", "projects");
+  await expect(noProject).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(palette).toHaveCount(0);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
 });

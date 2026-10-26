@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
+import { composeProject, invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
@@ -617,10 +617,7 @@ test("a follow-up takes a PDF: a tile, a chip with its pages, sent as [PDF: …]
 
 test("a first message's PDFs: an inline chip with its pages, an unreferenced PDF tile, both open the paged preview", async ({ page }) => {
   await openApp(page);
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page);
   const input = page.getByTestId("composer-file-input");
   // Into the empty prompt: a tile only, so the message does not refer to it.
   await input.setInputFiles([{ name: "notes.pdf", mimeType: "application/pdf", buffer: testPdf(1) }]);

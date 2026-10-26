@@ -112,6 +112,19 @@ export async function openApp(page: Page): Promise<void> {
 }
 
 /**
+ * cmd+N, then the nth project row of the picker (registry order, whatever the rows above
+ * it: No project and the workspaces): that project's composer, its prompt focused.
+ */
+export async function composeProject(page: Page, n = 1): Promise<void> {
+  await page.keyboard.press("Meta+n");
+  const palette = page.getByTestId("palette");
+  await expect(palette).toHaveAttribute("data-mode", "projects");
+  await palette.locator("[data-project]").nth(n - 1).click();
+  await expect(palette).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+}
+
+/**
  * Opens the Add Project dialog (project.add) the way a user without a shortcut does: the
  * sidebar's New thread button, then the project picker's "Add a project…" row.
  */

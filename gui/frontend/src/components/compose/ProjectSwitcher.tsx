@@ -10,7 +10,7 @@ import { useUiStore } from "@/stores/ui";
 /**
  * The composer heading's name (the workspace's, the project's, or "N projects") as a
  * button that opens the project set picker: a multi-select over the same rows as cmd+N's
- * picker (ProjectRows; "No project" last). A workspace row makes its members the set and
+ * picker, grouped (ProjectRowGroups: workspaces, projects, "No project" last). A workspace row makes its members the set and
  * the thread's reference (picked again, it drops the reference); a project row toggles
  * that project; both keep the popover open, and the rows of the set are checked. "No
  * project" moves the draft to the no-project composer (stores/compose switchDraftTarget)

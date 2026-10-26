@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Workspaces v2 in the GUI (docs/notes/workspaces-v2-3-composer.md): the composer's
@@ -32,12 +32,9 @@ function chips(page: Page) {
   return page.getByTestId("composer-member");
 }
 
-/** The composer for a project from cmd+N, by its cmd+number. */
+/** The composer for a project from cmd+N, the nth project row. */
 async function composeIn(page: Page, n: number): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 /** The heading's set picker (a multi-select popover). */

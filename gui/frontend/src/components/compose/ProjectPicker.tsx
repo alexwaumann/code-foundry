@@ -1,29 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FolderPlus } from "lucide-react";
-import { ProjectRowGroups } from "./ProjectRows";
-import { useProjectRows } from "./useProjectRows";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { NoProjectRow, ProjectRow, WorkspaceRow } from "./ProjectRows";
+import { rankPickerRows, usePickerRows, type PickerRow } from "./useProjectRows";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
-import { draftKey } from "@/lib/compose";
+import { HOME_KEY } from "@/lib/compose";
 import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compose";
 import { addProject } from "@/stores/projectActions";
-import { getUiContext } from "@/stores/context";
-import { useProjectsStore } from "@/stores/projects";
-import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useWorkspacesStore } from "@/stores/workspaces";
 
-/** cmdk value of the empty state's row (project.add). */
+/** cmdk value of the pinned "Add a project…" row (project.add). */
 const ADD_PROJECT_VALUE = "__add-project";
-
-/** The row to highlight first: the active thread's workspace, else the active project. */
-function initialValue(): string | undefined {
-  const ctx = getUiContext();
-  const ws = useThreadsStore.getState().byId[ctx.activeThreadId]?.workspaceId;
-  if (ws && useWorkspacesStore.getState().byId[ws]) return draftKey({ kind: "workspace", workspaceId: ws });
-  const id = ctx.activeProjectId;
-  return id && useProjectsStore.getState().byId[id] ? id : undefined;
-}
 
 const hints = [
   ["↑↓", "Navigate"],
@@ -33,49 +20,61 @@ const hints = [
 ] as const;
 
 /**
- * The palette's project picker: thread.new's presentation in the GUI. Workspaces are
- * listed above projects (ProjectRows), "No project" last; picking any opens the
- * new-thread composer for it. The active thread's workspace, else the project in the
- * current context, is highlighted first; cmd+1..9 pick projects by position. With no
- * projects yet, "Add a project…" comes first and "No project" still starts a thread;
- * with some, it is the last row.
+ * The palette's project picker: thread.new's presentation in the GUI. One flat list, no
+ * headings: "No project" first, then workspaces by name, then projects in registry order;
+ * picking any opens the new-thread composer for it. The picker ranks the rows itself
+ * (cmdk's filtering is off): a query keeps the rows that match, best first
+ * (rankPickerRows), so what is on screen is the one list cmd+1..9 count in: cmd+1 is
+ * always the top row. Opening with an empty query highlights "No project", so Enter
+ * right after cmd+N starts a no-project thread.
+ *
+ * "Add a project…" is pinned below the scrolling rows, never filtered. It stays a cmdk
+ * item inside CommandList (cmdk only moves to and selects items inside it), after the
+ * rows' own scroll region, so the arrow keys reach it last and it wraps with `loop`. With
+ * no projects yet (or none loaded) it is the highlighted row; so is it when a query
+ * matches nothing.
  */
 export function ProjectPicker({ close }: { close: () => void }) {
-  const { workspaces, projects: order, loaded } = useProjectRows();
-  // Highlight what the user was looking at when the picker opened.
-  // With no projects, the empty state's Add a project row.
-  const [initial] = useState(() => initialValue() ?? (useProjectsStore.getState().order.length === 0 ? ADD_PROJECT_VALUE : undefined));
+  const { rows, workspaces, projects, loaded } = usePickerRows();
   const [query, setQuery] = useState("");
+  // The highlighted row (cmdk value) once cmdk has moved it (keys, pointer, a new query);
+  // until then "No project", or Add a project while there are no projects.
+  const [value, setValue] = useState<string | undefined>(undefined);
+  const visible = useMemo(() => rankPickerRows(rows, query), [rows, query]);
 
   const leave = () => {
     // The composer takes focus, not whatever had it before the picker opened.
     useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "content" } }));
     close();
   };
-  const pick = (id: string) => {
+  const pick = (row: PickerRow) => {
     leave();
-    composeIn(id);
+    if (row.kind === "project") composeIn(row.id);
+    else if (row.kind === "workspace") composeInWorkspace(row.id);
+    else composeNoProject();
   };
-  const pickWorkspace = (id: string) => {
-    leave();
-    composeInWorkspace(id);
-  };
-  const pickNoProject = () => {
-    leave();
-    composeNoProject();
+  const rowFor = (row: PickerRow, index: number) => {
+    const onPick = () => {
+      pick(row);
+    };
+    if (row.kind === "project") return <ProjectRow key={row.value} id={row.id} index={index} current={false} onPick={onPick} />;
+    if (row.kind === "workspace") return <WorkspaceRow key={row.value} id={row.id} index={index} current={false} onPick={onPick} />;
+    return <NoProjectRow key={row.value} index={index} current={false} onPick={onPick} />;
   };
 
   return (
     <Command
       loop
-      defaultValue={initial}
+      shouldFilter={false}
+      value={value ?? (loaded && projects.length > 0 ? HOME_KEY : ADD_PROJECT_VALUE)}
+      onValueChange={setValue}
       data-testid="palette"
       data-mode="projects"
       onKeyDown={(e) => {
         if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) {
-          const id = order[Number(e.key) - 1];
+          const row = visible[Number(e.key) - 1];
           e.preventDefault();
-          if (id) pick(id);
+          if (row) pick(row);
           return;
         }
         if (e.key === "Backspace" && query === "") {
@@ -91,57 +90,31 @@ export function ProjectPicker({ close }: { close: () => void }) {
         placeholder={workspaces.length > 0 ? "Search workspaces and projects…" : "Search projects…"}
         aria-label={workspaces.length > 0 ? "Search workspaces and projects" : "Search projects"}
       />
-      <CommandList>
-        <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
-        {loaded && order.length === 0 && (
-          // The empty state's way forward: the Add Project dialog (project.add).
-          <CommandGroup heading="No projects yet">
-            <CommandItem
-              forceMount
-              value={ADD_PROJECT_VALUE}
-              onSelect={() => {
-                close();
-                addProject();
-              }}
-              data-testid="picker-add-project"
-              className="gap-3 py-2"
-            >
-              <FolderPlus />
-              Add a project…
-            </CommandItem>
-          </CommandGroup>
-        )}
-        <ProjectRowGroups
-          workspaces={workspaces}
-          projects={order}
-          soloHeading="New thread in…"
-          shortcuts
-          onPickProject={pick}
-          onPickWorkspace={pickWorkspace}
-          onPickNoProject={loaded ? pickNoProject : undefined}
-        />
-        {loaded && order.length > 0 && (
-          // The way to a project that is not listed yet: the Add Project dialog (project.add),
-          // last, under a border. Always shown, so a search that finds nothing still offers it.
-          <CommandGroup forceMount className="border-t">
-            <CommandItem
-              forceMount
-              value={ADD_PROJECT_VALUE}
-              onSelect={() => {
-                close();
-                addProject();
-              }}
-              data-testid="picker-add-project"
-              className="gap-3 py-2"
-            >
-              <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-cf-text-muted">
-                <FolderPlus className="size-4" />
-              </span>
-              <span className="truncate font-medium">Add a project…</span>
-              <span className="truncate text-caption">a folder on this Mac, or from GitHub</span>
-            </CommandItem>
-          </CommandGroup>
-        )}
+      {/* Not the scroll region itself: that is the rows' div, so Add a project stays put below it. */}
+      <CommandList className="max-h-none overflow-visible">
+        <div className="max-h-[min(420px,60vh/var(--cf-zoom))] scroll-py-1 overflow-x-hidden overflow-y-auto" data-testid="picker-rows">
+          <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
+          {visible.length > 0 && <div className="p-1">{visible.map(rowFor)}</div>}
+        </div>
+        {/* The way to a project that is not listed yet: the Add Project dialog (project.add). */}
+        <div className="border-t p-1">
+          <CommandItem
+            forceMount
+            value={ADD_PROJECT_VALUE}
+            onSelect={() => {
+              close();
+              addProject();
+            }}
+            data-testid="picker-add-project"
+            className="gap-3 py-2"
+          >
+            <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-cf-text-muted">
+              <FolderPlus className="size-4" />
+            </span>
+            <span className="truncate font-medium">Add a project…</span>
+            <span className="truncate text-caption">a folder on this Mac, or from GitHub</span>
+          </CommandItem>
+        </div>
       </CommandList>
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-caption-sm" data-testid="picker-hints">
         {hints.map(([key, label]) => (

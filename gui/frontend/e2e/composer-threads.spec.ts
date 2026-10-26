@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { composeProject, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 // Thread tags under "@" (docs/notes/composer-thread-pr-tags.md): a "Threads" group above
 // "Files" lists up to three active threads by name (not archived, not snoozed, never the
@@ -21,13 +21,9 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
 }
 
-/** cmd+n, then cmd+1: the code-foundry composer. */
+/** cmd+n, then the first project row: the code-foundry composer. */
 async function compose(page: Page): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page);
 }
 
 const value = (page: Page) => page.getByTestId("composer-prompt").first();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, openApp, openProjects, resetMock, selectProject } from "./fixtures";
+import { composeProject, invocations, openApp, openProjects, resetMock, selectProject } from "./fixtures";
 
 /**
  * Add-project PR 2: a project without git (the mock's "writing", a plain folder) and a
@@ -16,12 +16,9 @@ async function lastInvocation(name: string) {
   return (await invocations()).filter((i) => i.name === name).at(-1);
 }
 
-/** cmd+n, then cmd+<n> in the project picker. */
+/** cmd+n, then the nth project row of the picker. */
 async function compose(page: Page, n: number): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 test("a project without git: No git on the Projects page, its overview, then Initialize Git", async ({ page }) => {
