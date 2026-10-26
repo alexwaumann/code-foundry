@@ -375,11 +375,31 @@
     };
   }
 
+  function px(v) {
+    return parseFloat(v) || 0;
+  }
+
+  // The page's height: the body's, with its margins, or further down the margin box of
+  // its last in-flow child. A first or last child's vertical margin collapses out of a body
+  // with no padding or border (ui.css's body has no margin either), and scrollHeight misses
+  // it: `<Card className="m-3">` alone would be cut by 24px. Fixed and absolute children
+  // are left out: an overlay is the frame's height, and scrollHeight counts the rest.
   function measure() {
     var b = document.body;
     if (!b) return 0;
     var cs = window.getComputedStyle(b);
-    var h = b.scrollHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    var h = b.scrollHeight + px(cs.marginTop) + px(cs.marginBottom);
+    var y = window.scrollY || 0;
+    var kids = b.children;
+    for (var i = 0; i < kids.length; i++) {
+      var ks = window.getComputedStyle(kids[i]);
+      if (ks.position === "fixed" || ks.position === "absolute" || ks.display === "none") continue;
+      var edge = kids[i].getBoundingClientRect().bottom + y;
+      var below = px(cs.paddingBottom) + px(cs.borderBottomWidth);
+      // With nothing between them, the child's and the body's bottom margins collapse to the larger.
+      var gap = below > 0 ? px(ks.marginBottom) + below + px(cs.marginBottom) : Math.max(px(ks.marginBottom), px(cs.marginBottom));
+      h = Math.max(h, edge + gap);
+    }
     return Math.ceil(h);
   }
 
