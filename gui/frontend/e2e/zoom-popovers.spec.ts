@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { composeProject, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Floating surfaces under page zoom (CSS zoom on <html>, lib/zoom.ts). Radix positions
@@ -18,10 +18,7 @@ async function setZoom(page: Page, percent: number): Promise<void> {
 }
 
 async function compose(page: Page): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page);
 }
 
 async function rect(l: Locator) {

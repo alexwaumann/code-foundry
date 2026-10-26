@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { composeProject, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
 // the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
@@ -19,13 +19,9 @@ test.beforeEach(async () => {
   await mockPost("thread/archive?id=s-5");
 });
 
-/** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
+/** cmd+n, then the nth project row of the picker: that project's composer. */
 async function compose(page: Page, n = 1): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 /** The prompt as the draft stores it (tags as tokens). */

@@ -37,7 +37,8 @@ test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");
 test("composer: a /skill tag from the card starts a haiku thread that runs the skill", async ({ page }) => {
   await page.goto("/");
   await page.keyboard.press("Meta+n");
-  await page.keyboard.press("Meta+1");
+  // The first project (cmd+1 is No project, the list's top row).
+  await page.getByTestId("palette").locator("[data-project]").first().click();
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await page.getByTestId("composer-model").click();
   await page.getByTestId("composer-model-list").getByRole("option", { name: /Haiku/ }).click();

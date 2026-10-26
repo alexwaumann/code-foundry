@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { composeProject, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 // Pull request tags after "#" (docs/notes/composer-thread-pr-tags.md): the card lists the
 // draft's repositories' pull requests the daemon polls (the mock's dashboards for
@@ -18,11 +18,7 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 async function compose(page: Page): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page);
 }
 
 const value = (page: Page) => page.getByTestId("composer-prompt").first();

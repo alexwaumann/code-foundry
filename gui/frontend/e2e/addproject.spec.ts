@@ -61,14 +61,15 @@ test("every entry point opens the dialog", async ({ page }) => {
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  // The sidebar has no Add project button; New thread's project picker ends with
-  // "Add a project…" under a border, which closes the picker and opens the dialog.
+  // The sidebar has no Add project button; New thread's project picker has "Add a
+  // project…" pinned below its list, which closes the picker and opens the dialog.
   await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
   await page.getByTestId("sidebar-new-thread").click();
   const picker = page.getByTestId("palette");
   await expect(picker).toHaveAttribute("data-mode", "projects");
   const add = picker.locator("[cmdk-item]").last();
   await expect(add).toHaveAttribute("data-testid", "picker-add-project");
+  await expect(picker.getByTestId("picker-rows").getByTestId("picker-add-project")).toHaveCount(0);
   await expect(add).toHaveText("Add a project…a folder on this Mac, or from GitHub");
   await expect(add).not.toHaveAttribute("data-selected", "true");
   await add.click();

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { freshCopyByDefault, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Workspaces v2, fuzz round D fixes for the composer and sidebar
@@ -47,10 +47,7 @@ function chips(page: Page) {
 }
 
 async function composeIn(page: Page, n: number): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 async function pickWorkspaceInHeading(page: Page, workspaceId: string): Promise<void> {

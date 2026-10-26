@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { CF, composeProject, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
@@ -18,13 +18,9 @@ async function staged(): Promise<{ path: string; name: string; mimeType: string;
   return (await res.json()) as { path: string; name: string; mimeType: string; size: number; pages: number }[];
 }
 
-/** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
+/** cmd+n, then the nth project row of the picker: that project's composer. */
 async function compose(page: Page, n = 1): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 /** The prompt as the draft stores it (chips as `![name](cf-attachment://id)` tokens). */
@@ -70,13 +66,26 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     "Local only · ~/src/sketches",
     "No git · ~/Documents/writing",
   ]);
-  await expect(projects.nth(0)).toContainText("⌘1");
-  await expect(projects.nth(2)).toContainText("⌘3");
+  // One list: No project, the workspace, then the projects, numbered in that order.
+  const listed = palette.getByTestId("picker-rows").locator("[cmdk-item]");
+  await expect(listed).toHaveCount(7);
+  await expect(listed.nth(0)).toHaveAttribute("data-testid", "picker-no-project");
+  await expect(listed.nth(0)).toHaveAttribute("aria-selected", "true");
+  await expect(listed.nth(1)).toHaveAttribute("data-workspace", /.+/);
+  await expect(palette.locator("[cmdk-group-heading]")).toHaveCount(0);
+  await expect(listed.nth(0)).toContainText("⌘1");
+  await expect(projects.nth(0)).toContainText("⌘3");
+  await expect(projects.nth(2)).toContainText("⌘5");
   await expect(page.getByTestId("picker-hints")).toHaveText(/↑↓\s*Navigate\s*Enter\s*Select\s*Backspace\s*Back\s*Esc\s*Close/);
-  // The search box filters.
-  await page.keyboard.type("ghostty");
-  await expect(projects).toHaveCount(1);
-  await page.keyboard.press("Meta+1"); // by position in the full list, not the filtered one
+  // The search box filters and ranks across workspaces and projects: code-foundry's own
+  // name beats the workspace that has it as a member, and Add a project stays pinned.
+  await page.keyboard.type("foundry");
+  await expect(listed).toHaveCount(2);
+  await expect(listed.nth(0)).toHaveAttribute("data-project", "repo-cf");
+  await expect(listed.nth(0)).toContainText("⌘1");
+  await expect(listed.nth(1)).toHaveAttribute("data-workspace", /.+/);
+  await expect(palette.getByTestId("picker-add-project")).toBeVisible();
+  await page.keyboard.press("Meta+1"); // the top row of the list on screen
   await expect(palette).toHaveCount(0);
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
@@ -446,10 +455,11 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("composer")).toHaveCount(0);
 
-  // Back through the picker: the selected project is highlighted, Backspace returns to the commands.
+  // Back through the picker: No project is highlighted (not the selected project), Backspace returns to the commands.
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-project="repo-cf"]')).toHaveAttribute("data-selected", "true");
+  await expect(palette.getByTestId("picker-no-project")).toHaveAttribute("data-selected", "true");
+  await expect(palette.locator('[data-project="repo-cf"]')).toHaveAttribute("data-selected", "false");
   await page.keyboard.press("Backspace");
   await expect(palette).toHaveAttribute("data-mode", "commands");
   // Picking thread.new in the palette shows the picker again, not model/effort prompts.

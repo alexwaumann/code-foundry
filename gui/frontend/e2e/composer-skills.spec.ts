@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockUrl, openApp, resetMock } from "./fixtures";
+import { composeProject, invocations, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The mock's skills (mock/filesystem.ts): every project has deploy ("Ship the current
 // branch to staging.") and review; the user has commit.
@@ -8,13 +8,9 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
+/** cmd+n, then the nth project row of the picker: that project's composer. */
 async function compose(page: Page, n = 1): Promise<void> {
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press(`Meta+${String(n)}`);
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page, n);
 }
 
 /** The prompt as the draft stores it (tags as tokens). */

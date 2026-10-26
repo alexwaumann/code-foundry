@@ -1,5 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
 import { Check, House, Layers } from "lucide-react";
+import { byName, NO_PROJECT_TERMS, projectSearchTerms } from "./useProjectRows";
 import { CommandGroup, CommandItem, CommandSeparator, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
 import { draftKey, HOME_KEY, projectHue, projectInitials, projectSource } from "@/lib/compose";
@@ -9,10 +10,10 @@ import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
- * The rows the project pickers list (cmd+N's ProjectPicker and the composer heading's
- * ProjectSwitcher): workspaces above projects, each with its badge and a muted detail
- * line, then "No project" last. One place for the markup and the order; the pickers add
- * their own chrome.
+ * The rows the project pickers list: one place for their markup. cmd+N's ProjectPicker
+ * shows them as one flat ranked list ("No project", workspaces, projects, each with its
+ * cmd+number); the composer heading's ProjectSwitcher groups them (ProjectRowGroups:
+ * workspaces above projects, "No project" last). The pickers add their own chrome.
  */
 
 /** Two-letter badge with a hue hashed from the project name. */
@@ -46,7 +47,14 @@ function CurrentMark() {
   return <Check aria-label="Current" className="ml-auto size-3.5 shrink-0 text-cf-text-muted" data-testid="picker-current" />;
 }
 
-function ProjectRow({ id, index, current, onPick }: { id: string; index?: number; current: boolean; onPick: (id: string) => void }) {
+/** The cmd+number hint on one of the first nine rows (the picker handles the keys). */
+function RowShortcut({ index }: { index?: number }) {
+  if (index === undefined || index >= 9) return null;
+  return <CommandShortcut>{formatChord(`cmd+${String(index + 1)}`)}</CommandShortcut>;
+}
+
+/** A project's row. `index`: its position in the list, for a cmd+number hint. */
+export function ProjectRow({ id, index, current, onPick }: { id: string; index?: number; current: boolean; onPick: (id: string) => void }) {
   const name = useProjectsStore((s) => s.byId[id]?.name ?? id);
   const path = useProjectsStore((s) => s.byId[id]?.path ?? "");
   const source = useProjectsStore((s) => {
@@ -56,7 +64,7 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
   return (
     <CommandItem
       value={id}
-      keywords={[name, path, source]}
+      keywords={projectSearchTerms(name, path, source)}
       onSelect={() => {
         onPick(id);
       }}
@@ -72,16 +80,17 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
         </span>
       </span>
       {current && <CurrentMark />}
-      {index !== undefined && index < 9 && <CommandShortcut>{formatChord(`cmd+${String(index + 1)}`)}</CommandShortcut>}
+      <RowShortcut index={index} />
     </CommandItem>
   );
 }
 
-function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; onPick: (id: string) => void }) {
+/** A workspace's row: its name over its member projects. `index` as for ProjectRow. */
+export function WorkspaceRow({ id, index, current, onPick }: { id: string; index?: number; current: boolean; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
   // Member project names by name, case-insensitively (projects the store does not know show their id).
-  const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))));
+  const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r).sort(byName)));
   return (
     <CommandItem
       value={workspaceValue(id)}
@@ -104,38 +113,38 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
         </span>
       </span>
       {current && <CurrentMark />}
+      <RowShortcut index={index} />
     </CommandItem>
   );
 }
 
 /**
- * A thread without a project: it runs in the home directory (`~`). Never a cmd+number
- * shortcut, so Enter right after cmd+N still picks the first project. Its cmdk value is
- * the home target's draftKey.
+ * A thread without a project: it runs in the home directory (`~`). Its cmdk value is the
+ * home target's draftKey. In cmd+N's list it is an ordinary row (first by default, so
+ * Enter right after cmd+N starts a no-project thread); `index` as for ProjectRow.
  */
-function NoProjectRow({ current, onPick }: { current: boolean; onPick: () => void }) {
+export function NoProjectRow({ index, current, onPick }: { index?: number; current: boolean; onPick: () => void }) {
   return (
-    <CommandItem value={HOME_KEY} keywords={[NO_PROJECT, "home", "~"]} onSelect={onPick} data-testid="picker-no-project" data-current={current || undefined} className="gap-3 py-2">
+    <CommandItem value={HOME_KEY} keywords={[...NO_PROJECT_TERMS]} onSelect={onPick} data-testid="picker-no-project" data-current={current || undefined} className="gap-3 py-2">
       <NoProjectBadge />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{NO_PROJECT}</span>
         <span className="truncate text-caption">~</span>
       </span>
       {current && <CurrentMark />}
+      <RowShortcut index={index} />
     </CommandItem>
   );
 }
 
 /**
- * The "Workspaces" group (when there are any) above the projects. The projects' heading
- * is "Projects" next to workspaces, else `soloHeading` (none when omitted). With
+ * The composer ProjectSwitcher's grouped rows: the "Workspaces" group (when there are any)
+ * above the projects, whose heading is "Projects" next to workspaces (none alone). With
  * `onPickNoProject`, a "No project" row after them all, below a separator.
  */
 export function ProjectRowGroups({
   workspaces,
   projects,
-  soloHeading,
-  shortcuts = false,
   checked = () => false,
   onPickProject,
   onPickWorkspace,
@@ -143,9 +152,6 @@ export function ProjectRowGroups({
 }: {
   workspaces: readonly string[];
   projects: readonly string[];
-  soloHeading?: string;
-  /** cmd+1..9 hints on the first nine projects (the picker handles the keys). */
-  shortcuts?: boolean;
   /** Whether a row (its cmdk value: a draftKey) gets a check: the current target, or what the composer's set has. */
   checked?: (value: string) => boolean;
   onPickProject: (id: string) => void;
@@ -162,9 +168,9 @@ export function ProjectRowGroups({
         </CommandGroup>
       )}
       {projects.length > 0 && (
-        <CommandGroup heading={workspaces.length > 0 ? "Projects" : soloHeading}>
-          {projects.map((id, i) => (
-            <ProjectRow key={id} id={id} index={shortcuts ? i : undefined} current={checked(id)} onPick={onPickProject} />
+        <CommandGroup heading={workspaces.length > 0 ? "Projects" : undefined}>
+          {projects.map((id) => (
+            <ProjectRow key={id} id={id} current={checked(id)} onPick={onPickProject} />
           ))}
         </CommandGroup>
       )}

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { composeProject, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -219,10 +219,7 @@ test("headerless panes (start page, composer) drag the window from the same 44px
   };
   await expect(page.getByTestId("start-page")).toBeVisible();
   await check('[data-testid="start-page"] ~ [data-testid="pane-drag-band"]', '[data-testid="welcome-actions"]');
-  await page.keyboard.press("Meta+n");
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await composeProject(page);
   await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
 });
 
