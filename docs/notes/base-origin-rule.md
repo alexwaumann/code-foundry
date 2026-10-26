@@ -80,3 +80,9 @@ the local branch is used. A remote-tracking ref typed explicitly (`origin/x`,
   origin only, both with either newer, and another remote).
 * API: `TestProjectListRefsAndCreateFetch` maps the new fields;
   `TestProjectBaseFromOrigin` checks the default ref no longer depends on the setting.
+* e2e: `compose.spec.ts` and `settings.spec.ts` pass against the mock.
+* Not run end to end against a daemon: this build's scratch repos had to live under
+  `/tmp`, and `project add` only takes folders under home. The store tests above use
+  real git repositories (bare origin, a second clone pushing) through
+  `Store.CreateWorktree`, the same call every daemon caller makes; the callers' wiring
+  of the setting and flag is unchanged.
