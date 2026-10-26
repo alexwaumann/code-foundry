@@ -126,9 +126,9 @@ product. Plain HTML pages are unchanged.
 | react-dom-client.js | 208,061 (64,253) |
 | jsx-runtime.js | 122 (128) |
 | ui.js | 321,201 (84,116) |
-| ui.css | 109,789 (16,959) |
+| ui.css | 109,111 (16,871) |
 | icons.js | 749,312 (182,187) |
-| jsx.js | 204,756 (46,917) |
+| jsx.js | 204,761 (46,901) |
 | tailwind.js | 291,524 (75,598) |
 | chunks/ (5 files) | 18,266 |
 

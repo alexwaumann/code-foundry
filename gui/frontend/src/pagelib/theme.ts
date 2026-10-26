@@ -69,7 +69,7 @@ export function pageSafelist(indexCss: string): string {
     `{fill,stroke}-{${colours}}`,
     `{bg,text,border}-{background,foreground,card,card-foreground,popover,muted,muted-foreground,primary,primary-foreground,secondary,accent,destructive,border}`,
     `{${typeRoleNames(indexCss).join(",")}}`,
-    "rounded{,-t,-b,-l,-r}-{none,sm,md,lg,pane,2xl,full}",
+    "rounded-{sm,md,lg,pane,2xl,full} rounded-{t,b,l,r}-{sm,md,lg,pane,2xl}",
     "{block,inline-block,inline,flex,inline-flex,grid,inline-grid,contents,hidden,table}",
     "flex-{row,col,wrap,1,auto,none} {grow,shrink,shrink-0,grow-0}",
     "items-{start,center,end,stretch,baseline} justify-{start,center,end,between,around,evenly} self-{start,center,end,stretch} content-{start,center,between}",

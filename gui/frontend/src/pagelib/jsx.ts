@@ -48,7 +48,8 @@ let box: HTMLElement | null = null;
 
 /**
  * Shows an error in the page and logs it: one box at the top of the body, in the flow, so
- * the card grows to show it (a fixed box would sit outside a short card), newest last.
+ * the card grows to show it (a fixed box would sit outside a short card), newest last. In
+ * the theme's error colours; a page without /cf/theme.css (a mockup) gets the system's.
  */
 function report(title: string, detail: string, err?: unknown): void {
   console.error("cf/jsx: " + title + "\n" + detail, err ?? "");
@@ -58,8 +59,8 @@ function report(title: string, detail: string, err?: unknown): void {
     box.setAttribute("role", "alert");
     box.style.cssText =
       "position:relative;z-index:2147483647;margin:8px;padding:10px 12px;overflow:auto;" +
-      "border:1px solid var(--cf-error,#d1242f);border-radius:6px;background:var(--cf-error-surface,#fff0f0);" +
-      "color:var(--cf-error-text,#82071e);font:12px/1.45 ui-monospace,'SF Mono',Menlo,monospace;white-space:pre-wrap";
+      "border:1px solid var(--cf-error,CanvasText);border-radius:6px;background:var(--cf-error-surface,Canvas);" +
+      "color:var(--cf-error-text,CanvasText);font:12px/1.45 ui-monospace,'SF Mono',Menlo,monospace;white-space:pre-wrap";
     ((document.body as HTMLElement | null) ?? root).prepend(box);
   }
   const entry = document.createElement("div");
