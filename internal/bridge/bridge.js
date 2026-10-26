@@ -350,12 +350,30 @@
     });
   }
 
+  // The scheme a page pinned with /cf/theme.css?scheme=light (or dark), or "".
+  function pinnedScheme() {
+    var link = document.querySelector('link[href*="/cf/theme.css"]');
+    var m = link && /[?&]scheme=(dark|light)\b/.exec(link.getAttribute("href") || "");
+    return m ? m[1] : "";
+  }
+
   // The new slots on :root, over the stylesheet's, so a page that only links /cf/theme.css
-  // repaints without the reload a missing ack would cost it.
+  // repaints without the reload a missing ack would cost it. A page pinned to a scheme keeps
+  // its stylesheet's slots while the app shows the other (cf.theme still says what it shows).
   function applyTheme(t) {
     if (!t || typeof t !== "object") return;
     cf.theme = { id: t.id, scheme: t.scheme, vars: t.vars || {} };
     var root = document.documentElement;
+    var pinned = pinnedScheme();
+    if (pinned && pinned !== t.scheme) {
+      if (root) {
+        Object.keys(t.vars || {}).forEach(function (k) {
+          if (k.indexOf("--") === 0) root.style.removeProperty(k);
+        });
+        root.style.colorScheme = "";
+      }
+      return;
+    }
     if (root && t.vars && typeof t.vars === "object") {
       Object.keys(t.vars).forEach(function (k) {
         if (k.indexOf("--") === 0) root.style.setProperty(k, String(t.vars[k]));

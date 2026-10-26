@@ -192,6 +192,24 @@ func (l *Live) CSS() string {
 	return b.String()
 }
 
+// PinnedCSS is /cf/theme.css?scheme=<scheme>, for a page that is always light or always
+// dark (docs/notes/page-library-fixes-a.md): the published theme when it is of that scheme,
+// else that scheme's default, then frame.css. The bridge leaves such a page's slots alone
+// when the app switches to the other scheme.
+func (l *Live) PinnedCSS(scheme string) string {
+	var b strings.Builder
+	if f, ok := l.Current(); ok && f.Scheme == scheme {
+		b.WriteString("/* Code Foundry theme: " + f.ID + " (" + f.Scheme + "), published by the GUI, pinned to " + scheme + ". */\n")
+		writeRoot(&b, f, "")
+	} else {
+		f := DefaultFrame(scheme)
+		b.WriteString("/* Code Foundry theme: " + f.ID + ", the " + scheme + " default, pinned. */\n")
+		writeRoot(&b, f, "")
+	}
+	b.WriteString(frameCSS)
+	return b.String()
+}
+
 func writeRoot(b *strings.Builder, f Frame, indent string) {
 	b.WriteString(indent + ":root {\n")
 	b.WriteString(indent + "  color-scheme: " + f.Scheme + ";\n")
@@ -217,7 +235,8 @@ func (l *Live) JSON() FrameJSON {
 	return FrameJSON{Frame: DefaultFrame(SchemeDark)}
 }
 
-// FrameHandler serves GET /cf/theme.css and /cf/theme.json from live; any other path under
+// FrameHandler serves GET /cf/theme.css (?scheme=dark or light pins it, PinnedCSS) and
+// /cf/theme.json from live; any other path under
 // /cf/ is 404. It needs no credential (an <iframe>'s stylesheet link sends no header) and
 // reveals only colours. Never cached (a theme change must reach the next load), any origin
 // (the preview's pages are opaque-origin and may fetch the JSON).
@@ -238,7 +257,11 @@ func FrameHandler(live *Live) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		if r.URL.Path == FrameCSSPath {
 			h.Set("Content-Type", "text/css; charset=utf-8")
-			_, _ = w.Write([]byte(live.CSS()))
+			css := live.CSS()
+			if s := r.URL.Query().Get("scheme"); s == SchemeDark || s == SchemeLight {
+				css = live.PinnedCSS(s)
+			}
+			_, _ = w.Write([]byte(css))
 			return
 		}
 		body, err := json.Marshal(live.JSON())
