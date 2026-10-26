@@ -34,7 +34,7 @@ func tierInterval(p Presence) time.Duration {
 
 // nextInterval is the time from the end of one poll to the start of the next: the
 // configured interval (a floor every tier respects), stretched to the presence tier's
-// interval, and to idleInterval when nothing is tracked or watched.
+// interval, and to idleInterval when only the viewer is polled (isIdle).
 func nextInterval(cfg Config, p Presence, idle bool, idleInterval time.Duration) time.Duration {
 	d := max(cfg.PollInterval, tierInterval(p))
 	if idle {
@@ -67,7 +67,7 @@ func (s *Store) PresenceChanged(from, to Presence) {
 	cfg := s.config()
 	now := s.opts.Now()
 	s.mu.Lock()
-	idle := len(s.tracked) == 0 && len(s.watches) == 0 && len(s.prWatches) == 0
+	idle := isIdle(cfg, len(s.tracked), len(s.watches)+len(s.prWatches))
 	interval := nextInterval(cfg, to, idle, s.opts.IdleInterval)
 	soon := false
 	if to > from {

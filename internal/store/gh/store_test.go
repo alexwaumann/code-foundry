@@ -541,10 +541,11 @@ func TestStoreTrackRefreshUntrack(t *testing.T) {
 	s := startStore(t, testOptions(openTestDB(t), f, b))
 	ctx := context.Background()
 
-	// With nothing tracked, the first poll fetches only the viewer.
-	waitFor(t, "idle poll", func() bool { return !s.Snapshot().Poll.FetchedAt.IsZero() })
-	if c, _ := f.snapshot(); len(c) != 1 || c[0].vars["q_authored"] != nil || c[0].vars["r0o"] != nil {
-		t.Errorf("idle poll = %+v", c)
+	// With nothing tracked, the first poll fetches the viewer and the dashboards, no
+	// repository.
+	waitFor(t, "first poll", func() bool { return !s.Snapshot().Poll.FetchedAt.IsZero() })
+	if c, _ := f.snapshot(); len(c) != 1 || c[0].vars["q_authored"] == nil || c[0].vars["r0o"] != nil {
+		t.Errorf("first poll = %+v", c)
 	}
 
 	// Tracking announces the tracked flag (dashboard filter and repo activity) and

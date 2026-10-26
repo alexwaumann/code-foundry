@@ -17,8 +17,9 @@ Now the interval after each poll depends on whether anyone is looking:
 | none | no GUI client (only the CLI, or nothing) | `DefaultNoGUIInterval`, 15 min |
 
 `nextInterval(cfg, presence, idle, idleInterval)` (`internal/store/gh/presence.go`) is
-`max(configured, tier)`, then `max(that, IdleInterval)` when nothing is tracked or
-watched. The configured interval is a floor, so a 20 min setting is never shortened. The
+`max(configured, tier)`, then `max(that, IdleInterval)` when dashboards are off and
+nothing is tracked or watched (since `prs-inbox-1-daemon.md`; it was "nothing tracked or
+watched" before). The configured interval is a floor, so a 20 min setting is never shortened. The
 stats-deferred case (interval 0 right after the viewer's id arrives) is unchanged.
 
 **Signal.** `WatchEventsRequest` gained `client_kind` (unspecified, gui, cli),

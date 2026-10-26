@@ -21,6 +21,14 @@ page on it.
   `ReviewEntryView.commitSha: string` in `gui/frontend/src/api/gh.ts`.
 * Merged and closed PRs are fetched with the summary only, so they have no latest
   reviews and nothing changes for them. `partial` is unaffected.
+* The dashboard searches no longer wait for a tracked repository. With
+  `github.dashboards_enabled` on, they run at the normal interval even with no project
+  (`planPoll` in `poll.go`). The poll is "idle" (the viewer alone, every
+  `IdleInterval`, 10 min) only when dashboards are off and nothing is tracked or
+  watched. That is `isIdle`, shared by `planPoll` and `PresenceChanged`. The monthly
+  stats still need a tracked repository (`statsDue`), unchanged: the page's charts stay
+  empty for a user with no project. `gh-viewer-polling.md` and `gh-poll-tiers.md` say
+  so now.
 * Wording: the pages skill's `gh` source (`reference/sources.md`) now says the lists
   are the user's PRs in any repository; the PLAN.md known issue about filtering at
   read time is updated.
@@ -71,10 +79,9 @@ exercised live; a dismissal is a timeline event and bumps `updatedAt` like a rev
 
 ## Gotchas for PR 2
 
-* Dashboards are polled only while at least one project is tracked
-  (`cfg.Dashboards && len(tracked) > 0` in `poll.go`). A user with no projects gets
-  empty lists whatever the filter. Left unchanged here (it decides whether GitHub is
-  polled at all); PR 2 or a follow-up should decide whether the inbox needs it lifted.
+* A signed-in user with no projects now polls GitHub every interval (4 searches plus
+  details), where before it polled only the viewer every 10 minutes. Turning dashboards
+  off restores the old cadence.
 * Until PR 2 lands, the current page's "tracked only" view gets the full lists, since
   the daemon no longer filters. Accepted: the GUI and daemon always ship together.
 * The e2e mock daemon (`gui/frontend/mock/github.ts` `getDashboard`) still filters on
@@ -95,6 +102,11 @@ exercised live; a dismissal is a timeline event and bumps `updatedAt` like a rev
   `TestCacheReviewCommits` covers the old-row decode and the round trip.
   `TestGhDashboardListsEveryRepository` replaces the tracked-filter test and checks
   `commit_sha` on the wire. The fake GitHub renders review commits.
+  `TestPollDashboardsWithNothingTracked` checks both cases with no repository tracked:
+  dashboards on gives filled lists at the poll interval, off gives the viewer alone at
+  the idle interval. `TestPresenceChangedDashboardsNotIdle` checks that a rise with
+  nothing tracked polls soon. The branch-watch and track tests now expect the dashboard
+  searches in a poll with nothing tracked.
 * End to end: a scratch daemon (`CODE_FOUNDRY_HOME=/tmp/…`,
   `CODE_FOUNDRY_GH_SEARCH_AS=mitchellh`, one project tracked: alexwaumann/code-foundry),
   `GhService/GetDashboard` called as Connect JSON over the unix socket with curl.

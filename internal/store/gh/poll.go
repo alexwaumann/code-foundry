@@ -104,8 +104,11 @@ func (s *Store) runPoll(ctx context.Context, cfg Config, plan *pollPlan, idle bo
 	return nil
 }
 
-// planPoll decides what this poll asks for. idle is set when nothing is tracked or
-// watched (only the viewer is fetched, at least every IdleInterval; see nextInterval).
+// planPoll decides what this poll asks for. The dashboard searches run whenever
+// dashboards are enabled, tracked repositories or not (the Pull Requests page is the
+// viewer's inbox across GitHub). idle is set when dashboards are off and nothing is
+// tracked or watched (only the viewer is fetched, at least every IdleInterval; see
+// nextInterval).
 func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	s.mu.Lock()
 	tracked := slices.Sorted(maps.Keys(s.tracked))
@@ -139,7 +142,7 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	if s.opts.SearchAs != "" && s.searchAsID == "" {
 		plan.searchAs = s.opts.SearchAs
 	}
-	if cfg.Dashboards && len(tracked) > 0 {
+	if cfg.Dashboards {
 		plan.sections = dashboardSections(s.searchLogin(), now)
 		for i := range plan.sections {
 			if n := s.searchFirst[plan.sections[i].name]; n > 0 {
@@ -188,7 +191,13 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	if plan.stats != nil {
 		plan.closed = closedPlans(plan.stats, globalClosed, closedRepos)
 	}
-	return plan, len(tracked) == 0 && len(heads) == 0
+	return plan, isIdle(cfg, len(tracked), len(heads))
+}
+
+// isIdle: nothing to poll but the viewer (dashboards off, no tracked repository, no
+// watched branch or pull request).
+func isIdle(cfg Config, tracked, watched int) bool {
+	return !cfg.Dashboards && tracked == 0 && watched == 0
 }
 
 // nextStatsAt is when the current month's stats are next due after a fetch at t:

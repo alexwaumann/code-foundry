@@ -66,7 +66,11 @@ auth, and network pauses work as before, and on-demand jobs still go first.
   polled recently, bring the next poll to within 0.5s. A burst of them shares one poll.
 * A request that arrives while a poll is running gets another poll right after it,
   because the running poll may have planned without it.
-* With nothing tracked or watched, the poll fetches only the viewer, every 10 minutes.
+* The dashboard searches run whenever `github.dashboards_enabled` is on, tracked
+  repositories or not (since `docs/notes/prs-inbox-1-daemon.md`; they used to wait for a
+  tracked repository). Only with dashboards off and nothing tracked or watched does the
+  poll fetch the viewer alone, every 10 minutes. The monthly stats still need a tracked
+  repository.
 * The stats need the author's node id. The very first poll learns it, and the next poll
   follows at once.
 * On restart, a cache younger than the interval waits out the interval. The first poll
