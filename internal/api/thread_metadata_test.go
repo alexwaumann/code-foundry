@@ -66,8 +66,11 @@ func TestThreadLabelReportBudget(t *testing.T) {
 	if err != nil || !slices.Equal(lab.Msg.GetThread().GetLabels(), []string{"x"}) {
 		t.Fatalf("Label = %v, %v", lab, err)
 	}
-	if _, err := c.Label(ctx, connect.NewRequest(&v1.LabelThreadRequest{Id: "s-1", Add: []string{"x"}, Remove: []string{"x"}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Errorf("add and remove: %v", err)
+	// A kanban page moves a card: remove every column's label, add the new column's.
+	move, err := c.Label(ctx, connect.NewRequest(&v1.LabelThreadRequest{Id: "s-1",
+		Add: []string{"kanban/review"}, Remove: []string{"kanban/todo", "kanban/review", "kanban/done"}}))
+	if err != nil || !slices.Equal(move.Msg.GetThread().GetLabels(), []string{"kanban/review", "x"}) {
+		t.Fatalf("Label move = %v, %v", move, err)
 	}
 	if _, err := c.Label(ctx, connect.NewRequest(&v1.LabelThreadRequest{Id: "nope", Clear: true})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown: %v", err)
@@ -95,7 +98,7 @@ func TestThreadLabelReportBudget(t *testing.T) {
 	if _, err := c.SetBudget(ctx, connect.NewRequest(&v1.SetThreadBudgetRequest{Id: "s-1", BudgetUsd: -1})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("negative: %v", err)
 	}
-	want := []string{"Label s-1 add=x remove=test clear=false", "Label s-1 add=x remove=x clear=false", "Label nope add= remove= clear=true",
+	want := []string{"Label s-1 add=x remove=test clear=false", "Label s-1 add=kanban/review remove=kanban/todo,kanban/review,kanban/done clear=false", "Label nope add= remove= clear=true",
 		"Report s-1 done all good", "Report s-1 none ", "Report s-1 done ", "SetBudget s-1 0.25", "SetBudget s-1 -1"}
 	if got := fake.Calls(); !slices.Equal(got, want) {
 		t.Errorf("calls = %q, want %q", got, want)

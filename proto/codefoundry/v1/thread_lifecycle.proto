@@ -997,8 +997,8 @@ message LabelThreadRequest {
   bool clear = 2;
   // Labels to add (validated like CreateThreadRequest.labels).
   repeated string add = 3;
-  // Labels to remove; a label not on the thread is ignored. A label in both add and
-  // remove is INVALID_ARGUMENT.
+  // Labels to remove; a label not on the thread is ignored. Removes go before adds, so
+  // a label in both add and remove is on the thread after.
   repeated string remove = 4;
 }
 

@@ -63,7 +63,10 @@ func TestEditLabels(t *testing.T) {
 		{"add and remove", []string{"x"}, []string{"b"}, false, []string{"a", "x"}, false},
 		{"clear", nil, nil, true, nil, false},
 		{"clear then add", []string{"x"}, nil, true, []string{"x"}, false},
-		{"both add and remove", []string{"x"}, []string{"X"}, false, nil, true},
+		// Remove goes before add, so a label in both is on the thread after.
+		{"both add and remove", []string{"x"}, []string{"X"}, false, []string{"a", "b", "x"}, false},
+		{"move between columns", []string{"kanban/review"}, []string{"kanban/todo", "kanban/review", "kanban/done"}, false, []string{"a", "b", "kanban/review"}, false},
+		{"re-add a present label", []string{"a"}, []string{"a"}, false, []string{"a", "b"}, false},
 		{"invalid add", []string{"no way"}, nil, false, nil, true},
 		{"invalid remove", nil, []string{"no way"}, false, nil, true},
 	} {

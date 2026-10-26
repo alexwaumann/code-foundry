@@ -2550,8 +2550,8 @@ export type LabelThreadRequest = Message<"codefoundry.v1.LabelThreadRequest"> & 
   add: string[];
 
   /**
-   * Labels to remove; a label not on the thread is ignored. A label in both add and
-   * remove is INVALID_ARGUMENT.
+   * Labels to remove; a label not on the thread is ignored. Removes go before adds, so
+   * a label in both add and remove is on the thread after.
    *
    * @generated from field: repeated string remove = 4;
    */

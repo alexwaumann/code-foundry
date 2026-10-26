@@ -4787,8 +4787,8 @@ type LabelThreadRequest struct {
 	Clear bool `protobuf:"varint,2,opt,name=clear,proto3" json:"clear,omitempty"`
 	// Labels to add (validated like CreateThreadRequest.labels).
 	Add []string `protobuf:"bytes,3,rep,name=add,proto3" json:"add,omitempty"`
-	// Labels to remove; a label not on the thread is ignored. A label in both add and
-	// remove is INVALID_ARGUMENT.
+	// Labels to remove; a label not on the thread is ignored. Removes go before adds, so
+	// a label in both add and remove is on the thread after.
 	Remove        []string `protobuf:"bytes,4,rep,name=remove,proto3" json:"remove,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
