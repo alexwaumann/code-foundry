@@ -1,0 +1,36 @@
+/* /cf/ui.css (docs/notes/page-library.md): the stylesheet of @cf/ui, built by
+ * vite.pagelib.config.ts. Tailwind with the app's @theme and type roles (filled in at the
+ * cf:app-theme marker from index.css), the classes the components use, and a safelist of
+ * everyday utilities (src/pagelib/theme.ts) so a page's own layout works without the
+ * runtime. Every colour is a var() of a slot: a page links /cf/theme.css first, which sets
+ * them and follows theme switches. */
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@source "../components/ui";
+/* cf:safelist */
+
+/* cf:app-theme */
+
+/* A page's base, not the app's: the page scrolls and selects (no overflow or user-select
+ * rules), borders take the theme's colour, and --cf-zoom (the app's page zoom, which
+ * DialogContent's offset divides by) is 1. */
+:root {
+  --cf-zoom: 1;
+}
+@layer base {
+  /* index.css's `@apply border-cf-border outline-cf-focus/50`, spelled out: this file also
+   * compiles unfilled (the app's Vite in vitest), where the cf utilities do not exist. */
+  * {
+    border-color: var(--cf-border);
+    outline-color: color-mix(in oklab, var(--cf-focus) 50%, transparent);
+  }
+  ::placeholder {
+    color: var(--cf-placeholder);
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

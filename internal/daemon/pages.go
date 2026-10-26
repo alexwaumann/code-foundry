@@ -4,16 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/bridge"
+	"github.com/alexwaumann/code-foundry/internal/pagelib"
+	"github.com/alexwaumann/code-foundry/internal/preview"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // The pages listener (docs/notes/bridge-1-daemon.md) serves what an HTML page the model
 // shows loads without a credential: the preview route (its grant is in the URL) and /cf/
-// (the theme and the bridge script). It serves nothing else, and the API listener none of
+// (the theme, the bridge script and the page library). It serves nothing else, and the API listener none of
 // it. The split gives pages an origin of their own, http://127.0.0.1:<pages port>, which
 // CORS on the API listener refuses (allowedOrigin), so a page holding a leaked token still
 // cannot call the API. The port is kept in pages.port and tried again on the next start,
@@ -57,6 +63,19 @@ func lastPagesPort(log *slog.Logger, file string) (int, bool) {
 
 // pagesOrigin is the origin pages are served from.
 func pagesOrigin(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
+
+// newPageRoutes is what a page loads without a credential, by path prefix (the most
+// specific wins): the preview (its grant in the URL), the theme, the bridge script and the
+// page library's files (a route each); none reveals anything.
+func newPageRoutes(grants *preview.Grants, liveTheme *theme.Live, log *slog.Logger) map[string]http.Handler {
+	routes := map[string]http.Handler{
+		preview.Prefix:    preview.Handler(grants, log.With("component", "preview")),
+		theme.FramePrefix: theme.FrameHandler(liveTheme),
+		bridge.Path:       bridge.Handler(),
+	}
+	maps.Copy(routes, pagelib.Routes())
+	return routes
+}
 
 // pagesHandler is what the pages listener serves: routes, keyed by path prefix, each
 // setting its own headers; every other path is 404.

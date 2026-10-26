@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/api"
-	"github.com/alexwaumann/code-foundry/internal/bridge"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
@@ -378,13 +377,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	reqCtx, cancelRequests := context.WithCancel(ctx)
 	defer cancelRequests()
 	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
-	// What a page loads without a credential, by path prefix (the most specific wins): the
-	// preview (its grant in the URL), the theme and the bridge script (reveal nothing).
-	pageRoutes := map[string]http.Handler{
-		preview.Prefix:    preview.Handler(grants, log.With("component", "preview")),
-		theme.FramePrefix: theme.FrameHandler(liveTheme),
-		bridge.Path:       bridge.Handler(),
-	}
+	pageRoutes := newPageRoutes(grants, liveTheme, log)
 	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback",
 		loopbackHost(port, loopbackHandler(token, slices.Collect(maps.Keys(pageRoutes)), pagesPort, opts.DevOrigins, mux))))
 	pagesSrv := newServer(reqCtx, log, "pages", logRequests(log, "pages", loopbackHost(pagesPort, pagesHandler(pageRoutes))))
