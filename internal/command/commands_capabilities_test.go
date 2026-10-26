@@ -237,7 +237,11 @@ func TestCapabilitiesGroups(t *testing.T) {
 				"the whole new snapshot after each change", "not --json's shape", "only while Ember's board is open",
 				"a message to show the user", "kept by Code Foundry (256 KiB)", "starts empty", "a wake (thread subscribe) or a plugin",
 				"ask the user for a token", "cf.fetch(url, {method, headers, body, timeout})", "CORS rules never block it",
-				"resolves for every status", "private networks are allowed", "send it in a header with cf.fetch"},
+				"resolves for every status", "private networks are allowed", "send it in a header with cf.fetch",
+				// The page library, a line per specifier and file.
+				"  react pages ", `<script type="text/tsx">`, "  @cf/ui        /cf/ui.js: ", "  @cf/icons     /cf/icons.js: all of lucide-react",
+				"  react-dom/client /cf/react-dom-client.js", "  /cf/jsx.js    the loader", "  /cf/ui.css    ", "  /cf/tailwind.js optional",
+				"A mockup of another product skips both"},
 			jsonLen: map[string]int{"renderings": len(command.Renderings)}},
 		{group: "skills",
 			has: []string{"skills: 2 every thread gets", "  code-foundry               Start here for anything about Code Foundry\n",
