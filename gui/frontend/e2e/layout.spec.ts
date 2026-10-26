@@ -92,19 +92,24 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   // The first button's glyph (not its box) sits on the gutter line.
   expect((await box(page, "sidebar-dashboard")).left).toBe(GAP - ICON_INSET);
   expect(await page.getByTestId("sidebar-dashboard").locator("svg").evaluate((el) => el.getBoundingClientRect().left)).toBe(GAP);
-  // New thread is a full-width button under the toolbar: 12px from the window edge, and it
-  // ends where the sidebar does (the content pane's 12px margin is the gap beyond it).
+  // New thread is the first nav row under the toolbar, drawn like Pull Requests and
+  // Projects (28px, same left edge and width): 12px from the window edge, and it ends
+  // where the sidebar does (the content pane's 12px margin is the gap beyond it).
   const newThread = await box(page, "sidebar-new-thread");
+  const prs = await box(page, "nav-pullrequests");
   const sidebar = await box(page, "sidebar");
   expect(newThread.left).toBe(GAP);
   expect(newThread.top).toBeGreaterThan(BAND + 32);
-  expect(newThread.height).toBe(32);
+  expect(newThread.height).toBe(28);
   expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width);
-  // Labelled, with thread.new's chord as a hint.
-  await expect(page.getByTestId("sidebar-new-thread")).toHaveText("New thread⌘N");
-  await expect(page.getByTestId("sidebar-new-thread-chord")).toHaveText("⌘N");
-  // The only chord on screen: the welcome panel names none (onboarding-1).
-  await expect(page.locator("kbd")).toHaveCount(1);
+  expect([prs.left, prs.width, prs.height]).toEqual([newThread.left, newThread.width, 28]);
+  // The gap to Pull Requests is the nav rows' own (2px), not the group's.
+  expect(prs.top - (newThread.top + newThread.height)).toBe(2);
+  // Labelled, with no chord hint: the chord lives in the palette and help.
+  await expect(page.getByTestId("sidebar-new-thread")).toHaveText("New thread");
+  await expect(page.getByTestId("sidebar-new-thread-chord")).toHaveCount(0);
+  // No chord on screen: the welcome panel names none either (onboarding-1).
+  await expect(page.locator("kbd")).toHaveCount(0);
   // New terminal and Add project are not in the sidebar (palette, cmd+t and the row menu only).
   await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
