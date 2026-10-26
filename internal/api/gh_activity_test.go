@@ -106,6 +106,7 @@ func TestGhDashboardListsEveryRepository(t *testing.T) {
 		t.Errorf("stats = %v", s)
 	}
 
+	//lint:ignore SA1019 the deprecated field must still be accepted, and change nothing
 	all, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{IncludeUntracked: true}))
 	if err != nil {
 		t.Fatal(err)
