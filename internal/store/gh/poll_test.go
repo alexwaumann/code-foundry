@@ -52,6 +52,55 @@ func changeDrivenWorld() (*fakeGitHub, time.Time) {
 	return g, t0
 }
 
+// The dashboard searches run whenever dashboards are on, with no repository tracked
+// (the Pull Requests page is the viewer's inbox); only with them off is the poll the
+// viewer alone, at the idle interval.
+func TestPollDashboardsWithNothingTracked(t *testing.T) {
+	tests := []struct {
+		name       string
+		dashboards bool
+		wantLists  string
+		wantEvery  time.Duration
+	}{
+		{"dashboards on", true, "[o/r#1] [o/r#2] [o/r#3]", time.Hour},
+		{"dashboards off: viewer only, idle", false, "[] [] []", 2 * time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g, _ := changeDrivenWorld()
+			f := (&fakeRunner{}).serve(g)
+			opts := testOptions(openTestDB(t), f, nil)
+			opts.IdleInterval = 2 * time.Hour
+			opts.Config = func() Config { return Config{PollInterval: time.Hour, Dashboards: tt.dashboards} }
+			s := startStore(t, opts)
+			pollOnce(t, s, f)
+			calls, _ := f.snapshot()
+			for _, c := range calls {
+				if c.op == "Poll" && (c.vars["q_authored"] != nil) != tt.dashboards {
+					t.Errorf("poll vars = %v, want dashboards %t", c.vars, tt.dashboards)
+				}
+			}
+			d := s.Snapshot().Dashboard
+			list := func(prs []PullRequest) []string {
+				out := []string{}
+				for _, p := range prs {
+					out = append(out, fmt.Sprintf("%s#%d", p.Repo, p.Number))
+				}
+				return out
+			}
+			if got := fmt.Sprint(list(d.Authored), " ", list(d.ReviewRequested), " ", list(d.RecentlyMerged)); got != tt.wantLists {
+				t.Errorf("lists = %s, want %s", got, tt.wantLists)
+			}
+			s.mu.Lock()
+			every := s.pollNext.Sub(s.lastPoll)
+			s.mu.Unlock()
+			if every < tt.wantEvery-time.Minute || every > tt.wantEvery+time.Minute {
+				t.Errorf("next poll in %v, want about %v", every, tt.wantEvery)
+			}
+		})
+	}
+}
+
 func TestPollFetchesDetailsOnlyForWhatChanged(t *testing.T) {
 	b := bus.New()
 	dash := bus.Subscribe[DashboardUpdated](b, 64)
@@ -265,7 +314,7 @@ func TestPollBranchWatch(t *testing.T) {
 	ctx := context.Background()
 
 	// A first call returns nothing yet and puts the branch into the next poll (an
-	// untracked repository is polled for the branch only).
+	// untracked repository is polled for the branch only, next to the dashboards).
 	first, err := s.BranchPullRequests(ctx, "O/R", "feat")
 	if err != nil || len(first.PullRequests) != 0 || !first.FetchedAt.IsZero() || first.Slug != "o/r" {
 		t.Fatalf("first = %+v, %v", first, err)
@@ -285,8 +334,8 @@ func TestPollBranchWatch(t *testing.T) {
 			last = c
 		}
 	}
-	if last.vars["r0b0"] != "feat" || last.vars["q_authored"] != nil {
-		t.Errorf("poll vars = %v, want the branch and no dashboards (nothing tracked)", last.vars)
+	if last.vars["r0b0"] != "feat" || last.vars["q_authored"] == nil {
+		t.Errorf("poll vars = %v, want the branch and the dashboards (they poll with nothing tracked)", last.vars)
 	}
 
 	// Other people's PRs on the branch (forks, other authors) never get details.

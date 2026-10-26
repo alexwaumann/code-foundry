@@ -58,7 +58,7 @@ func TestPresenceChangedSnapBack(t *testing.T) {
 		{"none to background, last poll 2 min ago: 5 min after it", PresenceNone, PresenceBackground, 2 * time.Minute, 13 * time.Minute, true, 3 * time.Minute, true},
 		{"none to background, last poll 6 min ago: poll soon", PresenceNone, PresenceBackground, 6 * time.Minute, 9 * time.Minute, true, pollDebounce, true},
 		{"rise never delays a sooner poll", PresenceBackground, PresenceForeground, 20 * time.Second, 10 * time.Second, true, 10 * time.Second, true},
-		{"rise while idle: the idle interval applies", PresenceNone, PresenceForeground, 2 * time.Minute, 13 * time.Minute, false, 8 * time.Minute, true},
+		{"rise while idle (dashboards off, nothing tracked): the idle interval applies", PresenceNone, PresenceForeground, 2 * time.Minute, 13 * time.Minute, false, 8 * time.Minute, true},
 		{"foreground to background: unchanged", PresenceForeground, PresenceBackground, 2 * time.Minute, time.Minute, true, time.Minute, false},
 		{"background to none: unchanged", PresenceBackground, PresenceNone, 2 * time.Minute, 3 * time.Minute, true, 3 * time.Minute, false},
 		{"no change: unchanged", PresenceForeground, PresenceForeground, 2 * time.Minute, time.Minute, true, time.Minute, false},
@@ -69,6 +69,9 @@ func TestPresenceChangedSnapBack(t *testing.T) {
 			opts.PollInterval = time.Minute
 			opts.IdleInterval = 10 * time.Minute
 			opts.Now = func() time.Time { return now }
+			if !tt.tracked {
+				opts.Config = func() Config { return Config{PollInterval: time.Minute, Dashboards: false} }
+			}
 			s, err := New(context.Background(), opts)
 			if err != nil {
 				t.Fatal(err)
@@ -90,6 +93,24 @@ func TestPresenceChangedSnapBack(t *testing.T) {
 				t.Errorf("nudged = %t, want %t", nudged, tt.wantNudge)
 			}
 		})
+	}
+}
+
+// With dashboards on, nothing tracked is not idle: a rise polls soon, as when tracked.
+func TestPresenceChangedDashboardsNotIdle(t *testing.T) {
+	now := time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
+	opts := testOptions(openTestDB(t), &fakeRunner{}, nil)
+	opts.PollInterval = time.Minute
+	opts.IdleInterval = 10 * time.Minute
+	opts.Now = func() time.Time { return now }
+	s, err := New(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.lastPoll, s.pollNext = now.Add(-2*time.Minute), now.Add(13*time.Minute)
+	s.PresenceChanged(PresenceNone, PresenceForeground)
+	if got := s.pollNext.Sub(now); got != pollDebounce {
+		t.Errorf("next poll in %v, want %v", got, pollDebounce)
 	}
 }
 

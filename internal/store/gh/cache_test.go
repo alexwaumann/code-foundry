@@ -128,3 +128,23 @@ func TestCacheIgnoresOtherVersions(t *testing.T) {
 		t.Errorf("snapshot = %+v, want stale rows ignored", snap)
 	}
 }
+
+// A pull request cached before review commits were fetched decodes with them empty, and
+// a fresh one round-trips them.
+func TestCacheReviewCommits(t *testing.T) {
+	old := `{"v":3,"data":{"id":"P","number":1,"title":"t","headRef":"b","headSha":"h","baseRef":"main","state":"OPEN",` +
+		`"latestReviews":[{"author":"a","state":"APPROVED","submittedAt":"2026-10-20T00:00:00Z"}]}}`
+	p, ok := decodePayload[PullRequest](old)
+	if !ok || len(p.LatestReviews) != 1 || p.LatestReviews[0].Author != "a" || p.LatestReviews[0].CommitSHA != "" || p.ReviewCommits {
+		t.Fatalf("old payload = %+v, %v", p, ok)
+	}
+	p.ReviewCommits, p.LatestReviews[0].CommitSHA = true, "abc"
+	enc, err := encodePayload(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, ok := decodePayload[PullRequest](enc)
+	if !ok || !back.ReviewCommits || back.LatestReviews[0].CommitSHA != "abc" {
+		t.Errorf("round trip = %+v, %v (%s)", back, ok, enc)
+	}
+}

@@ -298,7 +298,7 @@ Collected from the step notes; none blocks daily use.
   * `CODE_FOUNDRY_EDITOR` remains as a fallback when `gitops.editor_command` is empty.
 * **GitHub / Pull Requests page**
   * Populated PR lists have only been seen live through the `CODE_FOUNDRY_GH_SEARCH_AS` dev knob. The owner's account has no PRs, so with the real login the GUI has only ever shown empty lists.
-  * Dashboards are fetched unfiltered (50 per list) and filtered to tracked repositories at read time. A viewer with many PRs outside registered projects can crowd out registered ones.
+  * Dashboards are fetched unfiltered (50 per list) and returned unfiltered since `docs/notes/prs-inbox-1-daemon.md` (the Pull Requests page is the viewer's inbox across GitHub).
   * The poll (`gh-viewer-polling.md`) keeps richer PR detail (merge state, size, reviews, review requests) and a "reviewed by you" list that no view shows yet.
   * Branch PRs on the overview show only the viewer's own, non-fork PRs.
 * **Side panel + PR surface** (`side-panel.md`)

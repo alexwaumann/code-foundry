@@ -28,7 +28,8 @@ type Options struct {
 	MinGap time.Duration
 	// PollInterval is the default for Config().PollInterval.
 	PollInterval time.Duration
-	// IdleInterval is the poll cadence while nothing is tracked or watched.
+	// IdleInterval is the poll cadence while dashboards are off and nothing is tracked
+	// or watched.
 	IdleInterval     time.Duration
 	AuthRetry        time.Duration
 	NetworkBackoff   time.Duration

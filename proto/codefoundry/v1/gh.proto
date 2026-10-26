@@ -40,7 +40,7 @@ service GhService {
   // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
   // PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
   // involving them) and their monthly stats across GitHub, from the last poll. The
-  // lists hold only tracked repositories unless include_untracked.
+  // lists are viewer-wide: every repository, tracked or not.
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {}
   // GetRepoActivity returns the viewer's monthly stats in one repository, its default
   // branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
@@ -266,6 +266,8 @@ message PullRequestReview {
   string author = 1;
   PullRequestReviewState state = 2;
   google.protobuf.Timestamp submitted_at = 3;
+  // The head commit the review was submitted on; empty in a cache written before it was fetched.
+  string commit_sha = 4;
 }
 
 message CheckRun {
@@ -498,7 +500,8 @@ message ActivityStats {
 }
 
 message GetDashboardRequest {
-  // Keep pull requests from every repository, not only tracked ones.
+  // Deprecated: ignored. The lists always hold every repository (they were filtered to
+  // tracked ones unless this was set).
   bool include_untracked = 1;
 }
 
@@ -518,7 +521,7 @@ message GetDashboardResponse {
   // When the dashboards were last fetched; unset if never.
   google.protobuf.Timestamp fetched_at = 7;
   string last_error = 8;
-  // The tracked repositories the lists were filtered to (lower case).
+  // The tracked repositories (lower case). The lists are not filtered to them.
   repeated string tracked_slugs = 9;
   // Open pull requests the viewer reviewed and did not author, except those in
   // review_requested, most recently updated first.

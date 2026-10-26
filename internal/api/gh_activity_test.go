@@ -13,7 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-func TestGhDashboardFiltersToTracked(t *testing.T) {
+func TestGhDashboardListsEveryRepository(t *testing.T) {
 	store, client, _ := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
@@ -25,11 +25,20 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 	}
 	merged := pr("o/tracked", 3, gh.PullRequestMerged)
 	merged.MergedAt = at
+	otherMerged := pr("x/other", 6, gh.PullRequestMerged)
+	otherMerged.MergedAt = at
+	reviewed := pr("x/other", 5, gh.PullRequestOpen)
+	reviewed.HeadSHA = "head5"
+	reviewed.LatestReviews = []gh.Review{
+		{Author: "octocat", State: "COMMENTED", SubmittedAt: at, CommitSHA: "old5"},
+		{Author: "hubot", State: "APPROVED", SubmittedAt: at, CommitSHA: "head5"},
+		{Author: "ghost", State: "APPROVED"}, // cached before commits were fetched
+	}
 	store.SetDashboard(gh.Dashboard{
 		Authored:        []gh.PullRequest{pr("o/tracked", 1, gh.PullRequestOpen), pr("x/other", 2, gh.PullRequestOpen)},
 		ReviewRequested: []gh.PullRequest{pr("x/other", 9, gh.PullRequestOpen)},
-		Reviewed:        []gh.PullRequest{pr("o/tracked", 4, gh.PullRequestOpen), pr("x/other", 5, gh.PullRequestOpen)},
-		RecentlyMerged:  []gh.PullRequest{merged},
+		Reviewed:        []gh.PullRequest{pr("o/tracked", 4, gh.PullRequestOpen), reviewed},
+		RecentlyMerged:  []gh.PullRequest{merged, otherMerged},
 		FetchedAt:       at,
 		LastError:       "partial",
 		Stats: gh.MonthlyStats{
@@ -47,9 +56,40 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		!m.GetFetchedAt().AsTime().Equal(at) || len(m.GetTrackedSlugs()) != 1 || m.GetTrackedSlugs()[0] != "o/tracked" {
 		t.Errorf("header = %v", m)
 	}
-	if len(m.GetAuthored()) != 1 || m.GetAuthored()[0].GetNumber() != 1 || len(m.GetReviewRequested()) != 0 ||
-		len(m.GetReviewed()) != 1 || m.GetReviewed()[0].GetNumber() != 4 || len(m.GetRecentlyMerged()) != 1 || m.GetDashboardsDisabled() {
-		t.Errorf("filtered lists: %d/%d/%d/%d", len(m.GetAuthored()), len(m.GetReviewRequested()), len(m.GetReviewed()), len(m.GetRecentlyMerged()))
+	// Every list holds every repository, tracked or not.
+	numbers := func(prs []*v1.PullRequest) string {
+		var out []string
+		for _, p := range prs {
+			out = append(out, fmt.Sprintf("%s#%d", p.GetRepoSlug(), p.GetNumber()))
+		}
+		return fmt.Sprint(out)
+	}
+	lists := []struct {
+		name string
+		got  []*v1.PullRequest
+		want string
+	}{
+		{"authored", m.GetAuthored(), "[o/tracked#1 x/other#2]"},
+		{"review requested", m.GetReviewRequested(), "[x/other#9]"},
+		{"reviewed", m.GetReviewed(), "[o/tracked#4 x/other#5]"},
+		{"recently merged", m.GetRecentlyMerged(), "[o/tracked#3 x/other#6]"},
+	}
+	for _, l := range lists {
+		if got := numbers(l.got); got != l.want {
+			t.Errorf("%s = %s, want %s", l.name, got, l.want)
+		}
+	}
+	if m.GetDashboardsDisabled() {
+		t.Error("dashboards disabled")
+	}
+	// Latest reviews carry the commit they were submitted on.
+	r := m.GetReviewed()[1]
+	var reviews []string
+	for _, lr := range r.GetLatestReviews() {
+		reviews = append(reviews, lr.GetAuthor()+"@"+lr.GetCommitSha())
+	}
+	if r.GetHeadSha() != "head5" || fmt.Sprint(reviews) != "[octocat@old5 hubot@head5 ghost@]" {
+		t.Errorf("reviewed head %s, latest reviews %v", r.GetHeadSha(), reviews)
 	}
 	p := m.GetAuthored()[0]
 	if p.GetRepoSlug() != "o/tracked" || p.GetState() != v1.PullRequestState_PULL_REQUEST_STATE_OPEN ||
@@ -66,12 +106,15 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		t.Errorf("stats = %v", s)
 	}
 
+	//lint:ignore SA1019 the deprecated field must still be accepted, and change nothing
 	all, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{IncludeUntracked: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all.Msg.GetAuthored()) != 2 || len(all.Msg.GetReviewRequested()) != 1 || len(all.Msg.GetReviewed()) != 2 {
-		t.Errorf("include_untracked lists: %d/%d", len(all.Msg.GetAuthored()), len(all.Msg.GetReviewRequested()))
+	// include_untracked is deprecated and changes nothing.
+	if numbers(all.Msg.GetAuthored()) != numbers(m.GetAuthored()) || numbers(all.Msg.GetReviewRequested()) != numbers(m.GetReviewRequested()) ||
+		numbers(all.Msg.GetReviewed()) != numbers(m.GetReviewed()) || numbers(all.Msg.GetRecentlyMerged()) != numbers(m.GetRecentlyMerged()) {
+		t.Errorf("include_untracked lists differ: %s %s", numbers(all.Msg.GetAuthored()), numbers(all.Msg.GetReviewed()))
 	}
 
 	// A renamed repository: search results carry its new name; they are the tracked
@@ -85,7 +128,7 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a := moved.Msg.GetAuthored(); len(a) != 1 || a[0].GetNumber() != 11 || a[0].GetRepoSlug() != "o/tracked" {
+	if a := numbers(moved.Msg.GetAuthored()); a != "[o/tracked#11 x/other#2]" {
 		t.Errorf("renamed repository's authored = %v", a)
 	}
 	act, err := client.GetRepoActivity(ctx, connect.NewRequest(&v1.GetRepoActivityRequest{RepoSlug: "o/tracked"}))

@@ -114,7 +114,7 @@ fragment PullRequestDetail on PullRequest {
   totalCommentsCount
   reviews { totalCount }
   latestReviews(first: 10) {
-    nodes { author { login } state submittedAt }
+    nodes { author { login } state submittedAt commit { oid } }
   }
   reviewRequests(first: 10) {
     nodes {

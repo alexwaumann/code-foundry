@@ -3,6 +3,7 @@ package gh
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 )
@@ -177,6 +178,63 @@ func TestDecodeDetails(t *testing.T) {
 	}
 }
 
+// TestDecodeDetailsReviewCommits decodes a real capture of open pull requests whose
+// latest reviews are on the current head (14693) and on older commits (14815, 14318),
+// plus a merged one (summary only, no reviews).
+func TestDecodeDetailsReviewCommits(t *testing.T) {
+	got, err := decodeDetails(fixtureData(t, "pull_request_details_reviews.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	type review struct{ author, state, commit string }
+	tests := []struct {
+		id      string
+		head    string
+		reviews []review
+	}{
+		{"PR_kwDOHFhdAs8AAAABKJ9v7Q", "3085c8ea685bfcfffaa06c6d0e7a287bb0696da5", []review{
+			{"mitchellh", "CHANGES_REQUESTED", "fece54e14b936559065ff957ef3283ee41e75d9a"},
+			{"jcollie", "APPROVED", "fece54e14b936559065ff957ef3283ee41e75d9a"},
+		}},
+		{"PR_kwDOHFhdAs8AAAABIS8BwQ", "09bd8e5591677ca3a3508a569dded3c8c5578c6a", []review{
+			{"jcollie", "CHANGES_REQUESTED", "09bd8e5591677ca3a3508a569dded3c8c5578c6a"},
+		}},
+		{"PR_kwDOHFhdAs8AAAABESLwlQ", "687307d71c10b9bfef286664e06b7d07b4e78106", []review{
+			{"jcollie", "COMMENTED", "b09721d1b0e124c4bd05f38ee1bbb0b3c962089d"},
+			{"trag1c", "CHANGES_REQUESTED", "00a28201b3ed63a61d4065c8e98318d065c1bac4"},
+		}},
+	}
+	for _, tt := range tests {
+		p, ok := got[tt.id]
+		if !ok {
+			t.Errorf("%s: missing", tt.id)
+			continue
+		}
+		if p.HeadSHA != tt.head || !p.ReviewCommits {
+			t.Errorf("%s: head %s reviewCommits %v", tt.id, p.HeadSHA, p.ReviewCommits)
+		}
+		var have []review
+		for _, r := range p.LatestReviews {
+			if r.SubmittedAt.IsZero() {
+				t.Errorf("%s: %s has no submittedAt", tt.id, r.Author)
+			}
+			have = append(have, review{r.Author, r.State, r.CommitSHA})
+		}
+		if !slices.Equal(have, tt.reviews) {
+			t.Errorf("%s: reviews = %v, want %v", tt.id, have, tt.reviews)
+		}
+	}
+	m := got["PR_kwDOHFhdAs8AAAABHOg8hA"]
+	if m.State != PullRequestMerged || len(m.LatestReviews) != 0 || m.ReviewCommits {
+		t.Errorf("merged summary = %+v", m)
+	}
+	// A review GitHub has no commit for decodes with an empty CommitSHA.
+	null := []byte(`{"open":[{"__typename":"PullRequest","id":"P","state":"OPEN","latestReviews":{"nodes":[{"author":{"login":"a"},"state":"COMMENTED","commit":null}]}}],"closed":[]}`)
+	if got, err := decodeDetails(null); err != nil || len(got["P"].LatestReviews) != 1 || got["P"].LatestReviews[0].CommitSHA != "" || !got["P"].ReviewCommits {
+		t.Errorf("null commit: %+v %v", got["P"], err)
+	}
+}
+
 func TestDecodeDefaultBranchChecks(t *testing.T) {
 	reqs := []ciRequest{{"neovim/neovim", "402a494f47808442f3de9266b147b274f8c7a5be"}, {"alexwaumann/code-foundry", "cfd8bdf4f3da13280a2186a0be3cbcb88fa1dd7e"}}
 	pages, errs := decodeDefaultBranchChecks(reqs, fixtureData(t, "default_branch_checks.json"), nil)
@@ -235,6 +293,11 @@ func TestNeedsDetail(t *testing.T) {
 		{"counts only", nil, func(f *prFingerprint) { f.Checks.Passed, f.Checks.Total = 9, 9 }, true, false},
 		{"no checks selected", nil, func(f *prFingerprint) { f.HasChecks, f.Checks = false, CheckRollup{} }, true, false},
 		{"open, stored as summary", func(p *PullRequest) { p.Mergeable, p.MergeStateStatus = "", "" }, nil, true, true},
+		{"reviews without commits", func(p *PullRequest) { p.LatestReviews, p.ReviewCommits = []Review{{Author: "a"}}, false }, nil, true, true},
+		{"reviews with commits", func(p *PullRequest) { p.LatestReviews, p.ReviewCommits = []Review{{Author: "a"}}, true }, nil, true, false},
+		{"merged, reviews without commits", func(p *PullRequest) {
+			p.State, p.LatestReviews, p.ReviewCommits = PullRequestMerged, []Review{{Author: "a"}}, false
+		}, func(f *prFingerprint) { f.State = PullRequestMerged }, true, false},
 	}
 	for _, tt := range tests {
 		k, f := known, fp

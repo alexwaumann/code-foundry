@@ -107,8 +107,8 @@ question, false for a permission), `toolName`, `summary` (one line). No conversa
 
 ## gh
 
-Nothing until the app's first read of GitHub (fn is not called). Then the pull requests of
-the user's projects:
+Nothing until the app's first read of GitHub (fn is not called). Then the user's pull
+requests across GitHub, in any repository:
 
 - `authenticated`: false when gh is signed out (say "gh auth login"); `viewer`: null or
   `login`, `name`, `url`.
@@ -116,7 +116,8 @@ the user's projects:
   review; `reviewed`: open PRs the user reviewed; `recentlyMerged`: merged in the last 7
   days. No closed PRs, and no PR outside these lists.
 - `dashboardsDisabled`: the lists are off in Settings; `fetchedAtMs`; `lastError`;
-  `trackedSlugs`: the repositories (owner/name) the lists cover.
+  `trackedSlugs`: the repositories (owner/name) of the user's projects (the lists are not
+  limited to them).
 - Each PR: `repoSlug`, `number`, `title`, `url`, `author`, `state` (open, closed, merged),
   `draft`, `headRef`, `headSha` (pr.merge's head-sha), `baseRef`, `review` (approved,
   changes_requested, review_required or null), `checks`: `state` (none, pending, success,

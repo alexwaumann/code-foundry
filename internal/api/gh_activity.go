@@ -10,25 +10,21 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
-// GetDashboard returns the viewer's dashboards and global stats from the snapshot,
-// filtered to tracked repositories unless include_untracked.
-func (h *Gh) GetDashboard(_ context.Context, req *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {
+// GetDashboard returns the viewer's dashboards and global stats from the snapshot. The
+// lists are viewer-wide (every repository); include_untracked is ignored.
+func (h *Gh) GetDashboard(_ context.Context, _ *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {
 	snap := h.store.Snapshot()
 	d := snap.Dashboard
-	tracked := trackedSlugs(snap)
-	keep := func(p gh.PullRequest) bool {
-		return req.Msg.GetIncludeUntracked() || slices.Contains(tracked, p.Repo)
-	}
 	res := &v1.GetDashboardResponse{
 		Authenticated:      snap.Viewer.Authenticated,
-		Authored:           searchPullRequestsToProto(localRepos(snap, d.Authored), keep),
-		ReviewRequested:    searchPullRequestsToProto(localRepos(snap, d.ReviewRequested), keep),
-		Reviewed:           searchPullRequestsToProto(localRepos(snap, d.Reviewed), keep),
-		RecentlyMerged:     searchPullRequestsToProto(localRepos(snap, d.RecentlyMerged), keep),
+		Authored:           searchPullRequestsToProto(localRepos(snap, d.Authored), nil),
+		ReviewRequested:    searchPullRequestsToProto(localRepos(snap, d.ReviewRequested), nil),
+		Reviewed:           searchPullRequestsToProto(localRepos(snap, d.Reviewed), nil),
+		RecentlyMerged:     searchPullRequestsToProto(localRepos(snap, d.RecentlyMerged), nil),
 		Stats:              statsToProto(d.Stats),
 		FetchedAt:          timestamp(d.FetchedAt),
 		LastError:          d.LastError,
-		TrackedSlugs:       tracked,
+		TrackedSlugs:       trackedSlugs(snap),
 		DashboardsDisabled: d.Disabled,
 	}
 	if v := snap.Viewer.Viewer; v != nil {

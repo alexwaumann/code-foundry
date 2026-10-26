@@ -150,7 +150,7 @@ func (g *fakeGitHub) fullJSON(p *PullRequest) map[string]any {
 	reviewers := []any{}
 	for _, r := range p.LatestReviews {
 		reviewers = append(reviewers, map[string]any{"author": map[string]any{"__typename": "User", "login": r.Author},
-			"state": r.State, "submittedAt": ts(r.SubmittedAt), "commit": map[string]any{"oid": p.HeadSHA}})
+			"state": r.State, "submittedAt": ts(r.SubmittedAt), "commit": map[string]any{"oid": cmpString(r.CommitSHA, p.HeadSHA)}})
 	}
 	m["reviewers"] = map[string]any{"nodes": reviewers}
 	m["requestedReviewers"] = requestsJSON(p)

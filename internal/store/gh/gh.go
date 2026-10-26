@@ -246,6 +246,10 @@ type PullRequest struct {
 	Reviews  int `json:"reviews,omitempty"`
 	// LatestReviews is each reviewer's latest review (up to 10).
 	LatestReviews []Review `json:"latestReviews,omitempty"`
+	// ReviewCommits: LatestReviews were fetched with each review's commit. False in a
+	// cache written before they were, so the poll refetches such an open pull request
+	// once (needsDetail).
+	ReviewCommits bool `json:"reviewCommits,omitempty"`
 	// ReviewRequests are the pending review requests: user logins and "org/team" slugs.
 	ReviewRequests []string `json:"reviewRequests,omitempty"`
 	// Partial is set while only the poll's fingerprint is known (the detail fetch is
@@ -258,6 +262,9 @@ type Review struct {
 	Author      string    `json:"author,omitempty"`
 	State       string    `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED, PENDING
 	SubmittedAt time.Time `json:"submittedAt,omitzero"`
+	// CommitSHA is the head commit the review was submitted on. Empty in a cache written
+	// before it was fetched (or when GitHub has no commit for it).
+	CommitSHA string `json:"commitSha,omitempty"`
 }
 
 // CheckRun is one check on a commit: a check run (GitHub Actions job, app check) or a

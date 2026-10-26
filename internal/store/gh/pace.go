@@ -19,11 +19,12 @@ import "time"
 //     every response and pauses until resetAt when fewer than MinRemaining points remain.
 const (
 	DefaultMinGap = time.Second
-	// DefaultPollInterval is how often the fingerprint poll runs while any repository
-	// is tracked or branch watched (github.poll_interval_seconds). One request, cost 1.
+	// DefaultPollInterval is how often the fingerprint poll runs while the dashboards
+	// are on or any repository is tracked or branch watched
+	// (github.poll_interval_seconds). One request, cost 1.
 	DefaultPollInterval = 60 * time.Second
-	// DefaultIdleInterval is the poll cadence with nothing tracked or watched: only the
-	// viewer is fetched.
+	// DefaultIdleInterval is the poll cadence with dashboards off and nothing tracked
+	// or watched: only the viewer is fetched.
 	DefaultIdleInterval = 10 * time.Minute
 	// DefaultBackgroundInterval is the shortest poll interval while GUI clients are
 	// connected but every one is hidden (Presence). Not a setting: the configured

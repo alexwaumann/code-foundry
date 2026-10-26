@@ -311,7 +311,11 @@ func prJSON(p *PullRequest) map[string]any {
 	}
 	reviews := []any{}
 	for _, r := range p.LatestReviews {
-		reviews = append(reviews, map[string]any{"author": map[string]any{"login": r.Author}, "state": r.State, "submittedAt": ts(r.SubmittedAt)})
+		var commit any
+		if r.CommitSHA != "" {
+			commit = map[string]any{"oid": r.CommitSHA}
+		}
+		reviews = append(reviews, map[string]any{"author": map[string]any{"login": r.Author}, "state": r.State, "submittedAt": ts(r.SubmittedAt), "commit": commit})
 	}
 	requests := []any{}
 	for _, r := range p.ReviewRequests {
