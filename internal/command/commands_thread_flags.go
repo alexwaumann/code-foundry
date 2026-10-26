@@ -81,9 +81,10 @@ func flagsLine(s *v1.Thread) string {
 func threadFlagsCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:     "thread.flags",
-		ReadOnly: true,
-		Title:    "Show Thread Flags",
+		Name:      "thread.flags",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Show Thread Flags",
 		Description: "List the flags plugins raised on a thread: plugin, level (attention or error), reason, when, and whether " +
 			"opening the thread clears it. A flagged thread counts as needing attention.",
 		Category:     "Thread",
@@ -105,6 +106,7 @@ func threadFlagClearCmd(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
 		Name:         "thread.flag.clear",
+		NoPalette:    true,
 		Title:        "Clear Thread Flags",
 		Description:  "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",
 		Category:     "Thread",

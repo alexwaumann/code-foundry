@@ -257,6 +257,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 	return r.RegisterAll(
 		Command{
 			Name:         "theme.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Themes",
 			Description:  "Print every colour theme by scheme, yours first, marking the ones in use. Yours show the theme each was copied from.",
@@ -298,6 +299,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		},
 		Command{
 			Name:         "theme.show",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Show Theme File",
 			Description:  "Print a theme's file (curated or yours) as JSON. It is the format theme save reads.",
@@ -316,8 +318,9 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			},
 		},
 		Command{
-			Name:  "theme.save",
-			Title: "Save Theme File",
+			Name:      "theme.save",
+			NoPalette: true,
+			Title:     "Save Theme File",
 			Description: "Save a theme file as one of your themes. It replaces yours with the same id (the version it replaces is kept for Undo); a curated id is refused. " +
 				"From a thread, the file records the thread as created_by, and replacing a theme the thread did not make needs --replace. " +
 				"--apply also makes it the dark or light theme, per its scheme.",
@@ -423,8 +426,9 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			},
 		},
 		Command{
-			Name:  "theme.restore",
-			Title: "Restore Theme Colours",
+			Name:      "theme.restore",
+			NoPalette: true,
+			Title:     "Restore Theme Colours",
 			Description: "Put back an earlier version of one of your themes: each save keeps the version it replaces (the last 10). " +
 				"A theme card's Undo runs it when the save changed the colours of the theme in use.",
 			Category:     "Settings",

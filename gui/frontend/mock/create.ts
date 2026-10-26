@@ -118,6 +118,7 @@ interface CommandEntry {
     category: string;
     description: string;
     keybindings: string[];
+    noPalette?: boolean;
     args: { name: string; type: ArgType; required: boolean; description: string; enumValues?: string[] }[];
     /** Destructive: Invoke needs confirmed=true (the GUI's cancel path sends it). */
     confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;

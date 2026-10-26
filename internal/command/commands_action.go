@@ -103,9 +103,10 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 	whyNoProject := func(Context) string { return noProject }
 	return r.RegisterAll(
 		Command{
-			Name:     "action.list",
-			ReadOnly: true,
-			Title:    "List Actions",
+			Name:      "action.list",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "List Actions",
 			Description: "List a project's actions: the commands `action run` starts, in order, with their ids. " +
 				"The project is the thread's, else the worktree's, else the working directory's.",
 			Category:       "Action",
@@ -160,6 +161,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:        "action.edit",
+			NoPalette:   true,
 			Title:       "Edit Action",
 			Description: "Change an action's name, command, icon, where it runs, whether it runs for new worktrees, or its position.",
 			Category:    "Action",
@@ -218,6 +220,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:           "action.remove",
+			NoPalette:      true,
 			Title:          "Remove Action",
 			Description:    "Remove an action from its project. Runs in progress keep going.",
 			Category:       "Action",
@@ -236,8 +239,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:  "action.run",
-			Title: "Run Action",
+			Name:      "action.run",
+			NoPalette: true,
+			Title:     "Run Action",
 			Description: "Run an action for the active thread (its bottom panel), else the active worktree, else the registered " +
 				"worktree containing the working directory. It runs where the action says (a terminal, or the background); " +
 				"--background captures its output instead, --terminal opens it as a terminal. --wait waits for it to finish, " +
@@ -296,9 +300,10 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:     "action.wait",
-			ReadOnly: true,
-			Title:    "Wait for Action Run",
+			Name:      "action.wait",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "Wait for Action Run",
 			Description: "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code. " +
 				"Interrupting the wait leaves the run going (action stop ends it).",
 			Category:     "Action",
@@ -309,8 +314,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:  "action.stop",
-			Title: "Stop Action Run",
+			Name:      "action.stop",
+			NoPalette: true,
+			Title:     "Stop Action Run",
 			Description: "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's " +
 				"terminal is killed. A finished run is left as it is. `code-foundry action wait <run>` waits for the end.",
 			Category:     "Action",
@@ -330,6 +336,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 		},
 		Command{
 			Name:           "action.runs",
+			NoPalette:      true,
 			ReadOnly:       true,
 			Title:          "List Action Runs",
 			Description:    "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.",

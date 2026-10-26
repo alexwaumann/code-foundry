@@ -28,6 +28,7 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 	return []Command{
 		{
 			Name:        "pr.review",
+			NoPalette:   true,
 			Title:       "Review Pull Request",
 			Description: "Submit a review on a pull request: approve, request changes, or comment (a body is required for the last two).",
 			Category:    "Pull Request",
@@ -56,6 +57,7 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 		},
 		{
 			Name:        "pr.comment",
+			NoPalette:   true,
 			Title:       "Comment on Pull Request",
 			Description: "Post a comment on a pull request's conversation (not a review).",
 			Category:    "Pull Request",

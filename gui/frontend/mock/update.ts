@@ -41,6 +41,7 @@ export interface UpdateCommandEntry {
     category: string;
     description: string;
     keybindings: string[];
+    noPalette?: boolean;
     args: [];
     /** Destructive: Invoke needs confirmed=true (see World.invoke). */
     confirm?: (ctx: UiContext | undefined) => string;
@@ -274,7 +275,7 @@ export class MockUpdater {
     const always = () => true;
     return [
       {
-        cmd: { name: "app.version", title: "Version", category: "App", description: "Show the running version", keybindings: [], args: [] },
+        cmd: { name: "app.version", noPalette: true, title: "Version", category: "App", description: "Show the running version", keybindings: [], args: [] },
         when: always,
         run: () => `Code Foundry ${this.status.currentVersion}`,
       },

@@ -29,9 +29,10 @@ var threadItemRoles = map[string]v1.ThreadItemRole{
 func threadRead(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:     "thread.read",
-		ReadOnly: true,
-		Title:    "Read Thread",
+		Name:      "thread.read",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Read Thread",
 		Description: "Print a thread's latest items as a readable log, like thread.items: the last 20, or with since the ones " +
 			"after an item (oldest first, at most last). --json: {items, nextSince, more}.",
 		Category:     "Thread",

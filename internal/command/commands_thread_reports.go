@@ -59,9 +59,10 @@ type ThreadReport struct {
 // RegisterThreadReports registers thread.reports.
 func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 	return r.Register(Command{
-		Name:     "thread.reports",
-		ReadOnly: true,
-		Title:    "Show Thread Reports",
+		Name:      "thread.reports",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Show Thread Reports",
 		Description: "The reports of threads: one line each " +
 			"(`-`: no report yet; `(data)`: it has JSON data, see full; `*`: from before its last message). --json: one object each.",
 		Category:     "Thread",

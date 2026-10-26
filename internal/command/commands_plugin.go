@@ -59,9 +59,10 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		"permissions you were shown; enabling refuses if the plugin asks for anything else by then (--yes alone consents to what it asks)"}
 	return r.RegisterAll(
 		Command{
-			Name:     "plugin.list",
-			ReadOnly: true,
-			Title:    "List Plugins",
+			Name:      "plugin.list",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "List Plugins",
 			Description: "List the plugins in ~/.code-foundry/plugins: version, state (disabled, starting, running, crashed, " +
 				"failed), whether enabling needs consent, their commands, and their surfaces with whether each is " +
 				"available in the context (--context-thread, --context-project).",
@@ -76,8 +77,9 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		Command{
-			Name:  "plugin.enable",
-			Title: "Enable Plugin",
+			Name:      "plugin.enable",
+			NoPalette: true,
+			Title:     "Enable Plugin",
 			Description: "Enable a plugin: start it and register its commands. The first time, and whenever an update asks " +
 				"for more permissions, it lists what the plugin may do and asks for consent (--yes consents).",
 			Category:    "Plugin",
@@ -104,6 +106,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:        "plugin.disable",
+			NoPalette:   true,
 			Title:       "Disable Plugin",
 			Description: "Stop a plugin and remove its commands. Its secrets and the consent given stay.",
 			Category:    "Plugin",
@@ -118,6 +121,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:        "plugin.restart",
+			NoPalette:   true,
 			Title:       "Restart Plugin",
 			Description: "Re-read a plugin's manifest and start it afresh, also after it failed.",
 			Category:    "Plugin",
@@ -144,9 +148,10 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		Command{
-			Name:     "plugin.logs",
-			ReadOnly: true,
-			Title:    "Show Plugin Log",
+			Name:      "plugin.logs",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "Show Plugin Log",
 			Description: "Print the end of a plugin's log: its stderr, its log messages and the daemon's lines about it " +
 				"(starts, exits, refused calls), and the log file's path. --follow keeps printing (CLI).",
 			Category:     "Plugin",
@@ -165,8 +170,9 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		Command{
-			Name:  "plugin.dev",
-			Title: "Develop Plugin",
+			Name:      "plugin.dev",
+			NoPalette: true,
+			Title:     "Develop Plugin",
 			Description: "Link a plugin folder (with its plugin.json) into ~/.code-foundry/plugins under the manifest's name " +
 				"and enable it, asking for consent like plugin enable. A dev plugin restarts within 2 s after a crash and " +
 				"never gives up. From a terminal the CLI then follows its log (--follow=false: do not).",
@@ -206,6 +212,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:         "plugin.secrets.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Plugin Secrets",
 			Description:  "List the names of the secrets a plugin keeps in the Keychain (service code-foundry-plugin), never their values.",
@@ -232,6 +239,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 		},
 		Command{
 			Name:        "plugin.secrets.delete",
+			NoPalette:   true,
 			Title:       "Delete Plugin Secret",
 			Description: "Delete one of a plugin's secrets from the Keychain.",
 			Category:    "Plugin",

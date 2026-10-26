@@ -21,6 +21,7 @@ type CheckoutsBackend interface {
 func threadCheckouts(b CheckoutsBackend) Command {
 	return Command{
 		Name:         "thread.checkouts",
+		NoPalette:    true,
 		ReadOnly:     true,
 		Title:        "Thread Checkouts",
 		Description:  "List a thread's projects (path, branch, CLAUDE.md) and workspace folder.",

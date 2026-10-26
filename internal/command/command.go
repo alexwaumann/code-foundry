@@ -39,6 +39,13 @@ type Command struct {
 	// the GUI (ui.notify, thread.focus). The settings page offers no keybinding for it,
 	// and it may not have default Keybindings. The palette still lists it.
 	NoKeybinding bool
+	// NoPalette marks a command the GUI palette does not list: a query whose only output
+	// is a text toast (listings, thread.get, settings.get), a verb for the model or the
+	// CLI to drive the app (ui.notify, thread.respond, view.panel.file), or one whose
+	// required arg is an opaque id the palette can only take as typed text (a plugin
+	// name, a repo slug and PR number) where a page offers the action on the right row.
+	// The CLI, pages and chords still have it (palette_test.go keeps the list).
+	NoPalette bool
 	// ReadOnly marks a command that only reads: it creates, changes, sends, runs, opens
 	// or writes nothing, and moves no window (view.* and ui.* are not read-only). A page's
 	// bridge runs a read-only verb freely and any other only from a user gesture in the

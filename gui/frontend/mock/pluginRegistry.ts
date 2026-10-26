@@ -325,7 +325,7 @@ export class MockRegistry {
     const nameArg = { name: "name", type: ArgType.STRING, required: true, description: "Plugin name" };
     return [
       {
-        cmd: { name: "plugin.browse", title: "Browse Plugins", category: "Plugin", description: "List the plugins the registries offer.", keybindings: [], args: [refresh] },
+        cmd: { name: "plugin.browse", noPalette: true, title: "Browse Plugins", category: "Plugin", description: "List the plugins the registries offer.", keybindings: [], args: [refresh] },
         when: always,
         run: (_c: UiContext | undefined, a) => {
           const b = this.browse(a.refresh === "true");
@@ -335,7 +335,7 @@ export class MockRegistry {
       },
       {
         cmd: {
-          name: "plugin.install",
+          name: "plugin.install", noPalette: true,
           title: "Install Plugin",
           category: "Plugin",
           description: "Install a plugin from the registries, a GitHub release or a folder.",
@@ -409,7 +409,7 @@ export class MockRegistry {
       },
       {
         cmd: {
-          name: "plugin.uninstall",
+          name: "plugin.uninstall", noPalette: true,
           title: "Uninstall Plugin",
           category: "Plugin",
           description: "Disable a plugin, stop it, remove its threads and its package; --purge deletes its data, secrets and consent too.",

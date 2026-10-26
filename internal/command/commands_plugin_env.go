@@ -20,9 +20,10 @@ type PluginEnvBackend interface {
 
 func pluginEnvCmd(b PluginBackend) Command {
 	return Command{
-		Name:     "plugin.env",
-		ReadOnly: true,
-		Title:    "Show Plugin Session Environment",
+		Name:      "plugin.env",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Show Plugin Session Environment",
 		Description: "Print what plugins add to new Claude threads (and, without the --add-dir directories, to new shells): " +
 			"environment variables (names only: a value may be a secret), PATH entries and --add-dir directories, which " +
 			"projects get them, and what was refused or lost to another plugin. One plugin's with a name.",

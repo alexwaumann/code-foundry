@@ -257,6 +257,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		},
 		Command{
 			Name:         "view.open.url",
+			NoPalette:    true,
 			Title:        "Open URL in Browser",
 			Description:  "Open an http(s) URL in the default browser.",
 			Category:     "View",

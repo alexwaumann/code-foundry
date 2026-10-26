@@ -148,6 +148,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 		},
 		Command{
 			Name:         "terminal.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Terminals",
 			Description:  "List every terminal with its state, working directory and labels (who it belongs to).",

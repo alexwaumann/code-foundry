@@ -143,7 +143,7 @@ export async function reconnectMcp(threads: McpThreads, id: string, server: stri
 }
 
 type Command = {
-  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; args: { name: string; type: ArgType; required: boolean; description: string }[] };
+  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: { name: string; type: ArgType; required: boolean; description: string }[] };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
@@ -156,7 +156,7 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
   return [
     {
       cmd: {
-        name: "thread.mcp",
+        name: "thread.mcp", noPalette: true,
         title: "Show Thread MCP Servers",
         category: "Thread",
         description: "Print a thread's MCP servers as Claude last reported them.",
@@ -176,7 +176,7 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
     },
     {
       cmd: {
-        name: "thread.mcp-reconnect",
+        name: "thread.mcp-reconnect", noPalette: true,
         title: "Reconnect Thread MCP Server",
         category: "Thread",
         description: "Reconnect one of a connected thread's MCP servers, then check them again.",

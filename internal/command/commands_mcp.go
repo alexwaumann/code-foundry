@@ -42,8 +42,9 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
-			Name:  "thread.mcp",
-			Title: "Show Thread MCP Servers",
+			Name:      "thread.mcp",
+			NoPalette: true,
+			Title:     "Show Thread MCP Servers",
 			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
 				"status, scope, transport, version and tool count; --full adds each server's tools.",
 			Category:     "Thread",
@@ -64,8 +65,9 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:  "thread.mcp-reconnect",
-			Title: "Reconnect Thread MCP Server",
+			Name:      "thread.mcp-reconnect",
+			NoPalette: true,
+			Title:     "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
 				"It picks up a login made with /mcp in an interactive claude (a bottom-panel shell).",
 			Category: "Thread",

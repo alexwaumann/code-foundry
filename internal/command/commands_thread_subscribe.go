@@ -264,8 +264,9 @@ func boolCount(b bool) int {
 
 func threadSubscribe(b ThreadBackend) Command {
 	return Command{
-		Name:  "thread.subscribe",
-		Title: "Subscribe Thread to Wakes",
+		Name:      "thread.subscribe",
+		NoPalette: true,
+		Title:     "Subscribe Thread to Wakes",
 		Description: "Wake a thread with a message when another thread settles, " +
 			"an action run finishes, a pull request's checks finish, a plugin wake fires (plugin wakes), or at a time or every interval (at, every). " +
 			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
@@ -362,8 +363,9 @@ func threadSubscribe(b ThreadBackend) Command {
 
 func threadUnsubscribe(b ThreadBackend) Command {
 	return Command{
-		Name:  "thread.unsubscribe",
-		Title: "Unsubscribe Thread from Wakes",
+		Name:      "thread.unsubscribe",
+		NoPalette: true,
+		Title:     "Unsubscribe Thread from Wakes",
 		Description: "Remove a wake subscription by id, or every subscription of a thread (default: the thread this runs in) " +
 			"to a target.",
 		Category:     "Thread",
@@ -407,9 +409,10 @@ func threadUnsubscribe(b ThreadBackend) Command {
 
 func threadSubscriptions(b ThreadBackend) Command {
 	return Command{
-		Name:     "thread.subscriptions",
-		ReadOnly: true,
-		Title:    "List Thread Wake Subscriptions",
+		Name:      "thread.subscriptions",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "List Thread Wake Subscriptions",
 		Description: "List a thread's wake subscriptions (default: the thread this runs in; all for every thread) " +
 			"with their targets' status and how often they fired.",
 		Category:     "Thread",

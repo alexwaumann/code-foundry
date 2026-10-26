@@ -16,8 +16,9 @@ import (
 // branchDeleteCommand is project.branch.delete.
 func branchDeleteCommand(b ProjectBackend, notGit NotGitFunc) Command {
 	return Command{
-		Name:  "project.branch.delete",
-		Title: "Delete Branch",
+		Name:      "project.branch.delete",
+		NoPalette: true,
+		Title:     "Delete Branch",
 		Description: "Delete a branch no worktree has checked out (its worktree removed); remote: origin's too. " +
 			"Without force the branch, and origin's copy, must be merged into the default branch (or landed there " +
 			"squash- or rebase-merged); otherwise nothing is deleted and the error counts the unmerged commits.",

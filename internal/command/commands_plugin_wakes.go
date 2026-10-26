@@ -42,9 +42,10 @@ type WakeArgJSON struct {
 
 func pluginWakesCmd(b PluginBackend) Command {
 	return Command{
-		Name:     "plugin.wakes",
-		ReadOnly: true,
-		Title:    "List Plugin Wake Sources",
+		Name:      "plugin.wakes",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "List Plugin Wake Sources",
 		Description: "List the plugins' wake sources: events a thread waits for with `code-foundry thread subscribe --plugin <plugin>/<source>` " +
 			"instead of polling. Each with its args (which default from the subscribing thread: its id, pull request or project), " +
 			"its scope and the line that subscribes.",

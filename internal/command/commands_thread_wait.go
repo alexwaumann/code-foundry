@@ -44,9 +44,10 @@ const maxThreadWait = 24 * time.Hour
 func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
-		Name:     "thread.wait",
-		ReadOnly: true,
-		Title:    "Wait for Thread",
+		Name:      "thread.wait",
+		NoPalette: true,
+		ReadOnly:  true,
+		Title:     "Wait for Thread",
 		Description: "Wait until a thread settles: its turn ended, or it asks for a permission or an answer " +
 			"(or with --until: idle, attention, error, disconnected); returns at once when it already has. " +
 			"Prints the thread's status and any pending request with the thread respond line that answers it " +

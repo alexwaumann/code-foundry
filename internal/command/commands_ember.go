@@ -104,6 +104,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 	return errors.Join(r.RegisterAll(
 		Command{
 			Name:         "ember.status",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Ember: Status",
 			Description:  "Whether Ember is on, its thread, its epoch (fresh sessions so far), the context size against the epoch limit, the epoch's age and its open tasks.",
@@ -116,6 +117,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.board",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Ember: Board",
 			Description:  "Print Ember's task board as markdown: in progress, up next, blocked and done today, with ids and each worker's progress.",
@@ -127,8 +129,9 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			},
 		},
 		Command{
-			Name:  "ember.remember",
-			Title: "Ember: Remember",
+			Name:      "ember.remember",
+			NoPalette: true,
+			Title:     "Ember: Remember",
 			Description: "Keep a fact in Ember's memory now: a dated line under MEMORY.md's Notes, kept across epochs " +
 				"(a convention, a decision, a person). The rest of the memory is rewritten at each new epoch. " +
 				"A preference about how threads behave in the app goes to memory.add, which every thread gets.",
@@ -144,8 +147,9 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 			},
 		},
 		Command{
-			Name:  "ember.reseed",
-			Title: "Ember: New Epoch",
+			Name:      "ember.reseed",
+			NoPalette: true,
+			Title:     "Ember: New Epoch",
 			Description: "Start a new epoch now: consolidate Ember's memory (a one-shot claude -p), rebuild its seed and give it a " +
 				"fresh session. Its next message starts the new session; a running turn ends first.",
 			Category:     emberCategory,
@@ -165,6 +169,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.enable",
+			NoPalette:    true,
 			Title:        "Ember: Turn On",
 			Description:  "Turn Ember on (the ember.enabled setting): its thread is made on first use, in ~/.code-foundry/residents/ember.",
 			Category:     emberCategory,
@@ -173,6 +178,7 @@ func RegisterEmber(r *Registry, d EmberDeps) error {
 		},
 		Command{
 			Name:         "ember.disable",
+			NoPalette:    true,
 			Title:        "Ember: Turn Off",
 			Description:  "Turn Ember off (the ember.enabled setting): its process stops and its timers go; its thread, memory and board stay.",
 			Category:     emberCategory,

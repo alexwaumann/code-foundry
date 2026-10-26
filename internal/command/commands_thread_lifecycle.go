@@ -285,6 +285,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		threadNewLike(r, b, e),
 		Command{
 			Name:         "thread.focus",
+			NoPalette:    true,
 			Title:        "Focus Thread",
 			Description:  "Show a thread in every connected window.",
 			Category:     "Thread",

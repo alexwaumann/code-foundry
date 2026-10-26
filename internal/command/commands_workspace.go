@@ -78,6 +78,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:         "workspace.list",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Workspaces",
 			Description:  "List workspaces with their projects, default primary and folder.",
@@ -102,6 +103,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.add-project",
+			NoPalette:   true,
 			Title:       "Add Project to Workspace",
 			Description: "Add a project to a workspace. Nothing on disk changes.",
 			Category:    "Workspace",
@@ -124,6 +126,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.remove-project",
+			NoPalette:   true,
 			Title:       "Remove Project from Workspace",
 			Description: "Drop a project from a workspace. Nothing on disk changes; threads keep their projects.",
 			Category:    "Workspace",
@@ -167,6 +170,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.set-primary",
+			NoPalette:   true,
 			Title:       "Set Workspace Default Primary",
 			Description: "Set where new threads in a workspace start: one of its projects, or workspace (its folder). A project named workspace wins over the keyword.",
 			Category:    "Workspace",
@@ -208,8 +212,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:  "workspace.remove",
-			Title: "Remove Workspace",
+			Name:      "workspace.remove",
+			NoPalette: true,
+			Title:     "Remove Workspace",
 			Description: "Forget a workspace. Its folder goes with its instructions and skills; for a workspace with a root, only the links " +
 				"(the root is yours). Projects, worktrees and threads stay.",
 			Category: "Workspace",

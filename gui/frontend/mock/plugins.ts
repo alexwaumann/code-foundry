@@ -61,6 +61,7 @@ export interface PluginCommand {
     category: string;
     description: string;
     keybindings: string[];
+    noPalette?: boolean;
     args: ArgDef[];
     confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
     confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
@@ -1174,7 +1175,7 @@ export class MockPlugins {
     const out: PluginCommand[] = [
       {
         cmd: {
-          name: "plugin.enable",
+          name: "plugin.enable", noPalette: true,
           title: "Enable Plugin",
           category: "Plugin",
           description: "Turn a plugin on; the first time (or when it asks for more) you consent to its permissions.",
@@ -1198,7 +1199,7 @@ export class MockPlugins {
         },
       },
       {
-        cmd: { name: "plugin.disable", title: "Disable Plugin", category: "Plugin", description: "Stop a plugin and remove its commands.", keybindings: [], args: [nameArg] },
+        cmd: { name: "plugin.disable", noPalette: true, title: "Disable Plugin", category: "Plugin", description: "Stop a plugin and remove its commands.", keybindings: [], args: [nameArg] },
         when: () => true,
         run: (_c, a) => {
           const p = this.plugin(a.name ?? "");
@@ -1215,7 +1216,7 @@ export class MockPlugins {
         },
       },
       {
-        cmd: { name: "plugin.restart", title: "Restart Plugin", category: "Plugin", description: "Re-read the manifest and start the plugin afresh.", keybindings: [], args: [nameArg] },
+        cmd: { name: "plugin.restart", noPalette: true, title: "Restart Plugin", category: "Plugin", description: "Re-read the manifest and start the plugin afresh.", keybindings: [], args: [nameArg] },
         when: () => true,
         run: (_c, a) => {
           const p = this.plugin(a.name ?? "");
@@ -1228,7 +1229,7 @@ export class MockPlugins {
       },
       {
         cmd: {
-          name: "plugin.dev",
+          name: "plugin.dev", noPalette: true,
           title: "Add Dev Plugin",
           category: "Plugin",
           description: "Link a plugin folder (with a plugin.json) as a dev plugin and enable it.",
@@ -1242,7 +1243,7 @@ export class MockPlugins {
     ];
     out.push({
       cmd: {
-        name: "plugin.secrets.delete",
+        name: "plugin.secrets.delete", noPalette: true,
         title: "Delete Plugin Secret",
         category: "Plugin",
         description: "Delete one of a plugin's secrets from the Keychain.",

@@ -23,8 +23,9 @@ type ReseedBackend interface {
 
 func threadReseedCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "thread.reseed",
-		Title: "Reseed Thread",
+		Name:      "thread.reseed",
+		NoPalette: true,
+		Title:     "Reseed Thread",
 		Description: "Start a thread's next Claude session afresh (no resume) with a seed: a system prompt append and add-dirs " +
 			"for every spawn from now on (what is not given is cleared) and a prefix for the new session's first message. " +
 			"The items stay; the epoch goes up. A working thread stops when its turn ends; an idle one at once.",

@@ -313,7 +313,7 @@ export interface AgentThreads {
 }
 
 type Command = {
-  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; args: { name: string; type: ArgType; required: boolean; description: string }[] };
+  cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: { name: string; type: ArgType; required: boolean; description: string }[] };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
@@ -330,7 +330,7 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
   return [
     {
       cmd: {
-        name: "thread.agents",
+        name: "thread.agents", noPalette: true,
         title: "Show Thread Agents",
         category: "Thread",
         description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent.",
@@ -365,7 +365,7 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
     },
     {
       cmd: {
-        name: "thread.agent.open",
+        name: "thread.agent.open", noPalette: true,
         title: "Open Subagent",
         category: "Thread",
         description: "Show one of a thread's own subagent runs read-only in the GUI: its prompt, work log and report, under the thread.",

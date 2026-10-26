@@ -105,8 +105,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 	r.SetIDLister(SubscriptionID, subscriptionIDs(b))
 	return r.RegisterAll(
 		Command{
-			Name:  "thread.send",
-			Title: "Send to Thread",
+			Name:      "thread.send",
+			NoPalette: true,
+			Title:     "Send to Thread",
 			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it.",
 			Category: "Thread",
@@ -156,8 +157,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			},
 		},
 		Command{
-			Name:  "thread.respond",
-			Title: "Answer Thread Request",
+			Name:      "thread.respond",
+			NoPalette: true,
+			Title:     "Answer Thread Request",
 			Description: "Answer a thread's pending permission request or question (default: the oldest pending one). " +
 				"A question takes answer (the option label). Prints what is still pending.",
 			Category:     "Thread",
@@ -251,6 +253,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		},
 		Command{
 			Name:         "thread.items",
+			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "Show Thread Conversation",
 			Description:  "Print a thread's conversation as a readable log.",
