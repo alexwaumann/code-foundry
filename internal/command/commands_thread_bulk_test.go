@@ -135,6 +135,12 @@ func TestThreadRemoveIDsConfirm(t *testing.T) {
 		threads = append(threads, idle(id, ""))
 		ids = append(ids, id)
 	}
+	// s-000000000013 is in a worktree Code Foundry made; s-000000000014 was made in an
+	// existing checkout (created_worktree, no branch: nothing derived).
+	made, noBranch := idle("s-000000000013", ""), idle("s-000000000014", "")
+	made.CreatedWorktree, made.Branch = true, "feat/x"
+	noBranch.CreatedWorktree = true
+	threads = append(threads, made, noBranch)
 	tests := []struct {
 		name    string
 		ctx     command.Context
@@ -150,6 +156,13 @@ func TestThreadRemoveIDsConfirm(t *testing.T) {
 		{name: "twelve list ten and the count of the rest", args: map[string]string{"ids": strings.Join(ids, ",")},
 			wantAsk: "Remove 12 threads? Claude stops in each that runs, and they are forgotten: " +
 				strings.Join(ids[:10], ", ") + " and 2 more."},
+		{name: "one in a made worktree", args: map[string]string{"id": made.Id},
+			wantAsk: "Remove thread s-000000000013? Claude stops if it runs, and the thread is forgotten. Its clean worktrees are removed; branches stay."},
+		{name: "created_worktree without a branch says nothing extra", args: map[string]string{"id": noBranch.Id},
+			wantAsk: "Remove thread s-000000000014? Claude stops if it runs, and the thread is forgotten."},
+		{name: "several, one in a made worktree", args: map[string]string{"ids": ids[0] + "," + made.Id},
+			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s-000000000001, s-000000000013. " +
+				"Their clean worktrees are removed; branches stay."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

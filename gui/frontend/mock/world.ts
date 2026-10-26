@@ -3540,7 +3540,12 @@ export class World {
       {
         cmd: {
           name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the thread (closes it first if connected)", keybindings: [], args: [],
-          confirm: (ctx) => `Remove thread ${ctx?.activeThreadId ?? ""}? It is closed first if connected, and its row is forgotten.`,
+          // Like the daemon's DynamicConfirm: a thread in a worktree Code Foundry made says its clean worktrees go.
+          confirm: (ctx) => {
+            const s = activeThread(ctx);
+            const made = s?.createdWorktree === true && s.branch !== "" ? " Its clean worktrees are removed; branches stay." : "";
+            return `Remove thread ${ctx?.activeThreadId ?? ""}? Claude stops if it runs, and the thread is forgotten.${made}`;
+          },
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx) => {

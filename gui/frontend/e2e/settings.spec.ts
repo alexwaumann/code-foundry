@@ -506,6 +506,8 @@ test("destructive commands ask first; cancel keeps, confirm runs", async ({ page
   await remove();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove thread s-3?");
+  // s-3 is in a checkout, not a worktree Code Foundry made: no worktree sentence.
+  await expect(dialog).not.toContainText("worktrees are removed");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
   await expect(row(page, "s:s-3")).toBeVisible();

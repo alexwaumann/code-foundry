@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -110,9 +111,11 @@ func listSome(items []string) string {
 }
 
 // removeConfirm is thread.remove's confirmation: of the one thread, or of several
-// given ids; "" without a target (Run says what is missing). It names the hidden child
-// threads of the removed ones still working (orphanedWorking): they keep running and the
-// daemon shows them in the sidebar.
+// given ids; "" without a target (Run says what is missing). When one of them has
+// worktrees Code Foundry made (madeWorktrees), it says the daemon removes the clean ones
+// (docs/notes/remove-cleans-worktrees.md). It names the hidden child threads of the
+// removed ones still working (orphanedWorking): they keep running and the daemon shows
+// them in the sidebar.
 func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	ids, err := targetThreads(a)
 	var ask string
@@ -121,13 +124,33 @@ func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 		return ""
 	case len(ids) == 1:
 		ask = "Remove thread " + ids[0] + "? Claude stops if it runs, and the thread is forgotten."
+		if madeWorktrees(ctx, b, ids) {
+			ask += " Its clean worktrees are removed; branches stay."
+		}
 	default:
 		ask = fmt.Sprintf("Remove %d threads? Claude stops in each that runs, and they are forgotten: %s.", len(ids), listSome(ids))
+		if madeWorktrees(ctx, b, ids) {
+			ask += " Their clean worktrees are removed; branches stay."
+		}
 	}
 	if n := orphanedWorking(ctx, b, ids); n > 0 {
 		ask += " " + orphanedWorkingText(n)
 	}
 	return ask
+}
+
+// madeWorktrees reports whether one of ids is a worktree-mode thread (created_worktree
+// on a branch): its derived worktrees are Code Foundry's, and the daemon removes the
+// clean ones after the removal. A thread in place or in a folder has none. False when the
+// list fails.
+func madeWorktrees(ctx context.Context, b ThreadBackend, ids []string) bool {
+	res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}))
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(res.Msg.GetThreads(), func(s *v1.Thread) bool {
+		return s.GetCreatedWorktree() && s.GetBranch() != "" && slices.Contains(ids, s.GetId())
+	})
 }
 
 // orphanedWorking counts the hidden threads that ids created, not among ids, that are
