@@ -286,6 +286,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
 		// An archived thread's derived worktrees nobody else has go (cleanup_archived.go).
 		Archived: s.archived.archived,
+		// And a removed thread's, the same way (docs/notes/remove-cleans-worktrees.md).
+		Removed: s.archived.removed,
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
