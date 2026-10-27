@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { LoaderCircle } from "lucide-react";
 import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
 import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
 import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { isThemeAck, pageKey, resizeHeight } from "./previewGrant";
+import { isThemeAck, pageKey, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
  * The sandbox of a frame with no owning thread (a File tab on an arbitrary HTML file):
@@ -36,6 +37,13 @@ export const THREAD_PAGE_SANDBOX = `${HTML_PREVIEW_SANDBOX} allow-same-origin`;
 export const THEME_ACK_MS = 300;
 
 /**
+ * How long a frame stays hidden waiting for its `load` before it shows anyway: `load` waits
+ * for every image and script, and a page held up by a slow one should still show what it has
+ * (a thread's page is painted in the theme from its first byte, so it is not white then).
+ */
+export const FRAME_REVEAL_MS = 1000;
+
+/**
  * An HTML page in a sandboxed frame at a granted URL (usePreviewGrant). The File tab's
  * preview and a thread's inline page are this one frame (docs/notes/
  * html-preview-interactive.md, inline-html.md). A page that links `/cf/theme.css` paints in
@@ -55,7 +63,15 @@ export const THEME_ACK_MS = 300;
  *   stylesheet (fetched once, no-store) repaints, its state going with the reload.
  *
  * `onResize` hears this frame's own `{ type: "cf:resize", height }` messages (a page asking
- * for its height). A white canvas, as in a browser.
+ * for its height).
+ *
+ * No white flash (docs/notes/inline-page-frame.md): the iframe is transparent over a
+ * `bg-cf-surface` box (className and style size the box) and hidden until its `load`, or
+ * FRAME_REVEAL_MS, a spinner on the surface meanwhile; then it fades in over 120 ms (at once
+ * with reduced motion). Every load starts hidden again (a theme reload, a new owning thread;
+ * the host's `key` for an edit). A thread's page is asked for with THEMED_PARAM, so the daemon
+ * paints it in the theme from its first byte; an opaque frame's page (any other HTML file) is
+ * served as written and, once shown, has a white canvas, as in a browser.
  *
  * The bridge (stores/bridgeHost.ts): a page loading `/cf/bridge.js` runs verbs and
  * subscribes to the app's state as `thread`, the thread that shows it; without one (a File
@@ -170,7 +186,7 @@ export function HtmlFrame({
   const origin = opaque ? "null" : pageOrigin;
   const target = opaque ? "*" : pageOrigin;
   const [nonce] = useState(frameNonce);
-  const src = useMemo(() => withNonce(url, nonce), [url, nonce]);
+  const src = useMemo(() => withNonce(opaque ? url : themedUrl(url), nonce), [url, nonce, opaque]);
   const host = useRef<BridgeHost | null>(null);
   const nameRef = useRef(name);
   useEffect(() => {
@@ -227,25 +243,50 @@ export function HtmlFrame({
       window.removeEventListener("message", onMessage);
     };
   }, [origin, nonce]);
+  // The frame's load: visible once its `load` came (or FRAME_REVEAL_MS passed). A new grant's
+  // URL for the same frame (a daemon restart) keeps it visible: that page is up.
+  const frameKey = `${String(load)}:${thread ?? ""}`;
+  const [visibleKey, setVisibleKey] = useState<string | null>(null);
+  const visible = visibleKey === frameKey;
+  useEffect(() => {
+    if (visible) return;
+    const t = setTimeout(() => {
+      setVisibleKey(frameKey);
+    }, FRAME_REVEAL_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [frameKey, visible]);
   return (
-    <iframe
-      key={`${String(load)}:${thread ?? ""}`}
-      ref={frameRef}
-      onLoad={() => {
-        post();
-        if (errors.current.length > 0) report([]);
-        host.current?.loaded();
-      }}
-      aria-label={`${name} (rendered)`}
-      src={src}
-      sandbox={opaque ? HTML_PREVIEW_SANDBOX : THREAD_PAGE_SANDBOX}
-      allow="clipboard-write"
-      referrerPolicy="no-referrer"
-      className={cn("w-full border-0 bg-white", className)}
-      style={{ ...style, colorScheme: scheme }}
-      data-testid={testId}
-      data-load={load}
-    />
+    <div className={cn("relative w-full bg-cf-surface", className)} style={style} data-testid={`${testId}-box`}>
+      <iframe
+        key={frameKey}
+        ref={frameRef}
+        onLoad={() => {
+          setVisibleKey(frameKey);
+          post();
+          if (errors.current.length > 0) report([]);
+          host.current?.loaded();
+        }}
+        aria-label={`${name} (rendered)`}
+        src={src}
+        sandbox={opaque ? HTML_PREVIEW_SANDBOX : THREAD_PAGE_SANDBOX}
+        allow="clipboard-write"
+        referrerPolicy="no-referrer"
+        // Transparent: the box's surface shows until the page paints, and behind a thread's
+        // page with no background. An opaque frame's page turns white once shown, as in a browser.
+        className={cn("absolute inset-0 size-full border-0 transition-opacity duration-120 ease-out motion-reduce:transition-none", visible ? "opacity-100" : "opacity-0", visible && opaque && "bg-white")}
+        style={{ colorScheme: scheme }}
+        data-testid={testId}
+        data-load={load}
+        data-shown={visible || undefined}
+      />
+      {!visible && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-cf-text-muted" data-testid={`${testId}-loading`}>
+          <LoaderCircle className="size-4 animate-spin" aria-label="Loading" />
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -116,7 +116,7 @@ func TestHandler(t *testing.T) {
 	// started in the checkout) is guarded from then on.
 	write(t, filepath.Join(proj, "scratch-home", "pages.port"), "9300")
 	write(t, filepath.Join(proj, "scratch-home", "db.sqlite"), "db")
-	srv := httptest.NewServer(Handler(g, slog.Default()))
+	srv := httptest.NewServer(Handler(g, nil, slog.Default()))
 	t.Cleanup(srv.Close)
 
 	tests := []struct {

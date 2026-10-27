@@ -225,7 +225,7 @@ import { emberStateNames } from "./ember";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
-import { publishMockTheme, themeRoute } from "./theme";
+import { mockPaint, publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
@@ -1586,7 +1586,9 @@ const server = createServer((req, res) => {
       // origin is not the app's (docs/notes/bridge-2-gui.md).
       "Content-Security-Policy": "sandbox allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads",
     });
-    res.end(e.data);
+    // A thread's page is painted in the theme from its first byte, as the daemon does.
+    const themed = url.searchParams.get("cf-page") === "1" && e.mime.startsWith("text/html");
+    res.end(themed ? mockPaint(new TextDecoder().decode(e.data)) : e.data);
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

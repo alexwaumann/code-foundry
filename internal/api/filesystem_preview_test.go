@@ -69,7 +69,7 @@ func TestFilesystemPreviewFile(t *testing.T) {
 	route := NewFilesystem(root, fake, grants).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
-	mux.Handle(preview.Prefix, preview.Handler(grants, slog.Default()))
+	mux.Handle(preview.Prefix, preview.Handler(grants, nil, slog.Default()))
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	c := codefoundryv1connect.NewFilesystemServiceClient(srv.Client(), srv.URL)
@@ -171,7 +171,7 @@ func TestFilesystemPreviewFilePagesOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	grants := testGrants(root)
-	pages := httptest.NewServer(preview.Handler(grants, slog.Default()))
+	pages := httptest.NewServer(preview.Handler(grants, nil, slog.Default()))
 	t.Cleanup(pages.Close)
 	route := NewFilesystem(root, projecttest.New(nil), grants).WithPagesOrigin(pages.URL).Route()
 	api := httptest.NewServer(route.Handler)

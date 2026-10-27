@@ -105,7 +105,7 @@ func TestFloorFoldedNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(Handler(g, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(Handler(g, nil, slog.New(slog.DiscardHandler)))
 	defer srv.Close()
 	for rel, want := range map[string]int{
 		"index.html":            http.StatusOK,
@@ -180,7 +180,7 @@ func TestFloorHardLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(Handler(g, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(Handler(g, nil, slog.New(slog.DiscardHandler)))
 	defer srv.Close()
 	for rel, want := range map[string]int{"t": 404, "key": 404, "lib.js": 200, "index.html": 200} {
 		if got := get(t, srv.URL+URL(grant, rel)); got != want {
