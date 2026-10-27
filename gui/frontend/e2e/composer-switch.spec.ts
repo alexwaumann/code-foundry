@@ -96,7 +96,9 @@ test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc close
   await compose(page, 1);
   await page.keyboard.type("Keep me");
 
-  // Prompt ← Add project ← the heading's name.
+  // Prompt ← the collision banner's "Use a new branch" (s-1 runs in code-foundry's folder) ← Add project ← the heading's name.
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByTestId("composer-collision-new-branch")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByTestId("composer-add-project")).toBeFocused();
   await page.keyboard.press("Shift+Tab");

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { composeProject, openApp, resetMock, row } from "./fixtures";
+import { composeProject, freshCopyByDefault, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Floating surfaces under page zoom (CSS zoom on <html>, lib/zoom.ts). Radix positions
@@ -31,8 +31,10 @@ async function rect(l: Locator) {
 // at 125% the same checks hold with the factor applied.
 for (const zoom of [90, 125, 150]) {
   test(`the composer model picker opens right under its trigger at ${String(zoom)}%`, async ({ page }) => {
-    // Tall enough that the whole model list fits below the trigger at 150%.
+    // Tall enough that the whole model list fits below the trigger at 150%; a fresh copy
+    // has no collision banner (s-1 runs in code-foundry's folder) to push the card down.
     await page.setViewportSize({ width: 1280, height: 1100 });
+    await freshCopyByDefault();
     await openApp(page);
     await setZoom(page, zoom);
     await compose(page);
