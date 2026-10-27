@@ -550,6 +550,13 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   a cleanup removed makes it again first, on the branch the row records, at the same
   path, so `--resume` finds the transcript, and the thread's other derived worktrees too;
   user checkouts keep the refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
+  A conversation whose transcript Claude Code deleted (its `cleanupPeriodDays`) cannot
+  continue: the start is refused (`ErrTranscriptMissing`, FAILED_PRECONDITION, nothing
+  written; Send, Reconnect, Fork and the MCP and slash command queries alike) and
+  `Thread.transcript_missing` says so, checked at daemon start, when a process ends and on
+  a refusal, never per snapshot; a reseed is the one way to start over, and a resident
+  thread starts a new conversation as before (`transcriptmissing.go`,
+  `docs/notes/transcript-deleted.md`).
 * **The runner** (`runner.go`, `stream.go`): `internal/claudestream` speaks the control
   protocol (initialize handshake, `can_use_tool` routed to the store, interrupt,
   set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into

@@ -41,10 +41,10 @@ C, which deleted it (`docs/notes/hide-connection-state.md`). This PR is the daem
     that races the daemon's shutdown fails with ErrClosed and no timeline line: spawn's
     commit re-checks `m.closed` and kills the new process (`runner.abandon`), so
     `m.wg.Add` never races Shutdown's `Wait`.
-  * A conversation whose transcript is gone starts a new one with a note item before the
-    message: "Started a new conversation: the previous one's transcript is gone, so Claude
-    does not remember this thread's earlier messages." (`LastError` says it too, as
-    Reconnect did).
+  * A conversation whose transcript is gone is refused (FAILED_PRECONDITION, nothing
+    written) and the thread is flagged `transcript_missing`; only a resident thread still
+    starts a new one with the "Started a new conversation" note. Superseded by
+    `docs/notes/transcript-deleted.md` (2026-10-27).
   * Sending unarchives and unsnoozes as before. Respond on a stopped thread is
     FAILED_PRECONDITION ("no pending request … Claude is not running"); Interrupt is a
     no-op success.
