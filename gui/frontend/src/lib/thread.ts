@@ -147,8 +147,8 @@ export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): A
 
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
- * the user, attentionTier, or a plugin's attention flag), "error" (error / interrupted, or a
- * plugin's error flag), "done" (an unseen finished turn), "working" (busy, or Claude
+ * the user, attentionTier, or a plugin's attention flag), "error" (error / interrupted, a
+ * plugin's error flag, or a transcript Claude Code deleted), "done" (an unseen finished turn), "working" (busy, or Claude
  * starting), "idle" (everything else). The same reading as
  * threadBadge: attention and error win, so a thread waiting on the user never hides in the
  * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
@@ -191,7 +191,10 @@ export function restartCutsOff(
   return s.backgroundWakePending ? "reporting" : null;
 }
 
-export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "flags">>): ThreadGroup {
+export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing">>): ThreadGroup {
+  // Its transcript is gone, so it cannot continue: an error whatever status it kept
+  // (docs/notes/transcript-deleted.md).
+  if (s.transcriptMissing) return "error";
   const tier = attentionTier(s);
   if (tier === "prompt") return tier;
   if (s.status === "error") return "error";

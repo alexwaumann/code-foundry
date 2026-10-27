@@ -104,6 +104,7 @@ export function RowMenu({ id }: { id: string }) {
   const newLike = useThreadsStore((s) => canNewLike(s.byId[id]));
   // Another thread created it: a row in the sidebar is shown, so it can be handed back.
   const created = useThreadsStore((s) => (s.byId[id]?.createdBy ?? "") !== "");
+  const transcriptMissing = useThreadsStore((s) => s.byId[id]?.transcriptMissing === true);
   return (
     <ContextMenuContent
       data-testid="row-menu"
@@ -186,6 +187,9 @@ export function RowMenu({ id }: { id: string }) {
         </ContextMenuItem>
       )}
       <ContextMenuItem
+        data-testid="menu-fork"
+        // Nothing to fork from once Claude Code deleted the transcript (docs/notes/transcript-deleted.md).
+        disabled={transcriptMissing}
         onSelect={() => {
           void forkThread(id);
         }}

@@ -33,6 +33,10 @@
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
  *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
+ *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
+ *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
+ *   POST /__mock/transcript-deleted              (the thread s-transcript-deleted, "Fix sidebar flake":
+ *     one exchange, its transcript deleted; MOCK_SCENARIO=transcript-deleted seeds it; World.addTranscriptDeleted)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives;
  *                                                 hidden children go along: World.archiveCascade)
@@ -254,9 +258,14 @@ const mockFiles = new MockFiles((path) => {
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
 
-/** MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from the start and after every reset. */
+/**
+ * MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from
+ * the start and after every reset; transcript-deleted: the thread whose transcript Claude
+ * Code deleted (World.addTranscriptDeleted).
+ */
 function seedScenario(): void {
   if (process.env.MOCK_SCENARIO === "status-kinds") world.addStatusKinds();
+  if (process.env.MOCK_SCENARIO === "transcript-deleted") world.addTranscriptDeleted();
 }
 seedScenario();
 
@@ -897,7 +906,8 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript}?id=…[&status=…][&reason=…&code=…].
+ * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
@@ -941,6 +951,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         break;
       case "envstale":
         world.setPluginEnvChange(id, q.get("change") ?? "");
+        break;
+      case "transcript":
+        world.setTranscriptMissing(id, q.get("missing") !== "false");
         break;
       case "flag": {
         const level = flagLevels[q.get("level") ?? "attention"];
@@ -1011,7 +1024,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag|envstale|transcript)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
@@ -1299,6 +1312,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/resident":
       json(res, 200, { id: world.addResident() });
+      break;
+    case "POST /__mock/transcript-deleted":
+      json(res, 200, { id: world.addTranscriptDeleted() });
       break;
     case "POST /__mock/empty":
       world.empty();
