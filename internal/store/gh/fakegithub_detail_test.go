@@ -85,16 +85,25 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 		owner, name, number := vars["owner"].(string), vars["name"].(string), vars["number"].(int)
 		p := g.findPR(owner, name, number)
 		repo := map[string]any{"pullRequest": nil}
-		if vars["search"].(bool) {
-			// GitHub matches login and name; the fake takes a case-insensitive substring.
-			q := strings.ToLower(vars["query"].(string))
+		// GitHub matches login and name; the fake takes a case-insensitive substring of
+		// the whole query (assignableUsers) and of each word (t0..t3, when sN is set).
+		search := func(q string) map[string]any {
+			q = strings.ToLower(q)
 			users := []any{}
 			for _, u := range g.detail.assignable {
 				if len(users) < 20 && (strings.Contains(strings.ToLower(u.Login), q) || strings.Contains(strings.ToLower(u.Name), q)) {
 					users = append(users, map[string]any{"id": u.ID, "login": u.Login, "name": u.Name, "avatarUrl": u.AvatarURL})
 				}
 			}
-			repo["assignableUsers"] = map[string]any{"nodes": users}
+			return map[string]any{"nodes": users}
+		}
+		if vars["search"].(bool) {
+			repo["assignableUsers"] = search(vars["query"].(string))
+		}
+		for i := range reviewerSearchMaxTokens {
+			if on, _ := vars[fmt.Sprintf("s%d", i)].(bool); on {
+				repo[fmt.Sprintf("t%d", i)] = search(vars[fmt.Sprintf("q%d", i)].(string))
+			}
 		}
 		if p != nil {
 			repo["pullRequest"] = map[string]any{"author": map[string]any{"login": p.Author}, "reviewRequests": requestsJSON(p)}

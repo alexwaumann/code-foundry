@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -46,18 +47,16 @@ func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int,
 		if err != nil && !isPartial(err) {
 			return ReviewerCandidates{}, err
 		}
-		return decodeReviewerCandidates(data)
+		return decodeReviewerCandidates(data, reviewerSearchTokens(query))
 	})
 }
 
-// reviewerCandidatesVars are the ReviewerCandidates document's variables; search is
-// set only for a non-empty query.
-func reviewerCandidatesVars(owner, name string, number int, query string) map[string]any {
-	return map[string]any{"owner": owner, "name": name, "number": number, "query": query, "search": query != ""}
-}
-
 // SetReviewRequest implements Service. It returns the pending requests afterwards
-// (logins and "org/team").
+// (logins and "org/team"). GitHub answers a request it ignored (someone without access
+// to the repository) like one it took, so the pending requests it returns must list the
+// reviewer afterwards, or no longer list them after a withdraw; otherwise the call
+// fails with ErrFailedPrecondition. Bots are not checked: GitHub lists them under
+// another login (copilot-pull-request-reviewer[bot] comes back as Copilot).
 func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r ReviewRequest) ([]string, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
@@ -100,7 +99,11 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 		if err != nil {
 			return nil, err
 		}
-		return decodeRequestedReviewers(res, owner)
+		requested, err := decodeRequestedReviewers(res, owner)
+		if err != nil {
+			return nil, err
+		}
+		return requested, checkReviewRequest(requested, kind, login, r.Requested)
 	})
 	if err != nil {
 		return nil, err
@@ -110,6 +113,33 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 	// The review requests (and the requested reviewer's dashboard) moved: poll soon.
 	s.pollSoon()
 	return requested, nil
+}
+
+// checkReviewRequest reports whether GitHub's pending requests after a write (logins
+// and "org/team") agree with it: login (a team's slug for ReviewerTeam) is listed when
+// requested, and absent when withdrawn. Logins compare case-insensitively.
+func checkReviewRequest(pending []string, kind ReviewerKind, login string, requested bool) error {
+	if kind == ReviewerUser && strings.HasSuffix(login, "[bot]") {
+		return nil
+	}
+	listed := slices.ContainsFunc(pending, func(p string) bool {
+		org, team, isTeam := strings.Cut(p, "/")
+		if kind == ReviewerTeam {
+			return isTeam && strings.EqualFold(team, login)
+		}
+		return !isTeam && strings.EqualFold(org, login)
+	})
+	who := login
+	if kind == ReviewerTeam {
+		who = "team " + login
+	}
+	switch {
+	case requested && !listed:
+		return fmt.Errorf("%w: GitHub did not add %s as a reviewer (they may lack access to the repository)", ErrFailedPrecondition, who)
+	case !requested && listed:
+		return fmt.Errorf("%w: GitHub still lists %s as a requested reviewer", ErrFailedPrecondition, who)
+	}
+	return nil
 }
 
 // RevertPullRequest implements Service. The pull request must be merged; its node id

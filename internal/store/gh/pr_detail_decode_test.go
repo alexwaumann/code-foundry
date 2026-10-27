@@ -295,7 +295,7 @@ func TestDecodeFullPullRequestNotFound(t *testing.T) {
 }
 
 func TestDecodeReviewerCandidates(t *testing.T) {
-	c, err := decodeReviewerCandidates(fixtureData(t, "reviewer_candidates_13779.json"))
+	c, err := decodeReviewerCandidates(fixtureData(t, "reviewer_candidates_13779.json"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,12 +321,52 @@ func TestDecodeReviewerCandidates(t *testing.T) {
 	}
 }
 
+// "jane doe" and "doe, jane" against the synthetic capture of a two-word search (the
+// whole query's list, then t0 "jane" and t1 "doe"): requested first whatever the query,
+// then users with both words, login prefix first, then name-word prefixes (the stored
+// "Doe, Jane" among them), then the rest; one entry per login, the author left out.
+func TestDecodeReviewerCandidatesTokens(t *testing.T) {
+	data := fixtureData(t, "reviewer_candidates_tokens_synthetic.json")
+	want := []string{"ana:true", "kim:true", "janedoe-dev:false", "jdoe:false", "zdoe:false", "xjanex:false"}
+	for _, query := range []string{"jane doe", "doe, jane", "Doe,Jane"} {
+		c, err := decodeReviewerCandidates(data, reviewerSearchTokens(query))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, x := range c.Candidates {
+			got = append(got, fmt.Sprintf("%s:%v", x.Login, x.Requested))
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%q: got %v, want %v", query, got, want)
+		}
+	}
+}
+
 func TestDecodeReviewerCandidatesShapes(t *testing.T) {
 	tests := []struct {
 		name, data string
+		tokens     []string
 		want       []string
 		err        error
 	}{
+		{
+			name: "one token: GitHub's matches by login, unfiltered",
+			data: `{"repository":{"assignableUsers":{"nodes":[
+				{"id":"U2","login":"zed","name":"Jane Zed"},{"id":"U1","login":"amy","name":"Amy J. Ane"}]},
+				"pullRequest":{"author":{"login":"a"},"reviewRequests":{"nodes":[]}}}}`,
+			tokens: []string{"jane"},
+			want:   []string{"amy:USER:false", "zed:USER:false"},
+		},
+		{
+			name: "several tokens: the word lists merge, only full matches stay, a login-only hit counts",
+			data: `{"repository":{"assignableUsers":{"nodes":[]},
+				"t0":{"nodes":[{"id":"U1","login":"kim-lee","name":""},{"id":"U2","login":"kim","name":"Kim Park"}]},
+				"t1":{"nodes":[{"id":"U1","login":"kim-lee","name":""},{"id":"U3","login":"lee","name":"Lee Ito"}]},
+				"pullRequest":{"author":{"login":"a"},"reviewRequests":{"nodes":[]}}}}`,
+			tokens: []string{"kim", "lee"},
+			want:   []string{"kim-lee:USER:false"},
+		},
 		{
 			name: "requested then search results, author excluded, requested once",
 			data: `{"repository":{"assignableUsers":{"nodes":[
@@ -355,7 +395,7 @@ func TestDecodeReviewerCandidatesShapes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := decodeReviewerCandidates([]byte(tt.data))
+			c, err := decodeReviewerCandidates([]byte(tt.data), tt.tokens)
 			if tt.err != nil {
 				if !errors.Is(err, tt.err) {
 					t.Errorf("err = %v, want %v", err, tt.err)
@@ -404,6 +444,7 @@ func TestDetailQueryVariables(t *testing.T) {
 		{queryPullRequestFull, map[string]any{"owner": "o", "name": "r", "number": 1}},
 		{queryReviewerCandidates, reviewerCandidatesVars("o", "r", 1, "")},
 		{queryReviewerCandidates, reviewerCandidatesVars("o", "r", 1, "kim")},
+		{queryReviewerCandidates, reviewerCandidatesVars("o", "r", 1, "doe, jane")},
 		{queryRevertPullRequest, map[string]any{"id": "PR_x"}},
 		{queryMergePullRequest, map[string]any{"id": "PR_x", "method": "SQUASH", "head": "abc"}},
 	} {

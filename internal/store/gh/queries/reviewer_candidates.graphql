@@ -1,12 +1,21 @@
 # Who can be asked to review a pull request: whoever is requested now (users and teams)
 # plus, when $search is set, up to 20 assignable users GitHub matches against $query
-# (login and name). Fetched on demand by ListReviewerCandidates; never cached.
-query ReviewerCandidates($owner: String!, $name: String!, $number: Int!, $query: String, $search: Boolean!) {
+# (login and name). A search of several words also asks for each word on its own
+# (t0..t3, set by $s0..$s3): GitHub matches the whole string against the stored name,
+# so "jane doe" misses "Doe, Jane"; the store merges the lists and keeps only users
+# matching every word (reviewer_search.go). Still one request. Fetched on demand by
+# ListReviewerCandidates; never cached.
+query ReviewerCandidates($owner: String!, $name: String!, $number: Int!, $query: String, $search: Boolean!,
+    $q0: String, $s0: Boolean!, $q1: String, $s1: Boolean!, $q2: String, $s2: Boolean!, $q3: String, $s3: Boolean!) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {
     assignableUsers(first: 20, query: $query) @include(if: $search) {
       nodes { id login name avatarUrl }
     }
+    t0: assignableUsers(first: 20, query: $q0) @include(if: $s0) { nodes { id login name avatarUrl } }
+    t1: assignableUsers(first: 20, query: $q1) @include(if: $s1) { nodes { id login name avatarUrl } }
+    t2: assignableUsers(first: 20, query: $q2) @include(if: $s2) { nodes { id login name avatarUrl } }
+    t3: assignableUsers(first: 20, query: $q3) @include(if: $s3) { nodes { id login name avatarUrl } }
     pullRequest(number: $number) {
       author { login }
       reviewRequests(first: 50) {
