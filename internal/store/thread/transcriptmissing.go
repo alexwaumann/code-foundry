@@ -89,6 +89,7 @@ func (m *Manager) refuseTranscriptMissing(id string) error {
 		return nil
 	}
 	if m.transcriptGone(s) {
+		m.log.Info("refused: Claude Code deleted the thread's transcript", "thread", id, "claude_session_id", s.ClaudeSessionID)
 		return ErrTranscriptMissing
 	}
 	m.setTranscriptMissing(id, s.ClaudeSessionID, false)
