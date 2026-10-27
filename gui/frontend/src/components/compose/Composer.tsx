@@ -5,13 +5,14 @@ import { AttachmentPreview } from "./AttachmentPreview";
 import { PdfTile } from "./attachmentFaces";
 import { attachLabel, useHostFiles } from "./useHostFiles";
 import { BranchIndicator } from "./BranchIndicator";
+import { CollisionBanner, CollisionTip } from "./CollisionBanner";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./PromptEditor";
 import { TagMultiProjectContext } from "./tagContext";
-import { useCollisionHints } from "./useCollisionHints";
+import { useCollisions } from "./useCollisions";
 import { useCompletion, useFileSource, useSkillSource, type CompletionSource } from "./useCompletion";
 import { useMentionSource, useProjectSlugs, usePrSource } from "./useRefSources";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -20,7 +21,7 @@ import { ATTACHMENT_MIME_TYPES } from "@/api/threads";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Tip } from "@/components/ui/tooltip";
 import { DragBand } from "@/components/window/DragBand";
-import { draftCheckouts, mainCheckout, threadCheckouts, type HintProject } from "@/lib/collisionHints";
+import { draftCheckouts, hintLine, mainCheckout, threadCheckouts, type HintProject } from "@/lib/collisionHints";
 import {
   BASE_FROM_ORIGIN_KEY,
   baseRuleText,
@@ -203,21 +204,6 @@ function useProjectNames(ids: readonly string[]): (id: string) => string {
 /** The chips of a set: one per project by id, by name only (the Work in and Runs in pickers say the rest). */
 function setChips(projectIds: readonly string[], removable: boolean): MemberChipModel[] {
   return projectIds.map((projectId) => ({ projectId, removable }));
-}
-
-/** The collision hints under the chips (lib/collisionHints): muted, never a blocker. */
-function Hints({ hints }: { hints: readonly string[] }) {
-  if (hints.length === 0) return null;
-  return (
-    <ul className="mb-2 flex flex-col gap-0.5 px-1" aria-label="Shared checkouts" data-testid="composer-hints">
-      {hints.map((h) => (
-        <li key={h} className="flex items-start gap-1.5 text-caption text-cf-text-muted" data-testid="composer-hint">
-          <TriangleAlert className="mt-0.5 size-3 shrink-0 text-cf-warning-text" aria-hidden />
-          <span className="min-w-0">{h}</span>
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 /**
@@ -514,10 +500,19 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
     },
     [home, likeThreadId, likeKey, hintSetIds, likeSrc.paths, single, worktree.kind, pickedBranch, existingPath, primary],
   );
-  const hints = useCollisionHints(mine);
+  const found = useCollisions(mine);
+  // The banner's collisions in the daemon's words: the hints shown here are not toasted again after the create.
+  const hints = useMemo(() => found.map(hintLine), [found]);
+  // The pill's tooltip lists them all; each chip's, its project's.
+  const collisionTip = useMemo(() => (found.length > 0 ? <CollisionTip list={found} /> : null), [found]);
+  const chipWarnings = useMemo(() => Object.fromEntries(found.map((c) => [c.projectId, <CollisionTip key={c.projectId} list={[c]} />])), [found]);
+  // "Use a new branch": a draft that can make worktrees and is not on a new branch already (a like draft's mode is its thread's).
+  const canNewBranch = !like && !home && worktree.kind !== "new" && (isSet ? setGit > 0 : noGitPath === undefined);
+  const toNewBranch = useCallback(() => {
+    updateDraft(draftKey, { worktree: { kind: "new" } });
+  }, [draftKey]);
 
   const send = () => {
-    // The hints shown here are not toasted again after the create.
     if (canSend) void sendDraft(target, defaults, hints);
   };
 
@@ -636,8 +631,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
 
   return (
     <div>
-      {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} disabled={busy} />}
-      <Hints hints={hints} />
+      {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} warnings={chipWarnings} disabled={busy} />}
+      <CollisionBanner list={found} setSize={single ? 1 : hintSetIds.length} onNewBranch={canNewBranch ? toNewBranch : undefined} disabled={busy} />
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
         // paint over the in-flow prompt and toolbar; -z-10 inside this context keeps it under them.
@@ -800,26 +795,33 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
           {!home && !empty && (
             <>
               {like ? (
-                // What thread.new-like copies: read-only, not a Tab stop.
-                <div
-                  role="note"
-                  aria-label={`Work in: ${worktreeText}`}
-                  data-testid="composer-like-mode"
-                  // The editable pickers' role (Button xs: text-body-sm, medium); mono for a branch only.
-                  className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-cf-surface-sunken/50 px-1.5 text-body-sm font-medium whitespace-nowrap select-none"
-                >
-                  {(() => {
-                    const Icon = worktreeIcon;
-                    return <Icon className="size-3 shrink-0" aria-hidden />;
-                  })()}
-                  {likeSrc.worktreeMode && likeSrc.branch ? (
-                    <span className="truncate">
-                      On <span className="font-mono">{likeSrc.branch}</span>
-                    </span>
-                  ) : (
-                    <span className="truncate">{worktreeText}</span>
-                  )}
-                </div>
+                // What thread.new-like copies: read-only, not a Tab stop. A collision: the Work in pill's amber icon and tooltip.
+                <Tip label={collisionTip}>
+                  <div
+                    role="note"
+                    aria-label={`Work in: ${worktreeText}`}
+                    data-testid="composer-like-mode"
+                    data-warning={collisionTip ? "" : undefined}
+                    // The editable pickers' role (Button xs: text-body-sm, medium); mono for a branch only.
+                    className={cn(
+                      "inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-cf-surface-sunken/50 px-1.5 text-body-sm font-medium whitespace-nowrap select-none",
+                      collisionTip && "bg-cf-warning/10",
+                    )}
+                  >
+                    {(() => {
+                      const Icon = worktreeIcon;
+                      return <Icon className="size-3 shrink-0" aria-hidden />;
+                    })()}
+                    {likeSrc.worktreeMode && likeSrc.branch ? (
+                      <span className="truncate">
+                        On <span className="font-mono">{likeSrc.branch}</span>
+                      </span>
+                    ) : (
+                      <span className="truncate">{worktreeText}</span>
+                    )}
+                    {collisionTip && <TriangleAlert className="size-3 shrink-0 text-cf-warning-text" aria-hidden />}
+                  </div>
+                </Tip>
               ) : (
                 <ComposerPicker
                   label="Work in"
@@ -838,6 +840,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                   disabled={busy}
                   contentClassName="w-90"
                   listClassName="max-h-96"
+                  warning={collisionTip}
                   data-testid="composer-worktree"
                 />
               )}

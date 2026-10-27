@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectView } from "@/api/project";
-import { useComposeStore } from "@/stores/compose";
+import type { ThreadView } from "@/api/threads";
+import { draftKey } from "@/lib/compose";
+import { updateDraft, useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
+import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { Composer } from "./Composer";
 
@@ -52,5 +55,88 @@ describe("Composer without a project", () => {
     expect(screen.queryByTestId("composer-base")).toBeNull();
     expect(screen.getByTestId("composer-checkout-branch").textContent).toBe("On main");
     expect(screen.getByTestId("composer-members")).not.toBeNull();
+  });
+});
+
+const thread = (id: string, o: Partial<ThreadView> = {}) =>
+  ({
+    id,
+    name: id,
+    projectId: "web",
+    projectIds: ["web"],
+    worktreePath: "/src/web",
+    createdWorktree: false,
+    branch: "",
+    state: "connected",
+    status: "busy",
+    statusReason: "",
+    archivedAtMs: null,
+    snoozedUntilMs: null,
+    ...o,
+  }) as ThreadView;
+
+function setThreads(threads: ThreadView[]) {
+  useThreadsStore.setState({ byId: Object.fromEntries(threads.map((t) => [t.id, t])), order: threads.map((t) => t.id), loaded: true });
+}
+
+describe("Composer collision banner", () => {
+  afterEach(() => {
+    setThreads([]);
+  });
+
+  it("one project: the banner, the new-branch button and the warning on the Work in pill", () => {
+    setThreads([thread("Fix login")]);
+    render(<Composer projectId="web" />);
+    expect(screen.getByTestId("composer-collision-text").textContent).toBe(
+      "This project is already being edited on main by another running thread. Multiple agents changing the same file at the same time can overwrite each other's work.",
+    );
+    expect(screen.getByTestId("composer-worktree").hasAttribute("data-warning")).toBe(true);
+    expect(screen.getByTestId("composer-worktree-warning")).not.toBeNull();
+    // A new branch shares nothing: the banner and the pill's warning go.
+    fireEvent.click(screen.getByTestId("composer-collision-new-branch"));
+    expect(screen.getByTestId("composer-worktree").textContent).toContain("Fresh copy");
+    expect(screen.queryByTestId("composer-collision")).toBeNull();
+    expect(screen.getByTestId("composer-worktree").hasAttribute("data-warning")).toBe(false);
+  });
+
+  it.each<[string, Partial<ThreadView>]>([
+    ["stopped", { state: "disconnected" }],
+    ["closing", { state: "closing" }],
+    ["archived", { archivedAtMs: 1 }],
+    ["snoozed", { snoozedUntilMs: Date.now() + 3_600_000 }],
+  ])("a %s thread does not count", (_name, over) => {
+    setThreads([thread("Fix login", over)]);
+    render(<Composer projectId="web" />);
+    expect(screen.queryByTestId("composer-collision")).toBeNull();
+    expect(screen.getByTestId("composer-worktree").hasAttribute("data-warning")).toBe(false);
+  });
+
+  it("follows the thread: shown once it starts, gone once it stops", () => {
+    setThreads([thread("Fix login", { state: "disconnected" })]);
+    render(<Composer projectId="web" />);
+    expect(screen.queryByTestId("composer-collision")).toBeNull();
+    act(() => {
+      setThreads([thread("Fix login", { state: "starting" })]);
+    });
+    expect(screen.getByTestId("composer-collision")).not.toBeNull();
+    act(() => {
+      setThreads([thread("Fix login", { state: "disconnected" })]);
+    });
+    expect(screen.queryByTestId("composer-collision")).toBeNull();
+  });
+
+  it("a set: x of y projects, and the colliding project's chip carries the icon", () => {
+    useProjectsStore.setState({ byId: { web: project("web"), api: project("api") }, order: ["web", "api"], loaded: true });
+    updateDraft(draftKey({ kind: "project", projectId: "web" }), { projects: ["web", "api"], worktree: { kind: "current" } });
+    setThreads([thread("Fix login")]);
+    render(<Composer projectId="web" />);
+    expect(screen.getByTestId("composer-collision-text").textContent).toMatch(/^1 of 2 projects is already being edited on main by another running thread\. /);
+    const chips = screen.getAllByTestId("composer-member");
+    expect(chips.map((c) => [c.dataset.project, c.hasAttribute("data-warning")])).toEqual([
+      ["api", false],
+      ["web", true],
+    ]);
+    expect(screen.getAllByTestId("composer-member-warning")).toHaveLength(1);
+    expect(screen.getAllByTestId("composer-collision")).toHaveLength(1);
   });
 });

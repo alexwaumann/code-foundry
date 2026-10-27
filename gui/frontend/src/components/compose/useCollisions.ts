@@ -1,22 +1,28 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { collisionHints, type Checkout, type HintProject, type HintThread } from "@/lib/collisionHints";
+import { collisions, type Checkout, type Collision, type HintProject, type HintThread } from "@/lib/collisionHints";
+import { isRunningThread, isWorkingThread } from "@/lib/thread";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 
 const SEP = "\u0001";
 const LIST = "\u0002";
 
-/** One string per thread that is not archived: what its checkouts derive from (shallow-stable). */
+/**
+ * One string per running thread (lib/thread isRunningThread: not archived, not
+ * snoozed, starting or connected): what its checkouts derive from and whether it works
+ * (shallow-stable). A thread that starts, stops, is snoozed or archived changes the list.
+ */
 function useThreadKeys(): string[] {
   return useThreadsStore(
-    useShallow((s) =>
-      s.order.flatMap((id) => {
+    useShallow((s) => {
+      const now = Date.now();
+      return s.order.flatMap((id) => {
         const t = s.byId[id];
-        if (!t || t.archivedAtMs !== null) return [];
-        return [[t.id, t.name, t.projectId, t.projectIds.join(","), t.worktreePath, t.createdWorktree ? "1" : "", t.branch].join(SEP)];
-      }),
-    ),
+        if (!t || !isRunningThread(t, now)) return [];
+        return [[t.id, t.name, t.projectId, t.projectIds.join(","), t.worktreePath, t.createdWorktree ? "1" : "", t.branch, isWorkingThread(t) ? "1" : ""].join(SEP)];
+      });
+    }),
   );
 }
 
@@ -36,8 +42,8 @@ function useProjectKeys(): string[] {
 
 function decodeThreads(keys: readonly string[]): HintThread[] {
   return keys.map((k) => {
-    const [id = "", name = "", projectId = "", ids = "", worktreePath = "", wt = "", branch = ""] = k.split(SEP);
-    return { id, name, projectId, projectIds: ids ? ids.split(",") : [], worktreePath, createdWorktree: wt === "1", branch, archived: false };
+    const [id = "", name = "", projectId = "", ids = "", worktreePath = "", wt = "", branch = "", working = ""] = k.split(SEP);
+    return { id, name, projectId, projectIds: ids ? ids.split(",") : [], worktreePath, createdWorktree: wt === "1", branch, archived: false, working: working === "1" };
   });
 }
 
@@ -60,16 +66,16 @@ function decodeProjects(keys: readonly string[]): Record<string, HintProject> {
 }
 
 /**
- * The collision hints of a draft (lib/collisionHints): its checkouts against every
- * thread that is not archived. `checkouts` comes from the projects map this hook passes
- * to `mine` (so it sees the same data). Recomputed only when a thread's place or a
- * project's worktrees change.
+ * The collisions of a draft (lib/collisionHints): its checkouts against every running
+ * thread. `checkouts` comes from the projects map this hook passes to `mine` (so it sees
+ * the same data). Recomputed only when a running thread's place or work, the set of
+ * running threads, or a project's worktrees change.
  */
-export function useCollisionHints(mine: (projects: Readonly<Record<string, HintProject>>) => { checkouts: readonly Checkout[]; worktreeMode: boolean }): string[] {
+export function useCollisions(mine: (projects: Readonly<Record<string, HintProject>>) => { checkouts: readonly Checkout[]; worktreeMode: boolean }): Collision[] {
   const threadKeys = useThreadKeys();
   const projectKeys = useProjectKeys();
   const threads = useMemo(() => decodeThreads(threadKeys), [threadKeys]);
   const projects = useMemo(() => decodeProjects(projectKeys), [projectKeys]);
   const draft = useMemo(() => mine(projects), [mine, projects]);
-  return useMemo(() => collisionHints(draft, threads, projects), [draft, threads, projects]);
+  return useMemo(() => collisions(draft, threads, projects), [draft, threads, projects]);
 }

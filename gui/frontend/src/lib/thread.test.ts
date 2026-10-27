@@ -3,7 +3,9 @@ import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import {
   attentionTier,
   badgeLabels,
+  isRunningThread,
   isThreadGroup,
+  isWorkingThread,
   restartCutsOff,
   threadBadge,
   shortAge,
@@ -16,6 +18,35 @@ import {
   type StatusKind,
   type ThreadGroup,
 } from "./thread";
+
+describe("isRunningThread (counts for the composer's collision banner)", () => {
+  const now = 1_000_000;
+  type Running = Parameters<typeof isRunningThread>[0];
+  const base: Running = { archivedAtMs: null, snoozedUntilMs: null, state: "connected" };
+  it.each<[string, Partial<Running>, boolean]>([
+    ["connected", {}, true],
+    ["starting", { state: "starting" }, true],
+    ["disconnected: stopped, edits nothing", { state: "disconnected" }, false],
+    ["closing", { state: "closing" }, false],
+    ["unknown", { state: "unknown" }, false],
+    ["archived, even connected", { archivedAtMs: now - 1 }, false],
+    ["snoozed: a wake time ahead", { snoozedUntilMs: now + 60_000 }, false],
+    ["a wake time already past counts as awake", { snoozedUntilMs: now - 1 }, true],
+  ])("%s", (_name, over, want) => {
+    expect(isRunningThread({ ...base, ...over }, now)).toBe(want);
+  });
+});
+
+describe("isWorkingThread (working or idle in the collision tooltip)", () => {
+  it.each<[ThreadStateView, ThreadStatusView, boolean]>([
+    ["connected", "busy", true],
+    ["starting", "idle", true],
+    ["connected", "idle", false],
+    ["connected", "attention", false],
+  ])("%s / %s", (state, status, want) => {
+    expect(isWorkingThread({ state, status })).toBe(want);
+  });
+});
 
 describe("threadGroup (the sidebar group of an unpinned thread)", () => {
   it.each<[ThreadStateView, ThreadStatusView, string, ThreadGroup]>([

@@ -257,28 +257,36 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(row(page, `s:${id}`).getByTestId("row-workspace")).toHaveCount(0);
 });
 
-test("collision hints under the chips before send, and the daemon's after", async ({ page }) => {
+test("the collision banner before send, and the daemon's hints after", async ({ page }) => {
   // sketches and the writing folder have no thread of their own in the mock's world.
   await mockPost("set-thread?projects=repo-sk,repo-wr&name=Busy%20one");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.getByTestId("palette").locator('[data-project="repo-sk"]').click();
   await expect(page.getByTestId("composer-input")).toBeFocused();
-  // In place, sketches' own checkout is also Busy one's.
-  await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one"]);
-  // A fresh copy shares nothing.
-  await page.getByTestId("composer-worktree").click();
-  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Fresh copy" }).click();
-  await expect(page.getByTestId("composer-hints")).toHaveCount(0);
-  // With the writing folder, fresh copies still share the folder: it cannot be isolated.
+  // In place, sketches' own checkout is also Busy one's (a running thread).
+  const banner = page.getByTestId("composer-collision");
+  await expect(banner.getByTestId("composer-collision-text")).toHaveText(
+    "This project is already being edited on main by another running thread. Multiple agents changing the same file at the same time can overwrite each other's work.",
+  );
+  await expect(page.getByTestId("composer-worktree-warning")).toBeVisible();
+  // "Use a new branch": a fresh copy shares nothing.
+  await banner.getByTestId("composer-collision-new-branch").click();
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByTestId("composer-worktree-warning")).toHaveCount(0);
+  // With the writing folder, fresh copies still share the folder: it cannot be isolated. Already on a new branch: no button.
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "writing" }).click();
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copies");
-  await expect(page.getByTestId("composer-hint")).toHaveText(["writing is a folder, not a repo: thread Busy one also works there"]);
-  // In place: both, and never a blocker.
+  await expect(banner.getByTestId("composer-collision-text")).toContainText("1 of 2 projects is already being edited by another running thread.");
+  await expect(banner.getByTestId("composer-collision-new-branch")).toHaveCount(0);
+  // In place: both, one banner, never a blocker.
   await page.getByTestId("composer-worktree").click();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "Project folders" }).click();
-  await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one", "writing is also open in Busy one"]);
+  await expect(banner).toHaveCount(1);
+  await expect(banner.getByTestId("composer-collision-text")).toContainText("2 of 2 projects are already being edited by another running thread.");
+  await expect(banner.getByTestId("composer-collision-new-branch")).toBeVisible();
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Pair on the parser");
   await page.keyboard.press("Enter");
@@ -347,7 +355,10 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   await expect(page.getByTestId("composer-worktree")).toHaveCount(0);
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   // The same checkouts as the thread it copies: said, not blocked.
-  await expect(page.getByTestId("composer-hint").first()).toContainText("is also open in Parser");
+  await expect(page.getByTestId("composer-collision")).toContainText("already being edited on feat/parser by another running thread.");
+  // Its mode is its thread's: nothing to switch.
+  await expect(page.getByTestId("composer-collision-new-branch")).toHaveCount(0);
+  await expect(page.getByTestId("composer-like-mode")).toHaveAttribute("data-warning", "");
   // The primary is the thread's, changeable.
   const primary = page.getByTestId("composer-primary");
   await expect(primary).toHaveText("code-foundry");
