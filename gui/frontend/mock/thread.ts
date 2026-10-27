@@ -139,8 +139,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "html-scroll", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "html-repeat" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "html-scroll", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -905,6 +905,24 @@ export class MockThreadLogs {
         it({ case: "turnEnd", value: { subtype: "success", durationMs: 10_000n, numTurns: 1, costUsd: 0.02, turnCostUsd: 0.02, stopReason: "end_turn" } }, { at: ago(4 - n, 50) });
       }
       it({ case: "html", value: { path: "docs/tall.html", title: "", baseDir: cwd } }, { at: ago(1) });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+      return;
+    }
+    if (state === "html-repeat") {
+      // The same page shown in three turns (docs/notes/inline-page-shows.md): only the last
+      // show is a card, the two before it are link rows to it. The turns' text makes the
+      // thread taller than its pane, so a link row's click has somewhere to scroll.
+      const long = Array.from({ length: 8 }, (_, i) => `Paragraph ${String(i + 1)}: what changed in this version of the page, at some length.`).join("\n\n");
+      const asks = ["Show me a page that says hello.", "Make the greeting bigger.", "Add a wave button."];
+      asks.forEach((ask, i) => {
+        const at = 6 - 2 * i;
+        it({ case: "userMessage", value: { text: ask, attachments: [] } }, { at: ago(at) });
+        it({ case: "assistantText", value: { text: long } }, { at: ago(at, 10) });
+        it({ case: "html", value: { path: "docs/hello.html", title: i === 2 ? "Hello, third show" : "", baseDir: cwd } }, { at: ago(at, 20) });
+        it({ case: "assistantText", value: { text: `Version ${String(i + 1)} is above.` } }, { at: ago(at, 25) });
+        it({ case: "turnEnd", value: { subtype: "success", durationMs: 10_000n, numTurns: 1, costUsd: 0.02, turnCostUsd: 0.02, stopReason: "end_turn" } }, { at: ago(at, 25) });
+      });
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;
