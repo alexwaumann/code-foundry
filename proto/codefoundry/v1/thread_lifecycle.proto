@@ -340,6 +340,12 @@ message Thread {
   // A reseed's prefix waits for the fresh session's first message (it is prepended to
   // what Claude gets; UserMessageItem.seed_prefix shows it). Persisted.
   bool seed_pending = 67;
+  // The thread is stopped and Claude Code deleted its conversation's transcript (its
+  // cleanupPeriodDays setting), so it cannot continue: a message, a fork and the queries
+  // that would start Claude fail with FAILED_PRECONDITION. A reseed clears it (the next
+  // start is fresh); archive and remove work. Computed at daemon start and when the
+  // process ends, never per snapshot; not persisted. See docs/notes/transcript-deleted.md.
+  bool transcript_missing = 69;
 }
 
 // ThreadKind is what kind of thread a Thread is.

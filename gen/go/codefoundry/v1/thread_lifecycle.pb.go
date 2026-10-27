@@ -776,9 +776,15 @@ type Thread struct {
 	ReseedPending bool `protobuf:"varint,66,opt,name=reseed_pending,json=reseedPending,proto3" json:"reseed_pending,omitempty"`
 	// A reseed's prefix waits for the fresh session's first message (it is prepended to
 	// what Claude gets; UserMessageItem.seed_prefix shows it). Persisted.
-	SeedPending   bool `protobuf:"varint,67,opt,name=seed_pending,json=seedPending,proto3" json:"seed_pending,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SeedPending bool `protobuf:"varint,67,opt,name=seed_pending,json=seedPending,proto3" json:"seed_pending,omitempty"`
+	// The thread is stopped and Claude Code deleted its conversation's transcript (its
+	// cleanupPeriodDays setting), so it cannot continue: a message, a fork and the queries
+	// that would start Claude fail with FAILED_PRECONDITION. A reseed clears it (the next
+	// start is fresh); archive and remove work. Computed at daemon start and when the
+	// process ends, never per snapshot; not persisted. See docs/notes/transcript-deleted.md.
+	TranscriptMissing bool `protobuf:"varint,69,opt,name=transcript_missing,json=transcriptMissing,proto3" json:"transcript_missing,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1269,6 +1275,13 @@ func (x *Thread) GetReseedPending() bool {
 func (x *Thread) GetSeedPending() bool {
 	if x != nil {
 		return x.SeedPending
+	}
+	return false
+}
+
+func (x *Thread) GetTranscriptMissing() bool {
+	if x != nil {
+		return x.TranscriptMissing
 	}
 	return false
 }
@@ -5374,7 +5387,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x90\x16\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbf\x16\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -5453,7 +5466,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\rresident_name\x18@ \x01(\tR\fresidentName\x12\x14\n" +
 	"\x05epoch\x18A \x01(\x05R\x05epoch\x12%\n" +
 	"\x0ereseed_pending\x18B \x01(\bR\rreseedPending\x12!\n" +
-	"\fseed_pending\x18C \x01(\bR\vseedPendingB\b\n" +
+	"\fseed_pending\x18C \x01(\bR\vseedPending\x12-\n" +
+	"\x12transcript_missing\x18E \x01(\bR\x11transcriptMissingB\b\n" +
 	"\x06_depthB\r\n" +
 	"\v_in_sidebarJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xf5\x01\n" +
