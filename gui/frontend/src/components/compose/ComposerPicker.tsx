@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { Check, ChevronDown, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { defaultFilter } from "cmdk";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface PickerOption {
@@ -57,7 +58,23 @@ interface ComposerPickerProps {
   contentClassName?: string;
   /** Overrides the list's height cap (max-h-72). */
   listClassName?: string;
+  /**
+   * A warning about the current value (Work in's collision): an amber icon after the
+   * text, an amber tint, and this as the trigger's tooltip. null: a picker that can warn
+   * and does not now; absent: one that never warns.
+   */
+  warning?: ReactNode;
   "data-testid"?: string;
+}
+
+/** The warning's tooltip around a picker that can warn; the bare trigger for one that cannot. */
+function WarningTip({ warning, testId, children }: { warning: ReactNode; testId?: string; children: ReactElement }) {
+  if (warning === undefined) return children;
+  return (
+    <Tip label={warning} data-testid={testId ? `${testId}-warning-tip` : undefined}>
+      {children}
+    </Tip>
+  );
 }
 
 /**
@@ -83,6 +100,7 @@ export function ComposerPicker({
   className,
   contentClassName,
   listClassName,
+  warning,
   "data-testid": testId,
 }: ComposerPickerProps) {
   const [open, setOpen] = useState(false);
@@ -207,30 +225,43 @@ export function ComposerPicker({
         setOpen(o);
       }}
     >
-      <PopoverTrigger asChild>
-        <Button
-          ref={triggerRef}
-          type="button"
-          variant="ghost"
-          size="xs"
-          disabled={disabled}
-          aria-label={`${label}: ${text}`}
-          data-compose-stop
-          data-testid={testId}
-          className={cn("max-w-64 text-cf-text-muted hover:text-cf-text data-[state=open]:bg-cf-control-hover data-[state=open]:text-cf-text", className)}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              e.preventDefault();
-              if (!open) opening();
-              setOpen(true);
-            }
-          }}
-        >
-          <Icon aria-hidden />
-          <span className="truncate">{text}</span>
-          <ChevronDown aria-hidden className="opacity-60" />
-        </Button>
-      </PopoverTrigger>
+      {/*
+        A picker that can warn (warning passed, null while clear) has a Tip outside the
+        popover trigger, there whether it warns or not so the trigger never remounts. Its
+        data-state wins on the button, so the open look keys on aria-expanded.
+      */}
+      <WarningTip warning={warning} testId={testId}>
+        <PopoverTrigger asChild>
+          <Button
+            ref={triggerRef}
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={disabled}
+            aria-label={`${label}: ${text}`}
+            data-compose-stop
+            data-testid={testId}
+            data-warning={warning ? "" : undefined}
+            className={cn(
+              "max-w-64 text-cf-text-muted hover:text-cf-text aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text",
+              warning && "bg-cf-warning/10 text-cf-text hover:bg-cf-warning/15 aria-expanded:bg-cf-warning/15",
+              className,
+            )}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                if (!open) opening();
+                setOpen(true);
+              }
+            }}
+          >
+            <Icon aria-hidden />
+            <span className="truncate">{text}</span>
+            {warning ? <TriangleAlert aria-hidden className="text-cf-warning-text" data-testid={testId ? `${testId}-warning` : undefined} /> : null}
+            <ChevronDown aria-hidden className="opacity-60" />
+          </Button>
+        </PopoverTrigger>
+      </WarningTip>
       <PopoverContent
         // Never taller than the room Radix found on its side (viewport px, so divided by the zoom).
         className={cn("flex max-h-[calc(var(--radix-popover-content-available-height)/var(--cf-zoom))] flex-col p-0", contentClassName)}

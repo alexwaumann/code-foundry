@@ -1,8 +1,9 @@
 /**
  * Collision hints (workspaces v2 handoff §4): before a thread starts, the members it
- * would share with another thread that is not archived. Hints, never blockers; the
- * daemon says the same after the Create (CreateThreadResponse.hints). Pure, over the
- * threads and projects the GUI knows.
+ * would share with another running thread (lib/thread isRunningThread). Hints, never blockers; the
+ * daemon says the same after the Create (CreateThreadResponse.hints), over every thread
+ * that is not archived. Pure, over the threads and projects the GUI knows. The composer
+ * shows them as one banner (collisionBanner) and a line per project (collisionTip).
  *
  * Checkouts are derived the way the daemon does (docs/notes/workspaces-v2-1-threads.md):
  * the primary's is the thread's cwd; a plain folder is its folder; a worktree-mode git
@@ -38,6 +39,8 @@ export interface HintThread {
   createdWorktree: boolean;
   branch: string;
   archived: boolean;
+  /** Claude is at work in it (lib/thread isWorkingThread); else it reads as idle. */
+  working?: boolean;
 }
 
 export interface Checkout {
@@ -120,27 +123,83 @@ export function unshownHints(warnings: readonly string[], shown: readonly string
   return warnings.filter((w) => !seen.has(hintText(w)));
 }
 
+/** One project of a draft whose checkout another thread has (the first such thread). */
+export interface Collision {
+  projectId: string;
+  /** The project's name (its id when unknown). */
+  project: string;
+  /** The checkout's branch ("" for a plain folder, the short head when detached). */
+  branch: string;
+  /** The other thread's name (its id when unnamed). */
+  thread: string;
+  working: boolean;
+  /** A plain folder in a worktree-mode draft: fresh copies cannot set it apart. */
+  folder: boolean;
+}
+
 /**
- * One line per checkout of `mine` another thread that is not archived (and is not
- * `self`) also has: in worktree mode a plain folder "<name> is a folder, not a repo:
- * thread <other> also works there"; otherwise "<name> @ <branch> is also open in <other>"
- * (no "@ branch" for a folder). The first such thread names the collision.
+ * The checkouts of `mine` another thread that is not archived (and is not `self`) also
+ * has, one per checkout; the first such thread names the collision. The caller passes
+ * the threads that count (the composer: lib/thread isRunningThread).
  */
-export function collisionHints(mine: { checkouts: readonly Checkout[]; worktreeMode: boolean }, threads: readonly HintThread[], projects: HintProjects, self = ""): string[] {
+export function collisions(mine: { checkouts: readonly Checkout[]; worktreeMode: boolean }, threads: readonly HintThread[], projects: HintProjects, self = ""): Collision[] {
   const others = threads.filter((t) => t.id !== self && !t.archived).map((t) => ({ t, checkouts: threadCheckouts(t, projects) }));
-  const hints: string[] = [];
+  const out: Collision[] = [];
   for (const c of mine.checkouts) {
     const hit = others.find((o) => o.checkouts.some((x) => samePath(x.path, c.path)));
     if (!hit) continue;
     const p = projects[c.projectId];
-    const name = p?.name ?? c.projectId;
-    const other = hit.t.name || hit.t.id;
-    if (p && !p.git && mine.worktreeMode) {
-      hints.push(`${name} is a folder, not a repo: thread ${other} also works there`);
-      continue;
-    }
-    const branch = branchAt(p, c.path);
-    hints.push(`${branch ? `${name} @ ${branch}` : name} is also open in ${other}`);
+    out.push({
+      projectId: c.projectId,
+      project: p?.name ?? c.projectId,
+      branch: branchAt(p, c.path),
+      thread: hit.t.name || hit.t.id,
+      working: hit.t.working ?? false,
+      folder: Boolean(p && !p.git && mine.worktreeMode),
+    });
   }
-  return hints;
+  return out;
+}
+
+/**
+ * A collision as the daemon words its hint: a plain folder in worktree mode "<name> is a
+ * folder, not a repo: thread <other> also works there"; otherwise "<name> @ <branch> is
+ * also open in <other>" (no "@ branch" for a folder). The composer hands these to
+ * sendDraft, so the daemon's after-create toast does not say them again (unshownHints).
+ */
+export function hintLine(c: Collision): string {
+  if (c.folder) return `${c.project} is a folder, not a repo: thread ${c.thread} also works there`;
+  return `${c.branch ? `${c.project} @ ${c.branch}` : c.project} is also open in ${c.thread}`;
+}
+
+/** One line per checkout of `mine` another thread also has (collisions, worded by hintLine). */
+export function collisionHints(mine: { checkouts: readonly Checkout[]; worktreeMode: boolean }, threads: readonly HintThread[], projects: HintProjects, self = ""): string[] {
+  return collisions(mine, threads, projects, self).map(hintLine);
+}
+
+/** The composer banner's second, muted sentence. */
+export const COLLISION_DETAIL = "Multiple agents changing the same file at the same time can overwrite each other's work.";
+
+/**
+ * The composer banner's first sentence, split around the branch the UI sets in mono:
+ * `${lead}${branch}${tail}`, branch "" when none is named. A draft of several projects
+ * (`setSize` > 1): "2 of 3 projects are already being edited on main by another running
+ * thread."; of one: "This project is already being edited on main by another running
+ * thread." Colliding projects on different branches read "on their branches"; with a
+ * plain folder among them (no branch) the "on …" is left out.
+ */
+export function collisionBanner(list: readonly Collision[], setSize: number): { lead: string; branch: string; tail: string } {
+  const count = new Set(list.map((c) => c.projectId)).size;
+  const branches = new Set(list.map((c) => c.branch));
+  const subject = setSize > 1 ? `${String(count)} of ${String(setSize)} projects ${count === 1 ? "is" : "are"}` : "This project is";
+  const tail = " by another running thread.";
+  const [only = ""] = branches;
+  if (branches.size === 1 && only) return { lead: `${subject} already being edited on `, branch: only, tail };
+  const theirs = branches.size > 1 && !branches.has("");
+  return { lead: `${subject} already being edited${theirs ? " on their branches" : ""}`, branch: "", tail };
+}
+
+/** A collision's tooltip line: "<project> · <branch>" (the name alone for a folder) is open in <thread> (working | idle). */
+export function collisionTip(c: Collision): { place: string; thread: string; status: "working" | "idle" } {
+  return { place: c.branch ? `${c.project} · ${c.branch}` : c.project, thread: c.thread, status: c.working ? "working" : "idle" };
 }

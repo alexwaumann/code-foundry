@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Layers, Plus, X } from "lucide-react";
+import { Layers, Plus, TriangleAlert, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { Tip } from "@/components/ui/tooltip";
 import type { ComposeTarget } from "@/lib/compose";
@@ -22,14 +22,28 @@ const chipClass = "flex h-7 max-w-72 min-w-0 items-center rounded-full border te
 /**
  * A project's name, nothing else: where the thread runs is the Runs in picker's, its
  * branch the Work in picker's (it depends on the setting and the pick, so it is not
- * repeated here), and its path the Projects page's.
+ * repeated here), and its path the Projects page's. A `warning` (another running thread
+ * has the checkout this project would work in): an amber border and icon, the warning as
+ * the icon's tooltip.
  */
-function MemberChip({ target, member, disabled }: { target: ComposeTarget; member: MemberChipModel; disabled: boolean }) {
+function MemberChip({ target, member, warning, disabled }: { target: ComposeTarget; member: MemberChipModel; warning?: ReactNode; disabled: boolean }) {
   const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
   return (
-    <li className={cn(chipClass, "border-cf-border bg-cf-surface-raised text-cf-text")} data-testid="composer-member" data-project={member.projectId}>
-      <span className={cn("flex h-full min-w-0 items-center pl-2.5", member.removable ? "pr-1" : "pr-2.5")} data-testid="composer-member-body">
+    <li
+      className={cn(chipClass, "bg-cf-surface-raised text-cf-text", warning ? "border-cf-warning/40" : "border-cf-border")}
+      data-testid="composer-member"
+      data-project={member.projectId}
+      data-warning={warning ? "" : undefined}
+    >
+      <span className={cn("flex h-full min-w-0 items-center gap-1.5 pl-2.5", member.removable ? "pr-1" : "pr-2.5")} data-testid="composer-member-body">
         <span className="truncate font-medium">{name}</span>
+        {warning && (
+          <Tip label={warning} data-testid="composer-member-warning-tip">
+            <span className="flex shrink-0" data-testid="composer-member-warning">
+              <TriangleAlert className="size-3.5 text-cf-warning-text" aria-hidden />
+            </span>
+          </Tip>
+        )}
       </span>
       {member.removable && (
         <Tip label={`Remove ${name}`}>
@@ -142,6 +156,7 @@ export function MemberChips({
   members,
   workspaceId,
   readOnly = false,
+  warnings,
   disabled,
 }: {
   target: ComposeTarget;
@@ -149,6 +164,8 @@ export function MemberChips({
   /** The referenced workspace; "" without one. */
   workspaceId: string;
   readOnly?: boolean;
+  /** By project id: the tooltip of a project another running thread has the checkout of (CollisionTip). */
+  warnings?: Readonly<Record<string, ReactNode>>;
   disabled: boolean;
 }) {
   const single = !readOnly && !workspaceId && members.length <= 1;
@@ -156,7 +173,7 @@ export function MemberChips({
   return (
     <ul className="mb-2 flex flex-wrap items-center gap-1.5 empty:hidden" aria-label="Projects" data-testid="composer-members">
       {workspaceId && <WorkspaceChip target={target} workspaceId={workspaceId} removable={!readOnly && members.length > 0} disabled={disabled} />}
-      {!single && members.map((m) => <MemberChip key={m.projectId} target={target} member={m} disabled={disabled} />)}
+      {!single && members.map((m) => <MemberChip key={m.projectId} target={target} member={m} warning={warnings?.[m.projectId]} disabled={disabled} />)}
       {!readOnly && <AddProject target={target} exclude={ids} disabled={disabled} />}
     </ul>
   );

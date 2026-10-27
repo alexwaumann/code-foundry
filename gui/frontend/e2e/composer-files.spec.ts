@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
 // the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
@@ -336,6 +336,8 @@ for (const zoom of [100, 125, 150]) {
 test("a short window shows fewer rows; a taller one all eight; a very short one drops the hints", async ({ page }) => {
   await setFiles("repo-cf", MANY);
   await page.setViewportSize({ width: 1280, height: 560 });
+  // A fresh copy: no collision banner (s-1 runs in code-foundry's folder) taking the short window's room.
+  await freshCopyByDefault();
   await openApp(page);
   await compose(page);
   const before = await composerBoxes(page);

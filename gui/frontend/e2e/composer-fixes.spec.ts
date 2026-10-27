@@ -295,14 +295,14 @@ test("10: New thread on this branch and Run in… only where they apply, in the 
   await expect(page.getByTestId("row-menu").getByTestId("menu-new-like")).toHaveCount(1);
 });
 
-test("11, 13: the hints shown under the chips are not toasted again; a chip is the project's name alone", async ({ page }) => {
+test("11, 13: the collisions the banner showed are not toasted again; a chip is the project's name alone", async ({ page }) => {
   await mockPost("set-thread?projects=repo-sk,repo-wr&name=Busy%20one");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.getByTestId("palette").locator('[data-project="repo-sk"]').click();
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "writing" }).click();
-  await expect(page.getByTestId("composer-hint")).toHaveText(["sketches @ main is also open in Busy one", "writing is also open in Busy one"]);
+  await expect(page.getByTestId("composer-collision-text")).toContainText("2 of 2 projects are already being edited by another running thread.");
   // Name only: no branch, no path tooltip (the pickers say where it runs).
   await expect(chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body")).toHaveText("sketches");
   await chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body").hover();

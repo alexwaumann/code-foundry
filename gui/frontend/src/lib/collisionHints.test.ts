@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { collisionHints, draftCheckouts, threadCheckouts, unshownHints, type HintProjects, type HintThread } from "./collisionHints";
+import {
+  collisionBanner,
+  collisionHints,
+  collisions,
+  collisionTip,
+  draftCheckouts,
+  threadCheckouts,
+  unshownHints,
+  type Collision,
+  type HintProjects,
+  type HintThread,
+} from "./collisionHints";
 
 const projects: HintProjects = {
   web: {
@@ -137,5 +148,46 @@ describe("unshownHints", () => {
   });
   it("a thread named like another one with brackets still differs", () => {
     expect(unshownHints(["web @ main is also open in fix (wip) (s-1)"], ["web @ main is also open in fix"])).toEqual(["web @ main is also open in fix (wip) (s-1)"]);
+  });
+});
+
+describe("collisions", () => {
+  it("names the project, the checkout's branch, the thread and whether it works", () => {
+    expect(collisions({ checkouts: [{ projectId: "web", path: "/src/web" }], worktreeMode: false }, [thread({ working: true })], projects)).toEqual([
+      { projectId: "web", project: "web", branch: "main", thread: "Fix login", working: true, folder: false },
+    ]);
+  });
+});
+
+const collision = (over: Partial<Collision>): Collision => ({ projectId: "web", project: "web", branch: "main", thread: "Fix login", working: false, folder: false, ...over });
+const sentence = (b: { lead: string; branch: string; tail: string }) => b.lead + b.branch + b.tail;
+
+describe("collisionBanner", () => {
+  it.each<[string, Collision[], number, string, string]>([
+    ["one project", [collision({})], 1, "This project is already being edited on main by another running thread.", "main"],
+    ["two of three, one branch", [collision({}), collision({ projectId: "api", project: "api" })], 3, "2 of 3 projects are already being edited on main by another running thread.", "main"],
+    ["one of two: singular verb", [collision({ projectId: "api", project: "api", branch: "feat/x" })], 2, "1 of 2 projects is already being edited on feat/x by another running thread.", "feat/x"],
+    [
+      "mixed branches: on their branches",
+      [collision({}), collision({ projectId: "api", project: "api", branch: "feat/x" })],
+      2,
+      "2 of 2 projects are already being edited on their branches by another running thread.",
+      "",
+    ],
+    ["a plain folder: no branch to name", [collision({ projectId: "notes", project: "notes", branch: "", folder: true })], 1, "This project is already being edited by another running thread.", ""],
+    ["a folder beside a branch: no on …", [collision({}), collision({ projectId: "notes", project: "notes", branch: "" })], 3, "2 of 3 projects are already being edited by another running thread.", ""],
+  ])("%s", (_name, list, size, want, branch) => {
+    const b = collisionBanner(list, size);
+    expect(sentence(b)).toBe(want);
+    expect(b.branch).toBe(branch);
+  });
+});
+
+describe("collisionTip", () => {
+  it.each<[string, Collision, ReturnType<typeof collisionTip>]>([
+    ["a branch", collision({ working: true }), { place: "web · main", thread: "Fix login", status: "working" }],
+    ["a folder: the name alone", collision({ project: "notes", branch: "" }), { place: "notes", thread: "Fix login", status: "idle" }],
+  ])("%s", (_name, c, want) => {
+    expect(collisionTip(c)).toEqual(want);
   });
 });
