@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { REVIEWER_SEARCH_DEBOUNCE_MS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
+import { matchesReviewerSearch, REVIEWER_SEARCH_DEBOUNCE_MS, reviewerSearchTerm, reviewerSearchTokens, useReviewerSearchTerm } from "./reviewerSearch";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -16,6 +16,38 @@ describe("reviewerSearchTerm", () => {
     ["Ana Lee", "Ana Lee"],
   ])("%j → %j", (input, want) => {
     expect(reviewerSearchTerm(input)).toBe(want);
+  });
+});
+
+describe("reviewerSearchTokens", () => {
+  it.each([
+    ["", []],
+    ["jane", ["jane"]],
+    ["jane doe", ["jane", "doe"]],
+    ["doe, jane", ["doe", "jane"]],
+    ["Doe,Jane", ["Doe", "Jane"]],
+    [" ,, jane\tdoe ,", ["jane", "doe"]],
+    ["a b c d e f", ["a", "b", "c", "d"]],
+    ["jane-doe", ["jane-doe"]],
+  ])("%j → %j", (term, want) => {
+    expect(reviewerSearchTokens(term)).toEqual(want);
+  });
+});
+
+describe("matchesReviewerSearch", () => {
+  it.each([
+    ["first last against a stored last, first", "jdoe", "Doe, Jane", "jane doe", true],
+    ["last, first", "jdoe", "Doe, Jane", "doe, jane", true],
+    ["case and punctuation do not matter", "jdoe", "DOE, JANE", "Jane, Doe.", true],
+    ["one word, as before", "teammate-lee", "Lee", "lee", true],
+    ["a login-only hit", "kim-lee", "", "kim lee", true],
+    ["words split between login and name", "jdoe", "Jane", "jane jdoe", true],
+    ["inside words", "xjanex", "Mary Doeville", "jane doe", true],
+    ["a missing word", "janet", "Janet Smith", "jane doe", false],
+    ["a missing word in either field", "doe-j", "John Doe", "jane doe", false],
+    ["punctuation-only words are ignored", "jdoe", "Doe, Jane", "jane - doe", true],
+  ])("%s", (_name, login, name, term, want) => {
+    expect(matchesReviewerSearch(login, name, term)).toBe(want);
   });
 });
 

@@ -58,10 +58,12 @@ type Service interface {
 	// failure the cached copy comes back with LastError set.
 	FullPullRequest(ctx context.Context, slug string, number int, refresh bool) (FullPullRequest, error)
 	// ReviewerCandidates returns who can be asked to review a pull request: the pending
-	// requests and, for a non-empty query, the assignable users GitHub matches (up to 20).
+	// requests and, for a non-empty query, the assignable users GitHub matches (up to 20;
+	// a query of several words keeps the users matching every word, best first).
 	ReviewerCandidates(ctx context.Context, slug string, number int, query string) (ReviewerCandidates, error)
 	// SetReviewRequest requests or withdraws a review and returns the pending requests
-	// afterwards (logins and "org/team").
+	// afterwards (logins and "org/team"); ErrFailedPrecondition when GitHub answered
+	// but did not add (or withdraw) the reviewer.
 	SetReviewRequest(ctx context.Context, slug string, number int, r ReviewRequest) ([]string, error)
 	// RevertPullRequest opens a pull request reverting a merged one
 	// (ErrFailedPrecondition when it is not merged).

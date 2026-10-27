@@ -318,23 +318,33 @@ type candidateUserJSON struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
+type candidateUsersJSON struct {
+	Nodes []candidateUserJSON `json:"nodes"`
+}
+
 type reviewerCandidatesData struct {
 	Repository *struct {
-		// Absent when the search was skipped (@include(if: $search)).
-		AssignableUsers *struct {
-			Nodes []candidateUserJSON `json:"nodes"`
-		} `json:"assignableUsers"`
-		PullRequest *struct {
+		// Absent when the search was skipped (@include(if: $search)); T0..T3 search each
+		// word of a query of several (@include(if: $sN)).
+		AssignableUsers *candidateUsersJSON `json:"assignableUsers"`
+		T0              *candidateUsersJSON `json:"t0"`
+		T1              *candidateUsersJSON `json:"t1"`
+		T2              *candidateUsersJSON `json:"t2"`
+		T3              *candidateUsersJSON `json:"t3"`
+		PullRequest     *struct {
 			Author         *loginJSON          `json:"author"`
 			ReviewRequests *reviewRequestsJSON `json:"reviewRequests"`
 		} `json:"pullRequest"`
 	} `json:"repository"`
 }
 
-// decodeReviewerCandidates maps a ReviewerCandidates response: the requested users and
-// teams first, then the search results, each by login; the author is left out and a
-// requested user the search also returned appears once.
-func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
+// decodeReviewerCandidates maps a ReviewerCandidates response for a search split into
+// tokens (reviewerSearchTokens): the requested users and teams first, by login, then
+// the search results; the author is left out and a requested user the search also
+// returned appears once. With one token the results are GitHub's, by login; with
+// several, the lists (the whole query's and each word's) are merged by login and only
+// the users matching every token are kept, best matches first (filterReviewerSearch).
+func decodeReviewerCandidates(data []byte, tokens []string) (ReviewerCandidates, error) {
 	var d reviewerCandidatesData
 	if err := json.Unmarshal(data, &d); err != nil {
 		return ReviewerCandidates{}, fmt.Errorf("decode reviewer candidates: %w", err)
@@ -366,8 +376,10 @@ func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
 		}
 	}
 	var users []candidateUserJSON
-	if d.Repository.AssignableUsers != nil {
-		users = d.Repository.AssignableUsers.Nodes
+	for _, l := range []*candidateUsersJSON{d.Repository.AssignableUsers, d.Repository.T0, d.Repository.T1, d.Repository.T2, d.Repository.T3} {
+		if l != nil {
+			users = append(users, l.Nodes...)
+		}
 	}
 	for _, u := range users {
 		key := strings.ToLower(u.Login)
@@ -381,7 +393,11 @@ func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
 		return strings.Compare(strings.ToLower(a.Login), strings.ToLower(b.Login))
 	}
 	slices.SortStableFunc(requested, byLogin)
-	slices.SortStableFunc(others, byLogin)
+	if len(tokens) > 1 {
+		others = filterReviewerSearch(others, tokens)
+	} else {
+		slices.SortStableFunc(others, byLogin)
+	}
 	return ReviewerCandidates{Candidates: append(requested, others...)}, nil
 }
 

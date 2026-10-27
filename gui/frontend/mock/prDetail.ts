@@ -61,6 +61,7 @@ import {
   Mergeable,
   type ReviewerCandidateSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
+import { matchesReviewerSearch, reviewerSearchTokens } from "../src/components/pr/reviewerSearch";
 import type { PrInit } from "./github";
 import type { InvokeOut } from "./gitops";
 
@@ -183,6 +184,41 @@ const ORG_MEMBERS: readonly CandidateInit[] = ["Ada", "Ben", "Cleo", "Dev", "Eli
   }),
 );
 
+/**
+ * People whose profile names are stored "Last, First" (GitHub's whole-string search for
+ * "jane doe" misses them; the daemon's word search finds them). outside-olga has no
+ * access to the repository: GitHub answers her request without adding her, so the
+ * daemon fails it (FAILED_PRECONDITION).
+ */
+const STORED_LAST_FIRST: readonly CandidateInit[] = [
+  { id: "U_jdoe", kind: ReviewerKind.USER, login: "jdoe", name: "Doe, Jane", avatarUrl: avatar("jdoe") },
+  { id: "U_zdoe", kind: ReviewerKind.USER, login: "zdoe", name: "Doerr, Janelle", avatarUrl: avatar("zdoe") },
+  { id: "U_olga", kind: ReviewerKind.USER, login: "outside-olga", name: "Outside, Olga", avatarUrl: avatar("outside-olga") },
+];
+/** Logins GitHub accepts a request for without adding them (no access to the repository). */
+const NO_ACCESS = new Set(["outside-olga"]);
+
+/**
+ * The daemon's search (internal/store/gh/reviewer_search.go): one word is GitHub's
+ * substring match; several keep whoever has every word in the login or the name, login
+ * prefix first, then name-word prefixes, then the rest, each by login.
+ */
+function searchRank(c: CandidateInit, term: string): number | null {
+  const login = c.login ?? "";
+  const name = c.name ?? "";
+  const words = reviewerSearchTokens(term);
+  if (words.length < 2) {
+    const q = term.toLowerCase();
+    return login.toLowerCase().includes(q) || name.toLowerCase().includes(q) ? 0 : null;
+  }
+  if (!matchesReviewerSearch(login, name, term)) return null;
+  const fold = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const tokens = words.map(fold).filter((t) => t !== "");
+  if (tokens.some((t) => fold(login).startsWith(t))) return 0;
+  const nameWords = name.split(/[^\p{L}\p{N}']+/u).map(fold);
+  return tokens.every((t) => nameWords.some((w) => w.startsWith(t))) ? 1 : 2;
+}
+
 export interface PrDetailHooks {
   t0: number;
   viewer: string;
@@ -239,6 +275,7 @@ export class PrDetailWorld {
       { id: "U_kim", kind: ReviewerKind.USER, login: "teammate-kim", name: "Kim", avatarUrl: avatar("teammate-kim"), isRequested: true },
       { id: "U_lee", kind: ReviewerKind.USER, login: "teammate-lee", name: "Lee", avatarUrl: avatar("teammate-lee") },
       { id: "U_max", kind: ReviewerKind.USER, login: "teammate-max", name: "", avatarUrl: avatar("teammate-max") },
+      ...STORED_LAST_FIRST.map((m) => ({ ...m })),
       ...ORG_MEMBERS.map((m) => ({ ...m })),
     ]);
   }
@@ -582,12 +619,12 @@ export class PrDetailWorld {
   }
 
   /**
-   * The pending requests, then (for a non-empty query) up to 20 people whose login or
-   * name contains it, case-insensitively (GitHub's own matching is close enough); a
-   * requested match is listed once.
+   * The pending requests, then (for a non-empty query) up to 20 people matching it as
+   * the daemon does (searchRank: one word is a substring of the login or name, several
+   * must all be there, best matches first); a requested match is listed once.
    */
   listCandidates(slug: string, number: number, query: string) {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     this.h.count("ListReviewerCandidates");
     if (q) this.h.count("ListReviewerCandidates query");
     const list = this.candidateList(slug, number);
@@ -597,10 +634,13 @@ export class PrDetailWorld {
       q === ""
         ? []
         : list
-            .filter((c) => c.kind !== ReviewerKind.TEAM && ((c.login ?? "").toLowerCase().includes(q) || (c.name ?? "").toLowerCase().includes(q)))
+            .filter((c) => c.kind !== ReviewerKind.TEAM)
+            .map((c) => ({ c, rank: searchRank(c, q) }))
+            .filter((x): x is { c: CandidateInit; rank: number } => x.rank !== null)
             .slice(0, CANDIDATE_SEARCH_LIMIT)
-            .filter((c) => !c.isRequested)
-            .sort(byLogin);
+            .filter((x) => !x.c.isRequested)
+            .sort((a, b) => a.rank - b.rank || byLogin(a.c, b.c))
+            .map((x) => x.c);
     return { candidates: [...requested, ...found] };
   }
 
@@ -627,6 +667,10 @@ export class PrDetailWorld {
     const d = this.detailOf(slug, number);
     const list = this.candidateList(slug, number);
     const isTeam = kind === ReviewerKind.TEAM;
+    if (requested && NO_ACCESS.has(login.toLowerCase())) {
+      // GitHub answered without adding them; the daemon checks and refuses (SetReviewRequest).
+      throw new PrDetailError("failed_precondition", `failed precondition: GitHub did not add ${login} as a reviewer (they may lack access to the repository)`);
+    }
     let cand = list.find((c) => c.login === login);
     if (!cand) {
       cand = { id: `${isTeam ? "T" : "U"}_${login}`, kind: isTeam ? ReviewerKind.TEAM : ReviewerKind.USER, login, name: "", avatarUrl: avatar(login) };

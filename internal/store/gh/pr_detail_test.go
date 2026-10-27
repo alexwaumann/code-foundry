@@ -189,6 +189,41 @@ func TestReviewerCandidatesThroughWorker(t *testing.T) {
 	}
 }
 
+// A search of several words through the worker, against the fake's substring search:
+// "jane doe" finds the user stored as "Doe, Jane" (GitHub's whole-string search alone
+// would not), in one request.
+func TestReviewerCandidatesSeveralWords(t *testing.T) {
+	g, _ := changeDrivenWorld() // #1 open
+	g.detail.assignable = []ReviewerCandidate{
+		{ID: "U1", Login: "jdoe", Name: "Doe, Jane"},
+		{ID: "U2", Login: "janet", Name: "Janet Smith"},
+		{ID: "U3", Login: "doe-j", Name: "John Doe"},
+		{ID: "U4", Login: "jane-doe-bot", Name: ""},
+	}
+	f := (&fakeRunner{}).serve(g)
+	s := startStore(t, testOptions(openTestDB(t), f, nil))
+	ctx := context.Background()
+	before := f.count("ReviewerCandidates")
+	for _, q := range []string{"jane doe", " doe, jane ", "Doe,Jane"} {
+		c, err := s.ReviewerCandidates(ctx, "o/r", 1, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, x := range c.Candidates {
+			if !x.Requested {
+				got = append(got, x.Login)
+			}
+		}
+		if want := []string{"jane-doe-bot", "jdoe"}; !slices.Equal(got, want) {
+			t.Errorf("%q: got %v, want %v", q, got, want)
+		}
+	}
+	if n := f.count("ReviewerCandidates") - before; n != 3 {
+		t.Errorf("requests = %d, want one per search", n)
+	}
+}
+
 func TestSetReviewRequestREST(t *testing.T) {
 	srv := newAPIServer(t, "tok", func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -201,6 +236,13 @@ func TestSetReviewRequestREST(t *testing.T) {
 			w.Header().Set("X-Ratelimit-Remaining", "4999")
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte(`{"message":"Must have push access to repository","status":"403"}`))
+		case r.URL.Path == "/repos/o/r/pulls/4/requested_reviewers" && r.Method == http.MethodPost:
+			// GitHub took the request but did not add the reviewer (no access): only kim is pending.
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"number":4,"requested_reviewers":[{"login":"Kim"}],"requested_teams":[],"base":{"repo":{"owner":{"login":"o"}}}}`))
+		case r.URL.Path == "/repos/o/r/pulls/4/requested_reviewers":
+			// A withdraw GitHub did not apply: kim and the core team are still pending.
+			_, _ = w.Write([]byte(`{"number":4,"requested_reviewers":[{"login":"kim"}],"requested_teams":[{"slug":"core"}],"base":{"repo":{"owner":{"login":"o"}}}}`))
 		case r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"number":1,"requested_reviewers":[{"login":"kim"}],"requested_teams":[{"slug":"core"}],"base":{"repo":{"owner":{"login":"o"}}}}`))
@@ -247,6 +289,25 @@ func TestSetReviewRequestREST(t *testing.T) {
 		{name: "no push access (403, not a rate limit)", number: 3, req: ReviewRequest{Login: "kim", Requested: true},
 			method: "POST", body: `{"reviewers":["kim"],"team_reviewers":[]}`, err: ErrPermissionDenied,
 			errContain: "Must have push access to repository"},
+		{name: "GitHub answers but did not add the user", number: 4, req: ReviewRequest{Login: "outsider", Requested: true},
+			method: "POST", body: `{"reviewers":["outsider"],"team_reviewers":[]}`, err: ErrFailedPrecondition,
+			errContain: "GitHub did not add outsider as a reviewer (they may lack access to the repository)"},
+		{name: "added: the login compares case-insensitively", number: 4, req: ReviewRequest{Login: "kIM", Requested: true},
+			method: "POST", body: `{"reviewers":["kIM"],"team_reviewers":[]}`, want: []string{"Kim"}},
+		{name: "GitHub answers but did not add the team", number: 4, req: ReviewRequest{Login: "o/core", Kind: ReviewerTeam, Requested: true},
+			method: "POST", body: `{"reviewers":[],"team_reviewers":["core"]}`, err: ErrFailedPrecondition,
+			errContain: "GitHub did not add team core as a reviewer"},
+		{name: "a bot is not checked (GitHub lists it under another login)", number: 4,
+			req:    ReviewRequest{Login: "copilot-pull-request-reviewer[bot]", Requested: true},
+			method: "POST", body: `{"reviewers":["copilot-pull-request-reviewer[bot]"],"team_reviewers":[]}`, want: []string{"Kim"}},
+		{name: "withdraw GitHub did not apply", number: 4, req: ReviewRequest{Login: "KIM"},
+			method: "DELETE", body: `{"reviewers":["KIM"],"team_reviewers":[]}`, err: ErrFailedPrecondition,
+			errContain: "GitHub still lists KIM as a requested reviewer"},
+		{name: "team withdraw GitHub did not apply", number: 4, req: ReviewRequest{Login: "core", Kind: ReviewerTeam},
+			method: "DELETE", body: `{"reviewers":[],"team_reviewers":["core"]}`, err: ErrFailedPrecondition,
+			errContain: "GitHub still lists team core"},
+		{name: "withdraw a user: gone afterwards", number: 1, req: ReviewRequest{Login: "kim"},
+			method: "DELETE", body: `{"reviewers":["kim"],"team_reviewers":[]}`, want: []string{}},
 		{name: "invalid login: nothing sent", number: 1, req: ReviewRequest{Login: "not a login", Requested: true}, err: ErrInvalidArgument},
 		{name: "invalid kind: nothing sent", number: 1, req: ReviewRequest{Login: "kim", Kind: "ROBOT"}, err: ErrInvalidArgument},
 	}

@@ -1,0 +1,39 @@
+{
+  "data": {
+    "rateLimit": { "limit": 5000, "cost": 1, "remaining": 4990, "resetAt": "2026-10-27T12:00:00Z" },
+    "repository": {
+      "assignableUsers": {
+        "nodes": [
+          { "id": "U_jdd", "login": "janedoe-dev", "name": "", "avatarUrl": "https://avatars.example.com/janedoe-dev.png" }
+        ]
+      },
+      "t0": {
+        "nodes": [
+          { "id": "U_janet", "login": "janet", "name": "Janet Smith", "avatarUrl": "https://avatars.example.com/janet.png" },
+          { "id": "U_jdoe", "login": "jdoe", "name": "Doe, Jane", "avatarUrl": "https://avatars.example.com/jdoe.png" },
+          { "id": "U_jroe", "login": "jane-roe", "name": "Jane Roe", "avatarUrl": "https://avatars.example.com/jane-roe.png" },
+          { "id": "U_xjx", "login": "xjanex", "name": "Mary Doeville", "avatarUrl": "https://avatars.example.com/xjanex.png" },
+          { "id": "U_jdd", "login": "janedoe-dev", "name": "", "avatarUrl": "https://avatars.example.com/janedoe-dev.png" }
+        ]
+      },
+      "t1": {
+        "nodes": [
+          { "id": "U_zdoe", "login": "zdoe", "name": "Doerr, Janelle", "avatarUrl": "https://avatars.example.com/zdoe.png" },
+          { "id": "U_jdoe", "login": "jdoe", "name": "Doe, Jane", "avatarUrl": "https://avatars.example.com/jdoe.png" },
+          { "id": "U_john", "login": "doe-j", "name": "John Doe", "avatarUrl": "https://avatars.example.com/doe-j.png" },
+          { "id": "U_auth", "login": "author-doe", "name": "Jane Author Doe", "avatarUrl": "https://avatars.example.com/author-doe.png" },
+          { "id": "U_kim", "login": "kim", "name": "Kim Doe-Jane", "avatarUrl": "https://avatars.example.com/kim.png" }
+        ]
+      },
+      "pullRequest": {
+        "author": { "login": "author-doe" },
+        "reviewRequests": {
+          "nodes": [
+            { "requestedReviewer": { "__typename": "User", "id": "U_kim", "login": "kim", "name": "Kim Doe-Jane", "avatarUrl": "https://avatars.example.com/kim.png" } },
+            { "requestedReviewer": { "__typename": "User", "id": "U_ana", "login": "ana", "name": "Ana", "avatarUrl": "https://avatars.example.com/ana.png" } }
+          ]
+        }
+      }
+    }
+  }
+}
