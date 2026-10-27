@@ -112,38 +112,7 @@ func TestSendStartsStoppedThread(t *testing.T) {
 	}
 }
 
-// A stopped thread whose transcript is gone starts a new conversation, and the
-// timeline says Claude does not remember (a note before the message).
-func TestSendStartsNewConversationWhenTranscriptGone(t *testing.T) {
-	e := newEnv(t)
-	s := e.create(CreateOptions{InitialPrompt: "first"})
-	e.waitItems(s.ID, "the first turn", turnCount(1))
-	cid := argOf(e.spec(s.ID).Argv, "--session-id")
-	e.resumable(s.ID)
-	if err := e.m.Close(e.ctx(), s.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(filepath.Join(e.paths.projectDir(e.wt), cid+".jsonl")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "again"}); err != nil {
-		t.Fatal(err)
-	}
-	e.waitDeliveries("again", func(f, r int) bool { return f == 1 })
-	items := e.items(s.ID).Items
-	argv := e.argvOf()
-	if argOf(argv, "--resume") != "" || argOf(argv, "--session-id") == "" || argOf(argv, "--session-id") == cid {
-		t.Errorf("argv %q", argv)
-	}
-	n := slices.IndexFunc(items, func(it Item) bool { return it.Kind == KindNote })
-	u := slices.IndexFunc(items, func(it Item) bool { return it.Kind == KindUserMessage && it.Text == "again" })
-	if n < 0 || u != n+1 || !strings.Contains(items[n].Text, "does not remember") {
-		t.Errorf("note %d, message %d\n%s", n, u, describeItems(items))
-	}
-	if got := e.snapshot(s.ID); !strings.Contains(got.LastError, "not found") {
-		t.Errorf("LastError %q", got.LastError)
-	}
-}
+// A stopped thread whose transcript is gone is refused: transcriptmissing_test.go.
 
 // Messages that come while a thread starts wait for the handshake: Send returns their
 // items at once, in order after the first prompt's, and Claude gets them in that order.

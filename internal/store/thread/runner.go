@@ -384,8 +384,13 @@ func (r *runner) finish(fn func(*Thread)) {
 		st, reason = StatusError, ReasonStartFailed
 	}
 	now := r.m.opts.Now()
+	// Whether the conversation it leaves can continue, off m.mu: a miss globs
+	// (transcriptmissing.go).
+	cur, _ := r.m.Snapshot().Thread(r.id)
+	gone := r.m.transcriptGone(cur)
 	r.m.detach(r, func(s *Thread) {
 		fn(s)
+		s.TranscriptMissing = gone && s.ClaudeSessionID == cur.ClaudeSessionID && s.needsTranscript()
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
 		if owed := r.unsentCd(); owed != nil {
 			// The process is gone; the next reconnect resumes in the requested member.

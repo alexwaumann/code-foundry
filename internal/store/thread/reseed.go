@@ -86,6 +86,7 @@ func (m *Manager) Reseed(ctx context.Context, id string, o ReseedOptions) (t Thr
 func (s *Thread) applySeed(sd seed) {
 	s.SystemPromptAppend, s.SpawnAddDirs, s.SeedPrefix = sd.prompt, sd.dirs, sd.prefix
 	s.FreshStart = true
+	s.TranscriptMissing = false // a fresh start needs no transcript (transcriptmissing.go)
 	s.Epoch = max(s.Epoch, 1) + 1
 }
 

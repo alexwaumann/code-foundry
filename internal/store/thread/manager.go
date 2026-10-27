@@ -413,6 +413,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	}
 	var lost []string
 	reported := map[string]bool{}
+	transcripts := &transcriptIndex{paths: opts.Paths} // transcriptmissing.go
 	for _, s := range rows {
 		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
 		if s.State != StateDisconnected {
@@ -440,6 +441,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
 		s.Flags = flags[s.ID]
+		s.TranscriptMissing = transcripts.gone(s) // every thread is stopped here
 		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}
 	// Links that predate copying them up the CreatedBy chain (prlink_children.go).
@@ -811,7 +813,9 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, fmt.Errorf("%w: thread %s has no saved conversation to fork yet", ErrFailedPrecondition, id)
 	}
 	if _, ok := m.opts.Paths.transcriptPath(parent.WorktreePath, parent.ClaudeSessionID); !ok {
-		return Thread{}, fmt.Errorf("%w: transcript of %s not found", ErrFailedPrecondition, parent.ClaudeSessionID)
+		// A stopped parent says so from now on (transcriptmissing.go).
+		m.setTranscriptMissing(id, parent.ClaudeSessionID, parent.needsTranscript())
+		return Thread{}, ErrTranscriptMissing
 	}
 	if _, err := os.Stat(parent.WorktreePath); err != nil {
 		return Thread{}, fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, parent.WorktreePath, err)
@@ -888,9 +892,9 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	return m.Get(ctx, newID)
 }
 
-// Reconnect resumes a DISCONNECTED thread without a prompt. Without a resumable
-// conversation (no Claude session id yet, or its transcript is gone) it starts a new
-// conversation in the same worktree and says so in LastError. It unarchives and
+// Reconnect resumes a DISCONNECTED thread without a prompt. Without a conversation to
+// resume (no Claude session id yet) it starts a new one in the same worktree and says
+// so in LastError; one whose transcript is gone is ErrTranscriptMissing. It unarchives and
 // unsnoozes the thread. No command calls it any more (a message starts a stopped
 // thread: Send); it stays for ThreadService.Reconnect and tests.
 func (m *Manager) Reconnect(ctx context.Context, id string) (Thread, error) {
