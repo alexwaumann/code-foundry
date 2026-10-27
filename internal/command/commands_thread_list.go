@@ -232,6 +232,9 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 			cost += s.GetCostUsd()
 		}
 		var marks []string
+		if s.GetTranscriptMissing() { // it cannot continue (commands_thread_transcript.go)
+			marks = append(marks, transcriptMissingMark)
+		}
 		if s.GetArchivedAt() != nil {
 			marks = append(marks, "archived")
 		}

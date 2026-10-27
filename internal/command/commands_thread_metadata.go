@@ -86,6 +86,9 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	if p := s.GetPending(); p != nil {
 		lines = append(lines, "pending: "+pendingLine(p))
 	}
+	if l := transcriptMissingLine(s); l != "" { // commands_thread_transcript.go
+		lines = append(lines, l)
+	}
 	// Where the thread is listed: an agent sending to an archived child unarchives it.
 	if at := s.GetArchivedAt(); at != nil {
 		lines = append(lines, "archived: "+at.AsTime().Local().Format(time.DateTime))
