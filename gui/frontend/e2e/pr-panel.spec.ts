@@ -221,10 +221,17 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
   await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
   await shot(page, "chunk3-reviewers");
 
-  // Two or more search GitHub: someone past the first 100 is found; no match says so.
+  // Two or more search GitHub: someone past the first 100 is found under Matches; the
+  // pending requests that do not match stay below under Requested; no match says so.
   await search.fill("zoe-zim");
-  await expect.poll(logins).toEqual([["zoe-zimmerman", "false"]]);
-  await expect(page.getByTestId("pr-reviewer-requested")).toHaveCount(0);
+  await expect.poll(logins).toEqual([
+    ["zoe-zimmerman", "false"],
+    ["acme/core", "true"],
+    ["teammate-ana", "true"],
+    ["teammate-kim", "true"],
+  ]);
+  await expect(page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate")).toHaveCount(1);
+  await expect(page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate")).toHaveCount(3);
   await expect(page.getByTestId("pr-reviewer-searching")).toHaveCount(0);
   await shot(page, "reviewer-search");
   await search.fill("nobody-at-all");
@@ -232,13 +239,17 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
 
   // Choosing a result requests a review; the candidates and the detail are read again.
   await search.fill("lee");
-  await expect.poll(logins).toEqual([["teammate-lee", "false"]]);
-  await cands.first().click();
+  const matched = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
+  await expect(matched).toHaveCount(1);
+  await expect(matched).toHaveAttribute("data-login", "teammate-lee");
+  await matched.click();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").map((i) => i.args)).toEqual([
     { "repo-slug": SLUG, number: "145", login: "teammate-lee", kind: "user", requested: "true" },
   ]);
-  await expect(cands.filter({ hasText: "teammate-lee" })).toHaveAttribute("data-requested", "true");
   await expect(page.getByTestId("pr-reviewer").filter({ hasText: "teammate-lee" })).toHaveAttribute("data-status", "requested");
+  // Read again, it stays under Matches with its check, once.
+  await expect(cands.filter({ hasText: "teammate-lee" })).toHaveCount(1);
+  await expect(matched).toHaveAttribute("data-requested", "true");
 
   // Requested now, so not in Recent; withdrawn, it stays in Recent with a ×.
   await search.fill("");
@@ -281,8 +292,10 @@ test("the reviewer picker matches every word (\"jane doe\" finds \"Doe, Jane\"),
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-add-reviewer").click();
   const search = page.getByTestId("pr-reviewer-search");
-  const cands = page.getByTestId("pr-reviewer-candidate");
+  const cands = page.getByTestId("pr-reviewer-matches").getByTestId("pr-reviewer-candidate");
   const logins = () => cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]));
+  const pending = page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate");
+  const pendingLogins = () => pending.evaluateAll((els) => els.map((e) => e.getAttribute("data-login")));
 
   // First last against names stored "Last, First"; the word order does not matter.
   await search.fill("doe, jane");
@@ -309,6 +322,10 @@ test("the reviewer picker matches every word (\"jane doe\" finds \"Doe, Jane\"),
     ["zdoe", "false"],
   ]);
   await expect(page.getByTestId("pr-reviewer").filter({ hasText: "jdoe" })).toHaveAttribute("data-status", "requested");
+  // The other requests sit below under Requested; jdoe is not repeated there.
+  await expect.poll(pendingLogins).toEqual(["acme/core", "teammate-ana", "teammate-kim"]);
+  await expect(page.getByTestId("pr-reviewer-candidate").filter({ hasText: "jdoe" })).toHaveCount(1);
+  await shot(page, "reviewer-search-tokens-requested");
 
   // Someone without access: GitHub answers without adding them, the daemon refuses, and
   // the toast says why; the row stays unchecked.

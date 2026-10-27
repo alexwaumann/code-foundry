@@ -142,19 +142,37 @@ function RequestedAndRecent({ prRef }: { prRef: PrRef }) {
   );
 }
 
-/** At or over the threshold: the daemon's matches for term, in its order, each once. */
+/**
+ * At or over the threshold: Matches (the daemon's results for term, in its order, with
+ * any requested person who matches it, checked), then Requested (the pending requests
+ * that do not match). Each person shows once, in one group.
+ */
 function SearchResults({ prRef, term }: { prRef: PrRef; term: string }) {
   const entry = useResource(reviewerCandidatesResource, term === "" ? null : reviewerCandidatesKey(prRef, term));
   const data = entry?.data;
-  const list = data ? uniqueCandidates(data.candidates.filter((c) => !c.isRequested || matches(c, term))) : null;
-  if (list === null) return <Message>{entry?.error ? `Cannot search: ${entry.error}` : "Searching…"}</Message>;
-  if (list.length === 0) return <Message testId="pr-reviewer-nomatch">No one matches.</Message>;
+  if (!data) return <Message>{entry?.error ? `Cannot search: ${entry.error}` : "Searching…"}</Message>;
+  const all = uniqueCandidates(data.candidates);
+  const found = all.filter((c) => !c.isRequested || matches(c, term));
+  const requested = all.filter((c) => c.isRequested && !matches(c, term));
   return (
-    <CommandGroup className="p-0">
-      {list.map((c) => (
-        <CandidateRow key={`${c.kind}:${c.login}`} prRef={prRef} c={c} />
-      ))}
-    </CommandGroup>
+    <>
+      {found.length === 0 ? (
+        <Message testId="pr-reviewer-nomatch">No one matches.</Message>
+      ) : (
+        <CommandGroup heading="Matches" className="p-0" data-testid="pr-reviewer-matches">
+          {found.map((c) => (
+            <CandidateRow key={`${c.kind}:${c.login}`} prRef={prRef} c={c} />
+          ))}
+        </CommandGroup>
+      )}
+      {requested.length > 0 && (
+        <CommandGroup heading="Requested" className="p-0" data-testid="pr-reviewer-requested">
+          {requested.map((c) => (
+            <CandidateRow key={`${c.kind}:${c.login}`} prRef={prRef} c={c} />
+          ))}
+        </CommandGroup>
+      )}
+    </>
   );
 }
 

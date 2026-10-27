@@ -97,6 +97,11 @@ and choosing a result looked like it failed to add the person.
   still lists <login> as a requested reviewer". The detail is not invalidated then
   (nothing changed). Bots (`[bot]` logins) are not checked: GitHub lists
   copilot-pull-request-reviewer[bot] as Copilot.
+* **Search view groups** (the approved mockup). From 2 characters the picker shows
+  *Matches* (the daemon's results in its order, plus any requested person who matches
+  the term, checked) and then *Requested* (the pending requests that do not match).
+  This replaces "requested rows only when they match": a person just requested from the
+  results stays under Matches, and every row is listed once (Matches wins).
 * **Picker rows.** `matches()` uses `matchesReviewerSearch` (every word in the login or
   name, same folding). `prPanel.confirmed` holds what a successful pr.review.request
   from the picker left, keyed like `requesting`: the row shows the check (or its
