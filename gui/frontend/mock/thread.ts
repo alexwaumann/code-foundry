@@ -913,7 +913,7 @@ export class MockThreadLogs {
       // The same page shown in three turns (docs/notes/inline-page-shows.md): only the last
       // show is a card, the two before it are link rows to it. The turns' text makes the
       // thread taller than its pane, so a link row's click has somewhere to scroll.
-      const long = Array.from({ length: 8 }, (_, i) => `Paragraph ${String(i + 1)}: what changed in this version of the page, at some length.`).join("\n\n");
+      const long = Array.from({ length: 5 }, (_, i) => `Paragraph ${String(i + 1)}: what changed in this version of the page, at some length.`).join("\n\n");
       const asks = ["Show me a page that says hello.", "Make the greeting bigger.", "Add a wave button."];
       asks.forEach((ask, i) => {
         const at = 6 - 2 * i;

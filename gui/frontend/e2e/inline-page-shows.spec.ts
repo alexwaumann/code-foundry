@@ -36,11 +36,13 @@ async function openRepeat(page: Page): Promise<void> {
   await expect(card(page)).toHaveCount(1);
 }
 
-/** Whether an element is wholly inside the timeline's viewport. */
+/** Whether an element is wholly inside the timeline's viewport, clear of the composer floating over its bottom. */
 async function inView(page: Page, el: Locator): Promise<boolean> {
   const box = await el.boundingBox();
   const view = await timeline(page).boundingBox();
-  return !!box && !!view && box.y >= view.y - 1 && box.y + box.height <= view.y + view.height + 1;
+  const dock = await page.getByTestId("thread-pane").locator(".dock").boundingBox();
+  if (!box || !view || !dock) return false;
+  return box.y >= view.y - 1 && box.y + box.height <= Math.min(view.y + view.height, dock.y) + 1;
 }
 
 /** Scrolls the timeline to its start as the reader does (a wheel: a scroll with no input snaps back while pinned). */

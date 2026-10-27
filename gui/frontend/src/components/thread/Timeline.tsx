@@ -210,8 +210,10 @@ export function TimelineList<R extends ListRow>({
   // own timeline (its rows are the turns) or Ember's chat, not a subagent's.
   const rowsRef = useRef(rows);
   const unfoldRef = useRef(unfold);
+  const insetRef = useRef(bottomInset);
   useLayoutEffect(() => {
     rowsRef.current = rows;
+    insetRef.current = bottomInset;
     unfoldRef.current = unfold;
   });
   useEffect(() => {
@@ -225,7 +227,8 @@ export function TimelineList<R extends ListRow>({
         const node = el.querySelector(`[data-index="${String(i)}"]`);
         const box = el.getBoundingClientRect();
         const at = node?.getBoundingClientRect();
-        if (at && at.top >= box.top && at.bottom <= box.bottom) return true;
+        // In view means clear of the composer floating over the list's bottom (bottomInset).
+        if (at && at.top >= box.top && at.bottom <= box.bottom - insetRef.current) return true;
         pinned.current = false;
         v.scrollToIndex(i, { align: "center" });
         return true;
