@@ -73,6 +73,12 @@ func TestThreadList(t *testing.T) {
 				Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt", LastActivityAt: ago(time.Minute)}},
 			wantFilter: &v1.ThreadFilter{IncludeResident: true, Limit: 50},
 			wantLines:  []string{"s-0000000000e1  idle  Ember  no project  1m  [resident ember]"}},
+		// A thread whose transcript Claude Code deleted cannot continue: marked first.
+		{name: "transcript deleted", threads: []*v1.Thread{{Id: "s-0000000000d1", Name: "old work", WorktreePath: "/Users/me",
+			Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt", LastActivityAt: ago(40 * 24 * time.Hour),
+			TranscriptMissing: true, ArchivedAt: ago(time.Hour)}},
+			wantFilter: &v1.ThreadFilter{Limit: 50},
+			wantLines:  []string{"s-0000000000d1  idle  old work  no project  40d  [transcript deleted, archived]"}},
 		{name: "a caller not in the list", caller: "s-999999999999", threads: []*v1.Thread{busy},
 			wantFilter: &v1.ThreadFilter{Limit: 50}, wantLines: []string{"s-7754a478e649  busy  Fix the login  app@cf/fix  5m"}},
 		// The creator is resolved by its id: its current name, not the recorded one.

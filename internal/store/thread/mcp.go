@@ -385,6 +385,9 @@ func (m *Manager) McpStatus(ctx context.Context, id string, refresh bool) (*McpS
 	if err != nil {
 		return nil, err
 	}
+	if err := m.refuseTranscriptMissing(id); err != nil {
+		return nil, err // no Claude to ask, ever (transcriptmissing.go)
+	}
 	if !refresh {
 		if s := log.mcpStatus(); s != nil {
 			return s, nil
@@ -422,6 +425,9 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 	}
 	log, err := m.thread(ctx, id)
 	if err != nil {
+		return McpReconnectResult{}, err
+	}
+	if err := m.refuseTranscriptMissing(id); err != nil {
 		return McpReconnectResult{}, err
 	}
 	if cur := log.mcpStatus(); cur != nil {

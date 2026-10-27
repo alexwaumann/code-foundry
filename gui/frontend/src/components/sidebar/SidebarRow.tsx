@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, Hourglass, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, Hourglass, House, Layers, OctagonX, Pin, Trash2, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -140,6 +140,7 @@ function ThreadLine({ id }: { id: string }) {
           {status && (
             <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
               {line.kind === "waiting" && <Hourglass className="mr-0.5 inline size-2.5 align-[-1px] text-cf-icon-muted" aria-hidden data-testid="row-waiting" />}
+              {line.kind === "transcriptDeleted" && <Trash2 className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden data-testid="row-transcript-deleted" />}
               {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
             </span>
           )}

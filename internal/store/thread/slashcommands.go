@@ -132,5 +132,8 @@ func (m *Manager) SlashCommands(ctx context.Context, id string) ([]SlashCommand,
 	if err != nil {
 		return nil, err
 	}
+	if err := m.refuseTranscriptMissing(id); err != nil {
+		return nil, err // a thread that cannot continue offers nothing (transcriptmissing.go)
+	}
 	return log.slashCommands(), nil
 }

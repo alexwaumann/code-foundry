@@ -22,6 +22,9 @@ import { isWaiting } from "./waiting";
  * - "flagAttention": "<plugin>: <reason>" (amber), "flagError": the same in red: a plugin's
  *   flag (docs/notes/plugins-3-events-flags-env.md). Claude's own prompts and errors win
  *   over a flag; a flag wins over a finished turn and over working.
+ * - "transcriptDeleted": "Transcript deleted" (red, a trash icon before it), then the place:
+ *   Claude Code deleted the thread's transcript, so it cannot continue
+ *   (docs/notes/transcript-deleted.md). Wins over everything: the thread is stopped for good.
  */
 export type StatusLineKind =
   | "place"
@@ -36,7 +39,8 @@ export type StatusLineKind =
   | "snoozeEnded"
   | "waiting"
   | "flagAttention"
-  | "flagError";
+  | "flagError"
+  | "transcriptDeleted";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
 
@@ -62,19 +66,22 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   waiting: "muted",
   flagAttention: "amber",
   flagError: "red",
+  transcriptDeleted: "red",
 };
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
 export function showsPlace(kind: StatusLineKind): boolean {
-  return kind === "place" || kind === "working" || kind === "waiting";
+  return kind === "place" || kind === "working" || kind === "waiting" || kind === "transcriptDeleted";
 }
 
 const PLACE: StatusLine = { kind: "place", detail: "", at: null };
+const TRANSCRIPT_DELETED: StatusLine = { kind: "transcriptDeleted", detail: "", at: null };
 
 export function statusLine(
-  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags">>) | undefined,
+  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing">>) | undefined,
 ): StatusLine {
   if (!s) return PLACE;
+  if (s.transcriptMissing) return TRANSCRIPT_DELETED;
   const flag = topFlag(s);
   const badge = threadBadge(s);
   if (badge === "attention" || badge === "error") {
@@ -122,6 +129,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   waiting: "Waiting",
   flagAttention: "",
   flagError: "",
+  transcriptDeleted: "Transcript deleted",
 };
 
 /** The status text before the place: "" for "place". `now` only matters when `at` is set. */

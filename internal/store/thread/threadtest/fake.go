@@ -339,6 +339,9 @@ func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	if err == nil {
 		err = f.refuseResident(id, "forked")
 	}
+	if err == nil {
+		err = refuseTranscriptMissing(parent) // transcript.go
+	}
 	f.mu.Unlock()
 	if err != nil {
 		return thread.Thread{}, err
@@ -448,6 +451,9 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 	return f.mutate("Reconnect "+id, id, func(s *thread.Thread) error {
 		if s.State != thread.StateDisconnected {
 			return fmt.Errorf("%w: thread %s is %s", thread.ErrFailedPrecondition, id, s.State)
+		}
+		if err := refuseTranscriptMissing(*s); err != nil {
+			return err
 		}
 		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil = thread.StateStarting, "", time.Time{}, time.Time{}
 		return nil
@@ -669,6 +675,9 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 		return thread.Item{}, err
 	}
 	s, err := f.get(id)
+	if err == nil {
+		err = refuseTranscriptMissing(s) // transcript.go
+	}
 	if err != nil {
 		f.mu.Unlock()
 		return thread.Item{}, err
@@ -827,7 +836,11 @@ func (f *Fake) McpStatus(_ context.Context, id string, refresh bool) (*thread.Mc
 		f.mu.Unlock()
 		return nil, err
 	}
-	if _, err := f.get(id); err != nil {
+	s, err := f.get(id)
+	if err == nil {
+		err = refuseTranscriptMissing(s) // transcript.go
+	}
+	if err != nil {
 		f.mu.Unlock()
 		return nil, err
 	}
@@ -861,7 +874,11 @@ func (f *Fake) McpReconnect(_ context.Context, id, server string) (thread.McpRec
 		f.mu.Unlock()
 		return thread.McpReconnectResult{}, err
 	}
-	if _, err := f.get(id); err != nil {
+	s, err := f.get(id)
+	if err == nil {
+		err = refuseTranscriptMissing(s) // transcript.go
+	}
+	if err != nil {
 		f.mu.Unlock()
 		return thread.McpReconnectResult{}, err
 	}

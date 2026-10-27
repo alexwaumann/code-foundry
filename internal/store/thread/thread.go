@@ -316,6 +316,11 @@ type Thread struct {
 	// conversation and cleared once it went out. Both persisted.
 	FreshStart bool
 	SeedPrefix string
+	// TranscriptMissing: the thread is stopped and its saved conversation's transcript
+	// is gone (Claude Code deleted it), so it cannot continue (transcriptmissing.go).
+	// Checked at daemon start, when its process ends and when a start is refused, never
+	// per snapshot. Cleared by a reseed and a spawn. Not persisted.
+	TranscriptMissing bool
 	// MemoryHash identifies the app memory's entries the thread's conversation last got:
 	// in its system prompt (a fresh spawn) or as a refresh before a message after a
 	// resumed one (memory.go). "" for none. A fork starts with its parent's. Persisted.

@@ -134,7 +134,9 @@ type startOpts struct {
 // returns the user item, written before the spawn, and a start that fails becomes an
 // error item ("Claude did not start: <reason>") and status error with a nil error; the
 // thread stays stopped and the next message tries again. Without o.first a failure is
-// the error (LastError has it too). errNotStopped when the thread is not stopped.
+// the error (LastError has it too). errNotStopped when the thread is not stopped. A
+// conversation whose transcript is gone is never started: ErrTranscriptMissing, with or
+// without o.first, and nothing written (transcriptmissing.go).
 func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Item, error) {
 	m.mu.Lock()
 	rec, err := m.record(id)
@@ -166,14 +168,21 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 			return Item{}, m.failStart(id, nil, err)
 		}
 	}
+	// A conversation whose transcript is gone cannot continue: refused before anything
+	// is made or written (transcriptmissing.go).
+	l, lastErr, resumeNote, launchErr := m.resumeLaunch(prev)
+	if errors.Is(launchErr, ErrTranscriptMissing) {
+		m.refuseStart(id, prev)
+		return Item{}, launchErr
+	}
 	// A worktree a cleanup removed is made again first (recreate.go); clients see the
 	// thread STARTING meanwhile.
 	var notes []string
-	var l launch
-	var lastErr string
-	rw, launchErr := m.ensureWorktree(ctx, prev)
-	if rw != nil {
-		notes = append(notes, rw.note())
+	var rw *recreatedWorktree
+	if launchErr == nil {
+		if rw, launchErr = m.ensureWorktree(ctx, prev); rw != nil {
+			notes = append(notes, rw.note())
+		}
 	}
 	var remade []madeWorktree // the other members' worktrees made again
 	if launchErr == nil {
@@ -182,12 +191,11 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		}
 	}
 	if launchErr == nil {
-		var note string
-		l, lastErr, note, launchErr = m.resumeLaunch(ctx, prev)
-		if note != "" {
-			notes = append(notes, note)
-			m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
-		}
+		launchErr = m.ensureCwd(ctx, prev)
+	}
+	if launchErr == nil && resumeNote != "" {
+		notes = append(notes, resumeNote)
+		m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
 	}
 	gone := m.unregisteredMembers(prev) // left out of the spawn (requireCheckouts)
 	noteLog := log
@@ -239,6 +247,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 			r.namingTried = r.s.namedForGood()
 			r.s.FreshStart = false // a reseed's fresh start is this one (reseed.go)
 		}
+		r.s.TranscriptMissing = false // resumed or fresh: there is a conversation again
 		r.first = o.first
 	})
 	if err := m.spawn(ctx, id, l); errors.Is(err, ErrClosed) {
@@ -321,15 +330,12 @@ func userItem(id string, o *outgoing) Item {
 }
 
 // resumeLaunch is how a stopped thread starts again: claude --resume of its
-// conversation when the transcript is there; else a new conversation in the same
-// worktree, with why in lastErr, and note, when a conversation existed but its
-// transcript is gone, for the timeline (Claude remembers nothing of it). An error when
-// the worktree is gone (startStopped has recreated one a cleanup removed first, when
-// the thread qualifies: recreate.go).
-func (m *Manager) resumeLaunch(ctx context.Context, prev Thread) (l launch, lastErr, note string, err error) {
-	if err := m.ensureCwd(ctx, prev); err != nil {
-		return launch{}, "", "", err
-	}
+// conversation when the transcript is there; a new conversation after a reseed, or with
+// why in lastErr when no message was ever sent. A saved conversation whose transcript is
+// gone is ErrTranscriptMissing (transcriptmissing.go), but for a resident thread, which
+// starts a new one with note for the timeline (Claude remembers nothing of it).
+// startStopped checks the cwd afterwards, once it made a worktree a cleanup removed.
+func (m *Manager) resumeLaunch(prev Thread) (l launch, lastErr, note string, err error) {
 	if prev.FreshStart {
 		// A reseed asked for a new conversation (reseed.go).
 		l.newID, err = newUUID()
@@ -338,6 +344,9 @@ func (m *Manager) resumeLaunch(ctx context.Context, prev Thread) (l launch, last
 	if prev.ClaudeSessionID != "" {
 		if _, ok := m.opts.Paths.transcriptPath(prev.WorktreePath, prev.ClaudeSessionID); ok {
 			return launch{resume: prev.ClaudeSessionID}, "", "", nil
+		}
+		if prev.needsTranscript() {
+			return launch{}, "", "", ErrTranscriptMissing
 		}
 		lastErr = "transcript of " + prev.ClaudeSessionID + " not found; started a new conversation"
 		note = "Started a new conversation: the previous one's transcript is gone, so Claude does not remember this thread's earlier messages."

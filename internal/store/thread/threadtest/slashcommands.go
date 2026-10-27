@@ -30,7 +30,11 @@ func (f *Fake) SlashCommands(_ context.Context, id string) ([]thread.SlashComman
 	if err := f.record("SlashCommands " + id); err != nil {
 		return nil, err
 	}
-	if _, err := f.get(id); err != nil {
+	s, err := f.get(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := refuseTranscriptMissing(s); err != nil { // transcript.go
 		return nil, err
 	}
 	return f.itemsLocked(id).Commands, nil

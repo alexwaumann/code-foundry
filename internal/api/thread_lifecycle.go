@@ -319,6 +319,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.Flags = flagsToProto(s.Flags)               // thread_flags.go
 	p.Owner = s.Owner
 	p.PluginEnvStale, p.PluginEnvChange = s.PluginEnvStale, s.PluginEnvChange // thread_restart.go
+	p.TranscriptMissing = s.TranscriptMissing                                 // the store's transcriptmissing.go
 	residentToProto(s, p)                                                     // thread_reseed.go
 	return p
 }

@@ -214,6 +214,14 @@ export interface ThreadView {
   pluginEnvStale?: true;
   pluginEnvChange?: string;
   /**
+   * The thread is stopped and Claude Code deleted its conversation's transcript (its
+   * cleanupPeriodDays setting), so it cannot continue: the daemon refuses a message, a
+   * fork and the MCP and slash command queries. The composer is replaced by a note with
+   * Archive and Remove, the header and line 2 say "Transcript deleted" (red, sorted with
+   * errors). Absent for every other thread. docs/notes/transcript-deleted.md.
+   */
+  transcriptMissing?: true;
+  /**
    * A resident thread's name ("ember"): the daemon's own long-lived agent thread
    * (Thread.kind RESIDENT; docs/notes/ember-1-primitives.md). Kept out of the user's lists
    * like an owned thread (isOwned), whose Watch stream still carries it. Absent for
@@ -420,6 +428,7 @@ export function toThreadView(s: Thread): ThreadView {
     flags: s.flags.flatMap(toThreadFlagView),
     ...(s.owner ? { owner: s.owner } : {}),
     ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),
+    ...(s.transcriptMissing ? { transcriptMissing: true as const } : {}),
     ...(s.kind === ThreadKind.RESIDENT ? { resident: s.residentName, epoch: s.epoch } : {}),
   };
 }

@@ -98,6 +98,8 @@ export interface ThreadWorld {
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
   statusOf(id: string): ThreadStatus;
+  /** Throws the daemon's refusal when Claude Code deleted the thread's transcript (World.refuseTranscriptMissing). */
+  refuseTranscriptMissing(id: string): void;
   /** The thread's model as picked ("claude-opus-4-8[1m]"). */
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
@@ -1308,6 +1310,8 @@ export class MockThreadLogs {
   }
 
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
+    // Like the daemon's: nothing is recorded for a thread whose transcript is gone.
+    this.world.refuseTranscriptMissing(id);
     if (this.world.statusOf(id) === ThreadStatus.BUSY) {
       for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
     }

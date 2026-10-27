@@ -201,7 +201,17 @@ interface MockThread {
    * thread.restart and the process's end clear it (docs/notes/plugins-env-restart.md).
    */
   pluginEnvChange: string;
+  /**
+   * Thread.transcript_missing (POST /__mock/thread/transcript, MOCK_SCENARIO=transcript-deleted):
+   * stopped, and Claude Code deleted its transcript, so it cannot continue: a message and a
+   * fork are refused with the daemon's words (docs/notes/transcript-deleted.md).
+   */
+  transcriptMissing: boolean;
 }
+
+/** The daemon's refusal of a thread whose transcript is gone (internal/store/thread/transcriptmissing.go). */
+export const TRANSCRIPT_MISSING_MESSAGE =
+  "Claude Code deleted this thread's transcript (its cleanupPeriodDays setting, 30 days by default), so the conversation cannot continue. This is a Claude Code setting, not a Code Foundry one.";
 
 /** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
 export interface MockFlag {
@@ -706,6 +716,9 @@ export class World {
         this.publishThread(s);
       },
       statusOf: (id) => this.thread(id).status,
+      refuseTranscriptMissing: (id) => {
+        this.refuseTranscriptMissing(id);
+      },
       recordResult: (id, model) => {
         const s = this.thread(id);
         recordResult(s, model);
@@ -1531,6 +1544,7 @@ export class World {
       resident: "",
       epoch: 1,
       pluginEnvChange: "",
+      transcriptMissing: false,
       ...o,
       state,
     };
@@ -1620,6 +1634,7 @@ export class World {
       ...(s.resident ? { kind: ThreadKind.RESIDENT, residentName: s.resident } : {}),
       epoch: s.epoch,
       ...(s.pluginEnvChange ? { pluginEnvStale: true, pluginEnvChange: s.pluginEnvChange } : {}),
+      ...(s.transcriptMissing ? { transcriptMissing: true } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       ...(s.inSidebar !== null ? { inSidebar: s.inSidebar } : {}),
@@ -1733,6 +1748,52 @@ export class World {
     if (change && s.state !== ThreadState.CONNECTED) throw new CommandError("unavailable", "only a running thread can be stale");
     s.pluginEnvChange = change;
     this.publishThread(s);
+  }
+
+  /**
+   * Claude Code deleted the thread's transcript (or, with false, it is back): the thread is
+   * stopped (held, so the clock leaves it alone) and flagged, like the daemon's check at a
+   * stop or a refused start (docs/notes/transcript-deleted.md).
+   */
+  setTranscriptMissing(id: string, missing: boolean): void {
+    const s = this.thread(id);
+    if (missing && s.state !== ThreadState.DISCONNECTED) this.stopThread(id, "idle", 0, s.status === ThreadStatus.BUSY ? ThreadStatus.IDLE : undefined);
+    s.held = s.held || missing;
+    s.transcriptMissing = missing;
+    this.publishThread(s);
+  }
+
+  /** The daemon's refusal of a message or fork to a thread whose transcript is gone. */
+  refuseTranscriptMissing(id: string): void {
+    const s = this.thread(id);
+    if (s.transcriptMissing && s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", TRANSCRIPT_MISSING_MESSAGE);
+  }
+
+  /**
+   * Scenario: a thread whose transcript Claude Code deleted, "Fix sidebar flake", stopped a
+   * month ago with one exchange in its timeline (docs/notes/transcript-deleted.md). POST
+   * /__mock/transcript-deleted, or MOCK_SCENARIO=transcript-deleted. Idempotent; returns
+   * its id.
+   */
+  addTranscriptDeleted(): string {
+    const id = "s-transcript-deleted";
+    if (!this.threads.has(id)) {
+      const ago = (min: number) => new Date(Date.now() - min * 60_000);
+      const s = this.addThread({ id, projectId: "repo-cf", worktreePath: CF, name: "Fix sidebar flake", model: "claude-sonnet-5[1m]", effort: "medium",
+        state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(45 * 24 * 60),
+        createdAt: ago(45 * 24 * 60 + 30), lastActivityAt: ago(45 * 24 * 60), held: true, transcriptMissing: true });
+      this.logs.seed(id, {
+        prompt: "Can you look at why TestUsageFromLiveTranscript flakes in CI?",
+        intro: "Let me run it in a loop.",
+        command: "go test ./internal/store/thread -run TestUsageFromLiveTranscript -count=50",
+        output: "ok  \tgithub.com/alexwaumann/code-foundry/internal/store/thread\t4.812s",
+        reply: "The flake comes from the usage fold reading a transcript line before the writer flushed it. I added a retry in `runner.go` and the test passed 50× locally.",
+        minutesAgo: 45 * 24 * 60,
+        end: "done",
+      });
+      this.publishThread(s);
+    }
+    return id;
   }
 
   /** ThreadService.Restart: a running thread restarts with the current environment; any other is left as it is. */
@@ -3169,6 +3230,7 @@ export class World {
         run: (ctx) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
+          this.refuseTranscriptMissing(s.id);
           const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
           this.logs.fork(s.id, f.id, s.name || s.id);
           this.focusThread(f.id);

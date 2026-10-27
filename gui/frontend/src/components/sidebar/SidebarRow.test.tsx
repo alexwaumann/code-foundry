@@ -59,6 +59,13 @@ describe("SidebarRow line 2", () => {
     expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
   });
 
+  it("transcript deleted: red with a trash icon, then the place (docs/notes/transcript-deleted.md)", () => {
+    expect(renderRow({ state: "disconnected", transcriptMissing: true }).textContent).toBe("Transcript deleted · code-foundry @ main");
+    expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("transcriptDeleted");
+    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
+    expect(screen.getByTestId("row-transcript-deleted").getAttribute("class")).toContain("lucide-trash-2");
+  });
+
   it("the @ is muted and the branch mono", () => {
     renderRow({});
     expect(screen.getByText("@").className).toContain("opacity-60");

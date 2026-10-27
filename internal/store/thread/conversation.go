@@ -36,12 +36,18 @@ func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
 
 // Send implements Store. A thread that is not running starts with the message as its
 // first prompt (startStopped): the item is written at once, and a start that fails is
-// told in the timeline, not by an error. A message to a starting thread waits for the
+// told in the timeline, not by an error, unless its transcript is gone
+// (ErrTranscriptMissing: nothing is written). A message to a starting thread waits for the
 // handshake behind the first prompt (queue); one to a closing thread waits for the exit,
 // then starts it. A sent message unarchives and unsnoozes the thread.
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
 	log, err := m.thread(ctx, id)
 	if err != nil {
+		return Item{}, err
+	}
+	// A conversation Claude Code deleted cannot continue (transcriptmissing.go);
+	// startStopped checks again for one that is not flagged yet.
+	if err := m.refuseTranscriptMissing(id); err != nil {
 		return Item{}, err
 	}
 	// "/clear" and the like: the app has its own control (slashdeny.go). The commands

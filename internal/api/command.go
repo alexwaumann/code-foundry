@@ -10,6 +10,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // Command implements codefoundryv1connect.CommandServiceHandler over a command.Registry.
@@ -87,6 +88,10 @@ func commandError(name string, err error) error {
 			out.AddDetail(d)
 		}
 		return out
+	case errors.Is(err, thread.ErrTranscriptMissing):
+		// Not the caller's mistake: the thread cannot continue (the thread store's
+		// transcriptmissing.go). The CLI prints the words and exits 1, no help pointer.
+		return commandError(name, command.Failed(thread.ErrTranscriptMissing))
 	case errors.Is(err, command.ErrUnknownCommand):
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, command.ErrInvalidArgs):

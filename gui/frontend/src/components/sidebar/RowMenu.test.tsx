@@ -29,6 +29,18 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+describe("RowMenu: Fork (docs/notes/transcript-deleted.md)", () => {
+  it("is offered for a thread that can continue", () => {
+    openMenu({});
+    expect(screen.getByTestId("menu-fork").hasAttribute("data-disabled")).toBe(false);
+  });
+
+  it("is disabled once Claude Code deleted the transcript", () => {
+    openMenu({ transcriptMissing: true });
+    expect(screen.getByTestId("menu-fork").hasAttribute("data-disabled")).toBe(true);
+  });
+});
+
 describe("RowMenu: Hide from sidebar (docs/notes/hidden-children-2-gui.md)", () => {
   it("a thread another thread created (shown, since its row is listed): Hide from sidebar after Archive, hiding it", () => {
     openMenu({ createdBy: "s-0", inSidebar: true });

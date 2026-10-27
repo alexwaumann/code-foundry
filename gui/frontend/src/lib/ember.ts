@@ -90,6 +90,8 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
     case "crashed":
     case "flagError":
       return { text: "Error", tone: "red" };
+    case "transcriptDeleted":
+      return { text: "Transcript deleted", tone: "red" };
     case "place":
       return { text: "Idle", tone: "muted" };
   }

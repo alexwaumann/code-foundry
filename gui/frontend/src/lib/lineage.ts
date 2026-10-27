@@ -161,6 +161,7 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
     case "interrupted":
     case "crashed":
     case "flagError":
+    case "transcriptDeleted":
       return "error";
     case "place":
     case "waiting": // on its own child threads: needs nothing (lib/waiting)

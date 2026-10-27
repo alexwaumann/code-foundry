@@ -30,6 +30,7 @@ import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
 import { ColdCacheNote } from "./ColdCacheNote";
 import { RetryNote } from "./RetryNote";
+import { TranscriptDeletedNote } from "./TranscriptDeleted";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
@@ -176,9 +177,13 @@ export function ThreadComposer({
   // Native drops and the native open panel (in the Wails host); the panel opens in the
   // thread's checkout, else home (a thread without a project).
   const worktreePath = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const hostFiles = useHostFiles({ draftKey, editorRef, disabled: sending, startDir: worktreePath });
-  // The daemon takes a message in any state: a stopped thread starts on it.
-  const canSend = !sending && (text.trim() !== "" || hasAttachments);
+  // Claude Code deleted the transcript: the thread cannot continue, so nothing is typed,
+  // attached or sent; the card's note offers Archive and Remove (TranscriptDeleted.tsx).
+  const transcriptMissing = useThreadsStore((s) => s.byId[threadId]?.transcriptMissing === true);
+  const inputOff = sending || transcriptMissing;
+  const hostFiles = useHostFiles({ draftKey, editorRef, disabled: inputOff, startDir: worktreePath });
+  // The daemon takes a message in any state but that one: a stopped thread starts on it.
+  const canSend = !inputOff && (text.trim() !== "" || hasAttachments);
 
   useEffect(() => {
     void loadSkills(sources.skills);
@@ -284,6 +289,7 @@ export function ThreadComposer({
     if (canSend) void sendThreadDraft(threadId);
   };
   const attach = (files: File[]) => {
+    if (transcriptMissing) return;
     const added = addAttachments(draftKey, files);
     editorRef.current?.insertChips(added.map((a) => ({ id: a.id, name: a.file.name })));
   };
@@ -303,7 +309,7 @@ export function ThreadComposer({
         // file-drop-target-active while a drag from the OS is over it (thread.css).
         {...hostFiles.dropTarget}
         onDragOver={(e) => {
-          if (!e.dataTransfer.types.includes("Files")) return;
+          if (transcriptMissing || !e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
           setDragging(true);
@@ -322,7 +328,8 @@ export function ThreadComposer({
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
         <SnoozeNote threadId={threadId} />
         <RetryNote threadId={threadId} />
-        <ColdCacheNote threadId={threadId} pending={pending.length} />
+        {/* A cold cache means nothing once the conversation is gone. */}
+        {transcriptMissing ? <TranscriptDeletedNote threadId={threadId} /> : <ColdCacheNote threadId={threadId} pending={pending.length} />}
         <div
           className="col-span-2 flex min-w-0 flex-col"
           onKeyDownCapture={(e) => {
@@ -335,15 +342,21 @@ export function ThreadComposer({
             }
           }}
         >
-          <Attachments draftKey={draftKey} disabled={sending} refocus={refocus} />
+          <Attachments draftKey={draftKey} disabled={inputOff} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
           <TagMultiProjectContext.Provider value={sources.projectIds.length > 1}>
             <PromptEditor
               handleRef={editorRef}
               draftKey={draftKey}
               value={text}
-              disabled={sending}
-              placeholder={busy ? (busyPlaceholder ?? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn`) : (placeholder ?? "Send a follow-up…")}
+              disabled={inputOff}
+              placeholder={
+                transcriptMissing
+                  ? "Transcript deleted"
+                  : busy
+                    ? (busyPlaceholder ?? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn`)
+                    : (placeholder ?? "Send a follow-up…")
+              }
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}
@@ -400,7 +413,7 @@ export function ThreadComposer({
             <span className="ml-auto flex">
               <button
                 type="button"
-                disabled={sending}
+                disabled={inputOff}
                 aria-label={attachLabel(hostFiles.hosted)}
                 data-testid="thread-attach"
                 className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
