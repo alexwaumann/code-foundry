@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { makeTab, closePanelTab, openSurface, usePanelStore } = await import("./panel");
-const { prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
+const { clearConfirmedRequests, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -30,7 +30,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, reviewing: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {} });
   usePanelStore.setState({ byKey: {} });
 });
 
@@ -114,6 +114,33 @@ describe("setReviewRequest", () => {
     release();
   });
 
+  it("confirms a request as soon as the daemon does, keeps it over a re-read that lags, and forgets it when the picker closes", async () => {
+    const ref = { slug: SLUG, number: 5 };
+    const key = reviewerCandidatesKey(ref, "jane doe");
+    listReviewerCandidates.mockResolvedValueOnce(candidates(false));
+    const release = reviewerCandidatesResource.watch(key);
+    await vi.waitFor(() => {
+      expect(reviewerCandidatesResource.store.getState().entries[key]?.data).toBeTruthy();
+    });
+    const reread = deferred<ReviewerCandidatesView>();
+    listReviewerCandidates.mockReturnValueOnce(reread.promise);
+    invokeCommand.mockResolvedValueOnce({ message: "Requested a review from lee on #5", resultJson: "{}" });
+    const confirmed = () => usePrPanelStore.getState().confirmed[requestingKey(ref, "lee")];
+
+    const p = setReviewRequest(ref, "lee", "user", true);
+    expect(confirmed()).toBeUndefined(); // the spinner while the command runs
+    await vi.waitFor(() => {
+      expect(confirmed()).toBe(true); // the check during the re-read
+    });
+    reread.resolve(candidates(false)); // GitHub's read lags the write
+    await expect(p).resolves.toBe(true);
+    expect(confirmed()).toBe(true);
+
+    clearConfirmedRequests(ref);
+    expect(confirmed()).toBeUndefined();
+    release();
+  });
+
   it("a failed request is toasted, re-reads, and clears the spinner", async () => {
     const ref = { slug: SLUG, number: 4 };
     const key = reviewerCandidatesKey(ref, "");
@@ -137,6 +164,7 @@ describe("setReviewRequest", () => {
     expect(toast.error).toHaveBeenCalledWith("pr.review.request failed", { description: expect.stringContaining("cannot be requested") as unknown });
     expect(listReviewerCandidates).toHaveBeenCalledTimes(2);
     expect(busy()).toBe(false);
+    expect(usePrPanelStore.getState().confirmed[requestingKey(ref, "lee")]).toBeUndefined(); // nothing to confirm
     release();
   });
 });

@@ -275,6 +275,52 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
   await expect(tabs(page)).toHaveText(["#145"]);
 });
 
+test("the reviewer picker matches every word (\"jane doe\" finds \"Doe, Jane\"), keeps a requested row checked, and toasts a request GitHub did not take", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await page.getByTestId("pr-add-reviewer").click();
+  const search = page.getByTestId("pr-reviewer-search");
+  const cands = page.getByTestId("pr-reviewer-candidate");
+  const logins = () => cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]));
+
+  // First last against names stored "Last, First"; the word order does not matter.
+  await search.fill("doe, jane");
+  await expect.poll(logins).toEqual([
+    ["jdoe", "false"],
+    ["zdoe", "false"],
+  ]);
+  await search.fill("jane doe");
+  await expect.poll(logins).toEqual([
+    ["jdoe", "false"],
+    ["zdoe", "false"],
+  ]);
+  await shot(page, "reviewer-search-tokens");
+
+  // Choosing one requests a review; the row stays, checked, once the candidates are read
+  // again (requested now, it must match "jane doe" word by word to stay among the results).
+  await cands.filter({ hasText: "jdoe" }).click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").map((i) => i.args)).toEqual([
+    { "repo-slug": SLUG, number: "145", login: "jdoe", kind: "user", requested: "true" },
+  ]);
+  await expect(cands.filter({ hasText: "jdoe" }).getByLabel("Requested")).toBeVisible();
+  await expect.poll(logins).toEqual([
+    ["jdoe", "true"],
+    ["zdoe", "false"],
+  ]);
+  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "jdoe" })).toHaveAttribute("data-status", "requested");
+
+  // Someone without access: GitHub answers without adding them, the daemon refuses, and
+  // the toast says why; the row stays unchecked.
+  await search.fill("olga outside");
+  await expect.poll(logins).toEqual([["outside-olga", "false"]]);
+  await cands.first().click();
+  await expect(page.getByText("Request Review failed")).toBeVisible();
+  await expect(page.getByText("GitHub did not add outside-olga as a reviewer (they may lack access to the repository)")).toBeVisible();
+  await expect(cands.first()).toHaveAttribute("data-requested", "false");
+  await expect(cands.first().getByLabel("Updating")).toHaveCount(0);
+});
+
 test("menu: Refresh (and a failed one), the thread actions, Open on GitHub, Copy link; shift+cmd+c copies too", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();

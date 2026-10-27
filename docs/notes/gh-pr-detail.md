@@ -15,7 +15,7 @@ mock daemon.
 | RPC | GitHub | Cache |
 |---|---|---|
 | `GetPullRequestDetail(repo_slug, number, refresh)` → `PullRequestDetail` | `queries/pull_request_full.graphql`, one request; `checks.graphql` pages only beyond 100 checks | memory (64 entries) + `gh_activity` row `pr_detail:<slug>#<n>` |
-| `ListReviewerCandidates(repo_slug, number, query)` | `queries/reviewer_candidates.graphql`: the pending requests, plus `assignableUsers(first: 20, query:)` for a non-empty query (`docs/notes/reviewer-search.md`) | none |
+| `ListReviewerCandidates(repo_slug, number, query)` | `queries/reviewer_candidates.graphql`: the pending requests, plus `assignableUsers(first: 20, query:)` for a non-empty query, and one aliased field per word (`t0`..`t3`) for a query of several (`docs/notes/reviewer-search.md`) | none |
 | `SetReviewRequest(repo_slug, number, login, kind, requested)` → pending requests | REST `POST`/`DELETE repos/{o}/{r}/pulls/{n}/requested_reviewers` | marks the detail stale |
 | `RevertPullRequest(repo_slug, number)` → number, url | GraphQL mutation `revertPullRequest(input: {pullRequestId})` | marks the detail stale, polls soon |
 | `MergePullRequest(repo_slug, number, method, delete_branch, expected_head_sha)` → merged, sha, message, branch_deleted | GraphQL `mergePullRequest(input: {pullRequestId, mergeMethod, expectedHeadOid})`, then REST `DELETE repos/{o}/{r}/git/refs/heads/{branch}` | marks the detail stale, polls soon (see "Merge" below) |

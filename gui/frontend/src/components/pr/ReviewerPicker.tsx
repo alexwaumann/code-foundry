@@ -1,27 +1,39 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
+import { clearConfirmedRequests, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { addRecentReviewer, removeRecentReviewer, useRecentReviewers, type RecentReviewer } from "@/stores/reviewerRecents";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
-import { REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
+import { matchesReviewerSearch, REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
 
 export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 
 const sameReviewer = (a: { login: string; kind: string }, b: { login: string; kind: string }): boolean =>
   a.kind === b.kind && a.login.toLowerCase() === b.login.toLowerCase();
 
-/** A requested candidate shown among search results only when it matches the term too. */
-const matches = (c: ReviewerCandidateView, term: string): boolean => {
-  const t = term.toLowerCase();
-  return c.login.toLowerCase().includes(t) || c.name.toLowerCase().includes(t);
+/**
+ * A requested candidate shown among search results only when it matches the term too:
+ * every word in the login or the name, as the daemon filters a search of several words,
+ * so a row just requested from the results keeps its place (with its check).
+ */
+const matches = (c: ReviewerCandidateView, term: string): boolean => matchesReviewerSearch(c.login, c.name, term);
+
+/** Each person once, first entry kept (a requested match is listed among the requests). */
+const uniqueCandidates = (list: readonly ReviewerCandidateView[]): ReviewerCandidateView[] => {
+  const seen = new Set<string>();
+  return list.filter((c) => {
+    const k = `${c.kind}:${c.login.toLowerCase()}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 };
 
 function Message({ children, testId }: { children: ReactNode; testId?: string }) {
@@ -35,12 +47,15 @@ function Message({ children, testId }: { children: ReactNode; testId?: string })
 /**
  * One person (or requested team): selecting requests a review, or withdraws a pending
  * one. A successful request puts them first in the repository's recents. `onRemove`
- * (Recent rows) adds the × that drops the row from the recents.
+ * (Recent rows) adds the × that drops the row from the recents. A change the daemon
+ * confirmed shows at once and wins over the candidates (stores/prPanel.ts `confirmed`).
  */
 function CandidateRow({ prRef, c, onRemove }: { prRef: PrRef; c: ReviewerCandidateView; onRemove?: () => void }) {
   const busy = usePrPanelStore((s) => s.requesting[requestingKey(prRef, c.login)] ?? false);
+  const confirmed = usePrPanelStore((s) => s.confirmed[requestingKey(prRef, c.login)]);
+  const isRequested = confirmed ?? c.isRequested;
   const select = () => {
-    const requested = !c.isRequested;
+    const requested = !isRequested;
     void setReviewRequest(prRef, c.login, c.kind, requested).then((ok) => {
       if (ok && requested) addRecentReviewer(prRef.slug, c);
     });
@@ -50,16 +65,16 @@ function CandidateRow({ prRef, c, onRemove }: { prRef: PrRef; c: ReviewerCandida
       value={`${c.kind}:${c.login}`}
       data-testid="pr-reviewer-candidate"
       data-login={c.login}
-      data-requested={c.isRequested}
+      data-requested={isRequested}
       onSelect={select}
     >
       <Avatar login={c.login} src={c.avatarUrl} size={20} />
       <span className="truncate">{c.login}</span>
       {c.name && <span className="truncate text-caption">{c.name}</span>}
       <span className="ml-auto flex size-4 shrink-0 items-center justify-center">
-        {busy ? (
+        {busy && confirmed === undefined ? (
           <Loader2 className="size-3.5 animate-spin" aria-label="Updating" />
-        ) : c.isRequested ? (
+        ) : isRequested ? (
           <Check className="size-3.5 text-cf-text" aria-label="Requested" />
         ) : onRemove ? (
           <button
@@ -93,7 +108,7 @@ const recentAsCandidate = (r: RecentReviewer): ReviewerCandidateView => ({ id: "
 function RequestedAndRecent({ prRef }: { prRef: PrRef }) {
   const entry = useResource(reviewerCandidatesResource, reviewerCandidatesKey(prRef, ""));
   const recents = useRecentReviewers(prRef.slug);
-  const requested = (entry?.data?.candidates ?? []).filter((c) => c.isRequested);
+  const requested = uniqueCandidates((entry?.data?.candidates ?? []).filter((c) => c.isRequested));
   const recent = recents.filter((r) => !requested.some((c) => sameReviewer(c, r)));
   const loaded = entry?.data != null;
   return (
@@ -127,10 +142,11 @@ function RequestedAndRecent({ prRef }: { prRef: PrRef }) {
   );
 }
 
-/** At or over the threshold: GitHub's matches for term (rows exactly as returned). */
+/** At or over the threshold: the daemon's matches for term, in its order, each once. */
 function SearchResults({ prRef, term }: { prRef: PrRef; term: string }) {
   const entry = useResource(reviewerCandidatesResource, term === "" ? null : reviewerCandidatesKey(prRef, term));
-  const list = entry?.data?.candidates.filter((c) => !c.isRequested || matches(c, term)) ?? null;
+  const data = entry?.data;
+  const list = data ? uniqueCandidates(data.candidates.filter((c) => !c.isRequested || matches(c, term))) : null;
   if (list === null) return <Message>{entry?.error ? `Cannot search: ${entry.error}` : "Searching…"}</Message>;
   if (list.length === 0) return <Message testId="pr-reviewer-nomatch">No one matches.</Message>;
   return (
@@ -148,6 +164,14 @@ function Candidates({ prRef }: { prRef: PrRef }) {
   const { term, pending } = useReviewerSearchTerm(input);
   const searching = reviewerSearchTerm(input) !== "";
   const loading = usePrSearchLoading(prRef, searching ? term : "");
+  // Closing the picker forgets its confirmed changes: the next open shows GitHub's state.
+  const { slug, number } = prRef;
+  useEffect(
+    () => () => {
+      clearConfirmedRequests({ slug, number });
+    },
+    [slug, number],
+  );
   return (
     <Command className="bg-transparent" loop shouldFilter={false}>
       <CommandInput

@@ -55,3 +55,79 @@ a large org anyone past the first 100 could not be found. It now asks GitHub.
 `make check` and `make gui-e2e` (pr-panel.spec.ts: no search under 2 characters, a
 member past the first 100 found, "No one matches.", a request lands in Recent once
 withdrawn, Recent survives reopening, × removes without requesting).
+
+# Word search and confirmed requests
+
+Two bugs a user hit: searching "first last" found nobody while "last, first" worked,
+and choosing a result looked like it failed to add the person.
+
+## Causes
+
+* `assignableUsers(query:)` matches the whole string against the login and the stored
+  profile name. Names stored as "Doe, Jane" match "doe, jane" but never "jane doe".
+* The picker kept a requested row among the results only when the whole term was a
+  substring of its login or name. A person found through a looser match lost their row
+  the moment the re-read listed them as requested.
+* The REST POST to `requested_reviewers` answers 201 even when GitHub does not add the
+  reviewer (someone without access to the repository). Nothing checked the
+  `requested_reviewers` it returned, so the click reported success and the row came
+  back unchecked.
+
+## Decisions
+
+* **Words.** The trimmed term splits on whitespace and commas; empty pieces are dropped
+  and at most 4 are kept (`reviewerSearchTokens`, mirrored by `reviewerSearchTokens` in
+  `components/pr/reviewerSearch.ts`). One word: exactly the old query and order.
+* **Still one request.** The document is static: four extra aliased fields
+  `t0..t3: assignableUsers(first: 20, query: $qN) @include(if: $sN)` beside the
+  whole-string field. Every variable is always sent (`sN` false, `qN` ""), so
+  `TestDetailQueryVariables` still holds and an empty or one-word search costs what it
+  did. A query of several words costs up to five 20-node lists in one paced call.
+* **Filter and order** (`reviewer_search.go`). The lists merge by login (first seen
+  wins, requested users and the author excluded as before). A user stays when every
+  word, folded (lowercase, letters and digits only), is in the folded login or the
+  folded name. Order: a word is a login prefix, then every word starts a name word,
+  then the rest; ties by login, case-insensitive. Words with no letter or digit
+  ("-") are ignored. Requested users still come first and are not filtered (the picker
+  filters them).
+* **Confirmed requests.** `SetReviewRequest` checks GitHub's response: after a request
+  the login (or the team's slug, against `requested_teams`) must be listed, after a
+  withdraw it must be gone; case-insensitive. Otherwise `ErrFailedPrecondition`: "GitHub
+  did not add <login> as a reviewer (they may lack access to the repository)" or "GitHub
+  still lists <login> as a requested reviewer". The detail is not invalidated then
+  (nothing changed). Bots (`[bot]` logins) are not checked: GitHub lists
+  copilot-pull-request-reviewer[bot] as Copilot.
+* **Picker rows.** `matches()` uses `matchesReviewerSearch` (every word in the login or
+  name, same folding). `prPanel.confirmed` holds what a successful pr.review.request
+  from the picker left, keyed like `requesting`: the row shows the check (or its
+  absence) as soon as the command returns, instead of the spinner during the re-read,
+  and keeps it if the re-read lags GitHub. Closing the picker clears it
+  (`clearConfirmedRequests`), so the next open shows GitHub's state. Lists are deduped
+  by kind and login before rendering.
+* **Bold token highlighting** from the mockup was skipped: it would split the login and
+  name spans for little gain.
+
+## Gotchas
+
+* GitHub's REST answer is the only confirmation: the GraphQL re-read right after the
+  write may not list the request yet, which is why the picker trusts `confirmed` over
+  the re-read while it stays open.
+* The mock (`mock/prDetail.ts`) adds jdoe ("Doe, Jane"), zdoe ("Doerr, Janelle") and
+  outside-olga ("Outside, Olga") to #145. Requesting outside-olga fails with the
+  daemon's precondition text, so the "Request Review failed" toast is testable.
+* The mock imports `reviewerSearchTokens` and `matchesReviewerSearch` from `src`; the
+  module also imports React, which tsx loads without trouble.
+
+## Verification
+
+* Go: `reviewer_search_test.go` (tokens, rank, filter order, variables),
+  `TestDecodeReviewerCandidatesTokens` on `testdata/reviewer_candidates_tokens_synthetic.json`
+  ("jane doe", "doe, jane", "Doe,Jane": the same list), the shapes table (one word
+  unfiltered, a login-only hit), `TestReviewerCandidatesSeveralWords` through the
+  worker and the fake GitHub (one request per search), and `TestSetReviewRequestREST`
+  (not added, team not added, case-insensitive hit, bot skipped, withdraw not applied).
+* GUI: `reviewerSearch.test.ts` (tokens, matching), `prPanel.test.ts` (confirmed during
+  and after a lagging re-read, cleared on close, absent after a failure), and the e2e
+  test in `pr-panel.spec.ts` ("doe, jane" and "jane doe" list jdoe then zdoe; the click
+  keeps jdoe checked; outside-olga toasts "Request Review failed" with the reason).
+* `make check` and `make gui-e2e`.

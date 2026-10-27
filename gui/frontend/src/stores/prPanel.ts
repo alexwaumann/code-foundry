@@ -42,13 +42,20 @@ interface PrPanelState {
   refreshing: Readonly<Record<string, boolean>>;
   /** pullRequestKey + "\u0000" + login → a pr.review.request in flight. */
   requesting: Readonly<Record<string, boolean>>;
+  /**
+   * requestingKey → what the last successful pr.review.request from the picker left
+   * (true: requested). The daemon has checked GitHub took it, so the row shows this over
+   * the candidates until the picker closes (clearConfirmedRequests): a re-read that lags
+   * GitHub, or is still running, never flips the check back.
+   */
+  confirmed: Readonly<Record<string, boolean>>;
   /** pullRequestKey → a pr.merge in flight (from its confirmation on). */
   merging: Readonly<Record<string, boolean>>;
   /** pullRequestKey → a pr.review in flight (until the detail shows it). */
   reviewing: Readonly<Record<string, boolean>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, merging: {}, reviewing: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
 
@@ -174,19 +181,33 @@ function settled<V>(r: Resource<V>, pred: (key: string) => boolean, timeoutMs = 
 
 export const requestingKey = (ref: PrRef, login: string): string => `${pullRequestKey(ref.slug, ref.number)}\u0000${login}`;
 
+/** Forgets the picker's confirmed requests for ref (it closed: the next open shows GitHub's state). */
+export function clearConfirmedRequests(ref: PrRef): void {
+  const prefix = `${pullRequestKey(ref.slug, ref.number)}\u0000`;
+  const confirmed = usePrPanelStore.getState().confirmed;
+  if (!Object.keys(confirmed).some((k) => k.startsWith(prefix))) return;
+  usePrPanelStore.setState({ confirmed: Object.fromEntries(Object.entries(confirmed).filter(([k]) => !k.startsWith(prefix))) });
+}
+
 /**
  * Reviewer picker: requests a review from login, or withdraws the pending request. The
  * row stays busy until the picker's candidates (every query it watches) are read again,
- * so it never shows the old state after the request, and a second click cannot repeat
- * the same request.
+ * so a second click cannot repeat the same request. Once the daemon confirms the
+ * change, `confirmed` holds the new state, so the row shows it at once (during the
+ * re-read too) and keeps it whatever the re-read says while the picker is open.
  */
 export async function setReviewRequest(ref: PrRef, login: string, kind: "user" | "team", requested: boolean): Promise<boolean> {
   const busy = requestingKey(ref, login);
   if (usePrPanelStore.getState().requesting[busy]) return false;
-  usePrPanelStore.setState((s) => ({ requesting: { ...s.requesting, [busy]: true } }));
+  usePrPanelStore.setState((s) => {
+    const { [busy]: _was, ...confirmed } = s.confirmed;
+    return { requesting: { ...s.requesting, [busy]: true }, confirmed };
+  });
   const key = pullRequestKey(ref.slug, ref.number);
   try {
-    return await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) });
+    const ok = await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) });
+    if (ok) usePrPanelStore.setState((s) => ({ confirmed: { ...s.confirmed, [busy]: requested } }));
+    return ok;
   } finally {
     pullRequestDetailResource.invalidate(key);
     const ofThisPr = (k: string) => k.startsWith(`${key}\u0000`);
