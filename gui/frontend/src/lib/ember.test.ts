@@ -255,7 +255,7 @@ describe("buildEmberRows", () => {
   it("draws the reply as the thread's text row and a page open", () => {
     const { list, wakes } = items("u:u1", "x:x1", "t:t1", "e:e1");
     const rows = buildEmberRows(list, opts(wakes));
-    expect(rows[1]).toEqual({ type: "html", key: "x1", id: "x1" });
+    expect(rows[1]).toEqual({ type: "html", key: "x1", id: "x1", page: "", later: "" });
     expect(rows[2]).toEqual({ type: "text", key: "t1", id: "t1", final: true, answer: "t1" });
   });
 

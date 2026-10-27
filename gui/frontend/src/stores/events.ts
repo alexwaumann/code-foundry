@@ -20,7 +20,7 @@ import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStor
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { onSkillEpoch } from "./skill";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
-import { applyThreadSourceEvent, pruneThreadLogs } from "./thread";
+import { applyThreadSourceEvent, prunePageModals, pruneThreadLogs } from "./thread";
 import { useUiStore } from "./ui";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
@@ -76,6 +76,12 @@ const handlers: Handlers = {
     }));
     // A removed thread's items go with it.
     if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useThreadsStore.getState().byId);
+    // A removed or archived thread's open page modal closes (session state; stores/thread.ts pageModals).
+    if (useThreadsStore.getState().loaded)
+      prunePageModals((id) => {
+        const t = useThreadsStore.getState().byId[id];
+      return t !== undefined && t.archivedAtMs === null;
+    });
   },
   // Pending requests of every thread; the visible one's items come from its Watch.
   thread: applyThreadSourceEvent,

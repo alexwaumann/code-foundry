@@ -22,7 +22,7 @@ const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home
 const HOVERED_FRAME = "iframe:hover";
 
 /** A first guess of a row's height before it is measured. */
-function estimate(r: { type: string } | undefined): number {
+function estimate(r: { type: string; later?: string } | undefined): number {
   switch (r?.type) {
     case "user":
       return 72;
@@ -37,7 +37,8 @@ function estimate(r: { type: string } | undefined): number {
     case "system":
       return 46;
     case "html":
-      return 470;
+      // An earlier show of a page shown again is a one-line link row (lib/threadTimeline linkRepeatShows).
+      return r.later ? 26 : 470;
     case "theme":
       return 132;
     default:

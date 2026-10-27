@@ -41,6 +41,8 @@ export interface TimelineItem {
   toolStatus: ToolStatusView | "";
   requestState: RequestStateView | "";
   streaming: boolean;
+  /** An html item's page, resolved to its absolute path (lib/inlinePage); "" or absent otherwise. */
+  page?: string;
 }
 
 /** Tools whose consecutive calls fold into one "Read 3 files, searched code 2 times" row. */
@@ -73,8 +75,11 @@ export type WorkNode =
    * and, while open, its card with the page. The turn's fold never touches it: its row and
    * card stay as they are, folded or not (only the row opens and closes the card). It is no
    * step and breaks a strip's run (docs/notes/inline-html.md, thread-fold-5-text-and-html.md).
+   * `page` is its absolute path. `later` is the row key of the latest show of the same page
+   * when this is an older one (linkRepeatShows): it renders as a one-line link to that card,
+   * with no card and no frame; "" for the latest show (docs/notes/inline-page-shows.md).
    */
-  | { type: "html"; key: string; id: string }
+  | { type: "html"; key: string; id: string; page: string; later: string }
   /**
    * A theme the thread saved (code-foundry theme save; docs/notes/theme-model-flow.md): its
    * card. Like a page it stays in a folded turn, is no step and breaks a strip's run.
@@ -201,7 +206,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         out.push({ type: "system", key: it.id, id: it.id });
         break;
       case "html":
-        out.push({ type: "html", key: it.id, id: it.id });
+        out.push({ type: "html", key: it.id, id: it.id, page: it.page ?? "", later: "" });
         break;
       case "theme":
         out.push({ type: "theme", key: it.id, id: it.id });
@@ -388,8 +393,44 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   });
   // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
   if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
-  return rows;
+  return linkRepeatShows(rows);
 }
+
+/**
+ * One live card per page: of the html rows showing the same page (by absolute path), the
+ * last keeps its card and every earlier one gets `later`, the row key of that last one, and
+ * renders as a link row to it (docs/notes/inline-page-shows.md). Only top-level rows count
+ * (a page nested under a subagent's Agent row keeps its card). Rows that change are
+ * copied; the rest keep their identity, as does the list when none changes. An html row
+ * with no page stays a card.
+ */
+export function linkRepeatShows<R extends { type: string; key: string }>(rows: R[]): R[] {
+  const last = new Map<string, string>();
+  for (const r of rows) {
+    const h = asHtml(r);
+    if (h?.page) last.set(h.page, h.key);
+  }
+  let out: R[] | null = null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const h = r ? asHtml(r) : null;
+    if (!r || !h) continue;
+    const latest = h.page ? (last.get(h.page) ?? h.key) : h.key;
+    const later = latest === h.key ? "" : latest;
+    if (later === h.later) continue;
+    out ??= [...rows];
+    out[i] = { ...r, later };
+  }
+  return out ?? rows;
+}
+
+/** The html node a row is, or null. */
+function asHtml(r: { type: string }): HtmlNode | null {
+  return r.type === "html" ? (r as unknown as HtmlNode) : null;
+}
+
+/** A page's row (WorkNode "html"). */
+export type HtmlNode = Extract<WorkNode, { type: "html" }>;
 
 /**
  * Work a strip collapses: tool rows without a permission request (an Agent included),
@@ -461,11 +502,11 @@ const SEP = "\u0001";
 
 /** One string per item with what the timeline depends on, so a shallow-equal list means "same rows". */
 export function timelineKey(it: TimelineItem): string {
-  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : ""].join(SEP);
+  return [it.id, it.kind, it.name, it.parentToolUseId, it.toolUseId, it.toolStatus, it.requestState, it.streaming ? "1" : "", it.page ?? ""].join(SEP);
 }
 
 export function decodeTimelineKey(k: string): TimelineItem {
-  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = ""] = k.split(SEP);
+  const [id = "", kind = "text", name = "", parentToolUseId = "", toolUseId = "", toolStatus = "", requestState = "", streaming = "", page = ""] = k.split(SEP);
   return {
     id,
     kind: kind as ThreadItemKind,
@@ -475,6 +516,7 @@ export function decodeTimelineKey(k: string): TimelineItem {
     toolStatus: toolStatus as ToolStatusView | "",
     requestState: requestState as RequestStateView | "",
     streaming: streaming === "1",
+    page,
   };
 }
 

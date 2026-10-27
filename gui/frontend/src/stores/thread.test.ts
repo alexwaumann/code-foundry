@@ -7,7 +7,13 @@ import {
   applyThreadEvent,
   applyThreadEvents,
   applyWatchBatch,
+  closePageModal,
   deferTurnFolds,
+  flashPage,
+  openPageModal,
+  PAGE_FLASH_MS,
+  prunePageModals,
+  setPageModalSource,
   foldDeferredTurns,
   forgetTurnView,
   KEPT_LOGS,
@@ -387,5 +393,52 @@ describe("turns left open while scrolled up (deferTurnFolds, watchTurnEnds)", ()
     expect(s.deferred).toEqual({ t: { x: true } });
     forgetTurnView("s");
     expect(useThreadStore.getState()).toBe(s);
+  });
+});
+
+describe("page modals (inline-page-shows)", () => {
+  beforeEach(() => {
+    useThreadStore.setState({ logs: {}, folds: {}, expanded: {}, deferred: {}, pageModals: {}, pageFlash: {} });
+  });
+
+  it("are kept per scope, survive leaving the thread, and close on Close, a removed or archived thread", () => {
+    openPageModal("s", "s", "h1");
+    openPageModal("t", "t", "h9", true);
+    openPageModal("s/run", "s", "h2");
+    setRowExpanded("s", "html:h1", false);
+    expect(useThreadStore.getState().pageModals).toEqual({ s: { thread: "s", id: "h1", source: false }, t: { thread: "t", id: "h9", source: true }, "s/run": { thread: "s", id: "h2", source: false } });
+    // Leaving the thread forgets its row state, not its modal.
+    forgetTurnView("s");
+    expect(useThreadStore.getState().expanded).toEqual({});
+    expect(useThreadStore.getState().pageModals.s).toEqual({ thread: "s", id: "h1", source: false });
+    // The source toggle; a no-op when it is already so, or when nothing is open.
+    setPageModalSource("s", true);
+    expect(useThreadStore.getState().pageModals.s?.source).toBe(true);
+    const before = useThreadStore.getState();
+    setPageModalSource("s", true);
+    setPageModalSource("nope", true);
+    closePageModal("nope");
+    expect(useThreadStore.getState()).toBe(before);
+    // Another page replaces the open one.
+    openPageModal("s", "s", "h3");
+    expect(useThreadStore.getState().pageModals.s).toEqual({ thread: "s", id: "h3", source: false });
+    closePageModal("t");
+    expect(Object.keys(useThreadStore.getState().pageModals)).toEqual(["s", "s/run"]);
+    // The thread goes (or is archived): every scope of it closes, with its flash.
+    flashPage("s", "h3", 5);
+    flashPage("u", "x", 5);
+    prunePageModals((id) => id !== "s");
+    expect(useThreadStore.getState().pageModals).toEqual({});
+    expect(useThreadStore.getState().pageFlash).toEqual({ u: { id: "x", at: 5 } });
+    const same = useThreadStore.getState();
+    prunePageModals(() => true);
+    expect(useThreadStore.getState()).toBe(same);
+  });
+
+  it("flashPage marks the card a link row pointed at, one per thread", () => {
+    flashPage("s", "a", 100);
+    flashPage("s", "b", 200);
+    expect(useThreadStore.getState().pageFlash).toEqual({ s: { id: "b", at: 200 } });
+    expect(PAGE_FLASH_MS).toBe(1000);
   });
 });

@@ -17,6 +17,7 @@ import { FlagChip } from "./FlagChip";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
+import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
@@ -93,29 +94,32 @@ function ThreadBody({ threadId }: { threadId: string }) {
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
-          {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
-          {loaded && catchingUp && (
-            <div
-              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
-              data-testid="thread-catching-up"
-            >
-              <Loader2 className="size-3 animate-spin" />
-              catching up…
+          {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
+          <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
+            {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
+            {loaded && catchingUp && (
+              <div
+                className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                data-testid="thread-catching-up"
+              >
+                <Loader2 className="size-3 animate-spin" />
+                catching up…
+              </div>
+            )}
+            {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+            {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
+            {loaded && empty && !working && (
+              <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
+                No messages yet.
+              </p>
+            )}
+            <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} />
+            <div className="dock" ref={dockRef}>
+              <AgentsStrip threadId={threadId} />
+              <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
             </div>
-          )}
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
-          {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
-          {loaded && empty && !working && (
-            <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
-              No messages yet.
-            </p>
-          )}
-          <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} />
-          <div className="dock" ref={dockRef}>
-            <AgentsStrip threadId={threadId} />
-            <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
-          </div>
-          <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+            <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+          </PaneOverlay>
         </div>
       </section>
     </ThreadContext.Provider>
