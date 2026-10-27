@@ -25,6 +25,7 @@ import { shareCommands, type SlashCommandView } from "@/api/slashCommands";
 import { watchThread, type ThreadEventView, type ThreadItemView, type ThreadPendingListView, type ThreadPendingView } from "@/api/thread";
 import { shareAgents } from "@/lib/agents";
 import { shareMcp } from "@/lib/mcp";
+import { inlinePage } from "@/lib/inlinePage";
 import { timelineKey } from "@/lib/threadTimeline";
 
 /** One thread's conversation as the Watch delivered it. */
@@ -70,6 +71,26 @@ export interface ThreadState {
    * prompt leaves at once (threadActions respondThread) and comes back if the answer fails.
    */
   answering: Readonly<Record<string, Readonly<Record<string, true>>>>;
+  /**
+   * The page open in a pane's modal (an inline page's Expand; docs/notes/inline-page-shows.md),
+   * by the pane's scope (PaneOverlay: the thread's id for its body, `<thread>/<run>` for a
+   * subagent view). Not forgotten when the reader leaves the thread (forgetTurnView), so the
+   * modal is up again on return; closing it, the thread going or being archived
+   * (prunePageModals) and its item going (the modal closes itself) clear it. Session only.
+   */
+  pageModals: Readonly<Record<string, PageModalState>>;
+  /**
+   * The card an earlier show's link row last pointed at, by thread: its item id and when
+   * (epoch ms). The card rings for a moment once it is on screen (PAGE_FLASH_MS).
+   */
+  pageFlash: Readonly<Record<string, { id: string; at: number }>>;
+}
+
+/** A pane's open page modal: the thread, the html item it shows, and whether it shows the source. */
+export interface PageModalState {
+  thread: string;
+  id: string;
+  source: boolean;
 }
 
 /** One thread's Watch: its stream's status, and the error it is retrying after. */
@@ -78,7 +99,7 @@ export interface ThreadWatchState {
   error: string | null;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {}, deferred: {}, answering: {} }));
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {}, deferred: {}, answering: {}, pageModals: {}, pageFlash: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -433,6 +454,68 @@ export function forgetTurnView(threadId: string): void {
   });
 }
 
+/** Opens a page in a pane's modal (the pane's scope; see ThreadState.pageModals). */
+export function openPageModal(scope: string, threadId: string, itemId: string, source = false): void {
+  useThreadStore.setState((s) => ({ pageModals: { ...s.pageModals, [scope]: { thread: threadId, id: itemId, source } } }));
+}
+
+/** Closes a pane's page modal. No-op when none is open. */
+export function closePageModal(scope: string): void {
+  useThreadStore.setState((s) => {
+    if (!(scope in s.pageModals)) return s;
+    const { [scope]: _gone, ...pageModals } = s.pageModals;
+    return { pageModals };
+  });
+}
+
+/** Shows the page (false) or its source (true) in a pane's open modal. */
+export function setPageModalSource(scope: string, source: boolean): void {
+  useThreadStore.setState((s) => {
+    const cur = s.pageModals[scope];
+    return !cur || cur.source === source ? s : { pageModals: { ...s.pageModals, [scope]: { ...cur, source } } };
+  });
+}
+
+/** Closes the page modals of threads not kept (removed or archived threads). */
+export function prunePageModals(keep: (threadId: string) => boolean): void {
+  useThreadStore.setState((s) => {
+    const kept = Object.entries(s.pageModals).filter(([, m]) => keep(m.thread));
+    const flashes = Object.entries(s.pageFlash).filter(([id]) => keep(id));
+    const same = kept.length === Object.keys(s.pageModals).length && flashes.length === Object.keys(s.pageFlash).length;
+    return same ? s : { pageModals: Object.fromEntries(kept), pageFlash: Object.fromEntries(flashes) };
+  });
+}
+
+/** A pane's open page modal; null when none. */
+export function usePageModal(scope: string | null): PageModalState | null {
+  return useThreadStore((s) => (scope === null ? null : (s.pageModals[scope] ?? null)));
+}
+
+/** The absolute path of the page open in a pane's modal; "" when none (or its item is not in the log). */
+export function usePageModalPath(scope: string | null): string {
+  return useThreadStore((s) => {
+    const m = scope === null ? undefined : s.pageModals[scope];
+    const it = m ? s.logs[m.thread]?.byId[m.id] : undefined;
+    return it?.kind === "html" ? inlinePage(it).abs : "";
+  });
+}
+
+/** How long (ms) a card a link row pointed at keeps its ring. */
+export const PAGE_FLASH_MS = 1000;
+
+/** Rings a page's card a moment (an earlier show's link row was clicked). */
+export function flashPage(threadId: string, itemId: string, at = Date.now()): void {
+  useThreadStore.setState((s) => ({ pageFlash: { ...s.pageFlash, [threadId]: { id: itemId, at } } }));
+}
+
+/** When the card of this item was last pointed at (epoch ms); 0 when it was not. */
+export function usePageFlash(threadId: string, itemId: string): number {
+  return useThreadStore((s) => {
+    const f = s.pageFlash[threadId];
+    return f?.id === itemId ? f.at : 0;
+  });
+}
+
 /** The turn_end item ids of a log. */
 function turnEndIds(log: ThreadLog): string[] {
   return log.order.filter((id) => log.byId[id]?.kind === "turnEnd");
@@ -580,6 +663,7 @@ export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] 
     toolStatus: it.kind === "tool" ? it.status : "",
     requestState: req?.state ?? "",
     streaming: it.streaming,
+    page: it.kind === "html" ? inlinePage(it).abs : "",
   };
 }
 

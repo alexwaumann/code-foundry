@@ -17,6 +17,7 @@ import { keyOf } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { PaneOverlay } from "@/components/thread/InlineHtml";
 import { EmberTimeline } from "./EmberTimeline";
 import { Flame } from "./Flame";
 import "@/components/thread/thread.css";
@@ -142,31 +143,34 @@ export function EmberBody({ threadId }: { threadId: string }) {
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
-          {loaded && catchingUp && (
-            <div
-              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
-              data-testid="thread-catching-up"
-            >
-              <Loader2 className="size-3 animate-spin" />
-              catching up…
+          {/* A page Ember showed expands over this body only (InlineHtml PaneOverlay). */}
+          <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
+            {loaded && catchingUp && (
+              <div
+                className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                data-testid="thread-catching-up"
+              >
+                <Loader2 className="size-3 animate-spin" />
+                catching up…
+              </div>
+            )}
+            {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+            {loaded && empty && !working && (
+              <div className="absolute inset-x-0 top-1/3 flex flex-col items-center gap-3 px-10 text-center" data-testid="ember-empty">
+                <Flame state="idle" size="hero" />
+                <p className="text-body text-cf-text-muted">Tell Ember what you want done. It plans the work, starts worker threads and reports back here.</p>
+              </div>
+            )}
+            <EmberPathPlace>
+              <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
+            </EmberPathPlace>
+            <div className="dock" ref={dockRef}>
+              <AgentsStrip threadId={threadId} />
+              <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={PLACEHOLDER} busyPlaceholder={BUSY_PLACEHOLDER} />
             </div>
-          )}
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
-          {loaded && empty && !working && (
-            <div className="absolute inset-x-0 top-1/3 flex flex-col items-center gap-3 px-10 text-center" data-testid="ember-empty">
-              <Flame state="idle" size="hero" />
-              <p className="text-body text-cf-text-muted">Tell Ember what you want done. It plans the work, starts worker threads and reports back here.</p>
-            </div>
-          )}
-          <EmberPathPlace>
-            <EmberTimeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
-          </EmberPathPlace>
-          <div className="dock" ref={dockRef}>
-            <AgentsStrip threadId={threadId} />
-            <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={PLACEHOLDER} busyPlaceholder={BUSY_PLACEHOLDER} />
-          </div>
-          {/* Ember's reply can be quoted into the composer, as a thread's answer can (docs/notes/citations.md). */}
-          <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+            {/* Ember's reply can be quoted into the composer, as a thread's answer can (docs/notes/citations.md). */}
+            <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+          </PaneOverlay>
         </div>
       </section>
     </ThreadContext.Provider>

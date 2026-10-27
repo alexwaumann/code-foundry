@@ -24,6 +24,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ThreadMarkdown } from "./Code";
 import { ThreadContext } from "./context";
+import { PaneOverlay } from "./InlineHtml";
 import { WorkNodeView } from "./rows";
 import { TimelineList } from "./Timeline";
 import { UserBubble } from "./UserBubble";
@@ -374,11 +375,14 @@ export function SubagentPane({ threadId, runId }: { threadId: string; runId: str
       >
         <RunHeader threadId={threadId} runId={runId} />
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">Loading the conversation…</p>}
-          {toolUseId !== null && <SubagentList threadId={threadId} runId={runId} toolUseId={toolUseId} bottomInset={dockHeight} />}
-          <div className="dock" ref={dockRef}>
-            <ReadOnlyPlate threadId={threadId} status={status} />
-          </div>
+          {/* A run's own modal scope: the thread's page modal stays with the thread's body. */}
+          <PaneOverlay scope={`${threadId}/${runId}`} threadId={threadId}>
+            {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">Loading the conversation…</p>}
+            {toolUseId !== null && <SubagentList threadId={threadId} runId={runId} toolUseId={toolUseId} bottomInset={dockHeight} />}
+            <div className="dock" ref={dockRef}>
+              <ReadOnlyPlate threadId={threadId} status={status} />
+            </div>
+          </PaneOverlay>
         </div>
       </section>
     </ThreadContext.Provider>

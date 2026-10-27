@@ -92,7 +92,7 @@ function estimate(r: EmberRow | undefined): number {
     case "text":
       return 64;
     case "html":
-      return 470;
+      return r.later ? 26 : 470;
     case "theme":
       return 132;
     case "work":

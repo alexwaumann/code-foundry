@@ -11,7 +11,7 @@ import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
 import { snoozeTimeShort } from "./snooze";
 import { waitingCount } from "./waiting";
-import { AGENT_TOOLS, EXPLORE_TOOLS, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
+import { AGENT_TOOLS, EXPLORE_TOOLS, linkRepeatShows, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 // ---------- the flame ----------
 
@@ -818,7 +818,7 @@ export function buildEmberRows(items: readonly TimelineItem[], opts: EmberRowOpt
   // Working with no work since the last message yet (Claude starting): a live row alone.
   const last = rows[rows.length - 1];
   if (opts.working && !liveRun) rows.push({ type: "work", key: `w:live:${last?.key ?? ""}`, ids: [], expanded: false, live: true });
-  return rows;
+  return linkRepeatShows(rows);
 }
 
 /** A work row's estimated height before it is measured. */

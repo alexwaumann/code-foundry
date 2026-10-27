@@ -22,7 +22,7 @@ const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home
 const HOVERED_FRAME = "iframe:hover";
 
 /** A first guess of a row's height before it is measured. */
-function estimate(r: { type: string } | undefined): number {
+function estimate(r: { type: string; later?: string } | undefined): number {
   switch (r?.type) {
     case "user":
       return 72;
@@ -37,7 +37,8 @@ function estimate(r: { type: string } | undefined): number {
     case "system":
       return 46;
     case "html":
-      return 470;
+      // An earlier show of a page shown again is a one-line link row (lib/threadTimeline linkRepeatShows).
+      return r.later ? 26 : 470;
     case "theme":
       return 132;
     default:
@@ -209,8 +210,10 @@ export function TimelineList<R extends ListRow>({
   // own timeline (its rows are the turns) or Ember's chat, not a subagent's.
   const rowsRef = useRef(rows);
   const unfoldRef = useRef(unfold);
+  const insetRef = useRef(bottomInset);
   useLayoutEffect(() => {
     rowsRef.current = rows;
+    insetRef.current = bottomInset;
     unfoldRef.current = unfold;
   });
   useEffect(() => {
@@ -224,7 +227,8 @@ export function TimelineList<R extends ListRow>({
         const node = el.querySelector(`[data-index="${String(i)}"]`);
         const box = el.getBoundingClientRect();
         const at = node?.getBoundingClientRect();
-        if (at && at.top >= box.top && at.bottom <= box.bottom) return true;
+        // In view means clear of the composer floating over the list's bottom (bottomInset).
+        if (at && at.top >= box.top && at.bottom <= box.bottom - insetRef.current) return true;
         pinned.current = false;
         v.scrollToIndex(i, { align: "center" });
         return true;

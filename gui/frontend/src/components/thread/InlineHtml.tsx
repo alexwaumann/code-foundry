@@ -1,6 +1,6 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, TriangleAlert, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, TriangleAlert, X, type LucideIcon } from "lucide-react";
+import type { ThreadItemView } from "@/api/thread";
 import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
@@ -9,17 +9,31 @@ import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGr
 import { useTabRead, useToolEdits } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { TITLE_BAND_HEIGHT } from "@/components/window/titleBand";
 import { SHELL_GAP } from "@/design/tokens";
 import { frameHeight, inlinePage, type InlinePage } from "@/lib/inlinePage";
 import type { PageError } from "@/lib/pageErrors";
 import { tildify } from "@/lib/path";
-import type { WorkNode } from "@/lib/threadTimeline";
+import type { HtmlNode } from "@/lib/threadTimeline";
 import { cn } from "@/lib/utils";
+import { getTimeline } from "@/stores/cite";
 import { openFileInPanel } from "@/stores/filePanel";
-import { setRowExpanded, useRowExpanded, useThreadItem } from "@/stores/thread";
+import {
+  closePageModal,
+  flashPage,
+  openPageModal,
+  PAGE_FLASH_MS,
+  setPageModalSource,
+  setRowExpanded,
+  useRowExpanded,
+  usePageFlash,
+  usePageModal,
+  usePageModalPath,
+  useThreadItem,
+  useThreadLoaded,
+  type PageModalState,
+} from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
-import { HoldTopContext, useThreadCtx } from "./context";
+import { HoldTopContext, PaneOverlayContext, useThreadCtx } from "./context";
 
 /**
  * A page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md),
@@ -30,6 +44,11 @@ import { HoldTopContext, useThreadCtx } from "./context";
  * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
  * the turn's fold never closes it: only its row does (docs/notes/thread-fold-5-text-and-html.md).
  * A closed card and a row scrolled away (the timeline is virtualized) hold no frame.
+ *
+ * One live instance per file (docs/notes/inline-page-shows.md): an earlier show of a page
+ * shown again later is a one-line link row to the latest card (lib/threadTimeline
+ * linkRepeatShows), and while the pane's modal (Expand) shows a file, that file's card keeps
+ * its row and strip but drops its frame.
  */
 
 /** The thread's scrolling timeline around an element (the pane the height cap is a share of). */
@@ -37,18 +56,40 @@ function timelineOf(el: Element | null): HTMLElement | null {
   return el?.closest<HTMLElement>('[data-testid="thread-timeline"]') ?? null;
 }
 
-/** The work-log row and, while open, the card. */
-export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode, { type: "html" }> }) {
+/** The row's page, from its item; null until the item is there (or when it is not a page). */
+function usePage(threadId: string, id: string): InlinePage | null {
+  const item = useThreadItem(threadId, id);
+  return useMemo(() => (item?.kind === "html" ? inlinePage(item) : null), [item]);
+}
+
+/** "Showed <b>name</b> dir": the row's label. */
+function ShowedLabel({ page }: { page: InlinePage }) {
+  return (
+    <span className="lbl">
+      Showed <b>{page.name}</b>
+      {page.dir && (
+        <>
+          {" "}
+          <span className="mono text-cf-text-muted">{page.dir}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** The work-log row and, while open, the card; an earlier show of a page shown again is a link row. */
+export const HtmlRow = memo(function HtmlRow({ node }: { node: HtmlNode }) {
   const { threadId } = useThreadCtx();
-  const item = useThreadItem(threadId, node.id);
+  const page = usePage(threadId, node.id);
   // Open until the reader closes it with its row; the turn's fold never changes it. Leaving
   // the thread forgets the choice, so the card is open again on return.
   const key = `html:${node.id}`;
   const open = useRowExpanded(threadId, key, true);
-  const page = useMemo(() => (item?.kind === "html" ? inlinePage(item) : null), [item]);
+  const flash = usePageFlash(threadId, node.id);
   if (!page) return null;
+  if (node.later) return <EarlierShow threadId={threadId} page={page} id={node.id} later={node.later} />;
   return (
-    <div data-testid="thread-html" data-open={open || undefined}>
+    <div data-testid="thread-html" data-item={node.id} data-open={open || undefined}>
       <button
         type="button"
         className="row"
@@ -61,22 +102,52 @@ export const HtmlRow = memo(function HtmlRow({ node }: { node: Extract<WorkNode,
         <span className="ico">
           <FileCode aria-hidden />
         </span>
-        <span className="lbl">
-          Showed <b>{page.name}</b>
-          {page.dir && (
-            <>
-              {" "}
-              <span className="mono text-cf-text-muted">{page.dir}</span>
-            </>
-          )}
-        </span>
+        <ShowedLabel page={page} />
         {page.title && <span className="meta max-w-72 truncate">{page.title}</span>}
         <ChevronRight className="chev" aria-hidden />
       </button>
-      {open && <HtmlCard threadId={threadId} page={page} />}
+      {open && <HtmlCard threadId={threadId} id={node.id} page={page} flash={flash} />}
     </div>
   );
 });
+
+/**
+ * An earlier show of a page the thread showed again later: one line, never a card. Clicking
+ * it (or Enter/Space) brings the latest card into view and rings it a moment.
+ */
+function EarlierShow({ threadId, page, id, later }: { threadId: string; page: InlinePage; id: string; later: string }) {
+  return (
+    <div data-testid="thread-html" data-item={id} data-earlier>
+      <button
+        type="button"
+        className="row"
+        data-testid="thread-html-earlier"
+        onClick={() => {
+          showLatestCard(threadId, later);
+        }}
+      >
+        <span className="ico">
+          <FileCode aria-hidden />
+        </span>
+        <ShowedLabel page={page} />
+        <span className="meta">
+          <span className="inline-flex items-center gap-1 text-link">
+            Shown again below
+            <ArrowDown className="size-3.5" aria-hidden />
+          </span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** Scrolls the thread's timeline to a page's card (its row key) and rings the card. */
+function showLatestCard(threadId: string, rowKey: string): void {
+  // Open it first: a card the reader closed with its row would have nothing to ring.
+  setRowExpanded(threadId, `html:${rowKey}`, true);
+  getTimeline(threadId)?.showRow(rowKey);
+  flashPage(threadId, rowKey);
+}
 
 /** The page's frame, or its source; a page that cannot be rendered says why over its source. */
 function CardBody({
@@ -86,6 +157,7 @@ function CardBody({
   source,
   height,
   version,
+  covered,
   onResize,
   onPageErrors,
 }: {
@@ -95,6 +167,8 @@ function CardBody({
   source: boolean;
   height: number;
   version: number;
+  /** The pane's modal shows this file: its frame is the file's one, so here the surface only. */
+  covered?: boolean;
   onResize?: (h: number) => void;
   onPageErrors?: (errors: readonly PageError[]) => void;
 }) {
@@ -116,6 +190,7 @@ function CardBody({
       </>
     );
   if (source) return <SourceView page={page} height={height} version={version} />;
+  if (covered) return <div className="bg-cf-surface" style={{ height }} data-testid="thread-html-covered" />;
   return <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} style={{ height }} onResize={onResize} onPageErrors={onPageErrors} testId="thread-html-frame" />;
 }
 
@@ -172,19 +247,58 @@ function Strip({ page, children, big }: { page: InlinePage; children: ReactNode;
   );
 }
 
-/** The card: strip and page; Expand shows the same over the pane. */
-function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
-  const grant = usePreviewGrant(page.baseDir, page.path);
+/** The strip's actions: page errors, open in the side panel, expand (the card's, in a pane with a modal), source, save. */
+function Actions({
+  threadId,
+  page,
+  errors,
+  onAsk,
+  onExpand,
+  source,
+  onSource,
+  failed,
+}: {
+  threadId: string;
+  page: InlinePage;
+  errors: readonly PageError[];
+  onAsk?: () => void;
+  onExpand?: () => void;
+  source: boolean;
+  onSource: () => void;
+  failed: boolean;
+}) {
   const project = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
+  const label = page.title ? `${page.title} (${tildify(page.abs)})` : tildify(page.abs);
+  return (
+    <>
+      <PageErrors errors={errors} threadId={threadId} page={label} onAsk={onAsk} />
+      <Action
+        label="Open in side panel"
+        icon={PanelRight}
+        onClick={() => {
+          openFileInPanel(`thread:${threadId}`, { project, base: page.baseDir, path: page.abs });
+        }}
+        testId="thread-html-panel"
+      />
+      {onExpand && <Action label="Expand" icon={Maximize2} onClick={onExpand} testId="thread-html-expand" />}
+      <Action label={source ? "Show the page" : "Source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
+      <Action label="Artifacts come in a later release" icon={Bookmark} disabled testId="thread-html-save" />
+    </>
+  );
+}
+
+const NO_ERRORS: readonly PageError[] = [];
+
+/** The card: strip and page; Expand shows the same in the pane's modal (PaneOverlay). */
+function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string; page: InlinePage; flash: number }) {
+  const grant = usePreviewGrant(page.baseDir, page.path);
+  const scope = useContext(PaneOverlayContext);
+  const covered = usePageModalPath(scope) === page.abs;
   const [source, setSource] = useState(false);
-  /** Expanded: the lightbox shows. */
-  const [lightbox, setLightbox] = useState(false);
   const [asked, setAsked] = useState<number | null>(null);
   const [pane, setPane] = useState(() => window.innerHeight);
   const [version, setVersion] = useState(0);
-  // The errors each frame's page got (the card's and the lightbox's are two documents).
   const [errors, setErrors] = useState<readonly PageError[]>([]);
-  const [boxErrors, setBoxErrors] = useState<readonly PageError[]>([]);
   const ref = useRef<HTMLDivElement>(null);
   // The thread edited the file: load it again (the grant holds).
   useToolEdits(page.abs, () => {
@@ -202,6 +316,21 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
       ro.disconnect();
     };
   }, []);
+  // A link row pointed here: the card rings a moment (data-flash), as long as is left of it
+  // when the card mounts (the timeline may bring it in a frame or two later).
+  useEffect(() => {
+    const el = ref.current;
+    const left = flash + PAGE_FLASH_MS - Date.now();
+    if (!el || flash === 0 || left <= 0) return;
+    el.dataset.flash = "";
+    const t = setTimeout(() => {
+      delete el.dataset.flash;
+    }, left);
+    return () => {
+      clearTimeout(t);
+      delete el.dataset.flash;
+    };
+  }, [flash]);
   const height = frameHeight(asked, pane);
   // A page resizing under the pointer or with focus (a list it filters) keeps the card's top
   // where it is, not the timeline's bottom (docs/notes/page-library-fixes-b.md).
@@ -212,91 +341,133 @@ function HtmlCard({ threadId, page }: { threadId: string; page: InlinePage }) {
     if (card && frame && frameHeight(h, pane) !== height && (frame.matches(":hover") || document.activeElement === frame)) holdTop(card);
     setAsked(h);
   };
-  const failed = !grant.loading && !grant.preview;
-  const close = () => {
-    setLightbox(false);
-  };
-  const label = page.title ? `${page.title} (${tildify(page.abs)})` : tildify(page.abs);
-  const actions = (expanded: boolean) => (
-    <>
-      <PageErrors errors={expanded ? boxErrors : errors} threadId={threadId} page={label} onAsk={expanded ? close : undefined} />
-      <Action
-        label="Open in side panel"
-        icon={PanelRight}
-        onClick={() => {
-          openFileInPanel(`thread:${threadId}`, { project, base: page.baseDir, path: page.abs });
-        }}
-        testId="thread-html-panel"
-      />
-      {!expanded && (
-        <Action
-          label="Expand"
-          icon={Maximize2}
-          onClick={() => {
-            setLightbox(true);
-          }}
-          testId="thread-html-expand"
-        />
-      )}
-      <Action
-        label={source ? "Show the page" : "Source"}
-        icon={Code}
-        pressed={source}
-        disabled={failed}
-        onClick={() => {
-          setSource((s) => !s);
-        }}
-        testId="thread-html-source-toggle"
-      />
-      <Action label="Artifacts come in a later release" icon={Bookmark} disabled testId="thread-html-save" />
-    </>
-  );
   return (
-    <div ref={ref} className="mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised" data-testid="thread-html-card">
-      <Strip page={page}>{actions(false)}</Strip>
-      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} onResize={onResize} onPageErrors={setErrors} />
-      {lightbox && (
-        <Lightbox onClose={close} returnFocus={() => ref.current?.querySelector<HTMLElement>('[data-testid="thread-html-expand"]') ?? null}>
-          <Strip page={page} big>
-            {actions(true)}
-            <Button type="button" variant="ghost" size="xs" className="ml-1 text-cf-text-muted" data-lightbox-close data-testid="thread-html-close" onClick={close}>
-              <X aria-hidden />
-              Close
-            </Button>
-          </Strip>
-          {grant.preview && !source ? (
-            <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setBoxErrors} onKey={close} testId="thread-html-lightbox-frame" />
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-              <CardBody threadId={threadId} page={page} grant={grant} source={source} height={Math.max(height, 2000)} version={version} />
-            </div>
-          )}
-        </Lightbox>
+    <div
+      ref={ref}
+      className={cn(
+        "mt-1 mb-2.5 ml-1 overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised transition-[box-shadow,border-color] duration-300 motion-reduce:transition-none",
+        "data-flash:border-cf-focus data-flash:ring-[3px] data-flash:ring-cf-focus/50",
       )}
+      data-testid="thread-html-card"
+      data-page={page.abs}
+    >
+      <Strip page={page}>
+        <Actions
+          threadId={threadId}
+          page={page}
+          errors={covered ? NO_ERRORS : errors}
+          source={source}
+          onSource={() => {
+            setSource((s) => !s);
+          }}
+          failed={!grant.loading && !grant.preview}
+          onExpand={
+            scope === null
+              ? undefined
+              : () => {
+                  openPageModal(scope, threadId, id, source);
+                }
+          }
+        />
+      </Strip>
+      <CardBody threadId={threadId} page={page} grant={grant} source={source} height={height} version={version} covered={covered} onResize={onResize} onPageErrors={setErrors} />
     </div>
   );
 }
 
 /**
- * The page over the whole window (sidebar, thread and side panel), below the title band so
- * the traffic lights stay clear, dimming the rest; Esc, Close or a click on the dimmed edge
- * closes it, and its frame goes with it. Opening moves focus to Close, not the frame: keys
- * inside the frame never reach the app (it is another document), so ⌘[ works only while
- * focus is outside it; Close stays one click or Tab away. Esc inside the frame closes it
- * too when the page loads /cf/bridge.js and nothing in the page consumed it: the bridge
- * forwards it as `cf:key` and the lightbox's frame (never the card's) hears it
- * (docs/notes/page-library-fixes-b.md). Closing hands focus back to the card's Expand
- * button (returnFocus). docs/notes/inline-html-2-fixes.md.
+ * A pane body's page modal (Expand): its scope for the cards inside (PaneOverlayContext),
+ * and the modal itself over the body when the store has one open for the scope
+ * (stores/thread.ts pageModals). It lives here, not in the card, so it outlives the card's
+ * row (the timeline drops rows scrolled away) and is up again when the reader comes back
+ * to the thread. Render it inside the pane's `relative` body, after what the modal covers.
  */
-function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; returnFocus: () => HTMLElement | null; children: ReactNode }) {
+export function PaneOverlay({ scope, threadId, children }: { scope: string; threadId: string; children: ReactNode }) {
+  const modal = usePageModal(scope);
+  return (
+    <PaneOverlayContext.Provider value={scope}>
+      {children}
+      {modal && <PageModal key={`${modal.thread}:${modal.id}`} scope={scope} threadId={threadId} modal={modal} />}
+    </PaneOverlayContext.Provider>
+  );
+}
+
+/** The open page: closes itself when its item leaves the log (once the log is there). */
+function PageModal({ scope, threadId, modal }: { scope: string; threadId: string; modal: PageModalState }) {
+  const item = useThreadItem(modal.thread, modal.id);
+  const loaded = useThreadLoaded(modal.thread);
+  const gone = modal.thread !== threadId || (loaded && item?.kind !== "html");
+  useEffect(() => {
+    if (gone) closePageModal(scope);
+  }, [gone, scope]);
+  if (gone || item?.kind !== "html") return null;
+  return <PageModalBox scope={scope} threadId={threadId} item={item} source={modal.source} />;
+}
+
+function PageModalBox({ scope, threadId, item, source }: { scope: string; threadId: string; item: Extract<ThreadItemView, { kind: "html" }>; source: boolean }) {
+  const page = useMemo(() => inlinePage(item), [item]);
+  const grant = usePreviewGrant(page.baseDir, page.path);
+  const [version, setVersion] = useState(0);
+  const [errors, setErrors] = useState<readonly PageError[]>([]);
+  useToolEdits(page.abs, () => {
+    setVersion((v) => v + 1);
+  });
+  const close = () => {
+    closePageModal(scope);
+  };
+  return (
+    <Lightbox onClose={close} returnFocus={(pane) => pane?.querySelector<HTMLElement>(`[data-testid="thread-html-card"][data-page="${CSS.escape(page.abs)}"] [data-testid="thread-html-expand"]`) ?? null}>
+      <Strip page={page} big>
+        <Actions
+          threadId={threadId}
+          page={page}
+          errors={errors}
+          onAsk={close}
+          source={source}
+          onSource={() => {
+            setPageModalSource(scope, !source);
+          }}
+          failed={!grant.loading && !grant.preview}
+        />
+        <Button type="button" variant="ghost" size="xs" className="ml-1 text-cf-text-muted" data-lightbox-close data-testid="thread-html-close" onClick={close}>
+          <X aria-hidden />
+          Close
+        </Button>
+      </Strip>
+      {grant.preview && !source ? (
+        <HtmlFrame key={version} url={grant.preview.url} name={page.title || page.name} thread={threadId} className="min-h-0 flex-1" onPageErrors={setErrors} onKey={close} testId="thread-html-lightbox-frame" />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          <CardBody threadId={threadId} page={page} grant={grant} source={source} height={2000} version={version} />
+        </div>
+      )}
+    </Lightbox>
+  );
+}
+
+/**
+ * The page over the thread pane's body (the conversation and its composer; not its header,
+ * the sidebar or the side panel, which stay usable), dimming it; Esc, Close or a click on
+ * the dimmed edge closes it, and its frame goes with it. Opening moves focus to Close, not
+ * the frame: keys inside the frame never reach the app (it is another document), so ⌘[ works
+ * only while focus is outside it; Close stays one click or Tab away. Esc inside the frame
+ * closes it too when the page loads /cf/bridge.js and nothing in the page consumed it: the
+ * bridge forwards it as `cf:key` and the lightbox's frame (never the card's) hears it
+ * (docs/notes/page-library-fixes-b.md). Closing hands focus back to the card's Expand
+ * button (returnFocus, given the pane body). docs/notes/inline-html-2-fixes.md,
+ * inline-page-shows.md.
+ */
+function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; returnFocus: (pane: HTMLElement | null) => HTMLElement | null; children: ReactNode }) {
   const close = useRef(onClose);
   const back = useRef(returnFocus);
+  const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     close.current = onClose;
     back.current = returnFocus;
   });
   useEffect(() => {
+    const pane = root.current?.parentElement ?? null;
     box.current?.querySelector<HTMLElement>("[data-lightbox-close]")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -307,17 +478,17 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
     document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("keydown", onKey, true);
-      // Not "what had focus before": WebKit does not focus a button on click.
-      back.current()?.focus();
+      // Not "what had focus before": WebKit does not focus a button on click. Only while the
+      // pane is still there (closing, not leaving the thread).
+      if (pane?.isConnected) back.current(pane)?.focus();
     };
   }, []);
-  return createPortal(
+  return (
     <div
-      // cf-thread: the strip's thread-scoped styles (.mono, tones) hold outside the pane too.
-      className="cf-thread fixed inset-0 z-40 bg-black/55"
+      ref={root}
+      className="absolute inset-0 z-40 bg-black/55"
       data-testid="thread-html-lightbox"
       role="dialog"
-      aria-modal="true"
       aria-label="Page"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close.current();
@@ -326,12 +497,11 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
       <div
         ref={box}
         className="absolute flex flex-col overflow-hidden rounded-pane border border-cf-border-strong bg-cf-surface-raised shadow-2xl"
-        style={{ top: TITLE_BAND_HEIGHT, left: SHELL_GAP, right: SHELL_GAP, bottom: SHELL_GAP }}
+        style={{ inset: SHELL_GAP }}
         data-testid="thread-html-lightbox-box"
       >
         {children}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

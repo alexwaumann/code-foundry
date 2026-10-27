@@ -74,9 +74,9 @@ test("source swaps the frame for the file's code, and back", async ({ page }) =>
   await expect(card.getByTestId("thread-html-frame")).toBeVisible();
 });
 
-test("expand shows the page over the whole window; Close has focus; Esc closes it and its frame goes", async ({ page }) => {
+test("expand shows the page over the thread pane's body only; the sidebar and side panel stay usable; Close has focus; Esc closes it", async ({ page }) => {
   await openHtmlThread(page);
-  // The side panel open too: the lightbox covers it as well (inline-html-2-fixes).
+  // The side panel open too: the modal stays clear of it (inline-page-shows).
   await hello(page).getByTestId("thread-html-panel").click();
   await expect(page.getByTestId("side-panel")).toBeVisible();
   const card = hello(page).getByTestId("thread-html-card");
@@ -87,22 +87,40 @@ test("expand shows the page over the whole window; Close has focus; Esc closes i
   await expect(box.frameLocator('[data-testid="thread-html-lightbox-frame"]').locator("#hello")).toHaveText("Hello");
   const lightboxFrame = await box.getByTestId("thread-html-lightbox-frame").boundingBox();
   expect(lightboxFrame?.height ?? 0).toBeGreaterThan(500);
+  // The box sits 12px inside the pane's body: under the header, left of the side panel.
   const inner = await box.getByTestId("thread-html-lightbox-box").boundingBox();
+  const scrim = await box.boundingBox();
   const panel = await page.getByTestId("side-panel").boundingBox();
   const pane = await page.getByTestId("thread-pane").boundingBox();
-  expect(inner && panel && pane).toBeTruthy();
-  if (inner && panel && pane) {
-    expect(inner.x).toBeLessThan(pane.x);
-    expect(inner.x + inner.width).toBeGreaterThanOrEqual(panel.x + panel.width - 1);
+  const header = await page.getByTestId("thread-header").boundingBox();
+  expect(inner && scrim && panel && pane && header).toBeTruthy();
+  if (inner && scrim && panel && pane && header) {
+    expect(scrim.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
+    expect(scrim.x).toBeGreaterThanOrEqual(pane.x - 1);
+    expect(scrim.x + scrim.width).toBeLessThanOrEqual(pane.x + pane.width + 1);
+    expect(inner.x - scrim.x).toBeCloseTo(12, 0);
+    expect(inner.y - scrim.y).toBeCloseTo(12, 0);
+    expect(scrim.x + scrim.width - (inner.x + inner.width)).toBeCloseTo(12, 0);
+    expect(scrim.y + scrim.height - (inner.y + inner.height)).toBeCloseTo(12, 0);
+    expect(inner.x + inner.width).toBeLessThan(panel.x);
   }
+  // One frame per file: the card keeps its row and strip, its frame gives way to the surface.
+  await expect(card.getByTestId("thread-html-strip")).toBeVisible();
+  await expect(card.getByTestId("thread-html-frame")).toHaveCount(0);
+  await expect(card.getByTestId("thread-html-covered")).toBeVisible();
   // Focus is on Close, not in the frame (whose keys the app never sees), so Esc works at once.
   const close = box.getByTestId("thread-html-close");
   await expect(close).toBeVisible();
   await expect(close).toBeFocused();
   await shot(page, "inline-html-expanded");
+  // The side panel takes clicks while the modal is up.
+  await page.getByTestId("side-panel").getByRole("tab").first().click();
+  await expect(box).toBeVisible();
+  await close.focus();
   await page.keyboard.press("Escape");
   await expect(box).toHaveCount(0);
   await expect(page.getByTestId("thread-html-lightbox-frame")).toHaveCount(0);
+  await expect(card.getByTestId("thread-html-frame")).toBeVisible();
   // Focus goes back to Expand.
   await expect(card.getByTestId("thread-html-expand")).toBeFocused();
   // Close is reachable by keyboard from the strip's other actions, and closes it too. WebKit
@@ -114,6 +132,45 @@ test("expand shows the page over the whole window; Close has focus; Esc closes i
   await expect(close).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("thread-html-lightbox")).toHaveCount(0);
+  // A click on the dimmed edge closes it too.
+  await card.getByTestId("thread-html-expand").click();
+  const edge = await box.boundingBox();
+  if (edge) await page.mouse.click(edge.x + 4, edge.y + edge.height / 2);
+  await expect(page.getByTestId("thread-html-lightbox")).toHaveCount(0);
+});
+
+test("the open page is kept per thread: the sidebar works while it is up, and it is up again on return", async ({ page }) => {
+  await openHtmlThread(page);
+  await hello(page).getByTestId("thread-html-card").getByTestId("thread-html-expand").click();
+  const box = page.getByTestId("thread-html-lightbox");
+  await expect(box).toBeVisible();
+  await box.getByTestId("thread-html-source-toggle").click();
+  await expect(box.getByTestId("thread-html-source")).toBeVisible();
+  // The sidebar is outside the modal: another thread opens, with no modal of its own.
+  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
+  await expect(items(page)).toHaveCount(0);
+  await expect(box).toHaveCount(0);
+  await shot(page, "inline-html-away");
+  // Back: the same page is up again, as it was (its source showing), and the card has no frame.
+  await row(page, "s:s-r1").click();
+  await expect(box).toBeVisible();
+  await expect(box.getByTestId("thread-html-path")).toHaveText("docs/hello.html");
+  await expect(box.getByTestId("thread-html-source")).toBeVisible();
+  await expect(box.getByTestId("thread-html-close")).toBeFocused();
+  await box.getByTestId("thread-html-source-toggle").click();
+  await expect(box.frameLocator('[data-testid="thread-html-lightbox-frame"]').locator("#hello")).toHaveText("Hello");
+  // The modal's frame is the file's one: the card has none.
+  await expect(hello(page).getByTestId("thread-html-covered")).toBeVisible();
+  await expect(page.getByTestId("thread-html-frame")).toHaveCount(0);
+  await shot(page, "inline-html-back");
+  // Closing forgets it: away and back, no modal.
+  await page.keyboard.press("Escape");
+  await expect(box).toHaveCount(0);
+  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
+  await expect(items(page)).toHaveCount(0);
+  await row(page, "s:s-r1").click();
+  await expect(items(page)).toHaveCount(2);
+  await expect(box).toHaveCount(0);
 });
 
 /** The html-idle state: three pages shown after a finished turn, outside any (mock/thread.ts). */

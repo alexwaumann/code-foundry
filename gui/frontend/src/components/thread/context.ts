@@ -42,3 +42,11 @@ export const PathPlaceContext = createContext<PathPlaceSource | null>(null);
  * its own: Ember's splits out its task links as pointer lines. Null: ThreadMarkdown.
  */
 export const TextMarkdownContext = createContext<((text: string) => ReactNode) | null>(null);
+
+/**
+ * The scope of the page modal of the pane body a row is in (InlineHtml PaneOverlay): the
+ * thread's id in its body and Ember's, `<thread>/<run>` in a subagent view. A card's Expand
+ * opens the page there, and the card drops its frame while that modal shows its file. Null
+ * outside such a body: no Expand.
+ */
+export const PaneOverlayContext = createContext<string | null>(null);

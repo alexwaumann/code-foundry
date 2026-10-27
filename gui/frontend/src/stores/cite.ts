@@ -80,7 +80,8 @@ export interface TimelineHandle {
   scroller: HTMLElement;
   /**
    * Brings the row with this key into view (scrolling only when it is not mounted and in
-   * view already); false when no row has that key (its turn is folded).
+   * view already, clear of the composer over the list's bottom); false when no row has
+   * that key (its turn is folded).
    */
   showRow(key: string): boolean;
   /** Stops following the bottom, before a scroll of the cite layer's own. */

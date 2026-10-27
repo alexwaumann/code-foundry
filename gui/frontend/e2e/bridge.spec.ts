@@ -411,16 +411,13 @@ test("Escape inside the lightbox's page closes the lightbox unless the page cons
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await expect(box).toBeVisible();
-  // Without the nonce, or from the card's frame, cf:key is not heard.
+  // Without the nonce, cf:key is not heard. The card has no frame of its own meanwhile: the
+  // modal's is the file's one frame (inline-page-shows).
   await inner.locator("body").evaluate(() => {
     parent.postMessage({ type: "cf:key", key: "Escape", cf: 1 }, "*");
   });
-  await doc(page)
-    .locator("body")
-    .evaluate(() => {
-      const nonce = /cf=([\w-]+)/.exec(location.hash)?.[1];
-      parent.postMessage({ type: "cf:key", key: "Escape", cf: 1, nonce }, "*");
-    });
+  await expect(card(page).getByTestId("thread-html-frame")).toHaveCount(0);
+  await expect(card(page).getByTestId("thread-html-covered")).toBeVisible();
   await page.waitForTimeout(300);
   await expect(box).toBeVisible();
   // Escape nothing consumed closes the lightbox, and only it.

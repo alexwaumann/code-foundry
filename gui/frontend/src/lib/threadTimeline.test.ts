@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildTurns, decodeTimelineKey, groupLabel, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, groupLabel, linkRepeatShows, stripRuns, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
 
 let n = 0;
 function item(kind: TimelineItem["kind"], over: Partial<TimelineItem> = {}): TimelineItem {
@@ -467,8 +467,10 @@ describe("live tool strip (stripRuns)", () => {
 
 describe("timelineKey", () => {
   it("round-trips", () => {
-    const it = tool("Bash", { parentToolUseId: "p", requestState: "pending", streaming: true });
+    const it = tool("Bash", { parentToolUseId: "p", requestState: "pending", streaming: true, page: "" });
     expect(decodeTimelineKey(timelineKey(it))).toEqual(it);
+    const page = item("html", { page: "/Users/dev/repo/docs/a.html" });
+    expect(decodeTimelineKey(timelineKey(page))).toEqual(page);
   });
 });
 
@@ -518,7 +520,7 @@ describe("inline pages (html items)", () => {
   it("are the same node whatever the turn's fold: by default at its end, by the reader, or unfolded (thread-fold-5-text-and-html)", () => {
     const items = [user("u1"), tool("Write"), item("html", { id: "h" }), text("a"), end("e1")];
     const node = (fold: () => boolean | undefined) => buildRows(buildTurns(items), { fold, working: false }).find((r) => r.type === "html");
-    const want = { type: "html", key: "h", id: "h" };
+    const want = { type: "html", key: "h", id: "h", page: "", later: "" };
     expect(node(() => undefined)).toEqual(want);
     expect(node(() => true)).toEqual(want);
     expect(node(() => false)).toEqual(want);
@@ -547,6 +549,52 @@ describe("inline pages (html items)", () => {
   it("shown between turns: the next message starts a turn of its own, not a steer", () => {
     const items = [user("u1"), end("e1"), item("html", { id: "h" }), user("u2"), tool("Bash"), text("b"), end("e2")];
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "header(folded 0)", "html:h", "user:u2", "header(folded 1)", "final:b"]);
+  });
+
+  it("shown again: only the latest show of a page is a card, the earlier ones link to it (inline-page-shows)", () => {
+    const A = "/Users/dev/repo/docs/a.html";
+    const B = "/Users/dev/repo/docs/b.html";
+    const page = (id: string, p: string) => item("html", { id, page: p });
+    const items = [user("u1"), page("a1", A), page("b1", B), text("t1"), end("e1"), user("u2"), page("a2", A), text("t2"), end("e2"), page("a3", A)];
+    const rows = buildRows(buildTurns(items), open);
+    const pages = rows.flatMap((r) => (r.type === "html" ? [`${r.id}${r.later ? `->${r.later}` : ""}`] : []));
+    expect(pages).toEqual(["a1->a3", "b1", "a2->a3", "a3"]);
+    // Folded or not, inside a turn or between turns: the same rule.
+    const unfolded = buildRows(buildTurns(items), expanded).flatMap((r) => (r.type === "html" ? [r.later] : []));
+    expect(unfolded).toEqual(["a3", "", "a3", ""]);
+  });
+
+  it("shown again while the turn runs: the earlier card turns into a link as the new show arrives, in the live turn's strips too", () => {
+    const A = "/Users/dev/repo/docs/a.html";
+    const before = [user("u1"), tool("Write"), item("html", { id: "a1", page: A }), tool("Edit"), tool("Bash")];
+    const live = { fold: () => undefined, working: true, strips: true };
+    const html = (rows: TimelineRow[]) => rows.flatMap((r) => (r.type === "html" ? [[r.id, r.later]] : []));
+    expect(html(buildRows(buildTurns(before), live))).toEqual([["a1", ""]]);
+    const after = [...before, item("html", { id: "a2", page: A })];
+    expect(html(buildRows(buildTurns(after), live))).toEqual([
+      ["a1", "a2"],
+      ["a2", ""],
+    ]);
+  });
+
+  it("linkRepeatShows keeps rows (and the list) by identity when nothing links, and leaves pathless pages alone", () => {
+    const rows: TimelineRow[] = [
+      { type: "html", key: "a", id: "a", page: "/x.html", later: "" },
+      { type: "html", key: "b", id: "b", page: "/y.html", later: "" },
+      { type: "html", key: "c", id: "c", page: "", later: "" },
+      { type: "html", key: "d", id: "d", page: "", later: "" },
+    ];
+    expect(linkRepeatShows(rows)).toBe(rows);
+    const again: TimelineRow[] = [...rows, { type: "html", key: "e", id: "e", page: "/x.html", later: "" }];
+    const out = linkRepeatShows(again);
+    expect(out).not.toBe(again);
+    expect(out[0]).toEqual({ type: "html", key: "a", id: "a", page: "/x.html", later: "e" });
+    expect(out.slice(1)).toEqual(again.slice(1));
+    expect(out[1]).toBe(again[1]);
+    // A link that no longer applies (its later show went) is a card again.
+    expect(linkRepeatShows([{ type: "html", key: "a", id: "a", page: "/x.html", later: "e" }])[0]).toMatchObject({ later: "" });
+    // stripRuns leaves pages as they are (they break runs).
+    expect(stripRuns(out as WorkNode[])).toEqual(out);
   });
 
   it("shown between turns while a new one starts: the live header follows the page", () => {
