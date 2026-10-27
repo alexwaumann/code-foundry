@@ -61,6 +61,19 @@ func lastPagesPort(log *slog.Logger, file string) (int, bool) {
 	return port, true
 }
 
+// themePaint is what a thread's page is painted in before its own styles load
+// (preview.Paint, docs/notes/inline-page-frame.md): the published theme's scheme and
+// surface, none before the GUI publishes.
+func themePaint(live *theme.Live) preview.Paint {
+	return func() (string, string) {
+		f, ok := live.Current()
+		if !ok {
+			return "", ""
+		}
+		return f.Scheme, f.Vars["--cf-surface"]
+	}
+}
+
 // pagesOrigin is the origin pages are served from.
 func pagesOrigin(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
 
@@ -69,7 +82,7 @@ func pagesOrigin(port int) string { return "http://127.0.0.1:" + strconv.Itoa(po
 // page library's files (a route each); none reveals anything.
 func newPageRoutes(grants *preview.Grants, liveTheme *theme.Live, log *slog.Logger) map[string]http.Handler {
 	routes := map[string]http.Handler{
-		preview.Prefix:    preview.Handler(grants, log.With("component", "preview")),
+		preview.Prefix:    preview.Handler(grants, themePaint(liveTheme), log.With("component", "preview")),
 		theme.FramePrefix: theme.FrameHandler(liveTheme),
 		bridge.Path:       bridge.Handler(),
 	}

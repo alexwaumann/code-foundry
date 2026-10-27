@@ -150,8 +150,9 @@ func escapeSegment(s string) string {
 // index.html. Responses are never cached (the thread edits these files), carry no
 // referrer, so the grant does not leak to the sites a page loads from, and allow any
 // origin: a page reads its own files with fetch(), and a frame that is not same-origin
-// (an older sandbox, a page opened elsewhere) must still be able to.
-func Handler(g *Grants, log *slog.Logger) http.Handler {
+// (an older sandbox, a page opened elsewhere) must still be able to. An HTML document asked
+// for with ThemedParam is painted in paint's theme (paint.go); a nil paint paints nothing.
+func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Any origin, on errors too, so a page's fetch() sees a 404 rather than a CORS failure.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -182,7 +183,11 @@ func Handler(g *Grants, log *slog.Logger) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		serve(w, r, p)
+		var tag []byte
+		if paint != nil && r.URL.Query().Get(ThemedParam) == "1" {
+			tag = paintTag(paint())
+		}
+		serve(w, r, p, tag)
 	})
 }
 
@@ -213,7 +218,8 @@ func resolve(floor Floor, dir, rel string) (string, error) {
 	return real, nil
 }
 
-func serve(w http.ResponseWriter, r *http.Request, p string) {
+// serve writes the file at p; an HTML document gets tag (paint.go) when tag is not nil.
+func serve(w http.ResponseWriter, r *http.Request, p string, tag []byte) {
 	f, err := os.Open(p)
 	if err != nil {
 		http.NotFound(w, r)
@@ -236,11 +242,15 @@ func serve(w http.ResponseWriter, r *http.Request, p string) {
 		return
 	}
 	h := w.Header()
-	h.Set("Content-Type", contentType(p, head[:n]))
+	ctype := contentType(p, head[:n])
+	h.Set("Content-Type", ctype)
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Content-Security-Policy", CSP)
+	if tag != nil && strings.HasPrefix(ctype, "text/html") && servePainted(w, r, f, fi, tag) {
+		return
+	}
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
 
