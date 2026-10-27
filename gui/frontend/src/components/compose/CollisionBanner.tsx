@@ -1,9 +1,5 @@
 import { TriangleAlert } from "lucide-react";
 import { COLLISION_DETAIL, collisionBanner, collisionTip, type Collision } from "@/lib/collisionHints";
-import { cn } from "@/lib/utils";
-
-/** The amber of a collision: the banner's frame, a member chip's border, the Work in pill's tint. */
-export const COLLISION_ICON = "text-cf-warning-text";
 
 /**
  * The one banner above the composer card while another running thread has a checkout this
@@ -15,8 +11,9 @@ export function CollisionBanner({ list, setSize, onNewBranch, disabled }: { list
   if (list.length === 0) return null;
   const { lead, branch, tail } = collisionBanner(list, setSize);
   return (
-    <div role="status" className="mb-2 flex items-start gap-2.5 rounded-lg border border-cf-warning/35 bg-cf-warning/7 px-3 py-2 text-body-sm" data-testid="composer-collision">
-      <TriangleAlert className={cn("mt-0.5 size-3.5 shrink-0", COLLISION_ICON)} aria-hidden />
+    // Frosted like the card below it, so the backdrop does not show through the tint.
+    <div role="status" className="mb-2 flex items-start gap-2.5 rounded-lg border border-cf-warning/35 bg-cf-warning/7 px-3 py-2 text-body-sm backdrop-blur-xl" data-testid="composer-collision">
+      <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cf-warning-text" aria-hidden />
       <p className="min-w-0 flex-1 text-pretty" data-testid="composer-collision-text">
         <span className="font-medium">
           {lead}
