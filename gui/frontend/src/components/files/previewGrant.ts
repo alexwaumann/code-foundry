@@ -26,6 +26,24 @@ export function isThemeAck(data: unknown): boolean {
   return typeof data === "object" && data !== null && (data as { type?: unknown }).type === "cf:theme:ack";
 }
 
+/**
+ * The query parameter that asks the daemon to paint a page in the app's theme from its first
+ * byte (internal/preview paint.go ThemedParam): a colour-scheme meta and the surface as its
+ * background, ahead of everything in its head (docs/notes/inline-page-frame.md).
+ */
+export const THEMED_PARAM = "cf-page";
+
+/** A grant URL with THEMED_PARAM set, for a frame that shows a thread's page; the URL as given when it does not parse. */
+export function themedUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set(THEMED_PARAM, "1");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 /** A grant for one file: loading (no preview, no error yet), the grant, or why there is none. */
 export interface PreviewGrant {
   preview: FilePreview | null;

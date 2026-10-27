@@ -190,6 +190,18 @@ addEventListener("load", () => parent.postMessage({ type: "cf:resize", height: M
 </body></html>
 `;
 
+/**
+ * A page with no stylesheet, no background and no cf:resize, taller than its card, so the
+ * card scrolls inside (docs/notes/inline-page-frame.md): a wheel up over it at its top must
+ * scroll the thread, and it must not show white while it loads or after.
+ */
+export const TALL_PAGE_HTML = `<!doctype html>
+<html><head><title>Tall</title></head>
+<body><h1 id="tall">A tall page</h1>
+${Array.from({ length: 40 }, (_, i) => `<p>Line ${String(i + 1)} of a page longer than its card.</p>`).join("\n")}
+</body></html>
+`;
+
 /** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
 export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
 
@@ -239,6 +251,7 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/hello.html`, text(INLINE_PAGE_HTML, "text/html")],
     [`${CF}/docs/plain.html`, text(PLAIN_PAGE_HTML, "text/html")],
     [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
+    [`${CF}/docs/tall.html`, text(TALL_PAGE_HTML, "text/html")],
     [`${CF}/docs/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
     // The page library's pages (mock/pagelib/; e2e/page-library.spec.ts).

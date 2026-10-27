@@ -137,8 +137,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * cache has expired); crashed: Claude did not start (an error item, nothing else;
  * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "html-scroll", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -888,6 +888,21 @@ export class MockThreadLogs {
       it({ case: "html", value: { path: "docs/hello.html", title: "", baseDir: cwd } }, { at: ago(1) });
       it({ case: "html", value: { path: "docs/plain.html", title: "", baseDir: cwd } }, { at: ago(1, 5) });
       it({ case: "html", value: { path: "docs/scheme.html", title: "", baseDir: cwd } }, { at: ago(1, 10) });
+      l.seq = l.items.length;
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+      return;
+    }
+    if (state === "html-scroll") {
+      // A conversation longer than the pane, ending in a page taller than its card (mock/files.ts
+      // TALL_PAGE_HTML), shown outside any turn so it arrives open at the bottom
+      // (docs/notes/inline-page-frame.md): a wheel up over the page scrolls the thread.
+      const long = Array.from({ length: 12 }, (_, i) => `Paragraph ${String(i + 1)}: the notes go on for a while so the thread is taller than its pane.`).join("\n\n");
+      for (const n of [1, 2]) {
+        it({ case: "userMessage", value: { text: `Write part ${String(n)} of the notes.`, attachments: [] } }, { at: ago(4 - n) });
+        it({ case: "assistantText", value: { text: long } }, { at: ago(4 - n, 50) });
+        it({ case: "turnEnd", value: { subtype: "success", durationMs: 10_000n, numTurns: 1, costUsd: 0.02, turnCostUsd: 0.02, stopReason: "end_turn" } }, { at: ago(4 - n, 50) });
+      }
+      it({ case: "html", value: { path: "docs/tall.html", title: "", baseDir: cwd } }, { at: ago(1) });
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;

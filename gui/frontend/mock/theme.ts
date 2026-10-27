@@ -54,6 +54,24 @@ const root = (f: MockFrame, indent = "") =>
     .join("") +
   `${indent}}\n`;
 
+/**
+ * A thread page's HTML painted in the served theme, as the daemon paints a request with
+ * ?cf-page=1 (internal/preview/paint.go; docs/notes/inline-page-frame.md): the scheme's meta
+ * and the surface as html's background, first in its head (else after <html>, else after the
+ * doctype, else first). A plainer scan than the daemon's: the mock's pages have no comments
+ * before their head.
+ */
+export function mockPaint(html: string): string {
+  const tag = published
+    ? `<meta name="color-scheme" content="${published.scheme}"><style>:where(html){background-color:var(--cf-surface, ${published.vars["--cf-surface"] ?? "Canvas"})}</style>`
+    : `<meta name="color-scheme" content="light dark"><style>:where(html){background-color:var(--cf-surface, Canvas)}</style>`;
+  for (const re of [/<head(?:\s[^>]*)?>/i, /<html(?:\s[^>]*)?>/i, /^\s*<!doctype[^>]*>/i]) {
+    const m = re.exec(html);
+    if (m) return html.slice(0, m.index + m[0].length) + tag + html.slice(m.index + m[0].length);
+  }
+  return tag + html;
+}
+
 /** GET /cf/theme.css (?scheme=dark or light pins it, Live.PinnedCSS) or /cf/theme.json; undefined for any other path (a 404). */
 export function themeRoute(pathname: string, scheme: string | null = null): { type: string; body: string } | undefined {
   if (pathname === "/cf/theme.css" && (scheme === "dark" || scheme === "light")) {

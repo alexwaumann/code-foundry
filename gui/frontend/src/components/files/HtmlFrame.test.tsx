@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** What the frame handed its bridge host, per host (one per owning thread). */
@@ -14,7 +14,7 @@ vi.mock("@/stores/bridgeHost", () => ({
     };
   },
 }));
-const { HTML_PREVIEW_SANDBOX, HtmlFrame, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
+const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
 
 const URL_ = "http://127.0.0.1:4100/preview/g1/page.html";
 const PAGES = "http://127.0.0.1:4100";
@@ -82,6 +82,59 @@ describe("HtmlFrame", () => {
     f.send({ type: "cf:resize", height: 140 });
     expect(hosts.at(-1)?.received).toHaveLength(1);
     expect(heights).toEqual([140]);
+  });
+
+  it("asks for a thread's page painted in the theme (cf-page=1) and any other page as written", () => {
+    const a = mount("t-1");
+    expect(a.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html\?cf-page=1#cf=[0-9a-f]{32}$/);
+    cleanup();
+    const b = mount(null);
+    expect(b.frame().getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4100\/preview\/g1\/page\.html#cf=[0-9a-f]{32}$/);
+  });
+
+  it("hides the frame over the surface until it loads, then shows it; white only for an opaque frame", () => {
+    for (const thread of ["t-1", null]) {
+      const f = mount(thread);
+      expect(screen.getByTestId("frame-box").className).toContain("bg-cf-surface");
+      expect(f.frame().className).toContain("opacity-0");
+      expect(f.frame().className).not.toContain("bg-white");
+      expect(f.frame().dataset.shown).toBeUndefined();
+      expect(screen.getByTestId("frame-loading")).toBeTruthy();
+      fireEvent.load(f.frame());
+      expect(f.frame().className).toContain("opacity-100");
+      expect(f.frame().className).toContain("motion-reduce:transition-none");
+      expect(f.frame().dataset.shown).toBe("true");
+      expect(screen.queryByTestId("frame-loading")).toBeNull();
+      expect(f.frame().className.includes("bg-white")).toBe(thread === null);
+      cleanup();
+    }
+  });
+
+  it("shows a frame whose load never comes after FRAME_REVEAL_MS", () => {
+    vi.useFakeTimers();
+    try {
+      const f = mount("t-1");
+      act(() => {
+        vi.advanceTimersByTime(FRAME_REVEAL_MS - 1);
+      });
+      expect(f.frame().dataset.shown).toBeUndefined();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(f.frame().dataset.shown).toBe("true");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides the frame again when it reloads for a new owning thread", () => {
+    const f = mount(null);
+    fireEvent.load(f.frame());
+    expect(f.frame().dataset.shown).toBe("true");
+    f.view.rerender(<HtmlFrame url={URL_} name="page.html" thread="t-1" testId="frame" />);
+    expect(f.frame().dataset.shown).toBeUndefined();
+    fireEvent.load(f.frame());
+    expect(f.frame().dataset.shown).toBe("true");
   });
 
   it("reloads the frame, with the other sandbox, when its owning thread changes", () => {

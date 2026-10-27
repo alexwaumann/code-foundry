@@ -5,6 +5,7 @@ import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/li
 import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { registerTimeline } from "@/stores/cite";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
+import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
 import { HoldTopContext, KeepRowContext } from "./context";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
@@ -17,6 +18,8 @@ const USER_SCROLL_MS = 400;
 const HOLD_MS = 400;
 /** Keys that scroll the list. */
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+/** A page's frame under the pointer (an inline page card's): its wheel never reaches the list (lib/scrollIntent.ts). */
+const HOVERED_FRAME = "iframe:hover";
 
 /** A first guess of a row's height before it is measured. */
 function estimate(r: { type: string } | undefined): number {
@@ -57,7 +60,8 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
  * of rows stays cheap. It sticks to the bottom like a live chat while the user is there
  * (new rows, growing text), and stays put once they scroll up. Only the user unpins it: a
  * scroll away from the bottom right after their wheel, touch, scroll key or a drag of the
- * scrollbar. Scrolls nobody asked for (the virtualizer keeping rows in place while it
+ * scrollbar, or an upward one with the pointer over a page's frame, whose wheel goes to the
+ * page (lib/scrollIntent.ts, docs/notes/inline-page-frame.md). Scrolls nobody asked for (the virtualizer keeping rows in place while it
  * measures the ones above, the browser clamping a shrinking list) never do, or the list
  * would stop short of the last rows (a finished turn's answer under the composer). A turn's
  * header keeps its place on screen when the user folds or unfolds the turn with it.
@@ -124,6 +128,12 @@ export function TimelineList<R extends ListRow>({
   const userInput = useRef(-Infinity);
   const markInput = useCallback(() => {
     if (userInput.current !== Infinity) userInput.current = performance.now();
+  }, []);
+  /** Where the scroller was when last seen (a scroll, a resize, a change of rows): what scrollIntent compares a scroll with. */
+  const seen = useRef<ScrollSample>({ top: 0, height: 0 });
+  const noteScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) seen.current = { top: el.scrollTop, height: el.scrollHeight };
   }, []);
   const [atBottom, setAtBottom] = useState(true);
   /** Pins the list (it follows the bottom again); the turns left open while it was scrolled up fold. */
@@ -233,15 +243,17 @@ export function TimelineList<R extends ListRow>({
     const inner = innerRef.current;
     if (!inner) return;
     if (pinned.current) toBottom();
+    noteScroll();
     const ro = new ResizeObserver(() => {
       if (!restoreHeld() && pinned.current) toBottom();
+      noteScroll();
     });
     ro.observe(inner);
     if (scrollRef.current) ro.observe(scrollRef.current);
     return () => {
       ro.disconnect();
     };
-  }, [toBottom, restoreHeld]);
+  }, [toBottom, restoreHeld, noteScroll]);
   // Away from the bottom, the row at the top of the viewport (and how far it starts above
   // the viewport's top) is the anchor a change of rows keeps in place.
   const anchor = useRef<{ index: number; offset: number; rows: readonly R[] } | null>(null);
@@ -306,7 +318,8 @@ export function TimelineList<R extends ListRow>({
     if (pinned.current) toBottom();
     else restoreHeld();
     captureAnchor();
-  }, [rows, bottomInset, toBottom, restoreHeld, v, captureAnchor, pin]);
+    noteScroll();
+  }, [rows, bottomInset, toBottom, restoreHeld, v, captureAnchor, pin, noteScroll]);
 
   return (
     <KeepRowContext.Provider value={keepRow}>
@@ -334,11 +347,16 @@ export function TimelineList<R extends ListRow>({
           onScroll={(e) => {
             const el = e.currentTarget;
             // The user's own scroll ends a hold; one nobody asked for (the browser clamping a
-            // list a held card shrank) is put back.
-            const theirs = performance.now() - userInput.current < USER_SCROLL_MS;
+            // list a held card shrank) is put back. A scroll with the pointer over a page's
+            // frame may be theirs with no input here: the frame's document had the wheel.
+            const prev = seen.current;
+            noteScroll();
+            const theirs =
+              scrollIntent({ input: performance.now() - userInput.current < USER_SCROLL_MS, overFrame: el.querySelector(HOVERED_FRAME) !== null, prev, now: seen.current }) === "user";
             if (theirs) held.current = null;
             else if (restoreHeld()) {
               captureAnchor();
+              noteScroll();
               return;
             }
             const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
@@ -347,6 +365,7 @@ export function TimelineList<R extends ListRow>({
             else if (pinned.current) toBottom();
             if (bottom !== atBottom) setAtBottom(bottom);
             captureAnchor();
+            noteScroll();
           }}
         >
           <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>
