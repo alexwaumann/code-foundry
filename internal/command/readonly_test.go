@@ -42,7 +42,7 @@ var readOnly = []string{
 	"settings.get", "settings.path",
 	"terminal.list",
 	"theme.check", "theme.list", "theme.show",
-	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.read",
+	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.prompts", "thread.read",
 	"thread.reports", "thread.subscriptions", "thread.wait",
 	"ui.presence",
 	"usage.show",

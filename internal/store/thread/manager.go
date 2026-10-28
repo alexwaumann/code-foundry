@@ -728,7 +728,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		// on the row until Claude has it, so a daemon stop before the handshake keeps it
 		// for the next start (firstprompt.go); spawn's commit writes it with the row.
 		rec.s.PendingFirst = pendingFirstOf(&outgoing{text: strings.TrimSpace(o.InitialPrompt),
-			composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt})
+			composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt, by: creatorID})
 	}
 	m.recs[id] = rec
 	m.mu.Unlock()

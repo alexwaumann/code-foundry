@@ -127,6 +127,10 @@ type Item struct {
 	Origin    MessageOrigin
 	WakeTitle string
 	WakeJSON  string
+	// SentBy: user_message's sending thread (Message.ByThreadID; a created thread's first
+	// prompt, its creator); "" for the user. Prompt history leaves such messages out
+	// (prompts.go).
+	SentBy string
 	// ResumeNote: user_message's resume note, the line Claude got before the text after
 	// something other than the user stopped its previous turn (resumenote.go).
 	ResumeNote string
@@ -286,6 +290,9 @@ type Message struct {
 	Origin    MessageOrigin
 	WakeTitle string
 	WakeJSON  string
+	// ByThreadID is the thread that sends it (the CLI's $CODE_FOUNDRY_THREAD), kept on the
+	// item as SentBy; "" for the user.
+	ByThreadID string
 }
 
 // MessageOrigin is who sent a user message.

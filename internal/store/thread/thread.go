@@ -633,6 +633,11 @@ type Store interface {
 	// so a finished turn is seen at once. Subscribe to
 	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
 	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
+	// ListPrompts lists the prompts the user sent, newest first, in one thread, the
+	// threads sharing a project with it (or with a project set), or every thread
+	// (prompts.go). A THREAD or anchor id that names nothing is ErrNotFound; a missing
+	// scope or thread id, or a project ref that names nothing, ErrInvalidArgument.
+	ListPrompts(ctx context.Context, q PromptQuery) ([]SentPrompt, error)
 	// Send sends a user message (also while a turn runs: Claude picks it up mid-turn,
 	// inside the running turn). A thread that is not running starts with it as its first prompt; its item is
 	// returned at once, and a start that fails is told in the timeline (lifecycle.go).

@@ -75,6 +75,8 @@ type ThreadBackend interface {
 	ThemeCardShower
 	// CheckoutsBackend backs thread.checkouts (commands_thread_checkouts.go).
 	CheckoutsBackend
+	// PromptsBackend backs thread.prompts (commands_thread_prompts.go).
+	PromptsBackend
 }
 
 var (
@@ -116,6 +118,10 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "text", Type: String, Required: true, Positional: true, FileOrStdin: true, Description: "The message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
+				// Inside a thread the message is that thread's, not the user's: prompt history
+				// leaves it out (docs/notes/prompt-history-1-daemon.md).
+				{Name: "by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
+					Description: "Thread that sends it, kept on the message so the user's prompt history leaves it out (the CLI sets it from $CODE_FOUNDRY_THREAD)"},
 				{Name: "wait", Type: Bool, Description: "Then wait like thread.wait until Claude has answered it and the thread settled: " +
 					"its turn ended, or it asks for a permission or an answer, which it prints with the thread respond line (--json: the thread, not the message item)"},
 				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, as thread.wait's for"},
@@ -132,7 +138,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
-					ComposerText: a.String("composer-text"),
+					ComposerText: a.String("composer-text"), ByThreadId: a.String("by"),
 				}))
 				if r, ok := removedFrom(err); ok {
 					return removedWaitResult(r, ""), nil // exit 1, not a usage error
