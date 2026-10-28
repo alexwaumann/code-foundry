@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, openApp, resetMock, row } from "./fixtures";
+import { emit, openApp, resetMock } from "./fixtures";
 
 /**
- * The Usage page (view.usage) over the mock's usage buckets (mock/usage.ts): two weeks
- * of four models on s-1..s-4, an unpriced claude-opus-5 on s-3, and a retired ledger
+ * The Usage page (view.usage), in its sheet, over the mock's usage buckets
+ * (mock/usage.ts): two weeks of four models on s-1..s-4, an unpriced claude-opus-5 on
+ * s-3, and a retired ledger
  * with claude-opus-4-8 ("Other") 12 days ago and opus 20, 33 and 60 days ago. Set
- * SHOTS=<dir> for the notes' screenshots.
+ * SHOTS=<dir> for the PR's screenshots. The sheet itself: usage-sheet.spec.ts.
  */
 
 test.beforeEach(async () => {
@@ -33,7 +34,14 @@ async function total(page: Page): Promise<number> {
   return Number(t.replace(/[$,]/g, ""));
 }
 
-test("the status-row button toggles the page; x, Escape and a selection close it", async ({ page }) => {
+/** Clicks where the chart button is: under the open sheet that hits the backdrop over it. */
+async function clickButtonSpot(page: Page) {
+  const box = await button(page).boundingBox();
+  if (!box) throw new Error("no usage button");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+test("the status-row button toggles the sheet; a selection closes it; the CLI only shows it", async ({ page }) => {
   await openApp(page);
   // Right of the palette button.
   const order = await page.getByTestId("sidebar-status").locator("[data-command-button]").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
@@ -43,40 +51,25 @@ test("the status-row button toggles the page; x, Escape and a selection close it
   await button(page).click();
   await expect(page_(page)).toBeVisible();
   await expect(button(page)).toHaveAttribute("aria-pressed", "true");
-  await button(page).click();
+  // Under the backdrop: a click there closes the sheet, so the button stays a toggle.
+  await clickButtonSpot(page);
   await expect(page_(page)).toHaveCount(0);
   await expect(button(page)).toHaveAttribute("aria-pressed", "false");
 
-  await button(page).click();
-  await page.getByTestId("usage-page-close").click();
-  await expect(page_(page)).toHaveCount(0);
-
+  // A selection change (the sidebar is under the backdrop: the keyboard, the palette or the CLI) closes it.
   await button(page).click();
   await expect(page_(page)).toBeVisible();
-  await page.keyboard.press("Escape");
+  expect(await emit({ showView: { name: "thread.next" } })).toBe(1);
   await expect(page_(page)).toHaveCount(0);
 
-  await button(page).click();
-  await row(page, "s:s-1").click();
-  await expect(page_(page)).toHaveCount(0);
-
-  // Settings and usage replace each other.
-  await button(page).click();
-  await page.getByTestId("status-settings").click();
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(page_(page)).toHaveCount(0);
-  // The settings sheet's backdrop covers the button: the CLI's view.usage replaces it.
+  // The CLI's view.usage (UiIntent.ShowView "usage") only shows: the open sheet stays.
   expect(await emit({ showView: { name: "usage" } })).toBe(1);
   await expect(page_(page)).toBeVisible();
-  await expect(page.getByTestId("settings-page")).toHaveCount(0);
-
-  // The CLI's view.usage (UiIntent.ShowView "usage") only shows: the open page stays.
   expect(await emit({ showView: { name: "usage" } })).toBe(1);
   await expect(page_(page)).toBeVisible();
-  await button(page).click();
+  await clickButtonSpot(page);
   await expect(page_(page)).toHaveCount(0);
-  expect(await emit({ showView: { name: "usage" } })).toBe(1);
-  await expect(page_(page)).toBeVisible();
+  // Closing, Escape and the settings sheet: usage-sheet.spec.ts.
 });
 
 test("range control filters by day and persists; the table lists unpriced and Other models by id", async ({ page }) => {
@@ -143,14 +136,14 @@ test("Tokens / Cost switches the chart; a day shows its tooltip", async ({ page 
   await expect(chart.locator("svg text").filter({ hasText: /^\$/ }).first()).toBeVisible();
 });
 
-/** SHOTS=<dir>: the notes' screenshots, WebKit, 1400x900, dark and light, tokens and cost. */
+/** SHOTS=<dir>: the PR screenshots, WebKit, 1440x900, dark and light, tokens and cost. */
 for (const scheme of ["dark", "light"] as const) {
   test(`screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
     test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
     const suffix = scheme === "light" ? "-light" : "";
     await page.emulateMedia({ colorScheme: scheme });
-    await page.setViewportSize({ width: 1400, height: 900 });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await openUsage(page);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/usage-page${suffix}.png` });

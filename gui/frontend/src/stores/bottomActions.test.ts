@@ -243,11 +243,6 @@ describe("a shell this window did not start", () => {
   const activates: [string, () => void][] = [
     ["the keyboard elsewhere", () => useBottomStore.setState({ byKey: { "thread:s1": { open: true } } })],
     ["the panel hidden", () => useUiStore.setState({ focus: "bottom" })],
-    ["the usage page up", () => {
-      useBottomStore.setState({ byKey: { "thread:s1": { open: true } } });
-      useUiStore.setState({ focus: "bottom" });
-      useViewsStore.setState({ usageOpen: true });
-    }],
   ];
   it.each(activates)("with %s: becomes active", (_name, arrange) => {
     arrange();
@@ -462,13 +457,13 @@ describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
       false,
     ],
     [
-      "under the usage page: a no-op",
+      "under the usage sheet: opens with a new shell, like anywhere (the sheet closes, openBottomShell)",
       () => {
         setTerminals([]);
         useViewsStore.setState({ usageOpen: true });
       },
-      false,
-      false,
+      true,
+      true,
     ],
     ["the dashboard: a no-op", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } }), false, false],
     [

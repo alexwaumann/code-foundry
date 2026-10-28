@@ -28,7 +28,7 @@ export function SidebarStatus() {
         <DaemonStatus />
         <span className="ml-auto flex shrink-0 items-center">
           <CommandButton command="ui.palette.open" icon={Command} tooltip="Command Palette" data-testid="status-palette" />
-          {/* A toggle (stores/views.ts showView "usage"): pressed while the Usage page shows. */}
+          {/* A toggle (stores/views.ts toggleView "usage"): pressed while the Usage sheet shows; under its backdrop, a click here closes it. */}
           <CommandButton
             command="view.usage"
             icon={ChartColumn}

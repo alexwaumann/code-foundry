@@ -140,13 +140,17 @@ test("at 125% the usage chart tooltip follows the pointer", async ({ page }) => 
   // clamped at the chart's right edge.
   const day = page.getByTestId("usage-page-day").nth(-13);
   const d = await rect(day);
-  await page.mouse.move(d.left + d.width / 2, d.top + 60);
+  // Whole px: WebKit's clientX/Y are integers, and the sheet (centred by a translate)
+  // puts the day at a fractional position.
+  const x = Math.round(d.left + d.width / 2);
+  const y = Math.round(d.top + 60);
+  await page.mouse.move(x, y);
   const tip = page.getByTestId("usage-page-tooltip");
   await expect(tip).toBeVisible();
   const t = await rect(tip);
   // 14 layout px right of and 10 above the pointer, in viewport px at 125%.
-  expect(Math.abs(t.left - (d.left + d.width / 2) - 14 * 1.25)).toBeLessThanOrEqual(1);
-  expect(Math.abs(t.top - (d.top + 60) + 10 * 1.25)).toBeLessThanOrEqual(1);
+  expect(Math.abs(t.left - x - 14 * 1.25)).toBeLessThanOrEqual(1);
+  expect(Math.abs(t.top - y + 10 * 1.25)).toBeLessThanOrEqual(1);
 });
 
 test("a settings select opens under its trigger, as wide, at 125%", async ({ page }) => {

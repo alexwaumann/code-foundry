@@ -140,7 +140,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it("toasts for a thread without links, and does nothing without a thread or under the usage page", () => {
+  it("toasts for a thread without links, does nothing without a thread, and opens under the usage sheet", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-0");
     expect(showView("panel.linked-prs")).toBe(true);
@@ -154,8 +154,8 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
 
     select("s-1");
     useViewsStore.setState({ usageOpen: true });
-    expect(linkedPrsPanelCommand()).toBe(false);
-    expect(getPanel("thread:s-1").open).toBe(false);
+    expect(linkedPrsPanelCommand()).toBe(true);
+    expect(getPanel("thread:s-1").open).toBe(true);
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {

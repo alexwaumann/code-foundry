@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Header of a page shown in a sheet (DialogContent size="sheet"; Settings, Themes): the
+ * Header of a page shown in a sheet (DialogContent size="sheet"; Settings, Themes, Usage): the
  * pane header's height (44 px, PaneHeader) and divider, without its window dragging or
  * traffic-light gutter, since a sheet sits in the middle of the window.
  */

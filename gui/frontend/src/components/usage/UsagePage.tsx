@@ -3,9 +3,9 @@ import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { UsageBucketView } from "@/api/threads";
 import { Button } from "@/components/ui/button";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Tip } from "@/components/ui/tooltip";
-import { PaneHeader } from "@/components/window/PaneHeader";
-import { useEscapeCloses } from "@/components/window/useEscapeCloses";
+import { SheetHeader } from "@/components/window/SheetHeader";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
 import { useThreadsStore } from "@/stores/threads";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
@@ -36,8 +36,8 @@ function plural(n: number, one: string, many: string): string {
 
 /**
  * The Usage page (view.usage, the sidebar's chart button): spend and tokens over every
- * Code Foundry thread, live and removed, for a range of UTC days. Replaces the content
- * area like the settings page. docs/sketches/session-usage/DESIGN.md "Views".
+ * Code Foundry thread, live and removed, for a range of UTC days. Shown in the Usage
+ * sheet (UsageSheet), which handles its Escape and focus. docs/sketches/session-usage/DESIGN.md "Views".
  */
 export function UsagePage() {
   const range = useUiStore((s) => s.usageRange);
@@ -49,14 +49,13 @@ export function UsagePage() {
     const days = utcDays(Date.parse(`${today}T12:00:00Z`), range);
     return usagePageData(all.slice(0, -1), all.at(-1) ?? NONE, days);
   }, [all, range, today]);
-  useEscapeCloses(closeUsage);
   const { totals } = data;
   const empty = totals.requests === 0 && totals.tokens === 0;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label="Usage" data-testid="usage-page" data-focus-root tabIndex={-1}>
-      <PaneHeader className="gap-3 px-4">
-        <h1 className="text-heading">Usage</h1>
+    <section className="flex min-h-0 flex-1 flex-col outline-none" aria-label="Usage" data-testid="usage-page" data-sheet-focus tabIndex={-1}>
+      <SheetHeader className="gap-3 px-4">
+        <DialogTitle>Usage</DialogTitle>
         <span className="ml-auto truncate text-caption">Code Foundry threads only</span>
         <Segmented
           options={RANGE_OPTIONS}
@@ -69,11 +68,11 @@ export function UsagePage() {
           className="ml-1"
         />
         <Tip label="Close (Esc)">
-          <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
+          <Button variant="ghost" size="icon-xs" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
             <X />
           </Button>
         </Tip>
-      </PaneHeader>
+      </SheetHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">
           <div className="text-display proportional-nums" data-testid="usage-page-total">

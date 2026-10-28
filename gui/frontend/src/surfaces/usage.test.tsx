@@ -154,14 +154,14 @@ describe("usagePanelCommand (view.panel.usage)", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it("does nothing without a thread or under the usage page", () => {
+  it("does nothing without a thread, and opens under the usage sheet", () => {
     usePanelStore.setState({ byKey: {} });
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
     expect(usagePanelCommand()).toBe(false);
     select("s-1");
     useViewsStore.setState({ usageOpen: true });
-    expect(usagePanelCommand()).toBe(false);
-    expect(getPanel("thread:s-1").open).toBe(false);
+    expect(usagePanelCommand()).toBe(true);
+    expect(getPanel("thread:s-1").open).toBe(true);
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {

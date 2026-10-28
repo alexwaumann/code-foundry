@@ -19,7 +19,6 @@ import {
   type GroupIndex,
 } from "@/stores/panel";
 import { PANEL_MIN, expandedPanelWidth, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
-import { selectPageOpen, useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces } from "@/surfaces/registry";
 import { closeTab, hidePanel, liftedTab } from "./actions";
 import { PanelResizeHandle } from "./PanelResizeHandle";
@@ -179,9 +178,10 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
 
 /**
  * The current selection's side panel, right of the content pane. Unmounted (with its
- * resize handle) when the selection has none open, while the settings or usage page is up, and
- * while the window has no room for it beside the content pane (panelMax < PANEL_MIN; it
- * stays open and comes back when there is room). An expanded panel always shows: it
+ * resize handle) when the selection has none open and while the window has no room for
+ * it beside the content pane (panelMax < PANEL_MIN; it stays open and comes back when
+ * there is room). A sheet (Settings, Themes, Usage) leaves it on screen, dimmed under
+ * the backdrop. An expanded panel always shows: it
  * replaces the content pane (App.tsx hides it) instead of sharing the row. A split panel
  * shows its two tab groups (TabGroup) side by side or stacked (splitLayout.ts).
  *
@@ -194,7 +194,6 @@ export function SidePanel() {
   const panelKey = useCurrentPanelKey();
   const open = usePanelStore((s) => (panelKey === null ? false : (s.byKey[panelKey]?.open ?? false)));
   const expanded = usePanelExpanded();
-  const pageOpen = useViewsStore(selectPageOpen);
   const max = useUiStore((s) => panelMax(s.windowWidth, visibleSidebarWidth(s)));
   const focusSeq = useUiStore((s) => s.panelFocusSeq);
   const asideRef = useRef<HTMLElement>(null);
@@ -206,6 +205,6 @@ export function SidePanel() {
     asideRef.current?.focus({ preventScroll: true });
   }, [focusSeq]);
 
-  if (panelKey === null || !open || pageOpen || (max < PANEL_MIN && !expanded)) return null;
+  if (panelKey === null || !open || (max < PANEL_MIN && !expanded)) return null;
   return <Panel key={panelKey} panelKey={panelKey} max={max} expanded={expanded} asideRef={asideRef} />;
 }

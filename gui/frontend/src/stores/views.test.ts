@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getBottom, useBottomStore } from "./bottomPanel";
 import { getPanel, makeTab, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { closeUsage, expandPanelCommand, newPanelTabCommand, setSettingsPage, showView, startViewSync, toggleBottomCommand, togglePanelCommand, toggleView, usagePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, newPanelTabCommand, setSettingsPage, showView, startViewSync, toggleBottomCommand, togglePanelCommand, toggleView, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -37,14 +37,7 @@ describe("togglePanelCommand", () => {
     expect(useUiStore.getState().contentFocusSeq).toBe(0);
   });
 
-  it("is a no-op while the usage page is up", () => {
-    useViewsStore.setState({ usageOpen: true });
-    expect(togglePanelCommand()).toBe(false);
-    expect(getPanel().open).toBe(false);
-    expect(useUiStore.getState().panelFocusSeq).toBe(0);
-  });
-
-  it.each(["settingsOpen", "themesOpen"] as const)("still toggles under the settings sheet (%s): the panel stays laid out under it", (flag) => {
+  it.each(["settingsOpen", "themesOpen", "usageOpen"] as const)("still toggles under a sheet (%s): the panel stays laid out under it", (flag) => {
     useViewsStore.setState({ [flag]: true });
     expect(togglePanelCommand()).toBe(true);
     expect(getPanel().open).toBe(true);
@@ -128,11 +121,7 @@ describe("expandPanelCommand", () => {
     expect(seqs()).toEqual([0, 0, 0, 0]);
   });
 
-  it("is a no-op while the usage page is up or with nothing selected", () => {
-    useViewsStore.setState({ usageOpen: true });
-    expect(expandPanelCommand()).toBe(false);
-    expect(usePanelStore.getState().byKey).toEqual({});
-    useViewsStore.setState({ usageOpen: false });
+  it("is a no-op with nothing selected", () => {
     useUiStore.getState().select({ kind: "none" });
     expect(expandPanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
@@ -176,10 +165,7 @@ describe("newPanelTabCommand", () => {
     expect(getPanel()).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
   });
 
-  it("is a no-op while the usage page is up or with nothing selected", () => {
-    useViewsStore.setState({ usageOpen: true });
-    expect(newPanelTabCommand()).toBe(false);
-    useViewsStore.setState({ usageOpen: false });
+  it("is a no-op with nothing selected", () => {
     useUiStore.getState().select({ kind: "none" });
     expect(newPanelTabCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
@@ -278,12 +264,12 @@ describe("the usage page", () => {
     }
   });
 
-  it("the panel commands are no-ops while it is up", () => {
+  it("the panel commands act on the panel under it, and it stays up", () => {
     useViewsStore.setState({ usageOpen: true });
-    expect(togglePanelCommand()).toBe(false);
-    expect(expandPanelCommand()).toBe(false);
-    expect(usagePanelCommand()).toBe(false);
-    expect(usePanelStore.getState().byKey).toEqual({});
+    expect(togglePanelCommand()).toBe(true);
+    expect(expandPanelCommand()).toBe(true);
+    expect(getPanel()).toMatchObject({ open: true, expanded: true });
+    expect(views().usageOpen).toBe(true);
   });
 });
 
@@ -320,7 +306,6 @@ describe("toggleBottomCommand", () => {
   const noops: [string, () => void][] = [
     ["a selection without a bottom panel (the dashboard)", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } })],
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
-    ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
     ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } })],
   ];
   it.each(noops)("is a no-op with %s", (_name, arrange) => {
@@ -328,6 +313,13 @@ describe("toggleBottomCommand", () => {
     expect(toggleBottomCommand()).toBe(false);
     expect(useBottomStore.getState().byKey).toEqual({});
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  it.each(["settingsOpen", "usageOpen"] as const)("still toggles under a sheet (%s): the panel stays laid out under it", (flag) => {
+    useViewsStore.setState({ [flag]: true });
+    expect(toggleBottomCommand()).toBe(true);
+    expect(getBottom("thread:a").open).toBe(true);
+    expect(useViewsStore.getState()[flag]).toBe(true);
   });
 
   it("works on the Projects page's own panel", () => {

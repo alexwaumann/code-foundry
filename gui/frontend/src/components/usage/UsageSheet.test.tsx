@@ -4,7 +4,7 @@ import type { ThreadView, UsageBucketView } from "@/api/threads";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
-import { UsagePage } from "./UsagePage";
+import { UsageSheet } from "./UsageSheet";
 
 function bucket(over: Partial<UsageBucketView>): UsageBucketView {
   return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 0, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, cacheSavingsUsd: 0, ...over };
@@ -30,7 +30,7 @@ afterEach(() => {
 
 const rows = () => screen.queryAllByTestId("usage-page-model-row").map((r) => r.getAttribute("data-model"));
 
-describe("UsagePage", () => {
+describe("UsageSheet", () => {
   it("shows the total, the summary line, the table with an unpriced row and the bucket strip", () => {
     setUsage(
       {
@@ -40,7 +40,7 @@ describe("UsagePage", () => {
       },
       [bucket({ model: "claude-fable-5-1", requests: 1, cacheWrite1h: 500, costUsd: 5, cacheSavingsUsd: 0.5, day: "2026-10-01" })],
     );
-    render(<UsagePage />);
+    render(<UsageSheet />);
     expect(screen.getByTestId("usage-page-total").textContent).toBe("$10.00");
     expect(screen.getByTestId("usage-page-summary").textContent).toBe("29.4M tokens · 1,206 requests · 2 threads");
     expect(rows()).toEqual(["claude-fable-5-1", "claude-opus-5-5", "claude-haiku-5-5", "claude-opus-5"]);
@@ -56,7 +56,7 @@ describe("UsagePage", () => {
 
   it("folds models without a slot into Other on the chart and legend, but lists them by id", () => {
     setUsage({ a: [bucket({ model: "claude-opus-4-8", cacheRead: 10, costUsd: 1 }), bucket({ model: "claude-opus-5", cacheRead: 5, unpriced: true }), bucket({ cacheRead: 1, costUsd: 1 })] });
-    render(<UsagePage />);
+    render(<UsageSheet />);
     const legend = screen.getByTestId("usage-page-legend");
     expect([...legend.querySelectorAll("[data-series]")].map((e) => e.textContent)).toEqual(["claude-opus-5-5", "Other"]);
     const today = screen.getByTestId("usage-page-chart").querySelector('g[data-day="2026-10-10"]');
@@ -66,7 +66,7 @@ describe("UsagePage", () => {
 
   it("has one day slot per day of the range, and the range control filters and persists", () => {
     setUsage({ a: [bucket({ costUsd: 1, cacheRead: 1 }), bucket({ costUsd: 2, cacheRead: 1, day: "2026-10-04" }), bucket({ costUsd: 4, cacheRead: 1, day: "2026-08-01" })] });
-    render(<UsagePage />);
+    render(<UsageSheet />);
     expect(screen.getAllByTestId("usage-page-day")).toHaveLength(30);
     expect(screen.getByTestId("usage-page-total").textContent).toBe("$3.00");
     expect(screen.getByTestId("usage-page-range-30").getAttribute("aria-pressed")).toBe("true");
@@ -81,7 +81,7 @@ describe("UsagePage", () => {
 
   it("says so when the range has no usage", () => {
     setUsage({ a: [bucket({ day: "2026-01-01", costUsd: 3, cacheRead: 9 })] });
-    render(<UsagePage />);
+    render(<UsageSheet />);
     expect(screen.getByTestId("usage-page-empty").textContent).toBe("No usage in this range");
     expect(screen.getByTestId("usage-page-total").textContent).toBe("$0.00");
     expect(screen.queryByTestId("usage-page-chart")).toBeNull();
@@ -90,7 +90,7 @@ describe("UsagePage", () => {
 
   it("switches the chart between tokens and cost, and shows a day's tooltip", () => {
     setUsage({ a: [bucket({ cacheRead: 2_000_000, costUsd: 1.25 }), bucket({ model: "claude-fable-5-1", cacheRead: 1_000_000, costUsd: 3 })] });
-    render(<UsagePage />);
+    render(<UsageSheet />);
     expect(screen.getByTestId("usage-page-chart").getAttribute("data-mode")).toBe("tokens");
     const day = screen.getAllByTestId("usage-page-day").at(-1);
     if (!day) throw new Error("no day");
@@ -103,15 +103,32 @@ describe("UsagePage", () => {
     expect(screen.queryByTestId("usage-page-tooltip")).toBeNull();
   });
 
-  it("closes with the × and with Escape", () => {
+  it("is a modal sheet: open with usageOpen, the page's section focused, a title for the dialog", () => {
     setUsage({});
-    render(<UsagePage />);
+    render(<UsageSheet />);
+    const sheet = screen.getByTestId("usage-sheet");
+    expect(sheet.getAttribute("role")).toBe("dialog");
+    expect(sheet.getAttribute("data-size")).toBe("sheet");
+    expect(screen.getByRole("dialog", { name: "Usage" })).toBe(sheet);
+    expect(document.activeElement).toBe(screen.getByTestId("usage-page"));
+    act(() => {
+      useViewsStore.setState({ usageOpen: false });
+    });
+    expect(screen.queryByTestId("usage-page")).toBeNull();
+  });
+
+  it("closes with the × and with Escape, and asks for the thread's prompt", () => {
+    setUsage({});
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
+    render(<UsageSheet />);
     fireEvent.click(screen.getByTestId("usage-page-close"));
     expect(useViewsStore.getState().usageOpen).toBe(false);
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
     act(() => {
       useViewsStore.setState({ usageOpen: true });
     });
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(screen.getByTestId("usage-page"), { key: "Escape" });
     expect(useViewsStore.getState().usageOpen).toBe(false);
+    expect(useUiStore.getState().promptFocusSeq).toBe(2);
   });
 });

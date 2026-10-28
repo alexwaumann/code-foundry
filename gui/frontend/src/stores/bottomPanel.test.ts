@@ -190,15 +190,14 @@ describe("neighbourOf", () => {
 });
 
 describe("bottomVisible", () => {
-  const cases: [string, string | null, boolean, boolean, boolean, boolean][] = [
-    ["open, nothing over it", "thread:a", true, false, false, true],
-    ["no key", null, true, false, false, false],
-    ["closed", "thread:a", false, false, false, false],
-    ["settings or usage up", "thread:a", true, true, false, false],
-    ["side panel expanded", "thread:a", true, false, true, false],
+  const cases: [string, string | null, boolean, boolean, boolean][] = [
+    ["open, nothing over it", "thread:a", true, false, true],
+    ["no key", null, true, false, false],
+    ["closed", "thread:a", false, false, false],
+    ["side panel expanded", "thread:a", true, true, false],
   ];
-  it.each(cases)("%s", (_name, key, open, page, side, want) => {
-    expect(bottomVisible(key, open, page, side)).toBe(want);
+  it.each(cases)("%s", (_name, key, open, side, want) => {
+    expect(bottomVisible(key, open, side)).toBe(want);
   });
 });
 

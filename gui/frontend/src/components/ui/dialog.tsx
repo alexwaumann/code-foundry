@@ -36,7 +36,7 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
 
 /**
  * The sizes a dialog comes in. "default": the dialog's own width (its className), its top
- * 14% down the window. "sheet": an app-level page in a modal (Settings and Themes;
+ * 14% down the window. "sheet": an app-level page in a modal (Settings, Themes, Usage;
  * docs/notes/settings-sheet.md), centred, at most 1280 by 800 and never closer than 48px
  * to a window edge, so it shrinks with the window. Viewport units divide by --cf-zoom
  * (lib/zoom.ts: the page zoom would scale them twice); the px values zoom with the page.

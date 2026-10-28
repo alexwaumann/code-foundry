@@ -33,7 +33,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { usePanelExpanded } from "@/stores/panel";
 import { useTerminalsStore } from "@/stores/terminals";
 import { bottomMax, useUiStore } from "@/stores/ui";
-import { selectPageOpen, useViewsStore, visibleBottomKey } from "@/stores/views";
+import { visibleBottomKey } from "@/stores/views";
 import { BottomResizeHandle } from "./BottomResizeHandle";
 import { bottomKeyAction, tabFocusIndex } from "./keys";
 
@@ -348,8 +348,8 @@ function Panel({
 /**
  * The current selection's bottom terminal panel, under the content pane in the content
  * column (App.tsx). Unmounted (so its terminal detaches) when the selection has none
- * (only threads and the Projects page do), when it is closed, while the settings or
- * usage page is up, and while the side panel fills the content area.
+ * (only threads and the Projects page do), when it is closed, and while the side panel
+ * fills the content area. A sheet (Settings, Themes, Usage) leaves it on screen.
  *
  * `columnHeight` is the content column's height in layout px (App.tsx), which bounds
  * the panel's (bottomMax).
@@ -362,14 +362,13 @@ function Panel({
 export function BottomPanel({ columnHeight }: { columnHeight: number }) {
   const panelKey = useCurrentBottomKey();
   const open = useBottomOpen(panelKey);
-  const pageOpen = useViewsStore(selectPageOpen);
   const sideExpanded = usePanelExpanded();
   const stored = useBottomHeight(panelKey ?? "");
   const focusSeq = useUiStore((s) => s.bottomFocusSeq);
   const asideRef = useRef<HTMLElement>(null);
   const hostRef = useRef<TerminalHostHandle>(null);
   const handled = useRef(focusSeq);
-  const shown = bottomVisible(panelKey, open, pageOpen, sideExpanded);
+  const shown = bottomVisible(panelKey, open, sideExpanded);
 
   // Only on a new request, and only for a panel on screen.
   useEffect(() => {
