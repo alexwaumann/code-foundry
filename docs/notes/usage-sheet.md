@@ -9,7 +9,7 @@ so the code that handled one is gone. Frontend only.
 ## What moved
 
 - **`UsageSheet`** (`components/usage/UsageSheet.tsx`), mounted in `App.tsx` beside
-  `SettingsSheet`. `DialogContent size="sheet"` (cap 1280×800, 48px from every window
+  `SettingsSheet`. `DialogContent size="sheet"` (cap 1280×1280, 48px from every window
   edge, zoom-aware; `settings-sheet.md`). It renders `UsagePage` while `usageOpen` is set.
   `stores/views.ts` stays the source of truth, and `setPages` already keeps `usageOpen`,
   `settingsOpen` and `themesOpen` exclusive, so at most one sheet is up.
