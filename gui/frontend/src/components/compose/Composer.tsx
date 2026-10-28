@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, Folder, FolderGit2, FolderOpen, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { ArrowUp, Folder, FolderGit2, FolderOpen, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { PdfTile } from "./attachmentFaces";
 import { attachLabel, useHostFiles } from "./useHostFiles";
 import { BranchIndicator } from "./BranchIndicator";
 import { CollisionBanner, CollisionTip } from "./CollisionBanner";
+import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
@@ -50,7 +51,6 @@ import {
   type WorktreeChoice,
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
-import { tildify } from "@/lib/path";
 import { byName, primaryOptions, resolveSet, setName, WORKSPACE_FOLDER, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
@@ -339,9 +339,9 @@ const FRESH_COPY_OF_ONE_DETAIL = "Edits land in a new branch with a worktree for
 const PROJECT_FOLDERS_DETAIL = "Edits land in every project's checkout directly. One thread at a time is safest.";
 const PROJECT_FOLDER_OF_ONE_DETAIL = "Edits land in the project's checkout directly. One thread at a time is safest.";
 
-function inPlaceDetail(path: string): string {
-  return `Edits land in ${tildify(path)} directly. One thread at a time is safest.`;
-}
+/** The send button with nothing to send: a neutral grey, not the faded accent. */
+export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-text-muted";
+
 
 /**
  * The project chips (MemberChips) and the collision hints above the card. The card:
@@ -543,7 +543,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
       ];
     }
     if (noGitPath !== undefined) {
-      return [{ heading: "Work in", options: [{ value: noGitPath, label: PROJECT_FOLDER, detail: inPlaceDetail(noGitPath), wrap: true }] }];
+      return [{ heading: "Work in", options: [{ value: noGitPath, label: PROJECT_FOLDER, detail: PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true }] }];
     }
     const main = worktrees.find((w) => w.isMain);
     return [
@@ -552,7 +552,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         fixed: true,
         options: [
           { value: "new", label: FRESH_COPY, detail: FRESH_COPY_DETAIL, wrap: true },
-          ...(main ? [{ value: main.path, label: PROJECT_FOLDER, detail: inPlaceDetail(main.path), wrap: true }] : []),
+          ...(main ? [{ value: main.path, label: PROJECT_FOLDER, detail: PROJECT_FOLDER_OF_ONE_DETAIL, wrap: true }] : []),
         ],
       },
       branchGroup,
@@ -679,7 +679,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
               draftKey={draftKey}
               value={text}
               disabled={busy}
-              placeholder={like ? "What's next on this branch…" : "Describe what to build…"}
+              placeholder={like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands"}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}
@@ -706,7 +706,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
           <ComposerPicker
             label="Model"
-            icon={Brain}
+            icon={ClaudeMarkBrand}
             text={choiceLabel(modelChoices, model)}
             value={model}
             groups={modelGroups}
@@ -905,7 +905,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                 data-phase={phase}
                 className={cn(
                   "flex h-8 items-center justify-center gap-1.5 rounded-full bg-cf-accent text-cf-accent-foreground outline-none transition-all hover:bg-cf-accent/90 focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none",
-                  busy ? "px-3 text-body-sm font-medium" : "w-8 disabled:opacity-40",
+                  busy ? "px-3 text-body-sm font-medium" : `w-8 ${SEND_DISABLED}`,
                 )}
                 onClick={send}
               >

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Check, ChevronDown, TriangleAlert, type LucideIcon } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 import { Button } from "@/components/ui/button";
 import { defaultFilter } from "cmdk";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
@@ -39,7 +40,8 @@ export interface PickerGroup {
 interface ComposerPickerProps {
   /** What is being picked ("Model"); the trigger's accessible name is "<label>: <text>". */
   label: string;
-  icon: LucideIcon;
+  /** A lucide icon or any svg component sized by className (the Claude mark). */
+  icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
   /** Trigger text for the current value. */
   text: string;
   value: string;

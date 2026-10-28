@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
+import { AlarmClockOff, ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
 import { CompletionCard } from "@/components/compose/CompletionCard";
-import { ATTACHMENT_ACCEPT, Attachments } from "@/components/compose/Composer";
+import { ATTACHMENT_ACCEPT, Attachments, SEND_DISABLED } from "@/components/compose/Composer";
+import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
@@ -18,6 +19,9 @@ import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/
 import { useNow } from "@/lib/clock";
 import { snoozeTimeShort } from "@/lib/snooze";
 import { statusLine, statusText } from "@/lib/statusLine";
+
+const PLACEHOLDER = "Reply or ask anything. @ files and threads, / skills and commands";
+const BUSY_PLACEHOLDER = "Steer the agent mid-turn. @ files and threads, / skills and commands";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
 import { getPanel } from "@/stores/panel";
@@ -137,9 +141,9 @@ export function ThreadComposer({
   threadId: string;
   pending: readonly ThreadPendingView[];
   busy: boolean;
-  /** The empty prompt's text (default "Send a follow-up…"). */
+  /** The empty prompt's text (default "Reply or ask anything. @ files and threads, / skills and commands"). */
   placeholder?: string | undefined;
-  /** The empty prompt's text while Claude works (default: the placeholder and "Claude picks it up mid-turn"). */
+  /** The empty prompt's text while Claude works (default "Steer the agent mid-turn. @ files and threads, / skills and commands"). */
   busyPlaceholder?: string | undefined;
   /** Whether focus requests for the content pane land here: the content pane's composer only, not a plugin's thread node's. */
   focusRequests?: boolean;
@@ -354,8 +358,8 @@ export function ThreadComposer({
                 transcriptMissing
                   ? "Transcript deleted"
                   : busy
-                    ? (busyPlaceholder ?? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn`)
-                    : (placeholder ?? "Send a follow-up…")
+                    ? (busyPlaceholder ?? BUSY_PLACEHOLDER)
+                    : (placeholder ?? PLACEHOLDER)
               }
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
@@ -373,7 +377,7 @@ export function ThreadComposer({
         <div className="col-start-1 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
           <ComposerPicker
             label="Model"
-            icon={Brain}
+            icon={ClaudeMarkBrand}
             text={model ? choiceLabel(modelChoices, model) : "Default"}
             value={model}
             groups={modelGroups}
@@ -462,7 +466,7 @@ export function ThreadComposer({
                 aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}
-                className="flex size-8 items-center justify-center rounded-full bg-cf-accent text-cf-accent-foreground outline-none transition-all hover:bg-cf-accent/90 focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-40"
+                className={`flex size-8 items-center justify-center rounded-full bg-cf-accent text-cf-accent-foreground outline-none transition-all hover:bg-cf-accent/90 focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none ${SEND_DISABLED}`}
                 // A click leaves the caret in the prompt, so it is focused again after the send.
                 onMouseDown={(e) => {
                   e.preventDefault();

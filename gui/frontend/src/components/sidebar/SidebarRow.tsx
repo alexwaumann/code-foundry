@@ -416,9 +416,9 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
 }
 
 /**
- * A footer's header, Working, Snoozed or Archived (design record: /tmp/working-header/index.html?v=2):
- * an overline label (text-overline), the number of threads in the section after it, and a
- * chevron on the right saying whether the section is open. A button (aria-expanded) inside
+ * A footer's header, Working, Snoozed or Archived: a title-case label (text-caption, medium),
+ * the number of threads in the section pushed to the right, and a chevron after it saying
+ * whether the section is open. A button (aria-expanded) inside
  * the row; the row itself is role="presentation", so the listbox's cursor never lands on
  * it. Pressing it with the mouse does not take focus from the list. Test ids
  * `<section>-header`, `-label`, `-count`.
@@ -446,14 +446,14 @@ function SectionHeader({ row }: { row: HeaderRow }) {
           else ui.toggleWorkingCollapsed();
         }}
       >
-        <span className="truncate text-overline" data-testid={`${row.section}-label`}>
+        <span className="truncate text-caption font-medium text-inherit" data-testid={`${row.section}-label`}>
           {row.label}
         </span>
         {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
-        <span className="shrink-0 text-overline font-normal tabular-nums opacity-70" data-testid={`${row.section}-count`}>
+        <span className="ml-auto shrink-0 text-caption tabular-nums text-inherit opacity-70" data-testid={`${row.section}-count`}>
           {row.count}
         </span>
-        <Chevron className="-mr-2 ml-auto size-3 shrink-0" aria-hidden />
+        <Chevron className="-mr-2 size-3 shrink-0" aria-hidden />
       </button>
     </div>
   );
