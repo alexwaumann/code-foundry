@@ -103,3 +103,25 @@ func TestRevertPullRequestOutcomes(t *testing.T) {
 		}
 	})
 }
+
+func TestReviewerLoginPattern(t *testing.T) {
+	tests := []struct {
+		login string
+		ok    bool
+	}{
+		{"octocat", true},
+		{"mona-lisa", true},
+		{"WMD270_cof", true}, // enterprise managed user: "_shortcode" suffix
+		{"copilot-pull-request-reviewer[bot]", true},
+		{"", false},
+		{"-octocat", false},
+		{"octo cat", false},
+		{"octo.cat", false},
+		{strings.Repeat("a", 40), false},
+	}
+	for _, tt := range tests {
+		if got := reviewerLoginRE.MatchString(tt.login); got != tt.ok {
+			t.Errorf("reviewerLoginRE.MatchString(%q) = %v, want %v", tt.login, got, tt.ok)
+		}
+	}
+}

@@ -15,6 +15,7 @@ func TestParsePullRequestTarget(t *testing.T) {
 	for _, tt := range []struct{ in, want string }{
 		{"alexwaumann/code-foundry#210", "alexwaumann/code-foundry#210"},
 		{"  Acme/Web.Site#7 ", "acme/web.site#7"},
+		{"Acme_cof/web#7", "acme_cof/web#7"},
 		{"https://github.com/Acme/web/pull/12", "acme/web#12"},
 		{"http://www.github.com/acme/web/pull/12/files", "acme/web#12"},
 		{"github.com/acme/web/pull/12#discussion_r1", "acme/web#12"},

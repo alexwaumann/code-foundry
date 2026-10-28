@@ -139,7 +139,8 @@ func (e PullRequestEvent) has(kinds ...PRChangeKind) bool {
 }
 
 var (
-	prOwner = `([A-Za-z0-9][A-Za-z0-9-]{0,38})`
+	// Enterprise managed users and their organisations may carry an "_shortcode" suffix.
+	prOwner = `([A-Za-z0-9][A-Za-z0-9_-]{0,38})`
 	prName  = `([A-Za-z0-9._-]{1,100})`
 	// "owner/name#123".
 	prRefRE = regexp.MustCompile(`^` + prOwner + `/` + prName + `#([0-9]{1,9})$`)

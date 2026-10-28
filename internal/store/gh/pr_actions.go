@@ -28,8 +28,9 @@ const (
 const restRequestedReviewers = "repos/%s/%s/pulls/%d/requested_reviewers"
 
 var (
-	// GitHub logins: alphanumerics and single hyphens, up to 39; apps end in "[bot]".
-	reviewerLoginRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$`)
+	// GitHub logins: alphanumerics and hyphens, up to 39; apps end in "[bot]". Enterprise
+	// managed users carry an "_shortcode" suffix, so underscores are allowed too.
+	reviewerLoginRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,38})(?:\[bot\])?$`)
 	teamSlugRE      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
 )
 
