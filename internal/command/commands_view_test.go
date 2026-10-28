@@ -27,6 +27,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.forward", view: command.ViewForward},
 		{command: "thread.previous", view: command.ViewThreadPrevious},
 		{command: "thread.next", view: command.ViewThreadNext},
+		{command: "composer.history", view: command.ViewComposerHistory},
 		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
 		{command: "view.panel.usage", view: command.ViewPanelUsage},
 		{command: "view.panel.threads", view: command.ViewPanelThreads},
