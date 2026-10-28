@@ -51,7 +51,9 @@
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
  *        the request first, NotFound); /__mock/thread/fail-turn[?subtype=error_max_turns] (the next
- *        message's turn ends in error before any text; default error_during_execution); GET /__mock/thread/calls;
+ *        message's turn ends in error before any text; default error_during_execution);
+ *        /__mock/thread/api-error[?text=…] (the next message's turn ends with Claude Code's API-error
+ *        text, api_error set; default "Invalid API key · Fix external API key"); GET /__mock/thread/calls;
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
  *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
  *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts) |
@@ -1307,6 +1309,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/fail-turn":
       world.logs.failTurn = q.get("subtype") || "error_during_execution";
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/api-error":
+      world.logs.apiError = q.get("text") || "Invalid API key · Fix external API key";
       json(res, 200, { ok: true });
       break;
     case "GET /__mock/thread/calls":

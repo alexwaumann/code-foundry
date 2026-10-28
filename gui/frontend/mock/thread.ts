@@ -14,6 +14,7 @@
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
  *   POST /__mock/thread/fail-turn[?subtype=…]  the next message's turn ends in error before any text
+ *   POST /__mock/thread/api-error[?text=…]     the next message's turn ends with Claude Code's API-error text
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
  *   POST /__mock/thread/commands?id=s-r1&set=none|more|default   replaces the slash commands
@@ -306,6 +307,13 @@ export class MockThreadLogs {
    * error_during_execution); "" for none.
    */
   failTurn = "";
+  /**
+   * POST /__mock/thread/api-error[?text=…]: the next message's request fails the way Claude
+   * Code reports it (docs/notes/api-error-reply-flag.md): a synthetic assistant text with
+   * its error wording (api_error set; default the captured invalid-key text), then an
+   * is_error turn end with subtype success; "" for none.
+   */
+  apiError = "";
 
   /** `source` gets what the EventService thread source carries (pending events only). */
   constructor(
@@ -322,6 +330,7 @@ export class MockThreadLogs {
     this.calls = [];
     this.failRespond = "";
     this.failTurn = "";
+    this.apiError = "";
     this.generation++;
   }
 
@@ -1375,6 +1384,17 @@ export class MockThreadLogs {
     void (async () => {
       await sleep(250);
       if (gen !== this.generation) return;
+      if (this.apiError) {
+        // POST /__mock/thread/api-error: Claude Code's synthetic API-error message, not streamed
+        // and with nothing before it (the request never reached the model).
+        const text = this.apiError;
+        this.apiError = "";
+        this.append(id, this.item(id, { case: "assistantText", value: { text, apiError: true } }));
+        this.append(id, this.item(id, { case: "turnEnd", value: { subtype: "success", isError: true, terminalReason: "api_error", durationMs: BigInt(120), numTurns: 1 } }));
+        const l = this.log(id);
+        this.world.setStatus(id, l.watchers > 0 ? ThreadStatus.IDLE : ThreadStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
+        return;
+      }
       this.append(id, this.item(id, { case: "thinking", value: { text: "" } }));
       await sleep(250);
       if (gen !== this.generation) return;

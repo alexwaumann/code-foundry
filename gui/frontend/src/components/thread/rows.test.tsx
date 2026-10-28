@@ -610,6 +610,11 @@ describe("Claude Code's API-error text", () => {
     expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
   });
 
+  it("its turn's header says Failed, without the result's success subtype", () => {
+    const c = show([hi, apiError, turnEndItem({ isError: true, subtype: "success", durationMs: 120 })]);
+    expect(c.querySelector('[data-testid="thread-turn-header"] .t-red')?.textContent).toBe("Failed after 0.1s");
+  });
+
   it("does not take the answer from a reply before it", () => {
     const c = show([hi, { ...base, id: "a", ordinal: 2, kind: "text", text: "Looking." }, { ...apiError, ordinal: 3 }, turnEndItem({ isError: true })]);
     expect(c.querySelector('[data-testid="thread-text"]')?.getAttribute("data-final")).toBeNull();

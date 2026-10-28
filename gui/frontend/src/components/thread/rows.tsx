@@ -934,7 +934,9 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   }
   if (it?.kind !== "turnEnd") return null;
   const took = formatDuration(it.durationMs);
-  const what = it.interrupted ? "Interrupted" : it.isError ? `Failed (${it.subtype.replace(/_/g, " ")})` : "Worked";
+  // An API failure ends with is_error and subtype success (docs/notes/api-error-reply-flag.md): no "(success)".
+  const failedAs = it.subtype && it.subtype !== "success" ? ` (${it.subtype.replace(/_/g, " ")})` : "";
+  const what = it.interrupted ? "Interrupted" : it.isError ? `Failed${failedAs}` : "Worked";
   const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
   if (row.steps > 0) parts.push(stepsLabel(row.steps));
   // The daemon's measure of the turn and the model that replied. Without them (the daemon
