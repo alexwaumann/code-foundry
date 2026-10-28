@@ -582,6 +582,20 @@ export function closeThemes(): void {
 }
 
 /**
+ * The "Settings" crumb in the Themes page's header: back to the settings page it came
+ * from, or, when Themes was opened on its own (theme.pick, theme.edit), to Settings →
+ * Appearance, the page that leads to Themes. With unsaved edits the confirm dialog asks
+ * first (setPages).
+ */
+export function themesToSettings(): void {
+  if (useThemePickerStore.getState().returnTo === "settings") {
+    closeThemes();
+    return;
+  }
+  openSettingsPage("appearance");
+}
+
+/**
  * Escape in the settings sheet on the Themes page: back from a colour's view in the
  * editor, then out of the editor (asking first when it has changes), then the page
  * closes (closeThemes: back to Settings when it came from there).
