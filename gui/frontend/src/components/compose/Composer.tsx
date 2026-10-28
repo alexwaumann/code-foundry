@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Folder, FolderGit2, FolderOpen, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
@@ -201,7 +201,7 @@ function useProjectNames(ids: readonly string[]): (id: string) => string {
   return useCallback((id: string) => names[ids.indexOf(id)] ?? id, [ids, names]);
 }
 
-/** The chips of a set: one per project by id, by name only (the Work in and Runs in pickers say the rest). */
+/** The chips of a set: one per project by id, by name only (the Work in and Run in pickers say the rest). */
 function setChips(projectIds: readonly string[], removable: boolean): MemberChipModel[] {
   return projectIds.map((projectId) => ({ projectId, removable }));
 }
@@ -346,11 +346,12 @@ export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-tex
 /**
  * The project chips (MemberChips) and the collision hints above the card. The card:
  * attachments, the prompt, the model/effort/permission pickers, attach and send; below it
- * the Work in picker (where the thread runs), the Runs in picker for a set (its primary:
- * a project, or the workspace's folder) and Branch from for a new branch, or the chosen
- * worktree's branch (read-only, not a Tab stop). Grid placement keeps the send button
- * inside the card while Tab goes textarea → pickers → send; the chips come before the
- * prompt.
+ * the Work in picker (where the thread runs) with Branch from for a new branch, or the
+ * chosen worktree's branch (read-only, not a Tab stop), on the left; the Run in picker for
+ * a set (its primary: a project, or the workspace's folder) on the right, so it stays put
+ * as Branch from comes and goes. Grid placement keeps the send button inside the card
+ * while Tab goes textarea → pickers → send; the chips come before the prompt. Every
+ * picker and chip button hands focus back to the prompt afterwards.
  *
  * A lone project (no workspace): a fresh copy, the project folder itself, or an existing
  * branch found by name below the two (the default from stores/compose projectWorktree; an
@@ -361,7 +362,7 @@ export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-tex
  * A like draft ("New thread on this branch") shows what thread.new-like copies (the set,
  * branch, workspace and mode, read-only) and lets only the primary change.
  */
-function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; set: ResolvedSet; workspaceName: string }) {
+function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: ComposeTarget; set: ResolvedSet; workspaceName: string; promptFocusRef: RefObject<() => void> }) {
   const draftKey = keyOf(target);
   const defaults = useDefaults();
   const modelChoices = useModelChoices();
@@ -522,6 +523,11 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
     editorRef.current?.insertChips(added.map((a) => ({ id: a.id, name: a.file.name })));
   };
   const refocus = () => editorRef.current?.focus();
+  // The heading's picker (outside the card) focuses the prompt through this, at once: a
+  // deferred focus (focusComposer's) can land after the next popover opened and close it.
+  useEffect(() => {
+    promptFocusRef.current = refocus;
+  });
 
   // Work in's existing branches (W2): every git project's, merged by name, newest first, minus the default branches.
   const branchGroup = useMemo<PickerGroup>(
@@ -575,8 +581,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   // Chips in display order: by name (the set is sent by id).
   const chipIds = useMemo(() => byName(like ? likeSrc.sorted : set.projectIds, projectNames), [like, likeSrc.sorted, set.projectIds, projectNames]);
   const chips = useMemo<MemberChipModel[]>(
-    () => (isSet || like ? setChips(chipIds, !like && (set.projectIds.length > 1 || set.workspaceId !== "")) : single ? [{ projectId: single, removable: false }] : []),
-    [isSet, like, chipIds, set.projectIds.length, set.workspaceId, single],
+    () => (isSet || like ? setChips(chipIds, !like) : single ? [{ projectId: single, removable: false }] : []),
+    [isSet, like, chipIds, single],
   );
   const worktreeText = like
     ? likeSrc.worktreeMode
@@ -608,7 +614,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
   // The primary picker: the workspace's folder (WORKSPACE_FOLDER) first when there is one, then the projects by name.
   const primaryGroups = useMemo<PickerGroup[]>(() => {
     const s = like ? { projectIds: likeSrc.sorted, workspaceId: likeSrc.workspaceId } : set;
-    return [{ heading: "Runs in", options: primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames) }];
+    return [{ heading: "Run in", options: primaryOptions(s, like ? likeSrc.workspaceName : workspaceName, projectNames) }];
   }, [like, likeSrc.sorted, likeSrc.workspaceId, likeSrc.workspaceName, set, workspaceName, projectNames]);
   const showPrimary = (isSet && (set.projectIds.length > 1 || set.workspaceId !== "")) || (like && (likeSrc.sorted.length > 1 || likeSrc.workspaceId !== ""));
   const primaryText = primary === WORKSPACE_PRIMARY ? WORKSPACE_FOLDER : projectNames(primary);
@@ -631,7 +637,7 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
 
   return (
     <div>
-      {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} warnings={chipWarnings} disabled={busy} />}
+      {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} warnings={chipWarnings} disabled={busy} focusPrompt={refocus} />}
       <CollisionBanner list={found} setSize={single ? 1 : hintSetIds.length} onNewBranch={canNewBranch ? toNewBranch : undefined} disabled={busy} />
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
@@ -841,22 +847,8 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                   contentClassName="w-90"
                   listClassName="max-h-96"
                   warning={collisionTip}
+                  focusAfter={refocus}
                   data-testid="composer-worktree"
-                />
-              )}
-              {showPrimary && (
-                <ComposerPicker
-                  label="Runs in"
-                  icon={primary === WORKSPACE_PRIMARY ? Layers : FolderOpen}
-                  text={primaryText}
-                  value={primary}
-                  groups={primaryGroups}
-                  onChange={(v) => {
-                    setPrimary(draftKey, v);
-                  }}
-                  disabled={busy}
-                  contentClassName="w-64"
-                  data-testid="composer-primary"
                 />
               )}
               {!like && !isSet && (noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-caption" /> : chosen && <BranchIndicator worktree={chosen} />)}
@@ -873,9 +865,27 @@ function ComposerCard({ target, set, workspaceName }: { target: ComposeTarget; s
                   filterPlaceholder="Filter branches…"
                   onOpen={loadLists}
                   footer={ruleOn ? baseRuleText(manyGit) : undefined}
+                  focusAfter={refocus}
                   disabled={busy}
                   contentClassName="w-72"
                   data-testid="composer-base"
+                />
+              )}
+              {showPrimary && (
+                <ComposerPicker
+                  label="Run in"
+                  icon={primary === WORKSPACE_PRIMARY ? Layers : FolderOpen}
+                  text={primaryText}
+                  value={primary}
+                  groups={primaryGroups}
+                  onChange={(v) => {
+                    setPrimary(draftKey, v);
+                  }}
+                  focusAfter={refocus}
+                  disabled={busy}
+                  className="ml-auto"
+                  contentClassName="w-64"
+                  data-testid="composer-primary"
                 />
               )}
               {isSet && setGit === 0 && (
@@ -938,6 +948,11 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
   );
   const key = keyOf(target);
   const { set, workspaceName } = useDraftSet(target, key);
+  // Set by ComposerCard once the prompt is mounted; the heading's picker focuses it at once.
+  const promptFocus = useRef<() => void>(() => {});
+  const focusPrompt = useCallback(() => {
+    promptFocus.current();
+  }, []);
   const names = useProjectNames(set.projectIds);
   const projectsLoaded = useProjectsStore((s) => s.loaded);
   const workspacesLoaded = useWorkspacesStore((s) => s.loaded);
@@ -996,15 +1011,15 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
                   </>
                 )
               ) : emptied ? (
-                <ProjectSwitcher target={target} name={name} set={set} disabled={busy} />
+                <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} />
               ) : (
                 <>
                   {/* "build with No project" reads as "with no project"; "in" would not. */}
-                  What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} set={set} disabled={busy} />?
+                  What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} />?
                 </>
               )}
             </h1>
-            <ComposerCard target={target} set={set} workspaceName={workspaceName} />
+            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} />
           </div>
         )}
       </section>

@@ -173,6 +173,7 @@ test("a second project: files grouped by project, the primary first; tooltips na
   await compose(page);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
 
   await page.getByTestId("composer-input").click();

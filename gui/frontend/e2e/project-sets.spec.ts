@@ -37,13 +37,23 @@ async function composeIn(page: Page, n: number): Promise<void> {
   await composeProject(page, n);
 }
 
-/** The heading's set picker (a multi-select popover). */
+/** The heading's picker (one pick: a workspace or a project). */
 async function openSetPicker(page: Page) {
   await page.getByTestId("composer-project-trigger").click();
   const list = page.getByTestId("composer-project-list");
   await expect(list).toBeVisible();
   return list;
 }
+
+/** The chip row's "Add project" (a multi-select that stays open). */
+async function openAddProject(page: Page) {
+  await page.getByTestId("composer-add-project").click();
+  const list = page.getByTestId("composer-add-project-list");
+  await expect(list).toBeVisible();
+  return list;
+}
+
+const option = (list: ReturnType<Page["getByTestId"]>, name: string) => list.getByRole("option").filter({ hasText: name });
 
 /** The selected thread row's id. */
 async function selectedThreadId(page: Page): Promise<string> {
@@ -56,27 +66,34 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the set picker multi-selects: chips by id, the primary picker, sent as projects with the primary", async ({ page }) => {
+test("Add project multi-selects: chips by id, the primary picker, sent as projects with the primary", async ({ page }) => {
   await openApp(page);
   await composeIn(page, 1);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
-  // A lone project: no chips, only Add project; no primary picker.
+  // A lone project: no chips, only Add project; no primary picker, no Clear.
   await expect(chips(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-add-project")).toHaveText("Add project");
   await expect(page.getByTestId("composer-primary")).toHaveCount(0);
+  await expect(page.getByTestId("composer-clear")).toHaveCount(0);
 
-  // Toggle two more projects in the heading's picker; it stays open, the set is checked.
-  const list = await openSetPicker(page);
-  await list.locator('[data-project="repo-sk"]').click();
-  await list.locator('[data-project="repo-gp"]').click();
-  await expect(list.locator('[data-project][data-current="true"]')).toHaveCount(3);
+  // Toggle two more projects in Add project; it stays open, the set is checked, by name.
+  const list = await openAddProject(page);
+  await expect(list.getByRole("option")).toHaveText([/^code-foundry/, /^dotfiles/, /^ghostty-playground/, /^sketches/, /^writing/]);
+  await expect(list.locator("[data-checked]")).toHaveText([/^code-foundry/]);
+  await option(list, "sketches").click();
+  await option(list, "ghostty-playground").click();
+  await expect(list.locator("[data-checked]")).toHaveCount(3);
   // And one out again.
-  await list.locator('[data-project="repo-sk"]').click();
-  await expect(list.locator('[data-project][data-current="true"]')).toHaveCount(2);
+  await option(list, "sketches").click();
+  await expect(list.locator("[data-checked]")).toHaveCount(2);
   await page.keyboard.press("Escape");
   await expect(list).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in 2 projects?");
+  // Add project first, then the chips, then Clear.
+  await expect(page.getByTestId("composer-members").locator("> li").first().getByTestId("composer-add-project")).toBeVisible();
+  await expect(page.getByTestId("composer-clear")).toHaveText("Clear");
   // Sorted by project id; the default primary is the first picked (code-foundry).
   await expect(chips(page)).toHaveCount(2);
   await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
@@ -90,10 +107,17 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
 
   const primary = page.getByTestId("composer-primary");
   await expect(primary).toHaveText("code-foundry");
+  await expect(primary).toHaveAccessibleName("Run in: code-foundry");
+  // Work in on the left, Run in on the right of the same row.
+  const [work, run] = await Promise.all([page.getByTestId("composer-worktree").boundingBox(), primary.boundingBox()]);
+  const card = await page.getByTestId("composer-card").boundingBox();
+  expect(work && run && card && Math.abs(work.y - run.y) < 2 && run.x + run.width > card.x + card.width - 16 && work.x < card.x + card.width / 2).toBe(true);
   await primary.click();
   await expect(page.getByTestId("composer-primary-list").getByRole("option")).toHaveText([/^code-foundry/, /^ghostty-playground/]);
   await page.getByTestId("composer-primary-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
   await expect(primary).toHaveText("ghostty-playground");
+  // A pill's pick hands focus to the prompt.
+  await expect(page.getByTestId("composer-input")).toBeFocused();
 
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Share the login types");
@@ -117,9 +141,10 @@ test("the set picker multi-selects: chips by id, the primary picker, sent as pro
 /** The composer for code-foundry with ghostty-playground added: a set of two git projects. */
 async function composeTwo(page: Page): Promise<void> {
   await composeIn(page, 1);
-  const list = await openSetPicker(page);
-  await list.locator('[data-project="repo-gp"]').click();
+  const list = await openAddProject(page);
+  await option(list, "ghostty-playground").click();
   await page.keyboard.press("Escape");
+  await expect(list).toHaveCount(0);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in 2 projects?");
 }
 
@@ -216,10 +241,14 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Workspaces", "Projects"]);
   await expect(list.locator('[data-workspace="w-000000000001"]').getByTestId("workspace-detail")).toHaveText("code-foundry, dotfiles");
   await list.locator('[data-workspace="w-000000000001"]').click();
+  await expect(list).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
+  await page.getByTestId("composer-project-trigger").click();
   await expect(list.locator('[data-workspace="w-000000000001"]')).toHaveAttribute("data-current", "true");
+  await expect(list.locator("[data-current]")).toHaveCount(1);
   await page.keyboard.press("Escape");
 
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
   await expect(page.getByTestId("composer-workspace")).toContainText("shop");
   await expect(chips(page)).toHaveCount(2);
   await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
@@ -257,6 +286,48 @@ test("a workspace row selects its members and the reference; Workspace as the pr
   await expect(row(page, `s:${id}`).getByTestId("row-workspace")).toHaveCount(0);
 });
 
+test("the workspace chip's × takes its members with it; Clear empties the set; every × goes to the prompt", async ({ page }) => {
+  await mockPost("workspace?name=shop&projects=repo-cf,repo-dot");
+  await openApp(page);
+  await composeIn(page, 3);
+  // ghostty-playground, then the workspace on top: its two members join, the reference is set.
+  const heading = await openSetPicker(page);
+  await heading.locator('[data-workspace="w-000000000001"]').click();
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
+  const add = await openAddProject(page);
+  await option(add, "ghostty-playground").click();
+  await page.keyboard.press("Escape");
+  await expect(chips(page)).toHaveCount(3);
+  // × on the workspace: shop and its members go, ghostty-playground stays; no tooltip on a chip's ×.
+  const remove = page.getByTestId("composer-workspace-remove");
+  await expect(remove).toHaveAccessibleName("Remove workspace shop");
+  await remove.hover();
+  await page.waitForTimeout(700);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await remove.click();
+  await expect(page.getByTestId("composer-workspace")).toHaveCount(0);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
+  await expect(chips(page)).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+
+  // Clear: a set of two to nothing, the empty state.
+  const again = await openAddProject(page);
+  await option(again, "sketches").click();
+  await page.keyboard.press("Escape");
+  await expect(chips(page)).toHaveCount(2);
+  await expect(chips(page).getByTestId("composer-member-remove")).toHaveCount(2);
+  await page.getByTestId("composer-clear").click();
+  await expect(page.getByTestId("composer-heading")).toHaveText("Pick a project");
+  await expect(chips(page)).toHaveCount(0);
+  await expect(page.getByTestId("composer-clear")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  // Add project is still there to start again.
+  const back = await openAddProject(page);
+  await option(back, "dotfiles").click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in dotfiles?");
+});
+
 test("the collision banner before send, and the daemon's hints after", async ({ page }) => {
   // sketches and the writing folder have no thread of their own in the mock's world.
   await mockPost("set-thread?projects=repo-sk,repo-wr&name=Busy%20one");
@@ -278,6 +349,7 @@ test("the collision banner before send, and the daemon's hints after", async ({ 
   // With the writing folder, fresh copies still share the folder: it cannot be isolated. Already on a new branch: no button.
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "writing" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copies");
   await expect(banner.getByTestId("composer-collision-text")).toContainText("1 of 2 projects is already being edited by another running thread.");
   await expect(banner.getByTestId("composer-collision-new-branch")).toHaveCount(0);
@@ -418,3 +490,29 @@ test("a workspace removed while its composer is open says so", async ({ page }) 
   await mockPost("reset");
   await expect(page.getByTestId("composer")).toHaveText("This workspace no longer exists.");
 });
+
+/** SHOTS=<dir>: the PR's screenshots, WebKit, 1440x900, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await freshCopyByDefault();
+    await mockPost("workspace?name=shop&projects=repo-cf,repo-dot");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openApp(page);
+    await composeIn(page, 1);
+    const heading = await openSetPicker(page);
+    await heading.locator('[data-workspace="w-000000000001"]').click();
+    const add = await openAddProject(page);
+    await option(add, "ghostty-playground").click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${String(shots)}/add-project-${scheme}.png` });
+    await page.keyboard.press("Escape");
+    await expect(add).toHaveCount(0);
+    await page.getByTestId("composer-input").click();
+    await page.keyboard.type("Ship the shop banner");
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${String(shots)}/set-${scheme}.png` });
+  });
+}

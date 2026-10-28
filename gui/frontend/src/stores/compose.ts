@@ -269,21 +269,39 @@ async function writeSet(target: ComposeTarget, picked: readonly string[], worksp
 
 /**
  * Adds a project to the draft's set, or removes it (its skill and file tags go too, after
- * a confirm when the text has any). The last project of a set without a workspace stays:
- * "No project" is its own target. The last project of a workspace's set takes the
- * workspace reference with it: the draft has no set then (the composer's empty state,
- * nothing to send) until a project or a workspace is picked, so an empty project list is
- * never sent with a workspace (the daemon would read it as all its members). Picked on
- * the no-project composer, it moves the draft to that project's composer instead.
+ * a confirm when the text has any). The last project of a workspace's set takes the
+ * workspace reference with it, and the last project of a plain set leaves it empty: the
+ * draft has no set then (the composer's empty state, nothing to send) until a project or
+ * a workspace is picked, so an empty project list is never sent with a workspace (the
+ * daemon would read it as all its members). Picked on the no-project composer, it moves
+ * the draft to that project's composer instead.
  */
 export async function toggleDraftProject(target: ComposeTarget, projectId: string): Promise<boolean> {
   if (target.kind === "home") return switchDraftTarget(target, { kind: "project", projectId });
   if (target.kind === "like") return false;
   const set = draftSet(target, getDraft(draftKey(target)));
   const last = set.picked.includes(projectId) && set.picked.length === 1;
-  if (last && !set.workspaceId) return false;
   const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
   return writeSet(target, toggled(set.picked, projectId), last ? "" : undefined, `Remove ${name} from the thread?`);
+}
+
+/**
+ * Makes one project the draft's whole set (the heading picker's project row): no
+ * workspace reference, nothing else. On the no-project composer it moves the draft to
+ * that project's composer.
+ */
+export async function setDraftProject(target: ComposeTarget, projectId: string): Promise<boolean> {
+  if (target.kind === "home") return switchDraftTarget(target, { kind: "project", projectId });
+  if (target.kind === "like") return false;
+  if (!(projectId in useProjectsStore.getState().byId)) return false;
+  const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
+  return writeSet(target, [projectId], "", `Switch to ${name}?`);
+}
+
+/** Empties the draft's set (the chip row's Clear): the composer's empty state until a project or a workspace is picked. */
+export async function clearDraftSet(target: ComposeTarget): Promise<boolean> {
+  if (target.kind === "home" || target.kind === "like") return false;
+  return writeSet(target, [], "", "Clear the projects?");
 }
 
 /** A draft whose set was emptied (every project of its workspace taken out): nothing to send until a project is picked. */
@@ -292,25 +310,38 @@ export function isSetEmpty(set: Pick<ResolvedSet, "projectIds" | "workspaceId">)
 }
 
 /**
- * Picks a workspace for the draft: its members become the set and it is the thread's
- * reference (its instructions and skills). Picking the referenced one again drops the
- * reference and keeps the projects. On the no-project composer it moves the draft to the
- * workspace's composer.
+ * Picks a workspace for the draft (the heading picker's workspace row): its members become
+ * the set and it is the thread's reference (its instructions and skills). On the
+ * no-project composer it moves the draft to the workspace's composer.
  */
 export async function pickDraftWorkspace(target: ComposeTarget, workspaceId: string): Promise<boolean> {
   if (target.kind === "home") return switchDraftTarget(target, { kind: "workspace", workspaceId });
   if (target.kind === "like") return false;
-  const set = draftSet(target, getDraft(draftKey(target)));
-  if (set.workspaceId === workspaceId) {
-    // A workspace with no project left in the set stays: without it the thread has nowhere to run.
-    if (set.picked.length === 0) return false;
-    return writeSet(target, set.picked, "", "");
-  }
   const ws = useWorkspacesStore.getState().byId[workspaceId];
   if (!ws) return false;
   const known = useProjectsStore.getState().byId;
   const members = ws.members.map((m) => m.projectId).filter((id) => id in known);
   return writeSet(target, members, workspaceId, `Switch to ${ws.name}?`);
+}
+
+/**
+ * Takes the referenced workspace out of the draft (the workspace chip's ×) with the
+ * members it brought; projects added on top of it stay. With none, the composer's empty
+ * state.
+ */
+export async function removeDraftWorkspace(target: ComposeTarget): Promise<boolean> {
+  if (target.kind === "home" || target.kind === "like") return false;
+  const set = draftSet(target, getDraft(draftKey(target)));
+  if (!set.workspaceId) return false;
+  const ws = useWorkspacesStore.getState().byId[set.workspaceId];
+  const members = new Set(ws?.members.map((m) => m.projectId) ?? []);
+  const name = ws?.name ?? set.workspaceId;
+  return writeSet(
+    target,
+    set.picked.filter((id) => !members.has(id)),
+    "",
+    `Remove ${name} from the thread?`,
+  );
 }
 
 export function isDraftEmpty(d: Pick<Draft, "text" | "attachments">): boolean {

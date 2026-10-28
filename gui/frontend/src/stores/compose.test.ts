@@ -21,6 +21,9 @@ import {
   emptyDraft,
   getDraft,
   pickDraftWorkspace,
+  removeDraftWorkspace,
+  setDraftProject,
+  clearDraftSet,
   projectWorktree,
   setPrimary,
   settlePdf,
@@ -75,9 +78,34 @@ describe("compose drafts", () => {
     expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], primary: "repo-sk" });
   });
 
-  it("the last project of a set without a workspace stays", async () => {
-    await expect(toggleDraftProject(cf, "repo-cf")).resolves.toBe(false);
-    expect(draftSet(cf, getDraft("repo-cf")).projectIds).toEqual(["repo-cf"]);
+  it("the last project of a set without a workspace leaves it empty (the composer's empty state)", async () => {
+    await expect(toggleDraftProject(cf, "repo-cf")).resolves.toBe(true);
+    expect(isSetEmpty(draftSet(cf, getDraft("repo-cf")))).toBe(true);
+  });
+
+  it("setDraftProject: one project is the whole set, the workspace reference goes", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    await expect(setDraftProject(cf, "repo-cf")).resolves.toBe(true);
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-cf"], workspaceId: "", primary: "repo-cf", isSet: false });
+    await expect(setDraftProject(cf, "nope")).resolves.toBe(false);
+  });
+
+  it("clearDraftSet: nothing left, nothing to send", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    await expect(clearDraftSet(cf)).resolves.toBe(true);
+    expect(isSetEmpty(draftSet(cf, getDraft("repo-cf")))).toBe(true);
+    await expect(clearDraftSet({ kind: "home" })).resolves.toBe(false);
+  });
+
+  it("removeDraftWorkspace: the workspace and its members go; projects added on top stay", async () => {
+    await pickDraftWorkspace(cf, "w-1");
+    await toggleDraftProject(cf, "repo-cf");
+    await expect(removeDraftWorkspace(cf)).resolves.toBe(true);
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-cf"], workspaceId: "", isSet: false });
+    await expect(removeDraftWorkspace(cf)).resolves.toBe(false);
+    await pickDraftWorkspace(cf, "w-1");
+    await removeDraftWorkspace(cf);
+    expect(isSetEmpty(draftSet(cf, getDraft("repo-cf")))).toBe(true);
   });
 
   it("removing the primary hands it back to the default and resets the base", async () => {
@@ -108,13 +136,13 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ projects: ["repo-cf"], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
-  it("a workspace row: its members become the set and it the reference (its default primary); again: the reference goes", async () => {
+  it("a workspace row: its members become the set and it the reference (its default primary); again: unchanged", async () => {
     await pickDraftWorkspace(cf, "w-1");
     expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1", primary: "repo-sk", isSet: true });
     setPrimary("repo-cf", "workspace");
     expect(draftSet(cf, getDraft("repo-cf")).primary).toBe("workspace");
     await pickDraftWorkspace(cf, "w-1");
-    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "", primary: "repo-gp" });
+    expect(draftSet(cf, getDraft("repo-cf"))).toMatchObject({ projectIds: ["repo-gp", "repo-sk"], workspaceId: "w-1", primary: "workspace" });
   });
 
   it("a workspace target's projects toggle like any set's", async () => {

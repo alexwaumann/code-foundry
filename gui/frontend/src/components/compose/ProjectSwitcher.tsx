@@ -4,64 +4,71 @@ import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { draftKey, HOME_KEY, type ComposeTarget } from "@/lib/compose";
-import { pickDraftWorkspace, switchDraftTarget, toggleDraftProject } from "@/stores/compose";
+import { pickDraftWorkspace, setDraftProject, switchDraftTarget } from "@/stores/compose";
 import { useUiStore } from "@/stores/ui";
 
 /**
  * The composer heading's name (the workspace's, the project's, or "N projects") as a
- * button that opens the project set picker: a multi-select over the same rows as cmd+N's
- * picker, grouped (ProjectRowGroups: workspaces, projects, "No project" last). A workspace row makes its members the set and
- * the thread's reference (picked again, it drops the reference); a project row toggles
- * that project; both keep the popover open, and the rows of the set are checked. "No
- * project" moves the draft to the no-project composer (stores/compose switchDraftTarget)
- * and closes; on the no-project composer any row moves it to that target. A dotted
- * underline only; a composer Tab stop before the chips.
+ * button that opens the project picker: a single pick over the same rows as cmd+N's
+ * picker, grouped (ProjectRowGroups: workspaces, projects, "No project" last). A workspace
+ * row makes its members the set and the thread's reference; a project row makes that
+ * project the whole set (no workspace); "No project" moves the draft to the no-project
+ * composer (stores/compose switchDraftTarget), and on the no-project composer any row
+ * moves it to that target. The row of the current target is checked: the referenced
+ * workspace, or a lone project. Adding to the set is the chip row's "Add project".
  *
- * Esc closes it and focus returns to the name; after a move the prompt has focus.
+ * Every pick closes the list; it, Esc and a click away all hand focus to the prompt. A
+ * dotted underline only; a composer Tab stop before the chips.
  */
 export function ProjectSwitcher({
   target,
   name,
   set,
   disabled,
+  focusPrompt,
 }: {
   target: ComposeTarget;
   name: string;
-  /** The draft's set: its rows are checked. */
+  /** The draft's set: the row it names is checked. */
   set: { projectIds: readonly string[]; workspaceId: string };
   disabled: boolean;
+  /**
+   * Focuses the prompt now (not a frame later: a deferred focus can land after the next
+   * popover opened and close it as a focus outside). A move to another composer uses
+   * stores/ui focusComposer, which the new composer answers on mount.
+   */
+  focusPrompt: () => void;
 }) {
   const [open, setOpen] = useState(false);
   // Controlled so every opening starts unfiltered.
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  // A move focuses the new composer's prompt; the popover must not hand focus back to the trigger.
-  const moved = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const { workspaces, projects, loaded } = useProjectRows();
   const home = target.kind === "home";
 
   const move = (to: ComposeTarget) => {
-    moved.current = true;
     setOpen(false);
     void switchDraftTarget(target, to).then((ok) => {
-      if (!ok) useUiStore.getState().focusComposer();
+      if (ok) useUiStore.getState().focusComposer();
+      else focusPrompt();
     });
+  };
+  const pick = (write: Promise<boolean>) => {
+    setOpen(false);
+    void write.then(focusPrompt);
   };
   const checked = (value: string) => {
     if (home) return value === HOME_KEY;
-    if (value === HOME_KEY) return false;
-    if (set.workspaceId && value === draftKey({ kind: "workspace", workspaceId: set.workspaceId })) return true;
-    return set.projectIds.includes(value);
+    if (set.workspaceId) return value === draftKey({ kind: "workspace", workspaceId: set.workspaceId });
+    return set.projectIds.length === 1 && value === set.projectIds[0];
   };
 
   return (
     <Popover
       open={open}
       onOpenChange={(o) => {
-        if (o) {
-          setQuery("");
-          moved.current = false;
-        }
+        if (o) setQuery("");
         setOpen(o);
       }}
     >
@@ -89,6 +96,7 @@ export function ProjectSwitcher({
         </button>
       </PopoverTrigger>
       <PopoverContent
+        ref={contentRef}
         align="center"
         sideOffset={8}
         className="w-80 p-0 text-left text-body tracking-normal"
@@ -99,11 +107,16 @@ export function ProjectSwitcher({
           inputRef.current?.focus();
         }}
         onCloseAutoFocus={(e) => {
-          if (moved.current) e.preventDefault();
+          // The prompt, never the heading: after a pick, Esc or a click away alike. This
+          // runs after the exit animation: not when another control (Add project's list)
+          // has the keyboard by then, or it would close as a focus outside.
+          e.preventDefault();
+          const el = document.activeElement;
+          if (!el || el === document.body || contentRef.current?.contains(el)) focusPrompt();
         }}
       >
         <Command loop label="Projects of the thread" className="rounded-lg outline-hidden">
-          <CommandInput ref={inputRef} placeholder="Add or remove projects…" aria-label="Filter projects" value={query} onValueChange={setQuery} />
+          <CommandInput ref={inputRef} placeholder="Switch to a workspace or project…" aria-label="Filter projects" value={query} onValueChange={setQuery} />
           <CommandList className="max-h-80">
             <CommandEmpty>{loaded ? "No matching projects." : "Loading projects…"}</CommandEmpty>
             <ProjectRowGroups
@@ -112,11 +125,11 @@ export function ProjectSwitcher({
               checked={checked}
               onPickProject={(projectId) => {
                 if (home) move({ kind: "project", projectId });
-                else void toggleDraftProject(target, projectId);
+                else pick(setDraftProject(target, projectId));
               }}
               onPickWorkspace={(workspaceId) => {
                 if (home) move({ kind: "workspace", workspaceId });
-                else void pickDraftWorkspace(target, workspaceId);
+                else pick(pickDraftWorkspace(target, workspaceId));
               }}
               onPickNoProject={
                 loaded

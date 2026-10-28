@@ -25,6 +25,7 @@ async function compose(page: Page, projectId: string): Promise<void> {
 async function addProject(page: Page, name: string): Promise<void> {
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: name }).click();
+  await page.keyboard.press("Escape");
 }
 
 test("a set: 2 of 3 projects, one banner, the pill and the two chips name the threads", async ({ page }) => {
