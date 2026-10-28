@@ -11,6 +11,8 @@ import type { TimelineListApi } from "./Timeline";
 
 /** Space (px) kept clear above the rail and between it and the composer. */
 const RAIL_MARGIN = 16;
+/** Within this many px of the list's end it counts as at the end (the last prompt is in view). */
+const END_SLACK = 4;
 
 /** A prompt on the rail: its user row's item id and the row's index in the timeline. */
 interface RailPrompt {
@@ -22,7 +24,8 @@ interface RailPrompt {
  * The thread's prompt rail (docs/notes/thread-prompt-rail.md): one tick per prompt the
  * timeline shows as a bubble (its `user` rows, wakes left out), in the rows' 40px left
  * gutter, centred in the body above the composer. The tick of the turn in view (the last
- * prompt whose row top is at or above the viewport's middle) is full strength; hovering one
+ * prompt whose row top is at or above the viewport's middle, the last one at the list's
+ * end) is full strength; hovering one
  * shows the prompt, a click scrolls its row to the top (focus stays where it was). Ticks
  * pack closer in a long thread (lib/promptRail railGap); when they cannot fit, or the thread
  * has fewer than two prompts, there is no rail. Only the rail re-renders as the list
@@ -72,11 +75,14 @@ export const PromptRail = memo(function PromptRail({ threadId, list, rows, botto
     let raf = 0;
     const update = () => {
       raf = 0;
+      // The middle of what shows above the composer.
       const middle = el.scrollTop + Math.max(el.clientHeight - bottomInset, 0) / 2;
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < END_SLACK;
       setCurrent(
         promptInView(
           prompts.map((p) => list.rowStart(p.index)),
           middle,
+          atEnd,
         ),
       );
     };

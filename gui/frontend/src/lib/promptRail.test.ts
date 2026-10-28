@@ -21,16 +21,18 @@ describe("railGap", () => {
 });
 
 describe("promptInView", () => {
-  it.each<[string, (number | undefined)[], number, number]>([
-    ["none above the middle", [400, 900], 300, -1],
-    ["first only", [28, 900], 300, 0],
-    ["a top exactly at the middle counts", [28, 300], 300, 1],
-    ["the last above wins", [28, 120, 250, 700], 300, 2],
-    ["all above", [28, 120, 250], 5000, 2],
-    ["a row not laid out is skipped", [28, undefined, 250], 300, 2],
-    ["no prompts", [], 300, -1],
-  ])("%s", (_name, starts, middle, want) => {
-    expect(promptInView(starts, middle)).toBe(want);
+  it.each<[string, (number | undefined)[], number, boolean, number]>([
+    ["none above the middle", [400, 900], 300, false, -1],
+    ["first only", [28, 900], 300, false, 0],
+    ["a top exactly at the middle counts", [28, 300], 300, false, 1],
+    ["the last above wins", [28, 120, 250, 700], 300, false, 2],
+    ["all above", [28, 120, 250], 5000, false, 2],
+    ["a row not laid out is skipped", [28, undefined, 250], 300, false, 2],
+    ["no prompts", [], 300, false, -1],
+    ["at the end: the last, though below the middle", [28, 900], 300, true, 1],
+    ["at the end with no prompts", [], 300, true, -1],
+  ])("%s", (_name, starts, middle, atEnd, want) => {
+    expect(promptInView(starts, middle, atEnd)).toBe(want);
   });
 });
 

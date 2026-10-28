@@ -28,9 +28,12 @@ export function railGap(count: number, available: number): number | null {
 /**
  * The index of the prompt in view: the last whose row top (`starts`, the rows' offsets in
  * the list, in order; undefined for a row not laid out yet) is at or above `middle` (the
- * viewport's middle as an offset in the list). -1 when none is.
+ * viewport's middle as an offset in the list). -1 when none is. `atEnd`: the list is
+ * scrolled to its end, where the last turn is what shows even when it is too short to
+ * reach the middle: the last prompt.
  */
-export function promptInView(starts: readonly (number | undefined)[], middle: number): number {
+export function promptInView(starts: readonly (number | undefined)[], middle: number, atEnd = false): number {
+  if (atEnd) return starts.length - 1;
   let at = -1;
   starts.forEach((s, i) => {
     if (s !== undefined && s <= middle) at = i;
