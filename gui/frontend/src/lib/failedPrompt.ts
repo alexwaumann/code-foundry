@@ -31,7 +31,7 @@ export interface FailedPrompt {
   line: string;
 }
 
-type Reason = { kind: "didNotStart" } | { kind: "stopped" } | { kind: "failed"; subtype: string } | { kind: "unknown" };
+type Reason = { kind: "didNotStart" } | { kind: "stopped" } | { kind: "failed"; subtype: string } | { kind: "apiError"; text: string } | { kind: "unknown" };
 
 /** The daemon's error items (internal/store/thread stream.go, lifecycle.go). */
 const DID_NOT_START = "Claude did not start";
@@ -40,6 +40,36 @@ const STOPPED = "Claude stopped";
 /** "error_during_execution" -> "error during execution"; "" for none or "success". */
 function shortSubtype(subtype: string): string {
   return subtype === "success" ? "" : subtype.replace(/_+/g, " ").trim();
+}
+
+/** The longest API-error detail the line shows before an ellipsis. */
+const DETAIL_MAX = 60;
+/** Words a detail keeps capitalised at its start (names, not sentence case). */
+const PROPER = new Set(["Claude", "Anthropic", "OAuth", "Bedrock", "Vertex"]);
+
+/**
+ * Claude Code's API-error text as the line's short detail: its first line, Claude Code's
+ * hint after " · " and an "API Error:" prefix dropped (the line already says the request
+ * failed), an Anthropic error body ("529 {…"message":"Overloaded"…}") as its message,
+ * sentence case lowered ("invalid API key"), at most DETAIL_MAX characters.
+ * "Invalid API key · Fix external API key" -> "invalid API key".
+ */
+export function apiErrorDetail(text: string): string {
+  let d = (text.trim().split("\n")[0] ?? "").split(" · ")[0]?.trim() ?? "";
+  d = d.replace(/^API Error:\s*/i, "");
+  const body = /^\d{3}\s+(\{.*\})$/.exec(d)?.[1];
+  if (body) {
+    try {
+      const msg = (JSON.parse(body) as { error?: { message?: unknown } }).error?.message;
+      if (typeof msg === "string" && msg.trim()) d = msg.trim();
+    } catch {
+      // Not JSON: keep it as it is.
+    }
+  }
+  d = d.replace(/\.$/, "").trim();
+  const first = d.split(/\s/)[0] ?? "";
+  if (/^[A-Z][a-z]+$/.test(first) && !PROPER.has(first)) d = first.toLowerCase() + d.slice(first.length);
+  return d.length > DETAIL_MAX ? `${d.slice(0, DETAIL_MAX - 1).trimEnd()}…` : d;
 }
 
 function lineOf(r: Reason): string {
@@ -52,6 +82,10 @@ function lineOf(r: Reason): string {
       const short = shortSubtype(r.subtype);
       return `The request failed${short ? ` (${short})` : ""}, so your message was not sent.`;
     }
+    case "apiError": {
+      const detail = apiErrorDetail(r.text);
+      return `The request failed${detail ? ` (${detail})` : ""}, so your message was not sent.`;
+    }
     case "unknown":
       return "Your message didn't go through.";
   }
@@ -63,7 +97,8 @@ function lineOf(r: Reason): string {
  * is not working, and Claude did not start (the daemon's "Claude did not start" error item,
  * or status error "did not start"), Claude stopped (a "Claude stopped …" error item, or
  * another status error), the turn ended in error (a turn end with is_error or a subtype
- * other than success, not an interrupt) or some other error item followed the prompt. The
+ * other than success, not an interrupt), the request failed (Claude Code's API-error text,
+ * apiError, in place of a reply: it is no reply) or some other error item followed the prompt. The
  * status counts only when it changed at or after the prompt (an older failure's status
  * says nothing about a prompt just sent). Subagent items, a wake message (the daemon's, not
  * the user's) and a message Claude has not read yet never qualify; nor does anything while
@@ -76,12 +111,19 @@ export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
   if (running && (status === "busy" || state === "starting")) return null;
   // Walking back from the end: the first error after the prompt, the last turn end.
   let error: string | null = null;
+  let apiError: string | null = null;
   let turnFailed: string | null = null;
   for (let i = order.length - 1; i >= 0; i--) {
     const it = byId[order[i] ?? ""];
     if (!it || it.parentToolUseId !== "") continue;
     switch (it.kind) {
       case "text":
+        if (it.apiError) {
+          apiError = it.text;
+          break;
+        }
+        if (it.text.trim() !== "") return null;
+        break;
       case "commandOutput":
         if (it.text.trim() !== "") return null;
         break;
@@ -94,7 +136,7 @@ export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
       case "user": {
         if (it.wake || it.queued) return null;
         const fresh = status === "error" && input.statusChangedAtMs !== null && it.createdAtMs !== null && input.statusChangedAtMs >= it.createdAtMs;
-        const reason = reasonOf(error, turnFailed, fresh ? input.statusReason : null);
+        const reason = reasonOf(error, apiError, turnFailed, fresh ? input.statusReason : null);
         return reason ? { itemId: it.id, ordinal: it.ordinal, line: lineOf(reason) } : null;
       }
       default:
@@ -105,9 +147,10 @@ export function failedPrompt(input: FailedPromptInput): FailedPrompt | null {
 }
 
 /** statusReason: the error status's reason when it is the prompt's, else null. */
-function reasonOf(error: string | null, turnFailed: string | null, statusReason: string | null): Reason | null {
+function reasonOf(error: string | null, apiError: string | null, turnFailed: string | null, statusReason: string | null): Reason | null {
   if (error?.startsWith(DID_NOT_START) || statusReason === "did not start") return { kind: "didNotStart" };
   if (error?.startsWith(STOPPED)) return { kind: "stopped" };
+  if (apiError !== null) return { kind: "apiError", text: apiError };
   if (turnFailed !== null) return { kind: "failed", subtype: turnFailed };
   if (error !== null) return { kind: "unknown" };
   if (statusReason !== null) return { kind: "stopped" };

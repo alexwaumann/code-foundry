@@ -367,7 +367,7 @@ function CopyAnswer({ answer }: { answer: string }) {
   const onClick = () => {
     const ids = new Set(answer.split("\n"));
     const text = getThreadItems(threadId)
-      .flatMap((x: ThreadItemView) => (ids.has(x.id) && x.kind === "text" ? [x.text] : []))
+      .flatMap((x: ThreadItemView) => (ids.has(x.id) && x.kind === "text" && !x.apiError ? [x.text] : []))
       .join("\n\n");
     void copy(text);
   };
@@ -496,13 +496,13 @@ const PermissionRow = memo(function PermissionRow({ id }: { id: string }) {
   );
 });
 
-/** An error, a compaction, or a local command's output. */
+/** An error (the daemon's, or Claude Code's API-error text), a compaction, or a local command's output. */
 const NoteRow = memo(function NoteRow({ id }: { id: string }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   const [open, toggle] = useToggle(id, false);
   if (!it) return null;
-  if (it.kind === "error") {
+  if (it.kind === "error" || (it.kind === "text" && it.apiError)) {
     return (
       <div className="my-1.5 flex items-start gap-2 rounded-md border border-cf-error/30 bg-cf-error/5 px-2.5 py-1.5 text-body-sm selectable" data-testid="thread-error">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0 t-red" aria-hidden />
