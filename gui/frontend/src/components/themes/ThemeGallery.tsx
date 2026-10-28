@@ -4,7 +4,6 @@ import {
   Archive,
   ArrowUp,
   Bot,
-  Brain,
   Check,
   ChevronDown,
   ChevronRight,
@@ -25,6 +24,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { Chip } from "@/components/thread/Chip";
 import { ThreadMarkdown } from "@/components/thread/Code";
 import { UserBubble } from "@/components/thread/UserBubble";
@@ -276,10 +276,10 @@ function Composer() {
   return (
     <div className="shrink-0 px-3 pb-3">
       <div className="ccard docked">
-        <div className="col-span-2 min-h-10 px-4 pt-2.5 pb-1 text-body text-cf-text-muted">Send a follow-up…</div>
+        <div className="col-span-2 min-h-10 px-4 pt-2.5 pb-1 text-body text-cf-text-muted">Reply or ask anything. @ files and threads, / skills and commands</div>
         <div className="col-start-1 flex min-w-0 items-center gap-0.5 px-2 pb-2">
           <Button variant="ghost" size="xs" className={picker} tabIndex={-1}>
-            <Brain /> Opus 4.8 <ChevronDown className="opacity-60" />
+            <ClaudeMark style={{ color: CLAUDE_ORANGE }} /> Opus 4.8 <ChevronDown className="opacity-60" />
           </Button>
           <Button variant="ghost" size="xs" className={picker} tabIndex={-1}>
             <Gauge /> High <ChevronDown className="opacity-60" />
@@ -456,7 +456,7 @@ function Menu() {
   return (
     <div className="flex flex-col items-start gap-1">
       <Button variant="outline" size="xs" tabIndex={-1}>
-        <Brain /> Opus 4.8 <ChevronDown className="opacity-60" />
+        <ClaudeMark style={{ color: CLAUDE_ORANGE }} /> Opus 4.8 <ChevronDown className="opacity-60" />
       </Button>
       <div className="w-full rounded-lg border bg-cf-surface-overlay p-1 text-cf-text shadow-lg" role="presentation">
         <div className="px-2 py-1.5 text-caption-sm font-medium">Model</div>

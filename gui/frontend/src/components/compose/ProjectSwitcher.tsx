@@ -80,7 +80,7 @@ export function ProjectSwitcher({
           {/* The popover centres on the name itself, whatever box the button gets. */}
           <PopoverAnchor asChild>
             <span
-              className="border-b-[1.5px] border-dotted border-cf-text/45 transition-colors group-hover:border-cf-text group-disabled:border-cf-text/45 group-data-[state=open]:border-cf-text"
+              className="border-b-[1.5px] border-dotted border-cf-text/45 font-semibold transition-colors group-hover:border-cf-text group-disabled:border-cf-text/45 group-data-[state=open]:border-cf-text"
               data-testid="composer-project-name"
             >
               {name}

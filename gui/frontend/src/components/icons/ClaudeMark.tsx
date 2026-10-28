@@ -15,3 +15,8 @@ export function ClaudeMark({ className, ...props }: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+/** The mark in Claude's orange, for icon slots that pass no colour (the composers' Model picker). */
+export function ClaudeMarkBrand(props: SVGProps<SVGSVGElement>) {
+  return <ClaudeMark {...props} style={{ color: CLAUDE_ORANGE, ...props.style }} />;
+}
