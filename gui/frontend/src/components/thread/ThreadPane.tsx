@@ -113,7 +113,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
                 No messages yet.
               </p>
             )}
-            <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} />
+            <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} rail />
             <div className="dock" ref={dockRef}>
               <AgentsStrip threadId={threadId} />
               <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />

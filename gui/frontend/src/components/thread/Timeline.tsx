@@ -7,6 +7,7 @@ import { registerTimeline } from "@/stores/cite";
 import { heldScroll, spacerAfterGrowth } from "@/lib/timelineHold";
 import { scrollIntent, type ScrollSample } from "@/lib/scrollIntent";
 import { HoldTopContext, KeepRowContext } from "./context";
+import { PromptRail } from "./PromptRail";
 import { RowBoundary } from "./RowError";
 import { TimelineRowView } from "./rows";
 
@@ -77,9 +78,28 @@ function useRows(threadId: string, working: boolean, strips: boolean): TimelineR
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
  */
-export function Timeline({ threadId, working, strips, bottomInset, inset }: { threadId: string; working: boolean; strips: boolean; bottomInset: number; inset?: number }) {
+export function Timeline({
+  threadId,
+  working,
+  strips,
+  bottomInset,
+  inset,
+  rail = false,
+}: {
+  threadId: string;
+  working: boolean;
+  strips: boolean;
+  bottomInset: number;
+  inset?: number;
+  /** The prompt rail in the left gutter (PromptRail): the content pane's thread only, not the inline view. */
+  rail?: boolean;
+}) {
   const rows = useRows(threadId, working, strips);
-  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} />;
+  const overlay = useCallback(
+    (o: TimelineOverlay<TimelineRow>) => <PromptRail threadId={threadId} list={o.list} rows={o.rows} bottomInset={o.bottomInset} />,
+    [threadId],
+  );
+  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} overlay={rail ? overlay : undefined} />;
 }
 
 function renderTimelineRow(row: TimelineRow) {
@@ -90,6 +110,23 @@ function renderTimelineRow(row: TimelineRow) {
 export interface ListRow {
   key: string;
   type: string;
+}
+
+/** What a TimelineList offers a layer drawn over it (the prompt rail). Stable for the list's life. */
+export interface TimelineListApi {
+  /** The scrolling list; null before it mounts. */
+  scroller(): HTMLDivElement | null;
+  /** A row's top as an offset in the list (measured, else estimated); undefined for no such row. */
+  rowStart(index: number): number | undefined;
+  /** Scrolls a row to just under the list's top (the virtualizer's own scrollToIndex); the list stops following the bottom. */
+  scrollToRow(index: number): void;
+}
+
+/** What a TimelineList's overlay is drawn from. */
+export interface TimelineOverlay<R extends ListRow> {
+  list: TimelineListApi;
+  rows: readonly R[];
+  bottomInset: number;
 }
 
 /**
@@ -108,6 +145,7 @@ export function TimelineList<R extends ListRow>({
   citable = turns,
   unfold,
   inset = 40,
+  overlay,
 }: {
   threadId: string;
   rows: readonly R[];
@@ -121,6 +159,8 @@ export function TimelineList<R extends ListRow>({
   unfold?: (rows: readonly R[], itemId: string) => boolean;
   /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
   inset?: number | undefined;
+  /** A layer over the list, outside the scroller (the thread's prompt rail in the left gutter). */
+  overlay?: ((o: TimelineOverlay<R>) => ReactNode) | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -159,6 +199,8 @@ export function TimelineList<R extends ListRow>({
     overscan: 8,
     paddingStart: 28,
     paddingEnd: bottomInset + 8,
+    // A row scrolled to its start (the prompt rail's jump) lands this far under the top.
+    scrollPaddingStart: 16,
     useFlushSync: false,
     getItemKey: (i) => rows[i]?.key ?? i,
   });
@@ -239,6 +281,21 @@ export function TimelineList<R extends ListRow>({
       unfold: unfoldRef.current ? (itemId) => unfoldRef.current?.(rowsRef.current, itemId) ?? false : undefined,
     });
   }, [threadId, citable, v]);
+
+  // The overlay's handle (the prompt rail): row offsets from the virtualizer, and a jump to
+  // a row that unpins first, so following the bottom does not pull the list back.
+  const listApi = useMemo<TimelineListApi>(
+    () => ({
+      scroller: () => scrollRef.current,
+      rowStart: (index) => v.measurementsCache[index]?.start,
+      scrollToRow: (index) => {
+        if (index < 0 || index >= rowsRef.current.length) return;
+        pinned.current = false;
+        v.scrollToIndex(index, { align: "start" });
+      },
+    }),
+    [v],
+  );
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
   // text streaming in, the composer growing), or the list's own (the bottom panel opening
@@ -418,6 +475,7 @@ export function TimelineList<R extends ListRow>({
           <ArrowDown aria-hidden />
           Jump to bottom
         </button>
+        {overlay?.({ list: listApi, rows, bottomInset })}
       </HoldTopContext.Provider>
     </KeepRowContext.Provider>
   );
