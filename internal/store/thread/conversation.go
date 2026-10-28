@@ -83,7 +83,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 		prompt = note + "\n\n" + prompt
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, note: note, resume: resume}
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, by: strings.TrimSpace(msg.ByThreadID), note: note, resume: resume}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)

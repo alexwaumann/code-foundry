@@ -366,6 +366,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		},
 		threadRunIn(b, idArg),
 		threadCheckouts(b),
+		threadPrompts(b),
 		threadPin(b, idArg),
 		threadArchive(b, idArg),
 		threadSnooze(b, idArg),

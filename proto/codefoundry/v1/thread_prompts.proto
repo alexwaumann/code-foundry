@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Prompt history (ThreadService.ListPrompts): the prompts the user sent, derived from the
+// threads' user_message items (nothing is stored for it). See
+// docs/notes/prompt-history-1-daemon.md.
+
+// PromptScope is which threads ListPrompts reads.
+enum PromptScope {
+  PROMPT_SCOPE_UNSPECIFIED = 0;
+  // One thread (thread_id).
+  PROMPT_SCOPE_THREAD = 1;
+  // Every thread whose project set intersects the anchor thread's (thread_id), or the
+  // given project_ids. An empty set (a thread without a project, or neither thread_id nor
+  // project_ids) matches the threads without a project.
+  PROMPT_SCOPE_PROJECT = 2;
+  // Every thread.
+  PROMPT_SCOPE_ALL = 3;
+}
+
+message ListPromptsRequest {
+  // Required (INVALID_ARGUMENT when unspecified).
+  PromptScope scope = 1;
+  // THREAD: the thread (required). PROJECT: the anchor thread whose project set defines
+  // the scope; exclusive with project_ids. Ignored for ALL.
+  string thread_id = 2;
+  // PROJECT without a thread_id: the project set (ids, names when unique, or paths
+  // inside a project), as the New-thread composer's Work-in picker fixes it.
+  repeated string project_ids = 3;
+  // Case-insensitive substring of the prompt's text; empty for every prompt.
+  string query = 4;
+  // At most this many prompts (default 50 when 0 or less, capped at 500).
+  int32 limit = 5;
+}
+
+// SentPrompt is one prompt the user sent.
+message SentPrompt {
+  string thread_id = 1;
+  // The thread's current name; "" when it has none yet.
+  string thread_name = 2;
+  // The user_message item.
+  string item_id = 3;
+  // What the user typed as the composer shows it: attachments dropped, a file tag as its
+  // path, a thread tag as the thread's current name, a pull request tag as #<number>, a
+  // skill as /<name>, a citation as its quote in double quotes (then its comment). Never
+  // empty.
+  string text = 4;
+  google.protobuf.Timestamp sent_at = 5;
+  // The composer's own text with its tag tokens (UserMessageItem.composer_text), image and
+  // PDF chips removed, for a composer that restores the tags; "" when the prompt was sent
+  // without one (the CLI, or a composer prompt without tags).
+  string composer_text = 6;
+}
+
+message ListPromptsResponse {
+  // Newest first. A run of the same text in one thread is its newest; a forked thread's
+  // copied history is listed once, under the thread it was first sent in (PROJECT, ALL).
+  repeated SentPrompt prompts = 1;
+}

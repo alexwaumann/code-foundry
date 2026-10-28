@@ -150,7 +150,8 @@ func (h *Thread) watchGone(ctx context.Context, id string) error {
 // Send sends a user message.
 func (h *Thread) Send(ctx context.Context, req *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	m := req.Msg
-	it, err := h.store.Send(ctx, m.GetThreadId(), thread.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText()})
+	it, err := h.store.Send(ctx, m.GetThreadId(), thread.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText(),
+		ByThreadID: m.GetByThreadId()})
 	if err != nil {
 		return nil, threadError(err)
 	}

@@ -25,6 +25,8 @@ type PendingFirst struct {
 	// ItemID is the user item's id once it is in the timeline (a message queued behind
 	// it, or a start for a message, wrote it first); "" before.
 	ItemID string `json:"item_id,omitempty"`
+	// By is the item's SentBy: the creator thread of a thread another thread created.
+	By string `json:"by,omitempty"`
 }
 
 type firstAttachment struct {
@@ -37,7 +39,7 @@ type firstAttachment struct {
 
 // pendingFirstOf is o as a pending first message.
 func pendingFirstOf(o *outgoing) *PendingFirst {
-	p := &PendingFirst{Text: o.text, Composer: o.composer, Prompt: o.prompt, ItemID: o.itemID}
+	p := &PendingFirst{Text: o.text, Composer: o.composer, Prompt: o.prompt, ItemID: o.itemID, By: o.by}
 	for _, a := range o.attachments {
 		p.Attachments = append(p.Attachments, firstAttachment{Path: a.path, Size: a.size, PDF: a.pdf, Pages: a.pages, Exact: a.exact})
 	}
@@ -47,7 +49,7 @@ func pendingFirstOf(o *outgoing) *PendingFirst {
 // outgoing is p as the message a spawn delivers first; first marks it, so sendMessage
 // clears the row's once it went out.
 func (p *PendingFirst) outgoing() *outgoing {
-	o := &outgoing{text: p.Text, composer: p.Composer, prompt: p.Prompt, itemID: p.ItemID, first: true}
+	o := &outgoing{text: p.Text, composer: p.Composer, prompt: p.Prompt, itemID: p.ItemID, by: p.By, first: true}
 	for _, a := range p.Attachments {
 		o.attachments = append(o.attachments, attachment{path: a.Path, size: a.Size, pdf: a.PDF, pages: a.Pages, exact: a.Exact})
 	}

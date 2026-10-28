@@ -39,6 +39,8 @@ type Thread struct {
 	Hints  []string
 	// CheckoutsResp is Checkouts' answer (nil: an empty one for the requested thread).
 	CheckoutsResp *v1.ThreadCheckoutsResponse
+	// Prompts is ListPrompts' answer.
+	Prompts []*v1.SentPrompt
 	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
 	// request has again.
 	PageShown bool
@@ -95,6 +97,14 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 		res.WorktreeModeDropped = p.GetWorktreeModeDropped()
 	}
 	return connect.NewResponse(res), nil
+}
+
+// ListPrompts records the request and returns Prompts.
+func (s *Thread) ListPrompts(_ context.Context, r *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1.ListPromptsResponse{Prompts: s.Prompts}), nil
 }
 
 // Checkouts returns CheckoutsResp (an empty answer for the requested thread when nil).

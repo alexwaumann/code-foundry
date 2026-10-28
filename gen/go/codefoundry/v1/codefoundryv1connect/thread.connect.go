@@ -94,6 +94,9 @@ const (
 	ThreadServiceReadAttachmentProcedure = "/codefoundry.v1.ThreadService/ReadAttachment"
 	// ThreadServiceListItemsProcedure is the fully-qualified name of the ThreadService's ListItems RPC.
 	ThreadServiceListItemsProcedure = "/codefoundry.v1.ThreadService/ListItems"
+	// ThreadServiceListPromptsProcedure is the fully-qualified name of the ThreadService's ListPrompts
+	// RPC.
+	ThreadServiceListPromptsProcedure = "/codefoundry.v1.ThreadService/ListPrompts"
 	// ThreadServiceWatchThreadProcedure is the fully-qualified name of the ThreadService's WatchThread
 	// RPC.
 	ThreadServiceWatchThreadProcedure = "/codefoundry.v1.ThreadService/WatchThread"
@@ -258,6 +261,14 @@ type ThreadServiceClient interface {
 	// ListItems returns a thread's items (the streaming one included) and its pending
 	// requests. Works while disconnected (items persist).
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
+	// ListPrompts lists the prompts the user sent in one thread, in the threads sharing a
+	// project with it (or with a project set), or in every thread, newest first, from
+	// their user_message items. Only the user's own: wake messages, messages another
+	// thread sent (SendThreadMessageRequest.by_thread_id, a created thread's first prompt)
+	// and attachment-only messages are left out, and so are threads a plugin owns and,
+	// for PROJECT and ALL, hidden child threads. Archived threads count. See
+	// docs/notes/prompt-history-1-daemon.md.
+	ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error)
 	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
@@ -542,6 +553,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("ListItems")),
 			connect.WithClientOptions(opts...),
 		),
+		listPrompts: connect.NewClient[v1.ListPromptsRequest, v1.ListPromptsResponse](
+			httpClient,
+			baseURL+ThreadServiceListPromptsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ListPrompts")),
+			connect.WithClientOptions(opts...),
+		),
 		watchThread: connect.NewClient[v1.WatchThreadRequest, v1.ThreadEvent](
 			httpClient,
 			baseURL+ThreadServiceWatchThreadProcedure,
@@ -676,6 +693,7 @@ type threadServiceClient struct {
 	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
 	listItems         *connect.Client[v1.ListThreadItemsRequest, v1.ListThreadItemsResponse]
+	listPrompts       *connect.Client[v1.ListPromptsRequest, v1.ListPromptsResponse]
 	watchThread       *connect.Client[v1.WatchThreadRequest, v1.ThreadEvent]
 	send              *connect.Client[v1.SendThreadMessageRequest, v1.SendThreadMessageResponse]
 	respond           *connect.Client[v1.RespondThreadRequest, v1.RespondThreadResponse]
@@ -828,6 +846,11 @@ func (c *threadServiceClient) ReadAttachment(ctx context.Context, req *connect.R
 // ListItems calls codefoundry.v1.ThreadService.ListItems.
 func (c *threadServiceClient) ListItems(ctx context.Context, req *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error) {
 	return c.listItems.CallUnary(ctx, req)
+}
+
+// ListPrompts calls codefoundry.v1.ThreadService.ListPrompts.
+func (c *threadServiceClient) ListPrompts(ctx context.Context, req *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
+	return c.listPrompts.CallUnary(ctx, req)
 }
 
 // WatchThread calls codefoundry.v1.ThreadService.WatchThread.
@@ -1036,6 +1059,14 @@ type ThreadServiceHandler interface {
 	// ListItems returns a thread's items (the streaming one included) and its pending
 	// requests. Works while disconnected (items persist).
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
+	// ListPrompts lists the prompts the user sent in one thread, in the threads sharing a
+	// project with it (or with a project set), or in every thread, newest first, from
+	// their user_message items. Only the user's own: wake messages, messages another
+	// thread sent (SendThreadMessageRequest.by_thread_id, a created thread's first prompt)
+	// and attachment-only messages are left out, and so are threads a plugin owns and,
+	// for PROJECT and ALL, hidden child threads. Archived threads count. See
+	// docs/notes/prompt-history-1-daemon.md.
+	ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error)
 	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
@@ -1316,6 +1347,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("ListItems")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceListPromptsHandler := connect.NewUnaryHandler(
+		ThreadServiceListPromptsProcedure,
+		svc.ListPrompts,
+		connect.WithSchema(threadServiceMethods.ByName("ListPrompts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceWatchThreadHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchThreadProcedure,
 		svc.WatchThread,
@@ -1474,6 +1511,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceReadAttachmentHandler.ServeHTTP(w, r)
 		case ThreadServiceListItemsProcedure:
 			threadServiceListItemsHandler.ServeHTTP(w, r)
+		case ThreadServiceListPromptsProcedure:
+			threadServiceListPromptsHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchThreadProcedure:
 			threadServiceWatchThreadHandler.ServeHTTP(w, r)
 		case ThreadServiceSendProcedure:
@@ -1623,6 +1662,10 @@ func (UnimplementedThreadServiceHandler) ReadAttachment(context.Context, *connec
 
 func (UnimplementedThreadServiceHandler) ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListItems is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ListPrompts(context.Context, *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListPrompts is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error {

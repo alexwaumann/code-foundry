@@ -241,6 +241,7 @@ import { retiredUsage, utcDay } from "./usage";
 import { ageMcp, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
+import { listPrompts } from "./prompts";
 import { mockFetches, mockProxyFetch, resetFetches } from "./proxyFetch";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
@@ -536,6 +537,8 @@ function routes(router: ConnectRouter): void {
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
     listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),
+    // ThreadService.ListPrompts: the user's sent prompts (mock/prompts.ts).
+    listPrompts: (req) => guard(() => listPrompts(world, req)),
     watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),
     send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),

@@ -5,6 +5,7 @@ package codefoundry.v1;
 import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
+import "codefoundry/v1/thread_prompts.proto";
 import "codefoundry/v1/thread_subscriptions.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -136,6 +137,14 @@ service ThreadService {
   // ListItems returns a thread's items (the streaming one included) and its pending
   // requests. Works while disconnected (items persist).
   rpc ListItems(ListThreadItemsRequest) returns (ListThreadItemsResponse) {}
+  // ListPrompts lists the prompts the user sent in one thread, in the threads sharing a
+  // project with it (or with a project set), or in every thread, newest first, from
+  // their user_message items. Only the user's own: wake messages, messages another
+  // thread sent (SendThreadMessageRequest.by_thread_id, a created thread's first prompt)
+  // and attachment-only messages are left out, and so are threads a plugin owns and,
+  // for PROJECT and ALL, hidden child threads. Archived threads count. See
+  // docs/notes/prompt-history-1-daemon.md.
+  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse) {}
   // WatchThread streams one thread: a snapshot first, then appended/updated items, text
   // deltas and pending-request changes. While a WatchThread is open the thread counts as
   // looked at: a finished turn is seen at once. Apply only
@@ -809,6 +818,9 @@ message SendThreadMessageRequest {
   repeated string attachments = 3;
   // The composer's text (UserMessageItem.composer_text), kept on the item for display.
   string composer_text = 4;
+  // The thread that sends it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
+  // Kept on the item, so prompt history (ListPrompts) leaves the message out.
+  string by_thread_id = 5;
 }
 
 message SendThreadMessageResponse {

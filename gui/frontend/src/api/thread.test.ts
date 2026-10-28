@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { MessageOrigin, ThreadEventSchema, ThreadItemDelta_Field, ThreadItemSchema, ThreadRequestState, ToolCallStatus } from "@/gen/codefoundry/v1/thread_pb";
-import { toThreadEventView, toThreadItemView } from "./thread";
+import { ListPromptsResponseSchema, PromptScope, type ListPromptsRequest } from "@/gen/codefoundry/v1/thread_prompts_pb";
+import type { DaemonConnection } from "./endpoint";
+import { listPrompts, toThreadEventView, toThreadItemView } from "./thread";
 import { themeById } from "@/themes";
 
 describe("toThreadItemView: theme cards", () => {
@@ -83,5 +85,31 @@ describe("toThreadEventView", () => {
       kind: "pendingSnapshot",
       threads: [{ threadId: "s", seq: 3, pending: [] }],
     });
+  });
+});
+
+describe("listPrompts", () => {
+  it("sends the scope and maps the prompts to view models", async () => {
+    const sent: Partial<ListPromptsRequest>[] = [];
+    const client = {
+      listPrompts: (req: Partial<ListPromptsRequest>) => {
+        sent.push(req);
+        return Promise.resolve(
+          create(ListPromptsResponseSchema, {
+            prompts: [
+              { threadId: "s-3", threadName: "Fix resize race", itemId: "u1", text: "see src/a.ts", composerText: "see [a.ts](cf-file://r/src/a.ts)", sentAt: timestampFromMs(1_800_000_000_000) },
+              { threadId: "s-4", itemId: "u2", text: "retry" },
+            ],
+          }),
+        );
+      },
+    };
+    const conn = { client: () => Promise.resolve(client) } as unknown as DaemonConnection;
+    const got = await listPrompts({ scope: "project", projectIds: ["repo-cf"], query: "a" }, conn);
+    expect(sent).toEqual([{ scope: PromptScope.PROJECT, threadId: "", projectIds: ["repo-cf"], query: "a", limit: 0 }]);
+    expect(got).toEqual([
+      { threadId: "s-3", threadName: "Fix resize race", itemId: "u1", text: "see src/a.ts", composerText: "see [a.ts](cf-file://r/src/a.ts)", sentAt: new Date(1_800_000_000_000) },
+      { threadId: "s-4", threadName: "", itemId: "u2", text: "retry", composerText: "", sentAt: new Date(0) },
+    ]);
   });
 });
