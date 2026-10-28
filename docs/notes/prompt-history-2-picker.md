@@ -77,7 +77,10 @@ it needs a restart for the palette and CLI entry; the Up key works without one.
   case that both call `presentPromptHistory`: if the composer that holds the keyboard is
   registered (each composer registers while mounted), its picker opens; otherwise the
   palette opens on its `prompts` page, deferred because a palette pick closes the palette
-  after the presenter runs. It is left out of the agents' guide (`guide.leftOut`, beside
+  after the presenter runs. The registry and the presenter are in
+  `stores/historyComposers.ts`, which imports only the UI store: putting them in
+  stores/promptHistory.ts pulled the compose store into views.ts's imports, and broke
+  unit tests that mock `@/api/threads`. It is left out of the agents' guide (`guide.leftOut`, beside
   thread.prompts): it is the user's window action, and its topic line put the guide 8
   bytes over its cap.
 - `components/palette/PromptsPicker.tsx`: cmdk with its own ranking off, input "Search

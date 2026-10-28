@@ -3,7 +3,8 @@ import { errorMessage } from "@/api/stream";
 import { listPrompts, type ListPromptsOptions, type PromptScopeView, type SentPromptView } from "@/api/thread";
 import { FILTER_PLACEHOLDER, moveSelection, nextScope, opensPicker, pickerAction, pickerHeading, PROMPT_LIMIT } from "@/lib/promptHistory";
 import { proseOf } from "@/lib/prompt";
-import { copyPrompt, insertPrompt, registerHistoryComposer, revealPrompt, type PromptSource } from "@/stores/promptHistory";
+import { registerHistoryComposer, type PromptSource } from "@/stores/historyComposers";
+import { copyPrompt, insertPrompt, revealPrompt } from "@/stores/promptHistory";
 import { useDraft } from "@/stores/compose";
 import type { PromptEditorHandle } from "./PromptEditor";
 

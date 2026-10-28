@@ -11,7 +11,7 @@ import { getEmberAttentionId } from "@/stores/ember";
 import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
-import { presentPromptHistory } from "@/stores/promptHistory";
+import { presentPromptHistory } from "@/stores/historyComposers";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";

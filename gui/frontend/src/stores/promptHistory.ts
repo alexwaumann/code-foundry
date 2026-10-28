@@ -1,9 +1,8 @@
 /**
- * The "Previous prompts" picker's window side (docs/notes/prompt-history-2-picker.md):
- * the composers that can open it (a registry, like stores/cite.ts's targets), putting a
- * picked prompt in a draft, showing a prompt in its thread, copying it, and the
- * composer.history command's presentation (the focused composer's picker, else the
- * palette's prompts page).
+ * The "Previous prompts" picker's actions (docs/notes/prompt-history-2-picker.md): putting
+ * a picked prompt in a draft, showing a prompt in its thread, copying it, and the palette
+ * page's source and Enter. The composers' registry and composer.history's presentation
+ * are stores/historyComposers.ts.
  */
 import { toast } from "sonner";
 import type { PromptScopeView, SentPromptView } from "@/api/thread";
@@ -16,42 +15,8 @@ import { putCitation, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { threadDraftKey } from "./threadActions";
 import { useThreadsStore } from "./threads";
+import { historyComposer as composerOf, type PromptSource } from "./historyComposers";
 import { useUiStore, type Selection } from "./ui";
-
-/** Where a composer's Project scope reads: its thread, or its project set (none: the threads without a project). */
-export interface PromptSource {
-  threadId?: string;
-  projectIds?: readonly string[];
-}
-
-/** A mounted composer the picker can open in. */
-export interface HistoryComposer {
-  /** The composer's draft. */
-  draftKey: string;
-  /** Its root element: the command opens the picker in the composer that has the keyboard. */
-  root: () => HTMLElement | null;
-  /** Opens its picker. */
-  open: () => void;
-  /** Its Project scope's source (the palette lists the same). */
-  source: () => PromptSource;
-  /** Focuses its prompt, caret at the end. */
-  focus: () => void;
-}
-
-const composers = new Set<HistoryComposer>();
-
-/** A composer registers while mounted. Returns the unregister. */
-export function registerHistoryComposer(c: HistoryComposer): () => void {
-  composers.add(c);
-  return () => {
-    composers.delete(c);
-  };
-}
-
-function composerOf(draftKey: string): HistoryComposer | undefined {
-  for (const c of composers) if (c.draftKey === draftKey) return c;
-  return undefined;
-}
 
 /**
  * Puts a prompt in a draft, replacing its text (the picker's filter): the composer text
@@ -151,25 +116,4 @@ export function insertFromPalette(p: SentPromptView): void {
   requestAnimationFrame(() => {
     composerOf(target)?.focus();
   });
-}
-
-/**
- * composer.history in this window: the picker of the composer that has the keyboard, else
- * the palette's prompts page (deferred: picked in the palette, the palette closes after
- * the presenter runs).
- */
-export function presentPromptHistory(): boolean {
-  const active = document.activeElement;
-  if (!useUiStore.getState().palette.open && active) {
-    for (const c of composers) {
-      if (c.root()?.contains(active)) {
-        c.open();
-        return true;
-      }
-    }
-  }
-  queueMicrotask(() => {
-    useUiStore.getState().openPromptsPalette();
-  });
-  return true;
 }

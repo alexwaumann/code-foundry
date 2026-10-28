@@ -22,7 +22,7 @@ import { jumpToNeighbour } from "./threadNeighbours";
 import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorktreeSurface } from "./worktreePanel";
-import { presentPromptHistory } from "./promptHistory";
+import { presentPromptHistory } from "./historyComposers";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
