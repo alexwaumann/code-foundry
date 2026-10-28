@@ -86,14 +86,14 @@ func TestPromptPicker(t *testing.T) {
 			want: []got{{"a", "a1", "one"}},
 		},
 		{
-			name: "query is a case-insensitive substring",
-			rows: []promptRow{row("a", "a3", 30, "Fix the Resize race"), row("a", "a2", 20, "tidy"), row("b", "b1", 10, "resize again")},
+			name:  "query is a case-insensitive substring",
+			rows:  []promptRow{row("a", "a3", 30, "Fix the Resize race"), row("a", "a2", 20, "tidy"), row("b", "b1", 10, "resize again")},
 			query: "RESIZE",
 			want:  []got{{"a", "a3", "Fix the Resize race"}, {"b", "b1", "resize again"}},
 		},
 		{
-			name: "query matches the text as shown, not the token",
-			rows: []promptRow{{threadID: "a", itemID: "a1", createdAt: at(20), text: "x", composer: "[#12](cf-pr://o/r/12)"}},
+			name:  "query matches the text as shown, not the token",
+			rows:  []promptRow{{threadID: "a", itemID: "a1", createdAt: at(20), text: "x", composer: "[#12](cf-pr://o/r/12)"}},
 			query: "cf-pr",
 			want:  nil,
 		},
