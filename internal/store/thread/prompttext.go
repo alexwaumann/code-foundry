@@ -38,7 +38,7 @@ var composerTag = regexp.MustCompile(`!\[[^\[\]\n]*\]\(cf-attachment://[A-Za-z0-
 
 // citeLinkPattern is a sent citation link (gui lib/citation.ts citeLink); its group is
 // the query.
-const citeLinkPattern = `\[[^\[\]\n]*\]\(cf-cite://v1/[A-Za-z0-9_-]{1,64}/[^\s?()]+\?([^\s()]*)\)`
+const citeLinkPattern = `\[[^\[\]\n]*\]\(cf-cite://v1/[^\s/?()]+/[^\s?()]+\?([^\s()]*)\)`
 
 // citeLink matches a citation link alone (typed text).
 var citeLink = regexp.MustCompile(citeLinkPattern)
