@@ -48,7 +48,8 @@ function TooltipContent({ className, sideOffset = 6, alignOffset, collisionPaddi
  * The child stays the element (asChild), so it must take a ref and spread props (shadcn
  * Button, a DOM element, a Radix trigger with asChild). No label: it never opens.
  * Text is xs, wraps at max-w-80 and keeps "\n" line breaks; `maxLines` clamps it. The app root's
- * TooltipProvider sets the delays.
+ * TooltipProvider sets the delays; `delay` (ms) overrides the open delay for this one, 0 for
+ * an instant open (the prompt rail's ticks, where the tooltip is the content).
  *
  * - `whenTruncated` for a label that repeats the trigger's own text: it opens only while
  *   that text is cut short.
@@ -69,6 +70,7 @@ function Tip({
   sideOffset,
   whenTruncated = false,
   maxLines,
+  delay,
   className,
   "data-testid": testId,
 }: {
@@ -81,6 +83,8 @@ function Tip({
   whenTruncated?: boolean
   /** Clamp the label to this many lines with an ellipsis (a long text repeated by whenTruncated); absent: unlimited. */
   maxLines?: number
+  /** Open delay in ms for this tooltip (0: instant); absent: the provider's. */
+  delay?: number
   className?: string
   "data-testid"?: string
 }) {
@@ -103,6 +107,7 @@ function Tip({
         setOpen(next && !pressed.current && wanted(el) && (!whenTruncated || truncated(el)))
       }}
       disableHoverableContent
+      delayDuration={delay}
     >
       <TooltipTrigger
         asChild

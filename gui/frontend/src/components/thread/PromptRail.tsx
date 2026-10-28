@@ -120,7 +120,7 @@ export const PromptRail = memo(function PromptRail({ threadId, list, rows, botto
   );
 });
 
-/** One prompt's tick: an 8×2 bar in a button as tall as the bar and one gap; its tooltip shows the prompt. */
+/** One prompt's tick: an 8×2 bar in a button as tall as the bar and one gap; its tooltip shows the prompt, with no open delay (the tooltip is what the tick is for). */
 const PromptTick = memo(function PromptTick({
   threadId,
   id,
@@ -152,7 +152,7 @@ const PromptTick = memo(function PromptTick({
   );
   return (
     <li className="flex">
-      <Tip label={tip} side="right" className="max-w-65" data-testid="prompt-rail-tip">
+      <Tip label={tip} side="right" delay={0} className="max-w-65" data-testid="prompt-rail-tip">
         <button
           type="button"
           aria-label={tickLabel(n, total, preview)}

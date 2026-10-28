@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { tooltipText } from "@/test/tooltip";
 import { Tip } from "./tooltip";
 
@@ -109,5 +109,32 @@ describe("Tip", () => {
     const clamp = screen.queryByTestId("tip-clamp");
     expect(clamp?.style.getPropertyValue("--tip-lines") ?? null).toBe(want);
     if (want) expect(clamp?.className).toContain("line-clamp-(--tip-lines)");
+  });
+
+  it.each([
+    ["delay 0 opens on hover at once (the prompt rail)", 0, true],
+    ["no delay: the provider's 500 ms", undefined, false],
+  ])("%s", (_name, delay, atOnce) => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Tip label="Prompt text" delay={delay}>
+          <button type="button">x</button>
+        </Tip>,
+      );
+      const b = screen.getByRole("button");
+      fireEvent.pointerMove(b, { pointerType: "mouse" });
+      // Radix opens from a timer even at 0 ms: flush that, nothing more.
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+      expect(screen.queryByRole("tooltip") !== null).toBe(atOnce);
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.queryByRole("tooltip")).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
