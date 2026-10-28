@@ -237,17 +237,18 @@ test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daem
   expect(await emit({ showView: { name: "panel.toggle" } })).toBeGreaterThan(0);
   await expect(panel(page)).toBeVisible();
 
-  // The settings page covers the panel; closing it brings the panel back.
+  // The settings sheet is a modal over the window: the panel stays laid out under it.
   await page.keyboard.press("Meta+,");
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(panel(page)).toHaveCount(0);
-  // Escape outside the focused search field closes the page.
+  await expect(panel(page)).toBeVisible();
+  // Escape outside the focused search field closes the sheet.
   await page.getByRole("heading", { name: "Settings", exact: true }).click();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
 });
 
-test("toggling while the settings page is up does nothing", async ({ page }) => {
+test("under the settings sheet the chord and the CLI still toggle the panel; the keyboard stays in the sheet", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
@@ -256,19 +257,21 @@ test("toggling while the settings page is up does nothing", async ({ page }) => 
   await page.keyboard.press("Meta+,");
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await page.getByRole("heading", { name: "Settings", exact: true }).click();
-  // Neither the chord nor the CLI flips the hidden panel's state.
+  // The panel is on screen under the backdrop, so its toggles act on it, as under help.
   await page.keyboard.press("Meta+Shift+e");
+  await expect(panel(page)).toHaveCount(0);
   expect(await emit({ showView: { name: "panel.toggle" } })).toBeGreaterThan(0);
-  // Emit returns once the intent is queued. A Notify behind it on the same stream shows
-  // when the toggle has been handled, so it cannot land after settings closes.
-  expect(await emit({ notify: { level: "LEVEL_INFO", title: "after-toggle", body: "" } })).toBeGreaterThan(0);
-  await expect(page.getByText("after-toggle")).toBeVisible();
+  await expect(panel(page)).toBeVisible();
+  // Showing the panel from the keyboard asks for focus, but the modal keeps it.
   await page.keyboard.press("Meta+Shift+e");
-  await expect(page.getByTestId("settings-page")).toBeVisible();
+  await expect(panel(page)).toHaveCount(0);
+  await page.keyboard.press("Meta+Shift+e");
+  await expect(panel(page)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[data-testid="settings-sheet"]')))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
-  // No focus request was left pending for it: the thread's prompt has focus, as after any settings close.
+  // Closing hands the keyboard to the thread's prompt, as after any settings close.
   await expect.poll(() => region(page)).toBe("content");
 });
 
@@ -574,15 +577,11 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
   await expect.poll(() => region(page)).toBe("panel");
   expect((await invocations()).map((i) => i.name)).toContain("view.panel.expand");
 
-  // Settings hides the panel and shows in the content pane; closing it brings the
-  // expanded panel back.
+  // The settings sheet opens over the expanded panel, which stays as it is under it.
   await page.keyboard.press("Meta+,");
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(panel(page)).toHaveCount(0);
-  // A no-op while settings is up.
-  expect(await emit({ showView: { name: "panel.expand" } })).toBeGreaterThan(0);
-  expect(await emit({ notify: { level: "LEVEL_INFO", title: "after-expand", body: "" } })).toBeGreaterThan(0);
-  await expect(page.getByText("after-expand")).toBeVisible();
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByTestId("content-pane")).toBeHidden();
   await page.getByRole("heading", { name: "Settings", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("settings-page")).toHaveCount(0);

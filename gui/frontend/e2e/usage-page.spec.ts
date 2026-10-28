@@ -65,7 +65,8 @@ test("the status-row button toggles the page; x, Escape and a selection close it
   await page.getByTestId("status-settings").click();
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await expect(page_(page)).toHaveCount(0);
-  await button(page).click();
+  // The settings sheet's backdrop covers the button: the CLI's view.usage replaces it.
+  expect(await emit({ showView: { name: "usage" } })).toBe(1);
   await expect(page_(page)).toBeVisible();
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
 

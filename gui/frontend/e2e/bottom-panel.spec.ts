@@ -242,7 +242,7 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "280");
 });
 
-test("no bottom panel on the dashboard, the Pull Requests page, settings, usage, or under an expanded side panel", async ({ page }) => {
+test("no bottom panel on the dashboard, the Pull Requests page, usage, or under an expanded side panel; it stays under the settings sheet", async ({ page }) => {
   await openApp(page);
   // The dashboard: no toggle, and cmd+j does nothing.
   await page.keyboard.press("Meta+j");
@@ -265,14 +265,14 @@ test("no bottom panel on the dashboard, the Pull Requests page, settings, usage,
   await selectThread(page, "s-1");
   await expect(bottom(page)).toBeVisible();
 
-  // Settings hides it; cmd+j is a no-op meanwhile.
+  // The settings sheet is a modal over the window: the panel stays laid out under it.
   await page.getByTestId("status-settings").click();
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(bottom(page)).toHaveCount(0);
-  await page.keyboard.press("Meta+j");
-  await page.getByTestId("status-settings").click();
   await expect(bottom(page)).toBeVisible();
-  // So does the Usage page.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-page")).toHaveCount(0);
+  await expect(bottom(page)).toBeVisible();
+  // The Usage page hides it.
   await page.getByTestId("status-usage").click();
   await expect(page.getByTestId("usage-page")).toBeVisible();
   await expect(bottom(page)).toHaveCount(0);

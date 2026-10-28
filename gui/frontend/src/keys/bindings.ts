@@ -170,10 +170,11 @@ function terminalYields(chord: string): CommandView | undefined {
 
 /**
  * Commands whose chords also leave a focused text field (the settings search, which the
- * settings page focuses on open; a filter box): back and forward, as in Safari. Only cmd
- * chords that do not move or delete text (a user may rebind these to cmd+arrow).
+ * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
+ * settings toggle, so cmd+, closes the sheet it just opened. Only cmd chords that do not
+ * move or delete text (a user may rebind these to cmd+arrow).
  */
-const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward"]);
+const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings"]);
 
 /** The command a focused text field yields this chord to (see fieldYielded). */
 function fieldYields(chord: string): CommandView | undefined {

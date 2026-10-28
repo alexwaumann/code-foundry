@@ -75,6 +75,10 @@ export function SettingsSheet() {
           e.preventDefault();
           first.focus();
         }}
+        onInteractOutside={(e) => {
+          // A toast's button (a theme card's Undo, "Show in Settings") is not the backdrop.
+          if (e.target instanceof Element && e.target.closest("[data-sonner-toaster]")) e.preventDefault();
+        }}
         onCloseAutoFocus={(e) => {
           if (useUiStore.getState().selection.kind === "thread") e.preventDefault();
         }}

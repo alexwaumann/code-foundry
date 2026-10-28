@@ -200,9 +200,17 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await check('[data-testid="prs-page"] > header', ['[data-testid="panel-toggle"]']);
   await page.getByTestId("nav-projects").click();
   await check('[data-testid="projects-page"] > header', ['[data-testid="projects-register"]', '[data-testid="panel-toggle"]']);
+  // Settings is a sheet in the middle of the window (docs/notes/settings-sheet.md): its
+  // header is as tall as a page's, inside the sheet's 1px border, and never drags.
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);
+  const sheetTop = (await box(page, "settings-sheet")).top;
+  const sheetHeader = await page.locator('[data-testid="settings-page"] > header').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top, height: r.height };
+  });
+  expect(sheetHeader).toEqual({ top: sheetTop + 1, height: HEADER });
+  expect(await drag(page, '[data-testid="settings-page"] > header')).toBe("");
   await page.getByRole("button", { name: "Close settings" }).click();
 
   // A stopped thread keeps the thread header, with the bottom panel's toggle too.
