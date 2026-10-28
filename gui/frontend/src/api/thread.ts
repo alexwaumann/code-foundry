@@ -6,7 +6,7 @@
  * thread's seq. The EventService `thread` source carries only pending requests (a
  * pending_snapshot, then a pending event per change), for badges without a Watch.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
+import { timestampDate, timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   MessageOrigin,
   ThreadItemDelta_Field,
@@ -18,6 +18,7 @@ import {
   type ThreadPendingRequest,
   type ThreadRequestItem,
 } from "@/gen/codefoundry/v1/thread_pb";
+import { PromptScope, type SentPrompt } from "@/gen/codefoundry/v1/thread_prompts_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toAgentRunViews, type AgentRunView } from "./agents";
@@ -391,4 +392,47 @@ export async function* watchThread(threadId: string, signal: AbortSignal, conn: 
     const v = toThreadEventView(ev);
     if (v) yield v;
   }
+}
+
+/** Which threads prompt history reads (ThreadService.ListPrompts; docs/notes/prompt-history-1-daemon.md). */
+export type PromptScopeView = "thread" | "project" | "all";
+
+/** One prompt the user sent. */
+export interface SentPromptView {
+  threadId: string;
+  /** The thread's current name; "" when it has none yet. */
+  threadName: string;
+  /** The user_message item. */
+  itemId: string;
+  /** As the composer shows it: attachments dropped, a file tag as its path, a thread tag as its name, a pull request tag as #N. Never empty. */
+  text: string;
+  sentAt: Date;
+  /** The composer's text with its tag tokens (lib/prompt.ts), image chips removed; "" when it was sent without tags. */
+  composerText: string;
+}
+
+/**
+ * What to list: one thread (`threadId`), the threads sharing a project with `threadId` or
+ * with `projectIds` (neither: the threads without a project), or every thread. `query` is a
+ * case-insensitive substring; `limit` defaults to 50 (at most 500).
+ */
+export interface ListPromptsOptions {
+  scope: PromptScopeView;
+  threadId?: string;
+  projectIds?: readonly string[];
+  query?: string;
+  limit?: number;
+}
+
+const PROMPT_SCOPES: Record<PromptScopeView, PromptScope> = { thread: PromptScope.THREAD, project: PromptScope.PROJECT, all: PromptScope.ALL };
+
+export function toSentPromptView(p: SentPrompt): SentPromptView {
+  return { threadId: p.threadId, threadName: p.threadName, itemId: p.itemId, text: p.text, sentAt: p.sentAt ? timestampDate(p.sentAt) : new Date(0), composerText: p.composerText };
+}
+
+/** ThreadService.ListPrompts: the prompts the user sent, newest first. */
+export async function listPrompts(opts: ListPromptsOptions, conn: DaemonConnection = daemon): Promise<SentPromptView[]> {
+  const c = await conn.client(ThreadService);
+  const res = await c.listPrompts({ scope: PROMPT_SCOPES[opts.scope], threadId: opts.threadId ?? "", projectIds: [...(opts.projectIds ?? [])], query: opts.query ?? "", limit: opts.limit ?? 0 });
+  return res.prompts.map(toSentPromptView);
 }
