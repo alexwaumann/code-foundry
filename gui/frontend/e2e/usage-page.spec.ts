@@ -22,6 +22,8 @@ async function openUsage(page: Page) {
   await button(page).click();
   await expect(page_(page)).toBeVisible();
   await expect(page.getByTestId("usage-page-model-row").first()).toBeVisible();
+  // Done fading in (a screenshot taken earlier shows the window through the sheet).
+  await expect(page.getByTestId("usage-sheet")).toHaveCSS("opacity", "1");
 }
 
 async function cacheSavings(page: Page): Promise<number> {
