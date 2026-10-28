@@ -199,6 +199,7 @@ export const SLOTS: readonly Slot[] = [
   { name: "--cf-border", group: "surfaces", rule: "text at 11% dark / 10% light over the surface", derive: (c) => over(c.get("--cf-text"), by(c, 0.11, 0.1), c.get("--cf-surface")) },
   { name: "--cf-border-strong", group: "surfaces", rule: "text at 18% dark / 16% light over the surface (the lightbox frame, a focused composer)", derive: (c) => over(c.get("--cf-text"), by(c, 0.18, 0.16), c.get("--cf-surface")) },
   { name: "--cf-divider", group: "surfaces", rule: "text at 11% dark / 8% light over the surface (pane outlines, header rules)", derive: (c) => over(c.get("--cf-text"), by(c, 0.11, 0.08), c.get("--cf-surface")) },
+  { name: "--cf-scrim", group: "surfaces", rule: "black at 50% alpha dark / 30% light (the dim under a modal: the palette, help and dialogs)", derive: (c) => withAlpha(BLACK, by(c, 0.5, 0.3)) },
 
   // Controls before the muted text, which has to read on a hovered row.
   { name: "--cf-control", group: "interactive", rule: "surface mixed 11% dark / 5.5% light toward the text (a secondary button at rest)", derive: (c) => mix(c.get("--cf-surface"), c.get("--cf-text"), by(c, 0.11, 0.055)) },
