@@ -67,7 +67,7 @@ test("edit, pin, go stale, drill in, save and apply, revert", async ({ page }) =
   await expect(option(page, "Ocean Dusk").getByTestId("theme-origin")).toHaveText("editing · 1 pinned");
   await expect(page.getByTestId("editor-slots-summary")).toHaveText("1 pinned");
   // Every slot, Terminal and Syntax collapsed.
-  await expect(page.getByTestId("editor-filter")).toHaveAttribute("placeholder", "Filter 102 slots");
+  await expect(page.getByTestId("editor-filter")).toHaveAttribute("placeholder", "Filter 103 slots");
   await expect(page.getByTestId("editor-group-terminal").getByTestId("editor-slot-terminal-fg")).toHaveCount(0);
   await expect(page.getByTestId("editor-slot-sidebar-row-selected")).toHaveAttribute("data-pinned", "true");
 
