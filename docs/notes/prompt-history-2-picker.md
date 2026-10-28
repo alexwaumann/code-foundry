@@ -115,6 +115,10 @@ it needs a restart for the palette and CLI entry; the Up key works without one.
   thread's composer). With SHOTS=<dir> it writes the PR's dark and light screenshots.
 - Go: commands_test's full list and commands_view_test's ShowView table include the
   command.
+- End to end (isolated home): `make build`, a daemon on a scratch CODE_FOUNDRY_HOME,
+  `code-foundry events` running, then `code-foundry composer history` printed "no app
+  window is open: nothing was shown" and the events stream showed `ui show-view
+  composer.history`. The home was deleted afterwards.
 
 ## Gotchas
 
