@@ -205,6 +205,7 @@ test("a second project: skills grouped by project; removing the project removes 
   await compose(page);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
   await expect.poll(completionCalls).toContain("skills repo-cf,repo-sk true");
 
@@ -242,6 +243,7 @@ test("a second project: skills grouped by project; removing the project removes 
   // Without references, removing asks nothing.
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Remove sketches" }).click();
   await expect(page.getByTestId("composer-member")).toHaveCount(0);
   await expect(dialog).toHaveCount(0);

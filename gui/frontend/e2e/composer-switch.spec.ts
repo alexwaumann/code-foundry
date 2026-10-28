@@ -23,7 +23,7 @@ const chips = (page: Page) => page.getByTestId("composer-member");
 /** The prompt as the draft stores it. */
 const prompt = (page: Page) => page.getByTestId("composer-prompt");
 
-test("the heading's picker: centred under the name, the set checked; toggles keep the draft and send the set", async ({ page }) => {
+test("the heading's picker: centred under the name, the current target checked; a project row makes it the whole set and the prompt takes focus", async ({ page }) => {
   await freshCopyByDefault();
   await openApp(page);
   await compose(page, 1);
@@ -36,7 +36,7 @@ test("the heading's picker: centred under the name, the set checked; toggles kee
 
   await trigger(page).click();
   await expect(list(page)).toBeVisible();
-  await expect(page.getByPlaceholder("Add or remove projects…")).toBeFocused();
+  await expect(page.getByPlaceholder("Switch to a workspace or project…")).toBeFocused();
   // Centred under the name, just below it; the dotted underline is the name's own border.
   const name = page.getByTestId("composer-project-name");
   await expect(name).toHaveCSS("border-bottom-style", "dotted");
@@ -53,33 +53,35 @@ test("the heading's picker: centred under the name, the set checked; toggles kee
   await expect(list(page).locator("[data-project]")).toHaveCount(5);
   await expect(list(page).locator('[data-slot="command-shortcut"]')).toHaveCount(0);
   await expect(list(page).getByTestId("project-source").first()).toHaveText("alexwaumann/code-foundry · ~/src/code-foundry");
-  // The set is checked.
+  // The current project is checked.
   await expect(list(page).locator('[data-project="repo-cf"]')).toHaveAttribute("data-current", "true");
   await expect(list(page).locator('[data-project="repo-cf"]').getByTestId("picker-current")).toBeVisible();
   await expect(list(page).locator("[data-current]")).toHaveCount(1);
 
-  // Enter toggles a project in and keeps the list open.
+  // Enter on a project row: that project alone, the list closes, the prompt has focus; the draft is the same one.
   await page.keyboard.type("ghostty");
   await page.keyboard.press("Enter");
-  await expect(list(page)).toBeVisible();
-  // The filter shows ghostty-playground alone: checked now.
-  await expect(list(page).locator('[data-project="repo-gp"]')).toHaveAttribute("data-current", "true");
-  await page.keyboard.press("Escape");
   await expect(list(page)).toHaveCount(0);
-  await expect(trigger(page)).toBeFocused();
-  await expect(heading(page)).toHaveText("What should we build in 2 projects?");
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
   await expect(prompt(page)).toHaveAttribute("data-value", "Port the login form");
   await expect(page.getByTestId("composer-model")).toHaveText("Haiku 4.5");
-  await expect(chips(page)).toHaveCount(2);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copies");
+  await expect(chips(page)).toHaveCount(0);
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 
-  // code-foundry out again: ghostty-playground alone, the draft is the same one.
-  await trigger(page).click();
-  await list(page).locator('[data-project="repo-cf"]').click();
+  // A set of two: the heading's project row still replaces it all.
+  await page.getByTestId("composer-add-project").click();
+  await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "code-foundry" }).click();
   await page.keyboard.press("Escape");
+  await expect(heading(page)).toHaveText("What should we build in 2 projects?");
+  await trigger(page).click();
+  // Nothing checked: the set is not one row of the list.
+  await expect(list(page).locator("[data-current]")).toHaveCount(0);
+  await list(page).locator('[data-project="repo-gp"]').click();
+  await expect(list(page)).toHaveCount(0);
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
   await expect(chips(page)).toHaveCount(0);
-  await page.getByTestId("composer-input").click();
+  await expect(page.getByTestId("composer-input")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args ?? {};
@@ -91,7 +93,7 @@ test("the heading's picker: centred under the name, the set checked; toggles kee
   await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
 
-test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it back to the trigger", async ({ page }) => {
+test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it and the prompt takes focus", async ({ page }) => {
   await openApp(page);
   await compose(page, 1);
   await page.keyboard.type("Keep me");
@@ -105,17 +107,21 @@ test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc close
   await expect(trigger(page)).toBeFocused();
 
   await page.keyboard.press("Enter");
-  await expect(page.getByPlaceholder("Add or remove projects…")).toBeFocused();
+  await expect(page.getByPlaceholder("Switch to a workspace or project…")).toBeFocused();
   await page.keyboard.type("dot");
   await page.keyboard.press("Escape");
   await expect(list(page)).toHaveCount(0);
-  await expect(trigger(page)).toBeFocused();
+  await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
 
-  // Space opens it too, unfiltered again.
+  // Space opens it too, unfiltered again; a click away closes it onto the prompt as well.
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+Tab");
+  await expect(trigger(page)).toBeFocused();
   await page.keyboard.press("Space");
-  await expect(page.getByPlaceholder("Add or remove projects…")).toHaveValue("");
-  await page.keyboard.press("Escape");
+  await expect(page.getByPlaceholder("Switch to a workspace or project…")).toHaveValue("");
+  await page.getByTestId("composer-heading").click({ position: { x: 4, y: 4 } });
+  await expect(list(page)).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
   await expect(prompt(page)).toHaveAttribute("data-value", "Keep me");
 });

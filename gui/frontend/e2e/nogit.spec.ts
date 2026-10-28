@@ -80,7 +80,7 @@ test("the composer in a project without git offers only its current checkout; th
   // No base ref, no branch.
   for (const id of ["composer-base", "composer-checkout-branch"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await page.getByTestId("composer-worktree").click();
-  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^Project folder\s*Edits land in ~\/Documents\/writing directly/]);
+  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^Project folder\s*Edits land in the project's checkout directly/]);
   await page.keyboard.press("Escape");
 
   await page.getByTestId("composer-input").click();

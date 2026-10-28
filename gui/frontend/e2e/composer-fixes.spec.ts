@@ -54,7 +54,6 @@ async function pickWorkspaceInHeading(page: Page, workspaceId: string): Promise<
   await page.getByTestId("composer-project-trigger").click();
   const list = page.getByTestId("composer-project-list");
   await list.locator(`[data-workspace="${workspaceId}"]`).click();
-  await page.keyboard.press("Escape");
   await expect(list).toHaveCount(0);
 }
 
@@ -102,6 +101,7 @@ test("1: taking out every project of a picked workspace drops it too; nothing se
   // A project picked: the set again, sent without the workspace.
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
   await expect(page.getByTestId("composer-send")).toBeEnabled();
   await page.getByTestId("composer-input").click();
@@ -302,6 +302,7 @@ test("11, 13: the collisions the banner showed are not toasted again; a chip is 
   await page.getByTestId("palette").locator('[data-project="repo-sk"]').click();
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "writing" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-collision-text")).toContainText("2 of 2 projects are already being edited by another running thread.");
   // Name only: no branch, no path tooltip (the pickers say where it runs).
   await expect(chips(page).filter({ hasText: "sketches" }).getByTestId("composer-member-body")).toHaveText("sketches");

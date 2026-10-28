@@ -126,6 +126,7 @@ test("a second project: both repositories' pull requests, the repository as the 
   await compose(page);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer-member")).toHaveCount(2);
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("#12");

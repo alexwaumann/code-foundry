@@ -66,6 +66,17 @@ interface ComposerPickerProps {
    * and does not now; absent: one that never warns.
    */
   warning?: ReactNode;
+  /**
+   * A multi-select (Add project): a pick calls onChange and keeps the list open, so several
+   * rows can be toggled; the rows in `selected` are checked (`value` is not).
+   */
+  multi?: boolean;
+  selected?: readonly string[];
+  /**
+   * Where focus goes after a pick or a dismissal (Esc, a click away): the composer's
+   * prompt. Without it, the trigger.
+   */
+  focusAfter?: () => void;
   "data-testid"?: string;
 }
 
@@ -103,6 +114,9 @@ export function ComposerPicker({
   contentClassName,
   listClassName,
   warning,
+  multi = false,
+  selected,
+  focusAfter,
   "data-testid": testId,
 }: ComposerPickerProps) {
   const [open, setOpen] = useState(false);
@@ -170,10 +184,12 @@ export function ComposerPicker({
   };
   const pick = (v: string) => {
     onChange(v);
+    if (multi) return;
     setOpen(false);
     // Now, not after the exit animation: an immediate Tab moves on from the trigger.
-    triggerRef.current?.focus();
+    (focusAfter ?? (() => triggerRef.current?.focus()))();
   };
+  const isChecked = (v: string) => (multi ? (selected ?? []).includes(v) : v === value);
   const renderGroup = (g: PickerGroup, i: number, force: boolean) =>
     g.options.length === 0 && !g.status ? null : (
       <Fragment key={g.heading ?? `${force ? "fixed" : "group"}-${String(i)}`}>
@@ -187,11 +203,12 @@ export function ComposerPicker({
               forceMount={force || undefined}
               data-fixed={force ? "" : undefined}
               className={cn(o.wrap && "items-start")}
+              data-checked={isChecked(o.value) || undefined}
               onSelect={() => {
                 pick(o.value);
               }}
             >
-              <Check aria-hidden className={cn("size-3.5", o.wrap && "mt-0.5", o.value !== value && "invisible")} />
+              <Check aria-hidden className={cn("size-3.5", o.wrap && "mt-0.5", !isChecked(o.value) && "invisible")} />
               {o.icon && <o.icon aria-hidden className="size-3.5" />}
               <span className="flex min-w-0 flex-col">
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -273,6 +290,11 @@ export function ComposerPicker({
           // Radix's own return lands on the body after a reopen during the close animation.
           e.preventDefault();
           const el = document.activeElement;
+          if (focusAfter) {
+            // The prompt, unless the click away landed on another control (another pill).
+            if (!el || el === document.body || el === triggerRef.current || rootRef.current?.contains(el)) focusAfter();
+            return;
+          }
           if (!el || el === document.body || rootRef.current?.contains(el)) triggerRef.current?.focus();
         }}
         onOpenAutoFocus={(e) => {
