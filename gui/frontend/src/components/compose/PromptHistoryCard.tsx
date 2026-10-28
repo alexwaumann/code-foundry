@@ -135,8 +135,8 @@ export function Hint({ keys, children }: { keys: readonly string[]; children: Re
 
 /**
  * The "Previous prompts" card (docs/notes/prompt-history-2-picker.md), in the completion
- * card's place and surface (CompletionCard: overlaid, height fitted to the room left), a
- * little more opaque so it reads over the transcript. A header with the count and the
+ * card's place and surface (CompletionCard: overlaid, height fitted to the room left), but
+ * opaque: over the transcript, text behind a translucent card showed through. A header with the count and the
  * scope toggle, one row per prompt (the selected one on the control-hover background with
  * a ⏎), the keys in the footer. A mousedown keeps the keyboard in the prompt; hovering a
  * row selects it, a click puts it in the draft.
@@ -164,7 +164,7 @@ export function PromptHistoryCard({ picker, above = false }: { picker: PromptPic
     <div
       ref={cardRef}
       className={cn(
-        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised/95 text-body-sm shadow-sm backdrop-blur-xl",
+        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-lg border border-cf-border bg-cf-surface-raised text-body-sm shadow-sm",
         above ? "bottom-full mb-2" : "top-full mt-2",
       )}
       data-testid="prompt-history"
