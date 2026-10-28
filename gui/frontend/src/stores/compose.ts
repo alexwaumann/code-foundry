@@ -429,6 +429,23 @@ export async function addAttachmentPaths(key: string, paths: readonly string[]):
   return added;
 }
 
+/**
+ * Puts attachments back that were staged and sent already (a failed message's, by the
+ * composer notice's Edit: stores/threadActions editThreadMessage). No checks: they went
+ * out like this once (the daemon checks again on send). Each send reuses its staged path;
+ * a PDF has its count from the staged name, then its thumbnail. Returns them in order.
+ */
+export function addStagedAttachments(key: string, files: readonly { file: File; stagedPath: string }[]): DraftAttachment[] {
+  if (files.length === 0) return [];
+  const added = files.map<DraftAttachment>(({ file, stagedPath }) => {
+    const pdf = file.type === PDF_MIME_TYPE;
+    return { id: `a${String(nextAttachmentId++)}`, file, kind: pdf ? "pdf" : "image", url: URL.createObjectURL(file), stagedPath, pages: pdf ? stagedPdfPages(stagedPath) : null, thumb: null };
+  });
+  updateDraft(key, { attachments: [...getDraft(key).attachments, ...added] });
+  for (const a of added) if (a.kind === "pdf") void summarizePdf(a);
+  return added;
+}
+
 /** Counts a PDF's pages and renders its thumbnail (pdf.js, loaded on the first PDF: lib/pdf.ts). */
 async function summarizePdf(a: DraftAttachment): Promise<void> {
   try {

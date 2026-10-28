@@ -6,7 +6,7 @@
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { citeToken, splitCiteLinks, type Citation } from "./citation";
-import { parsePrompt, serializePrompt } from "./prompt";
+import { parsePrompt, serializePrompt, type PromptPiece } from "./prompt";
 
 export interface FailedPromptInput {
   /** The thread's items in the log's order (stores/thread ThreadLog). */
@@ -163,7 +163,7 @@ export function draftOfSent(m: SentMessage, idOf: (index: number) => string | un
     })
     .join("");
   const lines = parsePrompt(withCites).map((line) =>
-    line.flatMap((p) => {
+    line.flatMap((p): PromptPiece[] => {
       if (p.kind !== "tag" || p.tagKind !== "image") return [p];
       const id = /^\d+$/.test(p.id) ? idOf(Number(p.id)) : undefined;
       return id === undefined ? [] : [{ ...p, id }];

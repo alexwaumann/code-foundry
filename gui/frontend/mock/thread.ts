@@ -13,6 +13,7 @@
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
+ *   POST /__mock/thread/fail-turn[?subtype=…]  the next message's turn ends in error before any text
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
  *   POST /__mock/thread/commands?id=s-r1&set=none|more|default   replaces the slash commands
@@ -136,14 +137,23 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 /**
  * The scripted conversation's states. stopped: idle's conversation, the thread stopped at
  * its prompt cache expiry (no process; mock/world.ts backdates its last result so the
- * cache has expired); crashed: Claude did not start (an error item, nothing else;
- * mock/world.ts stops the thread with status error "did not start").
+ * cache has expired); crashed: Claude did not start for a message (its item, the error
+ * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
+ * error "did not start").
  */
 export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "html-repeat" | "theme" | "bridge" | "pagelib";
 export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "html-scroll", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
+
+/** The message the "crashed" state's claude did not start for: an image chip, a file tag and a skill. */
+export const CRASHED_PROMPT = {
+  text: `The PR badge in the sidebar stays green after a force-push, see [Image: pr-badge-stale.png; ref=${MOCK_ATTACHMENT}] Look at @cf-file://repo-cf/internal/store/pr/poller.go and tell me why the fingerprint misses it with /tdd .`,
+  attachments: [MOCK_ATTACHMENT],
+  composerText:
+    "The PR badge in the sidebar stays green after a force-push, see ![pr-badge-stale.png](cf-attachment://0) Look at [poller.go](cf-file://repo-cf/internal/store/pr/poller.go) and tell me why the fingerprint misses it with [/tdd](cf-skill://~/tdd).",
+};
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
 
@@ -290,6 +300,12 @@ export class MockThreadLogs {
    * back); with ?withdrawn=1 Claude withdrew the request first (NotFound, like the daemon).
    */
   failRespond: "" | "error" | "withdrawn" = "";
+  /**
+   * POST /__mock/thread/fail-turn[?subtype=…]: the next message's turn ends in error before
+   * Claude writes any text (a turn_end with is_error and that subtype, default
+   * error_during_execution); "" for none.
+   */
+  failTurn = "";
 
   /** `source` gets what the EventService thread source carries (pending events only). */
   constructor(
@@ -305,6 +321,7 @@ export class MockThreadLogs {
     this.shells.clear();
     this.calls = [];
     this.failRespond = "";
+    this.failTurn = "";
     this.generation++;
   }
 
@@ -781,8 +798,12 @@ export class MockThreadLogs {
       return x;
     };
     if (loaded === "crashed") {
-      // The daemon's item for a claude that exited before the initialize handshake.
+      // Like the daemon's Send to a stopped thread whose claude exited before the initialize
+      // handshake: the message's item, the error item, and the turn end the daemon writes
+      // for a turn that never ran (turnclose.go closeOpenTurn).
+      const prompt = it({ case: "userMessage", value: CRASHED_PROMPT }, { at: ago(0, -3) });
       it({ case: "error", value: { text: `Claude did not start: exit code 1: ${CRASH_STDERR}` } }, { at: ago(0, -2) });
+      it({ case: "turnEnd", value: { subtype: "process_ended", interrupted: true, durationMs: BigInt(1000) } }, { id: `turn-synth-${prompt.id ?? ""}`, at: ago(0, -2) });
       l.seq = l.items.length;
       return;
     }
@@ -1354,6 +1375,15 @@ export class MockThreadLogs {
       this.append(id, this.item(id, { case: "thinking", value: { text: "" } }));
       await sleep(250);
       if (gen !== this.generation) return;
+      if (this.failTurn) {
+        // POST /__mock/thread/fail-turn: the turn ends in error before any text.
+        const subtype = this.failTurn;
+        this.failTurn = "";
+        this.append(id, this.item(id, { case: "turnEnd", value: { subtype, isError: true, durationMs: BigInt(500), numTurns: 1 } }));
+        const l = this.log(id);
+        this.world.setStatus(id, l.watchers > 0 ? ThreadStatus.IDLE : ThreadStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
+        return;
+      }
       this.append(id, this.item(id, { case: "assistantText", value: { text: "" } }, { streaming: true }));
       for (const part of ["Got it", ": I'll ", "take a look", " now."]) {
         await sleep(120);

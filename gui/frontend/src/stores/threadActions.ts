@@ -18,10 +18,14 @@ import type { ComposePermission } from "@/lib/compose";
 import { inSidebar } from "@/lib/inSidebar";
 import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
+import { newCitationId } from "@/lib/citation";
+import { appendToDraft, draftOfSent, sentAttachmentNames, type SentMessage } from "@/lib/failedPrompt";
 import { sentComposerText } from "@/lib/userMessage";
+import { readAttachmentFile } from "./attachments";
 import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
-import { clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, updateDraft } from "./compose";
+import { addStagedAttachments, clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, putCitation, updateDraft } from "./compose";
 import { getUiContext } from "./context";
+import { holdFailedNotice } from "./failedNotice";
 import { getShowCreatedThreads } from "./settings";
 import { setAnswering } from "./thread";
 import { useThreadsStore } from "./threads";
@@ -143,6 +147,8 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
   if (d.phase !== "idle" || isDraftEmpty(d)) return false;
   const pending = d.attachments.filter((a) => a.stagedPath === null);
   updateDraft(key, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
+  // The composer's failed-prompt notice goes with any message sent (back if this fails).
+  const release = holdFailedNotice(threadId);
   try {
     for (const a of pending) {
       const path = await stageAttachment(a.file, a.pages);
@@ -172,17 +178,75 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
     if (composer && composer !== text) args["composer-text"] = composer;
     const res = await invokeConfirmed(THREAD_COMMANDS.send, args, threadContext(threadId));
     if (!res) {
+      release();
       updateDraft(key, { phase: "idle" });
       return false;
     }
     clearDraft(key);
     return true;
   } catch (err) {
+    release();
     updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });
     return false;
   } finally {
     void refreshCommands();
   }
+}
+
+/**
+ * Sends a message again exactly as it went out (the composer notice's Send again after a
+ * failed turn; docs/notes/composer-failed-notice.md): its text, its staged attachments
+ * and its composer text, through thread.send like any message, so a stopped thread
+ * starts. The draft is left alone; a failure is its error line.
+ */
+export async function resendThreadMessage(threadId: string, m: SentMessage): Promise<boolean> {
+  const args: Record<string, string> = { id: threadId, text: m.text };
+  if (m.attachments.length > 0) args.attachments = m.attachments.join(",");
+  if (m.composerText && m.composerText !== m.text) args["composer-text"] = m.composerText;
+  const release = holdFailedNotice(threadId);
+  try {
+    const res = await invokeConfirmed(THREAD_COMMANDS.send, args, threadContext(threadId));
+    if (!res) release();
+    return res !== null;
+  } catch (err) {
+    release();
+    updateDraft(threadDraftKey(threadId), { error: sendErrorMessage(err) });
+    return false;
+  } finally {
+    void refreshCommands();
+  }
+}
+
+/**
+ * Puts a sent message back in the thread's draft (the composer notice's Edit): its tags
+ * as they were (lib/failedPrompt draftOfSent), its attachments read back from the daemon
+ * and attached again with their staged paths, after a blank line when the draft has text
+ * already. An attachment the daemon no longer has is left out, with a notice. Resolves
+ * false when a send began meanwhile (the draft is not editable then).
+ */
+export async function editThreadMessage(threadId: string, m: SentMessage): Promise<boolean> {
+  const key = threadDraftKey(threadId);
+  const names = sentAttachmentNames(m);
+  const files = await Promise.all(
+    m.attachments.map(async (stagedPath, i) => {
+      const blob = await readAttachmentFile(stagedPath).catch(() => null);
+      return blob ? { file: new File([blob], names[i] ?? "attachment", { type: blob.type }), stagedPath, index: i } : null;
+    }),
+  );
+  if (getDraft(key).phase !== "idle") return false;
+  const kept = files.flatMap((f) => (f ? [f] : []));
+  const added = addStagedAttachments(key, kept);
+  const idByIndex = new Map(kept.map((f, j) => [f.index, added[j]?.id ?? ""]));
+  const draft = draftOfSent(m, (i) => idByIndex.get(i), newCitationId);
+  for (const c of draft.citations) putCitation(key, c);
+  const missing = names.filter((_, i) => !files[i]);
+  const cur = getDraft(key);
+  updateDraft(key, {
+    text: appendToDraft(cur.text, draft.text),
+    error: null,
+    notice: missing.length > 0 ? `${missing.join(", ")}: no longer staged; attach ${missing.length > 1 ? "them" : "it"} again` : cur.notice,
+  });
+  return true;
 }
 
 /**
