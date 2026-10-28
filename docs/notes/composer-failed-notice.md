@@ -71,6 +71,10 @@ when its item arrives, because the rule then finds a newer last prompt.
   did not start: the message's item (image chip, file tag, skill: `CRASHED_PROMPT`), the
   error item, and the synthetic process_ended turn end (`turn-synth-<id>`). As with the real
   daemon, the timeline therefore shows "Interrupted after 1.0s" above the error.
+- The mock's watch used to turn any status into idle "at prompt" once the log ended in a turn
+  end. With the synthetic turn end, that wiped the crashed thread's "Error · did not start".
+  It now leaves an error status alone, like the daemon (waiting.go only treats "finished" and
+  "at prompt" as a plainly ended turn).
 - `POST /__mock/thread/fail-turn[?subtype=…]`: the next message's turn ends with an is_error
   turn end (default error_during_execution) before any text.
 - `e2e/composer-failed-notice.spec.ts`: the notice in the crashed state (one line, tabbable

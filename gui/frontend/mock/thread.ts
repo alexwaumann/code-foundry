@@ -523,11 +523,14 @@ export class MockThreadLogs {
     }
   }
 
-  /** A finished turn is seen while someone watches: "finished" becomes "at prompt". */
+  /**
+   * A finished turn is seen while someone watches: "finished" becomes "at prompt". An error
+   * status stays, like the daemon's (a failed start ends with a turn end too).
+   */
   private seen(id: string): void {
     const l = this.log(id);
     const last = l.items[l.items.length - 1];
-    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd") this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd" && this.world.statusOf(id) !== ThreadStatus.ERROR) this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
   }
 
   private item(id: string, payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}): ItemInit {
