@@ -51,7 +51,6 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/compose/AttachmentChip.tsx", match: 'DEFAULT_ACCENT = "oklch(', why: "an image chip's tint before its thumbnail is sampled" },
   { file: "/src/components/compose/AttachmentChip.tsx", match: "return `rgb(${", why: "an image chip's tint: the thumbnail's average colour" },
   { file: "/src/components/compose/ProjectRows.tsx", match: "tracking-wide text-white", why: "the initials on a project's identity tile (the hashed hue above), not a theme colour" },
-  { file: "/src/components/ui/dialog.tsx", match: "bg-black/40", why: "the dialog scrim dims whatever is under it, black in every theme" },
   { file: "/src/components/compose/AttachmentLightbox.tsx", match: 'overlayClassName="bg-black/80"', why: "the attachment lightbox scrim (composers and thread)" },
   { file: "/src/components/compose/Composer.tsx", match: "rounded-full bg-black/70 text-white", why: "the remove button sits on an image thumbnail, not on a theme surface" },
   { file: "/src/components/files/HtmlFrame.tsx", match: `visible && opaque && "bg-white"`, why: "an arbitrary HTML file (an opaque frame), once loaded, renders on a browser's white canvas, not the theme's pane" },

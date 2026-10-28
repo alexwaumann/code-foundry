@@ -58,8 +58,8 @@ describe("the slot set", () => {
     for (const n of SLOT_NAMES) expect(n).toMatch(/^--(?:cf-[a-z]+(?:-[a-z0-9]+)*|terminal-[a-z0-9-]+|syn-[a-z]+|sh-[a-z]+)$/);
   });
 
-  it("has 71 semantic slots, the 21 terminal colours and the 10 syntax colours, each in a known group", () => {
-    expect(SLOT_NAMES.filter((n) => n.startsWith("--cf-"))).toHaveLength(71);
+  it("has 72 semantic slots, the 21 terminal colours and the 10 syntax colours, each in a known group", () => {
+    expect(SLOT_NAMES.filter((n) => n.startsWith("--cf-"))).toHaveLength(72);
     expect(SLOT_NAMES.filter((n) => n.startsWith("--terminal-"))).toHaveLength(21);
     expect(SLOT_NAMES.filter((n) => /^--(syn|sh)-/.test(n))).toHaveLength(10);
     for (const s of SLOTS) expect(SLOT_GROUPS, s.name).toContain(s.group);
@@ -90,6 +90,7 @@ describe("rules", () => {
     expect(v("--cf-border")).toBe(over(v("--cf-text"), dark ? 0.11 : 0.1, b.surface));
     expect(v("--cf-border-strong")).toBe(over(v("--cf-text"), dark ? 0.18 : 0.16, b.surface));
     expect(v("--cf-divider")).toBe(over(v("--cf-text"), dark ? 0.11 : 0.08, b.surface));
+    expect(v("--cf-scrim")).toBe(dark ? "#00000080" : "#0000004d");
     expect(v("--cf-input")).toBe(over(v("--cf-text"), dark ? 0.15 : 0.13, b.surface));
   });
 

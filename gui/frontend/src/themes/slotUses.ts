@@ -19,6 +19,7 @@ export const SLOT_USES: Readonly<Record<string, string>> = {
   "--cf-border": "card, menu and table borders",
   "--cf-border-strong": "the inline page lightbox's frame",
   "--cf-divider": "pane outlines and header rules",
+  "--cf-scrim": "the dim under the palette, help and dialogs",
   "--cf-text": "body text",
   "--cf-text-muted": "secondary text, captions and hints",
   "--cf-text-secondary": "blockquotes in threads and notes",

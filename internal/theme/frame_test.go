@@ -51,8 +51,8 @@ func without(names ...string) map[string]string {
 
 func TestSlotNames(t *testing.T) {
 	names := SlotNames()
-	if len(names) != 102 {
-		t.Errorf("%d slot names, want 102 (71 --cf-*, 21 terminal, 10 syntax)", len(names))
+	if len(names) != 103 {
+		t.Errorf("%d slot names, want 103 (72 --cf-*, 21 terminal, 10 syntax)", len(names))
 	}
 	if light := DefaultFrame(SchemeLight); len(light.Vars) != len(names) {
 		t.Errorf("the light default has %d vars, the dark %d", len(light.Vars), len(names))
@@ -85,12 +85,12 @@ func TestFrameCheck(t *testing.T) {
 		{"named colour", frame(full(map[string]string{"--cf-text": "red"})), "not #rrggbb"},
 		{"injected value", frame(full(map[string]string{"--cf-text": "#000000;}*{x:y"})), "not #rrggbb"},
 		{"short hex", frame(full(map[string]string{"--cf-text": "#000"})), "not #rrggbb"},
-		{"one slot missing", frame(without("--cf-text")), "missing 1 of the 102 slots: --cf-text"},
-		{"two missing, named in order", frame(without("--syn-kw", "--cf-accent")), "missing 2 of the 102 slots: --cf-accent, --syn-kw"},
-		{"a partial set", frame(map[string]string{"--cf-text": "#000000"}), "missing 101 of the 102 slots"},
+		{"one slot missing", frame(without("--cf-text")), "missing 1 of the 103 slots: --cf-text"},
+		{"two missing, named in order", frame(without("--syn-kw", "--cf-accent")), "missing 2 of the 103 slots: --cf-accent, --syn-kw"},
+		{"a partial set", frame(map[string]string{"--cf-text": "#000000"}), "missing 102 of the 103 slots"},
 		{"a misspelt slot", frame(full(map[string]string{"--cf-txet": "#000000"})), "1 unknown: --cf-txet"},
 		{"a retired slot", frame(full(map[string]string{"--cf-sidebar-row-active": "#000000"})), "1 unknown: --cf-sidebar-row-active"},
-		{"missing and unknown", frame(func() map[string]string { v := without("--cf-link"); v["--cf-lnik"] = "#000000"; return v }()), "missing 1 of the 102 slots: --cf-link; 1 unknown: --cf-lnik"},
+		{"missing and unknown", frame(func() map[string]string { v := without("--cf-link"); v["--cf-lnik"] = "#000000"; return v }()), "missing 1 of the 103 slots: --cf-link; 1 unknown: --cf-lnik"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

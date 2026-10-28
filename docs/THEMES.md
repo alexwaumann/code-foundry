@@ -80,7 +80,7 @@ removed one (`--cf-icon`, `--cf-sidebar-row-active`) refuses the file. The Theme
 editor calls an override a pin.
 
 Values are `#rrggbb`, or `#rrggbbaa` for the slots that are tints and composite over what
-they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`,
+they sit on: `--cf-accent-surface`, `--cf-selection`, `--cf-message-surface`, `--cf-scrim`,
 `--cf-code-background` (dark themes; light ones use an opaque well),
 and `--cf-<tone>-surface` for success, warning, error, info, highlight and update. Give
 every other slot an opaque colour. `--cf-diff-addition-surface` and
@@ -92,7 +92,7 @@ colours are checked opaque.
 
 ## Slots
 
-102 in all: 71 `--cf-*` slots, 21 terminal colours (`--terminal-fg`, `-cursor`,
+103 in all: 72 `--cf-*` slots, 21 terminal colours (`--terminal-fg`, `-cursor`,
 `-cursor-accent`, `-selection`, `-selection-inactive`, `-ansi-0` … `-ansi-15`) and 10 syntax
 colours (`--syn-fg`, `-kw`, `-fn`, `-type`, `-str`, `-num`, `-com`, `--sh-cmd`, `-flag`,
 `-str`). The rule for each is in `slots.ts` (`SLOTS[].rule`). A slot exists only when two
@@ -112,7 +112,7 @@ app itself paints with, so an override shows in the app:
 
 - Surfaces: `--cf-canvas`, `--cf-surface`, `--cf-chrome`, `--cf-surface-raised`,
   `--cf-surface-overlay`, `--cf-surface-sunken`, `--cf-border`, `--cf-border-strong`,
-  `--cf-divider`
+  `--cf-divider`, `--cf-scrim`
 - Text: `--cf-text`, `--cf-text-muted`, `--cf-text-secondary`, `--cf-placeholder`,
   `--cf-icon-muted`, `--cf-link`
 - Interactive: `--cf-accent`, `--cf-accent-foreground`, `--cf-accent-surface`,

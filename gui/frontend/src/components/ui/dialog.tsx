@@ -14,12 +14,19 @@ function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
 }
 
+/**
+ * Every modal's backdrop (docs/notes/modal-backdrop.md): the theme's scrim slot (a 50% dim
+ * on dark themes, 30% on light) over a 1px blur, so the window under a dialog, the palette or
+ * help reads as behind it. Only the opacity animates: the blur radius stays fixed, since animating
+ * backdrop-filter over the terminal canvas and page frames stutters in WebKit. A dialog may
+ * pass a darker scrim (overlayClassName, the attachment lightbox).
+ */
 function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/40 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-cf-scrim backdrop-blur-[1px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className
       )}
       {...props}

@@ -117,7 +117,7 @@ describe("startThemePublish", () => {
   });
 
   it.each([
-    ["a refusal", new ConnectError("a theme publishes every slot the GUI resolves, exactly: missing 1 of the 102 slots: --cf-text", Code.InvalidArgument), 1],
+    ["a refusal", new ConnectError("a theme publishes every slot the GUI resolves, exactly: missing 1 of the 103 slots: --cf-text", Code.InvalidArgument), 1],
     ["an unreachable daemon", new TypeError("Load failed"), 0],
     ["a daemon older than the RPC", new ConnectError("HTTP 404", Code.Unimplemented), 0],
   ] as const)("logs %s every time; a refusal is a toast, once per run", async (_, err, toasts) => {
@@ -135,7 +135,7 @@ describe("startThemePublish", () => {
     expect(console.warn).toHaveBeenCalledWith("theme publish", err);
     expect(toast.error).toHaveBeenCalledTimes(toasts);
     if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toBe("Theme could not be published to pages");
-    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[1]?.description).toContain("missing 1 of the 102 slots: --cf-text");
+    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[1]?.description).toContain("missing 1 of the 103 slots: --cf-text");
   });
 
   it("stops publishing once stopped", () => {
