@@ -33,6 +33,7 @@ import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThr
 import { useUiStore } from "@/stores/ui";
 import { registerCiteTarget } from "@/stores/cite";
 import { ColdCacheNote } from "./ColdCacheNote";
+import { FailedPromptNote } from "./FailedPromptNote";
 import { RetryNote } from "./RetryNote";
 import { TranscriptDeletedNote } from "./TranscriptDeleted";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
@@ -332,6 +333,7 @@ export function ThreadComposer({
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
         <SnoozeNote threadId={threadId} />
         <RetryNote threadId={threadId} />
+        <FailedPromptNote threadId={threadId} pending={pending.length} focusEditor={() => editorRef.current?.focusCollapsed()} />
         {/* A cold cache means nothing once the conversation is gone. */}
         {transcriptMissing ? <TranscriptDeletedNote threadId={threadId} /> : <ColdCacheNote threadId={threadId} pending={pending.length} />}
         <div
