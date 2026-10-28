@@ -9,6 +9,8 @@ import { CollisionBanner, CollisionTip } from "./CollisionBanner";
 import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
+import { PromptHistoryCard } from "./PromptHistoryCard";
+import { usePromptPicker } from "./usePromptHistory";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./PromptEditor";
@@ -91,6 +93,7 @@ const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
  * directory, which is never indexed, and there is no repository for "#".
  */
 const HOME_TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+const NO_TRIGGERS: readonly TriggerChar[] = [];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
@@ -464,6 +467,21 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const prSource = usePrSource(trigger, useProjectSlugs(sourceIds));
   const bySource: Record<TriggerChar, CompletionSource> = { "/": skillSource, "@": mentionSource, "#": prSource };
   const completion = useCompletion(trigger, setTrigger, bySource[trigger?.char ?? "/"], editorRef);
+  // Previous prompts: Up in the empty prompt opens it in Project, the Work in set's (none
+  // for No project: the threads without one); no This thread yet
+  // (docs/notes/prompt-history-2-picker.md).
+  const rootRef = useRef<HTMLDivElement>(null);
+  const historyIds = like ? likeSrc.sorted : home ? null : set.projectIds;
+  const historySource = useMemo(() => (historyIds ? { projectIds: historyIds } : {}), [historyIds]);
+  const picker = usePromptPicker({
+    draftKey,
+    editorRef,
+    rootRef,
+    threadId: "",
+    source: historySource,
+    canOpen: text.trim() === "" && !hasAttachments && trigger === null && completion.show === "none",
+    blocked: busy,
+  });
 
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
   // closing palette dialog has released focus.
@@ -636,13 +654,14 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   }, [branchLists, manyGit]);
 
   return (
-    <div>
+    <div ref={rootRef} onBlur={picker.onBlur}>
       {!home && <MemberChips target={target} members={chips} workspaceId={like ? likeSrc.workspaceId : set.workspaceId} readOnly={like} warnings={chipWarnings} disabled={busy} focusPrompt={refocus} />}
       <CollisionBanner list={found} setSize={single ? 1 : hintSetIds.length} onNewBranch={canNewBranch ? toNewBranch : undefined} disabled={busy} />
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
         // paint over the in-flow prompt and toolbar; -z-10 inside this context keeps it under them.
-        className="isolate grid grid-cols-[minmax(0,1fr)_auto]"
+        // relative: the previous prompts card hangs over the card, out of flow.
+        className="relative isolate grid grid-cols-[minmax(0,1fr)_auto]"
         data-testid="composer-card"
         data-dragging={dragging || undefined}
         // A native drop (Wails host) lands here by this id; the runtime marks the card
@@ -685,7 +704,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               draftKey={draftKey}
               value={text}
               disabled={busy}
-              placeholder={like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands"}
+              placeholder={picker.placeholder ?? (like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}
@@ -702,13 +721,16 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               }}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
-              triggers={home ? HOME_TRIGGERS : TRIGGERS}
+              // The open picker filters on the text: no completion meanwhile.
+              triggers={picker.card.open ? NO_TRIGGERS : home ? HOME_TRIGGERS : TRIGGERS}
               onTrigger={completion.onTrigger}
               onCompletionKey={completion.onKey}
-              completionAria={completion.aria}
+              completionAria={picker.aria ?? completion.aria}
+              onKeyDown={picker.onKeyDown}
             />
           </TagMultiProjectContext.Provider>
         </div>
+        <PromptHistoryCard picker={picker.card} above />
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
           <ComposerPicker
             label="Model"

@@ -44,9 +44,10 @@ export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom"
 
 /**
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
- * or the member picker of "Run in…" (for `palette.threadId`).
+ * the member picker of "Run in…" (for `palette.threadId`), or the previous prompts
+ * (composer.history; components/palette/PromptsPicker.tsx).
  */
-export type PalettePage = "commands" | "projects" | "runin";
+export type PalettePage = "commands" | "projects" | "runin" | "prompts";
 
 /**
  * The sidebar band must fit the 80px traffic-light gutter and the app name
@@ -197,6 +198,8 @@ interface UiState {
   openProjectPicker: (returnTo?: FocusRegion) => void;
   /** Opens the palette on the "Run in…" member picker for a thread (thread.run-in's presenter). */
   openRunInPicker: (threadId: string, returnTo?: FocusRegion) => void;
+  /** Opens the palette on the previous prompts (composer.history's presenter without a focused composer). */
+  openPromptsPalette: () => void;
   closePalette: () => void;
   focusComposer: () => void;
   setRenaming: (threadId: string | null) => void;
@@ -427,6 +430,9 @@ export const useUiStore = create<UiState>()(
       },
       openRunInPicker: (threadId, returnTo) => {
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", threadId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
+      },
+      openPromptsPalette: () => {
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "prompts", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));

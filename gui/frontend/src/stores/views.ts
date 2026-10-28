@@ -22,6 +22,7 @@ import { jumpToNeighbour } from "./threadNeighbours";
 import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorktreeSurface } from "./worktreePanel";
+import { presentPromptHistory } from "./historyComposers";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
@@ -202,6 +203,9 @@ export function showView(name: string): boolean {
       // thread.next: the thread below the current one in the sidebar, wrapping.
       jumpToNeighbour(1);
       return true;
+    case "composer.history":
+      // composer.history: the focused composer's Previous prompts, else the palette's.
+      return presentPromptHistory();
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a sheet would cover the panel.
       if (parsePluginView(name)) {

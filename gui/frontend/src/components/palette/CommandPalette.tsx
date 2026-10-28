@@ -8,6 +8,7 @@ import { usePathCompletion } from "./usePathListing";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
+import { PromptsPicker } from "./PromptsPicker";
 import { RunInPicker } from "./RunInPicker";
 import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
@@ -335,9 +336,15 @@ export function CommandPalette() {
   const runInThread = useUiStore((s) => s.palette.threadId ?? "");
   const context = useUiStore((s) => s.palette.context);
   const close = useUiStore((s) => s.closePalette);
-  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : "Command palette";
+  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : "Command palette";
   const description =
-    page === "projects" ? "Pick the project for a new thread" : page === "runin" ? "Pick the workspace member the thread moves to" : "Run a command in the current context";
+    page === "projects"
+      ? "Pick the project for a new thread"
+      : page === "runin"
+        ? "Pick the workspace member the thread moves to"
+        : page === "prompts"
+          ? "Pick a prompt you sent to put it in the composer"
+          : "Run a command in the current context";
   return (
     <Dialog
       open={open}
@@ -358,6 +365,8 @@ export function CommandPalette() {
           <ProjectPicker close={close} />
         ) : page === "runin" ? (
           <RunInPicker threadId={runInThread} close={close} />
+        ) : page === "prompts" ? (
+          <PromptsPicker close={close} />
         ) : (
           <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} initialContext={context} close={close} />
         )}

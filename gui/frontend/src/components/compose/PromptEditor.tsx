@@ -82,6 +82,12 @@ interface PromptEditorProps {
   onCompletionKey: (key: CompletionKey) => boolean;
   /** The open card's listbox and active option ids, for aria-controls / aria-activedescendant. */
   completionAria: { controls: string; active: string } | null;
+  /**
+   * Every key first, ahead of the completion card and the editor's own keys (the previous
+   * prompts picker: Up in the empty prompt, then its card's keys); true when taken.
+   * `selectionEmpty`: nothing is selected in the prompt.
+   */
+  onKeyDown?: (e: KeyboardEvent, selectionEmpty: boolean) => boolean;
   handleRef: Ref<PromptEditorHandle>;
 }
 
@@ -188,6 +194,7 @@ export function PromptEditor({
   onTrigger,
   onCompletionKey,
   completionAria,
+  onKeyDown,
   handleRef,
 }: PromptEditorProps) {
   // What the editor last reported (or was set to): a store value that differs came from
@@ -195,9 +202,9 @@ export function PromptEditor({
   const shown = useRef(value);
   const focused = useRef(false);
   const lastTrigger = useRef<EditorTrigger | null>(null);
-  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, triggers, disabled });
+  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, onKeyDown, triggers, disabled });
   useLayoutEffect(() => {
-    cb.current = { onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, triggers, disabled };
+    cb.current = { onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, onKeyDown, triggers, disabled };
   });
 
   /** Reports the trigger at the caret when it changed (none without focus or while disabled). */
@@ -235,6 +242,7 @@ export function PromptEditor({
       attributes,
       handleKeyDown: (view, e) => {
         if (e.isComposing) return false;
+        if (!cb.current.disabled && cb.current.onKeyDown?.(e, view.state.selection.empty)) return true;
         const ck = completionKey(e);
         // The open completion card first: Enter inserts there instead of sending.
         if (ck && cb.current.onCompletionKey(ck)) return true;
