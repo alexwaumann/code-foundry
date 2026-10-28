@@ -25,7 +25,8 @@ with no daemon change.
   The rail reads the scroll in one rAF per frame and sets state only when the index
   changes. TimelineList already re-renders on scroll, but the rail is `memo` with stable
   props (`list` is memoized on the virtualizer), so only the rail updates.
-- Tooltip: the repo's `Tip`, side right, `max-w-65` (the 260px cap). It shows the prompt
+- Tooltip: the repo's `Tip`, side right, `max-w-65` (the 260px cap), `delay={0}` (`Tip` gained
+  a per-tooltip `delay` for it: the tooltip is the tick's content, so no 500 ms wait). It shows the prompt
   clamped to two lines, then "<sent time> · n of N" in `text-caption` muted. The text is
   `promptPreview`: tags read as their labels (/skill, file name, thread name, #PR,
   "Assistant quote"), images and PDFs are left out, and whitespace is collapsed. A prompt
