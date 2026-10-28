@@ -19,7 +19,7 @@ import {
   setPickerSlot,
   useThemePickerStore,
 } from "./themePicker";
-import { closeThemes, openThemes, setSettingsPage, showView, useViewsStore } from "./views";
+import { closeSheet, closeThemes, openThemes, setSettingsPage, showView, themesEscape, toggleView, useViewsStore } from "./views";
 
 // A fixed pair of slots (not the app defaults), so the pairing cases have a companion to find.
 const SLOTS = { dark: "catppuccin-mocha", light: "catppuccin-latte" };
@@ -145,6 +145,30 @@ describe("the page state", () => {
     expect(showView(name)).toBe(true);
     expect(useViewsStore.getState().themesOpen).toBe(true);
     expect(useThemePickerStore.getState().slot).toBe(slot);
+  });
+
+  it("the sheet's backdrop and the settings toggle close it whole: Themes opened from Settings does not go back there", () => {
+    useViewsStore.setState({ settingsOpen: true });
+    openThemes("light", "settings");
+    previewTheme("solarized-light");
+    closeSheet();
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
+    expect(useThemePickerStore.getState()).toMatchObject({ preview: null, returnTo: null });
+    useViewsStore.setState({ settingsOpen: true });
+    openThemes(undefined, "settings");
+    expect(toggleView("settings")).toBe(true);
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
+  });
+
+  it("Escape on the page goes back to Settings when it came from there, else closes", () => {
+    useViewsStore.setState({ settingsOpen: true });
+    openThemes(undefined, "settings");
+    themesEscape();
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: true });
+    useViewsStore.setState({ settingsOpen: false });
+    openThemes();
+    themesEscape();
+    expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
   });
 
   it("opening settings or usage closes it", () => {

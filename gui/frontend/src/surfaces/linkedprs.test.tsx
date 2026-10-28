@@ -47,7 +47,7 @@ beforeEach(() => {
   // First-seen order 5, 7, 6: the list shows 6, 7, 5.
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
   usePanelStore.setState({ byKey: { "thread:s-1": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-0": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
-  useViewsStore.setState({ settingsOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
 });
@@ -140,7 +140,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it("toasts for a thread without links, and does nothing without a thread or under settings", () => {
+  it("toasts for a thread without links, and does nothing without a thread or under the usage page", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-0");
     expect(showView("panel.linked-prs")).toBe(true);
@@ -153,7 +153,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
     expect(toast).not.toHaveBeenCalled();
 
     select("s-1");
-    useViewsStore.setState({ settingsOpen: true });
+    useViewsStore.setState({ usageOpen: true });
     expect(linkedPrsPanelCommand()).toBe(false);
     expect(getPanel("thread:s-1").open).toBe(false);
   });

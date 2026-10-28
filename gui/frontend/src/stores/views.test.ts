@@ -9,7 +9,7 @@ const closedPalette = { open: false, query: "", commandName: null, page: "comman
 describe("togglePanelCommand", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
-    useViewsStore.setState({ settingsOpen: false, helpOpen: false });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
     useUiStore.setState({
       selection: { kind: "thread", id: "a" },
       focus: "content",
@@ -37,11 +37,18 @@ describe("togglePanelCommand", () => {
     expect(useUiStore.getState().contentFocusSeq).toBe(0);
   });
 
-  it("is a no-op while the settings page is up", () => {
-    useViewsStore.setState({ settingsOpen: true });
+  it("is a no-op while the usage page is up", () => {
+    useViewsStore.setState({ usageOpen: true });
     expect(togglePanelCommand()).toBe(false);
     expect(getPanel().open).toBe(false);
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+
+  it.each(["settingsOpen", "themesOpen"] as const)("still toggles under the settings sheet (%s): the panel stays laid out under it", (flag) => {
+    useViewsStore.setState({ [flag]: true });
+    expect(togglePanelCommand()).toBe(true);
+    expect(getPanel().open).toBe(true);
+    expect(useViewsStore.getState()[flag]).toBe(true);
   });
 
   describe("from the palette", () => {
@@ -68,7 +75,7 @@ describe("togglePanelCommand", () => {
 describe("expandPanelCommand", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
-    useViewsStore.setState({ settingsOpen: false, helpOpen: false });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
     useUiStore.setState({
       selection: { kind: "thread", id: "a" },
       focus: "content",
@@ -121,11 +128,11 @@ describe("expandPanelCommand", () => {
     expect(seqs()).toEqual([0, 0, 0, 0]);
   });
 
-  it("is a no-op while the settings page is up or with nothing selected", () => {
-    useViewsStore.setState({ settingsOpen: true });
+  it("is a no-op while the usage page is up or with nothing selected", () => {
+    useViewsStore.setState({ usageOpen: true });
     expect(expandPanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
-    useViewsStore.setState({ settingsOpen: false });
+    useViewsStore.setState({ usageOpen: false });
     useUiStore.getState().select({ kind: "none" });
     expect(expandPanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
@@ -169,10 +176,10 @@ describe("newPanelTabCommand", () => {
     expect(getPanel()).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
   });
 
-  it("is a no-op while the settings page is up or with nothing selected", () => {
-    useViewsStore.setState({ settingsOpen: true });
+  it("is a no-op while the usage page is up or with nothing selected", () => {
+    useViewsStore.setState({ usageOpen: true });
     expect(newPanelTabCommand()).toBe(false);
-    useViewsStore.setState({ settingsOpen: false });
+    useViewsStore.setState({ usageOpen: false });
     useUiStore.getState().select({ kind: "none" });
     expect(newPanelTabCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
@@ -313,7 +320,6 @@ describe("toggleBottomCommand", () => {
   const noops: [string, () => void][] = [
     ["a selection without a bottom panel (the dashboard)", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } })],
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
-    ["the settings page", () => { useViewsStore.setState({ settingsOpen: true }); }],
     ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
     ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } })],
   ];

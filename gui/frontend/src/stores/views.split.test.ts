@@ -68,10 +68,10 @@ describe("splitPanelCommand", () => {
 
   it("is a no-op while a page is up or with nothing selected", () => {
     usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
-    useViewsStore.setState({ settingsOpen: true });
+    useViewsStore.setState({ usageOpen: true });
     expect(splitPanelCommand()).toBe(false);
     expect(getPanel().groups).toHaveLength(1);
-    useViewsStore.setState({ settingsOpen: false });
+    useViewsStore.setState({ usageOpen: false });
     useUiStore.getState().select({ kind: "none" });
     expect(splitPanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey["thread:a"]?.groups).toHaveLength(1);

@@ -14,8 +14,7 @@ import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { ConsentDialog } from "@/components/plugin/ConsentDialog";
 import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
-import { SettingsPage } from "@/components/settings/SettingsPage";
-import { ThemesPage } from "@/components/themes/ThemesPage";
+import { SettingsSheet } from "@/components/settings/SettingsSheet";
 import { UsagePage } from "@/components/usage/UsagePage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
@@ -197,10 +196,9 @@ function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactN
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
-  const settingsOpen = useViewsStore((s) => s.settingsOpen);
   const usageOpen = useViewsStore((s) => s.usageOpen);
-  const themesOpen = useViewsStore((s) => s.themesOpen);
-  // Settings and usage hide the panel, so the content pane shows the page even then.
+  // Usage hides the panel, so the content pane shows the page even then. Settings and
+  // Themes are a modal sheet over the window (SettingsSheet), which stays as it was.
   const pageOpen = useViewsStore(selectPageOpen);
   const panelExpanded = usePanelExpanded() && !pageOpen;
   useWindowTitle(useAttentionCount(useShowCreatedThreads()));
@@ -224,10 +222,11 @@ export function App() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <ContentColumn hidden={panelExpanded}>
-            <ContentPane>{settingsOpen ? <SettingsPage /> : themesOpen ? <ThemesPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
+            <ContentPane>{usageOpen ? <UsagePage /> : <Content />}</ContentPane>
           </ContentColumn>
           <SidePanel />
         </div>
+        <SettingsSheet />
         <CommandPalette />
         <HelpOverlay />
         <ConfirmDialog />

@@ -42,7 +42,7 @@ beforeEach(() => {
   useTerminalsStore.setState({ byId: {}, order: [] });
   const open = { open: true, groups: [{ tabs: [], activeTabId: null }] };
   usePanelStore.setState({ byKey: { "thread:s-main": open, "thread:s-feat": open, "thread:s-sub": open, "view:projects": open } });
-  useViewsStore.setState({ settingsOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-feat");
 });
@@ -125,7 +125,7 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     expect(getPanel("thread:s-main").groups[0]?.tabs[0]?.title).toBe("web");
   });
 
-  it("does nothing for a thread outside any worktree, on a page, or under the settings page", () => {
+  it("does nothing for a thread outside any worktree, on a page, or under the usage page", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-lost");
     expect(worktreePanelCommand()).toBe(false);
@@ -134,7 +134,7 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     expect(worktreePanelCommand()).toBe(false);
     expect(getPanel("view:projects").open).toBe(false);
     select("s-feat");
-    useViewsStore.setState({ settingsOpen: true });
+    useViewsStore.setState({ usageOpen: true });
     expect(worktreePanelCommand()).toBe(false);
     expect(getPanel("thread:s-feat").open).toBe(false);
   });

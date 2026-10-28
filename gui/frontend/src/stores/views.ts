@@ -1,6 +1,7 @@
 /**
- * Window-level views that are not selections: the settings, usage and themes pages (each replaces
- * the content area; at most one is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
+ * Window-level views that are not selections: the settings and themes sheet (one modal
+ * over the window showing Settings or Themes, docs/notes/settings-sheet.md), the usage
+ * page (replaces the content area; at most one of the three is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
  * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
  * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
@@ -20,7 +21,7 @@ import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
-import { afterLeavingEditor, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
+import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
 
 interface ViewsState {
@@ -32,7 +33,10 @@ interface ViewsState {
   settingsPage: string;
   /** The Usage page (view.usage, docs/notes/session-usage.md). Never open with settings. */
   usageOpen: boolean;
-  /** The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). Never open with settings or usage. */
+  /**
+   * The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md), shown in the
+   * settings sheet in place of Settings. Never open with settings or usage.
+   */
   themesOpen: boolean;
   helpOpen: boolean;
   /** The help overlay's tab. Opening it lands on the guide unless a caller asks for the shortcuts. */
@@ -55,15 +59,27 @@ export const useViewsStore = create<ViewsState>()(() => ({
 }));
 
 /**
- * A window-level page (settings or usage) covers the content area. It hides the side
- * panel, so the panel commands are no-ops meanwhile.
+ * A window-level page (usage) covers the content area. It hides the side panel and the
+ * bottom panel, so the panel commands are no-ops meanwhile. The settings and themes sheet
+ * does not count: it is a modal over the window, which stays laid out (dimmed) under it.
  */
 export function selectPageOpen(s: ViewsState): boolean {
-  return s.settingsOpen || s.usageOpen || s.themesOpen;
+  return s.usageOpen;
 }
 
 function pageOpen(): boolean {
   return selectPageOpen(useViewsStore.getState());
+}
+
+/** The settings and themes sheet is up (showing Settings or Themes). */
+export function selectSheetOpen(s: ViewsState): boolean {
+  return s.settingsOpen || s.themesOpen;
+}
+
+/** Settings, Themes or Usage is up: none of them is a selection. */
+function anyViewOpen(): boolean {
+  const s = useViewsStore.getState();
+  return selectSheetOpen(s) || s.usageOpen;
 }
 
 /** Whether the current selection's side panel is open and expanded over the content column. */
@@ -79,8 +95,8 @@ export function visibleBottomKey(): string | null {
 }
 
 /**
- * Whether a key's bottom panel would be on screen if it were open: no settings or usage
- * page is up and the side panel is not expanded over the content column.
+ * Whether a key's bottom panel would be on screen if it were open: the usage page is not
+ * up and the side panel is not expanded over the content column.
  */
 export function bottomCanShow(key: string): boolean {
   return bottomVisible(key, true, pageOpen(), sideExpanded());
@@ -88,12 +104,13 @@ export function bottomCanShow(key: string): boolean {
 
 /**
  * The window's own settings and usage keys and sidebar buttons (keys/bindings.ts): a
- * toggle, closing the page that is already open. The daemon's ShowView only shows
- * (showView), since "Show the Usage page" from the CLI or a thread must not close it.
+ * toggle, closing the page that is already open (for settings, the sheet, whether it
+ * shows Settings or Themes). The daemon's ShowView only shows (showView), since "Show
+ * the Usage page" from the CLI or a thread must not close it.
  */
 export function toggleView(name: "settings" | "usage"): boolean {
   const v = useViewsStore.getState();
-  if (name === "settings" && v.settingsOpen) closeSettings();
+  if (name === "settings" && selectSheetOpen(v)) closeSheet();
   else if (name === "usage" && v.usageOpen) closeUsage();
   else return showView(name);
   return true;
@@ -235,7 +252,7 @@ export function historyCommand(by: 1 | -1): boolean {
 }
 
 /**
- * view.panel.toggle for the current selection. A no-op while the settings or usage page is up: it
+ * view.panel.toggle for the current selection. A no-op while the usage page is up: it
  * hides the panel, so a toggle there would flip state the user cannot see.
  *
  * Focus: toggling on focuses the panel. Hiding the panel while it has focus hands focus
@@ -260,7 +277,7 @@ export function togglePanelCommand(): boolean {
 
 /**
  * view.bottom.toggle for the current selection (a thread or the Projects page; other
- * selections have no bottom panel and it does nothing). A no-op while the settings or
+ * selections have no bottom panel and it does nothing). A no-op while the
  * usage page is up, or while the side panel fills the content area: both hide the bottom
  * panel, so a toggle there would flip state the user cannot see.
  *
@@ -293,7 +310,7 @@ export function toggleBottomCommand(): boolean {
 /**
  * view.panel.expand for the current selection: flips its panel between the split and the
  * full width of the content area. A hidden panel is shown expanded. A no-op while the
- * settings or usage page is up (it hides the panel) and with nothing selected.
+ * usage page is up (it hides the panel) and with nothing selected.
  *
  * Focus stays where it was, unless it was in the content pane, which expanding hides:
  * then it moves to the panel. With the palette open, its return target moves instead.
@@ -319,7 +336,7 @@ export function expandPanelCommand(): boolean {
  * its panel if hidden, with the surface list ("Open a surface") instead of the active
  * tab (stores/panel.ts startPicking). No tab is added until a surface is picked; Escape
  * goes back. A panel without tabs shows the list anyway, so it is only shown. A no-op
- * while the settings or usage page is up and with nothing selected. In a split panel it
+ * while the usage page is up and with nothing selected. In a split panel it
  * picks in the focused group; a group's own "+" focuses that group before it runs.
  *
  * Focus moves to the panel, like toggling it on, so Escape and the surface letters work
@@ -339,7 +356,7 @@ export function newPanelTabCommand(): boolean {
  * tab the new group starts on its surface list), or joins a split panel's groups back
  * into one (unsplit). A hidden panel is shown, split: a hidden split panel just shows,
  * since joining groups the user cannot see would be a surprise. A panel without tabs has
- * nothing to split (it is only shown). A no-op while the settings or usage page is up and
+ * nothing to split (it is only shown). A no-op while the usage page is up and
  * with nothing selected. Returns whether the panel is split afterwards.
  *
  * Focus: splitting moves it to the panel (the new group is the focused one), like
@@ -364,7 +381,7 @@ export function splitPanelCommand(): boolean {
 /**
  * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
  * the selected thread's own worktree in its panel and shows the panel. A no-op while the
- * settings or usage page is up (a window reached through the CLI's ShowView may have
+ * usage page is up (a window reached through the CLI's ShowView may have
  * anything selected) and when the selection is not in a registered worktree (a page, a
  * composer, a thread whose cwd is elsewhere).
  *
@@ -385,7 +402,7 @@ export function worktreePanelCommand(): boolean {
  * view.panel.linked-prs for the current selection: opens (or activates) the Linked PRs tab
  * in the selected thread's panel and shows the panel, like view.panel.worktree. A thread
  * without linked pull requests gets a brief "No linked PRs yet" toast instead. A no-op
- * while the settings or usage page is up and when the selection is no thread.
+ * while the usage page is up and when the selection is no thread.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
@@ -408,7 +425,7 @@ export function linkedPrsPanelCommand(): boolean {
  * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
  * selected thread's panel and shows the panel, like view.panel.worktree. A thread
  * without usage opens it too (the surface says "No usage yet"). A no-op while the
- * settings or usage page is up and when the selection is no thread.
+ * usage page is up and when the selection is no thread.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
@@ -425,7 +442,7 @@ export function usagePanelCommand(): boolean {
 /**
  * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
  * selected thread's panel and shows the panel, like view.panel.usage. A no-op
- * while the settings or usage page is up and when no thread is selected.
+ * while the usage page is up and when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
@@ -443,7 +460,7 @@ export function mcpPanelCommand(): boolean {
  * view.panel.agents for the current selection: opens (or activates) the Agents tab in the
  * selected thread's panel and shows the panel, like view.panel.mcp. A thread without
  * subagent runs (the surface is hidden) gets a brief "No agents yet" toast instead, like
- * view.panel.linked-prs. A no-op while the settings or usage page is up and when no
+ * view.panel.linked-prs. A no-op while the usage page is up and when no
  * thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
@@ -467,7 +484,7 @@ export function agentsPanelCommand(): boolean {
  * view.panel.threads for the current selection: opens (or activates) the Threads tab in
  * the selected thread's panel and shows the panel, like view.panel.agents. A thread
  * without lineage (no creator, siblings or children: the surface is hidden) gets a brief
- * "No related threads" toast instead. A no-op while the settings or usage page is up and
+ * "No related threads" toast instead. A no-op while the usage page is up and
  * when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
@@ -573,8 +590,9 @@ export function openThemes(slot?: ThemeSlot, from?: "settings"): void {
 }
 
 /**
- * Leaves the Themes page, dropping its preview and its editor; back to Settings when it
- * came from there. With unsaved edits the confirm dialog asks first.
+ * Leaves the Themes page (its × and Escape), dropping its preview and its editor; back to
+ * Settings when it came from there, else the sheet closes. With unsaved edits the confirm
+ * dialog asks first.
  */
 export function closeThemes(): void {
   if (editorDirty()) {
@@ -586,6 +604,38 @@ export function closeThemes(): void {
   resetThemePicker(undefined, null);
   useViewsStore.setState({ themesOpen: false, settingsOpen: back });
   if (!back) requestPromptFocus();
+}
+
+/**
+ * Escape in the settings sheet on the Themes page: back from a colour's view in the
+ * editor, then out of the editor (asking first when it has changes), then the page
+ * closes (closeThemes: back to Settings when it came from there).
+ */
+export function themesEscape(): void {
+  if (editorBack()) return;
+  if (useThemeEditorStore.getState().id !== null) void leaveEditor();
+  else closeThemes();
+}
+
+/**
+ * Closes the sheet whatever it shows (a click on its backdrop, the settings toggle):
+ * Themes does not go back to Settings first. With unsaved edits in the Themes editor the
+ * confirm dialog asks first.
+ */
+export function closeSheet(): void {
+  const v = useViewsStore.getState();
+  if (!v.themesOpen) {
+    if (v.settingsOpen) closeSettings();
+    return;
+  }
+  if (editorDirty()) {
+    afterLeavingEditor(closeSheet);
+    return;
+  }
+  stopEditing();
+  resetThemePicker(undefined, null);
+  useViewsStore.setState({ themesOpen: false, settingsOpen: false });
+  requestPromptFocus();
 }
 
 export function closeUsage(): void {
@@ -617,11 +667,11 @@ export function setHelpTab(tab: HelpTab): void {
   useViewsStore.setState({ helpTab: tab });
 }
 
-/** Selecting something in the sidebar leaves the settings or usage page. */
+/** Selecting something (a sidebar chord, the palette, the CLI) leaves the sheet or the usage page. */
 export function startViewSync(): () => void {
   let restoring = false;
   const unsubUi = useUiStore.subscribe((s, prev) => {
-    if (restoring || s.selection === prev.selection || !pageOpen()) return;
+    if (restoring || s.selection === prev.selection || !anyViewOpen()) return;
     // Cancel in the Themes editor's confirm: the page and its edits stay, and so does what was selected under it.
     const back = () => {
       restoring = true;

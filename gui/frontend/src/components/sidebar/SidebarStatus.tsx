@@ -3,7 +3,7 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { DaemonStatus } from "@/components/status/DaemonStatus";
 import { UpdateIndicator } from "@/components/update/UpdateIndicator";
 import { cn } from "@/lib/utils";
-import { useViewsStore } from "@/stores/views";
+import { selectSheetOpen, useViewsStore } from "@/stores/views";
 
 /**
  * The bottom of the sidebar, on the sheet: a pending update (when there is one) above
@@ -19,7 +19,8 @@ import { useViewsStore } from "@/stores/views";
  */
 export function SidebarStatus() {
   const usageOpen = useViewsStore((s) => s.usageOpen);
-  const settingsOpen = useViewsStore((s) => s.settingsOpen);
+  // The settings sheet, showing Settings or Themes.
+  const settingsOpen = useViewsStore(selectSheetOpen);
   return (
     <div className="flex shrink-0 flex-col gap-0.5 pt-1 pb-1.75 text-caption-sm" data-testid="sidebar-status">
       <UpdateIndicator />
@@ -37,7 +38,7 @@ export function SidebarStatus() {
             data-testid="status-usage"
           />
           <CommandButton command="view.help" icon={CircleHelp} tooltip="Keyboard Shortcuts and Help" data-testid="status-help" />
-          {/* A toggle like usage (showView "settings"): pressed while the settings page shows. */}
+          {/* A toggle like usage (toggleView "settings"): pressed while the settings sheet shows. */}
           <CommandButton
             command="view.settings"
             icon={Settings}

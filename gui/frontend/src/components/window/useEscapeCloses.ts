@@ -4,7 +4,8 @@ import { useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 
 /**
- * Escape closes a window-level page (settings, usage), unless the palette, help or a
+ * Escape closes a window-level page in the content pane (usage; the settings sheet is a
+ * dialog and handles its own, components/settings/SettingsSheet.tsx), unless the palette, help or a
  * confirmation is open, a field (or the key recorder, or a select's trigger) is being
  * edited, or the key comes from inside a floating surface (an open select's list, a
  * menu) or a dialog over the page (a plugin's log): Radix closes that one on the same

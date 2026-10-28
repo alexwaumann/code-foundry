@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Bell, FileText, GitBranch, Keyboard, Palette, Search, Settings2, SlidersHorizontal, TriangleAlert, Wrench, X, type LucideIcon } from "lucide-react";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
 import { FlameNavIcon } from "@/components/ember/Flame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tip } from "@/components/ui/tooltip";
-import { PaneHeader } from "@/components/window/PaneHeader";
-import { useEscapeCloses } from "@/components/window/useEscapeCloses";
+import { DialogTitle } from "@/components/ui/dialog";
+import { SheetHeader } from "@/components/window/SheetHeader";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
@@ -119,7 +119,8 @@ function FieldsPage({ schema, page }: { schema: SettingsSchemaView; page: Settin
 /**
  * The settings page (view.settings, cmd+,): tabs from the daemon's schema. A left nav of
  * pages, the current page's section cards, and a search across every page that replaces
- * the page with a flat list of matches while it has text.
+ * the page with a flat list of matches while it has text. Shown in the settings sheet
+ * (SettingsSheet), which also handles its Escape.
  */
 export function SettingsPage() {
   const schema = useSettingsStore((s) => s.schema);
@@ -129,13 +130,8 @@ export function SettingsPage() {
   const [query, setQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  // Esc clears the search first; with nothing to clear it closes the page.
-  const escape = useCallback(() => {
-    if (query) setQuery("");
-    else closeSettings();
-  }, [query]);
-  useEscapeCloses(escape);
 
+  // The search takes the keyboard on open (the sheet leaves its first focus to the page).
   useEffect(() => {
     void loadSettingsSchema();
     searchRef.current?.focus();
@@ -205,26 +201,25 @@ export function SettingsPage() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Settings" data-testid="settings-page">
-      <PaneHeader className="gap-3 px-4">
-        <h1 className="text-heading">Settings</h1>
-        <div className="relative max-w-xs flex-1 [--wails-draggable:no-drag]">
+      <SheetHeader className="gap-3 px-4">
+        <DialogTitle>Settings</DialogTitle>
+        <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-cf-text-muted" />
           <Input
             ref={searchRef}
             type="search"
             aria-label="Search settings"
+            data-sheet-focus
             placeholder="Search settings"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
             }}
             onKeyDown={(e) => {
-              // useEscapeCloses leaves a field's Escape alone: this one is the page's.
-              if (e.key !== "Escape") return;
-              e.preventDefault();
-              escape();
+              // Escape with text clears it; on an empty search the sheet closes (SettingsSheet).
+              if (e.key === "Escape" && query) setQuery("");
             }}
-            // The pane header's compact size, beside its xs buttons.
+            // The header's compact size, beside its xs buttons.
             className="h-7 pl-7 text-body-sm"
           />
         </div>
@@ -233,13 +228,13 @@ export function SettingsPage() {
             {tildify(path)}
           </span>
         </Tip>
-        <Button variant="outline" size="xs" className="[--wails-draggable:no-drag]" onClick={() => void runCommand("settings.reveal")} data-testid="reveal-settings">
+        <Button variant="outline" size="xs" onClick={() => void runCommand("settings.reveal")} data-testid="reveal-settings">
           <FileText /> Reveal settings file
         </Button>
-        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close settings" onClick={closeSettings}>
+        <Button variant="ghost" size="icon-xs" aria-label="Close settings" onClick={closeSettings}>
           <X />
         </Button>
-      </PaneHeader>
+      </SheetHeader>
       <div className="flex min-h-0 flex-1">
         <SettingsNav pages={pages} current={searching ? null : (page?.id ?? null)} counts={counts} onPick={pick} />
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
