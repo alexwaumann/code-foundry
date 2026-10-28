@@ -263,9 +263,14 @@ export function TimelineList<R extends ListRow>({
     if (!citable || !el) return;
     return registerTimeline(threadId, {
       scroller: el,
-      showRow: (key) => {
+      showRow: (key, align = "center") => {
         const i = rowsRef.current.findIndex((r) => r.key === key);
         if (i < 0) return false;
+        if (align === "start") {
+          pinned.current = false;
+          v.scrollToIndex(i, { align: "start" });
+          return true;
+        }
         const node = el.querySelector(`[data-index="${String(i)}"]`);
         const box = el.getBoundingClientRect();
         const at = node?.getBoundingClientRect();

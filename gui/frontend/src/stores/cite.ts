@@ -81,9 +81,10 @@ export interface TimelineHandle {
   /**
    * Brings the row with this key into view (scrolling only when it is not mounted and in
    * view already, clear of the composer over the list's bottom); false when no row has
-   * that key (its turn is folded).
+   * that key (its turn is folded). `align` "start" always scrolls the row to just under
+   * the list's top (the prompt rail's jump; the previous prompts' Show in thread).
    */
-  showRow(key: string): boolean;
+  showRow(key: string, align?: "center" | "start"): boolean;
   /** Stops following the bottom, before a scroll of the cite layer's own. */
   unpin(): void;
   /** Opens the row that folds an item away (Ember's work row); false when none does. Unset (a thread's timeline, whose fold never hides text): nothing to open. */

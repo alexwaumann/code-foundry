@@ -3987,6 +3987,18 @@ export class World {
       },
       {
         cmd: {
+          name: "composer.history",
+          title: "Previous Prompts",
+          category: "View",
+          description: "Show the prompts you sent, to put one back in the composer: above the focused composer, else in the command palette.",
+          keybindings: [],
+          args: [],
+        },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "composer.history" } } }))}`,
+      },
+      {
+        cmd: {
           name: "view.panel.worktree",
           title: "Show Worktree in Side Panel",
           category: "View",

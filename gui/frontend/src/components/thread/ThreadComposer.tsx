@@ -3,6 +3,8 @@ import { AlarmClockOff, ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
 import { CompletionCard } from "@/components/compose/CompletionCard";
+import { PromptHistoryCard } from "@/components/compose/PromptHistoryCard";
+import { usePromptPicker } from "@/components/compose/usePromptHistory";
 import { ATTACHMENT_ACCEPT, Attachments, SEND_DISABLED } from "@/components/compose/Composer";
 import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
@@ -44,6 +46,7 @@ const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
  * its cwd, the home directory, which is never indexed; no repository for "#").
  */
 const HOME_TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+const NO_TRIGGERS: readonly TriggerChar[] = [];
 
 /**
  * The last ui promptFocusSeq a thread composer acted on. Module-level: selecting a thread
@@ -301,11 +304,23 @@ export function ThreadComposer({
   const refocus = () => editorRef.current?.focus();
   const editorEmpty = text.trim() === "" && !hasAttachments;
   const docked = pending.length > 0;
+  // Previous prompts: Up in the empty prompt (no tags, attachments or open card) opens it,
+  // in This thread (docs/notes/prompt-history-2-picker.md).
+  const historySource = useMemo(() => ({ threadId }), [threadId]);
+  const picker = usePromptPicker({
+    draftKey,
+    editorRef,
+    rootRef,
+    threadId,
+    source: historySource,
+    canOpen: editorEmpty && trigger === null && completion.show === "none",
+    blocked: inputOff || docked,
+  });
 
   return (
     // data-chord-yield: cmd chords bound to commands (cmd+j, cmd+r) reach
     // the app from the prompt, as they did from a thread's terminal (keys/bindings.ts).
-    <div className="relative" ref={rootRef} data-chord-yield="">
+    <div className="relative" ref={rootRef} data-chord-yield="" onBlur={picker.onBlur}>
       <div
         className={cn("ccard", docked && "docked")}
         data-testid="thread-composer"
@@ -359,9 +374,7 @@ export function ThreadComposer({
               placeholder={
                 transcriptMissing
                   ? "Transcript deleted"
-                  : busy
-                    ? (busyPlaceholder ?? BUSY_PLACEHOLDER)
-                    : (placeholder ?? PLACEHOLDER)
+                  : (picker.placeholder ?? (busy ? (busyPlaceholder ?? BUSY_PLACEHOLDER) : (placeholder ?? PLACEHOLDER)))
               }
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
@@ -369,10 +382,12 @@ export function ThreadComposer({
               onSubmit={send}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
-              triggers={sources.noProject ? HOME_TRIGGERS : TRIGGERS}
+              // The open picker filters on the text: no completion meanwhile.
+              triggers={picker.card.open ? NO_TRIGGERS : sources.noProject ? HOME_TRIGGERS : TRIGGERS}
               onTrigger={completion.onTrigger}
               onCompletionKey={completion.onKey}
-              completionAria={completion.aria}
+              completionAria={picker.aria ?? completion.aria}
+              onKeyDown={picker.onKeyDown}
             />
           </TagMultiProjectContext.Provider>
         </div>
@@ -501,6 +516,7 @@ export function ThreadComposer({
         )}
       </div>
       <CompletionCard completion={completion} above />
+      <PromptHistoryCard picker={picker.card} above />
     </div>
   );
 }

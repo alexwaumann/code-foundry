@@ -11,6 +11,7 @@ import { getEmberAttentionId } from "@/stores/ember";
 import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
+import { presentPromptHistory } from "@/stores/promptHistory";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
@@ -344,6 +345,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     markTerminalNewFromHere();
     return false;
   },
+  // Window-local: the focused composer's Previous prompts picker, else the palette's
+  // prompts page (stores/promptHistory.ts). The CLI's reaches every window through ShowView.
+  "composer.history": () => presentPromptHistory(),
   // Like cmd+k: opens this window's palette without a round trip. Deferred so that
   // picking it inside the palette (which closes after a presenter runs) reopens it.
   "ui.palette.open": () => {
