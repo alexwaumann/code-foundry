@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { Check, Link2, Monitor, Moon, Search, Sun, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Link2, Monitor, Moon, Search, Sun, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ import {
 } from "@/stores/themePicker";
 import { afterLeavingEditor, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
 import { deleteThemeFile, useThemesStore, useUserThemes } from "@/stores/themes";
-import { closeThemes } from "@/stores/views";
+import { closeThemes, themesToSettings } from "@/stores/views";
 import { useWidth } from "@/lib/useWidth";
 import { AskTheModel } from "./AskTheModel";
 import { editorLayout } from "./editor/model";
@@ -136,7 +136,15 @@ export function ThemesPage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Themes" data-testid="themes-page" data-keys-local onKeyDown={onKeyDown}>
       <SheetHeader className="gap-3 px-4">
-        <DialogTitle>Themes</DialogTitle>
+        {/* Themes lives under Settings: the crumb shows the way out without the ×. */}
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1" data-testid="themes-crumbs">
+          <button type="button" className="rounded-sm text-heading text-cf-text-muted outline-none hover:text-cf-text focus-visible:ring-2 focus-visible:ring-cf-focus" onClick={themesToSettings} data-testid="themes-crumb-settings">
+            Settings
+          </button>
+          <ChevronRight className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
+          <span className="sr-only"> › </span>
+          <DialogTitle aria-current="page">Themes</DialogTitle>
+        </nav>
         <Button variant="ghost" size="icon-xs" className="ml-auto" aria-label="Close themes" onClick={closeThemes}>
           <X />
         </Button>

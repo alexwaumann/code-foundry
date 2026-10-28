@@ -10,8 +10,10 @@ and Themes shows inside the same sheet. Frontend only.
 
 - **`DialogContent size="sheet"`** (`components/ui/dialog.tsx`). Centred
   (`top-1/2 left-1/2`, translated back by half), `w-[min(1280px,calc(100vw/var(--cf-zoom)-96px))]`,
-  `h-[min(800px,calc(100vh/var(--cf-zoom)-96px))]`: at most 1280×800 and never closer than
-  48px to a window edge, so below 1376×896 it shrinks with the window. The viewport units
+  `h-[min(1280px,calc(100vh/var(--cf-zoom)-96px))]`: at most 1280×1280 and never closer
+  than 48px to a window edge, so below 1376×1376 it shrinks with the window (the height
+  cap was 800 at first; a user wanted the sheet taller, so on a laptop window the margin
+  decides the height and only the width is capped). The viewport units
   divide by `--cf-zoom` like the default size's `top-[calc(14vh/…)]`. The px values zoom
   with the page, so the margin is 48 layout px (53 viewport px at 110%). It is a clipping
   flex column; the body lays out its own scrolling. `size="default"` is the old geometry.
@@ -32,6 +34,16 @@ and Themes shows inside the same sheet. Frontend only.
   toggle. cmd+, (`toggleView("settings")`) closes the sheet when it shows either body.
   `view.settings` joined `fieldYielded` in `keys/bindings.ts`, so cmd+, also works from
   the settings search, which has focus as soon as the sheet opens.
+
+## The Themes crumb
+
+Themes shows `Settings › Themes` where Settings showed its title: a user found it was not
+obvious that Themes sits inside Settings, so the only way back was the ×. The Settings
+crumb (`themesToSettings`) does what × does when Themes came from Settings (back to the
+page it came from), and opens Settings → Appearance when Themes was opened on its own
+(`theme.pick`, `theme.edit`), since Appearance is the page that leads to Themes. Unsaved
+edits ask first either way. `DialogTitle` is still "Themes", so the dialog's name is
+unchanged.
 
 ## Closing
 
@@ -110,14 +122,15 @@ matters now that Settings is a modal. `index.css` gives visible toasts
 ## Tests
 
 - `e2e/settings-sheet.spec.ts`:
-  - size at 1440×900 (the cap, centred), 1280×800 and 1000×700 (margin-limited), and
-    under 110% zoom;
+  - size at 1500×1400 (the cap, centred), 1440×900 (width capped, height margin-limited),
+    1280×800 and 1000×700 (margin-limited), and under 110% zoom;
   - gear, Escape, backdrop, × and cmd+, closing, with the prompt refocused;
   - a `settings:memory` link opening the sheet on Memory, and a toast clicked over the
     open sheet;
   - Escape in a select, the palette, the key recorder and help leaving the sheet open;
-  - Themes inside the sheet: same rect, one dialog, back to Appearance by Escape and ×,
-    backdrop closing everything, `theme.pick` alone closing on Escape;
+  - Themes inside the sheet: same rect, one dialog, back to Appearance by Escape, × and
+    the Settings crumb, backdrop closing everything, `theme.pick` alone closing on Escape
+    and its crumb opening Settings → Appearance;
   - the editor's Save… and Discard dialogs stacking over the sheet;
   - the editor fitting a 900×600 window.
 - Updated specs: things under the backdrop can no longer be clicked. `settings.spec`

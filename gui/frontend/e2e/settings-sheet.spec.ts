@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { emit, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 // Settings and Themes in one modal sheet over the window (docs/notes/settings-sheet.md):
-// centred, at most 1280x800, never closer than 48px to a window edge.
+// centred, at most 1280x1280, never closer than 48px to a window edge.
 
 test.beforeEach(async () => {
   await resetMock();
@@ -32,8 +32,10 @@ async function clickBackdrop(page: Page) {
 
 test.describe("size", () => {
   for (const [w, h, want] of [
-    // The cap: 1280x800 centred, with room to spare around it.
-    [1440, 900, { x: 80, y: 50, width: 1280, height: 800 }],
+    // The cap: 1280x1280 centred, with room to spare around it.
+    [1500, 1400, { x: 110, y: 60, width: 1280, height: 1280 }],
+    // Width at the cap, height margin-limited: a common laptop window.
+    [1440, 900, { x: 80, y: 48, width: 1280, height: 804 }],
     // Margin-limited: 48px from every edge.
     [1280, 800, { x: 48, y: 48, width: 1184, height: 704 }],
     [1000, 700, { x: 48, y: 48, width: 904, height: 604 }],
@@ -190,6 +192,14 @@ test("Themes opens inside the sheet and goes back to Appearance; theme.pick alon
   await page.getByRole("button", { name: "Close themes" }).click();
   await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
 
+  // And the Settings crumb in its header (Settings › Themes).
+  await page.getByTestId("choose-theme-dark").click();
+  await expect(themesPage(page)).toBeVisible();
+  await expect(page.getByTestId("themes-crumbs")).toHaveText(/Settings.*Themes/);
+  await page.getByTestId("themes-crumb-settings").click();
+  await expect(themesPage(page)).toHaveCount(0);
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
+
   // The backdrop closes the whole sheet, Themes or not.
   await page.getByTestId("choose-theme-dark").click();
   await expect(themesPage(page)).toBeVisible();
@@ -199,6 +209,15 @@ test("Themes opens inside the sheet and goes back to Appearance; theme.pick alon
   // theme.pick from outside Settings: Escape closes the sheet.
   expect(await emit({ showView: { name: "themes" } })).toBe(1);
   await expect(sheet(page).getByTestId("themes-page")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet(page)).toHaveCount(0);
+
+  // theme.pick from outside Settings: the crumb still leads to Settings → Appearance.
+  expect(await emit({ showView: { name: "themes" } })).toBe(1);
+  await expect(sheet(page).getByTestId("themes-page")).toBeVisible();
+  await page.getByTestId("themes-crumb-settings").click();
+  await expect(themesPage(page)).toHaveCount(0);
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
   await page.keyboard.press("Escape");
   await expect(sheet(page)).toHaveCount(0);
 });
