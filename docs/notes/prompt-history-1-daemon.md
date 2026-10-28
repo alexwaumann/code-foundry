@@ -95,7 +95,10 @@ when there is a thread (`--thread`, `$CODE_FOUNDRY_THREAD`, the GUI's active thr
 all. `--project` with another explicit scope is refused. Lines are `<age>  <thread id>
 <thread name>  <prompt>`, the prompt on one line and cut at 100 characters, like
 `thread list`. `NoPalette`, `ReadOnly`, `NoKeybinding`; the three pinned lists in the
-command tests gained it.
+command tests gained it. The agents' guide leaves it out (`guide.leftOut`, beside
+`thread.restart`): it is the user's history, not an agent's work, and its detailed Thread
+entry put the guide 900 bytes over its 25,500-byte soft cap (main had about 50 to spare).
+`thread.send --by` is hidden there already ("the CLI sets it").
 
 ## Mock
 
