@@ -59,6 +59,8 @@ close and simpler.
 - **Headless WebKit (Playwright) does not paint `backdrop-filter`.** It computes it (the
   e2e assertion passes), but screenshots from the mock app show the dim and no blur. Only
   the real Wails window shows the blur, so the PR's blur screenshot comes from an isolated
-  real app.
+  real app (`CODE_FOUNDRY_HOME=/tmp/...`, a scratch project with a terminal of text behind
+  `ui.palette.open`, `screencapture -l <window id>`). The shots are on the
+  `cf/modal-backdrop-shots` branch, not in the repo (notes are text only).
 - The overlay's opacity is animated, so read its computed colour only after
   `toHaveCSS("opacity", "1")`.
