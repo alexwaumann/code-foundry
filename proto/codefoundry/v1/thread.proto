@@ -384,6 +384,9 @@ enum MessageOrigin {
 // One text block of Claude's reply (markdown).
 message AssistantTextItem {
   string text = 1;
+  // Claude Code's synthetic API-error message (the request failed: authentication,
+  // rate limit, timeout, overload): text is its error wording, not a reply.
+  bool api_error = 2;
 }
 
 // One thinking block. Text is usually empty: Claude streams only its progress.

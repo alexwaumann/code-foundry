@@ -394,6 +394,9 @@ func TestProjectFixtures(t *testing.T) {
 		{"interrupt-pending", []string{"tool_call:Write error", "turn_end:error_during_execution interrupted"}},
 		{"compact", []string{"assistant_text:Hello (English)", "turn_end:success", "compaction:This session is being continued", "command_output:Compacted", "turn_end:success"}},
 		{"task", []string{"tool_call:Agent done", "tool_call:Write done sub", "thinking:", "assistant_text:Done.", "turn_end:success"}},
+		// Claude Code 2.1.312 with an invalid ANTHROPIC_API_KEY: a synthetic assistant
+		// message (error authentication_failed) and an is_error result with subtype success.
+		{"api-error", []string{"assistant_text:api_error Invalid API key · Fix external API key", "turn_end:success error"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {
@@ -423,8 +426,14 @@ func TestProjectFixtures(t *testing.T) {
 					if it.Turn.Interrupted {
 						d += " interrupted"
 					}
+					if it.Turn.IsError {
+						d += " error"
+					}
 				default:
 					d = firstLine(it.Text)
+				}
+				if it.APIError {
+					d = "api_error " + d
 				}
 				got = append(got, string(it.Kind)+":"+d)
 				if it.Streaming {
@@ -537,6 +546,45 @@ func TestRenderedStartCrash(t *testing.T) {
 	}
 	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
 		t.Fatalf("reconnect after a crash: %v", err)
+	}
+}
+
+// TestProjectAPIError: only an assistant frame Claude Code marks as an API error (its
+// error field or is_api_error_message) flags its text, streamed or not; another synthetic
+// message does not.
+func TestProjectAPIError(t *testing.T) {
+	tests := []struct {
+		name  string
+		lines []string
+		want  bool
+	}{
+		{"error field", []string{`{"type":"assistant","message":{"id":"m1","model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"API Error: Request timed out."}]},"parent_tool_use_id":null,"error":"unknown"}`}, true},
+		{"is_api_error_message", []string{`{"type":"assistant","message":{"id":"m1","model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Credit balance is too low"}]},"parent_tool_use_id":null,"is_api_error_message":true}`}, true},
+		{"synthetic without an error", []string{`{"type":"assistant","message":{"id":"m1","model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"No response requested."}]},"parent_tool_use_id":null}`}, false},
+		{"a reply", []string{`{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"API Error: is a heading"}]},"parent_tool_use_id":null}`}, false},
+		{"streamed then marked", []string{
+			`{"type":"stream_event","event":{"type":"message_start","message":{"id":"m1","model":"<synthetic>","role":"assistant","content":[]}},"parent_tool_use_id":null}`,
+			`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"parent_tool_use_id":null}`,
+			`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Rate limit"}},"parent_tool_use_id":null}`,
+			`{"type":"assistant","message":{"id":"m1","model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Rate limit reached"}]},"parent_tool_use_id":null,"error":"rate_limit"}`,
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := newThreadLog("s", bus.New(), time.Now, nil)
+			saved := map[string]Item{}
+			p := newProjector(itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }}, runningTotals{known: true})
+			for _, l := range tt.lines {
+				p.event(claudestream.Parse([]byte(l)))
+			}
+			items := log.snapshot().Items
+			if len(items) != 1 || items[0].Kind != KindAssistantText || items[0].Streaming {
+				t.Fatalf("items:\n%s", describeItems(items))
+			}
+			if items[0].APIError != tt.want || saved[items[0].ID].APIError != tt.want {
+				t.Errorf("APIError = %v (saved %v), want %v", items[0].APIError, saved[items[0].ID].APIError, tt.want)
+			}
+		})
 	}
 }
 

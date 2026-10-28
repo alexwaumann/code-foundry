@@ -329,6 +329,7 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 		// them its message_delta follows with the final output count.
 		p.noteUsage(e.Message.ID, e.Message.Usage)
 	}
+	apiErr := e.APIError()
 	for _, b := range e.Message.Content {
 		kind := blockKind(b.Type)
 		if kind == "" {
@@ -340,6 +341,9 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 				return o.kind == kind && (kind != KindToolCall || o.id == b.ID)
 			})
 			if i >= 0 {
+				if apiErr && kind == KindAssistantText {
+					p.w.change(blocks[i].id, func(it *Item) { it.APIError = true })
+				}
 				p.finish(blocks[i].id, &b)
 				p.drop(e.Message.ID, i)
 				continue
@@ -349,7 +353,7 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 		it := Item{Kind: kind, ParentToolUseID: e.ParentToolUseID}
 		switch kind {
 		case KindAssistantText:
-			it.ID, it.Text = p.nextID(e.Message.ID+"/t"), b.Text
+			it.ID, it.Text, it.APIError = p.nextID(e.Message.ID+"/t"), b.Text, apiErr
 		case KindThinking:
 			it.ID, it.Text = p.nextID(e.Message.ID+"/th"), b.Thinking
 		case KindToolCall:

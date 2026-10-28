@@ -190,6 +190,12 @@ func TestItemToProto(t *testing.T) {
 		{"created-by note", thread.Item{Kind: thread.KindNote, Text: "Created by Parent", NoteCreatedBy: "s-parent"}, func(p *v1.ThreadItem) bool {
 			return p.GetNote().GetText() == "Created by Parent" && p.GetNote().GetCreatedBy() == "s-parent"
 		}},
+		{"assistant text", thread.Item{Kind: thread.KindAssistantText, Text: "hi"}, func(p *v1.ThreadItem) bool {
+			return p.GetAssistantText().GetText() == "hi" && !p.GetAssistantText().GetApiError()
+		}},
+		{"api error text", thread.Item{Kind: thread.KindAssistantText, Text: "Invalid API key", APIError: true}, func(p *v1.ThreadItem) bool {
+			return p.GetAssistantText().GetText() == "Invalid API key" && p.GetAssistantText().GetApiError()
+		}},
 		{"subagent", thread.Item{Kind: thread.KindAssistantText, Text: "x", ParentToolUseID: "agent"}, func(p *v1.ThreadItem) bool { return p.GetParentToolUseId() == "agent" }},
 		{"unknown kind", thread.Item{Kind: "future"}, func(p *v1.ThreadItem) bool { return p.GetPayload() == nil }},
 	}
