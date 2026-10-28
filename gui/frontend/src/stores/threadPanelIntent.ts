@@ -9,8 +9,8 @@
  * Unlike the window's own panel commands (stores/views.ts), they never take keyboard
  * focus (the user may be typing in another thread's prompt), never toast (a "No linked
  * PRs yet" about a thread the user is not looking at would puzzle them; the action is
- * just a no-op), and apply while the settings or usage page is up, since what they change
- * is the thread's panel, not the screen.
+ * just a no-op), and apply under a sheet (Settings, Themes, Usage), since what they
+ * change is the thread's panel, not the screen.
  *
  * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
  * daemon checked it exists first (internal/command/commands_view_items.go).

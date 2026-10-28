@@ -15,7 +15,7 @@ import { ConsentDialog } from "@/components/plugin/ConsentDialog";
 import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsSheet } from "@/components/settings/SettingsSheet";
-import { UsagePage } from "@/components/usage/UsagePage";
+import { UsageSheet } from "@/components/usage/UsageSheet";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
@@ -40,7 +40,7 @@ import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
-import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
+import { startViewSync } from "@/stores/views";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
@@ -196,11 +196,9 @@ function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactN
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
-  const usageOpen = useViewsStore((s) => s.usageOpen);
-  // Usage hides the panel, so the content pane shows the page even then. Settings and
-  // Themes are a modal sheet over the window (SettingsSheet), which stays as it was.
-  const pageOpen = useViewsStore(selectPageOpen);
-  const panelExpanded = usePanelExpanded() && !pageOpen;
+  // Settings, Themes and Usage are modal sheets over the window (SettingsSheet,
+  // UsageSheet), which stays laid out under them: no page replaces the content pane.
+  const panelExpanded = usePanelExpanded();
   useWindowTitle(useAttentionCount(useShowCreatedThreads()));
 
   return (
@@ -222,11 +220,14 @@ export function App() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <ContentColumn hidden={panelExpanded}>
-            <ContentPane>{usageOpen ? <UsagePage /> : <Content />}</ContentPane>
+            <ContentPane>
+              <Content />
+            </ContentPane>
           </ContentColumn>
           <SidePanel />
         </div>
         <SettingsSheet />
+        <UsageSheet />
         <CommandPalette />
         <HelpOverlay />
         <ConfirmDialog />

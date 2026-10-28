@@ -77,9 +77,9 @@ async function startShell(ctx: UiContextView, args: Record<string, string> = {})
 }
 
 /**
- * Lets the selection's bottom panel show and take the keyboard: the Usage page closes, and
- * so does the settings sheet (a modal keeps focus inside it, so a shell under it could not
- * be typed in), and its side panel leaves full width (an expanded side panel hides the
+ * Lets the selection's bottom panel show and take the keyboard: an open sheet (Settings,
+ * Themes or Usage) closes, since a modal keeps focus inside it and a shell under it could
+ * not be typed in, and its side panel leaves full width (an expanded side panel hides the
  * content column).
  */
 function uncoverBottom(key: string): void {
@@ -120,7 +120,7 @@ function showOwnShell(key: string, id: string): void {
 
 /**
  * Opens a key's panel (on shell `id`, if given). If it is the selection's, uncovers it
- * (Settings, Usage, an expanded side panel) and focuses it (the active terminal, else the
+ * (closes a sheet, unexpands the side panel) and focuses it (the active terminal, else the
  * panel), or makes it the open palette's return target.
  */
 function showBottom(key: string, id?: string): void {
@@ -318,9 +318,8 @@ export function revealArrived(): void {
 
 /**
  * The focusTerminal intent for a shell: select its owner (the thread, or the Projects
- * page for a worktree's shell), open that panel with the shell active, and focus it. The
- * settings and usage pages close, and the owner's side panel leaves full width, so the
- * panel shows. False when the terminal is unknown (it is revealed when it arrives, if it
+ * page for a worktree's shell), open that panel with the shell active, and focus it. An
+ * open sheet closes, and the owner's side panel leaves full width, so the panel shows. False when the terminal is unknown (it is revealed when it arrives, if it
  * is a shell) or no shell.
  */
 export function revealShell(id: string): boolean {

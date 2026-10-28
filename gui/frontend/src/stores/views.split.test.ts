@@ -66,12 +66,15 @@ describe("splitPanelCommand", () => {
     expect(getPanel()).toEqual({ open: true, groups: [{ tabs: [], activeTabId: null }] });
   });
 
-  it("is a no-op while a page is up or with nothing selected", () => {
+  it("splits the panel under a sheet (it stays laid out under the backdrop)", () => {
     usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
     useViewsStore.setState({ usageOpen: true });
-    expect(splitPanelCommand()).toBe(false);
-    expect(getPanel().groups).toHaveLength(1);
-    useViewsStore.setState({ usageOpen: false });
+    expect(splitPanelCommand()).toBe(true);
+    expect(getPanel().groups).toHaveLength(2);
+  });
+
+  it("is a no-op with nothing selected", () => {
+    usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [files, diff], activeTabId: diff.id }] } } });
     useUiStore.getState().select({ kind: "none" });
     expect(splitPanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey["thread:a"]?.groups).toHaveLength(1);

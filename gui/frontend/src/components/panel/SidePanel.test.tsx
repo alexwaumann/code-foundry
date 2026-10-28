@@ -84,7 +84,7 @@ describe("SidePanel", () => {
     expect(sep.getAttribute("aria-valuemax")).toBe("600");
   });
 
-  it("expanded, it fills the row without a resize handle, shows without room, and the usage page still hides it", () => {
+  it("expanded, it fills the row without a resize handle, shows without room, and stays under the usage sheet", () => {
     usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500, expanded: true } } });
     useUiStore.setState({ windowWidth: 1000, sidebarWidth: 520 });
     render(<SidePanel />);
@@ -96,7 +96,8 @@ describe("SidePanel", () => {
     act(() => {
       useViewsStore.setState({ usageOpen: true });
     });
-    expect(screen.queryByTestId("side-panel")).toBeNull();
+    // A sheet is a modal over the window: the panel stays laid out under its backdrop.
+    expect(screen.getByTestId("side-panel")).toBeTruthy();
     // Back to the split: the stored width and the handle return (the room allows it again).
     act(() => {
       useViewsStore.setState({ usageOpen: false });

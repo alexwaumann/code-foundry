@@ -125,7 +125,7 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     expect(getPanel("thread:s-main").groups[0]?.tabs[0]?.title).toBe("web");
   });
 
-  it("does nothing for a thread outside any worktree, on a page, or under the usage page", () => {
+  it("does nothing for a thread outside any worktree or on a page, and opens under the usage sheet", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-lost");
     expect(worktreePanelCommand()).toBe(false);
@@ -135,8 +135,8 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     expect(getPanel("view:projects").open).toBe(false);
     select("s-feat");
     useViewsStore.setState({ usageOpen: true });
-    expect(worktreePanelCommand()).toBe(false);
-    expect(getPanel("thread:s-feat").open).toBe(false);
+    expect(worktreePanelCommand()).toBe(true);
+    expect(getPanel("thread:s-feat").open).toBe(true);
   });
 
   it("is reached through ShowView panel.worktree and, from the palette, returns focus to the panel", () => {

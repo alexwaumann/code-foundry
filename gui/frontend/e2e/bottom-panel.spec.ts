@@ -242,7 +242,7 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "280");
 });
 
-test("no bottom panel on the dashboard, the Pull Requests page, usage, or under an expanded side panel; it stays under the settings sheet", async ({ page }) => {
+test("no bottom panel on the dashboard, the Pull Requests page, or under an expanded side panel; it stays under the settings and usage sheets", async ({ page }) => {
   await openApp(page);
   // The dashboard: no toggle, and cmd+j does nothing.
   await page.keyboard.press("Meta+j");
@@ -272,11 +272,13 @@ test("no bottom panel on the dashboard, the Pull Requests page, usage, or under 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await expect(bottom(page)).toBeVisible();
-  // The Usage page hides it.
+  // So is the Usage sheet, and the panel keeps its stream.
   await page.getByTestId("status-usage").click();
   await expect(page.getByTestId("usage-page")).toBeVisible();
-  await expect(bottom(page)).toHaveCount(0);
+  await expect(bottom(page)).toBeVisible();
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await page.getByTestId("usage-page-close").click();
+  await expect(page.getByTestId("usage-page")).toHaveCount(0);
   await expect(bottom(page)).toBeVisible();
 
   // The side panel expanded over the content column hides it too, and detaches it.

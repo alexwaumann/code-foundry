@@ -1,9 +1,11 @@
 /**
  * Window-level views that are not selections: the settings and themes sheet (one modal
  * over the window showing Settings or Themes, docs/notes/settings-sheet.md), the usage
- * page (replaces the content area; at most one of the three is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
- * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
- * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
+ * sheet (docs/notes/usage-sheet.md; at most one of the three is open) and the help
+ * overlay. None replaces the content area: the window stays laid out under them.
+ * Top-level pages that are selections (ui.ts `viewNames`, the Pull Requests page) are
+ * routed to `select`. Opened by view.settings / view.help (their chords are presented
+ * locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
  * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
  */
 import { toast } from "sonner";
@@ -31,7 +33,10 @@ interface ViewsState {
    * General; coming back from the Themes page keeps the page it was opened from.
    */
   settingsPage: string;
-  /** The Usage page (view.usage, docs/notes/session-usage.md). Never open with settings. */
+  /**
+   * The Usage page (view.usage, docs/notes/session-usage.md), shown in its own sheet
+   * (docs/notes/usage-sheet.md). Never open with settings or themes.
+   */
   usageOpen: boolean;
   /**
    * The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md), shown in the
@@ -58,19 +63,6 @@ export const useViewsStore = create<ViewsState>()(() => ({
   helpTab: "guide",
 }));
 
-/**
- * A window-level page (usage) covers the content area. It hides the side panel and the
- * bottom panel, so the panel commands are no-ops meanwhile. The settings and themes sheet
- * does not count: it is a modal over the window, which stays laid out (dimmed) under it.
- */
-export function selectPageOpen(s: ViewsState): boolean {
-  return s.usageOpen;
-}
-
-function pageOpen(): boolean {
-  return selectPageOpen(useViewsStore.getState());
-}
-
 /** The settings and themes sheet is up (showing Settings or Themes). */
 export function selectSheetOpen(s: ViewsState): boolean {
   return s.settingsOpen || s.themesOpen;
@@ -91,15 +83,15 @@ function sideExpanded(): boolean {
 /** The key whose bottom panel is on screen now (bottomVisible, read imperatively), or null. */
 export function visibleBottomKey(): string | null {
   const key = bottomKeyOf(useUiStore.getState().selection);
-  return key !== null && bottomVisible(key, getBottom(key).open, pageOpen(), sideExpanded()) ? key : null;
+  return key !== null && bottomVisible(key, getBottom(key).open, sideExpanded()) ? key : null;
 }
 
 /**
- * Whether a key's bottom panel would be on screen if it were open: the usage page is not
- * up and the side panel is not expanded over the content column.
+ * Whether a key's bottom panel would be on screen if it were open: the side panel is not
+ * expanded over the content column.
  */
 export function bottomCanShow(key: string): boolean {
-  return bottomVisible(key, true, pageOpen(), sideExpanded());
+  return bottomVisible(key, true, sideExpanded());
 }
 
 /**
@@ -211,7 +203,7 @@ export function showView(name: string): boolean {
       jumpToNeighbour(1);
       return true;
     default:
-      // A plugin surface's show command (stores/pluginPanel.ts): a page would hide the panel.
+      // A plugin surface's show command (stores/pluginPanel.ts): a sheet would cover the panel.
       if (parsePluginView(name)) {
         if (!editingThemes()) {
           useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
@@ -252,8 +244,8 @@ export function historyCommand(by: 1 | -1): boolean {
 }
 
 /**
- * view.panel.toggle for the current selection. A no-op while the usage page is up: it
- * hides the panel, so a toggle there would flip state the user cannot see.
+ * view.panel.toggle for the current selection. Under a sheet (Settings, Themes, Usage) it
+ * acts on the panel under the backdrop; the sheet's focus trap keeps the keyboard.
  *
  * Focus: toggling on focuses the panel. Hiding the panel while it has focus hands focus
  * to the content pane (a thread's prompt, or the page's focus root). With the palette open
@@ -261,7 +253,6 @@ export function historyCommand(by: 1 | -1): boolean {
  * is what moves: to the panel when it opens, off it when it hides.
  */
 export function togglePanelCommand(): boolean {
-  if (pageOpen()) return getPanel().open;
   const ui = useUiStore.getState();
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
@@ -277,9 +268,9 @@ export function togglePanelCommand(): boolean {
 
 /**
  * view.bottom.toggle for the current selection (a thread or the Projects page; other
- * selections have no bottom panel and it does nothing). A no-op while the
- * usage page is up, or while the side panel fills the content area: both hide the bottom
- * panel, so a toggle there would flip state the user cannot see.
+ * selections have no bottom panel and it does nothing). A no-op while the side panel
+ * fills the content area: it hides the bottom panel, so a toggle there would flip state
+ * the user cannot see.
  *
  * Focus works like view.panel.toggle: showing focuses the panel (its active terminal, else
  * the panel), hiding it while it has focus hands focus to the content pane, and with the
@@ -309,18 +300,14 @@ export function toggleBottomCommand(): boolean {
 
 /**
  * view.panel.expand for the current selection: flips its panel between the split and the
- * full width of the content area. A hidden panel is shown expanded. A no-op while the
- * usage page is up (it hides the panel) and with nothing selected.
+ * full width of the content area. A hidden panel is shown expanded. A no-op with nothing
+ * selected.
  *
  * Focus stays where it was, unless it was in the content pane, which expanding hides:
  * then it moves to the panel. With the palette open, its return target moves instead.
  * Restoring the split leaves focus alone (in the panel, typically).
  */
 export function expandPanelCommand(): boolean {
-  if (pageOpen()) {
-    const e = getPanel();
-    return e.open && (e.expanded ?? false);
-  }
   const ui = useUiStore.getState();
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
@@ -336,14 +323,13 @@ export function expandPanelCommand(): boolean {
  * its panel if hidden, with the surface list ("Open a surface") instead of the active
  * tab (stores/panel.ts startPicking). No tab is added until a surface is picked; Escape
  * goes back. A panel without tabs shows the list anyway, so it is only shown. A no-op
- * while the usage page is up and with nothing selected. In a split panel it
+ * with nothing selected. In a split panel it
  * picks in the focused group; a group's own "+" focuses that group before it runs.
  *
  * Focus moves to the panel, like toggling it on, so Escape and the surface letters work
  * at once; with the palette open, its return target moves there instead.
  */
 export function newPanelTabCommand(): boolean {
-  if (pageOpen()) return false;
   const inPalette = useUiStore.getState().palette.open;
   if (!startPanelPicking("current", { focus: !inPalette })) return false;
   if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
@@ -356,15 +342,13 @@ export function newPanelTabCommand(): boolean {
  * tab the new group starts on its surface list), or joins a split panel's groups back
  * into one (unsplit). A hidden panel is shown, split: a hidden split panel just shows,
  * since joining groups the user cannot see would be a surprise. A panel without tabs has
- * nothing to split (it is only shown). A no-op while the usage page is up and
- * with nothing selected. Returns whether the panel is split afterwards.
+ * nothing to split (it is only shown). A no-op with nothing selected. Returns whether the panel is split afterwards.
  *
  * Focus: splitting moves it to the panel (the new group is the focused one), like
  * view.panel.new-tab; with the palette open, its return target moves there instead.
  * Joining keeps focus in the panel when it was there (the second group's strip is gone).
  */
 export function splitPanelCommand(): boolean {
-  if (pageOpen()) return false;
   const ui = useUiStore.getState();
   const inPalette = ui.palette.open;
   const e = getPanel();
@@ -380,16 +364,14 @@ export function splitPanelCommand(): boolean {
 
 /**
  * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
- * the selected thread's own worktree in its panel and shows the panel. A no-op while the
- * usage page is up (a window reached through the CLI's ShowView may have
- * anything selected) and when the selection is not in a registered worktree (a page, a
- * composer, a thread whose cwd is elsewhere).
+ * the selected thread's own worktree in its panel and shows the panel. A no-op when the
+ * selection is not in a registered worktree (a page, a composer, a thread whose cwd is
+ * elsewhere; a window reached through the CLI's ShowView may have anything selected).
  *
  * Focus moves to the panel, like toggling it on; with the palette open, its return target
  * moves there instead.
  */
 export function worktreePanelCommand(): boolean {
-  if (pageOpen()) return false;
   const key = openWorktreeSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
@@ -402,12 +384,11 @@ export function worktreePanelCommand(): boolean {
  * view.panel.linked-prs for the current selection: opens (or activates) the Linked PRs tab
  * in the selected thread's panel and shows the panel, like view.panel.worktree. A thread
  * without linked pull requests gets a brief "No linked PRs yet" toast instead. A no-op
- * while the usage page is up and when the selection is no thread.
+ * when the selection is no thread.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function linkedPrsPanelCommand(): boolean {
-  if (pageOpen()) return false;
   const target = linkedPrsTarget();
   if (target !== "linked") {
     if (target === "none") toast("No linked PRs yet", { description: "Pull requests this thread creates or mentions show up here." });
@@ -424,13 +405,12 @@ export function linkedPrsPanelCommand(): boolean {
 /**
  * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
  * selected thread's panel and shows the panel, like view.panel.worktree. A thread
- * without usage opens it too (the surface says "No usage yet"). A no-op while the
- * usage page is up and when the selection is no thread.
+ * without usage opens it too (the surface says "No usage yet"). A no-op when the
+ * selection is no thread.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function usagePanelCommand(): boolean {
-  if (pageOpen()) return false;
   const key = openUsageSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
@@ -442,12 +422,11 @@ export function usagePanelCommand(): boolean {
 /**
  * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
  * selected thread's panel and shows the panel, like view.panel.usage. A no-op
- * while the usage page is up and when no thread is selected.
+ * when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function mcpPanelCommand(): boolean {
-  if (pageOpen()) return false;
   const key = openMcpSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
@@ -460,13 +439,11 @@ export function mcpPanelCommand(): boolean {
  * view.panel.agents for the current selection: opens (or activates) the Agents tab in the
  * selected thread's panel and shows the panel, like view.panel.mcp. A thread without
  * subagent runs (the surface is hidden) gets a brief "No agents yet" toast instead, like
- * view.panel.linked-prs. A no-op while the usage page is up and when no
- * thread is selected.
+ * view.panel.linked-prs. A no-op when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function agentsPanelCommand(): boolean {
-  if (pageOpen()) return false;
   const target = agentsPanelTarget();
   if (target !== "agents") {
     if (target === "none") toast("No agents yet", { description: "Claude's subagents (the Agent tool) show here as they run." });
@@ -484,13 +461,11 @@ export function agentsPanelCommand(): boolean {
  * view.panel.threads for the current selection: opens (or activates) the Threads tab in
  * the selected thread's panel and shows the panel, like view.panel.agents. A thread
  * without lineage (no creator, siblings or children: the surface is hidden) gets a brief
- * "No related threads" toast instead. A no-op while the usage page is up and
- * when no thread is selected.
+ * "No related threads" toast instead. A no-op when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function threadsPanelCommand(): boolean {
-  if (pageOpen()) return false;
   const target = threadsPanelTarget();
   if (target !== "related") {
     if (target === "none") toast("No related threads", { description: "Threads an agent here creates (code-foundry thread new) show up here." });
@@ -667,7 +642,7 @@ export function setHelpTab(tab: HelpTab): void {
   useViewsStore.setState({ helpTab: tab });
 }
 
-/** Selecting something (a sidebar chord, the palette, the CLI) leaves the sheet or the usage page. */
+/** Selecting something (a sidebar chord, the palette, the CLI) closes the settings or usage sheet. */
 export function startViewSync(): () => void {
   let restoring = false;
   const unsubUi = useUiStore.subscribe((s, prev) => {

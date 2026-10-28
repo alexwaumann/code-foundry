@@ -156,13 +156,13 @@ export function neighbourOf(ids: readonly string[], id: string): string | null {
 }
 
 /**
- * Whether a key's bottom panel is on screen: there is a key, its panel is open, no
- * settings or usage page covers the content area, and the side panel is not expanded over
- * it. The one rule BottomPanel, visibleBottomKey (stores/views.ts) and
- * toggleBottomCommand share.
+ * Whether a key's bottom panel is on screen: there is a key, its panel is open, and the
+ * side panel is not expanded over the content column. The one rule BottomPanel,
+ * visibleBottomKey (stores/views.ts) and toggleBottomCommand share. A sheet (Settings,
+ * Themes, Usage) does not hide it: it is a modal over the window, which stays laid out.
  */
-export function bottomVisible(key: string | null, open: boolean, pageOpen: boolean, sideExpanded: boolean): key is string {
-  return key !== null && open && !pageOpen && !sideExpanded;
+export function bottomVisible(key: string | null, open: boolean, sideExpanded: boolean): key is string {
+  return key !== null && open && !sideExpanded;
 }
 
 /** A new shell for this key: show the panel with it active. */
