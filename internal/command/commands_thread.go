@@ -550,6 +550,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			}
 		case it.GetAssistantText() != nil:
 			body = "claude: " + line(it.GetAssistantText().GetText())
+			if it.GetAssistantText().GetApiError() {
+				// Claude Code's error wording, not a reply (docs/notes/api-error-reply-flag.md).
+				body = "claude (API error): " + line(it.GetAssistantText().GetText())
+			}
 		case it.GetThinking() != nil:
 			body = "thinking"
 			if t := it.GetThinking().GetText(); t != "" {

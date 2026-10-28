@@ -67,3 +67,19 @@ func TestThreadRead(t *testing.T) {
 		t.Errorf("thread.read = %+v", c)
 	}
 }
+
+// TestThreadReadAPIError: Claude Code's synthetic API-error text reads as one.
+func TestThreadReadAPIError(t *testing.T) {
+	reg, fake := newThreadRegistry(t)
+	fake.PutItems("s1",
+		thread.Item{ID: "i1", Kind: thread.KindUserMessage, Text: "hi"},
+		thread.Item{ID: "i2", Kind: thread.KindAssistantText, Text: "Invalid API key · Fix external API key", APIError: true},
+	)
+	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.read", map[string]string{"id": "s1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "#1 you: hi\n#2 claude (API error): Invalid API key · Fix external API key"; res.Message != want {
+		t.Errorf("message =\n%s\nwant\n%s", res.Message, want)
+	}
+}

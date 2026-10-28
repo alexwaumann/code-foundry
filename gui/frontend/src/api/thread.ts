@@ -135,7 +135,12 @@ export type ThreadItemView = ItemBase &
      * queued: set while Claude has not read it yet (sent while it worked; docs/notes/orch-queued-placement.md).
      */
     | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView; resumeNote?: string; queued?: true }
-    | { kind: "text"; text: string }
+    /**
+     * Claude's text. apiError: Claude Code's synthetic API-error message (the request failed:
+     * auth, rate limit, timeout, overload), so the text is its error wording, not a reply
+     * (docs/notes/api-error-reply-flag.md).
+     */
+    | { kind: "text"; text: string; apiError?: true }
     | { kind: "thinking"; text: string }
     | ({ kind: "tool" } & ToolCallView)
     | { kind: "permission"; request: ThreadRequestView }
@@ -270,7 +275,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         ...(p.value.queued ? { queued: true as const } : {}),
       };
     case "assistantText":
-      return { ...base, kind: "text", text: p.value.text };
+      return { ...base, kind: "text", text: p.value.text, ...(p.value.apiError ? { apiError: true as const } : {}) };
     case "thinking":
       return { ...base, kind: "thinking", text: p.value.text };
     case "toolCall":

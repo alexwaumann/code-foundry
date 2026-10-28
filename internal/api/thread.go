@@ -312,7 +312,7 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 	case thread.KindUserMessage:
 		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: userMessageToProto(it)}
 	case thread.KindAssistantText:
-		p.Payload = &v1.ThreadItem_AssistantText{AssistantText: &v1.AssistantTextItem{Text: it.Text}}
+		p.Payload = &v1.ThreadItem_AssistantText{AssistantText: &v1.AssistantTextItem{Text: it.Text, ApiError: it.APIError}}
 	case thread.KindThinking:
 		p.Payload = &v1.ThreadItem_Thinking{Thinking: &v1.ThinkingItem{Text: it.Text}}
 	case thread.KindToolCall:

@@ -1155,8 +1155,11 @@ func (x *UserMessageItem) GetSeedPrefix() string {
 
 // One text block of Claude's reply (markdown).
 type AssistantTextItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// Claude Code's synthetic API-error message (the request failed: authentication,
+	// rate limit, timeout, overload): text is its error wording, not a reply.
+	ApiError      bool `protobuf:"varint,2,opt,name=api_error,json=apiError,proto3" json:"api_error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1196,6 +1199,13 @@ func (x *AssistantTextItem) GetText() string {
 		return x.Text
 	}
 	return ""
+}
+
+func (x *AssistantTextItem) GetApiError() bool {
+	if x != nil {
+		return x.ApiError
+	}
+	return false
 }
 
 // One thinking block. Text is usually empty: Claude streams only its progress.
@@ -5533,9 +5543,10 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"resumeNote\x12\x16\n" +
 	"\x06queued\x18\b \x01(\bR\x06queued\x12\x1f\n" +
 	"\vseed_prefix\x18\t \x01(\tR\n" +
-	"seedPrefix\"'\n" +
+	"seedPrefix\"D\n" +
 	"\x11AssistantTextItem\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"\"\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1b\n" +
+	"\tapi_error\x18\x02 \x01(\bR\bapiError\"\"\n" +
 	"\fThinkingItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\xed\x01\n" +
 	"\fToolCallItem\x12\x1e\n" +

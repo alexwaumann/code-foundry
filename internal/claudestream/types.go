@@ -229,10 +229,17 @@ type Assistant struct {
 	ParentToolUseID string     `json:"parent_tool_use_id"`
 	// Aborted: truncated by an interrupt; the text may end mid-word.
 	Aborted bool `json:"aborted,omitempty"`
-	// Error is set on synthetic API-error messages (rate_limit, overloaded, ...).
-	Error        string `json:"error,omitempty"`
-	SubagentType string `json:"subagent_type,omitempty"`
+	// Error is set on synthetic API-error messages (authentication_failed, rate_limit,
+	// server_error, ...); IsAPIErrorMessage marks them too. Such a message (model
+	// "<synthetic>") holds Claude Code's error wording as its text, not a reply.
+	Error             string `json:"error,omitempty"`
+	IsAPIErrorMessage bool   `json:"is_api_error_message,omitempty"`
+	SubagentType      string `json:"subagent_type,omitempty"`
 }
+
+// APIError reports a synthetic API-error message: the request failed (auth, rate limit,
+// timeout, overload) and the text is Claude Code's error wording.
+func (a *Assistant) APIError() bool { return a.IsAPIErrorMessage || a.Error != "" }
 
 // APIMessage is an Anthropic Messages API message.
 type APIMessage struct {

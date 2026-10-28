@@ -651,12 +651,16 @@ export function setAnswering(threadId: string, requestId: string, on: boolean): 
   });
 }
 
-/** What the timeline knows about an item. */
+/**
+ * What the timeline knows about an item. Claude Code's API-error text (apiError) is an
+ * error there, not Claude's text: a red row that is no answer (no Copy answer, never a
+ * final text, never Ember's reply) and stays when the turn folds.
+ */
 export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] {
   const req = it.kind === "permission" || it.kind === "question" ? it.request : null;
   return {
     id: it.id,
-    kind: it.kind,
+    kind: it.kind === "text" && it.apiError ? "error" : it.kind,
     name: it.kind === "tool" ? it.name : (req?.toolName ?? ""),
     parentToolUseId: it.parentToolUseId,
     toolUseId: it.kind === "tool" ? it.toolUseId : (req?.toolUseId ?? ""),

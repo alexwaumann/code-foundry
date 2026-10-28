@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadItemView, TurnEndView } from "@/api/thread";
 import { citeLink, citeToken, type CitationBody } from "./citation";
-import { appendToDraft, draftOfSent, failedPrompt, sentAttachmentNames, type FailedPromptInput } from "./failedPrompt";
+import { apiErrorDetail, appendToDraft, draftOfSent, failedPrompt, sentAttachmentNames, type FailedPromptInput } from "./failedPrompt";
 
 const T0 = Date.UTC(2026, 9, 28, 10, 0, 0);
 
@@ -22,6 +22,8 @@ const user = (text = "Fix the badge", o: { wake?: boolean; queued?: boolean } = 
 });
 const text = (t: string, parent = ""): ThreadItemView => ({ ...base({ parent }), kind: "text", text: t });
 const error = (t: string): ThreadItemView => ({ ...base(), kind: "error", text: t });
+/** Claude Code's synthetic API-error message (docs/notes/api-error-reply-flag.md). */
+const apiError = (t: string): ThreadItemView => ({ ...base(), kind: "text", text: t, apiError: true });
 const tool = (): ThreadItemView => ({ ...base(), kind: "tool", toolUseId: "toolu_1", name: "Bash", inputJson: "{}", status: "done", output: "", isError: false, resultJson: "" });
 const commandOutput = (t: string): ThreadItemView => ({ ...base(), kind: "commandOutput", text: t });
 const note = (t: string): ThreadItemView => ({ ...base(), kind: "note", text: t, createdBy: "" });
@@ -108,6 +110,17 @@ describe("failedPrompt", () => {
     ["a busy status from a process that is gone means nothing", () => input([user(), error("Claude did not start: killed")], { state: "disconnected", status: "busy" }), DID_NOT_START],
     ["prompts docked", () => input([user(), error("Claude did not start: killed")], { pending: 1 }), null],
     ["the transcript is gone", () => input([user(), error("Claude did not start: killed")], { transcriptMissing: true }), null],
+    [
+      "an API error in place of a reply (captured: invalid key)",
+      () => input([user(), apiError("Invalid API key · Fix external API key"), turnEnd({ subtype: "success", isError: true, terminalReason: "api_error" })]),
+      "The request failed (invalid API key), so your message was not sent.",
+    ],
+    ["an API error before its turn end arrives", () => input([user(), apiError("API Error: Request timed out.")]), "The request failed (request timed out), so your message was not sent."],
+    ["an API error after work", () => input([user(), tool(), apiError("Rate limit reached"), turnEnd({ isError: true })]), "The request failed (rate limit reached), so your message was not sent."],
+    ["a reply before the API error counts", () => input([user(), text("Looking now."), tool(), apiError("API Error: Connection error."), turnEnd({ isError: true })]), null],
+    ["did not start wins over an API error", () => input([user(), apiError("Invalid API key"), error("Claude did not start: killed")]), DID_NOT_START],
+    ["an API error while working", () => input([user(), apiError("Rate limit reached")], { state: "connected", status: "busy" }), null],
+    ["an older prompt's API error does not count", () => input([user("one"), apiError("Invalid API key"), turnEnd({ isError: true }), user("two"), text("Done."), turnEnd()]), null],
   ])("%s", (_name, make, want) => {
     expect(failedPrompt(make())?.line ?? null).toBe(want);
   });
@@ -115,6 +128,24 @@ describe("failedPrompt", () => {
   it("names the prompt", () => {
     const u = user();
     expect(failedPrompt(input([text("earlier"), u, error("Claude did not start: killed")]))).toEqual({ itemId: u.id, ordinal: u.ordinal, line: DID_NOT_START });
+  });
+});
+
+describe("apiErrorDetail", () => {
+  it.each<[string, string]>([
+    ["Invalid API key · Fix external API key", "invalid API key"],
+    ["Invalid API key · Please run /login", "invalid API key"],
+    ["API Error: Request timed out.", "request timed out"],
+    ["Credit balance is too low", "credit balance is too low"],
+    ['API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}', "overloaded"],
+    ['API Error: 500 {"type":"error"', '500 {"type":"error"'],
+    ["Claude AI usage limit reached", "Claude AI usage limit reached"],
+    ["OAuth token has expired · Please run /login", "OAuth token has expired"],
+    ["API Error: first line\nsecond line", "first line"],
+    ["   ", ""],
+    ["A".repeat(80), `${"A".repeat(59)}…`],
+  ])("%s", (raw, want) => {
+    expect(apiErrorDetail(raw)).toBe(want);
   });
 });
 

@@ -22,6 +22,7 @@ type itemData struct {
 	SeedPrefix    string      `json:"seed_prefix,omitempty"`
 	MemoryNote    string      `json:"memory_note,omitempty"`
 	NoteCreatedBy string      `json:"note_created_by,omitempty"`
+	APIError      bool        `json:"api_error,omitempty"`
 	Queued        bool        `json:"queued,omitempty"`
 	PlacedAfter   int64       `json:"placed_after,omitempty"`
 	Tool          *ToolCall   `json:"tool,omitempty"`
@@ -59,7 +60,7 @@ func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item) e
 func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
 		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, SentBy: it.SentBy, ResumeNote: it.ResumeNote, SeedPrefix: it.SeedPrefix, MemoryNote: it.MemoryNote,
-		NoteCreatedBy: it.NoteCreatedBy, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
+		NoteCreatedBy: it.NoteCreatedBy, APIError: it.APIError, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction, HTML: it.HTML, Theme: it.Theme})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -101,7 +102,7 @@ func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error)
 		it.ComposerText = d.Composer
 		it.Origin, it.WakeTitle, it.WakeJSON, it.SentBy = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON, d.SentBy
 		it.NoteCreatedBy, it.ResumeNote, it.SeedPrefix, it.MemoryNote = d.NoteCreatedBy, d.ResumeNote, d.SeedPrefix, d.MemoryNote
-		it.Queued, it.PlacedAfter = d.Queued, d.PlacedAfter
+		it.Queued, it.PlacedAfter, it.APIError = d.Queued, d.PlacedAfter, d.APIError
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 		it.HTML, it.Theme = d.HTML, d.Theme
 		out = append(out, it)

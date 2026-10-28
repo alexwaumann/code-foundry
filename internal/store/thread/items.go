@@ -141,6 +141,11 @@ type Item struct {
 	// before the text (and the seed prefix and resume note) because they changed since its
 	// conversation started (memory.go). Not shown: the message shows as typed.
 	MemoryNote string
+	// APIError: an assistant_text that is Claude Code's synthetic API-error message (the
+	// request failed: auth, rate limit, timeout, overload), not a reply; Text is its
+	// wording ("Invalid API key · Fix external API key"). The turn end that follows has
+	// IsError.
+	APIError bool
 	// Queued: a user_message Claude has but has not read yet. A message sent while a turn
 	// runs waits in Claude Code's queue until its next tool call (or the end of the reply);
 	// the item is in the log from its arrival so the send shows at once (queued.go).

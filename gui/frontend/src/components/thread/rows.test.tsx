@@ -597,3 +597,28 @@ describe("a live tool strip", () => {
     expect(waiting?.closest('[data-testid="thread-strip"]')).toBeNull();
   });
 });
+
+describe("Claude Code's API-error text", () => {
+  const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" };
+  const apiError: ThreadItemView = { ...base, id: "x", ordinal: 2, kind: "text", text: "Invalid API key · Fix external API key", apiError: true };
+
+  it("is a red error row, not an answer: no Copy answer, kept when the turn folds", () => {
+    const c = show([hi, apiError, turnEndItem({ isError: true, terminalReason: "api_error" })], { fold: () => true });
+    const row = c.querySelector('[data-testid="thread-error"]');
+    expect(row?.textContent).toBe("Invalid API key · Fix external API key");
+    expect(c.querySelector('[data-testid="thread-text"]')).toBeNull();
+    expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
+  });
+
+  it("its turn's header says Failed, without the result's success subtype", () => {
+    const c = show([hi, apiError, turnEndItem({ isError: true, subtype: "success", durationMs: 120 })]);
+    expect(c.querySelector('[data-testid="thread-turn-header"] .t-red')?.textContent).toBe("Failed after 0.1s");
+  });
+
+  it("does not take the answer from a reply before it", () => {
+    const c = show([hi, { ...base, id: "a", ordinal: 2, kind: "text", text: "Looking." }, { ...apiError, ordinal: 3 }, turnEndItem({ isError: true })]);
+    expect(c.querySelector('[data-testid="thread-text"]')?.getAttribute("data-final")).toBeNull();
+    expect(c.querySelector('[data-testid="thread-copy-answer"]')).toBeNull();
+    expect(c.querySelector('[data-testid="thread-error"]')).not.toBeNull();
+  });
+});

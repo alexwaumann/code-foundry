@@ -71,6 +71,12 @@ describe("toThreadItemView", () => {
     expect(v({ case: "note", value: { text: "Created by P", createdBy: "s-p" } })).toMatchObject({ kind: "note", text: "Created by P", createdBy: "s-p" });
     expect(v({ case: undefined })).toBeNull();
   });
+
+  it("marks Claude Code's API-error text, and only it", () => {
+    const v = (payload: object) => toThreadItemView(create(ThreadItemSchema, { id: "i", payload } as never));
+    expect(v({ case: "assistantText", value: { text: "Invalid API key", apiError: true } })).toMatchObject({ kind: "text", text: "Invalid API key", apiError: true });
+    expect(v({ case: "assistantText", value: { text: "hi" } })).not.toHaveProperty("apiError");
+  });
 });
 
 describe("toThreadEventView", () => {
