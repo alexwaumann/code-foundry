@@ -6,6 +6,7 @@ import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { usePrTagInfo, useThreadTagInfo } from "@/components/compose/useTagInfo";
 import { Tip } from "@/components/ui/tooltip";
 import { pageCount, previewLabel } from "@/lib/compose";
+import { sentTime } from "@/lib/format";
 import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tagLabel } from "@/lib/prompt";
 import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
@@ -162,14 +163,6 @@ function PrChip({ slug, number }: { slug: string; number: number }) {
   );
 }
 
-/** "14:02" (today's), else the date too. */
-function timeOf(ms: number | null): string {
-  if (ms === null) return "";
-  const d = new Date(ms);
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
-}
-
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
  * the item carries, lib/userMessage) and citations (cite/CiteChip), attachments (images and PDFs) the text does not
@@ -244,16 +237,16 @@ export const UserBubble = memo(function UserBubble({
       {steer ? (
         <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
           <ArrowDown className="size-3" aria-hidden />
-          {["sent mid-turn", timeOf(createdAtMs)].filter(Boolean).join(" · ")}
+          {["sent mid-turn", sentTime(createdAtMs)].filter(Boolean).join(" · ")}
           {queued && <QueuedTag />}
         </span>
       ) : queued ? (
         <span className="inline-flex items-center gap-1.5">
-          <span className="when">{timeOf(createdAtMs)}</span>
+          <span className="when">{sentTime(createdAtMs)}</span>
           <QueuedTag />
         </span>
       ) : (
-        <span className="when">{timeOf(createdAtMs)}</span>
+        <span className="when">{sentTime(createdAtMs)}</span>
       )}
     </div>
   );
