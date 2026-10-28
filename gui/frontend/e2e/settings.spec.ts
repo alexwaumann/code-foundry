@@ -488,9 +488,11 @@ test("ShowView intents from the daemon open settings and help", async ({ page })
   await openApp(page);
   expect(await emit({ showView: { name: "settings" } })).toBe(1);
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  // Selecting something in the sidebar leaves the page.
-  await row(page, "s:s-1").click();
+  // A selection change (the sidebar's next-thread chord or its CLI verb; the backdrop covers
+  // the sidebar itself) leaves the sheet.
+  expect(await emit({ showView: { name: "thread.next" } })).toBe(1);
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
+  await expect(page.getByTestId("thread-header")).toBeVisible();
   await emit({ showView: { name: "help" } });
   await expect(page.getByTestId("help-overlay")).toBeVisible();
 });

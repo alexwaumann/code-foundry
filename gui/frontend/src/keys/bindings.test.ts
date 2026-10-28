@@ -5,6 +5,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { useViewsStore } from "@/stores/views";
 import { chordFires, commandBindings, handleKeyDown, inPalette, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
@@ -393,6 +394,15 @@ describe("handleKeyDown precedence", () => {
     const e = press(input, init);
     expect(e.defaultPrevented).toBe(leaves);
     if (chord === "cmd+[") expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("view.settings's cmd+, leaves a text field: the sheet's toggle closes it from its own search", () => {
+    useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "view.settings", keybindings: ["cmd+,"] })] }));
+    useViewsStore.setState({ settingsOpen: true, themesOpen: false, usageOpen: false });
+    const e = press(input, { key: ",", code: "Comma", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(useViewsStore.getState().settingsOpen).toBe(false);
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 

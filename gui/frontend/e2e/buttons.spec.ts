@@ -55,12 +55,17 @@ test("status row buttons toggle settings, open help and the palette; so does the
   await settings.click();
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await expect(settings).toHaveAttribute("aria-pressed", "true");
-  // A toggle, like usage: the button closes the page it opened.
-  await settings.click();
+  // A toggle, like usage: the button stays pressed under the sheet's backdrop, and a click
+  // there (on the backdrop over it) closes the sheet it opened.
+  const gear = await settings.boundingBox();
+  if (!gear) throw new Error("no settings button");
+  await page.mouse.click(gear.x + gear.width / 2, gear.y + gear.height / 2);
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await expect(settings).toHaveAttribute("aria-pressed", "false");
   await settings.click();
   await expect(page.getByTestId("settings-page")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-page")).toHaveCount(0);
 
   await status.getByTestId("status-help").click();
   await expect(page.getByTestId("help-overlay")).toBeVisible();

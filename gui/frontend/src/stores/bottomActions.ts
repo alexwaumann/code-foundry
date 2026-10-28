@@ -77,8 +77,10 @@ async function startShell(ctx: UiContextView, args: Record<string, string> = {})
 }
 
 /**
- * Lets the selection's bottom panel show: the Settings and Usage pages close, and its
- * side panel leaves full width (an expanded side panel hides the content column).
+ * Lets the selection's bottom panel show and take the keyboard: the Usage page closes, and
+ * so does the settings sheet (a modal keeps focus inside it, so a shell under it could not
+ * be typed in), and its side panel leaves full width (an expanded side panel hides the
+ * content column).
  */
 function uncoverBottom(key: string): void {
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });

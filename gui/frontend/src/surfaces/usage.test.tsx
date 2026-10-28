@@ -57,7 +57,7 @@ beforeEach(() => {
   useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
   usePanelStore.setState({ byKey: { "thread:s-1": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-0": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-x": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
-  useViewsStore.setState({ settingsOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
 });
@@ -154,12 +154,12 @@ describe("usagePanelCommand (view.panel.usage)", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it("does nothing without a thread or under settings", () => {
+  it("does nothing without a thread or under the usage page", () => {
     usePanelStore.setState({ byKey: {} });
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
     expect(usagePanelCommand()).toBe(false);
     select("s-1");
-    useViewsStore.setState({ settingsOpen: true });
+    useViewsStore.setState({ usageOpen: true });
     expect(usagePanelCommand()).toBe(false);
     expect(getPanel("thread:s-1").open).toBe(false);
   });

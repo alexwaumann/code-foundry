@@ -388,6 +388,14 @@
   pointer-events: none;
 }
 
+/* Toasts stay clickable over a modal (the settings sheet, help). A modal Radix dialog sets
+   pointer-events: none on <body> for everything outside it, the toaster too; its toasts
+   take the pointer back (a hidden one keeps sonner's none). The sheet does not count a
+   click on a toast as one on its backdrop (SettingsSheet.tsx). */
+[data-sonner-toast]:not([data-visible="false"]) {
+  pointer-events: auto;
+}
+
 /* Floating surfaces under page zoom (lib/zoom.ts, docs/notes/zoom-popovers.md). Radix
    (floating-ui) measures anchors and the viewport with getBoundingClientRect, in viewport
    px, and writes `transform: translate(x, y)` on this wrapper; under the zoom on <html>

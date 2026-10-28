@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Tip } from "@/components/ui/tooltip";
-import { PaneHeader } from "@/components/window/PaneHeader";
-import { useEscapeCloses } from "@/components/window/useEscapeCloses";
+import { DialogTitle } from "@/components/ui/dialog";
+import { SheetHeader } from "@/components/window/SheetHeader";
 import { useColorScheme, useThemeSlots, type ThemePreference } from "@/lib/theme";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themeById, type Theme } from "@/themes";
 import { saveSettings, useSettingValue } from "@/stores/settings";
@@ -30,7 +30,7 @@ import {
   useThemePickerStore,
   type ThemeSlot,
 } from "@/stores/themePicker";
-import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
+import { afterLeavingEditor, editorDirty, leaveEditor, revertEdits, setSaveOpen, useEditorAnalysis, useThemeEditorStore } from "@/stores/themeEditor";
 import { deleteThemeFile, useThemesStore, useUserThemes } from "@/stores/themes";
 import { closeThemes } from "@/stores/views";
 import { useWidth } from "@/lib/useWidth";
@@ -60,7 +60,8 @@ function themeOf(id: string, scheme?: ThemeSlot): Theme {
  * it in the gallery only; Apply writes the slot (theme.set-dark / theme.set-light) and the
  * window follows. Leaving the page drops the preview. The list has two sections: the
  * user's own themes (docs/notes/user-themes.md) above the curated ones; a row's hover
- * actions copy a theme into them (Customise) or delete one of them.
+ * actions copy a theme into them (Customise) or delete one of them. Shown in the settings
+ * sheet (SettingsSheet) in place of Settings; the sheet's Escape runs themesEscape.
  */
 export function ThemesPage() {
   const slot = useThemePickerStore((s) => s.slot);
@@ -70,8 +71,6 @@ export function ThemesPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const editingId = useThemeEditorStore((s) => s.id);
-  // In the editor, Escape first goes back from a colour's view to the lists, then leaves the editor.
-  useEscapeCloses(closeOrBack);
   const [bodyRef, bodyWidth] = useWidth(1200);
   const layout = editorLayout(bodyWidth);
   const listMode = editingId ? layout.list : "full";
@@ -131,24 +130,17 @@ export function ThemesPage() {
         e.preventDefault();
         searchRef.current?.focus();
         return;
-      case "Escape":
-        // useEscapeCloses skips fields: in the search, the first Escape clears it.
-        if (!inSearch) return;
-        e.preventDefault();
-        if (query) setPickerQuery("");
-        else closeThemes();
-        return;
     }
   };
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Themes" data-testid="themes-page" data-keys-local onKeyDown={onKeyDown}>
-      <PaneHeader className="gap-3 px-4">
-        <h1 className="text-heading">Themes</h1>
-        <Button variant="ghost" size="icon-xs" className="ml-auto [--wails-draggable:no-drag]" aria-label="Close themes" onClick={closeThemes}>
+      <SheetHeader className="gap-3 px-4">
+        <DialogTitle>Themes</DialogTitle>
+        <Button variant="ghost" size="icon-xs" className="ml-auto" aria-label="Close themes" onClick={closeThemes}>
           <X />
         </Button>
-      </PaneHeader>
+      </SheetHeader>
       <ControlBar slot={slot} slots={slots} />
       <div ref={bodyRef} className="flex min-h-0 flex-1" data-testid="themes-body" data-list={listMode}>
         {listMode !== "hidden" && (
@@ -164,6 +156,10 @@ export function ThemesPage() {
                   value={query}
                   onChange={(e) => {
                     setPickerQuery(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    // Escape with text clears it; on an empty search the sheet's Escape runs themesEscape.
+                    if (e.key === "Escape" && query) setPickerQuery("");
                   }}
                   className="h-8 pr-8 pl-7 text-body-sm"
                 />
@@ -182,6 +178,7 @@ export function ThemesPage() {
               aria-activedescendant={list.some((t) => t.id === shownId) ? `theme-option-${shownId}` : undefined}
               className={cn("min-h-0 flex-1 overflow-y-auto pb-2 outline-none", listMode === "strip" ? "px-1.5 pt-2" : "px-2")}
               data-testid="themes-list"
+              data-sheet-focus
             >
               {listMode === "strip" ? (
                 <>
@@ -254,12 +251,6 @@ export function ThemesPage() {
   );
 }
 
-/** Escape on the page: back from a colour's view in the editor, then out of the editor (asking first when it has changes), then the page closes. */
-function closeOrBack(): void {
-  if (editorBack()) return;
-  if (useThemeEditorStore.getState().id !== null) void leaveEditor();
-  else closeThemes();
-}
 
 /** The files that did not load whose name or message has every word of the search. */
 function filterIssues<T extends { file: string; message: string }>(issues: readonly T[], query: string): readonly T[] {

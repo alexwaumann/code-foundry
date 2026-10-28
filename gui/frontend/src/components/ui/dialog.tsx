@@ -34,19 +34,36 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
   )
 }
 
+/**
+ * The sizes a dialog comes in. "default": the dialog's own width (its className), its top
+ * 14% down the window. "sheet": an app-level page in a modal (Settings and Themes;
+ * docs/notes/settings-sheet.md), centred, at most 1280 by 800 and never closer than 48px
+ * to a window edge, so it shrinks with the window. Viewport units divide by --cf-zoom
+ * (lib/zoom.ts: the page zoom would scale them twice); the px values zoom with the page.
+ * The sheet is a flex column that clips: its body lays out its own scrolling regions.
+ */
+const dialogSizes = {
+  default: "top-[calc(14vh/var(--cf-zoom))] w-full max-w-[calc(100%-2rem)]",
+  sheet:
+    "top-1/2 flex h-[min(800px,calc(100vh/var(--cf-zoom)-96px))] w-[min(1280px,calc(100vw/var(--cf-zoom)-96px))] max-w-none -translate-y-1/2 flex-col overflow-hidden",
+} as const
+
 function DialogContent({
   className,
   overlayClassName,
+  size = "default",
   children,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & { overlayClassName?: string }) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { overlayClassName?: string; size?: keyof typeof dialogSizes }) {
   return (
     <DialogPortal>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-size={size}
         className={cn(
-          "fixed top-[calc(14vh/var(--cf-zoom))] left-1/2 z-50 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-pane border bg-popover shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+          "fixed left-1/2 z-50 -translate-x-1/2 rounded-pane border bg-popover shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+          dialogSizes[size],
           className
         )}
         {...props}

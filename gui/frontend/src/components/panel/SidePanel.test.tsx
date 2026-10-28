@@ -19,7 +19,7 @@ const newTabCommand: CommandView = { name: "view.panel.new-tab", title: "New Sid
 
 beforeEach(() => {
   usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
-  useViewsStore.setState({ settingsOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
   useUiStore.setState({ selection: { kind: "thread", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
   useCommandsStore.setState({ commands: [newTabCommand] });
 });
@@ -84,7 +84,7 @@ describe("SidePanel", () => {
     expect(sep.getAttribute("aria-valuemax")).toBe("600");
   });
 
-  it("expanded, it fills the row without a resize handle, shows without room, and settings still hides it", () => {
+  it("expanded, it fills the row without a resize handle, shows without room, and the usage page still hides it", () => {
     usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500, expanded: true } } });
     useUiStore.setState({ windowWidth: 1000, sidebarWidth: 520 });
     render(<SidePanel />);
@@ -94,12 +94,12 @@ describe("SidePanel", () => {
     expect(wrapper.className).toContain("flex-1");
     expect(screen.queryByRole("separator")).toBeNull();
     act(() => {
-      useViewsStore.setState({ settingsOpen: true });
+      useViewsStore.setState({ usageOpen: true });
     });
     expect(screen.queryByTestId("side-panel")).toBeNull();
     // Back to the split: the stored width and the handle return (the room allows it again).
     act(() => {
-      useViewsStore.setState({ settingsOpen: false });
+      useViewsStore.setState({ usageOpen: false });
       useUiStore.setState({ windowWidth: 1400, sidebarWidth: 260 });
       usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [], activeTabId: null }], width: 500 } } });
     });

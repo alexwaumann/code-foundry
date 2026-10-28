@@ -101,11 +101,12 @@ for (const width of [900, 1100, 1200, 1440]) {
       expect((box?.x ?? 0) + (box?.width ?? 0), id).toBeLessThanOrEqual(width);
     }
     expect((await page.getByTestId("themes-editing-name").boundingBox())?.width ?? 0).toBeGreaterThan(40);
-    // Focus on Save… does not scroll the page sideways (the content pane hides its overflow).
+    // Focus on Save… does not scroll the page sideways (the sheet hides its overflow).
     await page.getByTestId("themes-save").focus();
     expect((await page.getByTestId("themes-page").boundingBox())?.x).toBe(pageBox?.x);
-    // The list folds to a strip below 1440's body plus the full columns; a row still leaves for its theme.
-    await expect(page.getByTestId("themes-body")).toHaveAttribute("data-list", "strip");
+    // The list folds to a strip below a body of 1220px (its full columns): the sheet is 1280
+    // wide from a 1376px window (48px margins), narrower below. A row still leaves for its theme.
+    await expect(page.getByTestId("themes-body")).toHaveAttribute("data-list", width >= 1440 ? "full" : "strip");
     await option(page, "Nord").click();
     await expect(page.getByTestId("confirm-dialog")).toContainText("Ocean Dusk has changes that are not saved.");
     await page.getByTestId("confirm-cancel").click();
@@ -311,10 +312,12 @@ test("12, 16: Pinned only with a filter that matches no pin says so; a group hea
   await expect(surfaces.getByTestId("editor-slot-canvas")).toBeVisible();
 });
 
-test("14: Cancel on leaving through the sidebar puts the selection back", async ({ page }) => {
+test("14: Cancel on leaving through a selection change puts the selection back", async ({ page }) => {
   await editOceanDusk(page);
   await setBase(page, "accent", "#ff00ff");
-  await row(page, "s:s-2").click();
+  // The sheet's backdrop covers the sidebar: the selection changes from the keyboard or the
+  // CLI (thread.next, the sidebar's next-thread chord).
+  expect(await emit({ showView: { name: "thread.next" } })).toBeGreaterThan(0);
   await page.getByTestId("confirm-cancel").click();
   await expect(inspector(page)).toBeVisible();
   await expect(page.getByTestId("sidebar-dashboard")).toHaveAttribute("aria-current", "page");
