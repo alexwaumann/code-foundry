@@ -247,7 +247,7 @@ func (e *Engine) Exited() bool {
 type Launcher struct {
 	mu sync.Mutex
 	// Fail are the errors of the next launches, in order (nil entries succeed).
-	Fail []error
+	Fail    []error
 	setup   func(*Engine)
 	engines []*Engine
 }
@@ -386,4 +386,3 @@ func (c *Clock) Pending() int {
 	}
 	return n
 }
-

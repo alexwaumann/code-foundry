@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
@@ -82,6 +83,10 @@ type Deps struct {
 	// Ember backs ember.* (ember.enable and ember.disable also use Settings). Nil
 	// registers them failing with Unimplemented.
 	Ember command.EmberBackend
+	// Dictation backs dictation.*, DictationStatus their snapshot reads (nil: dictation
+	// unavailable).
+	Dictation       command.DictationBackend
+	DictationStatus func() *v1.DictationSnapshot
 	// Memory backs memory.* (the app memory; add, remove and clear also use Thread and
 	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
@@ -196,6 +201,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
+		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,

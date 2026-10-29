@@ -799,9 +799,10 @@ export const DictationService: GenService<{
     output: typeof StopDictationResponseSchema;
   },
   /**
-   * Session streams one session's events: level (at most 20 a second), each phrase as
-   * it lands, and ended last. A session that already ended sends ended at once;
-   * NotFound for an id the daemon never opened.
+   * Session streams one session's events: a heartbeat at once (opening the stream),
+   * level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
+   * after 5 s of silence. A session that already ended sends ended at once; NotFound
+   * for an id the daemon never opened.
    *
    * @generated from rpc codefoundry.v1.DictationService.Session
    */

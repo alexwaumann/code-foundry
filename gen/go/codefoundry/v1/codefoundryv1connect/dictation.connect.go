@@ -83,9 +83,10 @@ type DictationServiceClient interface {
 	// and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
 	// session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
-	// Session streams one session's events: level (at most 20 a second), each phrase as
-	// it lands, and ended last. A session that already ended sends ended at once;
-	// NotFound for an id the daemon never opened.
+	// Session streams one session's events: a heartbeat at once (opening the stream),
+	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
+	// after 5 s of silence. A session that already ended sends ended at once; NotFound
+	// for an id the daemon never opened.
 	Session(context.Context, *connect.Request[v1.DictationSessionRequest]) (*connect.ServerStreamForClient[v1.DictationSessionEvent], error)
 	// Audio is the host's client stream of microphone frames for the listening session.
 	// Frames for another session are dropped. The rms of each frame is republished as
@@ -247,9 +248,10 @@ type DictationServiceHandler interface {
 	// and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
 	// session is not an error.
 	Stop(context.Context, *connect.Request[v1.StopDictationRequest]) (*connect.Response[v1.StopDictationResponse], error)
-	// Session streams one session's events: level (at most 20 a second), each phrase as
-	// it lands, and ended last. A session that already ended sends ended at once;
-	// NotFound for an id the daemon never opened.
+	// Session streams one session's events: a heartbeat at once (opening the stream),
+	// level (at most 20 a second), each phrase as it lands, and ended last; a heartbeat
+	// after 5 s of silence. A session that already ended sends ended at once; NotFound
+	// for an id the daemon never opened.
 	Session(context.Context, *connect.Request[v1.DictationSessionRequest], *connect.ServerStream[v1.DictationSessionEvent]) error
 	// Audio is the host's client stream of microphone frames for the listening session.
 	// Frames for another session are dropped. The rms of each frame is republished as

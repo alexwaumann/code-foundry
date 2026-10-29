@@ -24,6 +24,7 @@ import (
 var noPalette = []string{
 	"action.edit", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
 	"action.wait", "app.version", "daemon.capabilities", "daemon.status", "daemon.version",
+	"dictation.start", "dictation.status", "dictation.stop",
 	"ember.board", "ember.disable", "ember.enable", "ember.remember", "ember.reseed",
 	"ember.status", "ember.task.add", "ember.task.cancel", "ember.task.done", "ember.task.list",
 	"ember.task.show", "ember.task.start", "ember.task.update", "memory.add", "memory.remove",
