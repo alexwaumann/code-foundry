@@ -134,6 +134,10 @@ start is too slow, and the download verified it once.
   engine stopped; state NO_MODEL. A daemon restarted with the model on disk loaded it at
   start, and a session transcribed again. Stopping the daemon left no engine process.
 
+* After rebasing onto PR 1 (#395), again without `CODE_FOUNDRY_DICTATE_BIN`: the daemon
+  found `bin/code-foundry-dictate` beside itself, loaded at start and transcribed the same
+  recording.
+
 Not exercised for real: the presence unload (it needs a GUI window; unit tests cover it
 with a fake clock and presence) and the engine's memory-pressure `unloaded` (fake engine
 only).
