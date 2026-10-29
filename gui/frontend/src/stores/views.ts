@@ -23,6 +23,7 @@ import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 import { presentPromptHistory } from "./historyComposers";
+import { presentDictationToggle } from "./dictation";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
@@ -206,6 +207,9 @@ export function showView(name: string): boolean {
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();
+    case "dictation.toggle":
+      // dictation.toggle from the CLI: the focused composer's dictation, else the content pane's.
+      return presentDictationToggle();
     default:
       // A plugin surface's show command (stores/pluginPanel.ts): a sheet would cover the panel.
       if (parsePluginView(name)) {

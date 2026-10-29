@@ -9,6 +9,8 @@ import { CollisionBanner, CollisionTip } from "./CollisionBanner";
 import { ClaudeMarkBrand } from "@/components/icons/ClaudeMark";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
+import { DictationMic, DictationNote } from "./DictationMic";
+import { useComposerDictation } from "./useComposerDictation";
 import { PromptHistoryCard } from "./PromptHistoryCard";
 import { usePromptPicker } from "./usePromptHistory";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
@@ -53,6 +55,7 @@ import {
   type WorktreeChoice,
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
+import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
 import { byName, primaryOptions, resolveSet, setName, WORKSPACE_FOLDER, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
@@ -471,6 +474,14 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   // for No project: the threads without one); no This thread yet
   // (docs/notes/prompt-history-2-picker.md).
   const rootRef = useRef<HTMLDivElement>(null);
+  // The mic (docs/notes/dictation-4-gui.md): phrases land at the prompt's caret.
+  const dictation = useComposerDictation({
+    draftKey,
+    rootRef,
+    primary: true,
+    insert: (t) => editorRef.current?.insertDictated(t),
+    setMarker: (on) => editorRef.current?.setDictationMarker(on),
+  });
   const historyIds = like ? likeSrc.sorted : home ? null : set.projectIds;
   const historySource = useMemo(() => (historyIds ? { projectIds: historyIds } : {}), [historyIds]);
   const picker = usePromptPicker({
@@ -532,6 +543,11 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   }, [draftKey]);
 
   const send = () => {
+    // Dictating: stop, let the last phrase land, then send what the prompt holds.
+    if (dictation.phase) {
+      if (!busy && !empty) void dictation.flush().then(() => sendDraft(target, defaults, hints));
+      return;
+    }
     if (canSend) void sendDraft(target, defaults, hints);
   };
 
@@ -704,12 +720,13 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               draftKey={draftKey}
               value={text}
               disabled={busy}
-              placeholder={picker.placeholder ?? (like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands")}
+              placeholder={picker.placeholder ?? (dictation.listening ? LISTENING_PLACEHOLDER : like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}
               onSubmit={send}
               onEscape={() => {
+                if (dictation.onEscape()) return true;
                 if (!isDraftEmpty(getDraft(draftKey))) return false;
                 // Back where the composer came from: the thread for a like draft, the
                 // Projects page for a project (the worktree overview is a panel tab there,
@@ -771,9 +788,11 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
             contentClassName="w-60"
             data-testid="composer-permission"
           />
+          <div className="ml-auto flex items-center gap-0.5">
+          <DictationMic dictation={dictation} disabled={busy} stop />
           {/* The span carries the tooltip while the button is disabled (no pointer events). */}
           <Tip label={attachLabel(hostFiles.hosted)}>
-            <span className="ml-auto flex">
+            <span className="flex">
               <button
                 type="button"
                 disabled={busy}
@@ -790,6 +809,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               </button>
             </span>
           </Tip>
+          </div>
           <input
             ref={fileRef}
             type="file"
@@ -803,20 +823,20 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
             }}
           />
         </div>
-        {(error ?? notice) && (
-          <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-body">
-            {error && (
-              <p role="alert" className="text-cf-error-text" data-testid="composer-error">
-                {error}
-              </p>
-            )}
-            {notice && (
-              <p role="status" className="text-cf-warning-text" data-testid="composer-notice">
-                {notice}
-              </p>
-            )}
-          </div>
-        )}
+        {/* empty:hidden: nothing to say, no row (the dictation line renders nothing most of the time). */}
+        <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-body empty:hidden">
+          {error && (
+            <p role="alert" className="text-cf-error-text" data-testid="composer-error">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="text-cf-warning-text" data-testid="composer-notice">
+              {notice}
+            </p>
+          )}
+          <DictationNote dictation={dictation} />
+        </div>
         {/* relative: the completion card hangs under this row, out of flow (CompletionCard). */}
         <div className="relative col-span-2 col-start-1 row-start-4 flex flex-wrap items-center gap-0.5 px-1 pt-2" data-testid="composer-worktree-row">
           {/* No project (or an emptied set): no worktree, branch or base to pick. */}
@@ -930,7 +950,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
             <span className="flex">
               <button
                 type="button"
-                disabled={!canSend}
+                disabled={!canSend && !(dictation.listening && !busy && !empty)}
                 aria-label={busy ? phaseText(phase, newWorktrees) : "Start thread"}
                 data-compose-stop
                 data-testid="composer-send"

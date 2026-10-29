@@ -1,0 +1,81 @@
+/* Dictation in the composers (DictationMic.tsx, dictationLanding.ts; docs/notes/dictation-4-gui.md). */
+
+/* The listening pill: the theme's error tokens, like a recording light. */
+.cf-dict-pill {
+  background: color-mix(in oklab, var(--cf-error) 10%, transparent);
+  color: var(--cf-error-text);
+}
+.cf-dict-pill:hover {
+  background: color-mix(in oklab, var(--cf-error) 16%, transparent);
+}
+.cf-dict-pill.loading {
+  background: var(--cf-surface-sunken);
+  color: var(--cf-text-muted);
+}
+
+.cf-dict-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 25%, transparent);
+  animation: cf-dict-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cf-dict-pulse {
+  50% {
+    box-shadow: 0 0 0 1px color-mix(in oklab, currentColor 10%, transparent);
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-dict-dot {
+    animation: none;
+  }
+}
+
+.cf-dict-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+.cf-dict-bars i {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+/* A phrase that just landed: tinted, fading out over a second (the plugin drops it after). */
+.cf-dictated {
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: cf-dict-landed 1s ease-out forwards;
+}
+@keyframes cf-dict-landed {
+  from {
+    background: color-mix(in oklab, var(--cf-accent) 14%, transparent);
+  }
+  60% {
+    background: color-mix(in oklab, var(--cf-accent) 10%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+/* Where the next phrase lands, after the caret while dictating. */
+.cf-dictation-marker {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--cf-accent);
+  opacity: 0.7;
+  vertical-align: middle;
+  pointer-events: none;
+}

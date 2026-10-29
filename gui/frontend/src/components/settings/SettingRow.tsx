@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
 import { Highlight } from "./Highlight";
-import { keyEditors, tallKeyEditors } from "./keyEditors";
+import { keyDescriptionTails, keyEditors, keyTitleChips, tallKeyEditors } from "./keyEditors";
 import { displayValue } from "./model";
 import { useSettingField } from "./useSettingField";
 
@@ -92,6 +92,8 @@ export interface SettingRowProps {
 /** One field in a section card: title, description, restart hint, editor, inline error, reset. */
 export function SettingRow({ field, className, crumb, words, indent = false, dimmed = false, note }: SettingRowProps) {
   const state = useSettingField(field);
+  const TitleChip = keyTitleChips[field.key];
+  const DescriptionTail = keyDescriptionTails[field.key];
   return (
     <div
       className={cn(
@@ -113,10 +115,12 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
             <Highlight text={field.title} words={words} />
           </span>
           <RestartChip field={field} restartPending={state.restartPending} />
+          {TitleChip && <TitleChip />}
         </div>
         {field.description && (
           <p className="mt-0.5 text-caption">
             <Highlight text={field.description} words={words} />
+            {DescriptionTail && <DescriptionTail />}
           </p>
         )}
         {dimmed && note && <p className="mt-0.5 text-caption-sm">{note}</p>}

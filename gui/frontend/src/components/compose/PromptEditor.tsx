@@ -9,8 +9,10 @@ import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { findTrigger, LEAF_CHAR, type TriggerChar } from "@/lib/completion";
+import { phraseAtCaret } from "@/lib/dictation";
 import { spacedAtCaret } from "@/lib/droppedPaths";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece, type PromptTag } from "@/lib/prompt";
+import { DictationLanding, dictationLandingKey, expireMeta, LANDED_MS, landedMeta, markerMeta } from "./dictationLanding";
 import { TagDraftContext, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
 import { TagNode } from "./tagNode";
 import { selectedChipId } from "./tagSelection";
@@ -56,6 +58,15 @@ export interface PromptEditorHandle {
    * caret after it. One undo step. Does nothing while the prompt is disabled.
    */
   insertPlain(text: string): void;
+  /**
+   * Puts a dictated phrase at the caret (the end of the prompt when it was never focused)
+   * with a space before it unless the caret follows whitespace or starts the line
+   * (lib/dictation phraseAtCaret), tinted while it fades in (dictationLanding.ts), and
+   * leaves the caret after it. Does not take focus. One undo step.
+   */
+  insertDictated(text: string): void;
+  /** Shows or hides the dot after the caret where the next dictated phrase lands. */
+  setDictationMarker(on: boolean): void;
 }
 
 interface PromptEditorProps {
@@ -235,7 +246,7 @@ export function PromptEditor({
   );
 
   const editor = useEditor({
-    extensions: [Document, Paragraph, Text, UndoRedo, TagNode],
+    extensions: [Document, Paragraph, Text, UndoRedo, TagNode, DictationLanding],
     content: toDoc(value),
     editable: !disabled,
     editorProps: {
@@ -420,6 +431,31 @@ export function PromptEditor({
           .setTextSelection(sel.from + insert.length)
           .scrollIntoView()
           .run();
+      },
+      insertDictated: (text) => {
+        if (editor.isDestroyed) return;
+        const { state } = editor;
+        const sel = focused.current ? state.selection : TextSelection.atEnd(state.doc);
+        const { $from, $to } = sel;
+        const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
+        const after = $to.parent.textBetween($to.parentOffset, $to.parent.content.size, undefined, LEAF_CHAR);
+        const insert = phraseAtCaret(text, before, after);
+        if (insert === "") return;
+        const lead = insert.length - insert.trimStart().length;
+        const words = insert.trim().length;
+        const at = Date.now();
+        const tr = state.tr.insertText(insert, sel.from, sel.to);
+        const start = sel.from + lead;
+        tr.setSelection(TextSelection.create(tr.doc, sel.from + insert.length));
+        tr.setMeta(dictationLandingKey, landedMeta(start, start + words, at));
+        editor.view.dispatch(tr.scrollIntoView());
+        setTimeout(() => {
+          if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, expireMeta(at)));
+        }, LANDED_MS + 100);
+      },
+      setDictationMarker: (on) => {
+        if (editor.isDestroyed || dictationLandingKey.getState(editor.state)?.marker === on) return;
+        editor.view.dispatch(editor.state.tr.setMeta(dictationLandingKey, markerMeta(on)));
       },
       insertText: (range, text) => {
         const { doc } = editor.state;

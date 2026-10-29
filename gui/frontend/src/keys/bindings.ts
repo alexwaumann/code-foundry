@@ -12,6 +12,7 @@ import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
 import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
+import { presentDictationToggle } from "@/stores/dictation";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
@@ -172,10 +173,11 @@ function terminalYields(chord: string): CommandView | undefined {
 /**
  * Commands whose chords also leave a focused text field (the settings search, which the
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
- * settings toggle, so cmd+, closes the sheet it just opened. Only cmd chords that do not
+ * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so ⌘⇧M works in
+ * a side panel's PR review composer (a plain textarea). Only cmd chords that do not
  * move or delete text (a user may rebind these to cmd+arrow).
  */
-const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings"]);
+const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle"]);
 
 /** The command a focused text field yields this chord to (see fieldYielded). */
 function fieldYields(chord: string): CommandView | undefined {
@@ -348,6 +350,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Window-local: the focused composer's Previous prompts picker, else the palette's
   // prompts page (stores/promptHistory.ts). The CLI's reaches every window through ShowView.
   "composer.history": () => presentPromptHistory(),
+  // Window-local: dictation into the focused composer, else the one dictating (it stops),
+  // else the content pane's (stores/dictation.ts). The CLI's reaches every window through ShowView.
+  "dictation.toggle": () => presentDictationToggle(),
   // Like cmd+k: opens this window's palette without a round trip. Deferred so that
   // picking it inside the palette (which closes after a presenter runs) reopens it.
   "ui.palette.open": () => {
