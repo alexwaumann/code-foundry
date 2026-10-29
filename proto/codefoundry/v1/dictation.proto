@@ -1,0 +1,229 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/heartbeat.proto";
+import "google/protobuf/timestamp.proto";
+
+// DictationService is voice dictation into Code Foundry's own composers
+// (docs/notes/dictation-2-daemon.md). Audio never leaves the Mac: the Wails host opens
+// the microphone and streams 16 kHz mono frames here (Audio), the daemon hands them to
+// its local engine (code-foundry-dictate, whisper.cpp), and each finished phrase comes
+// back on Session. The daemon owns the engine: with dictation.enabled on and the model
+// downloaded it runs from daemon start with the model loaded, unloads it after 10
+// minutes without the user looking at the app and loads it again when they return.
+//
+// A session belongs to one client (the composer that pressed the mic): Start opens it,
+// the host streams Audio while Watch says LISTENING, the composer reads Session, and
+// Stop (or 30 s without speech, or disabling) ends it. One session at a time.
+service DictationService {
+  // Watch sends the snapshot now, then again on every change, and a heartbeat after 5 s
+  // of silence (see heartbeat.proto).
+  rpc Watch(WatchDictationRequest) returns (stream DictationSnapshot) {}
+  // Download starts downloading the model and returns at once; progress arrives on
+  // Watch (model.download). An interrupted download resumes where it stopped. When it
+  // finishes (sha256 verified) dictation.enabled is turned on. FailedPrecondition when
+  // the model is already downloaded.
+  rpc Download(DownloadDictationModelRequest) returns (DownloadDictationModelResponse) {}
+  // CancelDownload stops a running download, keeping what it fetched for the next
+  // Download. Nothing to cancel is not an error.
+  rpc CancelDownload(CancelDictationDownloadRequest) returns (CancelDictationDownloadResponse) {}
+  // RemoveModel deletes the model (and a partial download), stopping the engine and any
+  // session. dictation.enabled is left as it is: the state becomes NO_MODEL.
+  rpc RemoveModel(RemoveDictationModelRequest) returns (RemoveDictationModelResponse) {}
+  // Start opens a session for client_id, loading the model first when it was unloaded
+  // (the state is LOADING meanwhile). FailedPrecondition when dictation is off, has no
+  // model or is in ERROR; Aborted when another client is listening. The same client
+  // starting again gets its open session back.
+  rpc Start(StartDictationRequest) returns (StartDictationResponse) {}
+  // Stop ends the session. With flush the engine transcribes the speech it holds first
+  // and its phrases arrive on Session before ended (bounded: 1.5 s). An unknown or ended
+  // session is not an error.
+  rpc Stop(StopDictationRequest) returns (StopDictationResponse) {}
+  // Session streams one session's events: level (at most 20 a second), each phrase as
+  // it lands, and ended last. A session that already ended sends ended at once;
+  // NotFound for an id the daemon never opened.
+  rpc Session(DictationSessionRequest) returns (stream DictationSessionEvent) {}
+  // Audio is the host's client stream of microphone frames for the listening session.
+  // Frames for another session are dropped. The rms of each frame is republished as
+  // level on Session.
+  rpc Audio(stream DictationAudioFrame) returns (DictationAudioResponse) {}
+  // MicDenied is the host reporting whether macOS denied the microphone; it shows as
+  // mic_denied on Watch.
+  rpc MicDenied(DictationMicDeniedRequest) returns (DictationMicDeniedResponse) {}
+}
+
+// DictationState is dictation's state as the settings page and composers show it.
+enum DictationState {
+  DICTATION_STATE_UNSPECIFIED = 0;
+  // dictation.enabled is off (and no download runs).
+  DICTATION_STATE_DISABLED = 1;
+  // dictation.enabled is on but the model is not downloaded.
+  DICTATION_STATE_NO_MODEL = 2;
+  // The model is downloading (model.download); dictation turns on when it finishes.
+  DICTATION_STATE_DOWNLOADING = 3;
+  // The engine is starting or loading the model.
+  DICTATION_STATE_LOADING = 4;
+  // The model is loaded: Start is instant.
+  DICTATION_STATE_READY = 5;
+  // The model was unloaded (the user was away, or macOS was short of memory); it loads
+  // again when the user returns, or on the next Start.
+  DICTATION_STATE_UNLOADED = 6;
+  // A session is open (session).
+  DICTATION_STATE_LISTENING = 7;
+  // The engine failed and was not restarted (error). Turning dictation off and on
+  // again retries.
+  DICTATION_STATE_ERROR = 8;
+}
+
+message WatchDictationRequest {}
+
+// DictationSnapshot is dictation's whole state.
+message DictationSnapshot {
+  // dictation.enabled.
+  bool enabled = 1;
+  DictationState state = 2;
+  DictationModel model = 3;
+  DictationHardware hardware = 4;
+  // The open session; unset unless LISTENING.
+  DictationSession session = 5;
+  // What went wrong: the engine's failure in ERROR, else the last download's failure
+  // ("" when none).
+  string error = 6;
+  // The host reported that macOS denied the microphone.
+  bool mic_denied = 7;
+  // Set on a heartbeat, which carries nothing else.
+  StreamHeartbeat heartbeat = 8;
+}
+
+// DictationModel is the one Whisper model.
+message DictationModel {
+  // Its file name ("ggml-large-v3-turbo-q8_0.bin").
+  string name = 1;
+  int64 size_bytes = 2;
+  // The model is on disk (and was verified when it was downloaded).
+  bool downloaded = 3;
+  // The running download; unset when none runs.
+  DictationDownload download = 4;
+}
+
+// DictationDownload is a running model download's progress.
+message DictationDownload {
+  int64 received_bytes = 1;
+  int64 total_bytes = 2;
+  // Recent speed; 0 until known.
+  int64 bytes_per_second = 3;
+}
+
+// DictationHardware is this Mac, for the settings page.
+message DictationHardware {
+  // machdep.cpu.brand_string ("Apple M4 Pro").
+  string chip = 1;
+  // hw.memsize.
+  int64 memory_bytes = 2;
+  // The chip is an M1 (M1, Pro, Max, Ultra): each phrase takes a few seconds there.
+  bool m1_family = 3;
+}
+
+// DictationSession is the open session.
+message DictationSession {
+  string id = 1;
+  // The client that started it (StartDictationRequest.client_id).
+  string client_id = 2;
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message DownloadDictationModelRequest {}
+
+message DownloadDictationModelResponse {
+  DictationSnapshot snapshot = 1;
+}
+
+message CancelDictationDownloadRequest {}
+
+message CancelDictationDownloadResponse {
+  DictationSnapshot snapshot = 1;
+}
+
+message RemoveDictationModelRequest {}
+
+message RemoveDictationModelResponse {
+  DictationSnapshot snapshot = 1;
+}
+
+message StartDictationRequest {
+  // Who is dictating: an id the GUI makes per composer (or "cli").
+  string client_id = 1;
+}
+
+message StartDictationResponse {
+  string session_id = 1;
+}
+
+message StopDictationRequest {
+  string session_id = 1;
+  // Transcribe the speech the engine holds first (Send stops with it).
+  bool flush = 2;
+}
+
+message StopDictationResponse {}
+
+message DictationSessionRequest {
+  string session_id = 1;
+}
+
+// Why a session ended.
+enum DictationEndReason {
+  DICTATION_END_REASON_UNSPECIFIED = 0;
+  // Stop.
+  DICTATION_END_REASON_STOPPED = 1;
+  // 30 s without speech.
+  DICTATION_END_REASON_SILENCE = 2;
+  // Dictation was turned off, or the model removed.
+  DICTATION_END_REASON_DISABLED = 3;
+  // The engine failed or unloaded the model.
+  DICTATION_END_REASON_ERROR = 4;
+}
+
+// DictationSessionEvent is one event of a session. Exactly one field is set.
+message DictationSessionEvent {
+  oneof event {
+    DictationLevel level = 1;
+    DictationPhrase phrase = 2;
+    DictationEnded ended = 3;
+    StreamHeartbeat heartbeat = 4;
+  }
+}
+
+// DictationLevel is the microphone's level, for the live bars.
+message DictationLevel {
+  // Root mean square of the frame's samples, 0 to 1.
+  float rms = 1;
+}
+
+// DictationPhrase is one transcribed phrase, to insert at the caret.
+message DictationPhrase {
+  string text = 1;
+}
+
+// DictationEnded is a session's last event.
+message DictationEnded {
+  DictationEndReason reason = 1;
+}
+
+// DictationAudioFrame is a slice of microphone audio.
+message DictationAudioFrame {
+  string session_id = 1;
+  // 16 kHz mono signed 16-bit little-endian samples.
+  bytes pcm = 2;
+  // The frame's level, 0 to 1 (the host computes it).
+  float rms = 3;
+}
+
+message DictationAudioResponse {}
+
+message DictationMicDeniedRequest {
+  bool denied = 1;
+}
+
+message DictationMicDeniedResponse {}
