@@ -69,7 +69,8 @@ PR 4; until then a session is opened from the CLI (`dictation start`).
   access your microphone?", with no usage text. That build is linker-signed only
   (`Identifier=a.out`, `Info.plist=not bound`). `scripts/package.sh` re-signs with
   `codesign --sign -`, which binds the embedded plist (`Identifier=dev.alexwaumann.codefoundry`,
-  `Info.plist entries=12`). See Verification for what a re-signed copy showed.
+  `Info.plist entries=12`). Whether that brings the usage text into the prompt was not
+  checked (it needs another prompt answered). PR 5 should look at an installed release.
 * The prompt stays up while the daemon's 30 s silence clock runs, so a first press that
   waits on the prompt longer than that ends silently. The grant still counts for the
   next press. PR 4 may want the composer to say so.
@@ -107,6 +108,7 @@ the sessions, and `say` spoke through the speakers into the built-in microphone:
   microphone" in the host log.
 * Responsible process: before the fix 41745 → T3 Code; after it the GUI was its own
   (43916 → 43916), and the prompt read "Allow "Code Foundry" to access your microphone?".
+  Each build prompted again: three Code Foundry prompts over three builds.
 * Two `say` sentences, 1.5 s apart, came back as two phrases, word for word: "Let's add
   a retry to the fetch step, then rerun the tests and open a pull request when they
   pass." and "Next, rename the session store to thread store and update every caller."
