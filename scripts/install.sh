@@ -6,7 +6,8 @@
 # Downloads code-foundry-darwin-arm64.tar.gz and checksums.txt from the latest GitHub
 # release of a channel (or --version) with the authenticated gh CLI, verifies the checksum, and
 # installs the app directory ~/.code-foundry/app: code-foundry (daemon + CLI),
-# "Code Foundry" (the GUI) and VERSION. Plain executables, not an .app bundle: managed Macs
+# "Code Foundry" (the GUI), code-foundry-dictate (the dictation engine the daemon runs;
+# releases before it shipped have none) and VERSION. Plain executables, not an .app bundle: managed Macs
 # often block unsigned bundles. An existing install is replaced by unpacking next to it
 # (app.new) and swapping with mv (the old one moves to app.old and is restored if the
 # swap fails). Then it links ~/.local/bin/code-foundry to the CLI and adds ~/.local/bin
@@ -462,6 +463,10 @@ stage_download() {
 	/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
 	[ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
 	[ -f "$STAGE/Code Foundry" ] && [ -x "$STAGE/Code Foundry" ] || die "the archive has no Code Foundry executable"
+	# Optional: older releases do not have it. When there, it must be an executable.
+	if [ -e "$STAGE/code-foundry-dictate" ] || [ -L "$STAGE/code-foundry-dictate" ]; then
+		[ -f "$STAGE/code-foundry-dictate" ] && [ -x "$STAGE/code-foundry-dictate" ] || die "the archive's code-foundry-dictate is not an executable"
+	fi
 	got="$(installed_version "$STAGE")"
 	[ "$got" = "$TAG" ] || die "the archive contains version '$got', expected $TAG"
 	# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and

@@ -5,12 +5,13 @@
 #   dist/code-foundry-darwin-arm64.tar.gz   the app directory's contents (no prefix):
 #       code-foundry   daemon + CLI (the GUI auto-starts it; ~/.local/bin links to it)
 #       Code Foundry   the Wails GUI, a bare executable with an embedded Info.plist
+#       code-foundry-dictate   the dictation engine (whisper.cpp), run by the daemon
 #       VERSION        the tag, e.g. v0.2.0 (what the installer and updater read)
 #   dist/install.sh                         the installer, defaulting to RELEASE_REPO
 #   dist/checksums.txt                      sha256 of the above
 #
 # No .app bundle: managed Macs often block unsigned bundles but allow bare executables.
-# Both binaries are ad-hoc signed.
+# All three executables are ad-hoc signed.
 set -euo pipefail
 
 VERSION="${VERSION:-}"
@@ -43,7 +44,7 @@ die() {
 
 echo "==> package $VERSION (release repo: ${RELEASE_REPO:-none})"
 
-# 1. Daemon/CLI, with the same version ldflags as the GUI.
+# 1. Daemon/CLI and the dictation engine, with the same version ldflags as the GUI.
 "$MAKE" build VERSION="$VERSION" RELEASE_REPO="$RELEASE_REPO"
 
 # 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags and
@@ -62,12 +63,13 @@ rm -f "gui/bin/$GUI" gui/bin/CodeFoundry
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-package.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 cp bin/code-foundry "$STAGE/code-foundry"
+cp bin/code-foundry-dictate "$STAGE/code-foundry-dictate"
 cp "gui/bin/$GUI" "$STAGE/$GUI"
 printf '%s\n' "$VERSION" >"$STAGE/VERSION"
-chmod 755 "$STAGE/code-foundry" "$STAGE/$GUI"
+chmod 755 "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI"
 chmod 644 "$STAGE/VERSION"
-xattr -c "$STAGE/code-foundry" "$STAGE/$GUI" 2>/dev/null || true
-for bin in code-foundry "$GUI"; do
+xattr -c "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI" 2>/dev/null || true
+for bin in code-foundry code-foundry-dictate "$GUI"; do
 	codesign --force --sign - "$STAGE/$bin"
 	codesign --verify --strict "$STAGE/$bin" || die "$bin: signature does not verify"
 done
@@ -77,6 +79,8 @@ case "$cli_version" in
 "code-foundry $VERSION "*) ;;
 *) die "the CLI reports '$cli_version', want $VERSION" ;;
 esac
+dictate_version="$("$STAGE/code-foundry-dictate" --version)"
+[ "$dictate_version" = "code-foundry-dictate $VERSION" ] || die "the dictation engine reports '$dictate_version', want $VERSION"
 # The GUI is linked with the same -X flag and prints it without opening a window.
 gui_version="$("$STAGE/$GUI" --version)"
 [ "$gui_version" = "Code Foundry $VERSION" ] || die "the GUI reports '$gui_version', want $VERSION"
@@ -93,9 +97,9 @@ file_version="$(cat "$STAGE/VERSION")"
 # 4. Assets. COPYFILE_DISABLE keeps macOS tar from adding ._ AppleDouble entries.
 mkdir -p dist
 rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64
-COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry "$GUI" VERSION
+COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry code-foundry-dictate "$GUI" VERSION
 listing="$(tar -tzf "dist/$TARBALL" | LC_ALL=C sort | tr '\n' '|')"
-[ "$listing" = "$GUI|VERSION|code-foundry|" ] || die "unexpected tarball contents: $listing"
+[ "$listing" = "$GUI|VERSION|code-foundry|code-foundry-dictate|" ] || die "unexpected tarball contents: $listing"
 if [ -n "$RELEASE_REPO" ]; then
 	sed "s|^DEFAULT_REPO=.*|DEFAULT_REPO=\"$RELEASE_REPO\"|" scripts/install.sh >dist/install.sh
 else
