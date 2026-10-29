@@ -41,6 +41,9 @@ type Client struct {
 	// Plugin is for plugin logs --follow and plugin dev, which stream
 	// PluginService.FollowLogs.
 	Plugin codefoundryv1connect.PluginServiceClient
+	// Dictation is for the Wails host, which streams the microphone with
+	// DictationService.Audio while Watch says LISTENING.
+	Dictation codefoundryv1connect.DictationServiceClient
 
 	paths paths.Paths
 }
@@ -61,14 +64,15 @@ func NewLoopback(baseURL, token string) *Client {
 
 func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 	return &Client{
-		Health:  codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
-		Command: codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
-		UI:      codefoundryv1connect.NewUiServiceClient(hc, baseURL),
-		Update:  codefoundryv1connect.NewUpdateServiceClient(hc, baseURL),
-		Project: codefoundryv1connect.NewProjectServiceClient(hc, baseURL),
-		Events:  codefoundryv1connect.NewEventServiceClient(hc, baseURL),
-		Plugin:  codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
-		paths:   p,
+		Health:    codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
+		Command:   codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
+		UI:        codefoundryv1connect.NewUiServiceClient(hc, baseURL),
+		Update:    codefoundryv1connect.NewUpdateServiceClient(hc, baseURL),
+		Project:   codefoundryv1connect.NewProjectServiceClient(hc, baseURL),
+		Events:    codefoundryv1connect.NewEventServiceClient(hc, baseURL),
+		Plugin:    codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
+		Dictation: codefoundryv1connect.NewDictationServiceClient(hc, baseURL),
+		paths:     p,
 	}
 }
 
