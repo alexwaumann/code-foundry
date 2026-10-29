@@ -77,8 +77,7 @@ function WatchedThread({ threadId }: { threadId: string }) {
 function ThreadBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
-  const dockRef = useRef<HTMLDivElement>(null);
-  const dockHeight = useElementHeight(dockRef);
+  const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (

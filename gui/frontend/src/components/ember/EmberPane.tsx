@@ -125,8 +125,7 @@ export function EmberBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const flame = useFlameState(threadId);
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
-  const dockRef = useRef<HTMLDivElement>(null);
-  const dockHeight = useElementHeight(dockRef);
+  const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
