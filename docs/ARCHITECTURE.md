@@ -51,10 +51,11 @@ Three processes, one protocol.
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so threads can orchestrate other threads.
 
-Two binaries from one version stamp, installed side by side as plain executables (no
+Three executables from one version stamp, installed side by side as plain executables (no
 `.app` bundle; managed Macs often block unsigned bundles) in `~/.code-foundry/app`:
 `Code Foundry` (the Wails GUI), `code-foundry` (daemon + CLI; `~/.local/bin/code-foundry`
-links to it) and `VERSION` (the release tag the updater reads). `code-foundry gui` starts
+links to it), `code-foundry-dictate` (the dictation engine the daemon runs) and `VERSION`
+(the release tag the updater reads). `code-foundry gui` starts
 the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Every client
 auto-starts the daemon if the socket is absent. Packaging and updates:
 `docs/notes/bare-binary-distribution.md` (layout and launch) on top of
@@ -76,6 +77,8 @@ except through the protocol.
 
 ```
 cmd/code-foundry/          main package: subcommand dispatch (daemon, gui, cli verbs)
+cmd/code-foundry-dictate/  the dictation engine: whisper.cpp + Silero VAD, run by the daemon
+                           over stdio JSON (docs/notes/dictation-1-engine.md)
 proto/codefoundry/v1/      *.proto — the API. buf-managed. Generated code is committed.
 gen/go/                    generated Go (connect-go + protobuf-go)
 gui/frontend/src/gen/      generated TS (protobuf-es + connect-es)
@@ -112,6 +115,8 @@ internal/
                            one file per entry with provenance, and MEMORY.md), appended to
                            every thread's system prompt at spawn
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
+  dictate/                 the dictation engine's protocol, phrase segmentation and output
+                           filters (pure Go); dictate/whisper is the cgo model actor
   procscan/                the user's processes by working directory (sysctl + lsof), and
                            stopping process groups: what a thread left running in its worktree
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
@@ -131,7 +136,7 @@ gui/
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
   build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
-                           next-version.sh, ghostty-vt.sh
+                           next-version.sh, ghostty-vt.sh, whisper-cpp.sh
 docs/                      this file, PLAN.md, ADRs under docs/adr/, GETTING-STARTED.md (embedded by
                            embed.go, package docs, for the help skill)
 ```

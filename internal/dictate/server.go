@@ -155,7 +155,10 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, pressure <-chan Pressu
 		go func() {
 			for {
 				select {
-				case p := <-pressure:
+				case p, ok := <-pressure:
+					if !ok {
+						return
+					}
 					q.push(inboxItem{pressure: p})
 				case <-ctx.Done():
 					return
