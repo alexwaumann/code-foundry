@@ -91,7 +91,11 @@ daemon's DictationService. The microphone itself is the Wails host's (PR 3).
 
 ## Verification
 
-`make check` green; `make gui-e2e` green (`e2e/dictation.spec.ts`: 18 tests over the
+`make check` green. `make gui-e2e`: everything this PR touches passes
+(`e2e/settings.spec.ts` now lists the Dictation section on General); six tests fail the
+same way on an untouched origin/main checkout and are left alone here: compose.spec.ts
+:48 (placeholder "Describe what to build…"), :160, :244, :288, thread.spec.ts:837,
+usage-sheet.spec.ts:42. `e2e/dictation.spec.ts`: 18 tests over the
 settings states, search, keybinding, mic states, landing, Escape, Send, loading,
 failure, denied, switching composers, a session held by the CLI, ⌘⇧M, the PR review
 composer). Vitest: `lib/dictation.test.ts` (spacing, level decay, formatting).
