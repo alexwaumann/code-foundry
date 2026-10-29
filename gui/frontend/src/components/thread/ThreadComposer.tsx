@@ -447,25 +447,25 @@ export function ThreadComposer({
             data-testid="thread-permission-mode"
           />
           <div className="ml-auto flex items-center gap-0.5">
-          <DictationMic dictation={dictation} disabled={inputOff} />
-          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label={attachLabel(hostFiles.hosted)}>
-            <span className="flex">
-              <button
-                type="button"
-                disabled={inputOff}
-                aria-label={attachLabel(hostFiles.hosted)}
-                data-testid="thread-attach"
-                className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
-                onClick={() => {
-                  if (hostFiles.hosted) hostFiles.pick();
-                  else fileRef.current?.click();
-                }}
-              >
-                <Paperclip className="size-4" />
-              </button>
-            </span>
-          </Tip>
+            <DictationMic dictation={dictation} disabled={inputOff} />
+            {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+            <Tip label={attachLabel(hostFiles.hosted)}>
+              <span className="flex">
+                <button
+                  type="button"
+                  disabled={inputOff}
+                  aria-label={attachLabel(hostFiles.hosted)}
+                  data-testid="thread-attach"
+                  className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={() => {
+                    if (hostFiles.hosted) hostFiles.pick();
+                    else fileRef.current?.click();
+                  }}
+                >
+                  <Paperclip className="size-4" />
+                </button>
+              </span>
+            </Tip>
           </div>
           <input
             ref={fileRef}
