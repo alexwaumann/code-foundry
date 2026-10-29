@@ -98,10 +98,9 @@ composer). Vitest: `lib/dictation.test.ts` (spacing, level decay, formatting).
 Screenshots (dark and light) are in the PR body.
 
 The real thing, once (`make build && make gui-build`, `CODE_FOUNDRY_HOME=/tmp/dict4-home`,
-the model copied from PR 2's run, Apple M3 Pro): with dictation off the section showed
-the Download-free model row ("874 MB on disk"); `settings set dictation.enabled true`
-went LOADING then READY in about 4 s and the switch's chip said Ready, "This Mac: Apple
-M3 Pro · 36 GB", no M1 line. The search found the switch for "dictation" and the section
+the model copied from PR 2's run, Apple M3 Pro): `settings set dictation.enabled true` went LOADING then READY in about 4 s; the
+section showed the switch's Ready chip, "874 MB on disk" with Remove, and "This Mac: Apple
+M3 Pro · 36 GB" without the M1 line. The search found the switch for "dictation" and the section
 for "whisper". In the new-thread composer (No project) the mic sat left of attach; ⌘⇧M
 in the prompt opened a real session (`dictation status`: listening, for `home:@…`), the
 pill and the marker showed, and the bars stayed flat: the host does not stream audio
