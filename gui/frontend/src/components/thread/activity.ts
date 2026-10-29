@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ThreadPendingView } from "@/api/thread";
 import { useLinger } from "@/lib/linger";
 import { useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadWatch } from "@/stores/thread";
@@ -48,21 +48,26 @@ export function useThreadActivity(threadId: string): ThreadActivity {
   return { loaded, empty, catchingUp, watchError: catchingUp ? watch.error : null, open, busy, working, timelineWorking, timelineStrips: timelineWorking || busy };
 }
 
-/** An element's height, followed (the floating composer's, for the timeline's bottom inset). */
-export function useElementHeight(ref: React.RefObject<HTMLElement | null>): number {
+/**
+ * An element's height, followed (the floating composer's dock, for the timeline's bottom
+ * inset and the jump chip's place). A callback ref, not a ref object read once: the dock
+ * remounts when its keyed parent does (PaneOverlay, keyed by thread), and an observer left on
+ * the detached dock reported 0 for every thread shown after the first switch (the answer's
+ * end sat under the composer; docs/notes/thread-dock-height.md).
+ */
+export function useElementHeight(): [attach: (el: HTMLElement | null) => void, height: number] {
   const [h, setH] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
+  const ro = useRef<ResizeObserver | null>(null);
+  const attach = useCallback((el: HTMLElement | null) => {
+    ro.current?.disconnect();
+    ro.current = null;
     if (!el) return;
     const measure = () => {
       setH(el.offsetHeight);
     };
     measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, [ref]);
-  return h;
+    ro.current = new ResizeObserver(measure);
+    ro.current.observe(el);
+  }, []);
+  return [attach, h];
 }

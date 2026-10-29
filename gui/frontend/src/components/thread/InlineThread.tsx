@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { startThreadWatch } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
 import { useElementHeight, useThreadActivity } from "./activity";
@@ -27,8 +27,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
   useEffect(() => startThreadWatch(threadId, "inline"), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
-  const dockRef = useRef<HTMLDivElement>(null);
-  const dockHeight = useElementHeight(dockRef);
+  const [dockRef, dockHeight] = useElementHeight();
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
     <ThreadContext.Provider value={ctx}>
