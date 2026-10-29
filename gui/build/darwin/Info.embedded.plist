@@ -28,6 +28,9 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>(c) 2026 Alejandro Waumann</string>
+	<!-- The TCC prompt's text when dictation first opens the microphone (gui/mic_darwin.go). -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Code Foundry transcribes your voice on this Mac to dictate into a composer. Audio never leaves your Mac.</string>
 	<!-- The frontend calls the daemon at http://127.0.0.1:<port>. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

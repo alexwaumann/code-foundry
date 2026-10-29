@@ -120,6 +120,8 @@ func main() {
 			log.Error("relaunch", "err", err)
 		}
 	})
+	// The host is the daemon's microphone for dictation (dictation.go).
+	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(), log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)
