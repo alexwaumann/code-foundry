@@ -221,15 +221,21 @@ func TestPresenceUnload(t *testing.T) {
 			h.waitState(dictation.Ready)
 			h.clock.Advance(time.Second)
 			h.waitState(tc.want)
-			if eng := h.launcher.Last(); eng.Loaded() != (tc.want == dictation.Ready) {
-				t.Errorf("engine loaded = %v", eng.Loaded())
+			away := tc.want == dictation.Unloaded
+			// Away stops the engine (freeing more than an unload in it would).
+			if eng := h.launcher.Last(); eng.Exited() != away {
+				t.Errorf("engine exited = %v", eng.Exited())
 			}
-			// Back: loaded again.
+			// Back: running and loaded again.
 			h.attended.Store(true)
 			h.store.AttendedChanged(true)
 			h.waitState(dictation.Ready)
-			if !h.launcher.Last().Loaded() || h.launcher.Count() != 1 {
-				t.Errorf("not reloaded in the same engine: launches %d", h.launcher.Count())
+			want := 1
+			if away {
+				want = 2
+			}
+			if !h.launcher.Last().Loaded() || h.launcher.Count() != want {
+				t.Errorf("launches %d, want %d", h.launcher.Count(), want)
 			}
 		})
 	}
@@ -264,13 +270,14 @@ func TestIdleUnloadWaitsForSession(t *testing.T) {
 	if s := h.waitState(dictation.Listening); s.Session == nil || s.Session.ID != id {
 		t.Fatalf("session %+v", s.Session)
 	}
-	if !eng.Loaded() {
-		t.Fatal("unloaded under an open session")
+	if eng.Exited() {
+		t.Fatal("stopped under an open session")
 	}
 	if err := h.store.Stop(context.Background(), id, false); err != nil {
 		t.Fatal(err)
 	}
 	h.waitState(dictation.Unloaded)
+	h.wait("engine exit", func(dictation.Snapshot) bool { return eng.Exited() })
 }
 
 func TestPressureUnloadReloadsOnStart(t *testing.T) {
@@ -530,7 +537,7 @@ func TestStartLoadsWhenUnloaded(t *testing.T) {
 	h.waitState(dictation.Ready)
 	h.clock.Advance(dictation.UnloadAfter)
 	h.waitState(dictation.Unloaded)
-	h.launcher.Last().SetLoadGate(gate)
+	h.launcher.SetSetup(func(e *dictationtest.Engine) { e.SetLoadGate(gate) })
 	var (
 		id  string
 		err error

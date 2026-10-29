@@ -6,7 +6,8 @@
 //
 // Lifecycle: with dictation.enabled on and the model on disk the engine runs with the
 // model loaded from daemon start, so pressing the mic is instant. Not attended for
-// UnloadAfter (internal/presence) unloads the model; attended again loads it. The
+// UnloadAfter (internal/presence) stops the engine, freeing the model; attended again
+// starts it and loads the model. The
 // engine unloading it by itself (memory pressure) leaves it unloaded until the next
 // Start. A crash restarts the engine with backoff, MaxRestarts times, then the state is
 // Failed until dictation is turned off and on, or the model is removed.
@@ -41,7 +42,7 @@ import (
 // Timing.
 const (
 	// UnloadAfter is how long the user may be away from the app (not attended) before
-	// the model is unloaded.
+	// the model is unloaded (the engine stops).
 	UnloadAfter = 10 * time.Minute
 	// SilenceStop ends a session after this long without speech.
 	SilenceStop = 30 * time.Second
@@ -554,6 +555,12 @@ func (s *Store) reconcile() {
 		}
 		return
 	}
+	if s.eng == nil && s.idleUnload {
+		// Away: the engine stays down until the user returns or dictates.
+		s.publishLocked()
+		s.mu.Unlock()
+		return
+	}
 	if s.eng == nil {
 		s.phase = phaseLoading // the engine is starting: LOADING
 		s.publishLocked()
@@ -609,21 +616,14 @@ func (s *Store) reconcile() {
 		s.publishLocked()
 		s.mu.Unlock()
 		s.poke() // presence may have moved while it loaded
-	case !wantLoaded && s.phase == phaseReady && s.session == nil:
-		s.phase = phaseUnloaded
-		why := "away"
-		if s.pressureUnload {
-			why = "memory pressure"
-		}
+	case s.idleUnload && s.session == nil:
+		// Away: stop the engine rather than unload in it, which keeps ggml's and Metal's
+		// residue (about 170 MB; docs/notes/dictation-1-engine.md).
+		s.detachLocked(EndDisabled)
 		s.publishLocked()
 		s.mu.Unlock()
-		ctx, cancel := context.WithTimeout(s.ctx, callTimeout)
-		if err := eng.Call(ctx, MethodUnload, nil, nil); err != nil {
-			s.log.Warn("dictation model did not unload", "err", err)
-		} else {
-			s.log.Info("dictation model unloaded", "why", why)
-		}
-		cancel()
+		eng.Close()
+		s.log.Info("dictation engine stopped while the user is away")
 	default:
 		s.mu.Unlock()
 	}
@@ -979,7 +979,7 @@ func (s *Store) stateLocked() State {
 		return Listening
 	case s.phase == phaseReady:
 		return Ready
-	case s.phase == phaseUnloaded && (s.idleUnload || s.pressureUnload):
+	case s.idleUnload && s.eng == nil, s.pressureUnload && s.phase == phaseUnloaded:
 		return Unloaded
 	}
 	return Loading
