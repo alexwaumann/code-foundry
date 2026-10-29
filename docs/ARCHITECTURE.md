@@ -46,6 +46,10 @@ Three processes, one protocol.
   It takes file drags from the OS (`EnableFileDrop`) and hands a drop's paths and its
   target's `data-drop-id` to the page (`app:files-dropped`), and shows the open panel
   for attaching (`PickFiles`; `docs/notes/attach-drop.md`).
+  It also captures the microphone for dictation: while `DictationService.Watch` says
+  LISTENING it streams 16 kHz frames with `DictationService.Audio`; it starts itself as
+  its own responsible process so the macOS prompt names Code Foundry, not the terminal
+  (`docs/notes/dictation-3-host.md`).
   No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call

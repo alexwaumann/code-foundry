@@ -191,13 +191,14 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 	if daemonDenied {
 		w.reportDenied(ctx, conn, false)
 	}
+	opened := time.Now()
 	mic, err := w.mic.Start()
 	if err != nil {
 		w.log.Warn("dictation: cannot open the microphone; stopping the session", "session", id, "err", err)
 		w.stopSession(ctx, conn, id)
 		return
 	}
-	w.log.Info("dictation: microphone open", "session", id)
+	w.log.Info("dictation: microphone open", "session", id, "open_ms", time.Since(opened).Milliseconds())
 	sink := conn.Audio(connCtx)
 	defer func() {
 		mic.Stop()
