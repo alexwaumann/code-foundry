@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 // Timing.
@@ -592,8 +593,8 @@ func (s *Store) reconcile() {
 		s.publishLocked()
 		s.mu.Unlock()
 		ctx, cancel := context.WithTimeout(s.ctx, loadTimeout)
-		var res LoadResult
-		err := eng.Call(ctx, MethodLoad, LoadParams{Model: s.ModelPath(), Language: "en"}, &res)
+		var res dictate.LoadResult
+		err := eng.Call(ctx, dictate.MethodLoad, dictate.LoadParams{Model: s.ModelPath(), Language: dictate.Language}, &res)
 		cancel()
 		s.mu.Lock()
 		if s.eng != eng { // stopped meanwhile
@@ -664,8 +665,8 @@ func (s *Store) handle(gen int, ev Event) {
 		s.handledCh = make(chan struct{})
 	}()
 	switch ev.Name {
-	case EventSpeech:
-		var p SpeechEvent
+	case dictate.EventSpeech:
+		var p dictate.SpeechEvent
 		if json.Unmarshal(ev.Params, &p) != nil {
 			return
 		}
@@ -676,8 +677,8 @@ func (s *Store) handle(gen int, ev Event) {
 				s.armSilenceLocked(sess)
 			}
 		}
-	case EventPhrase:
-		var p PhraseEvent
+	case dictate.EventPhrase:
+		var p dictate.PhraseEvent
 		if json.Unmarshal(ev.Params, &p) != nil || p.Text == "" {
 			return
 		}
@@ -685,20 +686,20 @@ func (s *Store) handle(gen int, ev Event) {
 			s.log.Debug("dictation phrase", "chars", len(p.Text), "infer_ms", p.InferMS)
 			s.emit(SessionEvent{SessionID: p.Session, Kind: SessionPhrase, Text: p.Text})
 		}
-	case EventUnloaded:
-		var p UnloadedEvent
+	case dictate.EventUnloaded:
+		var p dictate.UnloadedEvent
 		_ = json.Unmarshal(ev.Params, &p)
 		s.log.Info("dictation engine unloaded the model", "reason", p.Reason)
 		s.pressureUnload = true
 		s.phase = phaseUnloaded
 		s.endSessionLocked(EndError)
 		s.publishLocked()
-	case EventError:
-		var p ErrorEvent
+	case dictate.EventError:
+		var p dictate.ErrorEvent
 		_ = json.Unmarshal(ev.Params, &p)
 		s.log.Warn("dictation engine error", "message", p.Message)
-	case EventState:
-		var p StateEvent
+	case dictate.EventState:
+		var p dictate.StateEvent
 		_ = json.Unmarshal(ev.Params, &p)
 		s.log.Debug("dictation engine state", "state", p.State)
 	}
@@ -801,7 +802,7 @@ func (s *Store) Start(ctx context.Context, clientID string) (string, error) {
 	s.mu.Unlock()
 
 	bctx, bcancel := context.WithTimeout(ctx, callTimeout)
-	err := eng.Call(bctx, MethodBegin, SessionParams{Session: sess.id}, nil)
+	err := eng.Call(bctx, dictate.MethodBegin, dictate.BeginParams{Session: sess.id}, nil)
 	bcancel()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -841,7 +842,7 @@ func (s *Store) stopSession(ctx context.Context, sessionID string, flush bool, w
 	if eng != nil && sess.begun {
 		s.mu.Unlock()
 		ectx, cancel := context.WithTimeout(ctx, FlushWait)
-		if err := eng.Call(ectx, MethodEnd, EndParams{Session: sessionID, Flush: flush}, nil); err != nil {
+		if err := eng.Call(ectx, dictate.MethodEnd, dictate.EndParams{Session: sessionID, Flush: flush}, nil); err != nil {
 			s.log.Warn("dictation session did not end cleanly", "session", sessionID, "err", err)
 		}
 		s.awaitEventsLocked(ectx, eng, eng.Enqueued())
@@ -871,7 +872,7 @@ func (s *Store) Audio(sessionID string, pcm []byte, rms float32) bool {
 		s.emit(SessionEvent{SessionID: sessionID, Kind: SessionLevel, RMS: rms})
 	}
 	s.mu.Unlock()
-	if err := eng.Notify(MethodAudio, AudioParams{Session: sessionID, PCM: pcm}); err != nil {
+	if err := eng.Notify(dictate.MethodAudio, dictate.AudioParams{Session: sessionID, PCM: pcm}); err != nil {
 		s.log.Debug("dictation audio not delivered", "err", err)
 		return false
 	}

@@ -95,6 +95,9 @@ start is too slow, and the download verified it once.
   `remove` stay in the palette (no prompt) with When by state. `dictation.*` is left out
   of the agent guide like `skill.*`: it is the user's microphone, not agent work, and the
   guide sits at its size budget.
+* **One protocol definition.** The store speaks with `internal/dictate`'s methods,
+  events and param types (PR 1's engine side, pure Go), so the two cannot drift.
+  `EngineConn` is the daemon's client half; `dictate`'s Decoder/Encoder are the server's.
 * `m1_family` matches the word `M1` in the brand string ("Apple M1 Pro"), not any
   substring.
 * A stderr line that is the engine's own `level=INFO`/`DEBUG` logging is not appended to

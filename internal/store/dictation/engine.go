@@ -16,92 +16,14 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/childproc"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 // The engine protocol (code-foundry-dictate over stdio, newline-delimited JSON): the
 // daemon's requests {"id":n,"method":…,"params":…} get {"id":n,"result":…} or
 // {"id":n,"error":{"message":…}}; its notifications ({"method":"audio",…}) get nothing;
-// the engine's events are {"event":…,"params":…}. docs/notes/dictation-2-daemon.md.
-
-// Requests and notifications (daemon → engine).
-const (
-	MethodLoad     = "load"
-	MethodUnload   = "unload"
-	MethodBegin    = "begin"
-	MethodEnd      = "end"
-	MethodStatus   = "status"
-	MethodShutdown = "shutdown"
-	MethodAudio    = "audio"
-)
-
-// Events (engine → daemon).
-const (
-	EventState    = "state"
-	EventSpeech   = "speech"
-	EventPhrase   = "phrase"
-	EventUnloaded = "unloaded"
-	EventError    = "error"
-)
-
-// LoadParams are load's params.
-type LoadParams struct {
-	Model    string `json:"model"`
-	Language string `json:"language"`
-}
-
-// LoadResult is load's result.
-type LoadResult struct {
-	LoadMS   int64 `json:"load_ms"`
-	RSSBytes int64 `json:"rss_bytes"`
-}
-
-// SessionParams are begin's params.
-type SessionParams struct {
-	Session string `json:"session"`
-}
-
-// EndParams are end's params.
-type EndParams struct {
-	Session string `json:"session"`
-	Flush   bool   `json:"flush"`
-}
-
-// AudioParams are the audio notification's params: pcm is base64 (encoding/json's
-// []byte) of 16 kHz mono int16 little-endian samples.
-type AudioParams struct {
-	Session string `json:"session"`
-	PCM     []byte `json:"pcm"`
-}
-
-// SpeechEvent is a VAD edge.
-type SpeechEvent struct {
-	Session string `json:"session"`
-	Active  bool   `json:"active"`
-}
-
-// PhraseEvent is one transcribed phrase.
-type PhraseEvent struct {
-	Session string `json:"session"`
-	Text    string `json:"text"`
-	StartMS int64  `json:"start_ms"`
-	EndMS   int64  `json:"end_ms"`
-	InferMS int64  `json:"infer_ms"`
-}
-
-// UnloadedEvent says the engine dropped the model by itself (memory pressure).
-type UnloadedEvent struct {
-	Reason string `json:"reason"`
-}
-
-// StateEvent is the engine's own state (idle, loading, ready, listening, transcribing).
-type StateEvent struct {
-	State string `json:"state"`
-}
-
-// ErrorEvent is a failure the engine survived.
-type ErrorEvent struct {
-	Message string `json:"message"`
-}
+// the engine's events are {"event":…,"params":…}. The methods, events and their params
+// are internal/dictate's, the engine's own side of it (docs/notes/dictation-1-engine.md).
 
 // Event is one event from the engine.
 type Event struct {
@@ -353,7 +275,7 @@ func (c *EngineConn) Err() error {
 func (c *EngineConn) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
-	_ = c.Call(ctx, MethodShutdown, nil, nil)
+	_ = c.Call(ctx, dictate.MethodShutdown, nil, nil)
 	_ = c.w.Close()
 	wait := func() bool {
 		select {

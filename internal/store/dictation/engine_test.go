@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 )
 
 // pipeEngine runs a scripted engine on the other end of an EngineConn: answer gets each
@@ -45,43 +47,43 @@ func TestEngineConn(t *testing.T) {
 			return string(b)
 		}
 		switch req["method"] {
-		case MethodLoad:
+		case dictate.MethodLoad:
 			return []string{`{"event":"state","params":{"state":"loading"}}`, "not json", reply(`{"load_ms":900,"rss_bytes":12}`)}
-		case MethodEnd:
+		case dictate.MethodEnd:
 			return []string{`{"event":"phrase","params":{"session":"s1","text":"tail"}}`, reply(`{}`)}
-		case MethodBegin:
+		case dictate.MethodBegin:
 			b, _ := json.Marshal(map[string]any{"id": id, "error": map[string]string{"message": "busy"}})
 			return []string{string(b)}
-		case MethodAudio:
+		case dictate.MethodAudio:
 			audio = append(audio, req["params"].(map[string]any))
 		}
 		return nil
 	})
 	ctx := context.Background()
-	var res LoadResult
-	if err := c.Call(ctx, MethodLoad, LoadParams{Model: "/m.bin", Language: "en"}, &res); err != nil {
+	var res dictate.LoadResult
+	if err := c.Call(ctx, dictate.MethodLoad, dictate.LoadParams{Model: "/m.bin", Language: "en"}, &res); err != nil {
 		t.Fatal(err)
 	}
 	if res.LoadMS != 900 || res.RSSBytes != 12 {
 		t.Errorf("load result %+v", res)
 	}
-	if ev := <-c.Events(); ev.Name != EventState || string(ev.Params) != `{"state":"loading"}` {
+	if ev := <-c.Events(); ev.Name != dictate.EventState || string(ev.Params) != `{"state":"loading"}` {
 		t.Errorf("event %+v", ev)
 	}
-	if err := c.Call(ctx, MethodBegin, SessionParams{Session: "s1"}, nil); err == nil || !strings.Contains(err.Error(), "busy") {
+	if err := c.Call(ctx, dictate.MethodBegin, dictate.BeginParams{Session: "s1"}, nil); err == nil || !strings.Contains(err.Error(), "busy") {
 		t.Errorf("begin error %v", err)
 	}
-	if err := c.Notify(MethodAudio, AudioParams{Session: "s1", PCM: []byte{1, 2, 3}}); err != nil {
+	if err := c.Notify(dictate.MethodAudio, dictate.AudioParams{Session: "s1", PCM: []byte{1, 2, 3}}); err != nil {
 		t.Fatal(err)
 	}
 	// The phrase sent before end's reply is counted by the time Call returns.
-	if err := c.Call(ctx, MethodEnd, EndParams{Session: "s1", Flush: true}, nil); err != nil {
+	if err := c.Call(ctx, dictate.MethodEnd, dictate.EndParams{Session: "s1", Flush: true}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if n := c.Enqueued(); n != 2 {
 		t.Errorf("enqueued %d, want 2", n)
 	}
-	if ev := <-c.Events(); ev.Name != EventPhrase {
+	if ev := <-c.Events(); ev.Name != dictate.EventPhrase {
 		t.Errorf("event %+v", ev)
 	}
 	if len(audio) != 1 || audio[0]["pcm"] != "AQID" || audio[0]["session"] != "s1" {
@@ -89,14 +91,14 @@ func TestEngineConn(t *testing.T) {
 	}
 	// A call waiting when the engine goes away fails, and so does every later one.
 	waiting := make(chan error, 1)
-	go func() { waiting <- c.Call(ctx, MethodStatus, nil, nil) }()
+	go func() { waiting <- c.Call(ctx, dictate.MethodStatus, nil, nil) }()
 	time.Sleep(20 * time.Millisecond)
 	hangUp()
 	<-c.Done()
 	if err := <-waiting; err == nil {
 		t.Error("pending call did not fail")
 	}
-	if err := c.Call(ctx, MethodStatus, nil, nil); err == nil {
+	if err := c.Call(ctx, dictate.MethodStatus, nil, nil); err == nil {
 		t.Error("call after exit did not fail")
 	}
 	if _, open := <-c.Events(); open {
@@ -136,7 +138,7 @@ func TestEngineConnCallTimeout(t *testing.T) {
 	defer hangUp()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if err := c.Call(ctx, MethodLoad, nil, nil); err == nil || !strings.Contains(err.Error(), "deadline") {
+	if err := c.Call(ctx, dictate.MethodLoad, nil, nil); err == nil || !strings.Contains(err.Error(), "deadline") {
 		t.Errorf("err %v", err)
 	}
 }

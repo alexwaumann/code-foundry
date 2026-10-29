@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation/dictationtest"
 )
@@ -263,7 +264,7 @@ func TestIdleUnloadWaitsForSession(t *testing.T) {
 	}
 	eng := h.launcher.Last()
 	// Keep it talking past the unload deadline: speech holds the silence stop off.
-	eng.Emit(dictation.EventSpeech, dictation.SpeechEvent{Session: id, Active: true})
+	eng.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: id, Active: true})
 	h.wait("speech handled", func(dictation.Snapshot) bool { return true })
 	time.Sleep(20 * time.Millisecond)
 	h.clock.Advance(dictation.UnloadAfter)
@@ -284,7 +285,7 @@ func TestPressureUnloadReloadsOnStart(t *testing.T) {
 	h := newHarness(t, setup{enabled: true, model: true, attended: true})
 	h.waitState(dictation.Ready)
 	eng := h.launcher.Last()
-	eng.Emit(dictation.EventUnloaded, dictation.UnloadedEvent{Reason: "memory-pressure"})
+	eng.Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
 	h.waitState(dictation.Unloaded)
 	// Presence does not bring it back; the next use does.
 	h.store.AttendedChanged(true)
@@ -300,7 +301,7 @@ func TestPressureUnloadReloadsOnStart(t *testing.T) {
 	}
 	loads := 0
 	for _, c := range eng.Calls() {
-		if c == dictation.MethodLoad {
+		if c == dictate.MethodLoad {
 			loads++
 		}
 	}
@@ -316,7 +317,7 @@ func TestPressureUnloadEndsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.launcher.Last().Emit(dictation.EventUnloaded, dictation.UnloadedEvent{Reason: "memory-pressure"})
+	h.launcher.Last().Emit(dictate.EventUnloaded, dictate.UnloadedEvent{Reason: "memory-pressure"})
 	if got := phrasesAndEnd(h.sessionEvents(id)); !slices.Equal(got, []string{"ended:error"}) {
 		t.Errorf("events %v", got)
 	}
@@ -498,7 +499,7 @@ func TestSilenceStop(t *testing.T) {
 		{"30 s of nothing", nil, dictation.SilenceStop, true},
 		{"29 s of nothing", nil, dictation.SilenceStop - time.Second, false},
 		{"speaking holds it off", func(e *dictationtest.Engine, id string) {
-			e.Emit(dictation.EventSpeech, dictation.SpeechEvent{Session: id, Active: true})
+			e.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: id, Active: true})
 		}, 2 * dictation.SilenceStop, false},
 		{"counts from the end of speech", func(e *dictationtest.Engine, id string) {
 			e.Speak("one")

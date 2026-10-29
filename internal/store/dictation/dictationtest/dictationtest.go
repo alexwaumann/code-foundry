@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/dictate"
 	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 )
 
@@ -55,7 +56,7 @@ func (e *Engine) Call(ctx context.Context, method string, params, result any) er
 	e.mu.Unlock()
 	raw, _ := json.Marshal(params)
 	switch method {
-	case dictation.MethodLoad:
+	case dictate.MethodLoad:
 		if gate != nil {
 			select {
 			case <-gate:
@@ -71,19 +72,19 @@ func (e *Engine) Call(ctx context.Context, method string, params, result any) er
 			return e.failLoad
 		}
 		e.loaded = true
-		return setResult(result, dictation.LoadResult{LoadMS: 1200, RSSBytes: 1 << 30})
-	case dictation.MethodUnload:
+		return setResult(result, dictate.LoadResult{LoadMS: 1200, RSSBytes: 1 << 30})
+	case dictate.MethodUnload:
 		e.mu.Lock()
 		e.loaded = false
 		e.mu.Unlock()
-	case dictation.MethodBegin:
-		var p dictation.SessionParams
+	case dictate.MethodBegin:
+		var p dictate.BeginParams
 		_ = json.Unmarshal(raw, &p)
 		e.mu.Lock()
 		defer e.mu.Unlock()
 		e.session = p.Session
-	case dictation.MethodEnd:
-		var p dictation.EndParams
+	case dictate.MethodEnd:
+		var p dictate.EndParams
 		_ = json.Unmarshal(raw, &p)
 		e.mu.Lock()
 		phrases := e.phrases
@@ -93,9 +94,9 @@ func (e *Engine) Call(ctx context.Context, method string, params, result any) er
 		e.phrases, e.session = nil, ""
 		e.mu.Unlock()
 		for _, t := range phrases {
-			e.Emit(dictation.EventPhrase, dictation.PhraseEvent{Session: p.Session, Text: t})
+			e.Emit(dictate.EventPhrase, dictate.PhraseEvent{Session: p.Session, Text: t})
 		}
-	case dictation.MethodShutdown:
+	case dictate.MethodShutdown:
 		e.exit(nil)
 	}
 	return nil
@@ -119,8 +120,8 @@ func (e *Engine) Notify(method string, params any) error {
 	if e.closed {
 		return errors.New("the engine stopped")
 	}
-	if method == dictation.MethodAudio {
-		if p, ok := params.(dictation.AudioParams); ok {
+	if method == dictate.MethodAudio {
+		if p, ok := params.(dictate.AudioParams); ok {
 			e.frames++
 			e.bytes += len(p.PCM)
 		}
@@ -200,9 +201,9 @@ func (e *Engine) Enqueued() uint64 {
 // Speak emits a phrase of the current session framed by its speech edges.
 func (e *Engine) Speak(text string) {
 	s := e.Session()
-	e.Emit(dictation.EventSpeech, dictation.SpeechEvent{Session: s, Active: true})
-	e.Emit(dictation.EventPhrase, dictation.PhraseEvent{Session: s, Text: text})
-	e.Emit(dictation.EventSpeech, dictation.SpeechEvent{Session: s, Active: false})
+	e.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: s, Active: true})
+	e.Emit(dictate.EventPhrase, dictate.PhraseEvent{Session: s, Text: text})
+	e.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: s, Active: false})
 }
 
 // Calls are the methods called so far, in order.
