@@ -37,6 +37,7 @@ export const groups: GroupInit[] = [
   { id: "update", title: "Updates", description: "Which releases the app checks for and offers to install." },
   { id: "plugins", title: "Plugins", description: "Where plugins are installed from." },
   { id: "ember", title: "Ember", description: "The resident agent: whether it runs, its models, and when it starts a fresh session." },
+  { id: "dictation", title: "Dictation", description: "Voice dictation into the composers, transcribed on this Mac." },
   { id: "advanced", title: "Advanced", description: "Executables and logging." },
 ];
 
@@ -64,6 +65,7 @@ export const staticPages: PageInit[] = [
       { id: "threads", title: "Threads" },
       { id: "textgen", title: "Text generation", description: "Models for small jobs like naming a thread." },
       { id: "lifecycle", title: "Lifecycle" },
+      { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." },
       { id: "updates", title: "Updates" },
     ],
   },
@@ -256,6 +258,8 @@ const staticFields: FieldInit[] = [
   { key: "projects.branch_instructions", group: "projects", page: "source", section: "projects", type: S.STRING, title: "Branch instructions", description: "For Custom: how the naming model should write the whole branch name, e.g. \"ab/<slug of 2 to 4 words>\". Spaces become dashes; a name git refuses falls back to cf/<thread id>.", defaultValue: "", placeholder: "ab/<slug of 2 to 4 words>" },
   { key: "projects.base_from_origin", group: "projects", page: "source", section: "projects", type: S.BOOL, title: "Branch from origin unless local is ahead", description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, unless the local branch is ahead of it or has diverged: then from the local branch. Off always starts from the local branch and never fetches. A remote branch, tag or commit given as the base is always used as is.", defaultValue: "true" },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.", defaultValue: "", placeholder: "auto-detect" },
+  // General › Dictation (docs/notes/dictation-2-daemon.md); the rest of the section is DictationService's state.
+  { key: "dictation.enabled", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictation", description: "Adds a microphone button to every composer and the ⌘⇧M shortcut.", defaultValue: "false" },
   // Ember (docs/notes/ember-2-store.md).
   {
     key: "ember.enabled",

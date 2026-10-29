@@ -142,6 +142,33 @@ export function searchGuiPages(pages: readonly SettingPageView[], schemaPageIds:
   return { hits, counts };
 }
 
+/**
+ * The search across rows the GUI adds to schema sections (sectionRowSearch: Dictation's
+ * Model): a section whose title, description or keywords have every word, unless one of
+ * its fields matched already (the field's row is the better hit). Counts are per page.
+ */
+export function searchSectionRows(
+  schema: SettingsSchemaView,
+  rows: Readonly<Partial<Record<string, { description: string; keywords: readonly string[] }>>>,
+  fieldHits: readonly SearchHit[],
+  words: readonly string[],
+): { hits: PageSectionHit[]; counts: Record<string, number> } {
+  const hits: PageSectionHit[] = [];
+  const counts: Record<string, number> = {};
+  if (words.length === 0) return { hits, counts };
+  for (const page of schema.pages) {
+    for (const section of page.sections) {
+      const row = rows[`${page.id}/${section.id}`];
+      if (!row || fieldHits.some((h) => h.page.id === page.id && h.section?.id === section.id)) continue;
+      const hay = `${section.title} ${section.description} ${row.description} ${row.keywords.join(" ")}`.toLowerCase();
+      if (!words.every((w) => hay.includes(w))) continue;
+      hits.push({ page, section: { ...section, description: row.description } });
+      counts[page.id] = (counts[page.id] ?? 0) + 1;
+    }
+  }
+  return { hits, counts };
+}
+
 /** A keybinding value that binds a chord: not "" (no default) and not "none" (unbound on purpose). */
 export function isBound(value: string | undefined): boolean {
   return value !== undefined && value !== "" && value !== "none";

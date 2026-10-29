@@ -1,8 +1,11 @@
 import { Loader2, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { DictationMic, DictationNote } from "@/components/compose/DictationMic";
+import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
+import { LISTENING_PLACEHOLDER, phraseAtCaret } from "@/lib/dictation";
 import { cn } from "@/lib/utils";
 import { composerKeyAction } from "./keys";
 
@@ -93,6 +96,31 @@ export function PanelComposer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const inputId = useId();
   const hintId = useId();
+  const rootRef = useRef<HTMLElement>(null);
+  // The latest text and submit: a dictated phrase and Send's wait for it outlive a render.
+  const latest = useRef({ text, onTextChange, onSubmit });
+  useLayoutEffect(() => {
+    latest.current = { text, onTextChange, onSubmit };
+  });
+  // Where the caret goes once a dictated phrase is in the text.
+  const caretAfter = useRef<number | null>(null);
+  const dictation = useComposerDictation({
+    draftKey: testIds.root,
+    rootRef,
+    primary: false,
+    insert: (phrase) => {
+      const el = ref.current;
+      const value = latest.current.text;
+      const start = el && document.activeElement === el ? el.selectionStart : value.length;
+      const end = el && document.activeElement === el ? el.selectionEnd : value.length;
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const nl = value.indexOf("\n", end);
+      const ins = phraseAtCaret(phrase, value.slice(lineStart, start), value.slice(end, nl === -1 ? undefined : nl));
+      if (ins === "") return;
+      caretAfter.current = start + ins.length;
+      latest.current.onTextChange(value.slice(0, start) + ins + value.slice(end));
+    },
+  });
 
   // After the menu closes (it does not take focus back to its button for these items).
   useEffect(() => {
@@ -104,6 +132,9 @@ export function PanelComposer({
 
   useLayoutEffect(() => {
     if (ref.current) fitHeight(ref.current);
+    const at = caretAfter.current;
+    caretAfter.current = null;
+    if (at !== null && ref.current && document.activeElement === ref.current) ref.current.setSelectionRange(at, at);
   }, [text]);
 
   /** Closes, handing focus to the panel so its keys keep working. */
@@ -114,7 +145,12 @@ export function PanelComposer({
   };
 
   const send = async () => {
-    if (await onSubmit()) close();
+    if (dictation.phase) {
+      // Dictating: stop, let the last phrase land (and render), then submit the text it made.
+      await dictation.flush();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    if (await latest.current.onSubmit()) close();
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -135,6 +171,8 @@ export function PanelComposer({
     if (!action) return;
     e.preventDefault();
     e.stopPropagation();
+    // Escape while dictating stops it, and only that.
+    if (action !== "send" && dictation.onEscape()) return;
     if (action === "send") void send();
     // Escape while the send runs does nothing: it goes through anyway.
     else if (!locked) close();
@@ -142,7 +180,7 @@ export function PanelComposer({
 
   const SubmitIcon = submit.icon;
   return (
-    <section className={cn("flex flex-col gap-2 border-b border-cf-divider px-4 py-3 @max-[340px]:px-3", className)} aria-label={ariaLabel} data-testid={testIds.root} {...dataAttrs}>
+    <section ref={rootRef} className={cn("flex flex-col gap-2 border-b border-cf-divider px-4 py-3 @max-[340px]:px-3", className)} aria-label={ariaLabel} data-testid={testIds.root} {...dataAttrs}>
       <Label htmlFor={inputId} className={cn("gap-1.5 text-body-sm", labelClassName ?? "text-cf-text-muted")} data-testid={testIds.label}>
         {label}
       </Label>
@@ -152,7 +190,7 @@ export function PanelComposer({
         rows={3}
         value={text}
         readOnly={locked}
-        placeholder={placeholder}
+        placeholder={dictation.listening ? LISTENING_PLACEHOLDER : placeholder}
         aria-describedby={hintId}
         className="max-h-[calc(6lh+1rem+2px)] min-h-0 resize-none overflow-y-auto text-body-sm read-only:opacity-70"
         data-testid={testIds.input}
@@ -167,10 +205,11 @@ export function PanelComposer({
             {hint}
           </span>
         </Tip>
+        <DictationMic dictation={dictation} disabled={locked} className="ml-auto" />
         <button
           type="button"
           disabled={locked}
-          className="ml-auto shrink-0 rounded-md px-2 py-1 text-body-sm text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:opacity-50 disabled:hover:bg-transparent"
+          className={cn("shrink-0 rounded-md px-2 py-1 text-body-sm text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:opacity-50 disabled:hover:bg-transparent", dictation.availability === "hidden" && !dictation.phase && "ml-auto")}
           data-testid={testIds.cancel}
           onClick={close}
         >
@@ -178,7 +217,7 @@ export function PanelComposer({
         </button>
         <button
           type="button"
-          disabled={submit.disabled}
+          disabled={submit.disabled && !(dictation.listening && !locked)}
           aria-busy={submit.busy || undefined}
           aria-label={submit.ariaLabel}
           className={cn(
@@ -192,6 +231,7 @@ export function PanelComposer({
           {submit.label}
         </button>
       </div>
+      <DictationNote dictation={dictation} />
     </section>
   );
 }

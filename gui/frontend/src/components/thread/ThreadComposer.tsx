@@ -3,6 +3,8 @@ import { AlarmClockOff, ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
 import { CompletionCard } from "@/components/compose/CompletionCard";
+import { DictationMic, DictationNote } from "@/components/compose/DictationMic";
+import { useComposerDictation } from "@/components/compose/useComposerDictation";
 import { PromptHistoryCard } from "@/components/compose/PromptHistoryCard";
 import { usePromptPicker } from "@/components/compose/usePromptHistory";
 import { ATTACHMENT_ACCEPT, Attachments, SEND_DISABLED } from "@/components/compose/Composer";
@@ -19,6 +21,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
+import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
 import { snoozeTimeShort } from "@/lib/snooze";
 import { statusLine, statusText } from "@/lib/statusLine";
 
@@ -281,6 +284,14 @@ export function ThreadComposer({
   // to something else meanwhile.
   const rootRef = useRef<HTMLDivElement>(null);
   const focusedAtSend = useRef(false);
+  // The mic (docs/notes/dictation-4-gui.md): phrases land at the prompt's caret.
+  const dictation = useComposerDictation({
+    draftKey,
+    rootRef,
+    primary: focusRequests,
+    insert: (t) => editorRef.current?.insertDictated(t),
+    setMarker: (on) => editorRef.current?.setDictationMarker(on),
+  });
   useLayoutEffect(() => {
     if (sending) focusedAtSend.current ||= hasFocusWithin(rootRef.current);
   }, [sending]);
@@ -294,6 +305,11 @@ export function ThreadComposer({
   }, [sending]);
 
   const send = () => {
+    // Dictating: stop, let the last phrase land, then send what the prompt holds.
+    if (dictation.phase) {
+      if (!inputOff) void dictation.flush().then(() => sendThreadDraft(threadId));
+      return;
+    }
     if (canSend) void sendThreadDraft(threadId);
   };
   const attach = (files: File[]) => {
@@ -374,12 +390,13 @@ export function ThreadComposer({
               placeholder={
                 transcriptMissing
                   ? "Transcript deleted"
-                  : (picker.placeholder ?? (busy ? (busyPlaceholder ?? BUSY_PLACEHOLDER) : (placeholder ?? PLACEHOLDER)))
+                  : (picker.placeholder ?? (dictation.listening ? LISTENING_PLACEHOLDER : busy ? (busyPlaceholder ?? BUSY_PLACEHOLDER) : (placeholder ?? PLACEHOLDER)))
               }
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}
               onSubmit={send}
+              onEscape={dictation.onEscape}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
               // The open picker filters on the text: no completion meanwhile.
@@ -429,24 +446,27 @@ export function ThreadComposer({
             contentClassName="w-60"
             data-testid="thread-permission-mode"
           />
-          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label={attachLabel(hostFiles.hosted)}>
-            <span className="ml-auto flex">
-              <button
-                type="button"
-                disabled={inputOff}
-                aria-label={attachLabel(hostFiles.hosted)}
-                data-testid="thread-attach"
-                className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
-                onClick={() => {
-                  if (hostFiles.hosted) hostFiles.pick();
-                  else fileRef.current?.click();
-                }}
-              >
-                <Paperclip className="size-4" />
-              </button>
-            </span>
-          </Tip>
+          <div className="ml-auto flex items-center gap-0.5">
+            <DictationMic dictation={dictation} disabled={inputOff} />
+            {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+            <Tip label={attachLabel(hostFiles.hosted)}>
+              <span className="flex">
+                <button
+                  type="button"
+                  disabled={inputOff}
+                  aria-label={attachLabel(hostFiles.hosted)}
+                  data-testid="thread-attach"
+                  className="flex size-7 items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-[3px] focus-visible:ring-cf-focus/50 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={() => {
+                    if (hostFiles.hosted) hostFiles.pick();
+                    else fileRef.current?.click();
+                  }}
+                >
+                  <Paperclip className="size-4" />
+                </button>
+              </span>
+            </Tip>
+          </div>
           <input
             ref={fileRef}
             type="file"
@@ -479,7 +499,7 @@ export function ThreadComposer({
             <span className="flex">
               <button
                 type="button"
-                disabled={!canSend}
+                disabled={!canSend && !(dictation.listening && !inputOff)}
                 aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}
@@ -495,6 +515,7 @@ export function ThreadComposer({
             </span>
           </Tip>
         </div>
+        <DictationNote dictation={dictation} className="col-span-2 px-4 pb-2" />
         {effortPending && (
           <p className="col-span-2 px-4 pb-2 text-caption" role="status" data-testid="thread-effort-pending">
             {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Switching to ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}

@@ -193,6 +193,12 @@
  *        t-2b3c4d5e done and t-5e6f7a8b todo (its subtasks), t-9c0d1e2f blocked (s-ember-wails
  *        reported blocked), t-3a4b5c6d done today (s-ember-flaky), t-7e8f9a0b cancelled. Reset restores them.
  *        Every change below reaches WatchBoard streams.
+ *   DictationService and dictation.* (mock/dictation.ts): enabled is dictation.enabled; the model, hardware,
+ *        sessions and the microphone are scripted. A session plays levels and two phrases 1 s apart.
+ *   POST /__mock/dictation?state=off|no-model|downloading|ready|unloaded|listening|error[&m1=true][&denied=true]
+ *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
+ *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
+ *   GET  /__mock/dictation                        ({ state, enabled, downloaded, session, micDenied, calls })
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
  *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…][&title=…]
@@ -228,6 +234,7 @@ import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
 import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
+import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
 import { emberStateNames } from "./ember";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
@@ -672,6 +679,32 @@ function routes(router: ConnectRouter): void {
     watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
   });
 
+  // Dictation (mock/dictation.ts): the snapshot, scripted sessions, and the model's download.
+  router.service(DictationService, {
+    watch: (_req, ctx) => tracked("DictationService/Watch", world.dictation.watch(ctx.signal)),
+    download: () => guard(() => ({ snapshot: world.dictation.startDownload() })),
+    cancelDownload: () => ({ snapshot: world.dictation.cancelDownload() }),
+    removeModel: () => ({ snapshot: world.dictation.removeModel() }),
+    start: async (req, ctx) => {
+      try {
+        return { sessionId: await world.dictation.start(req.clientId, ctx.signal) };
+      } catch (err) {
+        throw rpcError(err);
+      }
+    },
+    stop: (req) => (world.dictation.stop(req.sessionId, req.flush), {}),
+    session: (req, ctx) => tracked("DictationService/Session", guardStream(() => world.dictation.sessionEvents(req.sessionId, ctx.signal))),
+    // The host's microphone stream: the mock has no host, so frames are read and dropped.
+    audio: async (frames) => {
+      const it = frames[Symbol.asyncIterator]();
+      while (!(await it.next()).done) {
+        // dropped
+      }
+      return {};
+    },
+    micDenied: (req) => (world.dictation.setMicDenied(req.denied), {}),
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
@@ -862,6 +895,15 @@ function bump(name: string, by: number): void {
   else openStreams.delete(name);
 }
 
+/** A stream whose first step may throw a command error: mapped to its Connect code, like guard. */
+async function* guardStream<T>(open: () => AsyncGenerator<T>): AsyncGenerator<T> {
+  try {
+    yield* open();
+  } catch (err) {
+    throw rpcError(err);
+  }
+}
+
 async function* tracked<T>(name: string, src: AsyncIterable<T>, onOpen?: () => () => void): AsyncGenerator<T> {
   bump(name, 1);
   const onClose = onOpen?.();
@@ -1043,6 +1085,14 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && actionCtl?.[1]) {
     actionControl(res, actionCtl[1], q);
+    return;
+  }
+  const dictation = /^\/__mock\/dictation(|\/script|\/end)$/.exec(path);
+  if (dictation) {
+    const which = dictation[1];
+    if (req.method === "GET" && which === "") json(res, 200, world.dictation.json());
+    else if (req.method === "POST") json(res, 200, which === "/script" ? world.dictation.scriptControl(q) : which === "/end" ? world.dictation.endControl(q) : world.dictation.control(q));
+    else json(res, 405, { error: "method" });
     return;
   }
   const update = /^\/__mock\/update\/([a-z]+)$/.exec(path);

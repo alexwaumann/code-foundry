@@ -14,10 +14,11 @@ import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings, setSettingsPage, useViewsStore } from "@/stores/views";
 import { guiPages } from "./guiPages";
 import { KeybindingsPage } from "./KeybindingsPage";
-import { pageSections, queryWords, searchGuiPages, searchSettings, type SearchResult } from "./model";
+import { pageSections, queryWords, searchGuiPages, searchSectionRows, searchSettings, type SearchResult } from "./model";
 import { PageHead } from "./PageHead";
 import { SearchResults } from "./SearchResults";
 import { SettingsSection } from "./SectionCard";
+import { sectionRowSearch } from "./sectionLinks";
 
 /** The nav's icon per page id; a page without one gets a generic gear. Ember's is its flame. */
 const pageIcons: Readonly<Partial<Record<string, LucideIcon | ComponentType<{ className?: string }>>>> = {
@@ -144,18 +145,23 @@ export function SettingsPage() {
   const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page).filter((g) => !schema.pages.some((p) => p.id === g.id))] : []), [schema]);
   const page = pages.find((p) => p.id === pageId) ?? pages[0];
   // The GUI's own pages have no fields: their sections are found by name (Skills › Browse).
-  const guiHits = useMemo(
-    () =>
-      schema && searching
-        ? searchGuiPages(
-            guiPages.map((g) => g.page),
-            new Set(schema.pages.map((p) => p.id)),
-            words,
-          )
-        : null,
-    [schema, searching, words],
-  );
-  const counts = useMemo(() => (result ? { ...result.counts, ...guiHits?.counts } : null), [result, guiHits]);
+  // And so are the rows the GUI adds to schema sections (Dictation's Model), unless a field there matched.
+  const guiHits = useMemo(() => {
+    if (!schema || !searching || !result) return null;
+    const pagesHit = searchGuiPages(
+      guiPages.map((g) => g.page),
+      new Set(schema.pages.map((p) => p.id)),
+      words,
+    );
+    const rowsHit = searchSectionRows(schema, sectionRowSearch, result.hits, words);
+    return { hits: [...rowsHit.hits, ...pagesHit.hits], counts: pagesHit.counts, rowCounts: rowsHit.counts };
+  }, [schema, searching, words, result]);
+  const counts = useMemo(() => {
+    if (!result) return null;
+    const out: Record<string, number> = { ...result.counts, ...guiHits?.counts };
+    for (const [id, n] of Object.entries(guiHits?.rowCounts ?? {})) out[id] = (out[id] ?? 0) + n;
+    return out;
+  }, [result, guiHits]);
   // A section hit opens its page there (after the page change scrolls to the top).
   const [toSection, setToSection] = useState<string | null>(null);
 
