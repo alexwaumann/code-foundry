@@ -26,7 +26,10 @@ export CGO_LDFLAGS := -mmacosx-version-min=13.0
 # be moved after building.
 GHOSTTY_VT_PREFIX := $(shell ./scripts/ghostty-vt.sh --print-prefix)
 GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.pc
-export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
+# whisper.cpp (static, Metal embedded) for code-foundry-dictate, built the same way into
+# its own per-user cache (scripts/whisper-cpp.sh; override the root with WHISPER_CPP_CACHE).
+WHISPER_CPP_PREFIX := $(shell ./scripts/whisper-cpp.sh --print-prefix)
+export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig:$(WHISPER_CPP_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
 # GitHub repository the in-app updater and install.sh download releases from.
@@ -38,8 +41,8 @@ COMMIT   ?= $(shell git rev-parse HEAD 2>/dev/null)$(shell [ -n "$$(git status -
 # that version instead of the commit (a release built from a tagged main commit; the
 # release workflow fetches the tags).
 PLUGINSDK_TAG ?= $(shell git tag --points-at HEAD --list 'pluginsdk/v*' --sort=-v:refname 2>/dev/null | head -n 1)
-# One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh;
-# Commit and PluginSDKTag are the CLI's only).
+# One set of version ldflags for every binary (the CLI and the dictation engine here, the
+# GUI via scripts/package.sh; Commit and PluginSDKTag are the CLI's only).
 LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VERSION) \
             -X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO) \
             -X github.com/alexwaumann/code-foundry/internal/version.Commit=$(COMMIT) \
@@ -62,7 +65,7 @@ plugins:
 	done
 
 .PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub pagelib pagelib-check \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean fuzz
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz
 
 all: build
 
@@ -87,9 +90,11 @@ pagelib-check: pagelib
 		git status --short -- internal/pagelib/dist; exit 1; \
 	fi
 
-## build: build the CLI/daemon binary to ./bin/code-foundry.
-build: ghostty-vt
+## build: build the CLI/daemon binary to ./bin/code-foundry and the dictation engine to
+## ./bin/code-foundry-dictate.
+build: ghostty-vt whisper-cpp
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry ./cmd/code-foundry
+	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry-dictate ./cmd/code-foundry-dictate
 
 ## check: everything CI runs. On success it records the working tree's hash so that
 ## `make attest` can vouch for it once committed and pushed (scripts/attest.sh).
@@ -113,7 +118,7 @@ go-check: go-lint go-test
 
 # pluginsdk/ is its own module (stdlib only, replaced into this one), so ./... does not
 # reach it: vet, staticcheck and test it from its own directory.
-go-lint: gui-dist-stub ghostty-vt
+go-lint: gui-dist-stub ghostty-vt whisper-cpp
 	@unformatted=$$(gofmt -l cmd internal gui/*.go pluginsdk plugins 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
 	go vet ./...
 	go tool staticcheck ./...
@@ -147,7 +152,7 @@ fuzz:
 		fi; \
 	done
 
-go-test: gui-dist-stub ghostty-vt
+go-test: gui-dist-stub ghostty-vt whisper-cpp
 	go test -race ./...
 	cd pluginsdk && go test -race ./...
 
@@ -185,8 +190,9 @@ gui-dev: build
 	cd gui && $(WAILS3) dev
 
 ## package: release assets in dist/ (VERSION=vX.Y.Z required): the app tarball
-## (code-foundry, "Code Foundry", VERSION), install.sh, checksums.txt. See scripts/package.sh.
-package: ghostty-vt frontend-deps
+## (code-foundry, "Code Foundry", code-foundry-dictate, VERSION), install.sh, checksums.txt.
+## See scripts/package.sh.
+package: ghostty-vt whisper-cpp frontend-deps
 	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
 
 ## release: manual fallback for .github/workflows/release.yml, stable channel. Next version
@@ -207,6 +213,13 @@ promote:
 ## pkg-config file exists.
 ghostty-vt:
 	@./scripts/ghostty-vt.sh
+
+## whisper-cpp: build whisper.cpp's static libraries (Metal shaders embedded) from the
+## pinned tag with cmake into the shared per-user cache
+## (~/Library/Caches/code-foundry/whisper-cpp/<key>/, override with WHISPER_CPP_CACHE).
+## Needs cmake (brew install cmake). No-op once the pkg-config file exists.
+whisper-cpp:
+	@./scripts/whisper-cpp.sh
 
 clean:
 	rm -rf bin gui/bin dist $(FRONTEND)/dist
