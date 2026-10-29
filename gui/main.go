@@ -36,6 +36,11 @@ func main() {
 		os.Exit(2)
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	// Started from a terminal, run again as its own responsible process, so macOS asks
+	// for the microphone in Code Foundry's name (responsible_darwin.go).
+	if respawnDisclaimed(log) {
+		return
+	}
 	p, err := paths.Resolve()
 	if err != nil {
 		log.Error("resolve config home", "err", err)
