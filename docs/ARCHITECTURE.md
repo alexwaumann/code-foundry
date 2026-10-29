@@ -714,6 +714,12 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   terminal on screen. Everything else is unary, except a
   `ProjectService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
+* Dictation (`stores/dictation.ts`, `docs/notes/dictation-4-gui.md`): one shared
+  `DictationService.Watch` only while `dictation.enabled` is on (composers hold it at
+  "inline" priority) or the settings section is on screen ("core"), and one
+  `DictationService.Session` while a composer dictates. A phrase lands at the caret of the
+  composer that pressed the mic (every composer: thread, new thread, Ember, the PR panel's
+  ask and review), tinted by a ProseMirror decoration, never a mark.
 * Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
   after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
   `api/stream.ts` `HEARTBEAT_MS`). WKWebView can hold a stream's last bytes after the

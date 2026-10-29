@@ -228,7 +228,7 @@ export class MockDictation {
     const level = setInterval(() => {
       t += 1;
       // Speech-like: syllables (a fast wobble) inside words (a slower one).
-      const rms = 0.005 + 0.11 * Math.abs(Math.sin(t * 1.7)) * Math.abs(Math.sin(t * 0.45));
+      const rms = 0.004 + 0.16 * Math.abs(Math.sin(t * 1.7)) * Math.abs(Math.sin(t * 0.45));
       s.hub.publish({ event: { case: "level", value: { rms } } });
     }, 50);
     s.timers.push(level);

@@ -3,7 +3,7 @@ import { Loader2, Mic } from "lucide-react";
 import { openExternal } from "@/api/app";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
-import { barHeight, decayLevels, formatElapsed, LEVEL_BARS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
+import { barHeight, decayLevels, formatElapsed, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
 import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
 import { onDictationLevel, stopDictationIn, toggleDictation, useDictationStore } from "@/stores/dictation";
@@ -24,12 +24,14 @@ function Elapsed({ since }: { since: number }) {
   return <span className="tabular-nums">{formatElapsed(since > 0 ? now - since : 0)}</span>;
 }
 
-/** Seven live level bars: levels push in from the right and fall back between them (lib/dictation), drawn without React renders. */
+/** Seven live level bars: levels push in from the right and fall back when they stop (lib/dictation), drawn without React renders. */
 function LevelBars() {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     let bars: number[] = new Array<number>(LEVEL_BARS).fill(0);
     let last = performance.now();
+    // Levels arrive about every 50 ms; the bars fall back only once they stop (a pause, the end).
+    let lastLevel = 0;
     let frame = 0;
     const draw = () => {
       const el = ref.current;
@@ -40,13 +42,14 @@ function LevelBars() {
       });
     };
     const tick = (t: number) => {
-      bars = decayLevels(bars, t - last);
+      if (t - lastLevel > LEVEL_GAP_MS) bars = decayLevels(bars, t - last);
       last = t;
       draw();
       frame = requestAnimationFrame(tick);
     };
     const off = onDictationLevel((rms) => {
       bars = pushLevel(bars, rms);
+      lastLevel = performance.now();
       draw();
     });
     frame = requestAnimationFrame(tick);

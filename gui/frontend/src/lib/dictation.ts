@@ -24,6 +24,8 @@ export const LISTENING_PLACEHOLDER = "Listening…";
 
 /** The listening pill's bars. */
 export const LEVEL_BARS = 7;
+/** Levels this far apart mean they stopped (they arrive about every 50 ms): the bars start to fall back. */
+export const LEVEL_GAP_MS = 120;
 /** How fast a bar falls back without new levels: it halves in this many ms. */
 export const LEVEL_HALF_LIFE_MS = 140;
 

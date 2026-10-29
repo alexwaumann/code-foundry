@@ -60,7 +60,8 @@ export const DictationLanding = Extension.create({
             const decos = s.landed.map((r) =>
               Decoration.inline(r.from, r.to, { class: "cf-dictated", style: `animation-delay: -${String(Math.min(LANDED_MS, now - r.at))}ms` }),
             );
-            if (s.marker) {
+            // Not in an empty prompt: the placeholder ("Listening…") is there.
+            if (s.marker && state.doc.content.size > 2) {
               decos.push(
                 Decoration.widget(
                   state.selection.to,
