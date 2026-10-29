@@ -80,7 +80,7 @@ test("cmd+, opens settings on General; the nav switches pages, one at a time", a
   await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
   await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
   // General's sections, each a card; only this page's fields render.
-  await expect(settings.getByTestId("settings-section").locator("h3")).toHaveText(["Threads", "Text generation", "Lifecycle", "Updates"]);
+  await expect(settings.getByTestId("settings-section").locator("h3")).toHaveText(["Threads", "Text generation", "Lifecycle", "Dictation", "Updates"]);
   await expect(setting(page, "appearance.font_size")).toHaveCount(0);
   // The raw key is not shown under a row any more.
   await expect(setting(page, "threads.auto_name").getByTestId("setting-key")).toHaveCount(0);
