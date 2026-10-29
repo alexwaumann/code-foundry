@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -260,10 +261,16 @@ func exitError(p process) error {
 	if p.ExitCode() < 0 {
 		msg = "the engine was killed by a signal"
 	}
-	if l := p.LastStderrLine(); l != "" {
+	if l := p.LastStderrLine(); l != "" && !routineLog(l) {
 		msg += ": " + l
 	}
 	return errors.New(msg)
+}
+
+// routineLog reports whether a stderr line is the engine's own info or debug logging
+// (slog text), which says nothing about why it exited.
+func routineLog(line string) bool {
+	return strings.Contains(line, "level=INFO") || strings.Contains(line, "level=DEBUG")
 }
 
 func (c *EngineConn) write(v any) error {

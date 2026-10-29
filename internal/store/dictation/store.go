@@ -946,7 +946,7 @@ func (s *Store) endSessionLocked(why EndReason) {
 		clear(s.ended)
 	}
 	s.ended[sess.id] = why
-	s.log.Info("dictation ended", "session", sess.id, "reason", why)
+	s.log.Info("dictation ended", "session", sess.id, "reason", why.String())
 	s.emit(SessionEvent{SessionID: sess.id, Kind: SessionEnded, Reason: why})
 }
 

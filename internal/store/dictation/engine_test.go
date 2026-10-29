@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -100,6 +101,33 @@ func TestEngineConn(t *testing.T) {
 	}
 	if _, open := <-c.Events(); open {
 		t.Error("events not closed")
+	}
+}
+
+type fakeProcess struct {
+	code   int
+	stderr string
+}
+
+func (p fakeProcess) Done() <-chan struct{}     { return nil }
+func (p fakeProcess) ExitCode() int             { return p.code }
+func (p fakeProcess) LastStderrLine() string    { return p.stderr }
+func (fakeProcess) Signal(syscall.Signal) error { return nil }
+func (fakeProcess) CloseOutput()                {}
+
+func TestExitError(t *testing.T) {
+	for _, tc := range []struct {
+		p    fakeProcess
+		want string
+	}{
+		{fakeProcess{code: 2, stderr: "ggml_metal_init: no Metal device"}, "the engine exited with status 2: ggml_metal_init: no Metal device"},
+		{fakeProcess{code: -1, stderr: `time=x level=INFO msg="dictate: model loaded"`}, "the engine was killed by a signal"},
+		{fakeProcess{code: 1, stderr: `time=x level=ERROR msg="load failed"`}, `the engine exited with status 1: time=x level=ERROR msg="load failed"`},
+		{fakeProcess{code: 0}, "the engine exited with status 0"},
+	} {
+		if got := exitError(tc.p).Error(); got != tc.want {
+			t.Errorf("exitError(%+v) = %q, want %q", tc.p, got, tc.want)
+		}
 	}
 }
 
