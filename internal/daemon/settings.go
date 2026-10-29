@@ -40,6 +40,9 @@ import (
 //   - ember.* (and threads.show_created_threads) -> the Ember store's Config, read
 //     after every change (ConfigChanged; ember.go): on/off, its model and effort, its
 //     workers' and its epoch limits.
+//   - dictation.enabled -> the dictation store's ConfigChanged after every change
+//     (dictation.go): on starts the engine with the model loaded, off stops it. The
+//     store also writes it: a finished model download turns it on.
 
 // applySettings tells the settings store which commands exist (enabling keybinding
 // fields and validation) and keeps the registry and log level in sync with it. The

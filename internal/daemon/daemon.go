@@ -200,6 +200,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
+	dictationAPI := api.NewDictation(st.dictation, events)
 	grants := preview.NewGrants(preview.NewFloor(st.home, p))
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
@@ -289,6 +290,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
 		Skills:            st.skills,
 		Ember:             st.ember,
+		Dictation:         dictationAPI,
+		DictationStatus:   dictationAPI.Status,
 		Memory:            st.memory,
 		Themes:            st.themes,
 		ThemeReports:      themeReports,
@@ -336,6 +339,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		api.NewMemory(st.memory, events).Route(),
 		api.NewTheme(st.themes, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
+		dictationAPI.Route(),
 		filesystemAPI.Route(),
 		eventsAPI.Route(),
 	}

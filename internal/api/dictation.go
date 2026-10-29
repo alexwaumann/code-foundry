@@ -56,6 +56,11 @@ func (h *Dictation) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
+// Status is the snapshot now (the dictation.* commands read it).
+func (h *Dictation) Status() *v1.DictationSnapshot {
+	return DictationSnapshotToProto(h.store.Snapshot())
+}
+
 // Watch sends the snapshot, then again after every change, and a heartbeat after
 // HeartbeatInterval without one.
 func (h *Dictation) Watch(ctx context.Context, _ *connect.Request[v1.WatchDictationRequest], stream *connect.ServerStream[v1.DictationSnapshot]) error {
