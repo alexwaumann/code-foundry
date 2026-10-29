@@ -19,6 +19,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
+	"github.com/alexwaumann/code-foundry/internal/store/dictation"
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
@@ -78,6 +79,9 @@ type stores struct {
 	themes *usertheme.Store
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
+	// dictation owns the dictation model and engine process (dictation.go); closed
+	// early, stopping the engine.
+	dictation *dictation.Store
 	// skills reads the Skills marketplaces Claude Code has and what is installed
 	// (skill_registry.go); it holds no resources.
 	skills *skill.Store
@@ -329,6 +333,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
+	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings, pres)
 	if s.skills, err = newSkillStore(p, s.db, s.bus, s.settings, log.With("store", "skill")); err != nil {
 		return nil, err
 	}
@@ -385,6 +390,9 @@ func (s *stores) close() error {
 	var errs []error
 	if s.update != nil {
 		s.update.Close()
+	}
+	if s.dictation != nil {
+		s.dictation.Close()
 	}
 	if s.stopShells != nil {
 		s.stopShells()

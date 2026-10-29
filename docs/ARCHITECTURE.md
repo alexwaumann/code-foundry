@@ -114,6 +114,10 @@ internal/
     memory/                the app memory: the user's standing preferences (<home>/memory/,
                            one file per entry with provenance, and MEMORY.md), appended to
                            every thread's system prompt at spawn
+    dictation/             voice dictation: the Whisper model (<home>/dictation/models,
+                           resumed download, sha256-pinned), the code-foundry-dictate engine
+                           process (stdio JSON), one session at a time, unload while away
+                           (docs/notes/dictation-2-daemon.md)
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   dictate/                 the dictation engine's protocol, phrase segmentation and output
                            filters (pure Go); dictate/whisper is the cgo model actor
@@ -396,6 +400,11 @@ Services (v1):
   memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
   The GUI shows it on Settings › Memory, fed by the EventService memory source
   (`docs/notes/memory-page.md`).
+* `DictationService` — Watch (the whole state: on/off, model and download, this Mac,
+  the open session, mic denied), Download, CancelDownload, RemoveModel, Start, Stop,
+  Session (one session's levels, phrases and end), Audio (the Wails host's microphone
+  client stream), MicDenied: voice dictation into the composers, transcribed on this Mac
+  by the code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`).
 * `HealthService` — Ping, Version.
 
 Rules:

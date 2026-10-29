@@ -124,6 +124,7 @@ const (
 	GroupUpdate      = "update"
 	GroupPlugins     = "plugins"
 	GroupEmber       = "ember"
+	GroupDictation   = "dictation"
 	GroupAdvanced    = "advanced"
 )
 
@@ -148,6 +149,7 @@ var Pages = []Page{
 		{ID: "threads", Title: "Threads"},
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "lifecycle", Title: "Lifecycle"},
+		{ID: "dictation", Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it."},
 		{ID: "updates", Title: "Updates"},
 	}},
 	{ID: PageAppearance, Title: "Appearance", Description: "Applied live in every window.", Sections: []Section{
@@ -187,6 +189,7 @@ var Groups = []Group{
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
+	{GroupDictation, "Dictation", "Voice dictation into the composers, transcribed on this Mac."},
 	{GroupPlugins, "Plugins", "Where plugins are installed from."},
 	{GroupEmber, "Ember", "The resident agent: whether it runs, its models, and when it starts a fresh session."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
@@ -234,6 +237,7 @@ const (
 	KeyLogLevel             = "advanced.log_level"
 	KeyPluginRegistries     = "plugins.registries"
 	KeyEmberEnabled         = "ember.enabled"
+	KeyDictationEnabled     = "dictation.enabled"
 	KeyEmberModel           = "ember.model"
 	KeyEmberEffort          = "ember.effort"
 	KeyEmberWorkerModels    = "ember.worker_models"
@@ -393,6 +397,14 @@ var staticFields = []Field{
 		Description: "How long a closing thread waits for Claude to exit before it is force-quit.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
+	},
+	// General › Dictation. The rest of the section is the dictation store's state
+	// (DictationService.Watch): the model, its download, this Mac.
+	{
+		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictation",
+		Description: "Adds a microphone button to every composer and the ⌘⇧M shortcut.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Dictation.Enabled },
 	},
 	// General › Updates.
 	{

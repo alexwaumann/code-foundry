@@ -39,7 +39,14 @@ type Settings struct {
 	Update      Update
 	Plugins     Plugins
 	Ember       Ember
+	Dictation   Dictation
 	Advanced    Advanced
+}
+
+// Dictation configures voice dictation (internal/store/dictation).
+type Dictation struct {
+	// Enabled runs the engine with the model loaded (once the model is downloaded).
+	Enabled bool
 }
 
 // Ember configures the resident agent (internal/store/ember).
