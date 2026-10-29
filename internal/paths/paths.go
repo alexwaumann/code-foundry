@@ -201,6 +201,10 @@ func (p Paths) Themes() string { return filepath.Join(p.home, "themes") }
 // (docs/notes/workspaces-v2-2-workspaces.md).
 func (p Paths) Workspaces() string { return filepath.Join(p.home, "workspaces") }
 
+// DictationModels holds the dictation model (internal/store/dictation): downloaded once
+// on request, kept until the user removes it.
+func (p Paths) DictationModels() string { return filepath.Join(p.home, "dictation", "models") }
+
 // LegacyMemory is the single memory file before the directory, one "- <text>" line per
 // entry. The daemon imports it into Memory at start and renames it to
 // memory.md.imported.
