@@ -1,5 +1,5 @@
 name: setup-go-ghostty
-description: Go toolchain from go.mod plus a cached libghostty-vt build (shared by ci and release).
+description: Go toolchain from go.mod plus cached libghostty-vt and whisper.cpp builds (shared by ci and release).
 runs:
   using: composite
   steps:
@@ -7,11 +7,13 @@ runs:
     - uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
-        # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
-        # without keying on it, so key the build cache on the library pins as well.
+        # Go bakes the pkg-config link paths of libghostty-vt and whisper.cpp into compiled
+        # cgo packages without keying on them, so key the build cache on the library pins
+        # as well.
         cache-dependency-path: |
           go.sum
           scripts/ghostty-vt.sh
+          scripts/whisper-cpp.sh
 
     # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
     # both pins. The script installs into a per-user cache dir outside the checkout; the
@@ -31,3 +33,22 @@ runs:
 
     - shell: bash
       run: make ghostty-vt
+
+    # whisper.cpp (static, Metal shaders embedded) for code-foundry-dictate, from the
+    # pinned tag with cmake (preinstalled on the macOS runners), cached on the tag, the
+    # arch and the cmake flags. Same per-user cache layout as libghostty-vt. A cold build
+    # takes under a minute.
+    - name: whisper.cpp cache key
+      id: whisper-cpp
+      shell: bash
+      run: |
+        echo "key=$(./scripts/whisper-cpp.sh --print-key)" >> "$GITHUB_OUTPUT"
+        echo "prefix=$(./scripts/whisper-cpp.sh --print-prefix)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v6
+      with:
+        path: ${{ steps.whisper-cpp.outputs.prefix }}
+        key: ${{ runner.os }}-${{ steps.whisper-cpp.outputs.key }}
+
+    - shell: bash
+      run: make whisper-cpp
