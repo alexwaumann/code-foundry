@@ -565,7 +565,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   (thread, plugin), an overlay that never touches status; persisted (`thread_flags`),
   cleared by the plugin, when it is disabled or removed, on archive, and for until-seen
   flags when the thread's items are watched. The GUI counts a flagged thread as needing
-  attention (sort group, line 2, bell, dock).
+  attention (sort group, line 2, window title, dock).
   `ThreadService.RunIn` moves a thread to another of its checkouts (that member becomes
   the primary) with the control protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
@@ -874,7 +874,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   surface (`surfaces/ember.ts`, Ember's panel only) at the task. One shared
   `EmberService.WatchBoard` (`stores/ember.ts`) feeds the row, the chat header and the
   Board while any of them shows (inline for the row alone, core with the chat or the
-  Board). The bell counts Ember's attention; the Dock badge and lists leave it out.
+  Board). cmd+shift+a visits Ember's attention first; the window title, the Dock badge
+  and lists leave it out.
 * Skills page (`docs/notes/skills-4-gui.md`): Settings → Skills is a GUI page
   (`components/settings/guiPages.ts`, `components/skill/settings`) over `stores/skill.ts`,
   held open (`openSkillMarketplace`) while it shows. Installed rows (plugins and skills,
