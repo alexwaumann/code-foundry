@@ -3,7 +3,9 @@
 Status: done on branch `cf/thread-checkouts` (one PR, daemon model plus the GUI mapping it
 forces). The table below was the plan, written first from a grep of every reader and
 writer; each row now says what landed. A later GUI feature (a per-thread info card) reads
-`ThreadCheckout`'s live fields and `Thread.checkout_paths`.
+`ThreadCheckout`'s live fields and `Thread.checkout_paths`. Review fixes (PR #401, "merge
+after fixes") are in the decisions, gotchas, tests and verification below, marked
+"review".
 
 ## The change
 
@@ -50,7 +52,8 @@ derivation survives only as the resolution of an unrecorded member.
 | `thread/thread.go` `Thread` | set + branch + primary | + `CheckoutPaths map[string]string` (nil: not recorded); `Branch` documented as created-for |
 | `thread/db.go` save/load | | the `checkouts` column (`''` round-trips to nil) |
 | `thread/placement.go` `placeThread`/`placeWorktrees` | the branch decides the paths | records every member's path at Create: the made or reused worktree, the folder, the main checkout, the `--worktree` primary; with like or a creator, the copied thread's recorded paths for the members it shares (same checkouts), made only for members it lacks |
-| `thread/placement.go` `ensureMembers` | makes missing derived worktrees | also records: an unrecorded member is resolved and recorded; a missing worktree-mode member is made on the created-for branch and its path recorded |
+| `thread/placement.go` `memberWorktree`, `makeWorktrees`/`makeWorktree` (review) | the worktree at the default path is the branch's whatever it has | the default-path worktree is the branch's only while it has it checked out; one switched away refuses (`defaultPathTaken`, beside `mainCheckoutBusy`) |
+| `thread/placement.go` `ensureMembers` | makes missing derived worktrees | also records: an unrecorded member is resolved and recorded; a missing worktree-mode member is made on the created-for branch and its path recorded; (review) a recorded checkout-mode member that is gone falls back to the project's own checkout, with a timeline note |
 | `thread/placement.go` `decidePlacement`/`copyPlacement` | src checkouts by derivation | unchanged rules; src checkouts are its recorded ones; `sharedCheckouts` (pure) picks what a thread placed like src shares |
 | `thread/recreate.go` (primary) | on `Branch` at the same path | unchanged: created-for branch, same path (Claude's transcript is keyed by cwd) |
 | `thread/recreate.go` `backfillBranches` | fills `Branch` | unchanged; the checkouts fill runs beside it on the same loop |
@@ -80,7 +83,8 @@ derivation survives only as the resolution of an unrecorded member.
 | `plugin/reference/host-api.md` `threadList.branch` | made-for branch | unchanged (already says so) |
 | `docs/ARCHITECTURE.md` §6 | "derived, never stored" | recorded per member, branch from HEAD |
 | GUI `src/api/threads.ts`, `src/api/checkouts.ts` | | map `checkoutPaths` and the new checkout fields |
-| GUI `lib/collisionHints.ts`, `compose/useCollisions.ts` (composer banner), `thread/useThreadCheckouts.ts`, the Composer's like draft | members derived by branch | the thread's recorded paths (collision = same path); an unrecorded member resolves as the daemon does |
+| GUI `lib/collisionHints.ts`, `compose/useCollisions.ts` (composer banner), `thread/useThreadCheckouts.ts`, the Composer's like draft | members derived by branch | the thread's recorded paths (collision = same path); an unrecorded member resolves as the daemon does; (review) a draft on an existing branch, and an unrecorded member, never take the main checkout as the branch's worktree |
+| GUI `lib/alsoIn.ts` `checkoutsKey`, `stores/threadCheckouts.ts` (review) | cwd, branch, set, member worktree paths | + the recorded checkouts, so a start recording one (or Run in) refetches |
 | GUI `stores/threads.ts` `sameThread` | | `checkoutPaths` compared by value, so rows keep their identity |
 | GUI `lib/threadRow.ts` (sidebar line 2, header) | multi-project worktree mode shows `Thread.branch` | the cwd's HEAD; the created-for branch only where there is no checkout to read (workspace folder, folder primary) |
 | GUI Work in / Run in pickers | projects store worktrees; `Checkouts` RPC | unchanged (new threads are still placed by branch; Run in lists recorded checkouts through the RPC) |
@@ -112,9 +116,35 @@ derivation survives only as the resolution of an unrecorded member.
   `--new-worktree=false` from a worktree-mode thread, shares nothing.
 * **Missing checkouts.** The primary: `recreate.go` as before, on the created-for branch at
   the same path. A worktree-mode member: made again on the created-for branch by the
-  creation rule and recorded where it lands (logged when the path changed). A checkout-mode
-  member whose recorded checkout is gone (a user's worktree the thread ran in, then left
-  with Run in): a spawn error naming it, as a missing checkout always was.
+  creation rule and recorded where it lands (logged when the path changed). (Review) A
+  checkout-mode member whose recorded checkout is gone (a user's worktree an in-place
+  thread ran in, then left with Run in, since deleted): it falls back to the project's own
+  checkout (`resolveMember`), recorded, logged, with a timeline note, at a start and a
+  fork. The set never changes, so a spawn error there (the first version) left the thread
+  unable to start for good. A primary that is gone keeps the refusal: a user's checkout is
+  never replaced under the cwd.
+* **A worktree made for a branch, then switched away, is not that branch's** (review: the
+  first version shared it). `memberWorktree` takes the default-path worktree only while it
+  has the branch checked out and is not detached, else another linked worktree on the
+  branch, which is shared as before. `makeWorktrees` refuses, up front beside
+  `mainCheckoutBusy`, when the default path is listed with another HEAD: `ErrFailedPrecondition`
+  naming the path (as git lists it), its HEAD, a thread that works in it and the way out
+  ("switch it back to X, or pick another branch"). `makeWorktree` checks again under the
+  per-(project, branch) lock, where a git checkout at the default path that the project
+  does not list refuses too (an empty folder there is left to `git worktree add`). This
+  covers a Create, a child asking for its creator's branch (`--branch`, which shares
+  nothing: a new branch), and a start making a missing member again. `branchWorktree` keeps
+  the old rule for `resolveMember` and the fill, which must reproduce the derivation.
+* **The GUI agrees with that rule** where it can: a draft on an existing branch and an
+  unrecorded member never take the main checkout (the daemon refuses it); a worktree
+  switched away is not on the branch, so it is no draft's checkout. The GUI does not
+  compute default paths, so the refusal itself shows only after the Create; the mock does
+  not model it.
+* **`ListedCheckouts`** (review, optional item): the branch-link pass reads checkouts from
+  the snapshot alone, without the path rule, a stat or the CLAUDE.md lookup per checkout.
+* **`thread new --like` help** names checkouts (review). `thread new`'s own description
+  ("Inside a thread it copies that thread's projects, branch and mode") stays: the guide is
+  at its 25,500-byte soft cap and the like line was the one asked for.
 * **Collision is the same path**; the hint names the checkout's HEAD (the created-for branch
   while it is missing). The pure part is `holderOf`.
 * **Live facts come from the project snapshot** at the recorded path (`Listed`, branch,
@@ -144,17 +174,31 @@ derivation survives only as the resolution of an unrecorded member.
   ones `CreateWorktree` returns. With a home under `/tmp`, `DefaultWorktreePath` spells a
   resolved, missing member `/tmp/...` while git lists `/private/tmp/...` (cosmetic, as
   before; a made one is recorded as git lists it).
-* The creation rule's first look is the worktree at the default path whatever it has
-  checked out (`branchWorktree`, unchanged): a new thread for branch B whose default-path
-  worktree moved to another branch shares that worktree and is "moved" from the start. A
-  second worktree at a taken path is impossible; left as it was (follow-up: refuse, or a
-  suffixed path). Likewise a missing member made again may reuse another linked worktree
-  that has the created-for branch now, as the derivation did.
+* A missing member made again may reuse another linked worktree that has the created-for
+  branch now (the creation rule), as the derivation did; no note says so yet (follow-up).
+* `ThreadCheckout`'s live fields (head, moved, status) are as fresh as the read: the Also in
+  list refetches when its key changes (cwd, branch, set, recorded checkouts, member
+  worktree paths), not on a HEAD change inside a member; it shows branches from the
+  projects stream. The info card should join `checkout_paths` with that stream.
+* During the review run, Run in on a live thread to a scratch project's main checkout was
+  refused by Claude (`set_cwd`: `needs_trust`): the app pre-trusts the worktrees it makes,
+  not a project's own folder. Pre-existing, outside this change; a stopped thread moves
+  without asking Claude.
 * The daemon's branch-link fixture had projects without `Git`; the shared rule reads it.
 * `TestCheckoutsSurviveABranchMove` needs `RefExists` to know `feat/x`: a branch thought new
   skips the lookup of an existing worktree (the old note's `fresh` gotcha).
 * `make gui-e2e`'s "a project named workspace" spec failed once under 4 workers (an
-  invocation poll) and passed 3 of 3 alone; unrelated.
+  invocation poll) and passed 3 of 3 alone; `HtmlPreview.test.tsx`'s color-scheme case
+  failed once in a `make check` and passed 3 of 3 alone; both unrelated.
+
+## Follow-ups (from the review, not built)
+
+* After an archive cleanup removes a moved worktree (on Y), the next start makes it again
+  on the created-for branch X, not on Y where the commits were. At least the remade note
+  should name the branch it had; better, remember the last HEAD at cleanup and check that
+  out again.
+* A timeline note when a member made again takes over another linked worktree on the
+  branch.
 
 ## Tests
 
@@ -168,7 +212,12 @@ path, the next start passes it and makes nothing, a like child shares it),
 `TestStartRecordsCheckouts`, `TestRunInKeepsTheCheckoutItLeaves`,
 `TestFillCheckoutsAtStartup`; `TestBranchLinksFor` (a moved checkout's HEAD, a recorded
 worktree in checkout mode); `TestThreadCheckouts` (CLI), the GUI's `threadCheckouts`,
-`threadRowModel` and reducer tests.
+`threadRowModel` and reducer tests. Review: `TestMovedDefaultWorktreeIsNotTheBranchs` (a
+moved default-path worktree refuses a Create, a child asking for its creator's branch and
+a start remaking a missing member; another worktree on the branch is shared, nothing
+made), `TestGoneUserCheckoutFallsBackToTheProjects`, `TestListedCheckouts`, the migration
+test's round trip, `draftCheckouts` rows (the main checkout on the branch, a worktree
+switched away), `checkoutsKey` with the recorded checkouts.
 
 ## Verified
 
@@ -197,3 +246,12 @@ worktree in checkout mode); `TestThreadCheckouts` (CLI), the GUI's `threadChecko
     ("checkouts of thread recorded from its derivation"), api as `""`, shown missing at its
     default path; the next message made it again and recorded it.
   * Daemon log: no warnings or errors. Scratch repos, home and transcripts removed after.
+* Review fixes, a second scratch daemon the same way:
+  * `thread new --project api --new-worktree --branch feat/r`, then `git switch -c other` in
+    its worktree. `thread new --project api --new-worktree --branch feat/r` and, with the
+    first thread as the creator, `thread new --new-worktree --branch feat/r` were both
+    refused: "api's worktree for feat/r at …/api/feat-r has other checked out now; thread
+    owner (s-…) works in it; switch it back to feat/r, or pick another branch".
+  * An in-place thread with `--projects web,api` in a user worktree `web-mine`, stopped,
+    `thread run-in --project api`, `web-mine` removed: the next message started the thread,
+    web recorded as its own checkout, the log line and the timeline note written.
