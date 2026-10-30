@@ -575,7 +575,7 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
   await expect(tip.getByTestId("tip-branch")).toHaveText("feat/x");
 
   await card(folder.id);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("login");
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
   await expect(tip.getByTestId("tip-project")).toHaveText("Workspace folder");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
   await page.mouse.move(0, 0);
