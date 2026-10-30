@@ -1,5 +1,8 @@
 # Sidebar toolbar
 
+> **Superseded (2026-10-30):** the toolbar is gone; New thread, Pull Requests and Projects
+> sit in a menu pane under the band. See `sidebar-menu-pane.md`.
+
 > **Superseded in part (2026-10-15):** the toolbar holds only Dashboard and Notifications.
 > Add project (`sidebar-add-project`) is gone and New thread is a full-width labelled
 > button under the toolbar; see `onboarding-1-entry-points.md`.

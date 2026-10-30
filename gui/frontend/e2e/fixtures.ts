@@ -164,6 +164,11 @@ export function row(page: Page, key: string) {
   return page.locator(`[data-row-key="${key}"]`);
 }
 
+/** How many threads need the user, as the window title says ("Code Foundry (2)"); Ember is not counted there. */
+export async function expectAttention(page: Page, count: number): Promise<void> {
+  await expect(page).toHaveTitle(count > 0 ? `Code Foundry (${String(count)})` : "Code Foundry");
+}
+
 /**
  * Text of the bottom panel's active shell (renderer-agnostic: works for WebGL too). Its
  * host is the only terminal host (threads have none), exposed as window.__cfTerminal.

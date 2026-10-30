@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { appPath, CF, emit, expectAttention, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -92,7 +92,7 @@ test("a stopped thread keeps its status: busy ends interrupted, attention persis
   await mockPost("thread/stop?id=s-2&reason=daemon%20stopped&code=0");
   await expect(badge(page, "s-2")).toHaveAttribute("data-thread-badge", "attention");
   // Still waiting on the user: counted, still on top, still saying so (not dimmed).
-  await expect(page.getByTestId("attention-badge")).toHaveText("1");
+  await expectAttention(page, 1);
   await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
   await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Needs input · Bash zig build -Doptimize=ReleaseFast");
   await expect(row(page, "s:s-2").getByTestId("thread-body")).toHaveCSS("opacity", "1");
@@ -118,15 +118,12 @@ test("a crashed thread keeps its composer, no card; the header says where it ran
   await expect(page.getByTestId("thread-header")).not.toContainText(/disconnected|stopped|Close/);
 });
 
-test("needs-attention: count badge, window title, and cmd+shift+a", async ({ page }) => {
+test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
   await openApp(page);
-  const count = page.getByTestId("attention-badge");
-  await expect(count).toHaveText("1");
-  await expect(page).toHaveTitle("Code Foundry (1)");
+  await expectAttention(page, 1);
 
   await mockPost("thread/attention?id=s-1");
-  await expect(count).toHaveText("2");
-  await expect(page).toHaveTitle("Code Foundry (2)");
+  await expectAttention(page, 2);
   await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", "attention");
 
   // Both sit on top, newest first: s-2 (40 min old) before s-1 (42 min); wraps around.
@@ -135,15 +132,14 @@ test("needs-attention: count badge, window title, and cmd+shift+a", async ({ pag
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a"); // from inside the focused prompt
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await count.click();
+  await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 
   // Answering the waiting thread's docked permission (1: allow, the prompt being empty) clears it.
   await expect(page.getByTestId("thread-permission")).toBeVisible();
   await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
   await page.keyboard.press("1");
-  await expect(count).toHaveText("1");
-  await expect(page).toHaveTitle("Code Foundry (1)");
+  await expectAttention(page, 1);
 });
 
 test("new thread: a worktree's + on the Projects page opens the composer with that worktree", async ({ page }) => {
@@ -236,7 +232,7 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   await row(page, "s:s-2").click();
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer");
   await mockPost("thread/attention?id=s-1");
-  await expect(page.getByTestId("attention-badge")).toHaveText("2");
+  await expectAttention(page, 2);
   await expect.poll(() => emit({ notify: { title: "ping" } })).toBeGreaterThan(0);
   await expect(page.getByText("ping")).toBeVisible();
 

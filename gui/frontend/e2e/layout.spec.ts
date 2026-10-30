@@ -31,8 +31,6 @@ const GAP = 12;
 const BAND = 56;
 const HEADER = 44;
 const CENTER = 34;
-/** An icon-xs button's inset around its glyph: (24px box - 14px glyph) / 2. */
-const ICON_INSET = 5;
 
 test("the app name fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
@@ -76,32 +74,24 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(name.top + name.height / 2).toBe(CENTER);
   expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
 
-  // The toolbar sits right under the band, 32px tall, in the sidebar body's 12px left gutter
-  // with no inset of its own (#40: rows, toolbar and status run to the sidebar's edges, a
-  // shell gap from the window and from the pane), its buttons in order from there; it does
-  // not drag.
-  const toolbar = await box(page, "sidebar-toolbar");
-  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, GAP, 32]);
-  expect(await drag(page, '[data-testid="sidebar-toolbar"]')).toBe("no-drag");
+  // No toolbar: the menu pane sits right under the band, in the sidebar body's 12px left
+  // gutter (#40: rows, the menu and status run to the sidebar's edges, a shell gap from the
+  // window and from the pane); it does not drag.
+  await expect(page.getByTestId("sidebar-toolbar")).toHaveCount(0);
+  const menu = await box(page, "sidebar-menu");
+  expect([menu.top, menu.left]).toEqual([BAND, GAP]);
+  expect(await drag(page, '[data-testid="sidebar-menu"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-thread"]')).toBe("no-drag");
-  const buttons = await page
-    .getByTestId("sidebar-toolbar")
-    .locator("button")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-  expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications"]);
-  // The first button's glyph (not its box) sits on the gutter line.
-  expect((await box(page, "sidebar-dashboard")).left).toBe(GAP - ICON_INSET);
-  expect(await page.getByTestId("sidebar-dashboard").locator("svg").evaluate((el) => el.getBoundingClientRect().left)).toBe(GAP);
-  // New thread is the first nav row under the toolbar, drawn like Pull Requests and
-  // Projects (28px, same left edge and width): 12px from the window edge, and it ends
-  // where the sidebar does (the content pane's 12px margin is the gap beyond it).
+  // New thread is the menu's first row, drawn like Pull Requests and Projects (28px, same
+  // left edge and width), inside the pane's 1px border and 4px padding; the pane ends where
+  // the sidebar does (the content pane's 12px margin is the gap beyond it).
   const newThread = await box(page, "sidebar-new-thread");
   const prs = await box(page, "nav-pullrequests");
   const sidebar = await box(page, "sidebar");
-  expect(newThread.left).toBe(GAP);
-  expect(newThread.top).toBeGreaterThan(BAND + 32);
+  expect([newThread.left, newThread.top]).toEqual([GAP + 5, BAND + 5]);
   expect(newThread.height).toBe(28);
-  expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width);
+  expect(menu.left + menu.width).toBe(sidebar.left + sidebar.width);
+  expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width - 5);
   expect([prs.left, prs.width, prs.height]).toEqual([newThread.left, newThread.width, 28]);
   // The gap to Pull Requests is the nav rows' own (2px), not the group's.
   expect(prs.top - (newThread.top + newThread.height)).toBe(2);
@@ -113,8 +103,7 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   // New terminal and Add project are not in the sidebar (palette, cmd+t and the row menu only).
   await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
-  // Pull Requests, Projects and the thread list sit below the toolbar and do not drag.
-  expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND + 32);
+  // Pull Requests, Projects and the thread list do not drag.
   expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="nav-projects"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="thread-list"]')).toBe("");

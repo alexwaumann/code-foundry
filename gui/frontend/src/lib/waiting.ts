@@ -3,7 +3,7 @@
  * turn while threads it subscribed to still work, so the daemon will wake it and it needs
  * nothing from the user. The daemon says so with status "idle" and the reason "waiting on
  * 2 child threads" ("waiting" alone while only a wake to it is queued). It sorts with the
- * idle threads, never rings the bell or the dock, and its row says "Waiting". Pure.
+ * idle threads, never counts in the window title or the dock, and its row says "Waiting". Pure.
  */
 import type { ThreadView } from "@/api/threads";
 import { threadBadge } from "./thread";

@@ -195,8 +195,8 @@ export const useThreadsStore = create<ThreadsState>()(() => ({
 
 /**
  * The thread needs the user: needs-attention, in any state, or a plugin's flag on it
- * (attention or error: a plugin raising one asks for the user like a prompt, so the bell,
- * the badge and the dock alert follow; docs/notes/plugins-3-events-flags-env.md). The
+ * (attention or error: a plugin raising one asks for the user like a prompt, so the
+ * window title, the dock badge and alert follow; docs/notes/plugins-3-events-flags-env.md). The
  * daemon persists status, so a thread whose process stopped (or outlived a daemon restart)
  * while asking a question or waiting on a permission prompt still counts. "error"
  * (interrupted) does not.
@@ -207,7 +207,7 @@ export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pi
 
 /**
  * Thread ids that need the user, in `order`. An archived or snoozed thread never counts
- * (the bell, the window title, the dock badge, cmd+shift+a, the start page): archiving one
+ * (the window title, the dock badge, cmd+shift+a, the start page): archiving one
  * that was waiting (usually a finished turn) says the user is done with it, snoozing says
  * not until later, and it sits in a collapsed section. A snoozed thread counts again once
  * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared). Neither does a
