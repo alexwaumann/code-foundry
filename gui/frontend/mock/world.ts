@@ -1700,6 +1700,7 @@ export class World {
   }
 
   private refuseSetChange(s: MockThread): void {
+    if (s.archivedAt !== null) throw new CommandError("unavailable", `thread ${s.id} is archived; unarchive it first`);
     if (this.projectIdsOf(s).length === 0 && !s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} has no project; start a thread in the project instead`);
     if (!s.projectId && s.workspaceId) throw new CommandError("unavailable", `thread ${s.id}: it runs in workspace ${s.workspaceId}'s folder; move it to one of its projects first (thread run-in)`);
   }

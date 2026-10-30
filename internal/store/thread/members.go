@@ -106,10 +106,14 @@ func (m *Manager) RemoveProject(ctx context.Context, id, ref string) (Thread, er
 	return s, nil
 }
 
-// CheckMembersChange refuses a set change for a thread without a project (it runs in
-// the home folder; start a thread in the project) and for one that runs in its
-// workspace's folder (leaving the workspace would leave it without a cwd).
+// CheckMembersChange refuses a set change for an archived thread (unarchive it first), a
+// thread without a project (it runs in the home folder; start a thread in the project)
+// and one that runs in its workspace's folder (leaving the workspace would leave it
+// without a cwd).
 func CheckMembersChange(s Thread) error {
+	if !s.ArchivedAt.IsZero() {
+		return fmt.Errorf("%w: thread %s is archived; unarchive it first", ErrFailedPrecondition, s.ID)
+	}
 	if len(s.Projects()) == 0 && s.WorkspaceID == "" {
 		return fmt.Errorf("%w: thread %s has no project; start a thread in the project instead", ErrFailedPrecondition, s.ID)
 	}

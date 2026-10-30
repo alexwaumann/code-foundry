@@ -75,6 +75,7 @@ func TestCheckMembersChange(t *testing.T) {
 	}{
 		{name: "a project thread", s: Thread{ID: "s-1", ProjectID: "web", ProjectIDs: []string{"web"}}},
 		{name: "no project", s: Thread{ID: "s-1"}, want: "has no project"},
+		{name: "archived", s: Thread{ID: "s-1", ProjectID: "web", ProjectIDs: []string{"web"}, ArchivedAt: time.Unix(1, 0)}, want: "is archived; unarchive it first"},
 		{name: "in its workspace's folder", s: Thread{ID: "s-1", ProjectIDs: []string{"api", "web"}, WorkspaceID: "w-1"}, want: "workspace w-1's folder"},
 	}
 	for _, tt := range tests {
@@ -242,6 +243,10 @@ func TestAddProjectRefusals(t *testing.T) {
 	rr.Put(project.Project{ID: "r4", Path: docs, Name: "docs", Git: true, Worktrees: []project.Worktree{{ProjectID: "r4", Path: docs, IsMain: true, Branch: "feat/m"}}})
 	home := e.create(CreateOptions{NoProject: true})
 	inFolder := e.create(CreateOptions{WorkspaceID: "w-plat", ProjectID: workspace.PrimaryWorkspace})
+	archived := e.create(CreateOptions{ProjectID: "r1"})
+	if _, err := e.m.Archive(e.ctx(), archived.ID, true); err != nil {
+		t.Fatal(err)
+	}
 	calls := len(rr.created())
 
 	tests := []struct {
@@ -254,6 +259,7 @@ func TestAddProjectRefusals(t *testing.T) {
 		{name: "unknown project", id: s.ID, ref: "nope", want: ErrNotFound},
 		{name: "no project", id: home.ID, ref: "api", want: ErrFailedPrecondition, text: "has no project"},
 		{name: "in its workspace's folder", id: inFolder.ID, ref: "lib", want: ErrFailedPrecondition, text: "folder"},
+		{name: "archived", id: archived.ID, ref: "lib", want: ErrFailedPrecondition, text: "is archived; unarchive it first"},
 		{name: "unknown thread", id: "s-nope", ref: "api", want: ErrNotFound},
 	}
 	for _, tt := range tests {
@@ -322,4 +328,19 @@ func TestFailedSetChangeNoteRetriesTheRestart(t *testing.T) {
 		return hasNote("Added project api to this thread")(items) &&
 			hasNote("Could not restart Claude for the new project list: context deadline exceeded; it retries when idle")(items) && hasDirsRestartNote(items)
 	})
+}
+
+// Removing a member of an archived thread is refused the same way.
+func TestRemoveProjectArchived(t *testing.T) {
+	e, _, _ := memberEnv(t)
+	s := e.create(CreateOptions{ProjectID: "r1", ProjectIDs: []string{"r1", "r2"}})
+	if _, err := e.m.Archive(e.ctx(), s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.RemoveProject(e.ctx(), s.ID, "api"); !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "unarchive it first") {
+		t.Fatalf("err = %v", err)
+	}
+	if got, _ := e.m.Get(e.ctx(), s.ID); !slices.Equal(got.ProjectIDs, []string{"r1", "r2"}) {
+		t.Errorf("set changed: %v", got.ProjectIDs)
+	}
 }
