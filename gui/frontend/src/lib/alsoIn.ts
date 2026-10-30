@@ -40,14 +40,20 @@ const SEP = "\u0000";
 
 /**
  * The checkouts resource key for a thread: its id, then what the checkouts follow (the
- * cwd, the branch, the project set, and the members' worktree paths, so a worktree made
- * or removed asks again). Null when the thread has fewer than `min` projects: a
- * worktree's tab needs two (one checkout: no list, no call), a folder head one (its only
- * member is still elsewhere).
+ * cwd, the branch, the project set, the checkouts it records, so a start recording one
+ * or Run in asks again, and the members' worktree paths, so a worktree made or removed
+ * asks again). Null when the thread has fewer than `min` projects: a worktree's tab needs
+ * two (one checkout: no list, no call), a folder head one (its only member is still
+ * elsewhere).
  */
-export function checkoutsKey(t: Pick<ThreadView, "id" | "worktreePath" | "branch" | "projectIds"> | undefined, worktrees: readonly string[], min = 2): string | null {
+export function checkoutsKey(
+  t: Pick<ThreadView, "id" | "worktreePath" | "branch" | "projectIds" | "checkoutPaths"> | undefined,
+  worktrees: readonly string[],
+  min = 2,
+): string | null {
   if (!t || t.projectIds.length < min) return null;
-  return [t.id, t.worktreePath, t.branch, t.projectIds.join(","), worktrees.join(",")].join(SEP);
+  const recorded = t.checkoutPaths.map((c) => `${c.projectId}=${c.path}`).join(",");
+  return [t.id, t.worktreePath, t.branch, t.projectIds.join(","), recorded, worktrees.join(",")].join(SEP);
 }
 
 /** The thread id a checkouts key names. */

@@ -13,8 +13,8 @@ const SEP = "\u0000";
 /**
  * ThreadService.Checkouts for the thread whose Worktree tab is on screen (its "Also in"
  * list). Keyed by lib/alsoIn.ts checkoutsKey: the key changes when the thread's cwd,
- * branch or project set changes, or a member's worktree is made or removed, and a new key
- * is a new read. Nothing polls; only a visible tab watches a key.
+ * branch, project set or recorded checkouts change, or a member's worktree is made or
+ * removed, and a new key is a new read. Nothing polls; only a visible tab watches a key.
  */
 export const checkoutsResource = createResource((key, signal) => getThreadCheckouts(threadOfCheckoutsKey(key), undefined, signal), { abortOnRelease: true });
 
@@ -39,13 +39,26 @@ export function useAlsoIn(path: string, folder = false): AlsoInRow[] {
   const thread = useThreadsStore(
     useShallow((s) => {
       const t = threadId ? s.byId[threadId] : undefined;
-      return t ? { id: t.id, worktreePath: t.worktreePath, branch: t.branch, projectIds: t.projectIds.join(",") } : null;
+      return t
+        ? { id: t.id, worktreePath: t.worktreePath, branch: t.branch, projectIds: t.projectIds.join(","), recorded: t.checkoutPaths.map((c) => c.projectId + SEP + c.path).join(SEP + SEP) }
+        : null;
     }),
   );
   const idsKey = thread?.projectIds ?? "";
   const ids = useMemo(() => (idsKey ? idsKey.split(",") : []), [idsKey]);
+  const recordedKey = thread?.recorded ?? "";
+  const checkoutPaths = useMemo(
+    () =>
+      recordedKey
+        ? recordedKey.split(SEP + SEP).map((c) => {
+            const [projectId = "", path = ""] = c.split(SEP);
+            return { projectId, path };
+          })
+        : [],
+    [recordedKey],
+  );
   const worktrees = useProjectsStore((s) => memberWorktrees(s, ids).join(SEP));
-  const key = thread ? checkoutsKey({ ...thread, projectIds: ids }, worktrees ? worktrees.split(SEP) : [], folder ? 1 : 2) : null;
+  const key = thread ? checkoutsKey({ ...thread, projectIds: ids, checkoutPaths }, worktrees ? worktrees.split(SEP) : [], folder ? 1 : 2) : null;
   const data = useResource(checkoutsResource, key)?.data;
   return useMemo(() => alsoInRows(data, path, folder), [data, path, folder]);
 }

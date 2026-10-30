@@ -55,7 +55,16 @@ describe("alsoInRows", () => {
 });
 
 describe("checkoutsKey", () => {
-  const t = { id: "t-1", worktreePath: "/wt/web", branch: "feat/x", projectIds: ["api", "web"] };
+  const t = {
+    id: "t-1",
+    worktreePath: "/wt/web",
+    branch: "feat/x",
+    projectIds: ["api", "web"],
+    checkoutPaths: [
+      { projectId: "api", path: "/wt/api" },
+      { projectId: "web", path: "/wt/web" },
+    ],
+  };
   it("none for a thread with one project or none", () => {
     expect(checkoutsKey(undefined, [])).toBeNull();
     expect(checkoutsKey({ ...t, projectIds: ["web"] }, [])).toBeNull();
@@ -64,7 +73,7 @@ describe("checkoutsKey", () => {
     expect(checkoutsKey({ ...t, projectIds: ["web"] }, [], 1)).not.toBeNull();
     expect(checkoutsKey({ ...t, projectIds: [] }, [], 1)).toBeNull();
   });
-  it("changes with the cwd, the branch, the set and the members' worktrees, and names the thread", () => {
+  it("changes with the cwd, the branch, the set, the recorded checkouts and the members' worktrees, and names the thread", () => {
     const k = checkoutsKey(t, ["/src/api", "/src/web"]);
     expect(k).not.toBeNull();
     expect(threadOfCheckoutsKey(k ?? "")).toBe("t-1");
@@ -73,6 +82,8 @@ describe("checkoutsKey", () => {
       checkoutsKey({ ...t, branch: "feat/y" }, ["/src/api", "/src/web"]),
       checkoutsKey({ ...t, projectIds: ["api", "notes", "web"] }, ["/src/api", "/src/web"]),
       checkoutsKey(t, ["/src/api", "/src/web", "/wt/api/feat-x"]),
+      // A start recorded the member where it made it again, nothing else changed.
+      checkoutsKey({ ...t, checkoutPaths: [{ projectId: "api", path: "/wt/api-2" }, t.checkoutPaths[1] ?? { projectId: "web", path: "/wt/web" }] }, ["/src/api", "/src/web"]),
     ])
       expect(other).not.toBe(k);
     expect(checkoutsKey({ ...t }, ["/src/api", "/src/web"])).toBe(k);
