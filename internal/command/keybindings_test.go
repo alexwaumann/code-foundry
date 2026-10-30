@@ -14,7 +14,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 	f := newFixture(t)
 	want := []string{
 		"action.last", "action.list", "action.runs", "action.stop", "action.wait",
-		"app.version", "daemon.capabilities", "daemon.status", "daemon.version",
+		"app.version", "composer.stage", "daemon.capabilities", "daemon.status", "daemon.version",
 		"dictation.start", "dictation.status", "dictation.stop",
 		"ember.status", "ember.board", "ember.remember", "ember.reseed", "ember.enable", "ember.disable", "ember.task.add", "ember.task.update", "ember.task.done", "ember.task.start", "ember.task.cancel", "ember.task.list", "ember.task.show",
 		"memory.show", "memory.add", "memory.remove", "memory.clear",
@@ -26,7 +26,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"thread.agent.open", "thread.agents", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.new-like", "thread.placement.check", "thread.prompts", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
-		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",
+		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.page", "view.panel.pr",
 		"workspace.list", "worktree.editors",
 	}
 	var got []string

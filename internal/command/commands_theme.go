@@ -173,7 +173,7 @@ type ThemeFileDeleted struct {
 }
 
 // RegisterTheme registers the theme.* commands but theme.pick: list, set-dark,
-// set-light and set-scheme (the appearance.theme_dark / theme_light / theme settings),
+// set-light, set-scheme and reset (the appearance.theme_dark / theme_light / theme settings),
 // and show, save, duplicate, restore and delete (the user's own themes,
 // docs/notes/user-themes.md). The settings store validates a slot against the themes and
 // the scheme; the slot args list the scheme's ids (the user's included, again at every
@@ -453,6 +453,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 			},
 		},
 		themeDeleteCommand(d, values, set, setSlot),
+		themeResetCommand(d, values, set),
 		themeCheckCommand(d, userIDs, needThemes),
 	)
 }

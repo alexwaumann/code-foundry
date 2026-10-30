@@ -91,6 +91,17 @@ message UiIntent {
     PlayAlertSound play_alert_sound = 7;
     ShowAgentRun show_agent_run = 8;
     InvokeCommand invoke_command = 9;
+    StageComposer stage_composer = 10;
+  }
+
+  // StageComposer puts text in a thread's composer without sending it (composer.stage,
+  // a page's "Ask Claude about this" button): a window that shows the thread replaces
+  // its draft when the draft is empty, else adds the text on a new line after it, and
+  // focuses the prompt. A window that does not show the thread ignores it; the user
+  // reads, edits and sends the text themselves.
+  message StageComposer {
+    string thread_id = 1;
+    string text = 2;
   }
 
   // InvokeCommand asks the GUI to run a command through its normal flow (runCommand):
@@ -122,8 +133,9 @@ message UiIntent {
     int32 volume = 1;
   }
 
-  // ShowView opens a named GUI view: "help", "settings", "pullrequests".
-  // Unknown names are ignored.
+  // ShowView opens a named GUI view: "help", "settings", "pullrequests". "settings.<page
+  // id>" opens Settings on that page (view.settings --page); "project.add" opens the Add
+  // Project dialog (project.add without a path). Unknown names are ignored.
   message ShowView {
     string name = 1;
     // The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)

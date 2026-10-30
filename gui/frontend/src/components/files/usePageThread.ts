@@ -8,15 +8,16 @@ const THREAD_KEY = "thread:";
 /**
  * The thread a File tab's HTML page belongs to, for its bridge (docs/notes/bridge-2-gui.md):
  * the thread whose panel holds the tab, when that thread showed this very file as a page
- * (an html item: view.inline, its card's Open in side panel, `--panel`). Any other HTML
- * file, in any panel, has none: its bridge refuses every call.
+ * (an html item: view.inline, its card's Open in side panel, `--panel`), or opened it as
+ * its own with no card (view.panel.page: `own`, the tab's page flag, which only that verb's
+ * intent sets). Any other HTML file, in any panel, has none: its bridge refuses every call.
  */
-export function usePageThread(abs: string): PageOf | null {
+export function usePageThread(abs: string, own?: { title: string }): PageOf | null {
   const key = usePanelKey();
   const threadId = key.startsWith(THREAD_KEY) ? key.slice(THREAD_KEY.length) : "";
   // The log's items change as the thread streams; the scan runs only when they do.
   const byId = useThreadStore((s) => (threadId ? s.logs[threadId]?.byId : undefined));
-  return useMemo(() => {
+  const shown = useMemo(() => {
     if (!byId || !abs) return null;
     let found: PageOf | null = null;
     for (const it of Object.values(byId)) {
@@ -27,6 +28,12 @@ export function usePageThread(abs: string): PageOf | null {
     }
     return found;
   }, [byId, abs, threadId]);
+  // The tab's own title wins: it is what the user sees on the tab.
+  const ownTitle = own?.title;
+  return useMemo(() => {
+    if (ownTitle === undefined || !threadId || !abs) return shown;
+    return { thread: threadId, title: ownTitle || shown?.title || "" };
+  }, [ownTitle, threadId, abs, shown]);
 }
 
 /** The thread a File tab's page belongs to, and the title it was shown with ("" for none). */

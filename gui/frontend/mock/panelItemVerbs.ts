@@ -1,6 +1,7 @@
 /**
- * view.panel.file, view.panel.diff and view.panel.pr in the mock daemon, like the
- * daemon's (internal/command/commands_view_items.go): always scoped to a thread (the
+ * view.panel.file, view.panel.diff, view.panel.pr and view.panel.page in the mock daemon,
+ * like the daemon's (internal/command/commands_view_items.go, commands_view_panel_page.go):
+ * always scoped to a thread (the
  * app's selection, or --thread), a ShowView with the item in its params, and --focus an
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
  * its worktree for a diff, and a GitHub repository for a pull request. It does not read
@@ -28,7 +29,7 @@ type Command = {
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
 
-/** The three item verbs over `lookup`, emitting through `emit`. */
+/** The four item verbs over `lookup`, emitting through `emit`. */
 export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   const show = (ctx: UiContext | undefined, args: Record<string, string>, name: string, params: (t: ItemThread, id: string) => Record<string, string>): string => {
@@ -61,6 +62,29 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
           return { path, project: t.projectId, base: t.worktreePath, ...(args.line ? { line: args.line } : {}) };
+        }),
+    },
+    {
+      cmd: {
+        name: "view.panel.page", noPalette: true,
+        title: "Show HTML Page in Side Panel",
+        category: "View",
+        description: `Open an HTML page in a File tab ${lead}the page alone, no card in the conversation, run with the thread's /cf/bridge.js as view.inline --panel's is.`,
+        keybindings: [],
+        args: [
+          { name: "path", type: ArgType.PATH, required: true, description: "The .html or .htm file: absolute, ~/…, or relative to the current directory; under the home directory" },
+          { name: "title", type: ArgType.STRING, required: false, description: "The tab's title (default: the file's name)" },
+          ...panelThreadArgs,
+        ],
+      },
+      when,
+      run: (ctx, args) =>
+        show(ctx, args, "panel.file", (t) => {
+          const path = args.path ?? "";
+          if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
+          if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file (view.panel.file shows any file)`);
+          const title = (args.title ?? "").trim();
+          return { path, project: t.projectId, base: t.worktreePath, page: "1", ...(title ? { title } : {}) };
         }),
     },
     {

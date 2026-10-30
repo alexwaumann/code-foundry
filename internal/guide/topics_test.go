@@ -34,9 +34,9 @@ func TestWriteTopic(t *testing.T) {
 	var guide bytes.Buffer
 	Write(&guide, cmds, "")
 	// The topic list grows by a command's name per new command outside Thread (the user
-	// themes' four verbs took it from 25,000 to 25,054); the hard limit is guide_test's
-	// 29,000.
-	if n := guide.Len(); n > 25_500 {
+	// themes' four verbs took it from 25,000 to 25,054, composer.stage and theme.reset to
+	// 25,532); the hard limit is guide_test's 29,000.
+	if n := guide.Len(); n > 25_600 {
 		t.Errorf("the guide has %d bytes after the split", n)
 	}
 }

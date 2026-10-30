@@ -160,6 +160,12 @@ describe("a ShowView scoped to a thread", () => {
       untouched();
     });
 
+    it("panel.file with page=1 (view.panel.page) opens the file as the thread's page, titled", () => {
+      showItem("panel.file", { path: `${WEB_FEAT}/welcome.html`, project: "web", base: WEB_FEAT, page: "1", title: "Welcome" });
+      expect(active("thread:b")).toMatchObject({ kind: "files", title: "Welcome", params: { path: `${WEB_FEAT}/welcome.html`, page: "1", title: "Welcome" } });
+      untouched();
+    });
+
     it("panel.file again moves the open tab to the new line", () => {
       showItem("panel.file", { path: `${WEB_FEAT}/a.html`, project: "web", base: WEB_FEAT });
       showItem("panel.file", { path: `${WEB_FEAT}/a.html`, line: "3", project: "web", base: WEB_FEAT });

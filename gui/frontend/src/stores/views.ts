@@ -24,6 +24,7 @@ import { openUsageSurface } from "./usagePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 import { presentPromptHistory } from "./historyComposers";
 import { presentDictationToggle } from "./dictation";
+import { openAddProject } from "./addProject";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
@@ -120,6 +121,11 @@ export function showView(name: string): boolean {
     void openThemeEditor(name.slice(THEME_EDIT_VIEW.length));
     return true;
   }
+  // view.settings --page: the settings page on that page (the daemon checked the id).
+  if (name.startsWith(SETTINGS_PAGE_VIEW)) {
+    openSettingsPage(name.slice(SETTINGS_PAGE_VIEW.length));
+    return true;
+  }
   switch (name) {
     case "settings":
       // Already open: stays on the page it shows.
@@ -211,6 +217,10 @@ export function showView(name: string): boolean {
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();
+    case "project.add":
+      // project.add without a folder from the CLI or a page: the Add Project dialog.
+      openAddProject();
+      return true;
     case "dictation.toggle":
       // dictation.toggle from the CLI: the focused composer's dictation, else the content pane's.
       return presentDictationToggle();
@@ -521,6 +531,9 @@ function setPages(next: Partial<ViewsState>, after?: () => void, stay?: () => vo
 
 /** ShowView "themes.edit.<id>" (theme.edit). */
 export const THEME_EDIT_VIEW = "themes.edit.";
+
+/** ShowView "settings.<page id>" (view.settings --page). */
+export const SETTINGS_PAGE_VIEW = "settings.";
 
 /**
  * theme.edit: opens the Themes page on the theme's scheme with the editor on it (after

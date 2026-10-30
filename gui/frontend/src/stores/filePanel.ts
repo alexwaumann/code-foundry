@@ -5,14 +5,22 @@
  * through openFileInPanel too.
  */
 import { diffTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
-import { allTabs, openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { allTabs, getPanel, openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";
 
 /**
  * Opens (or activates) a file's tab in a panel ("current": the window's selection) and
- * shows the panel; an open tab of the same file moves to the new line. False with no panel.
+ * shows the panel; an open tab of the same file moves to the new line. A tab that is its
+ * thread's page (view.panel.page) stays one when the file opens again another way (a
+ * path chip), so its bridge keeps working. False with no panel.
  */
 export function openFileInPanel(target: PanelTarget, file: FileTarget): boolean {
-  return openSurface(target, fileTab(file));
+  let page = file.page;
+  if (!page) {
+    const tab = fileTab(file);
+    const old = allTabs(getPanel(target)).find((t) => t.id === tab.id);
+    if (old?.params.page === "1") page = { title: old.params.title ?? "" };
+  }
+  return openSurface(target, fileTab(page ? { ...file, page } : file));
 }
 
 /** Opens (or activates) a changed file's Diff tab in a panel; an open one takes the new scope. */

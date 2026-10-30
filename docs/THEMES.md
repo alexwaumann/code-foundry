@@ -6,7 +6,7 @@ pages the model writes get the same colours from `/cf/theme.css`. Your own theme
 in the themes directory, read by the same rules as the curated ones: the GUI and the daemon
 refuse the same files. Change them with the theme verbs (`code-foundry theme --help` lists
 them: `list`, `show`, `save`, `check`, `edit`, `duplicate`, `delete`, `restore`, `set-dark`,
-`set-light`, `set-scheme`, `ask`) or the Themes page's editor, not by editing the files: each
+`set-light`, `set-scheme`, `reset`, `ask`) or the Themes page's editor, not by editing the files: each
 save keeps the version it replaces (the last 10 of each theme), which a card's Undo or
 `theme restore <id> --version <v>` puts back. A hand edit is read too, but adds no card.
 

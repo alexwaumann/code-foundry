@@ -43,7 +43,7 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * Refresh, when the worktree changes and when the thread edits the file (useTabRead).
  */
 export function FileTab({ target }: { target: FileTarget }) {
-  const { project, base, path, line } = target;
+  const { project, base, path, line, page } = target;
   const key = `${base}\u0000${path}`;
   // A path not found at base is looked for once in the checkout (findMissing); what that
   // found (or null) is read from then on, so a refresh does not search again.
@@ -123,7 +123,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       </FileHeader>
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={text} lines={lines} line={line} rendered={rendered ? kind : null} onSize={onSize} onPages={setPages} />
+      <FileBody file={file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={text} lines={lines} line={line} page={page} rendered={rendered ? kind : null} onSize={onSize} onPages={setPages} />
     </div>
   );
 }
@@ -138,6 +138,7 @@ function FileBody({
   text,
   lines,
   line,
+  page,
   rendered,
   onSize,
   onPages,
@@ -151,6 +152,7 @@ function FileBody({
   text: string | null;
   lines: number;
   line: number | undefined;
+  page: FileTarget["page"];
   rendered: "markdown" | "html" | null;
   onSize: (w: number, h: number) => void;
   onPages: (pages: number) => void;
@@ -220,6 +222,6 @@ function FileBody({
       </FileEmptyState>
     );
   if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} />;
-  if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} />;
+  if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} />;
   return <CodeBody name={name} text={text} lines={lines} line={line} />;
 }

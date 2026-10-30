@@ -3,6 +3,7 @@ import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { threadFocus } from "@/lib/inSidebar";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
+import { stageInThreadComposer } from "./composerText";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
@@ -166,6 +167,10 @@ export function applyIntent(intent: UiIntentView): void {
       // thread.agent.open: the thread selected, one of its runs shown read-only.
       clearPendingFocus();
       showAgentRun(intent.threadId, intent.runId);
+      break;
+    case "stageComposer":
+      // composer.stage: text in the thread's composer, not sent, where the window shows it.
+      stageInThreadComposer(intent.threadId, intent.text);
       break;
   }
 }

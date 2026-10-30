@@ -58,7 +58,7 @@ func TestProjectAddAndClone(t *testing.T) {
 			refs = nil
 			projects := &commandtest.Project{Err: tt.backendErr}
 			reg := command.NewRegistry()
-			if err := command.RegisterProjectAdd(reg, projects, clone); err != nil {
+			if err := command.RegisterProjectAdd(reg, projects, clone, command.AddProjectDialog{}); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), command.Context{}, tt.cmd, tt.args)
@@ -92,7 +92,7 @@ func TestProjectAddAndClone(t *testing.T) {
 	}
 	t.Run("unconfigured backends are Unimplemented", func(t *testing.T) {
 		reg := command.NewRegistry()
-		if err := command.RegisterProjectAdd(reg, nil, nil); err != nil {
+		if err := command.RegisterProjectAdd(reg, nil, nil, command.AddProjectDialog{}); err != nil {
 			t.Fatal(err)
 		}
 		for name, args := range map[string]map[string]string{"project.clone": {"repo": "o/r"}, "project.add": {"path": "/Users/me/x"}} {
@@ -102,4 +102,55 @@ func TestProjectAddAndClone(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestProjectAddOpensTheDialog(t *testing.T) {
+	inThread := command.Context{ActiveThreadID: "s1", CallerThreadID: "s1"}
+	tests := []struct {
+		name    string
+		ctx     command.Context
+		args    map[string]string
+		windows int
+		viewed  bool
+		noEmit  bool // AddProjectDialog's zero value
+		// wantDialog: one ShowView project.add, else the hint (or the folder registered).
+		wantDialog bool
+		wantMsg    string
+	}{
+		{name: "CLI with a window open", windows: 2, wantDialog: true, wantMsg: "windows=2"},
+		{name: "CLI with no window", wantMsg: command.AddProjectHint},
+		{name: "a page in a thread a window shows", ctx: inThread, windows: 1, viewed: true, wantDialog: true, wantMsg: "windows=1"},
+		{name: "a thread no window shows", ctx: inThread, windows: 1, wantMsg: command.AddProjectHint},
+		{name: "no emitter wired", windows: 1, noEmit: true, wantMsg: command.AddProjectHint},
+		{name: "a folder registers it, no dialog", windows: 1, args: map[string]string{"path": "/Users/me/app"}, wantMsg: "registered repo (r1)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", "/Users/me")
+			emit := &commandtest.Emitter{Delivered: tt.windows, OpenWindows: tt.windows}
+			dialog := command.AddProjectDialog{Emitter: emit, Viewed: func(string) bool { return tt.viewed }}
+			if tt.noEmit {
+				dialog = command.AddProjectDialog{}
+			}
+			reg := command.NewRegistry()
+			if err := command.RegisterProjectAdd(reg, &commandtest.Project{}, nil, dialog); err != nil {
+				t.Fatal(err)
+			}
+			res, err := reg.Invoke(context.Background(), tt.ctx, "project.add", tt.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Message != tt.wantMsg {
+				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
+			}
+			got := emit.Intents()
+			if tt.wantDialog {
+				if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewProjectAdd {
+					t.Fatalf("intents = %v, want one ShowView %q", got, command.ViewProjectAdd)
+				}
+			} else if len(got) != 0 {
+				t.Fatalf("intents = %v, want none", got)
+			}
+		})
+	}
 }

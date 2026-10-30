@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { useAddProjectStore } from "./addProject";
 import { getBottom, useBottomStore } from "./bottomPanel";
 import { getPanel, makeTab, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
@@ -193,6 +194,21 @@ describe("showView", () => {
     expect(showView("dashboard")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
     expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+
+  it("\"settings.<page>\" opens settings on that page, and moves an open one there (view.settings --page)", () => {
+    useViewsStore.setState({ settingsOpen: false, usageOpen: true, themesOpen: false, helpOpen: false });
+    expect(showView("settings.memory")).toBe(true);
+    expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "memory", usageOpen: false });
+    expect(showView("settings.skills")).toBe(true);
+    expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "skills" });
+  });
+
+  it("\"project.add\" opens the Add Project dialog on Local folder", async () => {
+    useAddProjectStore.setState({ open: false, tab: "github" });
+    expect(showView("project.add")).toBe(true);
+    await Promise.resolve();
+    expect(useAddProjectStore.getState()).toMatchObject({ open: true, tab: "local" });
   });
 });
 

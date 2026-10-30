@@ -1,8 +1,8 @@
 /**
  * Text for a thread's composer from elsewhere in the app, not sent: a page strip's "Ask
- * Claude" (components/files/PageErrors.tsx). It goes after what the draft already holds,
- * and the thread's prompt takes focus (shown first when it is not), so the user reads
- * it, edits it and sends it themselves.
+ * Claude" (components/files/PageErrors.tsx), and composer.stage from a page or the CLI
+ * (UiIntent.StageComposer). It goes after what the draft already holds, and the thread's
+ * prompt takes focus, so the user reads it, edits it and sends it themselves.
  */
 import { getDraft, updateDraft } from "./compose";
 import { threadDraftKey } from "./threadActions";
@@ -16,4 +16,20 @@ export function putInThreadComposer(threadId: string, text: string): void {
   const ui = useUiStore.getState();
   if (ui.selection.kind === "thread" && ui.selection.id === threadId) useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
   else ui.select({ kind: "thread", id: threadId }, { focusPrompt: true });
+}
+
+/**
+ * composer.stage (UiIntent.StageComposer): puts text in threadId's composer when this
+ * window shows the thread, replacing an empty draft, else on a new line after it, and
+ * focuses its prompt. A window showing something else leaves the thread alone (the
+ * daemon sends it only while some window shows the thread). False when it did nothing.
+ */
+export function stageInThreadComposer(threadId: string, text: string): boolean {
+  const ui = useUiStore.getState();
+  if (ui.selection.kind !== "thread" || ui.selection.id !== threadId) return false;
+  const key = threadDraftKey(threadId);
+  const cur = getDraft(key).text.trimEnd();
+  updateDraft(key, { text: cur ? `${cur}\n${text}` : text, error: null });
+  useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+  return true;
 }
