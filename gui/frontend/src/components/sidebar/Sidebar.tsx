@@ -73,7 +73,7 @@ function useListRows(): ListRows {
 /**
  * The row the selection highlights: the selected thread's, or for a thread hidden from the
  * sidebar (opened from its creator's thread info card, the palette, a link) its nearest shown ancestor's
- * (lib/inSidebar.ts sidebarAnchor); null when none (the dashboard, a page, a hidden thread
+ * (lib/inSidebar.ts sidebarAnchor); null when none (the composer, a page, a hidden thread
  * with no shown ancestor). Arrow keys start from it. Derived, a primitive selector.
  */
 function useSelectedRowKey(): string | null {
