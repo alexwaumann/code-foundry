@@ -57,6 +57,7 @@ type Fake struct {
 	// checkouts and hints back Checkouts and CheckoutHints (checkouts.go).
 	checkouts map[string][]thread.Checkout
 	hints     []string
+	placement *thread.PlacementReport
 	// prompts back ListPrompts (prompts.go).
 	prompts []thread.SentPrompt
 }

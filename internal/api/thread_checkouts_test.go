@@ -1,8 +1,12 @@
 package api
 
 import (
+	"context"
 	"testing"
 
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
@@ -34,5 +38,27 @@ func TestCheckoutsToProtoOperation(t *testing.T) {
 				t.Errorf("operation %q %d/%d, want %q %d/%d", st.GetOperation(), st.GetOperationStep(), st.GetOperationTotal(), tt.op, tt.wantStep, tt.wantLast)
 			}
 		})
+	}
+}
+
+func TestThreadCheckPlacement(t *testing.T) {
+	fake, c := newThreadServer(t)
+	ctx := context.Background()
+	fake.SetPlacement(thread.PlacementReport{Branch: "feat/x", Members: []thread.MemberPlacement{
+		{ProjectID: "r1", ProjectName: "api", Outcome: thread.PlacementShare, Path: "/wt/api", Branch: "feat/x"},
+		{ProjectID: "r2", ProjectName: "web", Outcome: thread.PlacementRefused, Message: "web's main checkout is on feat/x"},
+	}})
+	res, err := c.CheckPlacement(ctx, connect.NewRequest(&v1.CheckPlacementRequest{ProjectIds: []string{"api", "web"}, Branch: "feat/x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := res.Msg.GetMembers()
+	if res.Msg.GetBranch() != "feat/x" || len(m) != 2 ||
+		m[0].GetOutcome() != v1.PlacementOutcome_PLACEMENT_OUTCOME_SHARE || m[0].GetPath() != "/wt/api" || m[0].GetBranch() != "feat/x" ||
+		m[1].GetOutcome() != v1.PlacementOutcome_PLACEMENT_OUTCOME_REFUSED || m[1].GetMessage() != "web's main checkout is on feat/x" || m[1].GetProjectName() != "web" {
+		t.Errorf("CheckPlacement = %v", res.Msg)
+	}
+	if _, err := c.CheckPlacement(ctx, connect.NewRequest(&v1.CheckPlacementRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("CheckPlacement without projects: %v", err)
 	}
 }

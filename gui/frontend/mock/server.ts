@@ -546,6 +546,7 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
     // ThreadService.Checkouts: the thread's checkouts (world.checkoutsOf); the GUI's Worktree tab lists the others as Also in.
     checkouts: (req) => guard(() => world.checkoutsMsg(req.id)),
+    checkPlacement: (req) => world.checkPlacement(req.projectIds, req.branch, req.checkoutMode),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
     listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),

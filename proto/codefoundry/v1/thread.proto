@@ -57,6 +57,12 @@ service ThreadService {
   // folder the folder; otherwise each member's own checkout. See
   // docs/notes/workspaces-v2-1-threads.md.
   rpc Checkouts(ThreadCheckoutsRequest) returns (ThreadCheckoutsResponse) {}
+  // CheckPlacement reports where a new thread with these projects, branch and mode would
+  // go, per project, without making or changing anything: a new worktree at a path, an
+  // existing checkout it would share, a plain folder, or the refusal Create would give
+  // (with its message). It runs Create's own placement checks, so the two agree; like and
+  // creator inheritance are not considered. See docs/notes/thread-info-facts.md.
+  rpc CheckPlacement(CheckPlacementRequest) returns (CheckPlacementResponse) {}
   // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
   // the GUI's thread list. Persisted; any state.
   rpc Pin(PinThreadRequest) returns (PinThreadResponse) {}

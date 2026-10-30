@@ -37,6 +37,32 @@ func checkoutsToProto(tc thread.ThreadCheckouts) *v1.ThreadCheckoutsResponse {
 	return res
 }
 
+// CheckPlacement reports where a new thread would go (thread.Manager.CheckPlacement).
+func (h *Thread) CheckPlacement(ctx context.Context, req *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error) {
+	rep, err := h.store.CheckPlacement(ctx, thread.PlacementCheck{
+		ProjectIDs: req.Msg.GetProjectIds(), Branch: req.Msg.GetBranch(), CheckoutMode: req.Msg.GetCheckoutMode(),
+	})
+	if err != nil {
+		return nil, threadError(err)
+	}
+	out := &v1.CheckPlacementResponse{Branch: rep.Branch, BranchNamedAtCreate: rep.BranchNamedAtCreate}
+	for _, m := range rep.Members {
+		out.Members = append(out.Members, &v1.MemberPlacement{
+			ProjectId: m.ProjectID, ProjectName: m.ProjectName, Outcome: placementOutcomes[m.Outcome],
+			Path: m.Path, Branch: m.Branch, Message: m.Message,
+		})
+	}
+	return connect.NewResponse(out), nil
+}
+
+// placementOutcomes maps thread.PlacementOutcome to the proto enum.
+var placementOutcomes = map[thread.PlacementOutcome]v1.PlacementOutcome{
+	thread.PlacementNew:     v1.PlacementOutcome_PLACEMENT_OUTCOME_NEW,
+	thread.PlacementShare:   v1.PlacementOutcome_PLACEMENT_OUTCOME_SHARE,
+	thread.PlacementFolder:  v1.PlacementOutcome_PLACEMENT_OUTCOME_FOLDER,
+	thread.PlacementRefused: v1.PlacementOutcome_PLACEMENT_OUTCOME_REFUSED,
+}
+
 // checkoutPathsToProto is Thread.checkout_paths: one per member, in project id order,
 // "" for a member with none recorded.
 func checkoutPathsToProto(s thread.Thread) []*v1.ThreadCheckoutPath {

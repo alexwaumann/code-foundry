@@ -82,3 +82,29 @@ func (f *Fake) CheckoutHints(thread.Thread) []string {
 	defer f.mu.Unlock()
 	return slices.Clone(f.hints)
 }
+
+// SetPlacement makes CheckPlacement return rep.
+func (f *Fake) SetPlacement(rep thread.PlacementReport) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.placement = &rep
+}
+
+// CheckPlacement records "CheckPlacement <ids> branch=<b> checkout=<bool>" and returns
+// what SetPlacement gave, else a new worktree per project on c.Branch.
+func (f *Fake) CheckPlacement(_ context.Context, c thread.PlacementCheck) (thread.PlacementReport, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, fmt.Sprintf("CheckPlacement %s branch=%s checkout=%v", strings.Join(c.ProjectIDs, ","), c.Branch, c.CheckoutMode))
+	if len(c.ProjectIDs) == 0 {
+		return thread.PlacementReport{}, fmt.Errorf("%w: a project is required", thread.ErrInvalidArgument)
+	}
+	if f.placement != nil {
+		return *f.placement, nil
+	}
+	rep := thread.PlacementReport{Branch: c.Branch, BranchNamedAtCreate: c.Branch == ""}
+	for _, id := range c.ProjectIDs {
+		rep.Members = append(rep.Members, thread.MemberPlacement{ProjectID: id, ProjectName: id, Outcome: thread.PlacementNew, Branch: c.Branch})
+	}
+	return rep, nil
+}

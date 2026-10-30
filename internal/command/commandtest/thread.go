@@ -39,6 +39,8 @@ type Thread struct {
 	Hints  []string
 	// CheckoutsResp is Checkouts' answer (nil: an empty one for the requested thread).
 	CheckoutsResp *v1.ThreadCheckoutsResponse
+	// PlacementResp is CheckPlacement's answer (nil: an empty one).
+	PlacementResp *v1.CheckPlacementResponse
 	// Prompts is ListPrompts' answer.
 	Prompts []*v1.SentPrompt
 	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
@@ -116,6 +118,17 @@ func (s *Thread) Checkouts(_ context.Context, r *connect.Request[v1.ThreadChecko
 		return connect.NewResponse(s.CheckoutsResp), nil
 	}
 	return connect.NewResponse(&v1.ThreadCheckoutsResponse{Thread: &v1.Thread{Id: r.Msg.GetId()}}), nil
+}
+
+// CheckPlacement records the request and returns PlacementResp.
+func (s *Thread) CheckPlacement(_ context.Context, r *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if s.PlacementResp != nil {
+		return connect.NewResponse(s.PlacementResp), nil
+	}
+	return connect.NewResponse(&v1.CheckPlacementResponse{}), nil
 }
 
 // Fork returns thread "s2" with ParentId set.
