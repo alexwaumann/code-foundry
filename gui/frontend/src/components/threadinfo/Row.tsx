@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
  * the right-hand value, and a chevron column that every row reserves so values line up.
  * A row may act on click, carry a menu or fold (its chevron), and a hover card (the
  * caller's Tip around it). `chevron`: "none" leaves the column empty; "closed" points
- * right; "open" points down, only while the row's menu is up or its fold is open.
+ * right; "open" points down, only while the row's menu is up or its fold is open. A menu
+ * trigger keeps its hover tint while its menu is up; an open fold shows only its chevron
+ * (a tinted fold read as selected).
  *
  * As a menu trigger (Radix `asChild`) the row takes the trigger's props and ref. A row
  * with both a click action and a menu (`onClick` and `menuOnChevron`) opens the menu only
@@ -63,7 +65,8 @@ export function Row({
         "group/row relative flex min-w-0 shrink-0 items-center gap-2 rounded-md pr-1 pl-2 text-caption text-cf-text outline-none",
         tall ? "py-1" : sub ? "h-6.5" : "h-7",
         sub && "pl-7.5",
-        (interactive || hoverable) && "cursor-default hover:bg-cf-control-hover focus-visible:bg-cf-control-hover aria-expanded:bg-cf-control-hover",
+        (interactive || hoverable) && "cursor-default hover:bg-cf-control-hover focus-visible:bg-cf-control-hover",
+        menu && "aria-expanded:bg-cf-control-hover",
         className,
       )}
       onPointerDown={(e: PointerEvent<HTMLDivElement>) => {

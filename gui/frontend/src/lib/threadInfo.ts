@@ -285,10 +285,34 @@ export function cacheMinutesLeft(expiresAtMs: number | null, now: number): numbe
   return expiresAtMs === null ? null : Math.ceil((expiresAtMs - now) / 60_000);
 }
 
-/** The context row's muted suffix: "cache 41m" while the prompt cache is warm, "cache expired" after, "" before the first result. */
+/**
+ * The context row's muted suffix: "cache 41m" while the prompt cache is warm; "" before the
+ * first result and once it has expired (the composer's ColdCacheNote says so).
+ */
 export function cacheSuffix(minutesLeft: number | null): string {
-  if (minutesLeft === null) return "";
-  return minutesLeft <= 0 ? "cache expired" : `cache ${String(minutesLeft)}m`;
+  return minutesLeft !== null && minutesLeft > 0 ? `cache ${String(minutesLeft)}m` : "";
+}
+
+/**
+ * The card shows costs in cents (lib/usage's fmtUsd keeps four decimals under a cent, which
+ * the Usage sheet wants). Under half a cent (USD) a total reads "<$0.01" and a token kind
+ * shows no cost.
+ */
+export const USD_SHOWN = 0.005;
+
+function cents(usd: number): string {
+  return `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** A total's cost on the card (the Usage row, the fold's Total, a model, a re-read): "$2.21", "<$0.01" under USD_SHOWN. */
+export function cardUsd(usd: number): string {
+  return usd > 0 && usd < USD_SHOWN ? "<$0.01" : cents(usd);
+}
+
+/** A token kind's cost in the usage fold: cents, "" under USD_SHOWN (noise beside the cents the rest show), "—" unpriced. */
+export function foldUsd(usd: number, unpriced: boolean): string {
+  if (unpriced) return "—";
+  return usd >= USD_SHOWN ? cents(usd) : "";
 }
 
 /** How full the context is, 0-100, rounded; null when the window is unknown. */
