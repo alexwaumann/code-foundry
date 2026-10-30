@@ -164,7 +164,10 @@ type VersionResponse struct {
 	// VCS commit the daemon was built from, if known.
 	Commit string `protobuf:"bytes,2,opt,name=commit,proto3" json:"commit,omitempty"`
 	// Go toolchain version the daemon was built with.
-	GoVersion     string `protobuf:"bytes,3,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	GoVersion string `protobuf:"bytes,3,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	// Absolute path of the first-run welcome page the daemon places at every start
+	// (<home>/pages/welcome.html); the GUI's zero-projects composer names it.
+	WelcomePage   string `protobuf:"bytes,4,opt,name=welcome_page,json=welcomePage,proto3" json:"welcome_page,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -220,6 +223,13 @@ func (x *VersionResponse) GetGoVersion() string {
 	return ""
 }
 
+func (x *VersionResponse) GetWelcomePage() string {
+	if x != nil {
+		return x.WelcomePage
+	}
+	return ""
+}
+
 var File_codefoundry_v1_health_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_health_proto_rawDesc = "" +
@@ -230,12 +240,13 @@ const file_codefoundry_v1_health_proto_rawDesc = "" +
 	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x121\n" +
 	"\x06uptime\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x06uptime\"\x10\n" +
-	"\x0eVersionRequest\"b\n" +
+	"\x0eVersionRequest\"\x85\x01\n" +
 	"\x0fVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x16\n" +
 	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x1d\n" +
 	"\n" +
-	"go_version\x18\x03 \x01(\tR\tgoVersion2\xa2\x01\n" +
+	"go_version\x18\x03 \x01(\tR\tgoVersion\x12!\n" +
+	"\fwelcome_page\x18\x04 \x01(\tR\vwelcomePage2\xa2\x01\n" +
 	"\rHealthService\x12C\n" +
 	"\x04Ping\x12\x1b.codefoundry.v1.PingRequest\x1a\x1c.codefoundry.v1.PingResponse\"\x00\x12L\n" +
 	"\aVersion\x12\x1e.codefoundry.v1.VersionRequest\x1a\x1f.codefoundry.v1.VersionResponse\"\x00B\xc3\x01\n" +

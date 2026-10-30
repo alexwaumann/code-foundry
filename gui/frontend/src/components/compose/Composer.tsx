@@ -85,6 +85,7 @@ import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
+import { loadWelcomePage, prefillWelcome, useWelcome, useWelcomeStore } from "@/stores/welcome";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
@@ -1006,6 +1007,15 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
   const likePlace = useLikePlace(likeThreadId ?? "");
   const workspaceGone = useWorkspacesStore((s) => (workspaceId ? !(workspaceId in s.byId) : false));
   const busy = useDraft(key, "phase") !== "idle";
+  // A first run (no projects at all): the No project composer greets and prefills the
+  // tutorial prompt (stores/welcome.ts, docs/notes/welcome-composer.md).
+  const welcome = useWelcome() && target.kind === "home";
+  const welcomePage = useWelcomeStore((s) => s.page);
+  useEffect(() => {
+    if (!welcome) return;
+    if (welcomePage) prefillWelcome();
+    else void loadWelcomePage();
+  }, [welcome, welcomePage]);
   // Every project of its workspace taken out (stores/compose toggleDraftProject): the empty state.
   const picked = useDraft(key, "projects");
   const emptied = !likeThreadId && !noProject && !(workspaceId && workspaceGone) && picked !== null && isSetEmpty(set);
@@ -1041,7 +1051,7 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
         ) : (
           // The heading's name is the first composer Tab stop, then the chips, the prompt…
           <div className="cf-thread-col m-auto" data-testid="composer-body" onKeyDown={cycleStops}>
-            <h1 className="mb-6 text-center text-title" data-testid="composer-heading">
+            <h1 className="mb-6 text-center text-title" data-testid="composer-heading" data-welcome={welcome || undefined}>
               {likeThreadId ? (
                 // "New thread on this branch": the set is the thread's; nothing to switch.
                 // Worktree mode has the thread's branch; in place, the workspace's or the project's name.
@@ -1054,6 +1064,9 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
                     What&apos;s next in <span data-testid="composer-like-name">{name}</span>?
                   </>
                 )
+              ) : welcome ? (
+                // Nothing to pick yet: no switcher.
+                "Welcome to Code Foundry"
               ) : emptied ? (
                 <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} />
               ) : (

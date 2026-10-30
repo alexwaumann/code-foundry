@@ -8,12 +8,16 @@ import { updateDraft, useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
+import { HOME_DRAFT, startWelcomeSync, useWelcomeStore, welcomePrompt } from "@/stores/welcome";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { Composer } from "./Composer";
 
 // No daemon: refs and skills never load (the composer shows them loading).
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
 vi.mock("@/api/filesystem", async (orig) => ({ ...(await orig<typeof import("@/api/filesystem")>()), listSkills: () => new Promise(() => undefined) }));
+// The daemon's placed welcome page (HealthService.Version).
+const PAGE = "/Users/me/.code-foundry/pages/welcome.html";
+vi.mock("@/api/health", async (orig) => ({ ...(await orig<typeof import("@/api/health")>()), welcomePage: () => Promise.resolve(PAGE) }));
 
 const project = (id: string): ProjectView => ({
   id,
@@ -34,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useComposeStore.setState({ drafts: {}, refs: {}, preview: null });
+  useWelcomeStore.setState({ page: "", decided: false });
 });
 
 describe("Composer without a project", () => {
@@ -56,6 +61,98 @@ describe("Composer without a project", () => {
     expect(screen.queryByTestId("composer-base")).toBeNull();
     expect(screen.getByTestId("composer-checkout-branch").textContent).toBe("On main");
     expect(screen.getByTestId("composer-members")).not.toBeNull();
+  });
+});
+
+describe("the first-run welcome (docs/notes/welcome-composer.md)", () => {
+  const noProjects = () => {
+    useProjectsStore.setState({ byId: {}, order: [], loaded: true });
+  };
+  const addProject = () => {
+    act(() => {
+      useProjectsStore.setState({ byId: { web: project("web") }, order: ["web"], loaded: true });
+    });
+  };
+  const heading = () => screen.getByTestId("composer-heading").textContent;
+  const homeText = () => useComposeStore.getState().drafts[HOME_DRAFT]?.text ?? "";
+  const mountHome = async () => {
+    render(<Composer projectId="" noProject />);
+    // The page's path arrives from the daemon a tick later.
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    stop = startWelcomeSync();
+  });
+  afterEach(() => {
+    stop();
+  });
+
+  it("the exact prompt, naming the placed page", () => {
+    expect(welcomePrompt(PAGE)).toBe(
+      "I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page /Users/me/.code-foundry/pages/welcome.html in the side panel and walk me through it.",
+    );
+  });
+
+  it.each<[string, () => void, string, string]>([
+    ["zero projects and an empty draft: Welcome heading, prompt prefilled", noProjects, "Welcome to Code Foundry", welcomePrompt(PAGE)],
+    ["with a project: the normal heading, nothing prefilled", () => undefined, "What should we build with No project?", ""],
+    [
+      "projects not loaded yet: no welcome",
+      () => {
+        useProjectsStore.setState({ byId: {}, order: [], loaded: false });
+      },
+      "What should we build with No project?",
+      "",
+    ],
+    [
+      "a typed draft is never replaced",
+      () => {
+        noProjects();
+        updateDraft(HOME_DRAFT, { text: "my own words" });
+      },
+      "Welcome to Code Foundry",
+      "my own words",
+    ],
+  ])("%s", async (_name, arrange, wantHeading, wantText) => {
+    arrange();
+    await mountHome();
+    expect(heading()).toBe(wantHeading);
+    expect(homeText()).toBe(wantText);
+  });
+
+  it("keeps the project switcher out of the welcome heading", async () => {
+    noProjects();
+    await mountHome();
+    expect(screen.queryByTestId("composer-project-trigger")).toBeNull();
+  });
+
+  it("prefills once: a prompt the user cleared stays clear", async () => {
+    noProjects();
+    await mountHome();
+    expect(homeText()).toBe(welcomePrompt(PAGE));
+    act(() => {
+      updateDraft(HOME_DRAFT, { text: "" });
+    });
+    cleanup();
+    await mountHome();
+    expect(homeText()).toBe("");
+  });
+
+  it.each<[string, (prefilled: string) => string, string]>([
+    ["the first project clears an untouched prefill", (p) => p, ""],
+    ["an edited prompt stays", (p) => `${p} Slowly, please.`, `${welcomePrompt(PAGE)} Slowly, please.`],
+  ])("%s, and the heading reverts", async (_name, edit, want) => {
+    noProjects();
+    await mountHome();
+    act(() => {
+      updateDraft(HOME_DRAFT, { text: edit(homeText()) });
+    });
+    addProject();
+    expect(heading()).toBe("What should we build with No project?");
+    expect(homeText()).toBe(want);
   });
 });
 

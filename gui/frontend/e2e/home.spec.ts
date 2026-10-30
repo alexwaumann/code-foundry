@@ -11,17 +11,18 @@ test.beforeEach(async () => {
 
 const composer = (page: Page) => page.getByTestId("composer");
 
-async function expectHome(page: Page): Promise<void> {
+async function expectHome(page: Page, heading = "What should we build with No project?"): Promise<void> {
   await expect(composer(page)).toBeVisible();
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
+  await expect(page.getByTestId("composer-heading")).toHaveText(heading);
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(page.getByTestId("composer-project-list")).toHaveCount(0);
 }
 
-test("no projects: the No project composer; New thread's picker offers Add a project", async ({ page }) => {
+test("no projects: the No project composer, as the welcome; New thread's picker offers Add a project", async ({ page }) => {
   await mockPost("empty");
   await page.goto(appPath);
-  await expectHome(page);
+  // The first-run welcome (e2e/welcome-composer.spec.ts).
+  await expectHome(page, "Welcome to Code Foundry");
   // The sidebar's thread list is simply empty: no placeholder text.
   await expect(page.getByTestId("thread-list")).toHaveText("");
   await expect(page.getByTestId("thread-list-empty")).toHaveCount(0);
