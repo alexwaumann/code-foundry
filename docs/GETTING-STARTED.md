@@ -26,7 +26,9 @@ bottom of the list, or click **Add project** on the Projects page. Then choose:
 
 Click **New thread** (<kbd>⌘N</kbd>), pick the project, type what you want and press
 Enter. Paste or attach screenshots with the paperclip. Type <kbd>@</kbd> to mention a
-file and <kbd>/</kbd> to run one of the project's skills or commands.
+file and <kbd>/</kbd> to run one of the project's skills or commands. To speak instead
+of typing, turn on Settings › General › **Dictation** (a one-time model download; audio
+never leaves your Mac), then press the microphone beside the paperclip or <kbd>⇧⌘M</kbd>.
 
 Under the prompt, **Model** picks the model, **Effort** how hard it thinks, and
 **Permissions** what it may do without asking: **Supervised** asks before edits and
