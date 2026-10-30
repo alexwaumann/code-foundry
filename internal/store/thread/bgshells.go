@@ -3,6 +3,7 @@ package thread
 import (
 	"cmp"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +22,8 @@ import (
 // its result comes at once ("Command running in background with ID: b…"), so the
 // projector keeps it running (projector.async) until the shell ends, then done with
 // Claude's summary as its output, or an error with it. No note items: the count shows
-// in the strip above the composer only (Thread.BackgroundShellsRunning).
+// in the strip above the composer and in the thread info card (Thread.BackgroundShells,
+// with the ports each one listens on: servers.go).
 
 // shellOrphanSuffix ends the error of a shell still running when its process ended
 // (the reasons are the agents': orphanProcessEnded, orphanDaemonStopped, ...).
@@ -42,6 +44,15 @@ type BackgroundShell struct {
 	Monitor bool
 	// StartedAt is task_started's arrival.
 	StartedAt time.Time
+	// ClaudePID is the Claude process the shell runs under: the shell is its child.
+	ClaudePID int
+	// PGID is the shell's process group once found (servers.go): the shell leads it.
+	// 0 until then. Only on Thread.BackgroundShells.
+	PGID int
+	// Ports are the TCP ports the shell's process group listens on, distinct, as last
+	// probed (servers.go); nil when none. Only on Thread.BackgroundShells; never changed
+	// in place.
+	Ports []int
 }
 
 // shellSet is a runner's background shells (runner goroutine only).
@@ -76,15 +87,35 @@ type shellChange struct {
 // count is the number of running shells.
 func (s *shellSet) count() int { return len(s.running) }
 
-// task applies a task frame received at at. call looks up a tool call's name and input
+// list is the running shells for Thread.BackgroundShells, oldest first, each keeping
+// what servers.go found for it in prev (the list published before).
+func (s *shellSet) list(prev []BackgroundShell) []BackgroundShell {
+	if len(s.running) == 0 {
+		return nil
+	}
+	out := make([]BackgroundShell, 0, len(s.running))
+	for _, sh := range s.running {
+		c := *sh
+		if i := slices.IndexFunc(prev, func(p BackgroundShell) bool { return p.TaskID == sh.TaskID }); i >= 0 {
+			c.PGID, c.Ports = prev[i].PGID, prev[i].Ports
+		}
+		out = append(out, c)
+	}
+	slices.SortFunc(out, func(a, b BackgroundShell) int {
+		return cmp.Or(a.StartedAt.Compare(b.StartedAt), strings.Compare(a.TaskID, b.TaskID))
+	})
+	return out
+}
+
+// task applies a task frame received at at from Claude process pid. call looks up a tool call's name and input
 // JSON by tool use id (the call precedes its task_started on the stream).
-func (s *shellSet) task(t *claudestream.Task, at time.Time, call func(toolUseID string) (name, input string)) shellChange {
+func (s *shellSet) task(t *claudestream.Task, at time.Time, pid int, call func(toolUseID string) (name, input string)) shellChange {
 	switch t.Subtype {
 	case claudestream.TaskStarted:
 		if t.TaskType != claudestream.TaskTypeShell || !t.IsBackgrounded || t.OwnedBySubagent || t.ParentTaskID != "" {
 			return shellChange{}
 		}
-		sh := &BackgroundShell{TaskID: t.TaskID, ToolUseID: t.ToolUseID, Description: t.Description, StartedAt: at}
+		sh := &BackgroundShell{TaskID: t.TaskID, ToolUseID: t.ToolUseID, Description: t.Description, StartedAt: at, ClaudePID: pid}
 		if call != nil && t.ToolUseID != "" {
 			name, input := call(t.ToolUseID)
 			sh.Monitor = name == "Monitor"

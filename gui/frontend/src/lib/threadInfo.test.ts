@@ -21,7 +21,9 @@ import {
   prCheck,
   prRows,
   rebasePrompt,
-  runningShell,
+  serverAddress,
+  shellCount,
+  shellRuntime,
   splitLineage,
   type GitStateRow,
   type LineageRow,
@@ -216,20 +218,30 @@ describe("small figures", () => {
   });
 });
 
-describe("runningShell", () => {
-  const item = (o: Record<string, unknown>) => ({ id: "t1", kind: "tool", parentToolUseId: "", createdAtMs: 5, name: "Bash", status: "running", inputJson: JSON.stringify({ command: "make e2e", description: "Run e2e", run_in_background: true }), ...o });
-  it("a running background Bash or Monitor call of the thread's own", () => {
-    expect(runningShell(item({}))).toEqual({ id: "t1", command: "make e2e", description: "Run e2e", startedAtMs: 5 });
-    expect(runningShell(item({ name: "Monitor", inputJson: JSON.stringify({ command: "gh pr checks", description: "CI" }) }))?.command).toBe("gh pr checks");
-  });
+describe("background shells", () => {
   it.each([
-    ["a foreground Bash", { inputJson: JSON.stringify({ command: "ls" }) }],
-    ["a finished one", { status: "done" }],
-    ["a subagent's", { parentToolUseId: "toolu_a" }],
-    ["another tool", { name: "Read" }],
-    ["unparsable input", { inputJson: "{" }],
-  ])("not %s", (_name, o) => {
-    expect(runningShell(item(o))).toBeNull();
+    ["node", "node server.js"],
+    ["node", "pnpm --dir web dev"],
+    ["node", "npx vite --port 5173"],
+    ["node", "PORT=3000 NODE_ENV=dev npm start"],
+    ["node", "/usr/local/bin/node app.js"],
+    ["python", "python3 -m http.server 9399"],
+    ["python", "python -m flask run"],
+    ["python", "python3.12 serve.py"],
+    ["go", "go run ./cmd/server"],
+    ["", "make dev"],
+    ["", "cd web && pnpm dev"],
+    ["", "pythonista run"],
+    ["", ""],
+  ])("runtime %j of %j", (want, command) => {
+    expect(shellRuntime(command)).toBe(want);
+  });
+  it("addresses and counts", () => {
+    expect(serverAddress(9399)).toBe("localhost:9399");
+    expect(shellCount(1)).toBe("1 shell");
+    expect(shellCount(3)).toBe("3 shells");
+    expect(shellCount(1, true)).toBe("1 more shell");
+    expect(shellCount(2, true)).toBe("2 more shells");
   });
 });
 

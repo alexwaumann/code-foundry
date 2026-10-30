@@ -1,78 +1,148 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { LoaderCircle, SquareTerminal } from "lucide-react";
+import { Globe, LoaderCircle, Square, SquareTerminal } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
+import type { BackgroundShellView } from "@/api/threads";
 import { fmtElapsed } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
-import { runningShell, shellCount } from "@/lib/threadInfo";
-import { useThreadStore } from "@/stores/thread";
+import { serverAddress, shellCount, shellRuntime } from "@/lib/threadInfo";
+import { cn } from "@/lib/utils";
+import { openUrl } from "@/stores/gh";
+import { stopShell } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
-import { Group, Row } from "./Row";
+import { Group, HOVER_CARD, Row, SubLine } from "./Row";
 
-const SEP = "\u0000";
+/**
+ * The thread's running background shells, encoded so a thread update that leaves them
+ * alone re-renders nothing. An archived thread has none.
+ */
+function useShells(threadId: string): readonly string[] {
+  return useThreadsStore(
+    useShallow((s) => {
+      const t = s.byId[threadId];
+      return t && t.archivedAtMs === null ? t.backgroundShells.map((b) => JSON.stringify(b)) : [];
+    }),
+  );
+}
 
-/** One running shell: a spinner, its command in mono, its description muted, how long it has run. */
-function ShellRow({ shell }: { shell: string }) {
-  const [id = "", command = "", description = "", at = ""] = shell.split(SEP);
+const decode = (s: string) => JSON.parse(s) as BackgroundShellView;
+
+/** How long the shell has run, ticking; "" when its start is unknown. */
+function Uptime({ startedAtMs }: { startedAtMs: number | null }) {
   const now = useNow(1000);
-  const started = at === "" ? null : Number(at);
+  return startedAtMs === null ? null : <span className="shrink-0 tabular-nums">{fmtElapsed(now - startedAtMs)}</span>;
+}
+
+/** One running shell in the fold: a spinner, its command in mono, its description muted, how long it has run. */
+function ShellRow({ shell }: { shell: BackgroundShellView }) {
   return (
-    <Row sub icon={<LoaderCircle className="animate-spin" />} meta={started === null ? null : fmtElapsed(now - started)} testId="ti-shell" data-shell={id}>
-      <span className="text-code">{command}</span>
-      {description && <span className="text-cf-text-muted"> {description}</span>}
+    <Row sub icon={<LoaderCircle className="animate-spin" />} meta={<Uptime startedAtMs={shell.startedAtMs} />} testId="ti-shell" data-shell={shell.taskId}>
+      <span className="text-code">{shell.command}</span>
+      {shell.description && <span className="text-cf-text-muted"> {shell.description}</span>}
     </Row>
   );
 }
 
-/** The thread's running background shells, read from its log (its open Watch) only while the fold is open. */
-function ShellRows({ threadId }: { threadId: string }) {
-  const shells = useThreadStore(
-    useShallow((s) => {
-      const log = s.logs[threadId];
-      if (!log) return [];
-      const out: string[] = [];
-      for (const id of log.order) {
-        const it = log.byId[id];
-        const sh = it ? runningShell(it) : null;
-        if (sh) out.push([sh.id, sh.command, sh.description, sh.startedAtMs === null ? "" : String(sh.startedAtMs)].join(SEP));
-      }
-      return out;
-    }),
+/**
+ * A shell that listens on a port: localhost:<port> (its first; the hover card lists them
+ * all), then its command, runtime and uptime. A click opens the port in the browser. On
+ * hover (or while it has the keyboard) a stop square stops the shell: the row's sibling
+ * laid over the value column, like the lineage group's, so Enter on it stops and does
+ * not open.
+ */
+function ServerRow({ threadId, shell }: { threadId: string; shell: BackgroundShellView }) {
+  const [first = 0, ...rest] = shell.ports;
+  const runtime = shellRuntime(shell.command);
+  const card = (
+    <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
+      {shell.ports.map((p) => (
+        <div key={p} className="text-code">
+          {serverAddress(p)}
+        </div>
+      ))}
+      {shell.description && <div className="font-medium">{shell.description}</div>}
+      <div className="text-code break-all text-cf-text-muted">{shell.command}</div>
+    </div>
   );
   return (
-    <>
-      {shells.map((s) => (
-        <ShellRow key={s.split(SEP)[0]} shell={s} />
-      ))}
-    </>
+    <div className="group/srv relative flex flex-col">
+      <Tip label={card} side="left">
+        <Row
+          tall
+          icon={<Globe />}
+          meta={rest.length > 0 ? <span className="text-cf-text-muted group-focus-within/srv:invisible group-hover/srv:invisible">+{rest.length}</span> : null}
+          onActivate={() => void openUrl(`http://${serverAddress(first)}`)}
+          testId="ti-server"
+          data-task={shell.taskId}
+          data-port={first}
+        >
+          <span className="truncate text-code">{serverAddress(first)}</span>
+          <SubLine className="text-cf-text-muted" testId="ti-server-line">
+            <span className="min-w-0 truncate">{shell.command}</span>
+            {runtime && <span className="shrink-0">· {runtime}</span>}
+            {shell.startedAtMs !== null && (
+              <span className="shrink-0">
+                · <Uptime startedAtMs={shell.startedAtMs} />
+              </span>
+            )}
+          </SubLine>
+        </Row>
+      </Tip>
+      <Tip label="Stop this server" side="left">
+        <button
+          type="button"
+          aria-label={`Stop ${serverAddress(first)}`}
+          className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/srv:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 [&_svg]:size-3 [&_svg]:fill-current"
+          data-testid="ti-server-stop"
+          data-task={shell.taskId}
+          onClick={(e) => {
+            e.stopPropagation();
+            void stopShell(threadId, shell.taskId);
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <Square aria-hidden />
+        </button>
+      </Tip>
+    </div>
   );
 }
 
 /**
- * The thread's own background shells (Bash run_in_background, Monitor) while any runs:
- * "N shells · running", a fold with one row per shell. Not the bottom panel's terminals.
+ * The thread's own background shells (Bash run_in_background, Monitor) while any runs
+ * (docs/notes/thread-servers.md). A shell listening on a port is a server row; the others
+ * fold under "N shells · running" ("N more shells" below servers). Not the bottom panel's
+ * terminals.
  */
 export function ShellsGroup({ threadId }: { threadId: string }) {
-  const count = useThreadsStore((s) => {
-    const t = s.byId[threadId];
-    return t && t.archivedAtMs === null ? t.backgroundShellsRunning : 0;
-  });
+  const encoded = useShells(threadId);
   const [open, setOpen] = useState(false);
-  if (count === 0) return null;
+  if (encoded.length === 0) return null;
+  const shells = encoded.map(decode);
+  const servers = shells.filter((s) => s.ports.length > 0);
+  const others = shells.filter((s) => s.ports.length === 0);
   return (
     <Group testId="ti-shells-group">
-      <Row
-        icon={<SquareTerminal />}
-        meta="running"
-        chevron={open ? "open" : "closed"}
-        onActivate={() => {
-          setOpen((o) => !o);
-        }}
-        aria-expanded={open}
-        testId="ti-shells"
-      >
-        {shellCount(count)}
-      </Row>
-      {open && <ShellRows threadId={threadId} />}
+      {servers.map((s) => (
+        <ServerRow key={s.taskId} threadId={threadId} shell={s} />
+      ))}
+      {others.length > 0 && (
+        <Row
+          icon={<SquareTerminal />}
+          meta="running"
+          chevron={open ? "open" : "closed"}
+          onActivate={() => {
+            setOpen((o) => !o);
+          }}
+          aria-expanded={open}
+          testId="ti-shells"
+        >
+          {shellCount(others.length, servers.length > 0)}
+        </Row>
+      )}
+      {open && others.map((s) => <ShellRow key={s.taskId} shell={s} />)}
     </Group>
   );
 }

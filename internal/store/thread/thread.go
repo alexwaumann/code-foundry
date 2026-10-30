@@ -252,6 +252,10 @@ type Thread struct {
 	// (bgshells.go): Bash calls with run_in_background and Monitor calls. 0 once the
 	// process ended. Not persisted.
 	BackgroundShellsRunning int
+	// BackgroundShells are those shells, oldest first, with their process group and the
+	// ports it listens on once found (servers.go). nil once the process ended. Never
+	// changed in place. Not persisted.
+	BackgroundShells []BackgroundShell
 	// WakePending: a background shell or agent run ended while Claude was at its prompt,
 	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
 	// persisted; Thread.background_wake_pending on the API.
@@ -682,6 +686,11 @@ type Store interface {
 	// restart's path: --resume), interrupting a running turn first; restarted is false,
 	// and nothing happens, when Claude is not running (restart.go).
 	Restart(ctx context.Context, id string) (t Thread, restarted bool, err error)
+	// StopShell stops one of a thread's own background shells (Thread.BackgroundShells,
+	// by task id): SIGTERM to its process group, SIGKILL ShellStopGrace later, and a
+	// note in its conversation (servers.go). ErrNotFound when the thread runs no such
+	// shell, ErrFailedPrecondition when its process cannot be found.
+	StopShell(ctx context.Context, id, taskID string) (Thread, error)
 	// McpStatus returns a thread's MCP servers as last checked (mcp.go), also while it
 	// is not running. refresh asks Claude again first, starting a stopped thread without
 	// a prompt. Without it, a running thread not checked yet is asked once.

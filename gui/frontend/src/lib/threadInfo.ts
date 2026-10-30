@@ -331,52 +331,25 @@ export const lineageStateWords: Readonly<Record<LineageRowState, string>> = {
   failed: "Failed",
 };
 
-/** A running background shell of the thread's own (Bash run_in_background, Monitor), from its call's item. */
-export interface ShellCall {
-  id: string;
-  command: string;
-  description: string;
-  startedAtMs: number | null;
+/** A shell's runtime from its command's first word (after any VAR=value): node, python or go; "" for any other. */
+export function shellRuntime(command: string): string {
+  const words = command.trim().split(/\s+/);
+  const first = words.find((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w)) ?? "";
+  const name = first.slice(first.lastIndexOf("/") + 1);
+  if (["node", "npm", "npx", "pnpm", "yarn"].includes(name)) return "node";
+  if (/^python(\d+(\.\d+)?)?$/.test(name)) return "python";
+  if (name === "go") return "go";
+  return "";
 }
 
-/**
- * The background shell an item is, while it runs: a running Bash call with
- * run_in_background, or a running Monitor call, of the thread itself (not a subagent's).
- * Null for every other item.
- */
-export function runningShell(it: {
-  id: string;
-  kind: string;
-  parentToolUseId: string;
-  createdAtMs: number | null;
-  name?: string;
-  status?: string;
-  inputJson?: string;
-}): ShellCall | null {
-  if (it.kind !== "tool" || it.status !== "running" || it.parentToolUseId !== "") return null;
-  if (it.name !== "Bash" && it.name !== "Monitor") return null;
-  let input: {
-    command?: unknown;
-    description?: unknown;
-    run_in_background?: unknown;
-  } = {};
-  try {
-    input = JSON.parse(it.inputJson ?? "") as typeof input;
-  } catch {
-    return null;
-  }
-  if (it.name === "Bash" && input.run_in_background !== true) return null;
-  return {
-    id: it.id,
-    command: typeof input.command === "string" ? input.command : "",
-    description: typeof input.description === "string" ? input.description : "",
-    startedAtMs: it.createdAtMs,
-  };
+/** A port as the card shows it and the browser opens it: every listening address is localhost to the user. */
+export function serverAddress(port: number): string {
+  return `localhost:${String(port)}`;
 }
 
-/** "1 shell", "3 shells". */
-export function shellCount(n: number): string {
-  return `${String(n)} ${n === 1 ? "shell" : "shells"}`;
+/** "1 shell", "3 shells"; under server rows "1 more shell", "3 more shells". */
+export function shellCount(n: number, more = false): string {
+  return `${String(n)} ${more ? "more " : ""}${n === 1 ? "shell" : "shells"}`;
 }
 
 /** A subagent run or a child thread as the lineage group lists it; both look the same. */

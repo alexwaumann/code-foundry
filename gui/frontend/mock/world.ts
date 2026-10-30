@@ -29,6 +29,7 @@ import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } fro
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands, listRuns } from "./agents";
+import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
@@ -1491,7 +1492,9 @@ export class World {
    *   nogit   s-ti-nogit in "writing" (no git: no git group);
    *   unnamed s-ti-un "Sweep the config readers": three projects in no workspace, cwd
    *           ghostty-playground (the header crumb "ghostty-playground +2");
-   *   home    s-ti-home "Plan the week": no project (the header crumb "No project").
+   *   home    s-ti-home "Plan the week": no project (the header crumb "No project");
+   *   servers s-ti-srv "Serve the docs preview": two servers listening (pnpm on 5173 and
+   *           24678, python3 on 9399) and two shells that do not (mock/shells.ts).
    */
   addThreadInfo(scenario: string): string {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1547,6 +1550,12 @@ export class World {
         const c = this.addThread({ ...base, id: "s-ti-child", projectId: "repo-cf", worktreePath: CF, name: "Port the rotation to web", createdBy: p.id, createdByName: p.name, inSidebar: true, status: ThreadStatus.BUSY, statusReason: "working: Port the rotation to web" });
         this.publishThread(c);
         return c.id;
+      }
+      case "servers": {
+        const s = this.threads.get("s-ti-srv") ?? this.addThread({ ...base, id: "s-ti-srv", projectId: "repo-cf", worktreePath: CF, name: "Serve the docs preview" });
+        this.logs.load(s.id, "servers");
+        this.publishThread(s);
+        return s.id;
       }
       case "nogit": {
         const s = this.addThread({ ...base, id: "s-ti-nogit", projectId: "repo-wr", worktreePath: WR, name: "Outline the essay" });
@@ -1916,6 +1925,10 @@ export class World {
       agentRuns: listRuns(this.logs.agentRunsOf(s.id)),
       // Shells die with the thread's process (mock/shells.ts).
       backgroundShellsRunning: s.state === ThreadState.CONNECTED ? this.logs.shellsOf(s.id) : 0,
+      backgroundShells:
+        s.state === ThreadState.CONNECTED
+          ? this.logs.backgroundShellsOf(s.id).map((c) => ({ taskId: c.taskId, description: c.description, command: c.command, startedAt: timestampFromDate(c.startedAt), ports: c.ports }))
+          : [],
       ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),
     };
   }
@@ -3429,6 +3442,7 @@ export class World {
         return t ? { projectId: t.projectId, worktreePath: t.worktreePath, githubSlug: this.projects.get(t.projectId)?.githubSlug ?? "" } : undefined;
       }, (i) => this.emit(i)),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
+      ...shellCommands(this.logs),
       ...this.actions.commands(),
       ...this.plugins.commands(),
       ...this.skills.commands(),

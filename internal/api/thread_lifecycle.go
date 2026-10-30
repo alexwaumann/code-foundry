@@ -308,6 +308,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	all, background := s.AgentsRunning()
 	p.AgentsRunning, p.BackgroundAgentsRunning = int32(all), int32(background)
 	p.BackgroundShellsRunning = int32(s.BackgroundShellsRunning)
+	p.BackgroundShells = backgroundShellsToProto(s.BackgroundShells) // thread_shell.go
 	p.BackgroundWakePending = s.WakePending
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
 	p.ContextWindow = model.ContextWindow(s.Model)

@@ -48,6 +48,7 @@ export const THREAD_COMMANDS = {
   respond: "thread.respond",
   setEffort: "thread.set-effort",
   sidebar: "thread.sidebar",
+  stopShell: "thread.shell.stop",
 } as const;
 
 /** The context of a thread (its worktree and workspace too), whether or not it is selected. */
@@ -255,6 +256,11 @@ export async function editThreadMessage(threadId: string, m: SentMessage): Promi
  */
 export async function interruptThread(threadId: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;
+}
+
+/** Stops one of the thread's own background shells (thread.shell.stop); its note lands in the timeline. */
+export async function stopShell(threadId: string, taskId: string): Promise<boolean> {
+  return (await runCommandForResult(THREAD_COMMANDS.stopShell, { id: threadId, task: taskId }, { ctx: threadContext(threadId), quiet: true })) !== null;
 }
 
 /**

@@ -94,8 +94,6 @@ type runner struct {
 	agentsPubAt time.Time
 	// bgShells are the thread's own background shells running in its process (bgshells.go).
 	bgShells shellSet
-	// bgShellsPub is the count last published on the row.
-	bgShellsPub int
 	// wakePending: a background end at the prompt; Claude's own turn is due (wake.go).
 	// wakePub is the value last published on the row.
 	wakePending, wakePub bool
@@ -399,7 +397,7 @@ func (r *runner) finish(fn func(*Thread)) {
 		s.PendingWorktreePath = ""
 		s.EffortPending = false // the next spawn uses the row's effort
 		s.Retry = nil           // the process is gone, so is the request it retried
-		s.BackgroundShellsRunning = 0
+		s.BackgroundShellsRunning, s.BackgroundShells = 0, nil
 		s.WakePending = false
 		s.PendingRequestID = "" // its requests ended with it
 		if s.ReseedPending {

@@ -8,7 +8,7 @@ import "github.com/alexwaumann/code-foundry/internal/claudestream"
 // onShellTask applies a task frame if it is one of the thread's own shells'; false
 // when it is not (the agents model takes it).
 func (r *runner) onShellTask(t *claudestream.Task) bool {
-	ch := r.bgShells.task(t, r.m.opts.Now(), r.shellCall)
+	ch := r.bgShells.task(t, r.m.opts.Now(), r.pid(), r.shellCall)
 	if !ch.handled {
 		return false
 	}
@@ -36,15 +36,17 @@ func (r *runner) shellCall(toolUseID string) (name, input string) {
 	return it.Tool.Name, it.Tool.InputJSON
 }
 
-// publishBgShells sets the Thread's count of running shells (not persisted: shells die
-// with the process). EventService carries it with the thread.
+// publishBgShells sets the Thread's running shells and their count (not persisted:
+// shells die with the process), then tells the server watch (servers.go), which maps
+// new ones to their process and probes their ports. EventService carries them with the
+// thread.
 func (r *runner) publishBgShells() {
 	n := r.bgShells.count()
-	if n == r.bgShellsPub {
-		return
-	}
-	r.bgShellsPub = n
-	r.m.update(r.id, false, func(rec *record) { rec.s.BackgroundShellsRunning = n })
+	r.m.update(r.id, false, func(rec *record) {
+		rec.s.BackgroundShellsRunning = n
+		rec.s.BackgroundShells = r.bgShells.list(rec.s.BackgroundShells)
+	})
+	r.m.servers.changed()
 }
 
 // endBgShells ends the shells still running: their process is gone (why). closeUnfinished

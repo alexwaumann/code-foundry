@@ -224,3 +224,41 @@ test("a folder without git: no git group", async ({ page }) => {
   await expect(c.getByTestId("ti-git-group")).toHaveCount(0);
   await expect(c.getByTestId("ti-context")).toBeVisible();
 });
+
+test("servers: a listening shell is a row that opens its port and stops the shell", async ({ page }) => {
+  const id = await openWithCard(page, "servers");
+  const c = card(page);
+  const servers = c.getByTestId("ti-server");
+  await expect(servers).toHaveCount(2);
+  const web = servers.nth(0);
+  const docs = servers.nth(1);
+  await expect(web).toHaveAttribute("data-port", "5173");
+  await expect(web).toContainText("localhost:5173");
+  await expect(web.getByTestId("ti-server-line")).toHaveText(/^pnpm --dir web dev\s*· node\s*· 1m \d\ds$/);
+  // Several ports: the first on the row, the rest in the hover card.
+  await expect(web.getByTestId("ti-server-meta")).toHaveText("+1");
+  await expectTooltip(page, web, /localhost:5173\s*localhost:24678/);
+  await expect(docs.getByTestId("ti-server-line")).toContainText("· python");
+  await expect(docs.getByTestId("ti-server-meta")).toHaveCount(0);
+  // The shells that listen on nothing stay folded below.
+  await expect(c.getByTestId("ti-shells")).toContainText("2 more shells");
+
+  // A click opens the port in the browser.
+  await docs.click();
+  const opened = async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url);
+  await expect.poll(opened).toEqual(["http://localhost:9399"]);
+
+  // The stop square stops the shell, by click or by Enter, without opening the port.
+  const stops = async () => (await invocations()).filter((i) => i.name === "thread.shell.stop").map((i) => `${i.args.id ?? ""} ${i.args.task ?? ""}`);
+  await docs.hover();
+  await c.locator('[data-testid="ti-server-stop"][data-task="bd9r3t6w1"]').click();
+  await expect.poll(stops).toEqual([`${id} bd9r3t6w1`]);
+  await expect(servers).toHaveCount(1);
+  await expect(page.getByTestId("thread-pane").getByText("Stopped background shell: python3 -m http.server 9399 --directory docs/_build")).toBeVisible();
+  await c.locator('[data-testid="ti-server-stop"][data-task="bk4v8n2p7"]').focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(stops).toEqual([`${id} bd9r3t6w1`, `${id} bk4v8n2p7`]);
+  await expect(servers).toHaveCount(0);
+  await expect(c.getByTestId("ti-shells")).toContainText("2 shells");
+  expect(await opened()).toEqual(["http://localhost:9399"]);
+});
