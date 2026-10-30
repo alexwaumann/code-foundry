@@ -42,7 +42,9 @@ Three processes, one protocol.
   `PlayAlertSound` UI intent; no notification banners for a bare executable,
   `docs/notes/dock-alerts.md`). It paints the window behind the page in the active
   theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
-  `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`).
+  `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`),
+  and reopens the window at its last frame fitted to the screens attached, 90% of the
+  primary work area on a first launch (`window-frame.json`; `docs/notes/window-frame.md`).
   It takes file drags from the OS (`EnableFileDrop`) and hands a drop's paths and its
   target's `data-drop-id` to the page (`app:files-dropped`), and shows the open panel
   for attaching (`PickFiles`; `docs/notes/attach-drop.md`).

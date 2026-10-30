@@ -79,13 +79,13 @@ func main() {
 	// runtime (`--wails-draggable: drag`), so their buttons still click. The title stays
 	// set for Mission Control and the app switcher even though the bar no longer shows it.
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Code Foundry",
-		Width:  1200,
-		Height: 780,
-		// Room for the content pane (360px minimum) beside a full-width sidebar; the side
-		// panel shrinks, then hides, when it does not fit (stores/ui.ts panelMax).
-		MinWidth:  900,
-		MinHeight: 500,
+		Title: "Code Foundry",
+		// Replaced before the window shows by the last frame, or a share of the screen on
+		// a first launch (applyWindowFrame); Wails has no screen sizes before launch.
+		Width:     1440,
+		Height:    900,
+		MinWidth:  windowMinWidth,
+		MinHeight: windowMinHeight,
 		// The last theme's sheet (--sheet; windowbg.go), so launch does not flash a
 		// different colour before the page paints. SetWindowBackground keeps it current.
 		BackgroundColour: launchBackgroundColour(p.WindowBackground(), systemIsDark()),
@@ -113,7 +113,9 @@ func main() {
 	window.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
 		shown.Do(func() {
 			application.InvokeSync(func() { clearWebViewBackground(window.NativeWindow()) })
+			applyWindowFrame(window, app, p.WindowFrame(), log)
 			window.Show()
+			watchWindowFrame(window, app, p.WindowFrame(), log)
 		})
 	})
 

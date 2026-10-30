@@ -108,22 +108,28 @@ func saveWindowBackground(path string, b WindowBackground) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := writeFileAtomic(path, data); err != nil {
 		return fmt.Errorf("save window background: %w", err)
+	}
+	return nil
+}
+
+// writeFileAtomic writes data (plus a trailing newline) through a temp file and a
+// rename, creating the directory first, so a reader never sees a partial file.
+func writeFileAtomic(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
 	if err != nil {
-		return fmt.Errorf("save window background: %w", err)
+		return err
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
 	_, werr := tmp.Write(append(data, '\n'))
 	if err := errors.Join(werr, tmp.Close()); err != nil {
-		return fmt.Errorf("save window background: %w", err)
+		return err
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return fmt.Errorf("save window background: %w", err)
-	}
-	return nil
+	return os.Rename(tmp.Name(), path)
 }
 
 // launchBackgroundColour is the window colour to open with: the saved state's sheet for
