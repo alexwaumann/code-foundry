@@ -99,6 +99,8 @@
  *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
  *   POST /__mock/thread/project-ids?id=…&projects=repo-cf,repo-gp   (a thread's project set)
  *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
+ *   POST /__mock/welcome                          (a first run: empty, then s-welcome with no project and its
+ *                                                 busy demo child s-welcome-demo; World.addWelcome)
  *   POST /__mock/threads?project=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
  *   POST /__mock/workspace-thread?workspace=login[&project=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread that references the workspace, its
@@ -1392,6 +1394,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/lineage":
       json(res, 200, world.addLineage());
+      break;
+    case "POST /__mock/welcome":
+      json(res, 200, world.addWelcome());
       break;
     case "POST /__mock/resident":
       json(res, 200, { id: world.addResident() });

@@ -1417,6 +1417,21 @@ export class World {
   }
 
   /**
+   * Scenario: a first run (docs/notes/welcome-page.md). The world is emptied (no projects),
+   * then the welcome thread s-welcome (no project) and one demo thread it created,
+   * s-welcome-demo, busy and out of the sidebar. POST /__mock/welcome.
+   */
+  addWelcome(): string[] {
+    this.empty();
+    const now = new Date();
+    const parent = this.addThread({ id: "s-welcome", projectId: "", worktreePath: HOME, name: "Welcome to Code Foundry", model: "claude-sonnet-5[1m]", effort: "medium", status: ThreadStatus.IDLE, statusReason: "at prompt", createdAt: now, held: true });
+    const child = this.addThread({ id: "s-welcome-demo", projectId: "", worktreePath: HOME, name: "What this project is", model: "claude-sonnet-5[1m]", effort: "medium", status: ThreadStatus.BUSY, statusReason: "working", createdAt: now, createdBy: parent.id, createdByName: parent.name, inSidebar: false });
+    this.publishThread(parent);
+    this.publishThread(child);
+    return [parent.id, child.id];
+  }
+
+  /**
    * Test control: a connected worktree-mode thread that references the workspace, its
    * members as its set, on branch cf/<workspace name> (each git member's worktree made, as
    * a spawn would), in `project`'s (else the default primary's; "workspace": its folder).
@@ -3966,8 +3981,11 @@ export class World {
           args: [{ name: "path", type: ArgType.PATH, required: false, description: "Project folder to add without the dialog (a git repository or any folder under home)" }],
         },
         when: always,
-        // The GUI presents it (the dialog); this is the CLI's answer, like the daemon.
-        run: (_ctx, args) => {
+        // The GUI presents it (the dialog); this is the CLI's answer, like the daemon. From a
+        // thread (a page's bridge) the daemon opens the dialog in the windows instead
+        // (docs/notes/page-verbs.md); the mock takes every thread as shown.
+        run: (ctx, args) => {
+          if (!args.path && ctx?.activeThreadId && this.emit({ intent: { case: "showView", value: { name: "project.add" } } }) > 0) return "";
           if (!args.path) return "Add a project from the CLI with `code-foundry project add <folder>` or `code-foundry project clone <owner/repo>`; in the app, project.add opens the Add Project dialog.";
           const project = this.registerFolder(args.path);
           return Promise.resolve({ message: `registered ${project.name} (${project.id})`, resultJson: JSON.stringify(this.projectMsg(project)) });

@@ -18,7 +18,7 @@ import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PdfPreview } from "./PdfPreview";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
-import { useDebounced, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
+import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
 
 const MODES = [
   { value: "rendered", label: "Rendered" },
@@ -40,7 +40,8 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * binaries, folders and missing paths get a placeholder; a missing path is first looked
  * for once in the checkout (findMissing: a model's path written from a subfolder or cut
  * short), and the file found is the tab's. Read again when the tab shows, on
- * Refresh, when the worktree changes and when the thread edits the file (useTabRead).
+ * Refresh, when the worktree changes and when the thread edits the file (useTabRead);
+ * outside every project, whenever the file is written (useFileChanges).
  */
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page } = target;
@@ -64,7 +65,10 @@ export function FileTab({ target }: { target: FileTarget }) {
   const abs = file?.path || resolvePath(base, path);
   useOnWindowVisible(later);
   useWorktreeChanges(project, project ? base : null, later);
-  useToolEdits(abs, later);
+  useToolEdits(project ? abs : "", later);
+  // Outside every project (a thread's pages, the welcome page) no worktree reports a
+  // write, so the file's stamp is watched instead (docs/notes/welcome-page.md).
+  useFileChanges(project ? "" : abs, later);
 
   const name = fileName(abs) || abs;
   const rel = project ? relativeTo(abs, base) : null;
