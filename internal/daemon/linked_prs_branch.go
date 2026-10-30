@@ -64,9 +64,10 @@ func prsByHead(prs []gh.PullRequest) map[headKey][]gh.PullRequest {
 
 // threadBranches is the branches thread th works on, each in its project's GitHub
 // repository: what each of its checkouts has checked out (its HEAD, at the path the
-// thread records; docs/notes/thread-checkouts.md), and for a worktree-mode checkout that
-// is gone the branch it is made again on. A project without a GitHub slug and a detached
-// checkout contribute nothing; so does a thread without a project.
+// thread records; docs/notes/thread-checkouts.md), and for a worktree-mode checkout or a
+// cwd that is gone the branch the thread was created for (it is made again on it). A
+// project without a GitHub slug and a detached checkout contribute nothing; so does a
+// thread without a project.
 func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 	var out []headKey
 	// No path rule and no stat: an unlisted checkout is "not on a branch now".
@@ -77,8 +78,8 @@ func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 			continue
 		}
 		head := c.Branch // "" when detached
-		if !c.Listed && c.WorktreeMode {
-			head = c.CreatedBranch
+		if !c.Listed && (c.WorktreeMode || c.Primary) {
+			head = th.Branch
 		}
 		if head == "" {
 			continue
