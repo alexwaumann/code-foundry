@@ -18,7 +18,8 @@ import (
 // <home>/dictation/models, runs the engine (code-foundry-dictate, beside this executable)
 // while dictation.enabled is on (live: every settings change calls ConfigChanged), and
 // unloads the model while the user is away (presence). A finished download turns
-// dictation.enabled on.
+// dictation.enabled on. The model downloads from GitHub through gh first, then Hugging
+// Face (docs/notes/dictation-6-model-mirror.md).
 
 // EnvDictateBin overrides where the engine is found (development: a build in another
 // worktree, or a stand-in).
@@ -48,6 +49,8 @@ func openDictation(log *slog.Logger, p paths.Paths, b *bus.Bus, st *settings.Sto
 		},
 		Attended: func() bool { return pres.Current().Attended },
 		Launch:   dictation.ProcessLauncher(bin, log),
+		// The model's GitHub source goes through the user's gh, like the updater.
+		Gh: dictation.ExecGh{Path: func() string { return settings.ExpandedPath(st.Settings().Advanced.GhPath) }},
 	})
 	st.OnChange(func(*settings.Snapshot) { d.ConfigChanged() })
 	pres.Subscribe(func(from, to presence.State) {

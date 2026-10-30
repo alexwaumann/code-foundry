@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -48,7 +49,8 @@ type DictationDeps struct {
 const dictationCategory = "Dictation"
 
 // DictationSummary is a one-line description of a dictation snapshot ("ready", "off",
-// "downloading the model: 557 MB of 874 MB", ...).
+// "downloading the model: 557 MB of 874 MB", ...), plus a line per source after a
+// download that failed from several.
 func DictationSummary(s *v1.DictationSnapshot) string {
 	if s == nil {
 		return "dictation unavailable"
@@ -82,7 +84,10 @@ func DictationSummary(s *v1.DictationSnapshot) string {
 	default:
 		out = "unknown"
 	}
-	if e := s.GetError(); e != "" {
+	if e := s.GetError(); strings.Contains(e, "\n") {
+		// A download that failed from every source: one line per source.
+		out += "\n" + e
+	} else if e != "" {
 		out += "; " + e
 	}
 	if s.GetMicDenied() {

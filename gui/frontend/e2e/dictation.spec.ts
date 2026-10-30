@@ -77,6 +77,19 @@ test.describe("settings section", () => {
     expect((await dictation()).calls).toContain("download");
   });
 
+  test("a failed download says so once, a line per source", async ({ page }) => {
+    await mockPost("dictation?state=download-failed");
+    await openApp(page);
+    const section = await openSettingsSection(page);
+    const error = section.getByTestId("dictation-download-error");
+    await expect(error).toBeVisible();
+    expect((await error.innerText()).split("\n")).toEqual([
+      "Download failed:",
+      "GitHub: gh is not logged in (run gh auth login)",
+      "huggingface.co: the server answered 403 Forbidden",
+    ]);
+  });
+
   test("downloading: progress, speed and Cancel", async ({ page }) => {
     await mockPost("dictation?state=downloading");
     await openApp(page);
