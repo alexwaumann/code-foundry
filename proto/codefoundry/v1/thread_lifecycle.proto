@@ -943,6 +943,26 @@ message RunInThreadResponse {
   Thread thread = 1;
 }
 
+message AddThreadProjectRequest {
+  string id = 1;
+  // The project to add: its id or name.
+  string project = 2;
+}
+
+message AddThreadProjectResponse {
+  Thread thread = 1;
+}
+
+message RemoveThreadProjectRequest {
+  string id = 1;
+  // The member to drop: its project id or name.
+  string project = 2;
+}
+
+message RemoveThreadProjectResponse {
+  Thread thread = 1;
+}
+
 message ThreadCheckoutsRequest {
   // Thread id. Empty: the thread one of whose checkouts holds cwd.
   string id = 1;

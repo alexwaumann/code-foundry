@@ -38,8 +38,12 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(c.getByTestId("ti-workspace")).toHaveCount(0);
   await expect(c.getByTestId("ti-project")).toContainText("code-foundry");
   await expect(c.getByTestId("ti-project-meta")).toHaveText("Fresh copy");
-  // One project: no menu, so no chevron.
-  await expect(c.getByTestId("ti-project-chevron")).toHaveCount(0);
+  // One project: the menu offers Add project only (no Run in, nothing to save).
+  await c.getByTestId("ti-project").click();
+  await expect(page.getByTestId("ti-add-project")).toBeVisible();
+  await expect(page.getByTestId("ti-runin-item")).toHaveCount(0);
+  await expect(page.getByTestId("ti-save-workspace")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(c.getByTestId("ti-open-in")).toHaveText(/Open in Finder/);
   await expect(c.getByTestId("ti-action")).toContainText("Dev");
   await expect(c.getByTestId("ti-action-project")).toHaveCount(0);
@@ -126,7 +130,7 @@ test("nine projects in a workspace: Run in menu, other projects' pull requests, 
   const menu = page.getByTestId("ti-project-menu");
   await expect(menu).toBeVisible();
   await expect(c.getByTestId("ti-project-chevron")).toHaveAttribute("data-open", "");
-  await expect(menu.getByTestId("ti-add-project")).toHaveAttribute("data-disabled", "");
+  await expect(menu.getByTestId("ti-add-project")).not.toHaveAttribute("data-disabled", "");
   // A named workspace: nothing to save.
   await expect(menu.getByTestId("ti-save-workspace")).toHaveCount(0);
   await expect(menu.getByTestId("ti-runin-item")).toHaveCount(9);
@@ -145,13 +149,11 @@ test("nine projects in a workspace: Run in menu, other projects' pull requests, 
   // The action last run in this thread was web's: named with its project.
   await expect(c.getByTestId("ti-action")).toContainText("Typecheck");
   await expect(c.getByTestId("ti-action-project")).toHaveText("web");
-  // It runs in web's checkout, not for the thread (its cwd is api): a toast says where, Show goes there.
+  // It runs for the thread (its cwd is api) in its web checkout: the thread's bottom panel, no toast.
   await c.getByTestId("ti-action").click();
-  await expect(page.getByText("Running Typecheck in web")).toBeVisible();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "action.run").map((i) => i.context?.activeView)).toEqual(["projects"]);
-  await page.locator("[data-sonner-toast]").filter({ hasText: "Running Typecheck in web" }).getByRole("button", { name: "Show" }).click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  await row(page, `s:${id}`).click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "action.run").map((i) => i.context?.activeThreadId)).toEqual([id]);
+  await expect(page.getByTestId("bottom-panel").locator('[data-kind="action"]')).toHaveCount(1);
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Typecheck" })).toHaveCount(0);
 
   // Pull requests over four projects: the cwd's first and unnamed, the others with their project; a stacked one names its base.
   const prs = c.getByTestId("ti-pr");

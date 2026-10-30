@@ -54,10 +54,10 @@ func TestActionRunOwnerAndMode(t *testing.T) {
 		// The same owner terminal.new would pick.
 		{name: "a thread (the agent's CODE_FOUNDRY_THREAD) owns it", ctx: command.Context{ActiveThreadID: "s1"},
 			args: map[string]string{"action": "test", "here": "/cf-test/elsewhere"},
-			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", ProjectId: "r1", WorktreePath: actFeat}},
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", WorktreePath: actFeat}},
 		{name: "a thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: actFeat}),
 			args: map[string]string{"action": "test"},
-			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", ProjectId: "r1", WorktreePath: actFeat}},
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", WorktreePath: actFeat}},
 		{name: "a worktree in the GUI", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: actApp, ActiveView: "projects"},
 			args: map[string]string{"action": "test"}, want: &v1.RunActionRequest{Action: "test", ProjectId: "r1", WorktreePath: actApp}},
 		{name: "the CLI's working directory", args: map[string]string{"action": "Lint", "here": actFeat + "/pkg"},

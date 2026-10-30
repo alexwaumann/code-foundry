@@ -215,7 +215,7 @@ func threadLabelCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Name:      "thread.label",
 		NoPalette: true,
 		Title:     "Label Thread",
-		Description: "Add or remove a thread's labels (lowercase letters, digits, -, _, . and /; up to 40 characters each). " +
+		Description: "Add or remove a thread's labels (a-z, 0-9, -, _, . and /; up to 40 characters each). " +
 			"clear removes every label first, then remove's go, then add's are added. Prints the labels.",
 		Category: "Thread",
 		Args: []ArgSpec{
@@ -279,9 +279,8 @@ func threadBudgetCmd(b ThreadBackend, idArg ArgSpec) Command {
 		Name:      "thread.budget",
 		NoPalette: true,
 		Title:     "Set Thread Budget",
-		Description: "Set a thread's spending limit in USD at Claude API rates (0 removes it). When the thread's cost reaches it " +
-			"while Claude works, Claude is interrupted and the thread needs attention (\"budget reached\"); messages can still be sent. " +
-			"A budget above the cost re-arms it.",
+		Description: "Set a thread's spending limit in USD at Claude API rates (0 removes it). Reaching it while Claude works " +
+			"interrupts Claude and the thread needs attention (\"budget reached\"); messages still go. A budget above the cost re-arms it.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,

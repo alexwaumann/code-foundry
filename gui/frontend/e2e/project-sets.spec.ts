@@ -290,15 +290,12 @@ test("the workspace chip's × takes its members with it; Clear empties the set; 
   await mockPost("workspace?name=shop&projects=repo-cf,repo-dot");
   await openApp(page);
   await composeIn(page, 3);
-  // ghostty-playground, then the workspace on top: its two members join, the reference is set.
+  // ghostty-playground, then the workspace: its two members are the set, the reference is set.
   const heading = await openSetPicker(page);
   await heading.locator('[data-workspace="w-000000000001"]').click();
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
-  const add = await openAddProject(page);
-  await option(add, "ghostty-playground").click();
-  await page.keyboard.press("Escape");
-  await expect(chips(page)).toHaveCount(3);
-  // × on the workspace: shop and its members go, ghostty-playground stays; no tooltip on a chip's ×.
+  await expect(chips(page)).toHaveCount(2);
+  // × on the workspace: shop and its members go; no tooltip on a chip's ×.
   const remove = page.getByTestId("composer-workspace-remove");
   await expect(remove).toHaveAccessibleName("Remove workspace shop");
   await remove.hover();
@@ -306,13 +303,14 @@ test("the workspace chip's × takes its members with it; Clear empties the set; 
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await remove.click();
   await expect(page.getByTestId("composer-workspace")).toHaveCount(0);
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
+  await expect(page.getByTestId("composer-heading")).toHaveText("Pick a project");
   await expect(chips(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-input")).toBeFocused();
 
   // Clear: a set of two to nothing, the empty state.
   const again = await openAddProject(page);
   await option(again, "sketches").click();
+  await option(again, "ghostty-playground").click();
   await page.keyboard.press("Escape");
   await expect(chips(page)).toHaveCount(2);
   await expect(chips(page).getByTestId("composer-member-remove")).toHaveCount(2);

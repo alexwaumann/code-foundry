@@ -800,7 +800,10 @@ export class World {
     projects: () => [...this.projects.values()].map((r) => ({ id: r.id, name: r.name, worktrees: r.worktrees.map((w) => w.path) })),
     thread: (id) => {
       const s = this.threads.get(id);
-      return s && { projectId: s.projectId, worktreePath: s.worktreePath };
+      if (!s) return undefined;
+      const checkouts: Record<string, string> = {};
+      for (const c of this.checkoutsOf(s)) if (c.path && !c.missing) checkouts[c.projectId] = c.path;
+      return { projectId: s.projectId, worktreePath: s.worktreePath, checkouts };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
     write: (id, text) => {
@@ -1643,6 +1646,71 @@ export class World {
     s.projectIds = ids.map((r) => this.projectRef(r).id);
     this.publishThread(s);
     return s;
+  }
+
+  /**
+   * thread.project.add like the daemon (thread/members.go): in worktree mode a git
+   * project gets its worktree for the thread's branch (shared, else made; the placement
+   * check's refusals), otherwise its own checkout; the thread leaves its workspace. The
+   * mock restarts nothing.
+   */
+  addThreadProject(s: MockThread, ref: string): MockThread {
+    this.refuseSetChange(s);
+    const p = this.projectRef(ref);
+    if (this.projectIdsOf(s).includes(p.id)) throw new CommandError("unavailable", `project ${p.name} is already one of thread ${s.id}'s projects`);
+    let path = this.mainPathOf(p.id);
+    let made = false;
+    if (s.createdWorktree && s.branch && p.git !== false) {
+      const m: { outcome: PlacementOutcome; path?: string; message?: string } | undefined = this.checkPlacement([p.id], s.branch, false).members[0];
+      if (m?.outcome === PlacementOutcome.REFUSED) throw new CommandError("unavailable", (m.message ?? "").replace(/^failed precondition: /, ""));
+      made = m?.outcome === PlacementOutcome.NEW;
+      path = made ? this.addWorktree(p, s.branch, "").path : (m?.path ?? path);
+    }
+    const left = this.leaveWorkspace(s);
+    s.projectIds = [...this.projectIdsOf(s), p.id].sort();
+    s.checkoutPaths = { ...s.checkoutPaths, [p.id]: path };
+    this.logs.addNote(s.id, `Added project ${p.name} to this thread (${made ? "new worktree" : "checkout"} ${path}).${left}`);
+    this.publishThread(s);
+    return s;
+  }
+
+  /** thread.project.remove like the daemon: never the cwd's project; the checkout stays; the thread leaves its workspace. */
+  removeThreadProject(s: MockThread, ref: string): MockThread {
+    this.refuseSetChange(s);
+    const p = this.projects.get(ref) ?? [...this.projects.values()].find((x) => x.name === ref);
+    const id = p?.id ?? ref;
+    if (!this.projectIdsOf(s).includes(id)) throw new CommandError("unavailable", `"${ref}" is not one of thread ${s.id}'s projects`);
+    const name = p?.name ?? id;
+    if (id === s.projectId) throw new CommandError("unavailable", `${name} is where thread ${s.id} runs; run it in another project first (thread run-in)`);
+    const path = s.checkoutPaths[id] ?? "";
+    const left = this.leaveWorkspace(s);
+    s.projectIds = this.projectIdsOf(s).filter((x) => x !== id);
+    const { [id]: _gone, ...rest } = s.checkoutPaths;
+    s.checkoutPaths = rest;
+    this.logs.addNote(s.id, `Removed project ${name} from this thread.${path ? ` Its checkout (${path}) stays on disk.` : ""}${left}`);
+    this.publishThread(s);
+    return s;
+  }
+
+  /** The member `ref` of `s` when its checkout has uncommitted changes (thread.project.remove's confirmation). */
+  dirtyMember(s: MockThread, ref: string): MockCheckout | undefined {
+    const c = this.checkoutsOf(s).find((x) => !x.primary && (x.projectId === ref || x.projectName === ref));
+    const wt = c ? this.projects.get(c.projectId)?.worktrees.find((w) => w.path === c.path) : undefined;
+    return wt?.status.dirty ? c : undefined;
+  }
+
+  private refuseSetChange(s: MockThread): void {
+    if (s.archivedAt !== null) throw new CommandError("unavailable", `thread ${s.id} is archived; unarchive it first`);
+    if (this.projectIdsOf(s).length === 0 && !s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} has no project; start a thread in the project instead`);
+    if (!s.projectId && s.workspaceId) throw new CommandError("unavailable", `thread ${s.id}: it runs in workspace ${s.workspaceId}'s folder; move it to one of its projects first (thread run-in)`);
+  }
+
+  /** Clears the thread's workspace reference; the note's sentence about it ("" when it had none). */
+  private leaveWorkspace(s: MockThread): string {
+    if (!s.workspaceId) return "";
+    const name = this.workspaces.get(s.workspaceId)?.name ?? s.workspaceId;
+    s.workspaceId = "";
+    return ` The thread no longer follows workspace ${name}: its projects are its own set now.`;
   }
 
   /** A project's main worktree (its folder without git). */
@@ -3571,6 +3639,53 @@ export class World {
           const out = this.runIn(s, args.project ?? "", args.worktree ?? "");
           const label = out.name ? `${out.name} (${out.id})` : out.id;
           return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle` : `thread ${label} runs in ${out.worktreePath}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.project.add", noPalette: true,
+          title: "Add Project to Thread",
+          category: "Thread",
+          description: "Add a project to a thread (in worktree mode a worktree on its branch). It leaves its workspace; Claude restarts when idle.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id or name" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = this.addThreadProject(this.thread(args.id || (ctx?.activeThreadId ?? "")), args.project ?? "");
+          return `added ${args.project ?? ""} to thread ${s.name ? `${s.name} (${s.id})` : s.id} (${String(this.projectIdsOf(s).length)} projects)`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.project.remove", noPalette: true,
+          title: "Remove Project from Thread",
+          category: "Thread",
+          description: "Remove a project (not the cwd's) from a thread; its checkout stays. As add, it leaves its workspace.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id or name" },
+          ],
+          // Like the daemon: only a member whose checkout has uncommitted changes asks.
+          confirmIf: (ctx, args) => {
+            const s = this.threads.get(args.id || (ctx?.activeThreadId ?? ""));
+            return s !== undefined && this.dirtyMember(s, args.project ?? "") !== undefined;
+          },
+          confirm: (ctx, args) => {
+            const s = this.threads.get(args.id || (ctx?.activeThreadId ?? ""));
+            const c = s ? this.dirtyMember(s, args.project ?? "") : undefined;
+            const name = c?.projectName ?? args.project ?? "";
+            return `${name}'s checkout at ${c?.path ?? ""} has uncommitted work.\n\nIt stays on disk with the work, but this thread no longer sees it. Remove ${name} from the thread?`;
+          },
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = this.removeThreadProject(this.thread(args.id || (ctx?.activeThreadId ?? "")), args.project ?? "");
+          return `removed ${args.project ?? ""} from thread ${s.name ? `${s.name} (${s.id})` : s.id}; its checkout stays on disk`;
         },
       },
       {

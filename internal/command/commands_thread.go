@@ -69,6 +69,9 @@ type ThreadBackend interface {
 	SidebarBackend
 	// WorkspaceRefBackend backs thread.workspace (commands_thread_workspace.go).
 	WorkspaceRefBackend
+	// ProjectSetBackend backs thread.project.add and thread.project.remove
+	// (commands_thread_project.go).
+	ProjectSetBackend
 	// ReseedBackend backs thread.reseed (commands_thread_reseed.go).
 	ReseedBackend
 	// HTMLShower backs view.inline (commands_view_inline.go).
@@ -330,7 +333,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Name:  "thread.set-effort",
 			Title: "Set Thread Effort",
 			Description: "Change a thread's effort level. A running Claude restarts with it (resuming the " +
-				"conversation) at once when idle, else when the running turn ends; otherwise the next message starts it with it.",
+				"conversation) once idle; a stopped one gets it at its next start.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,

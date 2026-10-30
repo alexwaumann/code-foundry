@@ -99,6 +99,9 @@ type streamState struct {
 	// maybeRestart begins once the interrupted turn is over; restartInterrupted: its
 	// interrupt went out. userRestart: the restart under way is the user's.
 	wantRestart, restartInterrupted, userRestart bool
+	// dirsApplied: the restart under way gives Claude a changed project set
+	// (runner.dirsStale); onRestarted notes it.
+	dirsApplied bool
 	// restartFrom is the effort of the process a restart replaced (onRestarted notes a
 	// change).
 	restartFrom  string

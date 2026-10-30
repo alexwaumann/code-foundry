@@ -41,9 +41,9 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 			NoPalette: true,
 			ReadOnly:  true,
 			Title:     "Show Thread Agents",
-			Description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent: " +
-				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported. " +
-				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
+			Description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent: type, model, " +
+				"mode, status, elapsed time, tool uses and tokens, what each running one does and what each finished one reported. The header " +
+				"counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
 			Category:     "Thread",
 			NoKeybinding: true,
 			Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Positional: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}},

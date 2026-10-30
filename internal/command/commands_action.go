@@ -252,8 +252,9 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Name:      "action.run",
 			NoPalette: true,
 			Title:     "Run Action",
-			Description: "Run an action for the active thread (its bottom panel), else the active worktree, else the registered " +
-				"worktree containing the working directory. It runs where the action says (a terminal, or the background); " +
+			Description: "Run an action for the active thread (an action of any of its projects, in its checkout of that project; " +
+				"its bottom panel), else the active worktree, else the registered worktree containing the working directory. " +
+				"It runs where the action says (a terminal, or the background); " +
 				"--background captures its output instead, --terminal opens it as a terminal. --wait waits for it to finish, " +
 				"prints a background run's output, and exits with the action's exit code.",
 			Category: "Action",
@@ -285,9 +286,11 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				res, err := d.Action.Run(ctx, connect.NewRequest(&v1.RunActionRequest{
-					Action: a.String("action"), ThreadId: o.thread, WorktreePath: o.worktree, ProjectId: o.project, Mode: mode,
-				}))
+				req := &v1.RunActionRequest{Action: a.String("action"), ThreadId: o.thread, WorktreePath: o.worktree, ProjectId: o.project, Mode: mode}
+				if o.thread != "" {
+					req.ProjectId = "" // any project of the thread's: the daemon finds the action among them
+				}
+				res, err := d.Action.Run(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
 				}

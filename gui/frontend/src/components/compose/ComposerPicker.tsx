@@ -4,7 +4,7 @@ import type { ComponentType, SVGProps } from "react";
 import { Button } from "@/components/ui/button";
 import { defaultFilter } from "cmdk";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,11 @@ export interface PickerOption {
   icon?: LucideIcon;
   /** The label is a name in monospace (a branch). */
   mono?: boolean;
+  /**
+   * Shown greyed and not picked (a branch the daemon would refuse, thread.placement.check),
+   * with `unavailable` as its tooltip: the reason, before anything is sent.
+   */
+  unavailable?: string;
 }
 
 export interface PickerGroup {
@@ -78,6 +83,27 @@ interface ComposerPickerProps {
    */
   focusAfter?: () => void;
   "data-testid"?: string;
+  /**
+   * Opened from elsewhere (a menu item) instead of a trigger: the list is anchored to this
+   * element, and open/onOpenChange control it.
+   */
+  anchor?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+/**
+ * An unavailable option's body under its reason as a tooltip, beside the list; the bare
+ * body otherwise. The tooltip's trigger is a span filling the row: cmdk's item sets its own
+ * pointer handlers over a trigger's.
+ */
+function UnavailableTip({ reason, wrap, children }: { reason?: string; wrap?: boolean; children: ReactElement }) {
+  if (!reason) return children;
+  return (
+    <Tip label={reason} side="right" data-testid="picker-unavailable-tip">
+      <span className={cn("flex min-w-0 flex-1 gap-2 self-stretch", wrap ? "items-start" : "items-center")}>{children}</span>
+    </Tip>
+  );
 }
 
 /** The warning's tooltip around a picker that can warn; the bare trigger for one that cannot. */
@@ -118,8 +144,16 @@ export function ComposerPicker({
   selected,
   focusAfter,
   "data-testid": testId,
+  anchor,
+  open: openProp,
+  onOpenChange,
 }: ComposerPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (o: boolean) => {
+    setOpenState(o);
+    onOpenChange?.(o);
+  };
   // Controlled so every opening starts unfiltered (the content can outlive a close).
   const [search, setSearch] = useState("");
   // The highlighted row, controlled so a search does not land on a fixed row (below).
@@ -183,6 +217,7 @@ export function ComposerPicker({
     setActive(v);
   };
   const pick = (v: string) => {
+    if (groups.some((g) => g.options.some((o) => o.value === v && o.unavailable))) return;
     onChange(v);
     if (multi) return;
     setOpen(false);
@@ -202,21 +237,27 @@ export function ComposerPicker({
               keywords={[o.label, o.tag ?? "", o.detail ?? ""]}
               forceMount={force || undefined}
               data-fixed={force ? "" : undefined}
-              className={cn(o.wrap && "items-start")}
+              // Not cmdk's disabled: that drops pointer events, and the tooltip says why.
+              className={cn(o.wrap && "items-start", o.unavailable && "opacity-50")}
+              data-unavailable={o.unavailable ? "" : undefined}
               data-checked={isChecked(o.value) || undefined}
               onSelect={() => {
                 pick(o.value);
               }}
             >
-              <Check aria-hidden className={cn("size-3.5", o.wrap && "mt-0.5", !isChecked(o.value) && "invisible")} />
-              {o.icon && <o.icon aria-hidden className="size-3.5" />}
-              <span className="flex min-w-0 flex-col">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className={cn("truncate", o.mono && "font-mono")}>{o.label}</span>
-                  {o.tag && <span className="shrink-0 rounded-sm border border-cf-border px-1 text-caption-sm">{o.tag}</span>}
-                </span>
-                {o.detail && <span className={cn("text-caption", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
-              </span>
+              <UnavailableTip reason={o.unavailable} wrap={o.wrap}>
+                <>
+                  <Check aria-hidden className={cn("size-3.5", o.wrap && "mt-0.5", !isChecked(o.value) && "invisible")} />
+                  {o.icon && <o.icon aria-hidden className="size-3.5" />}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={cn("truncate", o.mono && "font-mono")}>{o.label}</span>
+                      {o.tag && <span className="shrink-0 rounded-sm border border-cf-border px-1 text-caption-sm">{o.tag}</span>}
+                    </span>
+                    {o.detail && <span className={cn("text-caption", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
+                  </span>
+                </>
+              </UnavailableTip>
             </CommandItem>
           ))}
           {g.status && (
@@ -249,6 +290,9 @@ export function ComposerPicker({
         popover trigger, there whether it warns or not so the trigger never remounts. Its
         data-state wins on the button, so the open look keys on aria-expanded.
       */}
+      {anchor ? (
+        <PopoverAnchor asChild>{anchor}</PopoverAnchor>
+      ) : (
       <WarningTip warning={warning} testId={testId}>
         <PopoverTrigger asChild>
           <Button
@@ -281,6 +325,7 @@ export function ComposerPicker({
           </Button>
         </PopoverTrigger>
       </WarningTip>
+      )}
       <PopoverContent
         // Never taller than the room Radix found on its side (viewport px, so divided by the zoom).
         className={cn("flex max-h-[calc(var(--radix-popover-content-available-height)/var(--cf-zoom))] flex-col p-0", contentClassName)}

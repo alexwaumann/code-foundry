@@ -1260,14 +1260,18 @@ func (*DeleteActionResponse) Descriptor() ([]byte, []int) {
 
 type RunActionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Action id, or its name (ignoring case) within the owner's project or project_id.
+	// Action id, or its name (ignoring case) within the owner's project or project_id. With
+	// a thread: an action of any project of its set; a name is looked up in the cwd's
+	// project first, then in the other members (one action, else INVALID_ARGUMENT).
 	Action string `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
-	// The owning thread: the run uses its project and worktree. Wins over worktree_path.
+	// The owning thread: the run goes to the thread's checkout of the action's project
+	// (its bottom panel, its run records). Wins over worktree_path.
 	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// The owning worktree when there is no thread: a registered worktree of the action's
 	// project.
 	WorktreePath string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
-	// The project to find the action's name in; default: the owner's.
+	// The project to find the action's name in; default: the owner's (with a thread, one of
+	// its projects).
 	ProjectId string `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// UNSPECIFIED: the action's in_terminal.
 	Mode          ActionRunMode `protobuf:"varint,5,opt,name=mode,proto3,enum=codefoundry.v1.ActionRunMode" json:"mode,omitempty"`

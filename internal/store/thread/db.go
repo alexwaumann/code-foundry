@@ -227,6 +227,16 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	return nil
 }
 
+// deleteLinks removes thread threadID's links to urls (a member removed: members.go).
+func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string) error {
+	for _, u := range urls {
+		if _, err := db.ExecContext(ctx, `DELETE FROM thread_pull_requests WHERE thread_id = ? AND url = ?`, threadID, u); err != nil {
+			return fmt.Errorf("thread: delete link %s of %s: %w", u, threadID, err)
+		}
+	}
+	return nil
+}
+
 // loadLinks returns every thread's linked pull requests in first-seen (insertion)
 // order.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {

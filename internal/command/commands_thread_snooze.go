@@ -22,9 +22,9 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.snooze",
 		Title: "Snooze or Unsnooze Thread",
-		Description: "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and " +
-			"listed apart; when the time comes it returns needing attention (\"snooze ended\"). " +
-			"clear unsnoozes. Pinning, archiving or sending a message unsnoozes a thread too.",
+		Description: "Snooze a thread until a time: Claude is closed, its terminals removed, it is unpinned and " +
+			"listed apart; then it returns needing attention (\"snooze ended\"). " +
+			"clear unsnoozes, as do pinning, archiving and a message.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			positional(idArg),

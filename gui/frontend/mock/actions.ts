@@ -52,8 +52,8 @@ export interface ActionHost {
   publish(e: ActionEventInit): void;
   /** Registered projects and their worktree paths. */
   projects(): { id: string; name: string; worktrees: string[] }[];
-  /** A thread's project ("" for none) and worktree; undefined when unknown. */
-  thread(id: string): { projectId: string; worktreePath: string } | undefined;
+  /** A thread's project ("" for none), worktree and each member's checkout by project id; undefined when unknown. */
+  thread(id: string): { projectId: string; worktreePath: string; checkouts: Record<string, string> } | undefined;
   /** Starts a kind=action terminal and returns its id. */
   startTerminal(argv: string[], cwd: string, labels: Record<string, string>): string;
   /** Output to a running terminal (no-op when it is gone or exited). */
@@ -565,20 +565,53 @@ export class MockActions {
     return this.runMsg(r, true);
   }
 
-  /** ActionService.Run: an action by id, else by name in the owner's project (or projectId's). */
+  /**
+   * ActionService.Run: an action by id, else by name in the owner's project (or projectId's).
+   * A thread runs an action of any project of its set in its checkout of that project
+   * (the daemon's action/thread_run.go): a name in the cwd's project first, then in one other member.
+   */
   run(
     req: { action: string; threadId?: string; worktreePath?: string; projectId?: string; mode?: ActionRunMode },
     trigger = ActionRunTrigger.USER,
     script?: Script,
   ): RunInit {
-    const owner = this.owner(req.threadId ?? "", req.worktreePath ?? "", req.projectId ?? "");
     const ref = req.action.trim();
+    if (req.threadId) {
+      const { a, owner } = this.threadRun(req.threadId, req.projectId ?? "", ref);
+      const mode = req.mode === ActionRunMode.TERMINAL || req.mode === ActionRunMode.BACKGROUND ? req.mode : a.inTerminal ? ActionRunMode.TERMINAL : ActionRunMode.BACKGROUND;
+      return this.runMsg(this.start(a, owner, mode, trigger, script ?? scriptFor(a.command, owner.worktree)), true);
+    }
+    const owner = this.owner("", req.worktreePath ?? "", req.projectId ?? "");
     let a = this.actions.get(ref);
     if (a && a.projectId !== owner.projectId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
     a ??= this.sorted(req.projectId || owner.projectId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
     if (!a) throw new CommandError("notfound", `no action "${ref}" in this project`);
     const mode = req.mode === ActionRunMode.TERMINAL || req.mode === ActionRunMode.BACKGROUND ? req.mode : a.inTerminal ? ActionRunMode.TERMINAL : ActionRunMode.BACKGROUND;
     return this.runMsg(this.start(a, owner, mode, trigger, script ?? scriptFor(a.command, owner.worktree)), true);
+  }
+
+  private threadRun(threadId: string, projectId: string, ref: string): { a: MockAction; owner: { threadId: string; projectId: string; worktree: string } } {
+    const s = this.host.thread(threadId);
+    if (!s) throw new CommandError("notfound", `not found: thread ${threadId}`);
+    const members: Record<string, string> = { ...s.checkouts };
+    if (s.projectId) members[s.projectId] = s.worktreePath;
+    const ids = Object.keys(members).sort();
+    if (ids.length === 0) throw new CommandError("unavailable", `failed precondition: thread ${threadId} has no project; actions belong to a project`);
+    if (projectId && !ids.includes(projectId)) throw new CommandError("invalid", `invalid argument: project ${projectId} is not one of thread ${threadId}'s projects (${ids.join(", ")})`);
+    const named = (pid: string) => this.sorted(pid).filter((x) => x.name.toLowerCase() === ref.toLowerCase());
+    let a = this.actions.get(ref);
+    if (a && !ids.includes(a.projectId)) throw new CommandError("unavailable", `failed precondition: action ${a.name} (${a.id}) belongs to project ${a.projectId}, which is not one of thread ${threadId}'s projects`);
+    if (!a && projectId) a = named(projectId)[0];
+    if (!a && !projectId) {
+      a = s.projectId ? named(s.projectId)[0] : undefined;
+      if (!a) {
+        const found = ids.filter((pid) => pid !== s.projectId).flatMap(named);
+        if (found.length > 1) throw new CommandError("invalid", `invalid argument: action "${ref}" is in several of thread ${threadId}'s projects; pass its id`);
+        a = found[0];
+      }
+    }
+    if (!a) throw new CommandError("notfound", `no action "${ref}" in thread ${threadId}'s projects`);
+    return { a, owner: { threadId, projectId: a.projectId, worktree: members[a.projectId] ?? s.worktreePath } };
   }
 
   private owner(threadId: string, worktree: string, projectId: string): { threadId: string; projectId: string; worktree: string } {

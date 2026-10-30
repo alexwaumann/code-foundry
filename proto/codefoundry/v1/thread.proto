@@ -56,6 +56,19 @@ service ThreadService {
   // row changes at once; the next start resumes there. Refused for a thread without a
   // project and for a target that is not one of its checkouts.
   rpc RunIn(RunInThreadRequest) returns (RunInThreadResponse) {}
+  // AddProject adds a project to a thread's set. Its checkout is placed by Create's rule:
+  // in worktree mode a git project's worktree for the thread's branch (shared when one
+  // is on it, else made; Create's refusals for a main checkout on the branch or a
+  // default path holding another checkout), a plain folder its folder; in checkout mode
+  // the project's own checkout. RemoveProject drops a member: refused for the cwd's
+  // project; its checkout stays on disk. Either clears the thread's workspace_id (it no
+  // longer follows that workspace; the workspace is untouched) and adds a timeline
+  // note. A live Claude restarts, resuming the conversation, for its new --add-dir list
+  // once it is idle at its prompt; a stopped thread takes it at its next start. Refused
+  // for a thread without a project and for one running in its workspace's folder. See
+  // docs/notes/thread-project-set.md.
+  rpc AddProject(AddThreadProjectRequest) returns (AddThreadProjectResponse) {}
+  rpc RemoveProject(RemoveThreadProjectRequest) returns (RemoveThreadProjectResponse) {}
   // Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
   // cwd, the deepest winning) and lists one checkout per project in its set: the primary
   // at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain

@@ -231,11 +231,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	if s.action, err = action.New(ctx, action.Options{
 		DB: s.db, Projects: s.project, Terminals: s.terminal, Bus: s.bus, Log: log.With("store", "action"),
-		Thread: func(id string) (action.Owner, bool) {
+		Thread: func(id string) (action.ThreadPlace, bool) {
 			if s.thread == nil {
-				return action.Owner{}, false
+				return action.ThreadPlace{}, false
 			}
-			return threadOwner(s.thread.Snapshot(), id)
+			return threadPlace(s.thread.Snapshot(), id, s.thread.CheckoutsOf)
 		},
 	}); err != nil {
 		return nil, err
@@ -360,16 +360,24 @@ func envDuration(log *slog.Logger, name string) time.Duration {
 	return d
 }
 
-// threadOwner is thread id's project and worktree, the owner of its action runs.
-func threadOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
+// threadPlace is where thread id works, for the action runs it owns: its cwd's project
+// and checkout, and every member's checkout that exists (a missing one is made at the
+// thread's next start; checkouts is the thread store's CheckoutsOf).
+func threadPlace(snap *thread.Snapshot, id string, checkouts func(thread.Thread) []thread.Checkout) (action.ThreadPlace, bool) {
 	if snap == nil {
-		return action.Owner{}, false
+		return action.ThreadPlace{}, false
 	}
-	i := slices.IndexFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
-	if i < 0 {
-		return action.Owner{}, false
+	t, ok := snap.Thread(id)
+	if !ok {
+		return action.ThreadPlace{}, false
 	}
-	return action.Owner{ThreadID: id, ProjectID: snap.Threads[i].ProjectID, Worktree: snap.Threads[i].WorktreePath}, true
+	p := action.ThreadPlace{ProjectID: t.ProjectID, Worktree: t.WorktreePath, Checkouts: map[string]string{}}
+	for _, c := range checkouts(t) {
+		if c.Registered && !c.Missing && c.Path != "" {
+			p.Checkouts[c.ProjectID] = c.Path
+		}
+	}
+	return p, true
 }
 
 // worktreeThreads lists the threads that own their cwd, for the cleanup rule and the
