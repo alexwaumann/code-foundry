@@ -11,7 +11,7 @@ type SheetBody = "settings" | "themes";
  * Escape in the sheet (Radix calls this only when the sheet is the top layer: a dialog,
  * select, menu or popover over it takes its own Escape and the sheet stays). The sheet
  * decides, so Radix never dismisses it on its own:
- *  - the keybinding recorder (Settings → Keybindings) records Escape as a cancel;
+ *  - a recording keybinding recorder (Settings → Keybindings) takes Escape as a cancel;
  *  - a field keeps it (a text setting reverts, a search clears its text), except an empty
  *    search, where Escape means "close";
  *  - otherwise Settings closes the sheet, and Themes steps back (themesEscape: out of the
@@ -21,7 +21,8 @@ function onSheetEscape(e: KeyboardEvent, body: SheetBody): void {
   e.preventDefault();
   const t = e.target;
   if (t instanceof HTMLElement) {
-    if (t.closest("[data-key-recorder]")) return;
+    // A recorder that is recording takes Escape to cancel; an idle one lets it close the sheet.
+    if (t.closest("[data-key-recorder][data-recording]")) return;
     const emptySearch = t instanceof HTMLInputElement && t.type === "search" && t.value === "";
     if (!emptySearch && t.matches('input, select, textarea, [contenteditable=""], [contenteditable="true"], [role="combobox"]')) return;
   }

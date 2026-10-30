@@ -134,7 +134,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 			NoPalette:    true,
 			NoKeybinding: true,
 			Title:        "Start Dictation",
-			Description: "Open a dictation session: the app's microphone listens until dictation.stop, or 30 s without speech. " +
+			Description: "Open a dictation session: the app's microphone listens until dictation.stop, 30 s without speech, or 2 min without any audio. " +
 				"Prints the session id. Refused while another composer is dictating.",
 			Category: dictationCategory,
 			Args: []ArgSpec{

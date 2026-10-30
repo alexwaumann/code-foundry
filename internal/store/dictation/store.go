@@ -47,6 +47,10 @@ const (
 	UnloadAfter = 10 * time.Minute
 	// SilenceStop ends a session after this long without speech.
 	SilenceStop = 30 * time.Second
+	// FirstAudioWait ends a session that never gets a frame of audio. Silence counts
+	// only from the first frame, so a first press that waits on macOS's microphone
+	// prompt is not ended while the prompt is up.
+	FirstAudioWait = 2 * time.Minute
 	// FlushWait bounds how long Stop waits for the engine to finish a session.
 	FlushWait = 1500 * time.Millisecond
 	// MaxRestarts is how many times a failed engine is restarted before Failed.
@@ -231,7 +235,9 @@ type session struct {
 	id, clientID string
 	started      time.Time
 	// begun: the engine accepted begin; audio flows.
-	begun    bool
+	begun bool
+	// heard: a frame of audio arrived, so the silence clock runs.
+	heard    bool
 	stopping bool
 	// silence ends the session after SilenceStop without speech; silenceGen tells a
 	// stale timer from the current one.
@@ -674,7 +680,7 @@ func (s *Store) handle(gen int, ev Event) {
 			if p.Active {
 				s.stopSilenceLocked(sess)
 			} else {
-				s.armSilenceLocked(sess)
+				s.armSilenceLocked(sess, SilenceStop)
 			}
 		}
 	case dictate.EventPhrase:
@@ -815,7 +821,7 @@ func (s *Store) Start(ctx context.Context, clientID string) (string, error) {
 		return "", fmt.Errorf("start dictation: %w", err)
 	}
 	sess.begun = true
-	s.armSilenceLocked(sess)
+	s.armSilenceLocked(sess, FirstAudioWait)
 	s.log.Info("dictation started", "session", sess.id, "client", clientID)
 	s.publishLocked()
 	return sess.id, nil
@@ -867,6 +873,10 @@ func (s *Store) Audio(sessionID string, pcm []byte, rms float32) bool {
 		return false
 	}
 	eng := s.eng
+	if !sess.heard {
+		sess.heard = true
+		s.armSilenceLocked(sess, SilenceStop)
+	}
 	if now := s.clock.Now(); now.Sub(sess.lastLevel) >= levelEvery {
 		sess.lastLevel = now
 		s.emit(SessionEvent{SessionID: sessionID, Kind: SessionLevel, RMS: rms})
@@ -909,10 +919,12 @@ func (s *Store) SessionEnded(sessionID string) (reason EndReason, ended, ok bool
 	return r, ok, ok
 }
 
-func (s *Store) armSilenceLocked(sess *session) {
+// armSilenceLocked (re)starts the clock that ends sess after d: FirstAudioWait until
+// its first frame, then SilenceStop from the first frame and from each end of speech.
+func (s *Store) armSilenceLocked(sess *session, d time.Duration) {
 	s.stopSilenceLocked(sess)
 	gen := sess.silenceGen
-	sess.silence = s.clock.AfterFunc(SilenceStop, func() {
+	sess.silence = s.clock.AfterFunc(d, func() {
 		s.mu.Lock()
 		current := s.session == sess && sess.silenceGen == gen
 		s.mu.Unlock()

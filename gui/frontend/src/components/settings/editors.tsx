@@ -140,6 +140,7 @@ export function KeybindingEditor({ field, value, pending, invalid, commit, setEr
       variant="outline"
       size="sm"
       data-key-recorder
+      data-recording={recording || undefined}
       aria-label={`${field.title} shortcut`}
       aria-invalid={invalid || undefined}
       disabled={pending}

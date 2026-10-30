@@ -426,8 +426,11 @@ test("a keybinding override rejects a reserved chord and applies a valid one", a
   await expect(recorder).toHaveText("⇧⌘Y");
   await expect.poll(async () => (await mockSettings()).raw["keybindings.thread.new"]).toBe("cmd+shift+y");
 
-  // CommandService.List reports the override: the palette shows the new chord.
+  // An idle recorder lets Escape close the sheet (only a recording one keeps it).
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-sheet")).toHaveCount(0);
+
+  // CommandService.List reports the override: the palette shows the new chord.
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette").locator('[data-command="thread.new"]')).toContainText("⇧⌘Y");

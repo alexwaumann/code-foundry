@@ -12,8 +12,15 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/client"
 )
 
-// dictationRetry is how long the watcher waits before reconnecting to the daemon.
-const dictationRetry = 2 * time.Second
+const (
+	// dictationRetry is how long the watcher waits before reconnecting to the daemon.
+	dictationRetry = 2 * time.Second
+	// micReopenTries and micReopenWait: after the audio hardware changed, opening the
+	// microphone again is tried this many times this far apart (a headset's input may
+	// not be ready the moment it connects).
+	micReopenTries = 3
+	micReopenWait  = 300 * time.Millisecond
+)
 
 // dictationStream is the client side of DictationService.Watch.
 type dictationStream interface {
@@ -50,6 +57,8 @@ type dictationWatcher struct {
 	mic   microphone
 	log   *slog.Logger
 	retry time.Duration
+	// reopenWait is the pause between tries to reopen the microphone after a change.
+	reopenWait time.Duration
 }
 
 // watchDictation runs the dictation watcher over the host's daemon client until ctx
@@ -63,9 +72,10 @@ func watchDictation(ctx context.Context, connectDaemon func(context.Context) (*c
 			}
 			return daemonDictation{c.Dictation}, nil
 		},
-		mic:   mic,
-		log:   log,
-		retry: dictationRetry,
+		mic:        mic,
+		log:        log,
+		retry:      dictationRetry,
+		reopenWait: micReopenWait,
 	}
 	w.run(ctx)
 }
@@ -211,9 +221,26 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 		select {
 		case <-ctx.Done():
 			return
+		case <-mic.Changed():
+			// AirPods connecting, say: the old capture is dead. Open the new input and keep
+			// streaming to the same session, or end it so the mic returns to idle now.
+			w.log.Info("dictation: the audio hardware changed; reopening the microphone", "session", id)
+			mic.Stop()
+			next, err := w.reopen(ctx)
+			if err != nil {
+				if ctx.Err() == nil {
+					w.log.Warn("dictation: cannot reopen the microphone; stopping the session", "session", id, "err", err)
+					w.stopSession(ctx, conn, id)
+				}
+				return
+			}
+			mic = next
 		case f, ok := <-mic.Frames():
 			if !ok {
-				w.log.Warn("dictation: the microphone stopped", "session", id)
+				if ctx.Err() == nil {
+					w.log.Warn("dictation: the microphone stopped; stopping the session", "session", id)
+					w.stopSession(ctx, conn, id)
+				}
 				return
 			}
 			if err := sink.Send(&v1.DictationAudioFrame{SessionId: id, Pcm: f.pcm, Rms: f.rms}); err != nil {
@@ -222,6 +249,26 @@ func (w *dictationWatcher) capture(ctx, connCtx context.Context, conn dictationC
 			}
 		}
 	}
+}
+
+// reopen opens the microphone again after a hardware change, micReopenTries times
+// reopenWait apart.
+func (w *dictationWatcher) reopen(ctx context.Context) (micCapture, error) {
+	var err error
+	for try := range micReopenTries {
+		if try > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(w.reopenWait):
+			}
+		}
+		var mic micCapture
+		if mic, err = w.mic.Start(); err == nil {
+			return mic, nil
+		}
+	}
+	return nil, err
 }
 
 func (w *dictationWatcher) reportDenied(ctx context.Context, conn dictationConn, denied bool) {

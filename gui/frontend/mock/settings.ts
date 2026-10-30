@@ -259,7 +259,7 @@ const staticFields: FieldInit[] = [
   { key: "projects.base_from_origin", group: "projects", page: "source", section: "projects", type: S.BOOL, title: "Branch from origin unless local is ahead", description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, unless the local branch is ahead of it or has diverged: then from the local branch. Off always starts from the local branch and never fetches. A remote branch, tag or commit given as the base is always used as is.", defaultValue: "true" },
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Command for Open in Editor, e.g. \"code\" or \"open -a Zed\". {path} stands for the worktree path; without it the path is appended. Empty picks an editor automatically.", defaultValue: "", placeholder: "auto-detect" },
   // General › Dictation (docs/notes/dictation-2-daemon.md); the rest of the section is DictationService's state.
-  { key: "dictation.enabled", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictation", description: "Adds a microphone button to every composer and the ⌘⇧M shortcut.", defaultValue: "false" },
+  { key: "dictation.enabled", group: "dictation", page: "general", section: "dictation", type: S.BOOL, title: "Dictation", description: "Adds a microphone button to every composer and the ⇧⌘M shortcut.", defaultValue: "false" },
   // Ember (docs/notes/ember-2-store.md).
   {
     key: "ember.enabled",

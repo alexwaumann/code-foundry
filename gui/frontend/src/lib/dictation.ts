@@ -24,15 +24,25 @@ export const LISTENING_PLACEHOLDER = "Listening…";
 
 /** The listening pill's bars. */
 export const LEVEL_BARS = 7;
-/** Levels this far apart mean they stopped (they arrive about every 50 ms): the bars start to fall back. */
-export const LEVEL_GAP_MS = 120;
+/** Levels this far apart mean they stopped (they arrive about every 100 ms, PR 3's tap bursts): the bars start to fall back. */
+export const LEVEL_GAP_MS = 250;
 /** How fast a bar falls back without new levels: it halves in this many ms. */
 export const LEVEL_HALF_LIFE_MS = 140;
+/** How fast a drawn bar follows its level: it closes 63% of the gap in this many ms, so 10 levels a second move smoothly. */
+export const LEVEL_EASE_MS = 60;
+/**
+ * The level scale in dBFS. The floor sits just above a room's hum on a MacBook's built-in
+ * microphone (rms 0.005 to 0.012 measured, -46 to -38 dBFS), so pauses draw near flat;
+ * the top is a voice close to the microphone.
+ */
+export const LEVEL_FLOOR_DB = -45;
+export const LEVEL_TOP_DB = -15;
 
-/** A level event's rms (0..1) as a bar's height fraction (0..1): speech sits around 0.02 to 0.2, so the root spreads it out. */
+/** A level event's rms (0..1 of full scale) as a bar's height fraction (0..1), on a log (dBFS) scale: quiet speech (0.02 to 0.05) lands around half height, a near voice (0.1 to 0.15) near the top. */
 export function levelOf(rms: number): number {
   if (!(rms > 0)) return 0;
-  return Math.min(1, Math.sqrt(rms) * 2.2);
+  const db = 20 * Math.log10(rms);
+  return Math.min(1, Math.max(0, (db - LEVEL_FLOOR_DB) / (LEVEL_TOP_DB - LEVEL_FLOOR_DB)));
 }
 
 /** The bars after a new level: they move one to the left and the new one enters on the right. */
@@ -52,9 +62,19 @@ export function decayLevels(bars: readonly number[], dtMs: number): number[] {
   });
 }
 
-/** A bar's height in px: 3 at rest, 14 at full level (the sketch's range). */
+/** The drawn bars `dtMs` later, each moved toward its level (LEVEL_EASE_MS); within 0.002 they snap. */
+export function easeLevels(shown: readonly number[], target: readonly number[], dtMs: number): number[] {
+  const k = 1 - Math.exp(-Math.max(0, dtMs) / LEVEL_EASE_MS);
+  return target.map((t, i) => {
+    const v = shown[i] ?? 0;
+    const d = v + (t - v) * k;
+    return Math.abs(t - d) < 0.002 ? t : d;
+  });
+}
+
+/** A bar's height in px: 3 at rest, 14 at full level (the sketch's range); fractional, so eased bars do not step. */
 export function barHeight(v: number): number {
-  return 3 + Math.round(Math.min(1, Math.max(0, v)) * 11);
+  return 3 + Math.min(1, Math.max(0, v)) * 11;
 }
 
 /** Elapsed listening time as m:ss ("0:04", "12:30"). */

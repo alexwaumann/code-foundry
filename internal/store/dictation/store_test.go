@@ -489,21 +489,38 @@ func TestOneSessionAtATime(t *testing.T) {
 }
 
 func TestSilenceStop(t *testing.T) {
+	frame := func(h *harness, id string) { h.store.Audio(id, make([]byte, 640), 0.01) }
+	speak := func(text string) func(h *harness, id string) {
+		return func(h *harness, id string) {
+			h.launcher.Last().Speak(text)
+			time.Sleep(20 * time.Millisecond) // the watcher handles the events
+		}
+	}
+	type step struct {
+		wait time.Duration // the clock moves first
+		do   func(h *harness, id string)
+	}
 	for _, tc := range []struct {
-		name string
-		// script runs after Start; then the clock moves by advance.
-		script  func(e *dictationtest.Engine, id string)
+		name  string
+		steps []step
+		// then the clock moves by advance.
 		advance time.Duration
 		ended   bool
 	}{
-		{"30 s of nothing", nil, dictation.SilenceStop, true},
-		{"29 s of nothing", nil, dictation.SilenceStop - time.Second, false},
-		{"speaking holds it off", func(e *dictationtest.Engine, id string) {
-			e.Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: id, Active: true})
-		}, 2 * dictation.SilenceStop, false},
-		{"counts from the end of speech", func(e *dictationtest.Engine, id string) {
-			e.Speak("one")
-		}, dictation.SilenceStop, true},
+		{"no audio yet: 30 s does not end it", nil, dictation.SilenceStop, false},
+		{"no audio at all: ends at the cap", nil, dictation.FirstAudioWait, true},
+		{"no audio, just under the cap", nil, dictation.FirstAudioWait - time.Second, false},
+		{"30 s from the first frame", []step{{0, frame}}, dictation.SilenceStop, true},
+		{"29 s from the first frame", []step{{0, frame}}, dictation.SilenceStop - time.Second, false},
+		{"a slow prompt: counts from the first frame", []step{{90 * time.Second, frame}}, dictation.SilenceStop - time.Second, false},
+		{"a slow prompt, then 30 s", []step{{90 * time.Second, frame}}, dictation.SilenceStop, true},
+		{"later frames do not restart it", []step{{0, frame}, {20 * time.Second, frame}}, 10 * time.Second, true},
+		{"speaking holds it off", []step{{0, frame}, {10 * time.Second, func(h *harness, id string) {
+			h.launcher.Last().Emit(dictate.EventSpeech, dictate.SpeechEvent{Session: id, Active: true})
+			time.Sleep(20 * time.Millisecond)
+		}}}, 2 * dictation.FirstAudioWait, false},
+		{"counts from the end of speech", []step{{0, frame}, {10 * time.Second, speak("one")}}, dictation.SilenceStop, true},
+		{"just under 30 s from the end of speech", []step{{0, frame}, {10 * time.Second, speak("one")}}, dictation.SilenceStop - time.Second, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t, setup{enabled: true, model: true, attended: true})
@@ -512,10 +529,9 @@ func TestSilenceStop(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tc.script != nil {
-				h.clock.Advance(10 * time.Second)
-				tc.script(h.launcher.Last(), id)
-				time.Sleep(20 * time.Millisecond) // the watcher handles the events
+			for _, st := range tc.steps {
+				h.clock.Advance(st.wait)
+				st.do(h, id)
 			}
 			h.clock.Advance(tc.advance)
 			if !tc.ended {

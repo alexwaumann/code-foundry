@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -136,6 +137,26 @@ func TestPumpFrames(t *testing.T) {
 				if math.Abs(float64(got[i]-tt.want[i])) > 1e-6 {
 					t.Fatalf("levels = %v, want %v", got, tt.want)
 				}
+			}
+		})
+	}
+}
+
+func TestPumpSignals(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input string
+		want  int // signals pending afterwards (the channel holds one)
+	}{
+		{"nothing", "", 0},
+		{"one change", "c", 1},
+		{"a burst coalesces", "ccccc", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := make(chan struct{}, 1)
+			pumpSignals(strings.NewReader(tc.input), out)
+			if got := len(out); got != tc.want {
+				t.Errorf("pending = %d, want %d", got, tc.want)
 			}
 		})
 	}

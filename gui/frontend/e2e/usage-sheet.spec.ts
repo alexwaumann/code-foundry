@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { emit, openApp, openTooltip, resetMock, row, threadPrompt } from "./fixtures";
 
 // The Usage page in a modal sheet over the window (docs/notes/usage-sheet.md), the same
-// size as the settings sheet (settings-sheet.spec.ts): centred, at most 1280x800, never
+// size as the settings sheet (settings-sheet.spec.ts): centred, at most 1280x1280, never
 // closer than 48px to a window edge.
 
 test.beforeEach(async () => {
@@ -34,8 +34,10 @@ async function clickUnder(page: Page, testId: string) {
 }
 
 for (const [w, h, want] of [
-  // The cap: 1280x800 centred.
-  [1440, 900, { x: 80, y: 50, width: 1280, height: 800 }],
+  // The cap: 1280x1280 centred.
+  [1500, 1400, { x: 110, y: 60, width: 1280, height: 1280 }],
+  // Width at the cap, height margin-limited.
+  [1440, 900, { x: 80, y: 48, width: 1280, height: 804 }],
   // Margin-limited: 48px from every edge.
   [1000, 700, { x: 48, y: 48, width: 904, height: 604 }],
 ] as const) {
