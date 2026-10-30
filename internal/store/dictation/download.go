@@ -142,7 +142,7 @@ func (f fetcher) fetchFrom(ctx context.Context, src Source, m Model, file *os.Fi
 		have = 0
 	}
 	if have < m.Size {
-		f.log.Info("downloading the dictation model", "source", src.Label(), "from_byte", have)
+		f.log.Info("trying a dictation model source", "source", src.Label(), "from_byte", have)
 		if src.GitHub != nil {
 			have, err = f.fromGitHub(ctx, *src.GitHub, m, file, have)
 		} else {
@@ -185,6 +185,10 @@ func (f fetcher) fromURL(ctx context.Context, rawURL string, m Model, file *os.F
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
+		if viaProxy(f.client, req) {
+			// A proxy refusing the host fails the CONNECT with its status text alone.
+			return have, fmt.Errorf("could not connect through the proxy: %w", err)
+		}
 		return have, fmt.Errorf("could not connect: %w", err)
 	}
 	defer func() { _ = res.Body.Close() }()
@@ -192,6 +196,20 @@ func (f fetcher) fromURL(ctx context.Context, rawURL string, m Model, file *os.F
 		return have, err
 	}
 	return f.receive(res.Body, file, have, m)
+}
+
+// viaProxy reports whether c sends req through a proxy (HTTPS_PROXY and friends).
+func viaProxy(c *http.Client, req *http.Request) bool {
+	rt := c.Transport
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	t, ok := rt.(*http.Transport)
+	if !ok || t.Proxy == nil {
+		return false
+	}
+	u, err := t.Proxy(req)
+	return err == nil && u != nil
 }
 
 // fromGitHub is fromURL for a release asset, through gh: `gh api` finds the asset's id

@@ -7,6 +7,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,4 +140,19 @@ func TestFetchGitHubProgress(t *testing.T) {
 func sha256Hex(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+func TestFetchURLProxyRefused(t *testing.T) {
+	// A proxy that refuses every CONNECT, as a corporate proxy refuses a blocked host.
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	}))
+	defer proxy.Close()
+	pu, _ := url.Parse(proxy.URL)
+	m := Model{Name: "m.bin", Size: 10, SHA256: sha256Hex(make([]byte, 10)), Sources: []Source{{URL: "https://huggingface.co/m.bin"}}}
+	f := fetcher{client: &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(pu)}}, log: slog.New(slog.DiscardHandler), now: time.Now}
+	_, err := f.fetch(context.Background(), m, filepath.Join(t.TempDir(), m.Name))
+	if want := "Download failed: could not connect through the proxy: Forbidden"; err == nil || err.Error() != want {
+		t.Errorf("err %v, want %q", err, want)
+	}
 }
