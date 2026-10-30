@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import { findLinkedPr, fresher, linkedPrState, linkedPrTag, linkedPrTagText, linkedPrTip, type LinkedPrFact, type LinkedPrState } from "./linkedPrTag";
+import { findLinkedPr, fresher, linkedPrCardRows, linkedPrState, linkedPrTag, linkedPrTagText, linkedPrTip, type LinkedPrFact, type LinkedPrState } from "./linkedPrTag";
 
 const fact = (number: number, state: LinkedPrState, title = ""): LinkedPrFact => ({ number, state, title });
 const pr = (o: Partial<PullRequestView>) => ({ repoSlug: "o/r", number: 1, state: "open", draft: false, title: "", updatedAtMs: null, partial: false, ...o }) as PullRequestView;
@@ -76,5 +76,20 @@ describe("fresher and findLinkedPr", () => {
     expect(findLinkedPr([[partial], [first], [second]], "o/r#7")).toBe(first);
     expect(findLinkedPr([[first]], "o/r#8")).toBeNull();
     expect(findLinkedPr([], "o/r#7")).toBeNull();
+  });
+});
+
+describe("linkedPrCardRows", () => {
+  it.each<[string, LinkedPrFact[], number[], number]>([
+    ["none", [], [], 0],
+    ["all closed: no rows", [fact(1, "closed")], [], 0],
+    ["closed left out, the order kept", [fact(147, "open"), fact(131, "closed"), fact(145, "draft"), fact(138, "merged")], [147, 145, 138], 0],
+    ["unknown ones count", [fact(9, "unknown")], [9], 0],
+    ["capped at five, then how many more", [1, 2, 3, 4, 5, 6, 7].map((n) => fact(n, "open")), [1, 2, 3, 4, 5], 2],
+    ["a closed one past the cap is not more", [1, 2, 3, 4, 5].map((n) => fact(n, "open")).concat(fact(6, "closed")), [1, 2, 3, 4, 5], 0],
+  ])("%s", (_name, facts, numbers, more) => {
+    const got = linkedPrCardRows(facts);
+    expect(got.rows.map((r) => r.number)).toEqual(numbers);
+    expect(got.more).toBe(more);
   });
 });

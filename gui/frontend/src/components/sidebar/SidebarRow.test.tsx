@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DashboardView, PullRequestDetailView, PullRequestView } from "@/api/gh";
 import type { ThreadView } from "@/api/threads";
@@ -10,6 +10,7 @@ import { DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullReques
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { useWorkspacesStore } from "@/stores/workspaces";
 import { SidebarRow } from "./SidebarRow";
 
 const thread = (o: Partial<ThreadView>) =>
@@ -370,5 +371,139 @@ describe("SidebarRow linked PRs tag", () => {
       dashboardResource.set(DASHBOARD_KEY, { data: dashboard([], [pr(142, "merged", { updatedAtMs: 2 })]) });
     });
     expect(tag()?.getAttribute("data-state")).toBe("merged");
+  });
+});
+
+describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
+  const SLUG = "o/r";
+  const link = (number: number, at: number) => ({ slug: SLUG, number, url: `https://github.com/${SLUG}/pull/${String(number)}`, linkedAt: new Date(at) });
+  const pr = (number: number, state: PullRequestView["state"], o: Partial<PullRequestView> = {}) =>
+    ({ repoSlug: SLUG, number, state, draft: false, title: `PR ${String(number)}`, updatedAtMs: 1, partial: false, ...o }) as PullRequestView;
+  const dashboard = (authored: PullRequestView[], recentlyMerged: PullRequestView[] = []) =>
+    ({ authored, reviewRequested: [], reviewed: [], recentlyMerged }) as unknown as DashboardView;
+
+  beforeEach(() => {
+    pullRequestDetailResource.store.setState({ entries: {} });
+    dashboardResource.store.setState({ entries: {} });
+    useProjectsStore.setState({
+      byId: {
+        cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }, { path: "/wt/cf/feat-x", branch: "feat/x", head: "b", isMain: false }] },
+        gp: { id: "gp", name: "ghostty-playground", git: true, worktrees: [{ path: "/src/gp", branch: "main", head: "c", isMain: true }, { path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
+        notes: { id: "notes", name: "writing", git: false, worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
+      } as never,
+      order: ["cf", "gp", "notes"],
+    });
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login" } } as never });
+  });
+
+  /** Renders the row and opens its card (the provider's 500 ms delay on fake timers). */
+  function openCard(o: Partial<ThreadView>): HTMLElement {
+    vi.useFakeTimers();
+    try {
+      renderRow(o);
+      fireEvent.pointerMove(screen.getByRole("option"), { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    return screen.getAllByTestId("thread-tooltip")[0] as HTMLElement;
+  }
+  const ids = (card: HTMLElement) => Array.from(card.querySelectorAll(":scope > div")).map((e) => e.getAttribute("data-testid"));
+  const text = (card: HTMLElement, id: string) => within(card).queryByTestId(id)?.textContent ?? null;
+
+  it.each([
+    ["the main checkout: Project folder", { worktreePath: "/src/cf" }, "Project folder", "main"],
+    ["a worktree made for it: Fresh copy, no worktree chip on the branch", { worktreePath: "/wt/cf/feat-x", createdWorktree: true, branch: "feat/x" }, "Fresh copy", "feat/x"],
+    ["a worktree the user picked: no chip", { worktreePath: "/wt/cf/feat-x" }, null, "feat/x"],
+  ])("one project, %s", (_name, o, chip, branch) => {
+    const card = openCard(o);
+    expect(ids(card)).toEqual(["tip-name", "tip-project", "tip-branch", "tip-model"]);
+    expect(text(card, "tip-project-chip")).toBe(chip);
+    expect(text(card, "tip-branch")).toBe(branch);
+    expect(within(card).queryByTestId("tip-branch-chip")).toBeNull();
+  });
+
+  it("a project without git keeps its no git chip", () => {
+    const card = openCard({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
+    expect(text(card, "tip-project-chip")).toBe("no git");
+    expect(within(card).queryByTestId("tip-branch")).toBeNull();
+  });
+
+  it("a workspace thread: workspace, then the run-in project with Fresh copy, branch, model; no member list", () => {
+    const card = openCard({ projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/wt/gp/cf-login", createdWorktree: true, branch: "cf/login" });
+    expect(ids(card)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
+    expect(text(card, "tip-workspace")).toBe("login");
+    expect(within(card).getByTestId("tip-workspace").querySelector("svg")?.getAttribute("class")).toContain("lucide-layers");
+    expect(text(card, "tip-project")).toBe("ghostty-playgroundFresh copy");
+    expect(text(card, "tip-project-chip")).toBe("Fresh copy");
+    expect(text(card, "tip-branch")).toBe("cf/login");
+    expect(within(card).queryByTestId("tip-set")).toBeNull();
+  });
+
+  it("an unnamed set: N projects, in place: Project folder", () => {
+    const card = openCard({ projectId: "gp", projectIds: ["cf", "gp"], worktreePath: "/src/gp" });
+    expect(text(card, "tip-workspace")).toBe("2 projects");
+    expect(text(card, "tip-project-chip")).toBe("Project folder");
+  });
+
+  it("a thread in its workspace's folder: the workspace, then the folder as the place, no chip", () => {
+    const card = openCard({ projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/home/.code-foundry/workspaces/w-1", createdWorktree: true, branch: "cf/login" });
+    expect(text(card, "tip-workspace")).toBe("login");
+    expect(text(card, "tip-project")).toBe("Workspace folder");
+    expect(within(card).queryByTestId("tip-project-chip")).toBeNull();
+  });
+
+  it("no linked PRs, or only closed ones: no section, no hairline", () => {
+    let card = openCard({});
+    expect(within(card).queryByTestId("tip-prs")).toBeNull();
+    cleanup();
+    pullRequestDetailResource.set(pullRequestKey(SLUG, 131), { data: { pullRequest: pr(131, "closed") } as PullRequestDetailView });
+    card = openCard({ linkedPullRequests: [link(131, 1)] });
+    expect(within(card).queryByTestId("tip-prs")).toBeNull();
+  });
+
+  it("the linked PRs after the model, newest linked first, closed left out, state icon and number in the state's colour", () => {
+    dashboardResource.set(DASHBOARD_KEY, { data: dashboard([pr(142, "open", { title: "Fix the login" }), pr(145, "open", { draft: true, title: "Draft it" })], [pr(138, "merged", { title: "Merged one" })]) });
+    pullRequestDetailResource.set(pullRequestKey(SLUG, 131), { data: { pullRequest: pr(131, "closed") } as PullRequestDetailView });
+    const card = openCard({ linkedPullRequests: [link(138, 1), link(131, 2), link(145, 3), link(142, 4), link(7, 5)] });
+    expect(ids(card).at(-1)).toBe("tip-prs");
+    const rows = within(card).getAllByTestId("tip-pr");
+    expect(rows.map((r) => r.textContent)).toEqual(["#7", "#142Fix the login", "#145Draft it", "#138Merged one"]);
+    expect(rows.map((r) => r.getAttribute("data-state"))).toEqual(["unknown", "open", "draft", "merged"]);
+    expect(rows[1]?.querySelector("svg")?.getAttribute("class")).toContain("text-cf-success-text");
+    expect(rows[1]?.querySelector("span")?.className).toContain("text-cf-success-text");
+    expect(rows[2]?.querySelector('svg[aria-label="draft"]')).not.toBeNull();
+    expect(rows[3]?.querySelector("span")?.className).toContain("text-cf-highlight-text");
+    expect(rows[1]?.querySelector(".truncate")?.textContent).toBe("Fix the login");
+    expect(within(card).queryByTestId("tip-prs-more")).toBeNull();
+  });
+
+  it("at most five rows, then +N more", () => {
+    const card = openCard({ linkedPullRequests: [1, 2, 3, 4, 5, 6, 7].map((n) => link(n, n)) });
+    expect(within(card).getAllByTestId("tip-pr")).toHaveLength(5);
+    expect(text(card, "tip-prs-more")).toBe("+2 more");
+  });
+});
+
+describe("SidebarRow line 2 of a multi-project thread: the run-in project only", () => {
+  beforeEach(() => {
+    useProjectsStore.setState({
+      byId: {
+        cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
+        gp: { id: "gp", name: "ghostty-playground", git: true, worktrees: [{ path: "/wt/gp/cf-login", branch: "cf/login", head: "d", isMain: false }] },
+      } as never,
+      order: ["cf", "gp"],
+    });
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login" } } as never });
+  });
+
+  it.each([
+    ["a workspace thread", { projectId: "gp", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/wt/gp/cf-login", createdWorktree: true, branch: "cf/login" }, "ghostty-playground @ cf/login"],
+    ["an unnamed set", { projectId: "cf", projectIds: ["cf", "gp"], worktreePath: "/src/cf" }, "code-foundry @ main"],
+    ["a thread in its workspace's folder: the workspace, the place", { projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-1", worktreePath: "/home/.code-foundry/workspaces/w-1", createdWorktree: true, branch: "cf/login" }, "login @ cf/login"],
+  ])("%s", (_name, o, want) => {
+    expect(renderRow(o).textContent).toBe(want);
   });
 });

@@ -59,7 +59,7 @@ export function findLinkedPr(lists: readonly (readonly PullRequestView[])[], key
   return null;
 }
 
-type Counted = LinkedPrFact & { state: Exclude<LinkedPrState, "closed"> };
+export type Counted = LinkedPrFact & { state: Exclude<LinkedPrState, "closed"> };
 
 /** The pull requests the tag counts: all but the closed ones. */
 function counted(prs: readonly LinkedPrFact[]): Counted[] {
@@ -110,4 +110,14 @@ export function linkedPrTip(prs: readonly LinkedPrFact[]): string {
   const lines = shown.slice(0, LINKED_PR_TIP_CAP).map((p) => `#${String(p.number)} · ${linkedPrStateLabel(p.state)}`);
   const more = shown.length - LINKED_PR_TIP_CAP;
   return [...lines, ...(more > 0 ? [`+${String(more)} more`] : [])].join("\n");
+}
+
+/**
+ * The thread card's linked pull requests (docs/notes/sidebar-thread-card.md): the ones the
+ * tag counts (closed left out), in the given order, at most LINKED_PR_TIP_CAP, and how many
+ * more there are. No rows: the card shows no section.
+ */
+export function linkedPrCardRows(prs: readonly LinkedPrFact[]): { rows: Counted[]; more: number } {
+  const shown = counted(prs);
+  return { rows: shown.slice(0, LINKED_PR_TIP_CAP), more: Math.max(0, shown.length - LINKED_PR_TIP_CAP) };
 }

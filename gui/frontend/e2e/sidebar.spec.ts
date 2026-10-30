@@ -480,33 +480,34 @@ test("Working section: the header counts threads as they start and stop working,
   expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
 });
 
-test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {
+test("hovering a thread row shows its tooltip: name, project with where it runs, branch, model and effort", async ({ page }) => {
   await mockPost("threads?project=repo-wr&count=1&status=idle&prefix=Notes");
   await openApp(page);
   // The open one: the previous tooltip may still be fading out.
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
 
-  // s-3 runs in a linked worktree of code-foundry.
+  // s-3 runs in a linked worktree of code-foundry that it did not make (a picked one): no chip.
   await row(page, "s:s-3").hover();
   await expect(tip).toBeVisible();
   await expect(tip).toHaveAttribute("data-thread-id", "s-3");
   await expect(tip.getByTestId("tip-name")).toHaveText("Fix resize race");
   await expect(tip.getByTestId("tip-project")).toHaveText("code-foundry");
-  await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resizeworktree");
-  await expect(tip.getByTestId("tip-branch-chip")).toHaveText("worktree");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resize");
+  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
   await expect(tip.getByTestId("tip-model")).toHaveText("Opus 4.8 (medium)");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
+  await expect(tip.getByTestId("tip-workspace")).toHaveCount(0);
   // To the right of the sidebar, 260px wide.
   const sidebar = await page.getByTestId("sidebar").boundingBox();
   const box = await tip.boundingBox();
   expect(box && sidebar && box.x >= sidebar.x + sidebar.width - 1).toBe(true);
   expect(Math.round(box?.width ?? 0)).toBe(260);
 
-  // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort.
+  // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort: Project folder.
   await row(page, "s:s-2").hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-2");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Project folder");
   await expect(tip.getByTestId("tip-branch")).toHaveText("main");
-  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
   await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet 5");
 
   // A project without git: a plain folder, the no git chip, no branch row.
