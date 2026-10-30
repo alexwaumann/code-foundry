@@ -65,6 +65,9 @@ type Sources struct {
 	// SkillsDir is where Install puts the skills (<dir>/.claude/skills), for paths the
 	// skills name; empty when unknown.
 	SkillsDir string
+	// PagesDir is the pages root (paths.Paths.Pages), where PlaceWelcome writes the
+	// first-run page the skills name; empty when unknown.
+	PagesDir string
 	// Facts are the host facts plugins' when clauses read (plugin.HostFactNames).
 	Facts []string
 }

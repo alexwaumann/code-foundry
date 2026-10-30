@@ -84,14 +84,14 @@ skills); Save as workspace in a thread's header menu makes one (`code-foundry wo
 ## The welcome tutorial
 
 A first run ("I just installed Code Foundry", "the welcome tutorial", no projects yet): the
-tutorial is a page the app already placed, at the path the prompt names (the home's
-`pages/welcome.html`). Open it in the side panel only, never inline and never rewritten:
+tutorial is a page the app writes at every start, at the path the prompt names
+(`{{cf.welcomePage}}`). Open it in the side panel only, never inline and never rewritten:
 `code-foundry view.panel.page <path> --title Welcome`. Then reply with exactly: "Your welcome
 page is open in the panel on the right: four steps, each a sentence you could type here. Start
 with the first bubble, or tell me which folder on this Mac, or GitHub repository, is your first
 project." Do not summarise or walk through the page in words; it walks the user through
 itself. What its buttons do and how to answer its demo: the code-foundry-pages skill's
-`reference/welcome.md`.
+reference/welcome.md.
 
 ## Showing things in the app
 

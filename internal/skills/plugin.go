@@ -42,6 +42,7 @@ func placeholders(src Sources) map[string]string {
 		"sdkPin":        SDKPin(src.Commit, src.SDKTag),
 		"example":       exampleDir(src.SkillsDir),
 		"themesRef":     themesReference(src.SkillsDir),
+		"welcomePage":   welcomePage(src.PagesDir),
 		"facts":         codeList(src.Facts),
 		"reservedNames": codeList(pluginsdk.ReservedNames),
 		"reservedArgs":  codeList(pluginsdk.ReservedArgNames),
@@ -193,6 +194,15 @@ func themesReference(skillsDir string) string {
 		return "the code-foundry-help skill's reference/themes.md"
 	}
 	return filepath.Join(skillsDir, Help, "reference", "themes.md")
+}
+
+// welcomePage is where PlaceWelcome puts the first-run page, for the help skill and
+// welcome.md.
+func welcomePage(pagesDir string) string {
+	if pagesDir == "" {
+		return "<the home>/pages/" + WelcomeFile
+	}
+	return WelcomePath(pagesDir)
 }
 
 // exampleReferences are the minimal example's files, as the skill's example/.

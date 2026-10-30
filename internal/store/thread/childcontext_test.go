@@ -58,7 +58,7 @@ func TestThreadTmp(t *testing.T) {
 }
 
 // Every spawn gets the protocol rules and its own TMPDIR, made at spawn; removing the
-// thread removes it, and New removes those of threads that are gone.
+// thread removes it, and New removes those of threads that are gone (and keeps files).
 func TestSpawnChildContext(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "tmp")
 	pagesRoot := filepath.Join(t.TempDir(), "pages")
@@ -105,7 +105,21 @@ func TestSpawnChildContext(t *testing.T) {
 		}
 		strays = append(strays, stray)
 	}
+	// A file in a root is the app's own (the pages root's welcome.html): New keeps it.
+	var files []string
+	for _, r := range []string{root, pagesRoot} {
+		f := filepath.Join(r, "welcome.html")
+		if err := os.WriteFile(f, []byte("page"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
+	}
 	e.restart(withRoot)
+	for _, f := range files {
+		if b, err := os.ReadFile(f); err != nil || string(b) != "page" {
+			t.Errorf("%s after New = %q, %v; want it kept", f, b, err)
+		}
+	}
 	for _, stray := range strays {
 		if _, err := os.Stat(stray); !os.IsNotExist(err) {
 			t.Errorf("a gone thread's %s after New: %v", stray, err)

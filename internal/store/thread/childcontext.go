@@ -108,7 +108,7 @@ func (m *Manager) removeThreadTmp(id string) {
 
 // reapThreadTmps removes the TMPDIRs, pages directories and page storage of threads that
 // no longer exist (removed while the daemon was down, or a removal that failed to delete
-// it), at New.
+// it), at New. Files in those roots stay.
 func (m *Manager) reapThreadTmps() {
 	for _, root := range m.threadDirRoots() {
 		m.reapThreadDirs(root)
@@ -128,6 +128,11 @@ func (m *Manager) reapThreadDirs(root string) {
 	}
 	n := 0
 	for _, e := range entries {
+		// A thread's directory only: a file is the app's own (the pages root's
+		// welcome.html, internal/skills welcome.go).
+		if !e.IsDir() {
+			continue
+		}
 		if _, ok := m.recs[e.Name()]; ok {
 			continue
 		}

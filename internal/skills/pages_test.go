@@ -15,7 +15,8 @@ import (
 // pagesSkillFiles are the code-foundry-pages skill's files.
 var pagesSkillFiles = []string{"code-foundry-pages/SKILL.md", "code-foundry-pages/reference/examples.md",
 	"code-foundry-pages/reference/sources.md", "code-foundry-pages/reference/verbs.md", "code-foundry-pages/reference/react.md",
-	"code-foundry-pages/reference/components.md"}
+	"code-foundry-pages/reference/components.md", "code-foundry-pages/reference/welcome.md",
+	"code-foundry-pages/reference/welcome.html"}
 
 // cfRun is a cf.run call in a skill file with a literal verb and an args object:
 // cf.run("verb", { a: x, "b-c": y }).
@@ -71,6 +72,12 @@ func TestRenderPagesSkill(t *testing.T) {
 	for _, p := range pagesSkillFiles {
 		if len(files[p]) == 0 {
 			t.Fatalf("%s is missing or empty", p)
+		}
+	}
+	// The first-run instructions name the page where PlaceWelcome writes it.
+	for _, p := range []string{skills.Pages + "/reference/welcome.md", skills.Help + "/SKILL.md"} {
+		if want := "`/Users/ada/.code-foundry/pages/welcome.html`"; !strings.Contains(string(files[p]), want) {
+			t.Errorf("%s does not name the welcome page as %s", p, want)
 		}
 	}
 	p := skills.Pages + "/SKILL.md"
@@ -171,6 +178,7 @@ func TestRenderPagesSkill(t *testing.T) {
 	args := map[string][]string{}
 	for _, c := range src.Commands {
 		readOnly[c.GetName()] = c.GetReadOnly()
+		args[c.GetName()] = []string{} // a verb with no args is a verb too
 		for _, a := range c.GetArgs() {
 			args[c.GetName()] = append(args[c.GetName()], a.GetName())
 		}

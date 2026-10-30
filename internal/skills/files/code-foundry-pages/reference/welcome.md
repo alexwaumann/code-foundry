@@ -2,12 +2,13 @@
 
 {{cf.provenance}}
 
-For the code-foundry-pages skill. A new install prefills the composer with a prompt like
-"I just installed Code Foundry and have no projects yet. Open the welcome tutorial in the side
-panel and walk me through it." The tutorial is a page the app already placed at the path
-the prompt names (the home's `pages/welcome.html`; a copy is `welcome.html` beside this file
-if that one is missing: copy it to `$CODE_FOUNDRY_PAGES/welcome.html`). Do not write or rewrite
-it, and build nothing else; show it, then stop:
+For the code-foundry-pages skill. A new install prefills the composer with "I just installed
+Code Foundry and have no projects yet. This is the welcome tutorial: open the page
+~/.code-foundry/pages/welcome.html in the side panel." The app writes that page at every
+start, in the home's `pages` folder: here `{{cf.welcomePage}}` (the path the prompt names). Only
+if that file is missing, copy `welcome.html` beside this file to
+`$CODE_FOUNDRY_PAGES/welcome.html` and show the copy. Do not write or rewrite it, and build
+nothing else; show it, then stop:
 
 ```sh
 code-foundry view.panel.page "<the path>" --title "Welcome"
