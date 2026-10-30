@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { emit, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { emit, openApp, projectAt, resetMock, row, threadPrompt } from "./fixtures";
 
 // The intents behind the page verbs (docs/notes/page-verbs.md): composer.stage
 // (UiIntent.StageComposer), view.settings --page (ShowView "settings.<page>") and
@@ -41,4 +41,23 @@ test("project.add without a folder opens the Add Project dialog", async ({ page 
   const dialog = page.getByTestId("add-project-dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("data-tab", "local");
+});
+
+test("a project added in the dialog project.add opened leaves the window on its thread", async ({ page }) => {
+  await openApp(page);
+  await row(page, "s:s-6").click();
+  await expect(page.getByTestId("thread-header")).toBeVisible();
+  await emit({ showView: { name: "project.add" } });
+  const dialog = page.getByTestId("add-project-dialog");
+  const input = page.getByTestId("add-project-local-input");
+  await expect(input).toBeFocused();
+  await input.fill("src/new-app");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app" });
+  // No Projects page, no worktree: the thread stays selected and shown.
+  await expect(row(page, "s:s-6")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("thread-header")).toBeVisible();
+  await expect(page.getByTestId("projects-page")).toHaveCount(0);
+  await expect(page.getByTestId("worktree-surface")).toHaveCount(0);
 });
