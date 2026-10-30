@@ -21,6 +21,7 @@ func TestThreadProjectSet(t *testing.T) {
 		{ProjectId: "r-api", ProjectName: "api", Path: "/w/api", Status: &v1.GitStatus{Dirty: true, Modified: 2, Untracked: 1}},
 		{ProjectId: "r-lib", ProjectName: "lib", Path: "/w/lib", Status: &v1.GitStatus{}},
 	}}
+	inPlatform := &v1.ThreadCheckoutsResponse{WorkspaceId: "w-plat", WorkspaceName: "platform", Checkouts: dirty.GetCheckouts()}
 	stopped := &v1.Thread{Name: "fix", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ProjectIds: []string{"r-web"}}
 	inWS := &v1.Thread{Name: "fix", State: v1.ThreadState_THREAD_STATE_CONNECTED, ProjectIds: []string{"r-web", "r-api"}, WorkspaceId: "w-plat"}
 	tests := []struct {
@@ -39,19 +40,19 @@ func TestThreadProjectSet(t *testing.T) {
 		{name: "add to a stopped thread", cmd: "thread.project.add", ctx: command.Context{ActiveThreadID: "s-c"}, args: map[string]string{"project": "api"},
 			current: stopped, wantMsg: "added api to thread fix (s-c) (2 projects)",
 			wantReq: &v1.AddThreadProjectRequest{Id: "s-c", Project: "api"}},
-		{name: "add to a live thread in a workspace", cmd: "thread.project.add", args: map[string]string{"id": "s-c", "project": "lib"}, current: inWS,
-			wantMsg: "added lib to thread fix (s-c) (3 projects); it no longer follows workspace w-plat (thread workspace saves the set as one); " +
+		{name: "add to a live thread in a workspace", cmd: "thread.project.add", args: map[string]string{"id": "s-c", "project": "lib"}, current: inWS, checkouts: inPlatform,
+			wantMsg: "added lib to thread fix (s-c) (3 projects); it no longer follows workspace platform (w-plat) (thread workspace saves the set as one); " +
 				"Claude restarts for it once idle, resuming the conversation",
 			wantReq: &v1.AddThreadProjectRequest{Id: "s-c", Project: "lib"}},
 		{name: "remove a clean member", cmd: "thread.project.remove", args: map[string]string{"id": "s-c", "project": "lib"},
-			current: stopped, checkouts: dirty, wantMsg: "removed lib from thread fix (s-c) (1 projects); its checkout stays on disk",
+			current: stopped, checkouts: dirty, wantMsg: "removed lib from thread fix (s-c) (1 project); its checkout stays on disk",
 			wantReq: &v1.RemoveThreadProjectRequest{Id: "s-c", Project: "lib"}},
 		{name: "remove a dirty member asks", cmd: "thread.project.remove", args: map[string]string{"id": "s-c", "project": "api"},
 			current: stopped, checkouts: dirty,
 			wantAsk: "api's checkout at /w/api has uncommitted work: 2 modified, 1 untracked.\n\nIt stays on disk with the work, but this thread no longer sees it. Remove api from the thread?"},
 		{name: "remove a dirty member with --yes", cmd: "thread.project.remove", args: map[string]string{"id": "s-c", "project": "r-api"}, yes: true,
-			current: inWS, checkouts: dirty,
-			wantMsg: "removed r-api from thread fix (s-c) (1 projects); its checkout stays on disk; it no longer follows workspace w-plat " +
+			current: inWS, checkouts: inPlatform,
+			wantMsg: "removed r-api from thread fix (s-c) (1 project); its checkout stays on disk; it no longer follows workspace platform (w-plat) " +
 				"(thread workspace saves the set as one); Claude restarts for it once idle, resuming the conversation",
 			wantReq: &v1.RemoveThreadProjectRequest{Id: "s-c", Project: "r-api"}},
 		{name: "no thread in the GUI", cmd: "thread.project.add", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},

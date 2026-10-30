@@ -54,3 +54,15 @@ export function placementCandidates(projects: readonly CandidateProject[], branc
   }
   return out;
 }
+
+/**
+ * The Run in tooltip for a member whose refused worktree is the thread's own checkout
+ * (the folder of the branch it was made for, with another HEAD now): the daemon's
+ * refusal would name this thread as the one working there. null for any other checkout,
+ * which keeps the daemon's words.
+ */
+export function ownMovedText(path: string, createdBranch: string, head: string, detached: boolean): string | null {
+  if (!path || !createdBranch || lastSegment(path) !== branchFolder(createdBranch) || (!detached && head === createdBranch)) return null;
+  const now = detached || !head ? "a detached HEAD" : head;
+  return `This checkout moved from ${createdBranch} to ${now}; a new thread on ${createdBranch} would be refused here.`;
+}

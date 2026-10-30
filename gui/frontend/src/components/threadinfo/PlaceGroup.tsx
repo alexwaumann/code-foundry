@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { envStaleTip } from "@/lib/envStale";
+import { ownMovedText } from "@/lib/placementCandidates";
 import { chooseAction, moreProjects } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import { openActionEditor } from "@/stores/actionDialog";
@@ -61,6 +62,7 @@ function RunInItem({
   path,
   cwd,
   cwdBranch,
+  createdBranch,
   refusal,
   onRemove,
 }: {
@@ -69,17 +71,22 @@ function RunInItem({
   path: string;
   cwd: boolean;
   cwdBranch: string;
+  /** The branch the thread's worktrees were made for ("" in checkout mode). */
+  createdBranch: string;
   refusal?: string;
   onRemove: (projectId: string) => void;
 }) {
   const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const branch = useProjectsStore((s) => s.byId[projectId]?.worktrees.find((w) => w.path === path)?.branch ?? "");
+  const detached = useProjectsStore((s) => s.byId[projectId]?.worktrees.find((w) => w.path === path)?.detached ?? false);
+  // The thread's own checkout moved: say so, not the daemon's words naming this thread as the one working there.
+  const tip = refusal ? (ownMovedText(path, createdBranch, branch, detached) ?? refusal) : undefined;
   const item = (
     <DropdownMenuItem
       data-testid="ti-runin-item"
       data-project={projectId}
       data-current={cwd ? "" : undefined}
-      data-refused={refusal ? "" : undefined}
+      data-refused={tip ? "" : undefined}
       className="group/runin"
       onSelect={() => {
         if (!cwd) void runThreadIn(threadId, projectId);
@@ -94,8 +101,8 @@ function RunInItem({
       {cwd ? <Check className="text-cf-link" aria-hidden /> : <span className="size-4 shrink-0" aria-hidden />}
       <span className="min-w-0 flex-1 truncate">
         {name}
-        {!cwd && branch && (branch !== cwdBranch || refusal) && (
-          <span className={cn("text-cf-text-muted", refusal && "opacity-60")}>
+        {!cwd && branch && (branch !== cwdBranch || tip) && (
+          <span className={cn("text-cf-text-muted", tip && "opacity-60")}>
             {" @ "}
             <span className="text-code">{branch}</span>
           </span>
@@ -122,8 +129,8 @@ function RunInItem({
       )}
     </DropdownMenuItem>
   );
-  return refusal ? (
-    <Tip label={refusal} side="left" data-testid="ti-runin-refusal">
+  return tip ? (
+    <Tip label={tip} side="left" data-testid="ti-runin-refusal">
       {item}
     </Tip>
   ) : (
@@ -286,6 +293,7 @@ function ProjectRow({ threadId }: { threadId: string }) {
                   path={paths[id] ?? ""}
                   cwd={id === cwdProjectId}
                   cwdBranch={cwdBranch}
+                  createdBranch={createdBranch}
                   refusal={refusals[id]}
                   onRemove={remove}
                 />

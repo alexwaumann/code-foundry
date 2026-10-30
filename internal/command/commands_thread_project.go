@@ -18,7 +18,7 @@ type ProjectSetBackend interface {
 }
 
 // setChangeNote is how both commands end: what a live Claude does, and the workspace a
-// thread left (docs/notes/thread-project-set.md).
+// thread left, "<name> (<id>)" (docs/notes/thread-project-set.md).
 func setChangeNote(before string, s *v1.Thread) string {
 	msg := ""
 	if before != "" && s.GetWorkspaceId() == "" {
@@ -30,14 +30,26 @@ func setChangeNote(before string, s *v1.Thread) string {
 	return msg
 }
 
-// threadWorkspaceOf is thread id's workspace reference before a change, "" when it has
-// none or cannot be read (the message then leaves the workspace out).
+// projectCount is "1 project", "3 projects".
+func projectCount(n int) string {
+	if n == 1 {
+		return "1 project"
+	}
+	return fmt.Sprintf("%d projects", n)
+}
+
+// threadWorkspaceOf is thread id's workspace reference before a change, as "<name>
+// (<id>)" (the id alone when the name is not known), "" when it has none or cannot be
+// read (the message then leaves the workspace out).
 func threadWorkspaceOf(ctx context.Context, b ThreadBackend, id string) string {
-	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
-	if err != nil {
+	res, err := b.Checkouts(ctx, connect.NewRequest(&v1.ThreadCheckoutsRequest{Id: id}))
+	if err != nil || res.Msg.GetWorkspaceId() == "" {
 		return ""
 	}
-	return res.Msg.GetThread().GetWorkspaceId()
+	if name := res.Msg.GetWorkspaceName(); name != "" {
+		return name + " (" + res.Msg.GetWorkspaceId() + ")"
+	}
+	return res.Msg.GetWorkspaceId()
 }
 
 // threadProjectAdd is thread.project.add: a project joins a thread's set, with a
@@ -61,7 +73,7 @@ func threadProjectAdd(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			s := res.Msg.GetThread()
-			msg := fmt.Sprintf("added %s to thread %s (%d projects)", a.String("project"), threadLabel(s), len(s.GetProjectIds()))
+			msg := fmt.Sprintf("added %s to thread %s (%s)", a.String("project"), threadLabel(s), projectCount(len(s.GetProjectIds())))
 			return Result{Message: msg + setChangeNote(before, s), JSON: s}, nil
 		},
 	}
@@ -102,7 +114,7 @@ func threadProjectRemove(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			s := res.Msg.GetThread()
-			msg := fmt.Sprintf("removed %s from thread %s (%d projects); its checkout stays on disk", a.String("project"), threadLabel(s), len(s.GetProjectIds()))
+			msg := fmt.Sprintf("removed %s from thread %s (%s); its checkout stays on disk", a.String("project"), threadLabel(s), projectCount(len(s.GetProjectIds())))
 			return Result{Message: msg + setChangeNote(before, s), JSON: s}, nil
 		},
 	}

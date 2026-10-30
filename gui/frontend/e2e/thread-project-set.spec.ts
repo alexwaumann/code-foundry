@@ -112,7 +112,8 @@ test("a member whose worktree moved is greyed in Run in with the daemon's refusa
   await expect(item).toHaveAttribute("data-refused", "");
   await expect(item).toContainText("ghostty-playground @ other");
   await expect(runIn(page, "repo-cf")).not.toHaveAttribute("data-refused", "");
-  await expectTooltip(page, item, `ghostty-playground's worktree for feat/x at ${gp} has other checked out now; switch it back to feat/x, or pick another branch`);
+  // The thread's own checkout: the move in plain words, not the daemon's refusal naming this thread.
+  await expectTooltip(page, item, "This checkout moved from feat/x to other; a new thread on feat/x would be refused here.");
   await item.click();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.run-in").map((i) => [i.args.project, i.context?.activeThreadId])).toEqual([["repo-gp", id]]);
 });

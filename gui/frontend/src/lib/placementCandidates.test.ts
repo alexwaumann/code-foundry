@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchFolder, placementCandidates, type CandidateProject } from "./placementCandidates";
+import { branchFolder, ownMovedText, placementCandidates, type CandidateProject } from "./placementCandidates";
 
 const W = "/h/.code-foundry/worktrees/acme/web";
 
@@ -31,5 +31,17 @@ describe("placementCandidates", () => {
 
   it("names a branch's folder", () => {
     expect(branchFolder("feat/a/b")).toBe("feat-a-b");
+  });
+});
+
+describe("ownMovedText", () => {
+  it("names the move for the thread's own checkout of the branch", () => {
+    expect(ownMovedText(`${W}/feat-x`, "feat/x", "feat/x-2", false)).toBe("This checkout moved from feat/x to feat/x-2; a new thread on feat/x would be refused here.");
+    expect(ownMovedText(`${W}/feat-x`, "feat/x", "", true)).toBe("This checkout moved from feat/x to a detached HEAD; a new thread on feat/x would be refused here.");
+  });
+  it("is null for a checkout still on the branch, or another folder", () => {
+    expect(ownMovedText(`${W}/feat-x`, "feat/x", "feat/x", false)).toBeNull();
+    expect(ownMovedText(`${W}/mine`, "feat/x", "other", false)).toBeNull();
+    expect(ownMovedText("", "feat/x", "other", false)).toBeNull();
   });
 });
