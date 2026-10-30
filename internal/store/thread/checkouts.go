@@ -284,6 +284,13 @@ func fileExists(p string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
+// pathExists reports whether anything is at p (a worktree's .git is a file, a main
+// checkout's a directory).
+func pathExists(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
+}
+
 // checkouts is CheckoutsOf over the project store; with none (tests), only the primary.
 func (m *Manager) checkouts(t Thread) []Checkout {
 	var snap *project.Snapshot

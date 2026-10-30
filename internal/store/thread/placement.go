@@ -614,17 +614,65 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	return p, nil
 }
 
-// memberWorktree is r's existing worktree for branch (branchWorktree) when it is on
-// disk.
+// memberWorktree is r's existing worktree for branch when it is on disk: the one at the
+// default path while it has branch checked out, else another linked worktree on branch
+// (one made before the path rule, or by hand). A default-path worktree switched to
+// another branch is not branch's (it is the checkout of whatever thread made it):
+// making branch's worktree is refused while it is there (defaultPathTaken).
+// branchWorktree, which takes the default path whatever it has checked out, stays the
+// rule only for resolving a member with nothing recorded (the old derivation).
 func (m *Manager) memberWorktree(r project.Project, branch string) (project.Worktree, bool) {
 	if cur, ok := m.opts.Projects.Snapshot().Project(r.ID); ok {
 		r = cur
 	}
-	w, ok := branchWorktree(r, branch, m.opts.Projects.DefaultWorktreePath(r.ID, branch))
-	if !ok || !isDir(w.Path) {
+	want := m.opts.Projects.DefaultWorktreePath(r.ID, branch)
+	onBranch := func(w project.Worktree) bool { return !w.IsMain && !w.Detached && w.Branch == branch }
+	i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return onBranch(w) && want != "" && samePath(w.Path, want) })
+	if i < 0 {
+		i = slices.IndexFunc(r.Worktrees, onBranch)
+	}
+	if i < 0 || !isDir(r.Worktrees[i].Path) {
 		return project.Worktree{}, false
 	}
-	return w, true
+	return r.Worktrees[i], true
+}
+
+// defaultPathTaken is the refusal to make r's worktree for branch while the path it would
+// go to (the default path) holds another checkout: a worktree listed there with another
+// HEAD (made for branch, then switched away: still its thread's checkout), or, with
+// onDisk, a git checkout there that r does not list (checked under the per-branch lock,
+// where a worktree another Create just made is listed already). It names the path, its
+// HEAD, a thread that works in it and the way out. nil otherwise, and when the worktree
+// there has branch checked out (memberWorktree shares it).
+func (m *Manager) defaultPathTaken(r project.Project, branch string, onDisk bool) error {
+	want := m.opts.Projects.DefaultWorktreePath(r.ID, branch)
+	if want == "" {
+		return nil
+	}
+	name := cmp.Or(r.Name, r.ID)
+	i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return samePath(w.Path, want) })
+	holder := func() string {
+		if t, ok := m.otherHolder("", want); ok {
+			return "; thread " + holderLabel(t) + " works in it"
+		}
+		return ""
+	}
+	switch {
+	case i >= 0 && !r.Worktrees[i].Detached && r.Worktrees[i].Branch == branch:
+		return nil
+	case i >= 0:
+		w := r.Worktrees[i]
+		head := w.Branch
+		if w.Detached || head == "" {
+			head = "a detached HEAD at " + w.Head[:min(7, len(w.Head))]
+		}
+		return fmt.Errorf("%w: %s's worktree for %s at %s has %s checked out now%s; switch it back to %s, or pick another branch",
+			ErrFailedPrecondition, name, branch, want, head, holder(), branch)
+	case onDisk && pathExists(filepath.Join(want, ".git")):
+		return fmt.Errorf("%w: %s's worktree for %s would go to %s, which holds a git checkout %s does not list on %s%s; move it away, or pick another branch",
+			ErrFailedPrecondition, name, branch, want, name, branch, holder())
+	}
+	return nil
 }
 
 // makeWorktrees makes the worktree for branch in each of projects that has none, in
@@ -638,7 +686,9 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 		errs []error
 	)
 	// A main checkout on the branch refuses the lot before anything is made (fuzz
-	// finding A7): the thread would need a second worktree on that branch.
+	// finding A7): the thread would need a second worktree on that branch. So does the
+	// branch's default path holding a worktree switched to another branch: that is another
+	// thread's checkout now, never shared as the branch's (thread-checkouts).
 	for _, r := range projects {
 		if _, ok := m.memberWorktree(r, branch); ok {
 			continue
@@ -647,6 +697,8 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 			r = cur
 		}
 		if err := mainCheckoutBusy(r, branch); err != nil {
+			errs = append(errs, err)
+		} else if err := m.defaultPathTaken(r, branch, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -694,6 +746,13 @@ func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, b
 	}
 	if _, ok := m.memberWorktree(r, branch); ok && !fresh {
 		return madeWorktree{}, false, nil // a new branch has no worktree yet
+	}
+	cur := r
+	if p, ok := m.opts.Projects.Snapshot().Project(r.ID); ok {
+		cur = p
+	}
+	if err := m.defaultPathTaken(cur, branch, true); err != nil {
+		return madeWorktree{}, false, err
 	}
 	opts := project.CreateWorktreeOptions{ProjectID: r.ID, Branch: branch, Fetch: true, BaseFromOrigin: fromOrigin}
 	newBranch := fresh

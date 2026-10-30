@@ -2,6 +2,7 @@ package thread
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,5 +202,61 @@ func TestFillCheckoutsAtStartup(t *testing.T) {
 	e.restart()
 	if got := e.snapshot(s.ID); got.CheckoutPaths["r1"] != s.CheckoutPaths["r1"] {
 		t.Errorf("after another restart %v (not persisted?)", got.CheckoutPaths)
+	}
+}
+
+// A branch's default-path worktree switched to another branch is its thread's checkout,
+// never shared as the branch's: making the branch's worktree is refused, naming the path,
+// its HEAD, the thread in it and the way out (a Create, a child asking for its creator's
+// branch, a start making a missing member again). Another worktree on the branch is
+// shared as before.
+func TestMovedDefaultWorktreeIsNotTheBranchs(t *testing.T) {
+	e, rr := multiEnv(t, func(o *Options) {
+		o.Projects.(*recordingProjects).MakeDirs = true
+		o.RefExists = func(_ context.Context, _, ref string) bool { return ref == "refs/heads/feat/m" }
+	})
+	s := e.create(CreateOptions{ProjectID: "r2", ProjectIDs: []string{"r1", "r2"}, NewWorktree: &NewWorktree{Branch: "feat/m"}})
+	moved := s.CheckoutPaths["r1"]
+	switchBranch(rr, "r1", moved, "other")
+	calls := len(rr.created())
+
+	refused := func(what string, err error) {
+		t.Helper()
+		if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), moved) || !strings.Contains(err.Error(), "has other checked out now") ||
+			!strings.Contains(err.Error(), "thread "+holderLabel(s)) || !strings.Contains(err.Error(), "switch it back to feat/m, or pick another branch") {
+			t.Errorf("%s: err = %v, want the refusal naming %s, other, thread %s and the way out", what, err, moved, s.ID)
+		}
+	}
+	_, err := e.m.Create(e.ctx(), CreateOptions{ProjectIDs: []string{"r1"}, NewWorktree: &NewWorktree{Branch: "feat/m"}})
+	refused("a create on the branch", err)
+	_, err = e.m.Create(e.ctx(), CreateOptions{CreatedBy: s.ID, NewWorktree: &NewWorktree{Branch: "feat/m"}})
+	refused("a child asking for its creator's branch", err)
+	if n := len(rr.created()); n != calls {
+		t.Errorf("CreateWorktree calls %d after the refusals, want %d", n, calls)
+	}
+
+	// A start making a missing member again on the branch is refused the same way.
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.m.update(s.ID, true, func(r *record) { r.s = r.s.withCheckout("r1", filepath.Join(t.TempDir(), "gone")) })
+	_, err = e.m.Send(e.ctx(), s.ID, Message{Text: "again"})
+	if err == nil {
+		got := e.waitFor(s.ID, "the start failed", func(t Thread) bool { return t.State == StateDisconnected && t.LastError != "" })
+		err = errors.New(got.LastError)
+	}
+	if !strings.Contains(err.Error(), "has other checked out now") {
+		t.Errorf("start with the member's default path moved: %v", err)
+	}
+
+	// Another linked worktree on the branch is the branch's: shared, nothing made.
+	other := mkWorktree(t, rr, "r1", "feat/m-by-hand")
+	switchBranch(rr, "r1", other, "feat/m")
+	c := e.create(CreateOptions{ProjectIDs: []string{"r1"}, NewWorktree: &NewWorktree{Branch: "feat/m"}})
+	if c.WorktreePath != other || c.CheckoutPaths["r1"] != other {
+		t.Errorf("created %+v, want the worktree on feat/m at %s", c, other)
+	}
+	if n := len(rr.created()); n != calls {
+		t.Errorf("CreateWorktree calls %d, want %d (shared)", n, calls)
 	}
 }
