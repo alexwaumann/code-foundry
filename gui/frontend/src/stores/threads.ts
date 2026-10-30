@@ -63,6 +63,8 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
       case "labels":
       case "projectIds":
         return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((l, i) => l === b[k][i]));
+      case "checkoutPaths":
+        return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((c, i) => sameCheckoutPath(c, b[k][i])));
       case "report":
         return sameReport(a[k], b[k]);
       case "flags":
@@ -71,6 +73,11 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return a[k] === b[k];
     }
   });
+}
+
+/** A recorded checkout by value (every Updated event carries new objects). */
+function sameCheckoutPath(a: ThreadView["checkoutPaths"][number], b: ThreadView["checkoutPaths"][number] | undefined): boolean {
+  return b !== undefined && a.projectId === b.projectId && a.path === b.path;
 }
 
 /** Field-by-field equality of flags (every Updated event carries new objects). */

@@ -520,7 +520,9 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
       if (home) return { checkouts: [], worktreeMode: false };
       if (likeThreadId) {
         const [own = "", branch = "", wt = ""] = likeKey.split(SEP);
-        const t = { id: likeThreadId, name: "", projectId: own === WORKSPACE_PRIMARY ? "" : own, projectIds: hintSetIds, worktreePath: likeSrc.paths[own] ?? "", createdWorktree: wt === "1", branch, archived: false };
+        // The like thread's checkouts as it records them (useThreadCheckouts): the new thread shares them.
+        const checkoutPaths = Object.entries(likeSrc.paths).map(([projectId, path]) => ({ projectId, path }));
+        const t = { id: likeThreadId, name: "", projectId: own === WORKSPACE_PRIMARY ? "" : own, projectIds: hintSetIds, worktreePath: likeSrc.paths[own] ?? "", createdWorktree: wt === "1", branch, checkoutPaths, archived: false };
         return { checkouts: threadCheckouts(t, projects), worktreeMode: wt === "1" };
       }
       // An existing branch: a worktree thread on it (its listed worktrees are shared).

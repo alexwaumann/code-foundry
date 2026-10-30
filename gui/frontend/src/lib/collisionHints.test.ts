@@ -69,6 +69,43 @@ describe("threadCheckouts", () => {
     ],
     ["an unknown member is left out", { projectIds: ["gone", "web"] }, [{ projectId: "web", path: "/src/web" }]],
     ["no project set: the primary alone", { projectIds: [] }, [{ projectId: "web", path: "/src/web" }]],
+    [
+      "recorded: the paths the thread records, whatever they have checked out (not the worktree on the branch)",
+      {
+        projectIds: ["api", "web"],
+        worktreePath: "/wt/web/feat-x",
+        createdWorktree: true,
+        branch: "feat/x",
+        checkoutPaths: [
+          { projectId: "api", path: "/wt/api/moved" },
+          { projectId: "web", path: "/wt/web/feat-x" },
+        ],
+      },
+      [
+        { projectId: "api", path: "/wt/api/moved" },
+        { projectId: "web", path: "/wt/web/feat-x" },
+      ],
+    ],
+    [
+      "recorded in place: a user's worktree it left, not the main checkout",
+      { projectIds: ["api", "web"], checkoutPaths: [{ projectId: "api", path: "/u/api-mine" }] },
+      [
+        { projectId: "api", path: "/u/api-mine" },
+        { projectId: "web", path: "/src/web" },
+      ],
+    ],
+    [
+      "recorded empty: resolved like a member with nothing recorded",
+      { projectIds: ["api", "web"], worktreePath: "/wt/web/feat-x", createdWorktree: true, branch: "feat/x", checkoutPaths: [{ projectId: "api", path: "" }] },
+      [
+        { projectId: "api", path: "/wt/api/feat-x" },
+        { projectId: "web", path: "/wt/web/feat-x" },
+      ],
+    ],
+    ["recorded, the project unknown: its path still counts", { projectIds: ["gone", "web"], checkoutPaths: [{ projectId: "gone", path: "/x/gone" }] }, [
+      { projectId: "gone", path: "/x/gone" },
+      { projectId: "web", path: "/src/web" },
+    ]],
   ])("%s", (_name, over, want) => {
     expect(threadCheckouts(thread(over), projects)).toEqual(want);
   });

@@ -67,6 +67,7 @@ const thread = (id: string, o: Partial<ThreadView> = {}) =>
     worktreePath: "/src/web",
     createdWorktree: false,
     branch: "",
+    checkoutPaths: [{ projectId: "web", path: "/src/web" }],
     state: "connected",
     status: "busy",
     statusReason: "",

@@ -5,8 +5,10 @@
  * that is not archived. Pure, over the threads and projects the GUI knows. The composer
  * shows them as one banner (collisionBanner) and a line per project (collisionTip).
  *
- * Checkouts are derived the way the daemon does (docs/notes/workspaces-v2-1-threads.md):
- * the primary's is the thread's cwd; a plain folder is its folder; a worktree-mode git
+ * A thread's checkouts are the paths it records (Thread.checkout_paths; the primary's is
+ * its cwd), whatever they have checked out now, so a collision is the same path, never
+ * the same branch (docs/notes/thread-checkouts.md). A member with none recorded is
+ * resolved the way the daemon does: a plain folder is its folder; a worktree-mode git
  * member's is the worktree on the thread's branch (only when the project lists it: the
  * GUI does not compute the daemon's worktree path rule); otherwise the main checkout.
  */
@@ -37,7 +39,10 @@ export interface HintThread {
   projectIds: readonly string[];
   worktreePath: string;
   createdWorktree: boolean;
+  /** The branch a worktree-mode thread was created for (Thread.branch): resolves a member with no checkout recorded. */
   branch: string;
+  /** The checkouts the thread records (Thread.checkout_paths); a path "" (or none listed) is resolved. */
+  checkoutPaths?: readonly Checkout[];
   archived: boolean;
   /** Claude is at work in it (lib/thread isWorkingThread); else it reads as idle. */
   working?: boolean;
@@ -59,7 +64,9 @@ export function threadCheckouts(t: HintThread, projects: HintProjects): Checkout
   const out: Checkout[] = [];
   for (const id of ids) {
     const p = projects[id];
+    const recorded = t.checkoutPaths?.find((c) => c.projectId === id)?.path ?? "";
     if (id === t.projectId && t.worktreePath) out.push({ projectId: id, path: t.worktreePath });
+    else if (recorded) out.push({ projectId: id, path: recorded });
     else if (!p) continue;
     else if (!p.git) out.push({ projectId: id, path: mainCheckout(p) });
     else if (t.createdWorktree && t.branch) {

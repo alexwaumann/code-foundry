@@ -10,7 +10,13 @@ const co = (projectId: string, path: string, o: Partial<ThreadCheckoutView> = {}
   primary: false,
   missing: false,
   git: true,
-  derived: true,
+  worktreeMode: true,
+  head: "",
+  detached: false,
+  isMain: false,
+  status: null,
+  createdBranch: "feat/x",
+  moved: false,
   ...o,
 });
 const view = (...checkouts: ThreadCheckoutView[]): ThreadCheckoutsView => ({ checkouts, workspaceId: "", workspaceName: "" });

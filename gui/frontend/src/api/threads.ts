@@ -63,13 +63,22 @@ export interface ThreadView {
   /** Ref the thread's worktree branch was created from ("" unless createdWorktree). */
   baseRef: string;
   /**
-   * Worktree mode: every git project of the set works in its worktree on `branch`
-   * (thread.new made them, or shares them with threads on the same branch). False: each
-   * project's own checkout.
+   * Worktree mode: every git project of the set works in a worktree made for `branch`
+   * (thread.new made them, or shares them with another thread). False: each project's own
+   * checkout.
    */
   createdWorktree: boolean;
-  /** The branch of a worktree-mode thread; "" in checkout mode (the checkout's branch shows instead). */
+  /**
+   * The branch a worktree-mode thread was created for, a record; "" in checkout mode. What
+   * a checkout has checked out now is the projects store's worktree at its path
+   * (docs/notes/thread-checkouts.md).
+   */
   branch: string;
+  /**
+   * Every member's checkout, the thread's own, in project id order (the primary's path is
+   * worktreePath); path "" for a member with none recorded yet, which its next start records.
+   */
+  checkoutPaths: { projectId: string; path: string }[];
   /**
    * The project set, sorted by id, projectId (the primary) included; one entry for a
    * single-project thread, none without a project (docs/notes/workspaces-v2-1-threads.md).
@@ -391,6 +400,7 @@ export function toThreadView(s: Thread): ThreadView {
     baseRef: s.baseRef,
     createdWorktree: s.createdWorktree,
     branch: s.branch,
+    checkoutPaths: s.checkoutPaths.map((c) => ({ projectId: c.projectId, path: c.path })),
     projectIds: [...s.projectIds],
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
