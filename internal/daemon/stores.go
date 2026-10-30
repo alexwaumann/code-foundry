@@ -95,6 +95,9 @@ type stores struct {
 	// stopActions stops the glue that forgets an unregistered project's actions and
 	// kills a removed thread's or worktree's background runs (actions.go).
 	stopActions func()
+	// stopEditorApps stops the glue that makes gitops detect editor apps again after a
+	// settings change (editor_apps.go).
+	stopEditorApps func()
 	// stopWake stops the glue that hands every action run's end to the threads' wake
 	// subscriptions (wake.go).
 	stopWake func()
@@ -317,6 +320,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
+	s.stopEditorApps = startEditorAppsRefresh(ctx, s.gitops, s.bus)
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopWakePRs = startWakePullRequests(ctx, log.With("store", "thread"), s.thread, s.bus)
 	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
@@ -399,6 +403,9 @@ func (s *stores) close() error {
 	}
 	if s.stopActions != nil {
 		s.stopActions()
+	}
+	if s.stopEditorApps != nil {
+		s.stopEditorApps()
 	}
 	if s.stopWake != nil {
 		s.stopWake()

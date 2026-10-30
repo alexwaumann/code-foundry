@@ -179,6 +179,9 @@ type Store interface {
 	CreatePR(ctx context.Context, o CreatePROptions) (Op, error)
 	OpenPR(ctx context.Context, worktreePath string) (Op, error)
 	OpenEditor(ctx context.Context, o OpenOptions) (Op, error)
+	// EditorApps lists the known editors installed as app bundles (cached; refresh
+	// detects again).
+	EditorApps(ctx context.Context, refresh bool) []EditorApp
 	Reveal(ctx context.Context, o OpenOptions) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
 	// GitHubSlug returns the GitHub "owner/name" of the registered project containing

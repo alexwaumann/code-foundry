@@ -158,6 +158,8 @@ func TestGitOpsCommands(t *testing.T) {
 		{name: "reveal", cmd: "worktree.reveal", ctx: wt, wantReq: &v1.RevealRequest{WorktreePath: "/wt"}},
 		{name: "open editor file at line", cmd: "worktree.open.editor", ctx: wt, args: map[string]string{"file": "/wt/a.go", "line": "12"},
 			wantReq: &v1.OpenEditorRequest{WorktreePath: "/wt", File: "/wt/a.go", Line: 12}},
+		{name: "open editor with an app", cmd: "worktree.open.editor", ctx: wt, args: map[string]string{"app": " dev.zed.Zed "},
+			wantReq: &v1.OpenEditorRequest{WorktreePath: "/wt", App: "dev.zed.Zed"}},
 		{name: "open editor negative line", cmd: "worktree.open.editor", ctx: wt, args: map[string]string{"file": "/wt/a.go", "line": "-1"}, wantErr: command.ErrInvalidArgs},
 		{name: "reveal file", cmd: "worktree.reveal", ctx: wt, args: map[string]string{"file": "~/notes.md"},
 			wantReq: &v1.RevealRequest{WorktreePath: "/wt", File: "/Users/me/notes.md"}},
@@ -241,5 +243,24 @@ func TestGitOpsKeybindings(t *testing.T) {
 		if len(c.Keybindings) != 1 || c.Keybindings[0] != chord {
 			t.Errorf("%s keybindings = %v, want [%s]", name, c.Keybindings, chord)
 		}
+	}
+}
+
+func TestWorktreeEditors(t *testing.T) {
+	reg, be := newGitOpsRegistry(t)
+	be.Apps = []*v1.EditorApp{{Name: "Zed", BundleId: "dev.zed.Zed", Path: "/Applications/Zed.app"}}
+	res, err := reg.Invoke(context.Background(), command.Context{}, "worktree.editors", map[string]string{"refresh": "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Message, "BUNDLE ID") || !strings.Contains(res.Message, "dev.zed.Zed") {
+		t.Errorf("message = %q", res.Message)
+	}
+	if reqs := be.Requests(); len(reqs) != 1 || !proto.Equal(reqs[0], &v1.ListEditorAppsRequest{Refresh: true}) {
+		t.Errorf("requests = %v", reqs)
+	}
+	be.Apps = nil
+	if res, _ := reg.Invoke(context.Background(), command.Context{}, "worktree.editors", nil); !strings.Contains(res.Message, "no known editor app") {
+		t.Errorf("empty message = %q", res.Message)
 	}
 }

@@ -2,8 +2,8 @@ import { create, toJsonString } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
 import { ThreadSchema } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
-import { GitOpKind, GitOpSchema, GitOpState, GitOpsEventSchema } from "@/gen/codefoundry/v1/gitops_pb";
-import { isGitOpFailure, isGitOpResult, toGitOpsEventView } from "./gitops";
+import { EditorAppSchema, GitOpKind, GitOpSchema, GitOpState, GitOpsEventSchema } from "@/gen/codefoundry/v1/gitops_pb";
+import { isGitOpFailure, isGitOpResult, toEditorAppView, toGitOpsEventView } from "./gitops";
 
 const op = create(GitOpSchema, {
   id: "op-3",
@@ -40,5 +40,15 @@ describe("gitops mapping", () => {
     expect(isGitOpFailure(new ConnectError("Push failed", Code.Unknown, undefined, [{ desc: GitOpSchema, value: failed }]))).toBe(true);
     expect(isGitOpFailure(new ConnectError("not available", Code.FailedPrecondition))).toBe(false);
     expect(isGitOpFailure(new Error("x"))).toBe(false);
+  });
+});
+
+describe("toEditorAppView", () => {
+  it("maps an installed editor app", () => {
+    expect(toEditorAppView(create(EditorAppSchema, { name: "Zed", bundleId: "dev.zed.Zed", path: "/Applications/Zed.app" }))).toEqual({
+      name: "Zed",
+      bundleId: "dev.zed.Zed",
+      path: "/Applications/Zed.app",
+    });
   });
 });

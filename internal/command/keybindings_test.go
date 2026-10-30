@@ -27,7 +27,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
 		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",
-		"workspace.list",
+		"workspace.list", "worktree.editors",
 	}
 	var got []string
 	for _, l := range f.reg.List(command.Context{}, true) {

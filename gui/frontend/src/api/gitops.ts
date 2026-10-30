@@ -1,6 +1,7 @@
 import { fromJsonString } from "@bufbuild/protobuf";
 import { ConnectError } from "@connectrpc/connect";
-import { GitOpKind, GitOpSchema, GitOpState, type GitOp, type GitOpsEvent } from "@/gen/codefoundry/v1/gitops_pb";
+import { GitOpKind, GitOpSchema, GitOpState, GitOpsService, type EditorApp, type GitOp, type GitOpsEvent } from "@/gen/codefoundry/v1/gitops_pb";
+import { daemon, type DaemonConnection } from "./endpoint";
 
 export type GitOpKindView = "fetch" | "pull" | "push" | "pr-create" | "pr-open" | "open-editor" | "reveal" | "open-url" | "unknown";
 export type GitOpStateView = "queued" | "running" | "succeeded" | "failed" | "unknown";
@@ -92,4 +93,21 @@ export function isGitOpResult(resultJson: string): boolean {
 /** True when a command failed because its git operation failed (the error carries the GitOp). */
 export function isGitOpFailure(err: unknown): boolean {
   return err instanceof ConnectError && err.findDetails(GitOpSchema).length > 0;
+}
+
+/** An editor installed as an app bundle: what "Open in <app>" offers (worktree.open.editor --app takes bundleId). */
+export interface EditorAppView {
+  name: string;
+  bundleId: string;
+  path: string;
+}
+
+export function toEditorAppView(a: EditorApp): EditorAppView {
+  return { name: a.name, bundleId: a.bundleId, path: a.path };
+}
+
+/** GitOpsService.ListEditorApps: the installed editor apps, in the daemon's order (cached there; refresh detects again). */
+export async function listEditorApps(refresh = false, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<EditorAppView[]> {
+  const c = await conn.client(GitOpsService);
+  return (await c.listEditorApps({ refresh }, { signal })).apps.map(toEditorAppView);
 }

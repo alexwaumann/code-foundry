@@ -104,8 +104,14 @@ const specs: Spec[] = [
   },
   {
     name: "worktree.open.editor", title: "Open Worktree in Editor", category: "Worktree", description: "Open the worktree in the configured editor", keybindings: ["cmd+shift+o"], kind: GitOpKind.OPEN_EDITOR,
-    label: (w) => `Open ${base(w?.path ?? "")} in editor`,
-    ok: (w) => ({ summary: `opened ${base(w?.path ?? "")} in cursor`, output: `$ cursor ${w?.path ?? ""}\n` }),
+    args: [{ name: "app", type: ArgType.STRING, description: "Open with this installed editor app instead: its bundle id" }],
+    label: (w, a) => `Open ${base(w?.path ?? "")} in ${editorAppName(a.app) ?? "editor"}`,
+    ok: (w, a) => {
+      const app = editorAppName(a.app);
+      return app
+        ? { summary: `opened ${base(w?.path ?? "")} in ${app}`, output: `$ open -b ${a.app ?? ""} ${w?.path ?? ""}\n` }
+        : { summary: `opened ${base(w?.path ?? "")} in cursor`, output: `$ cursor ${w?.path ?? ""}\n` };
+    },
     fail: () => ({ summary: 'no editor found: set the editor command (for example "code" or "open -a Zed")', output: "no editor found\n" }),
   },
   {
@@ -122,6 +128,17 @@ const specs: Spec[] = [
     fail: () => ({ summary: "open: exit 1", output: "(exit 1)\n" }),
   },
 ];
+
+/** GitOpsService.ListEditorApps in the mock: the editor apps "installed". */
+export const EDITOR_APPS = [
+  { name: "VS Code", bundleId: "com.microsoft.VSCode", path: "/Applications/Visual Studio Code.app" },
+  { name: "Zed", bundleId: "dev.zed.Zed", path: "/Applications/Zed.app" },
+  { name: "Xcode", bundleId: "com.apple.dt.Xcode", path: "/Applications/Xcode.app" },
+];
+
+function editorAppName(bundleId: string | undefined): string | undefined {
+  return bundleId ? EDITOR_APPS.find((x) => x.bundleId === bundleId)?.name : undefined;
+}
 
 export class MockGitOps {
   /** Finished ops newest first, after active ones (like the real snapshot). */

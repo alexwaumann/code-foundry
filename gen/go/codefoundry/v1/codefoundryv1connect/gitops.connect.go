@@ -48,6 +48,9 @@ const (
 	// GitOpsServiceOpenEditorProcedure is the fully-qualified name of the GitOpsService's OpenEditor
 	// RPC.
 	GitOpsServiceOpenEditorProcedure = "/codefoundry.v1.GitOpsService/OpenEditor"
+	// GitOpsServiceListEditorAppsProcedure is the fully-qualified name of the GitOpsService's
+	// ListEditorApps RPC.
+	GitOpsServiceListEditorAppsProcedure = "/codefoundry.v1.GitOpsService/ListEditorApps"
 	// GitOpsServiceRevealProcedure is the fully-qualified name of the GitOpsService's Reveal RPC.
 	GitOpsServiceRevealProcedure = "/codefoundry.v1.GitOpsService/Reveal"
 	// GitOpsServiceOpenUrlProcedure is the fully-qualified name of the GitOpsService's OpenUrl RPC.
@@ -75,8 +78,13 @@ type GitOpsServiceClient interface {
 	// OpenPullRequest opens the current branch's pull request in the default browser.
 	OpenPullRequest(context.Context, *connect.Request[v1.OpenPullRequestRequest]) (*connect.Response[v1.OpenPullRequestResponse], error)
 	// OpenEditor opens the worktree in the configured editor, or with file one file of
-	// it (at line, for editors that take one).
+	// it (at line, for editors that take one); with app, in that installed editor app.
 	OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error)
+	// ListEditorApps lists the known editors installed as app bundles (VS Code, Cursor,
+	// Zed, JetBrains IDEs, Xcode, ...) under /Applications and ~/Applications: what an
+	// "Open in" menu offers. Detected on first use and cached; a settings change or
+	// refresh detects again.
+	ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error)
 	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
@@ -134,6 +142,12 @@ func NewGitOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(gitOpsServiceMethods.ByName("OpenEditor")),
 			connect.WithClientOptions(opts...),
 		),
+		listEditorApps: connect.NewClient[v1.ListEditorAppsRequest, v1.ListEditorAppsResponse](
+			httpClient,
+			baseURL+GitOpsServiceListEditorAppsProcedure,
+			connect.WithSchema(gitOpsServiceMethods.ByName("ListEditorApps")),
+			connect.WithClientOptions(opts...),
+		),
 		reveal: connect.NewClient[v1.RevealRequest, v1.RevealResponse](
 			httpClient,
 			baseURL+GitOpsServiceRevealProcedure,
@@ -169,6 +183,7 @@ type gitOpsServiceClient struct {
 	createPullRequest *connect.Client[v1.CreatePullRequestRequest, v1.CreatePullRequestResponse]
 	openPullRequest   *connect.Client[v1.OpenPullRequestRequest, v1.OpenPullRequestResponse]
 	openEditor        *connect.Client[v1.OpenEditorRequest, v1.OpenEditorResponse]
+	listEditorApps    *connect.Client[v1.ListEditorAppsRequest, v1.ListEditorAppsResponse]
 	reveal            *connect.Client[v1.RevealRequest, v1.RevealResponse]
 	openUrl           *connect.Client[v1.OpenUrlRequest, v1.OpenUrlResponse]
 	list              *connect.Client[v1.ListGitOpsRequest, v1.ListGitOpsResponse]
@@ -203,6 +218,11 @@ func (c *gitOpsServiceClient) OpenPullRequest(ctx context.Context, req *connect.
 // OpenEditor calls codefoundry.v1.GitOpsService.OpenEditor.
 func (c *gitOpsServiceClient) OpenEditor(ctx context.Context, req *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error) {
 	return c.openEditor.CallUnary(ctx, req)
+}
+
+// ListEditorApps calls codefoundry.v1.GitOpsService.ListEditorApps.
+func (c *gitOpsServiceClient) ListEditorApps(ctx context.Context, req *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
+	return c.listEditorApps.CallUnary(ctx, req)
 }
 
 // Reveal calls codefoundry.v1.GitOpsService.Reveal.
@@ -242,8 +262,13 @@ type GitOpsServiceHandler interface {
 	// OpenPullRequest opens the current branch's pull request in the default browser.
 	OpenPullRequest(context.Context, *connect.Request[v1.OpenPullRequestRequest]) (*connect.Response[v1.OpenPullRequestResponse], error)
 	// OpenEditor opens the worktree in the configured editor, or with file one file of
-	// it (at line, for editors that take one).
+	// it (at line, for editors that take one); with app, in that installed editor app.
 	OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error)
+	// ListEditorApps lists the known editors installed as app bundles (VS Code, Cursor,
+	// Zed, JetBrains IDEs, Xcode, ...) under /Applications and ~/Applications: what an
+	// "Open in" menu offers. Detected on first use and cached; a settings change or
+	// refresh detects again.
+	ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error)
 	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
@@ -297,6 +322,12 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(gitOpsServiceMethods.ByName("OpenEditor")),
 		connect.WithHandlerOptions(opts...),
 	)
+	gitOpsServiceListEditorAppsHandler := connect.NewUnaryHandler(
+		GitOpsServiceListEditorAppsProcedure,
+		svc.ListEditorApps,
+		connect.WithSchema(gitOpsServiceMethods.ByName("ListEditorApps")),
+		connect.WithHandlerOptions(opts...),
+	)
 	gitOpsServiceRevealHandler := connect.NewUnaryHandler(
 		GitOpsServiceRevealProcedure,
 		svc.Reveal,
@@ -335,6 +366,8 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 			gitOpsServiceOpenPullRequestHandler.ServeHTTP(w, r)
 		case GitOpsServiceOpenEditorProcedure:
 			gitOpsServiceOpenEditorHandler.ServeHTTP(w, r)
+		case GitOpsServiceListEditorAppsProcedure:
+			gitOpsServiceListEditorAppsHandler.ServeHTTP(w, r)
 		case GitOpsServiceRevealProcedure:
 			gitOpsServiceRevealHandler.ServeHTTP(w, r)
 		case GitOpsServiceOpenUrlProcedure:
@@ -374,6 +407,10 @@ func (UnimplementedGitOpsServiceHandler) OpenPullRequest(context.Context, *conne
 
 func (UnimplementedGitOpsServiceHandler) OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.OpenEditor is not implemented"))
+}
+
+func (UnimplementedGitOpsServiceHandler) ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.ListEditorApps is not implemented"))
 }
 
 func (UnimplementedGitOpsServiceHandler) Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error) {

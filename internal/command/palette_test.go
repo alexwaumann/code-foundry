@@ -45,7 +45,7 @@ var noPalette = []string{
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",
 	"view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
-	"workspace.set-primary",
+	"workspace.set-primary", "worktree.editors",
 }
 
 // Every registered command is classified on purpose: the unlisted ones are exactly the

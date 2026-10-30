@@ -31,8 +31,13 @@ service GitOpsService {
   // OpenPullRequest opens the current branch's pull request in the default browser.
   rpc OpenPullRequest(OpenPullRequestRequest) returns (OpenPullRequestResponse) {}
   // OpenEditor opens the worktree in the configured editor, or with file one file of
-  // it (at line, for editors that take one).
+  // it (at line, for editors that take one); with app, in that installed editor app.
   rpc OpenEditor(OpenEditorRequest) returns (OpenEditorResponse) {}
+  // ListEditorApps lists the known editors installed as app bundles (VS Code, Cursor,
+  // Zed, JetBrains IDEs, Xcode, ...) under /Applications and ~/Applications: what an
+  // "Open in" menu offers. Detected on first use and cached; a settings change or
+  // refresh detects again.
+  rpc ListEditorApps(ListEditorAppsRequest) returns (ListEditorAppsResponse) {}
   // Reveal shows the worktree (or file in it) in Finder (`open -R`).
   rpc Reveal(RevealRequest) returns (RevealResponse) {}
   // OpenUrl opens an http(s) URL in the default browser.
@@ -156,6 +161,30 @@ message OpenEditorRequest {
   // 1-based line to open file at; 0 for none. VS Code, Cursor and Windsurf get
   // `-g file:line`, Zed and Sublime Text `file:line`; other editors only the file.
   uint32 line = 3;
+  // The bundle id of an installed editor app (EditorApp.bundle_id) to open with
+  // (`open -b`) instead of the configured editor; line is then ignored. An id
+  // ListEditorApps does not list is INVALID_ARGUMENT.
+  string app = 4;
+}
+
+message ListEditorAppsRequest {
+  // Detect again instead of answering from the cache.
+  bool refresh = 1;
+}
+
+message ListEditorAppsResponse {
+  // In the daemon's registry order (editors, then JetBrains IDEs, then Xcode).
+  repeated EditorApp apps = 1;
+}
+
+// EditorApp is an editor installed as an app bundle.
+message EditorApp {
+  // Display name: "VS Code", "Cursor", "GoLand", "Xcode".
+  string name = 1;
+  // CFBundleIdentifier: OpenEditorRequest.app.
+  string bundle_id = 2;
+  // The .app found.
+  string path = 3;
 }
 
 message OpenEditorResponse {

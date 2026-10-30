@@ -227,6 +227,7 @@ import { ThreadFlagLevel, ThreadReportStatus, ThreadState, ThreadStatus } from "
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
+import { GitOpsService } from "../src/gen/codefoundry/v1/gitops_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
@@ -236,6 +237,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
 import { emberStateNames } from "./ember";
+import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles } from "./files";
@@ -594,6 +596,12 @@ function routes(router: ConnectRouter): void {
       }
     },
     watch: (_req, ctx) => tracked("ActionService/Watch", actionEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } }]))),
+  });
+
+  // GitOpsService: the GUI runs git operations through the git.*/worktree.* commands
+  // (mock/gitops.ts); only the editor app list is a direct read.
+  router.service(GitOpsService, {
+    listEditorApps: () => ({ apps: EDITOR_APPS }),
   });
 
   router.service(UpdateService, {

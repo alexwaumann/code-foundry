@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"text/tabwriter"
 
 	"connectrpc.com/connect"
 
@@ -23,6 +24,7 @@ type GitOpsBackend interface {
 	OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error)
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error)
+	ListEditorApps(context.Context, *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error)
 }
 
 var (
@@ -231,16 +233,34 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Description: "Open the worktree, or one file of it, in the configured editor (default: $VISUAL/$EDITOR if it is a GUI editor, else Cursor, VS Code, Zed, or Sublime Text).",
 			Category:    "Worktree",
 			Keybindings: []string{"cmd+shift+o"},
-			Args:        []ArgSpec{cwdWT, fileArg, {Name: "line", Type: Int, Description: "Line to open the file at (VS Code, Cursor, Windsurf, Zed, Sublime Text)"}},
-			When:        hasActiveWorktree,
+			Args: []ArgSpec{cwdWT, fileArg, {Name: "line", Type: Int, Description: "Line to open the file at (VS Code, Cursor, Windsurf, Zed, Sublime Text)"},
+				{Name: "app", Type: String, Description: "Open with this installed editor app instead: its bundle id (`worktree editors` lists them); --line is then ignored"}},
+			When: hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if a.Int("line") < 0 {
 					return Result{}, fmt.Errorf("%w: line %d is negative", ErrInvalidArgs, a.Int("line"))
 				}
 				res, err := b.OpenEditor(ctx, connect.NewRequest(&v1.OpenEditorRequest{
-					WorktreePath: a.Path("worktree"), File: a.Path("file"), Line: uint32(a.Int("line")),
+					WorktreePath: a.Path("worktree"), File: a.Path("file"), Line: uint32(a.Int("line")), App: strings.TrimSpace(a.String("app")),
 				}))
 				return opResult(res, err)
+			},
+		},
+		Command{
+			Name:         "worktree.editors",
+			NoPalette:    true,
+			ReadOnly:     true,
+			Title:        "List Editor Apps",
+			Description:  "List the editors installed as apps (VS Code, Cursor, Zed, Windsurf, Sublime Text, JetBrains IDEs, Xcode) that `worktree open editor --app` opens with.",
+			Category:     "Worktree",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "refresh", Type: Bool, Description: "Look for installed apps again instead of using the list found earlier"}},
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				res, err := b.ListEditorApps(ctx, connect.NewRequest(&v1.ListEditorAppsRequest{Refresh: a.Bool("refresh")}))
+				if err != nil {
+					return Result{}, err
+				}
+				return Result{Message: formatEditorApps(res.Msg.GetApps()), JSON: res.Msg}, nil
 			},
 		},
 		Command{
@@ -269,4 +289,19 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			},
 		},
 	)
+}
+
+// formatEditorApps is worktree.editors' table.
+func formatEditorApps(apps []*v1.EditorApp) string {
+	if len(apps) == 0 {
+		return "no known editor app found in /Applications or ~/Applications"
+	}
+	var sb strings.Builder
+	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "NAME\tBUNDLE ID\tPATH")
+	for _, a := range apps {
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\n", a.GetName(), a.GetBundleId(), a.GetPath())
+	}
+	_ = tw.Flush()
+	return strings.TrimRight(sb.String(), "\n")
 }
