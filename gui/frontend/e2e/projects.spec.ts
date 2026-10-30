@@ -190,10 +190,10 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
   }
 
   await wtRow(page, "repo-cf", CF).getByTestId("worktree-more").click();
-  expect(await menuItems(page, "worktree-more")).toEqual(["Show in side panel"]);
+  expect(await menuItems(page, "worktree-more")).toEqual(["Show changes"]);
   await closeMenu(page, "worktree-more");
   await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
-  expect(await menuItems(page, "worktree-more")).toEqual(["Show in side panel", "Remove worktree…"]);
+  expect(await menuItems(page, "worktree-more")).toEqual(["Show changes", "Remove worktree…"]);
   await expect(page.getByTestId("worktree-remove")).toHaveAttribute("data-variant", "destructive");
   await closeMenu(page, "worktree-more");
 
@@ -214,10 +214,10 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
   await expect(list).toHaveAttribute("aria-activedescendant", cursor ?? "");
   await expect(list).toBeFocused();
 
-  // Show in side panel opens the worktree's tab; the list keeps the keyboard.
+  // Show changes opens the worktree's Changes tab; the list keeps the keyboard.
   await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
   await page.getByTestId("worktree-show-panel").click();
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@fix/resize");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · fix/resize");
   await expect(list).toBeFocused();
 });
 

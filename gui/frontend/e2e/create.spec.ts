@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockUrl, openAddProjectDialog, openApp, openProjects, resetMock, row, selectProject } from "./fixtures";
+import { expectProjectRevealed, invocations, mockUrl, openAddProjectDialog, openApp, openProjects, resetMock, row } from "./fixtures";
 
 // Add-project PR 4: the Add Project dialog's New tab (project.create, then optionally
 // project.github.publish) and the overview's Publish to GitHub dialog, against the mock's
@@ -75,9 +75,7 @@ test("New: the name is checked as typed, Create makes the project and opens it",
   await page.getByTestId("add-project-create").click();
 
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("my-app@main");
-  // A new project has no remote: the overview offers to publish it.
-  await expect(page.getByTestId("publish-github")).toBeVisible();
+  await expectProjectRevealed(page, "my-app");
   expect((await lastInvocation("project.create"))?.args).toEqual({ name: "my-app" });
   expect(await lastInvocation("project.github.publish")).toBeUndefined();
 
@@ -108,9 +106,7 @@ test("New with publish to octo-org: Public by default, Private not offered", asy
   await expect(page.getByTestId("add-project-create")).toHaveText("Create and publish");
   await page.getByTestId("add-project-create").click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("octo-app@main");
-  // Published: origin on GitHub, so no Publish button any more.
-  await expect(page.getByTestId("publish-github")).toHaveCount(0);
+  await expectProjectRevealed(page, "octo-app");
   expect((await lastInvocation("project.github.publish"))?.args).toEqual({ project: "repo-octo-app", owner: "octo-org", name: "octo-app", visibility: "public" });
   expect(await projectCalls()).toEqual(["create octo-app", "publish repo-octo-app octo-org/octo-app public"]);
 });
@@ -165,8 +161,7 @@ test("a refused publish shows gh's error, keeps the picker, and the project exis
   expect((await projectCalls()).filter((c) => c.startsWith("create"))).toEqual(["create taken"]);
   await page.getByTestId("add-project-keep-local").click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("taken@main");
-  await expect(page.getByTestId("publish-github")).toBeVisible();
+  await expectProjectRevealed(page, "taken");
 });
 
 test("cancelling after a refused publish deletes the new project; Keep it local needs the publish step", async ({ page }) => {
@@ -214,12 +209,10 @@ test("cancelling after a refused publish deletes the new project; Keep it local 
   expect((await projectCalls()).filter((c) => c.startsWith("delete"))).toEqual(["delete repo-taken"]);
 });
 
-test("the overview's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
+test("the Projects page row's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
   await openApp(page);
-  await selectProject(page, "repo-sk");
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("sketches@main");
-  await expect(page.getByTestId("no-remote")).toContainText("No remote");
-  await page.getByTestId("publish-github").click();
+  await openProjects(page);
+  await page.locator('[data-nav-key="p:repo-sk"]').getByTestId("project-publish").click();
   const pub = page.getByTestId("publish-dialog");
   await expect(pub).toBeVisible();
   await expect(pub).toHaveAttribute("data-project", "repo-sk");
@@ -240,7 +233,8 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
   await page.getByTestId("publish-visibility-private").click();
   await page.getByTestId("publish-submit").click();
   await expect(pub).toHaveCount(0);
-  await expect(page.getByTestId("publish-github")).toHaveCount(0);
+  // Published: origin on GitHub, so the row no longer offers it.
+  await expect(page.locator('[data-nav-key="p:repo-sk"]').getByTestId("project-publish")).toHaveCount(0);
   expect((await lastInvocation("project.github.publish"))?.args).toEqual({ project: "repo-sk", owner: "acme", name: "sketchbook", visibility: "private" });
 });
 

@@ -1,20 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
- * The Linked PRs surface (docs/notes/linked-prs.md, GUI chunk): a thread's pull requests
- * from Claude's pr-link records, linked here through POST /__mock/link-pr. Set SHOTS=<dir>
- * to save the notes' screenshots (WebKit, 1400x900, dark and light).
+ * A thread's linked pull requests (docs/notes/linked-prs.md) from Claude's pr-link records,
+ * linked here through POST /__mock/link-pr: the sidebar row's tag and the row tooltip. The
+ * Linked PRs surface is gone (docs/notes/thread-header-crumb.md): the thread info card's
+ * pull request rows list them, and the tag's click shows the card. Set SHOTS=<dir> to save
+ * the notes' screenshots (WebKit, 1400x900, dark and light).
  */
 
 const CF = "alexwaumann/code-foundry";
 const MIN = 60_000;
 
-const panel = (page: Page) => page.getByTestId("side-panel");
-const empty = (page: Page) => page.getByTestId("panel-empty");
-const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
-const list = (page: Page) => page.getByTestId("linkedprs-list");
-const numbers = (page: Page) => list(page).getByTestId("linkedpr-number");
+const card = (page: Page) => page.getByTestId("thread-info-card");
 
 async function link(thread: string, number: number, agoMs = 0, slug = CF): Promise<void> {
   const res = (await mockPost(`link-pr?thread=${thread}&slug=${encodeURIComponent(slug)}&number=${String(number)}&ago=${String(agoMs)}`)) as { added: boolean };
@@ -32,13 +30,12 @@ async function linkFour(): Promise<void> {
   await link("s-1", 142, 5 * MIN);
 }
 
-async function expectLinkedTab(page: Page, thread = "s-1"): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${thread}`);
-  await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("Linked PRs");
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "linkedprs");
+/** The thread info card shows for `thread`, which is selected. */
+async function expectCard(page: Page, thread = "s-1"): Promise<void> {
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", thread);
+  await expect(page.getByTestId("thread-info-toggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(card(page)).toBeVisible();
 }
-
-const inPanel = (page: Page) => page.evaluate(() => document.activeElement?.closest('[data-region="panel"]') !== null);
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -57,133 +54,42 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("hidden without links; a link brings the sidebar badge, the header button and the L entry", async ({ page }) => {
+test("hidden without links; a link brings the sidebar tag, and the header shows none", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("pane-actions")).toBeVisible();
-  await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
-  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveCount(0);
-  await page.keyboard.press("Meta+Shift+e");
-  await expect(empty(page)).toBeVisible();
-  await expect(empty(page).locator('[data-surface="pullrequest"]')).toBeVisible();
-  await expect(empty(page).locator('[data-surface="linkedprs"]')).toHaveCount(0);
-  // L does nothing without links.
-  await page.keyboard.press("l");
-  await expect(empty(page)).toBeVisible();
 
   await link("s-1", 142);
   // One open PR: its bare number (docs/notes/sidebar-pr-tag.md).
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("142");
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-state", "open");
-  // One link: the header shows that PR, its state icon and number in the state's colour.
-  await expect(page.getByTestId("pane-linked-pr")).toHaveText("#142");
-  await expect(page.getByTestId("pane-linked-pr")).toHaveAttribute("data-state", "open");
+  // The header has no PR button: the card's rows are the pane's pull requests.
+  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
   await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
-  const entry = empty(page).locator('[data-surface="linkedprs"]');
-  await expect(entry).toHaveAttribute("data-availability", "enabled");
-  await expect(entry).toContainText("Linked PRs");
-  await expect(entry.locator("kbd")).toHaveText("L");
-  // It opens that PR as a tab of the thread's panel.
-  await page.getByTestId("pane-linked-pr").click();
-  await expect(tabs(page)).toHaveText(["#142"]);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
 
   await link("s-1", 147);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("2 PRs");
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-tone", "success");
-  // Two or more: a muted count (view.panel.linked-prs).
-  await expect(page.getByTestId("pane-linked-prs")).toHaveAttribute("aria-label", "Show Linked PRs in Side Panel (2)");
-  await expect(page.getByTestId("pane-linked-prs")).toHaveText("2");
-  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
   // Other threads have none.
   await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveCount(0);
 });
 
-test("L and the header button open the list newest first; Enter opens a PR tab and cmd+w comes back", async ({ page }) => {
-  await linkFour();
-  await openApp(page);
-  await row(page, "s:s-1").click();
-
-  // L in the empty panel.
-  await page.keyboard.press("Meta+Shift+e");
-  await expect(empty(page).locator('[data-surface="linkedprs"]')).toHaveAttribute("data-availability", "enabled");
-  await page.keyboard.press("l");
-  await expectLinkedTab(page);
-  await expect(page.getByTestId("linkedprs-thread")).toHaveText("Refactor sidebar tree");
-  await expect(page.getByTestId("linkedprs-count")).toHaveText("4 linked PRs");
-  await expect(numbers(page)).toHaveText(["#142", "#147", "#145", "#138"]);
-  // Details from the cached PR detail: title, state, CI (open only), branch.
-  await expect(list(page).getByTestId("linkedpr-title")).toHaveText([
-    "feat(gui): virtualized sidebar tree with thread rows",
-    "feat(thread): link pull requests from pr-link transcript records",
-    "fix(terminal): resize race between attach and first output",
-    "chore(gh): pace requests through one worker",
-  ]);
-  const states = list(page).getByTestId("linkedpr-state");
-  await expect(states).toHaveText(["Open", "Open", "Draft", "Merged"]);
-  const rows = list(page).getByTestId("linkedpr");
-  await expect(rows.nth(0).locator("[data-checks]")).toHaveAttribute("data-checks", "success");
-  await expect(rows.nth(1).locator("[data-checks]")).toHaveAttribute("data-checks", "failure");
-  await expect(rows.nth(3).locator("[data-checks]")).toHaveCount(0);
-  await expect(list(page).getByTestId("linkedpr-branch")).toHaveText(["feat/sidebar", "cf/linked-prs", "fix/resize", "gh-pacing"]);
-  await expect(list(page).getByTestId("linkedpr-age").first()).toHaveText("linked 5m ago");
-  // One repository: no repository names.
-  await expect(list(page).getByTestId("linkedpr-repo")).toHaveCount(0);
-
-  // Enter on the second row opens #147 as a tab of the same panel.
-  await list(page).focus();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("j");
-  await page.keyboard.press("Enter");
-  await expect(tabs(page)).toHaveText(["Linked PRs", "#147"]);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-  await expect(page.getByTestId("pr-surface")).toContainText("link pull requests from pr-link transcript records");
-  // Focus stayed in the panel: cmd+w closes the PR tab, back to the list.
-  await expect.poll(() => inPanel(page)).toBe(true);
-  await page.keyboard.press("Meta+w");
-  await expectLinkedTab(page);
-  await expect(tabs(page)).toHaveText(["Linked PRs"]);
-  await expect(numbers(page)).toHaveText(["#142", "#147", "#145", "#138"]);
-
-  // A click opens one too.
-  await rows.nth(3).click();
-  await expect(tabs(page)).toHaveText(["Linked PRs", "#138"]);
-  await page.keyboard.press("Meta+w");
-  await page.keyboard.press("Meta+w");
-  await expect(panel(page)).toHaveCount(0);
-
-  // The thread header's button (view.panel.linked-prs).
-  await page.getByTestId("pane-linked-prs").click();
-  await expectLinkedTab(page);
-  await expect.poll(() => inPanel(page)).toBe(true);
-  await page.keyboard.press("Meta+w");
-  await expect(panel(page)).toHaveCount(0);
-
-  // The CLI's ShowView acts on the window's selection.
-  expect(await emit({ showView: { name: "panel.linked-prs" } })).toBeGreaterThan(0);
-  await expectLinkedTab(page);
-});
-
-test("the sidebar badge opens the surface for its thread and selects it", async ({ page }) => {
+test("the sidebar tag shows the card for its thread and selects it", async ({ page }) => {
   await link("s-2", 12, 10 * MIN, "alexwaumann/ghostty-playground");
   await link("s-2", 147, 2 * MIN);
   await openApp(page);
   await row(page, "s:s-1").click();
   await row(page, "s:s-2").getByTestId("row-linked-prs").click();
-  await expectLinkedTab(page, "s-2");
+  await expectCard(page, "s-2");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("linkedprs-thread")).toHaveText("Port renderer");
-  await expect(numbers(page)).toHaveText(["#147", "#12"]);
-  // Two repositories: each row names its own.
-  await expect(list(page).getByTestId("linkedpr-repo")).toHaveText(["· alexwaumann/code-foundry", "· alexwaumann/ghostty-playground"]);
+  await expect(page.getByTestId("panel-body")).toHaveCount(0);
 });
 
 /**
  * The sidebar tag's states (docs/notes/sidebar-pr-tag.md): s-1 open #142, s-3 draft #145,
  * s-4 merged #138, s-5 all three plus closed #131. #131 is on no dashboard, so it counts
- * as unknown until its detail is read (the Linked PRs surface reads it); then it drops out.
+ * as unknown until its detail is read (the thread info card reads it); then it drops out.
  */
 async function linkStates(): Promise<void> {
   await link("s-1", 142, 10 * MIN);
@@ -211,10 +117,9 @@ test("the sidebar tag: one PR's state and number, a count in the worst state's t
   await tag("s-1").hover();
   await expect(page.getByTestId("row-linked-prs-tip").first()).toContainText("Open · feat(gui): virtualized sidebar tree with thread rows");
   await expect(page.getByTestId("thread-tooltip")).toHaveCount(0);
-  // Opening s-5's list reads #131's detail: closed, so it leaves the count.
+  // The card on s-5 reads #131's detail: closed, so it leaves the count.
   await tag("s-5").click();
-  await expectLinkedTab(page, "s-5");
-  await expect(list(page).locator('[data-testid="linkedpr-state"][data-state="closed"]')).toHaveCount(1);
+  await expectCard(page, "s-5");
   await expect(tag("s-5")).toHaveText("3 PRs");
   await page.mouse.move(0, 0);
   await tag("s-5").hover();
@@ -225,23 +130,22 @@ test("the thread card lists the linked PRs below the model, newest first, closed
   await linkFour();
   await link("s-1", 131);
   await openApp(page);
-  const card = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
   const hoverName = async () => {
     await page.mouse.move(0, 0);
     await row(page, "s:s-1").getByTestId("thread-name").hover();
-    await expect(card).toHaveAttribute("data-thread-id", "s-1");
+    await expect(tip).toHaveAttribute("data-thread-id", "s-1");
   };
   await hoverName();
-  const prs = card.getByTestId("tip-prs");
+  const prs = tip.getByTestId("tip-prs");
   await expect(prs).toBeVisible();
   // After the model; #147 and #131 are on no dashboard: unknown, the bare number.
-  expect(await card.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")).at(-1))).toBe("tip-prs");
+  expect(await tip.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")).at(-1))).toBe("tip-prs");
   await expect(prs.getByTestId("tip-pr")).toHaveText(["#131", "#142feat(gui): virtualized sidebar tree with thread rows", "#147", /^#145/, /^#138/]);
   await expect(prs.getByTestId("tip-pr").first()).toHaveAttribute("data-state", "unknown");
-  // Opening the list reads every detail: #131 is closed and leaves the card, #147 gets its state and title.
+  // The thread info card reads every detail: #131 is closed and leaves the tooltip, #147 gets its state and title.
   await row(page, "s:s-1").getByTestId("row-linked-prs").click();
-  await expectLinkedTab(page);
-  await expect(list(page).locator('[data-testid="linkedpr-state"][data-state="closed"]')).toHaveCount(1);
+  await expectCard(page);
   await hoverName();
   await expect(prs.getByTestId("tip-pr")).toHaveCount(4);
   await expect(prs.getByTestId("tip-pr").evaluateAll((els) => els.map((e) => e.getAttribute("data-state")))).resolves.toEqual(["open", "open", "draft", "merged"]);
@@ -249,72 +153,9 @@ test("the thread card lists the linked PRs below the model, newest first, closed
   await page.mouse.move(0, 0);
   // A thread without links: no section.
   await row(page, "s:s-2").getByTestId("thread-name").hover();
-  await expect(card).toHaveAttribute("data-thread-id", "s-2");
-  await expect(card.getByTestId("tip-prs")).toHaveCount(0);
+  await expect(tip).toHaveAttribute("data-thread-id", "s-2");
+  await expect(tip.getByTestId("tip-prs")).toHaveCount(0);
 });
-
-test("hover actions: open on GitHub and copy the link", async ({ page }) => {
-  await linkFour();
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await page.getByTestId("pane-linked-prs").click();
-  await expectLinkedTab(page);
-  const first = list(page).locator('[role="option"]').first();
-  await first.hover();
-  await first.getByTestId("linkedpr-copy").click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied)).toEqual([`https://github.com/${CF}/pull/142`]);
-  // A check and "Copied", no toast; the actions stay while it shows, pointer gone or not.
-  const copy = first.getByTestId("linkedpr-copy");
-  await expect(copy).toHaveAttribute("aria-label", "Copied");
-  await expect(page.getByText("Link copied")).toHaveCount(0);
-  await page.mouse.move(0, 0);
-  await expect(copy).toBeVisible();
-  await expect(copy).toHaveAttribute("aria-label", "Copy link", { timeout: 3000 });
-  await first.hover();
-  await first.getByTestId("linkedpr-open-github").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([`https://github.com/${CF}/pull/142`]);
-  // Neither opened a tab.
-  await expect(tabs(page)).toHaveText(["Linked PRs"]);
-});
-
-/** SHOTS=<dir>: the notes' screenshots, WebKit, 1400x900, dark and light. */
-for (const scheme of ["dark", "light"] as const) {
-  test(`screenshots (${scheme})`, async ({ page }, info) => {
-    const shots = process.env.SHOTS;
-    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
-    const suffix = scheme === "light" ? "-light" : "";
-    const shot = (name: string) => page.screenshot({ path: `${String(shots)}/${name}${suffix}.png` });
-    await page.emulateMedia({ colorScheme: scheme });
-    await page.setViewportSize({ width: 1400, height: 900 });
-    await linkFour();
-    await openApp(page);
-    await row(page, "s:s-1").click();
-    await expect(page.getByTestId("pane-linked-prs")).toBeVisible();
-
-    await page.keyboard.press("Meta+Shift+e");
-    await expect(empty(page).locator('[data-surface="linkedprs"]')).toBeVisible();
-    await page.mouse.move(0, 0);
-    await shot("linkedprs-empty-list");
-
-    await page.keyboard.press("l");
-    await expect(list(page).getByTestId("linkedpr-title")).toHaveCount(4);
-    await list(page).focus();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("ArrowDown");
-    await shot("linkedprs-list");
-
-    await page.keyboard.press("Enter");
-    await expect(page.getByTestId("pr-surface")).toBeVisible();
-    await expect(page.getByTestId("pr-loading")).toHaveCount(0);
-    await shot("linkedprs-pr-tab");
-
-    await page.keyboard.press("Meta+w");
-    await page.keyboard.press("Meta+w");
-    await expect(panel(page)).toHaveCount(0);
-    await page.getByTestId("pane-linked-prs").hover();
-    await shot("linkedprs-header-sidebar");
-  });
-}
 
 /** SHOTS=<dir>: the sidebar tag's screenshots for docs/notes/sidebar-pr-tag.md's PR, dark and light. */
 for (const scheme of ["dark", "light"] as const) {

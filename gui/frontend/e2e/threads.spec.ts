@@ -110,9 +110,8 @@ test("a crashed thread keeps its composer, no card; the header says where it ran
   // s-3 is seeded stopped, in the fix/resize worktree.
   await row(page, "s:s-3").click();
   await expect(page.getByTestId("thread-composer")).toBeVisible();
-  // The header says where it runs (project @ branch, a linked worktree), not the path, model or status.
-  await expect(page.getByTestId("thread-location")).toHaveText("code-foundry@fix/resizeworktree");
-  await expect(page.getByTestId("thread-worktree-chip")).toBeVisible();
+  // The header's crumb says where it runs (the project; the branch is the card's), not the path, model or status.
+  await expect(page.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
   await expect(page.getByTestId("thread-header")).not.toContainText("Opus");
   await expect(page.getByTestId("thread-header")).not.toContainText("fix-resize");
   await expect(page.getByTestId("thread-header")).not.toContainText(/disconnected|stopped|Close/);

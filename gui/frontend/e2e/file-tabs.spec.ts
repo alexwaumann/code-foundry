@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 /**
  * The File and Diff panel tabs (docs/notes/file-viewer-3-tabs.md) against the mock
@@ -22,13 +22,12 @@ async function calls(): Promise<string[]> {
   return (await res.json()) as string[];
 }
 
-/** Selects a thread and opens its own worktree's tab in its panel (T). */
+/** Selects a thread and opens its own Changes tab in its panel (the card's Changes row). */
 async function worktreeTab(page: Page, threadId: string): Promise<void> {
   await row(page, `s:${threadId}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await page.keyboard.press("Meta+Shift+e");
+  await openThreadChanges(page);
   await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${threadId}`);
-  await page.keyboard.press("t");
   await expect(page.getByTestId("worktree-changes")).toBeVisible();
 }
 
@@ -49,7 +48,7 @@ test("a Changes row opens its Diff tab on the working tree; Unified ↔ Split, t
   await worktreeTab(page, "s-1");
 
   await changeRow(page, "README.md").click();
-  await expect(tabs(page)).toHaveText(["code-foundry", "README.md"]);
+  await expect(tabs(page)).toHaveText(["Changes", "README.md"]);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
   await expect(diff(page)).toHaveAttribute("data-scope", "working");
   await expect(diff(page).getByTestId("file-header-name")).toHaveText("README.md");
@@ -78,14 +77,14 @@ test("a Changes row opens its Diff tab on the working tree; Unified ↔ Split, t
 
   // The same row again activates the tab rather than adding one, and resets its scope.
   await diff(page).getByTestId("diff-scope-branch").click();
-  await tabs(page).filter({ hasText: "code-foundry" }).click();
+  await tabs(page).filter({ hasText: "Changes" }).click();
   await changeRow(page, "README.md").click();
   await expect(tabs(page)).toHaveCount(2);
   await expect(activeTab(page)).toHaveText("README.md");
   await expect(diff(page)).toHaveAttribute("data-scope", "working");
 
   // Enter on a row works too.
-  await tabs(page).filter({ hasText: "code-foundry" }).click();
+  await tabs(page).filter({ hasText: "Changes" }).click();
   await changeRow(page, "notes/plan.md").click();
   await expect(activeTab(page)).toHaveText("plan.md");
   await expect(diff(page).getByTestId("diff-status")).toHaveText("A");
@@ -94,7 +93,7 @@ test("a Changes row opens its Diff tab on the working tree; Unified ↔ Split, t
 test("committed changes open on the branch: a rename, a deletion and a binary", async ({ page }) => {
   await openApp(page);
   await worktreeTab(page, "s-4");
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-path", FEAT);
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", FEAT);
 
   await changeRow(page, "docs/notes/sidebar.md").click();
   await expect(diff(page)).toHaveAttribute("data-scope", "branch");
@@ -110,7 +109,7 @@ test("committed changes open on the branch: a rename, a deletion and a binary", 
   await tabs(page).first().click();
   await changeRow(page, "assets/icon.png").click();
   await expect(diff(page).getByTestId("diff-binary")).toContainText("Binary file");
-  await expect(tabs(page)).toHaveText(["code-foundry · feat/sidebar", "sidebar.md", "old-tree.ts", "icon.png"]);
+  await expect(tabs(page)).toHaveText(["Changes", "sidebar.md", "old-tree.ts", "icon.png"]);
 });
 
 test("Open file goes to the File tab; markdown Rendered ↔ Source is remembered; the letters bring tabs back", async ({ page }) => {

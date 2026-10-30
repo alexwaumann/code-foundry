@@ -21,7 +21,7 @@ async function compose(page: Page, n: number): Promise<void> {
   await composeProject(page, n);
 }
 
-test("a project without git: No git on the Projects page, its overview, then Initialize Git", async ({ page }) => {
+test("a project without git: No git on the Projects page, its Changes tab, then Initialize git", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
   const project = page.locator('[data-testid="project"][data-project="repo-wr"]');
@@ -34,29 +34,19 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   await expect(project.getByTestId("worktree-branch")).toHaveCount(0);
   await expect(project.getByTestId("worktree-dirty")).toHaveCount(0);
 
-  // Its tab in the page's side panel.
+  // Its Changes tab in the page's side panel says there is nothing git-shaped to list.
   await selectProject(page, "repo-wr");
-  const overview = page.getByTestId("worktree-surface");
-  await expect(overview).toHaveAttribute("data-git", "false");
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText(/^writing\s*No git$/);
-  await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
-  // Nothing git-shaped renders: facts, pull request, changes, commits.
-  for (const id of ["worktree-facts", "overview-pr", "worktree-changes", "worktree-commits"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  const changes = page.getByTestId("changes-surface");
+  await expect(changes.getByTestId("changes-nogit")).toContainText("Not a git repository");
+  for (const id of ["worktree-changes", "worktree-commits"]) await expect(page.getByTestId(id)).toHaveCount(0);
 
-  // Initialize Git runs project.git.init on the project (the page itself has no project context).
-  const init = page.getByTestId("init-git");
-  await expect(init).toBeEnabled();
-  await expect(init).toHaveText("Initialize Git");
-  await init.click();
+  // The project's menu runs project.git.init on it (the page itself has no project context).
+  await project.getByTestId("project-more").click();
+  await page.getByTestId("project-menu-init-git").click();
   await expect.poll(async () => (await lastInvocation("project.git.init"))?.context?.activeProjectId).toBe("repo-wr");
-  // A git repository on main now: the normal overview takes over.
-  await expect(overview).toHaveAttribute("data-git", "true");
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("writing@main");
-  await expect(page.getByTestId("worktree-facts")).toBeVisible();
+  // A git repository on main now: the lists take over.
+  await expect(changes.getByTestId("changes-nogit")).toHaveCount(0);
   await expect(page.getByTestId("worktree-changes")).toBeVisible();
-  await expect(page.getByTestId("section-nogit")).toHaveCount(0);
-  // Still without a remote: Publish to GitHub.
-  await expect(page.getByTestId("publish-github")).toBeVisible();
 
   await openProjects(page);
   await expect(project).toHaveAttribute("data-git", "true");
@@ -96,10 +86,8 @@ test("the composer in a project without git offers only its current checkout; th
   await expect(row.getByTestId("row-project")).toHaveText("writing");
   await expect(row.getByTestId("no-git-badge")).toBeVisible();
   await expect(row.getByTestId("row-branch")).toHaveCount(0);
-  // The header: the folder, the project and No git; no "@", branch or worktree chip.
-  const where = page.getByTestId("thread-location");
-  await expect(where).toHaveText("writingNo git");
-  await expect(where.getByTestId("no-git-badge")).toBeVisible();
-  await expect(where.getByTestId("thread-branch")).toHaveCount(0);
-  await expect(where.getByTestId("thread-worktree-chip")).toHaveCount(0);
+  // The header's crumb: the project's folder and name (no branch: the card has the rest).
+  const crumb = page.getByTestId("thread-crumb");
+  await expect(crumb).toHaveAttribute("data-icon", "folder");
+  await expect(crumb.getByTestId("thread-crumb-place")).toHaveText("writing");
 });

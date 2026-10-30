@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { emit, expectAttention, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { expectAttention, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Thread lineage in the GUI (docs/notes/agents-3-lineage-gui.md) over the mock's
@@ -15,22 +15,24 @@ import { emit, expectAttention, expectTooltip, invocations, mockPost, mockUrl, o
 
 const P = "s-l-parent";
 const C = "s-l-child";
-const surface = (page: Page) => page.getByTestId("threads-surface");
-const section = (page: Page, id: string) => surface(page).getByTestId(`threads-section-${id}`);
-const sectionIds = (page: Page, id: string) => section(page, id).getByTestId("lineage-row").evaluateAll((els) => els.map((e) => e.getAttribute("data-thread")));
-const lineageRow = (page: Page, id: string) => surface(page).locator(`[data-testid="lineage-row"][data-thread="${id}"]`);
 const header = (page: Page) => page.getByTestId("thread-header");
-const chip = (page: Page) => header(page).getByTestId("thread-created-by");
+/** The crumb's parent segment (docs/notes/thread-header-crumb.md). */
+const parent = (page: Page) => header(page).getByTestId("thread-crumb-parent");
+const card = (page: Page) => page.getByTestId("thread-info-card");
+/** A thread's row in the thread info card's lineage group (finished ones under Previous). */
+const lineageRow = (page: Page, id: string) => card(page).locator(`[data-testid="ti-lineage-row"][data-id="${id}"]`);
 
 async function open(page: Page, id: string): Promise<void> {
   await row(page, `s:${id}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
 
-async function expectThreadsTab(page: Page, id: string): Promise<void> {
-  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", `thread:${id}`);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "threads");
-  await expect(surface(page)).toHaveAttribute("data-thread", id);
+/** Shows the thread info card (its lineage rows) and unfolds its finished rows. */
+async function openCard(page: Page): Promise<void> {
+  if ((await page.getByTestId("thread-info-toggle").getAttribute("aria-pressed")) !== "true") await page.getByTestId("thread-info-toggle").click();
+  await expect(card(page)).toBeVisible();
+  const previous = card(page).getByTestId("ti-previous");
+  if ((await previous.count()) > 0 && (await previous.getAttribute("aria-expanded")) !== "true") await previous.click();
 }
 
 async function removeThread(id: string): Promise<void> {
@@ -81,15 +83,15 @@ test.describe("lineage", () => {
     await expect(tip.getByTestId("tip-created-by")).toHaveCount(0);
   });
 
-  test("header: the from chip after the name opens the Threads tab; the timeline opens with the Created by note", async ({ page }) => {
+  test("header: the crumb names the creator, which opens; the timeline opens with the Created by note", async ({ page }) => {
     await openApp(page);
     await open(page, C);
-    await expect(chip(page)).toHaveText("from Fix login redirect");
-    // Name, chip, location in that order.
+    await expect(parent(page)).toHaveText("Fix login redirect");
+    // Place, creator, title in that order.
+    const place = await header(page).getByTestId("thread-crumb-place").boundingBox();
+    const p = await parent(page).boundingBox();
     const title = await header(page).getByTestId("thread-title").boundingBox();
-    const c = await chip(page).boundingBox();
-    const loc = await header(page).getByTestId("thread-location").boundingBox();
-    expect((title?.x ?? 0) < (c?.x ?? 0) && (c?.x ?? 0) < (loc?.x ?? 0)).toBe(true);
+    expect((place?.x ?? 0) < (p?.x ?? 0) && (p?.x ?? 0) < (title?.x ?? 0)).toBe(true);
 
     // The note: one muted line at the top, the creator a link, the brief, the age.
     const note = page.getByTestId("thread-created-by-note");
@@ -100,13 +102,14 @@ test.describe("lineage", () => {
     await expect(note.getByTestId("thread-created-by-note-age")).toHaveText("18 min ago");
     await expect(page.getByTestId("thread-note")).toHaveCount(0);
 
-    await chip(page).click();
-    await expectThreadsTab(page, C);
-
-    // The note's link opens the creator.
+    // The crumb's creator opens it; the user's own thread has no parent segment.
+    await parent(page).click();
+    await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
+    await expect(parent(page)).toHaveCount(0);
+    // So does the note's link.
+    await open(page, C);
     await note.getByTestId("thread-created-by-note-link").click();
     await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
-    await expect(chip(page)).toHaveCount(0);
   });
 
   test("timeline: a wake message is a collapsed Woken by note that expands to its payload", async ({ page }) => {
@@ -131,127 +134,32 @@ test.describe("lineage", () => {
     await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
   });
 
-  test("header: a removed creator leaves an inert chip saying so, with the recorded name; an archived one still opens", async ({ page }) => {
+  test("header: a removed creator leaves an inert crumb segment saying so, with the recorded name", async ({ page }) => {
     await openApp(page);
     await open(page, "s-l-grand");
-    await expect(chip(page)).toHaveText("from Add retry to login redirect");
-    await expect(chip(page)).not.toHaveAttribute("data-removed", "true");
+    await expect(parent(page)).toHaveText("Add retry to login redirect");
+    await expect(parent(page)).not.toHaveAttribute("data-removed", "true");
     await removeThread(C);
     // Gone from the list: the name the thread recorded when it was created.
-    await expect(chip(page)).toHaveAttribute("data-removed", "true");
-    await expect(chip(page)).toHaveText("from Add retry to login redirect (old)");
-    await expect(chip(page)).toHaveCSS("cursor", "default");
-    await expectTooltip(page, chip(page), "Thread removed");
-    await chip(page).click();
-    await expect(page.getByTestId("panel-body")).toHaveCount(0);
+    await expect(parent(page)).toHaveAttribute("data-removed", "true");
+    await expect(parent(page)).toHaveText("Add retry to login redirect (old)");
+    await expectTooltip(page, parent(page), "Thread removed");
+    await parent(page).click();
+    await expect(header(page).getByTestId("thread-title")).toHaveText("Write retry backoff tests");
     await expect(page.getByTestId("thread-created-by-note-link")).toHaveCount(0);
     await expect(page.getByTestId("thread-created-by-note-name")).toHaveText("Add retry to login redirect (old)");
-  });
-
-  test("Threads tab on an agent's thread: creator, this thread, five siblings then +1 more, its child; rows open threads", async ({ page }) => {
-    await openApp(page);
-    await open(page, C);
-    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
-    await expectThreadsTab(page, C);
-
-    await expect(surface(page).getByTestId("threads-count")).toHaveText("8 related");
-    await expect(surface(page).getByTestId("threads-subline")).toHaveText("Created by Fix login redirect · 6 siblings · 1 child");
-    expect(await sectionIds(page, "creator")).toEqual([P]);
-    expect(await sectionIds(page, "this")).toEqual([C]);
-    expect(await sectionIds(page, "siblings")).toEqual(["s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs"]);
-    expect(await sectionIds(page, "children")).toEqual(["s-l-grand"]);
-    await expect(section(page, "siblings").getByTestId("threads-section-siblings-count")).toHaveText("6");
-    await expect(surface(page).locator("h3")).toHaveText(["Created by", "This thread", "Siblings6", "Children1"]);
-
-    // Status words in the sidebar's tones, place and brief (viewing the child saw its finished turn: idle).
-    await expect(surface(page).getByTestId("lineage-row").getByTestId("lineage-status")).toHaveText(["Working", "Idle", "Working", "Needs input", "Error", "Archived", "Idle", "Idle"]);
-    await expect(lineageRow(page, C).getByTestId("lineage-place")).toHaveText("code-foundry @ fix/resize");
-    await expect(lineageRow(page, C).getByTestId("lineage-brief")).toHaveText("Add retry to the login redirect, keep the PR small");
-    await expect(lineageRow(page, P).getByTestId("lineage-brief")).toHaveCount(0);
-    await expect(lineageRow(page, C)).toHaveAttribute("data-me", "true");
-    await expect(lineageRow(page, C)).toContainText("this thread");
-    await expect(lineageRow(page, "s-l-spike")).toHaveAttribute("data-status", "archived");
-    // Line 2: the place, the model's short label and the effort, the age (docs/notes/threads-tab-model.md).
-    await expect(surface(page).getByTestId("lineage-row").getByTestId("lineage-model")).toHaveText([
-      "· Opus 4.8 · high",
-      "· Sonnet 5 · high",
-      "· Haiku 5.5 · medium",
-      "· Sonnet 5 · low",
-      "· Opus 4.7 · xhigh",
-      "· Haiku 4.5 · medium",
-      "· Sonnet 4.6 · low",
-      "· Haiku 5.5 · low",
-    ]);
-    expect(await lineageRow(page, "s-l-grand").getByTestId("lineage-meta").locator(":scope > *").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")))).toEqual(["lineage-place", "lineage-model", "lineage-age"]);
-
-    await surface(page).getByTestId("lineage-more").click();
-    expect(await sectionIds(page, "siblings")).toEqual(["s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"]);
-
-    // A row opens its thread like a sidebar click.
-    await lineageRow(page, "s-l-cookie").click();
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Audit session cookie flags");
-    await expect(row(page, "s:s-l-cookie")).toHaveAttribute("aria-selected", "true");
-  });
-
-  test("Threads tab: a child's effort change waiting on its turn is italic and its tooltip says when", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
-    await expectThreadsTab(page, P);
-    const effort = lineageRow(page, "s-l-e2e").getByTestId("lineage-effort");
-    await expect(effort).toHaveText("medium");
-    await expect(effort).not.toHaveAttribute("data-pending");
-    const res = await fetch(`${mockUrl}/codefoundry.v1.ThreadService/SetEffort`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-      body: JSON.stringify({ threadId: "s-l-e2e", effort: "high" }),
-    });
-    expect(res.ok, await res.clone().text()).toBe(true);
-    await expect(effort).toHaveText("high");
-    await expect(effort).toHaveAttribute("data-pending", "true");
-    await expectTooltip(page, effort, "Effort changes to high after this turn");
-  });
-
-  test("Threads tab on the creator, H opens it; a thread with no lineage does not list it and the palette toasts (docs/notes/panel-polish.md)", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    // H in the panel's surface list.
-    await page.getByTestId("thread-pane").getByRole("button", { name: "Toggle Side Panel" }).click();
-    await expect(page.getByTestId("panel-empty").locator('[data-surface="threads"]')).toBeVisible();
-    await page.keyboard.press("h");
-    await expectThreadsTab(page, P);
-    await expect(surface(page).getByTestId("threads-count")).toHaveText("7 related");
-    await expect(surface(page).getByTestId("threads-subline")).toHaveText("Created by you · 7 threads created from here, in 2 projects");
-    await expect(section(page, "creator")).toHaveCount(0);
-    await expect(section(page, "siblings")).toHaveCount(0);
-    expect(await sectionIds(page, "children")).toEqual([C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"]);
-
-    // A thread with nothing related: hidden from the list, H does nothing, the palette's command toasts.
-    await open(page, "s-3");
-    await page.keyboard.press("Meta+Shift+e");
-    await expect(page.getByTestId("panel-empty")).toBeVisible();
-    await expect(page.getByTestId("panel-empty").locator('[data-surface="threads"]')).toHaveCount(0);
-    await page.keyboard.press("h");
-    await expect(page.getByTestId("panel-body")).toHaveCount(0);
-    await page.keyboard.press("Meta+k");
-    await page.keyboard.type("Related Threads");
-    const palette = page.getByTestId("palette");
-    await palette.locator('[data-command="view.panel.threads"]').click();
-    await expect(page.getByText("No related threads")).toBeVisible();
-    await expect(page.getByTestId("panel-body")).toHaveCount(0);
   });
 });
 
 /**
  * Hidden child threads (docs/notes/hidden-children-2-gui.md): with
  * threads.show_created_threads off (the default) every thread P created is out of the
- * sidebar except s-l-logs, shown by its override; they stay in P's Threads tab.
+ * sidebar except s-l-logs, shown by its override; they stay in P's thread info card.
  */
 test.describe("hidden children", () => {
   const LOGS = "s-l-logs";
   const HIDDEN = [C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-metrics", "s-l-grand"];
   const sidebarKeys = (page: Page) => page.getByTestId("thread-list").locator('[data-row-key^="s:"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  const toggleIn = (page: Page, id: string) => lineageRow(page, id).locator("xpath=..").getByTestId("lineage-sidebar");
 
   async function invoke(name: string, args: Record<string, string>, context: Record<string, string> | null = null, confirmed = true): Promise<{ message?: string }> {
     const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
@@ -271,11 +179,6 @@ test.describe("hidden children", () => {
     });
     const { threads } = (await res.json()) as { threads: { id: string; archivedAt?: string }[] };
     return threads.filter((t) => t.archivedAt).map((t) => t.id);
-  }
-
-  async function openThreadsTab(page: Page, id: string): Promise<void> {
-    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
-    await expectThreadsTab(page, id);
   }
 
   test("are in no sidebar list, footers included, nor the attention count; the setting shows them live, from the settings page too", async ({ page }) => {
@@ -334,39 +237,6 @@ test.describe("hidden children", () => {
     expect([...visited].sort()).toEqual(["s-2", C, "s-l-allow", "s-l-cookie"].sort());
   });
 
-  test("Threads tab: hidden ones say so; Show in sidebar adds the row, Hide from sidebar takes it out again", async ({ page }) => {
-    await openApp(page);
-    await open(page, P);
-    await openThreadsTab(page, P);
-    const marked = await surface(page)
-      .getByTestId("lineage-row")
-      .evaluateAll((els) => els.filter((e) => e.querySelector('[data-testid="lineage-hidden"]')).map((e) => e.getAttribute("data-thread")));
-    expect(marked).toEqual([C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-metrics"]);
-    await expect(lineageRow(page, "s-l-cookie").getByTestId("lineage-hidden")).toHaveText("hidden");
-
-    // The action shows on hover, named by its tooltip.
-    const show = toggleIn(page, "s-l-cookie");
-    await expect(show).toHaveCSS("opacity", "0");
-    await lineageRow(page, "s-l-cookie").hover();
-    await expect(show).toHaveCSS("opacity", "1");
-    await expectTooltip(page, show, "Show in sidebar");
-    await lineageRow(page, "s-l-cookie").hover();
-    await show.click();
-    await expect(row(page, "s:s-l-cookie")).toBeVisible();
-    await expect(lineageRow(page, "s-l-cookie").getByTestId("lineage-hidden")).toHaveCount(0);
-    // It opened nothing: P stays selected.
-    await expect(header(page).getByTestId("thread-title")).toHaveText("Fix login redirect");
-    const calls = (await invocations()).filter((i) => i.name === "thread.sidebar");
-    expect(calls.map((i) => [i.context?.activeThreadId, i.args.shown])).toEqual([["s-l-cookie", "true"]]);
-
-    await lineageRow(page, "s-l-cookie").hover();
-    await expectTooltip(page, toggleIn(page, "s-l-cookie"), "Hide from sidebar");
-    await lineageRow(page, "s-l-cookie").hover();
-    await toggleIn(page, "s-l-cookie").click();
-    await expect(row(page, "s:s-l-cookie")).toHaveCount(0);
-    await expect(lineageRow(page, "s-l-cookie").getByTestId("lineage-hidden")).toHaveText("hidden");
-  });
-
   test("row menu: Hide from sidebar on a shown child takes its row out; none on the user's own thread", async ({ page }) => {
     await openApp(page);
     await row(page, `s:${LOGS}`).click({ button: "right" });
@@ -380,18 +250,18 @@ test.describe("hidden children", () => {
     await expect(menu.getByTestId("menu-sidebar-hide")).toHaveCount(0);
   });
 
-  test("a hidden child open (from the Threads tab): its creator's row is highlighted and arrows move from it; the header's button shows and hides it", async ({ page }) => {
+  test("a hidden child open (from the card): its creator's row is highlighted and arrows move from it; the title menu shows and hides it", async ({ page }) => {
     await openApp(page);
     await open(page, P);
-    await openThreadsTab(page, P);
+    await openCard(page);
     await lineageRow(page, C).click();
     await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
     await expect(row(page, `s:${C}`)).toHaveCount(0);
     await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(1);
 
-    // A hidden grandchild (from C's own Threads tab): still its nearest shown ancestor, P.
-    await openThreadsTab(page, C);
+    // A hidden grandchild (from C's own card): still its nearest shown ancestor, P.
+    await openCard(page);
     await lineageRow(page, "s-l-grand").click();
     await expect(header(page).getByTestId("thread-title")).toHaveText("Write retry backoff tests");
     await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
@@ -404,25 +274,30 @@ test.describe("hidden children", () => {
     await page.keyboard.press("ArrowDown");
     await expect(list).toHaveAttribute("aria-activedescendant", `row-${String(next)}`);
 
-    // The header's button, beside Archive: Show in sidebar, then Hide from sidebar.
-    const button = header(page).getByTestId("pane-sidebar");
-    await expect(button).toHaveAttribute("aria-label", "Show in sidebar");
-    const order = await header(page)
-      .getByTestId("pane-actions")
-      .locator("button")
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid") ?? e.getAttribute("data-command-button")));
-    expect(order.indexOf("pane-sidebar") + 1).toBe(order.indexOf("thread.archive"));
-    await expectTooltip(page, button, "Show in sidebar");
-    await button.click();
+    // The title menu: Show in sidebar, then Hide from sidebar.
+    const title = header(page).getByTestId("thread-title");
+    await title.click();
+    const menu = page.getByTestId("thread-title-menu");
+    await expect(menu.getByTestId("menu-sidebar-show")).toHaveText("Show in sidebar");
+    await menu.getByTestId("menu-sidebar-show").click();
+    await expect(menu).toHaveCount(0);
     await expect(row(page, "s:s-l-grand")).toHaveAttribute("aria-selected", "true");
     await expect(row(page, `s:${P}`)).not.toHaveAttribute("aria-selected", "true");
-    await expect(button).toHaveAttribute("aria-label", "Hide from sidebar");
-    await button.click();
+    await title.click();
+    await expect(menu.getByTestId("menu-sidebar-hide")).toHaveText("Hide from sidebar");
+    await menu.getByTestId("menu-sidebar-hide").click();
     await expect(row(page, "s:s-l-grand")).toHaveCount(0);
     await expect(row(page, `s:${P}`)).toHaveAttribute("aria-selected", "true");
-    // The user's own thread has none.
+    expect((await invocations()).filter((i) => i.name === "thread.sidebar").map((i) => [i.context?.activeThreadId, i.args.shown])).toEqual([
+      ["s-l-grand", "true"],
+      ["s-l-grand", "false"],
+    ]);
+    // The user's own thread has neither.
     await open(page, P);
-    await expect(header(page).getByTestId("pane-sidebar")).toHaveCount(0);
+    await title.click();
+    await expect(menu).toBeVisible();
+    await expect(menu.getByTestId("menu-sidebar-show")).toHaveCount(0);
+    await expect(menu.getByTestId("menu-sidebar-hide")).toHaveCount(0);
   });
 
   test("a thread an agent creates hidden does not take the view; one created with --sidebar does", async ({ page }) => {
@@ -449,7 +324,8 @@ test.describe("hidden children", () => {
   test("archiving the creator asks (its working hidden children named), then archives the hidden ones with it; the shown one stays", async ({ page }) => {
     await openApp(page);
     await open(page, P);
-    await header(page).locator('[data-command-button="thread.archive"]').click();
+    await header(page).getByTestId("thread-title").click();
+    await page.getByTestId("thread-title-menu").getByTestId("menu-archive").click();
     const dialog = page.getByTestId("confirm-dialog");
     await expect(dialog).toContainText(
       "Archive thread Fix login redirect? Claude is still working; archiving ends the turn. 2 hidden child threads are still working; archiving ends their turns and archives them too. To keep one, ask Fix login redirect to hand it over (code-foundry thread sidebar --shown=true) or show it in the sidebar first.",
@@ -457,13 +333,8 @@ test.describe("hidden children", () => {
     await page.getByTestId("confirm-ok").click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(async () => (await archivedIds()).sort()).toEqual([P, ...HIDDEN, "s-7"].sort());
-    // The shown child stays in the sidebar, and its Threads tab has the others archived.
-    await open(page, LOGS);
-    await openThreadsTab(page, LOGS);
-    await expect(lineageRow(page, P)).toHaveAttribute("data-status", "archived");
-    await surface(page).getByTestId("lineage-more").click();
-    for (const id of [C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-metrics"]) await expect(lineageRow(page, id)).toHaveAttribute("data-status", "archived");
-    await expect(lineageRow(page, LOGS)).not.toHaveAttribute("data-status", "archived");
+    // The shown child stays in the sidebar.
+    await expect(row(page, `s:${LOGS}`)).not.toHaveAttribute("data-section", "archived");
     // Under Archived: P only (its hidden children stay hidden there too).
     await page.getByTestId("archived-header").click();
     await expect(row(page, `s:${P}`)).toHaveAttribute("data-section", "archived");
@@ -481,15 +352,8 @@ for (const scheme of ["dark", "light"] as const) {
     await mockPost("settings/external?threads.show_created_threads=true");
     await openApp(page);
     await open(page, C);
-    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
-    await expectThreadsTab(page, C);
+    await openCard(page);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/lineage-mock-${scheme}.png` });
-    // The creator's tab: its children's model words (docs/notes/threads-tab-model.md), the panel only.
-    await open(page, P);
-    expect(await emit({ showView: { name: "panel.threads" } })).toBeGreaterThan(0);
-    await expectThreadsTab(page, P);
-    await page.mouse.move(0, 0);
-    await page.getByTestId("side-panel").screenshot({ path: `${String(shots)}/threads-tab-model-${scheme}.png` });
   });
 }

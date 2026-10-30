@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, listProjects, mockUrl, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
+import { expectProjectRevealed, invocations, listProjects, mockUrl, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
 
 // The Add Project dialog (project.add): its entry points, the tab order, the Local folder
 // tab (ProjectService.Register with path completion; completion itself is e2e/paths.spec.ts),
@@ -110,7 +110,7 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   // ProjectService.Register, not a command: "~" expanded, the trailing slash dropped.
   expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
   expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");
+  await expectProjectRevealed(page, "new-app");
 });
 
 test("Local folder: a click opens a folder; only Enter and the button add", async ({ page }) => {
@@ -276,7 +276,7 @@ test("GitHub: search, pick a result, clone with progress, and open the new proje
   await expect(page.getByTestId("add-project-github-input")).toBeDisabled();
   await expect(card.getByTestId("add-project-clone-line").first()).toHaveText("Cloning into '/Users/dev/.code-foundry/projects/octo-org/Hello-World'...");
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("Hello-World@main");
+  await expectProjectRevealed(page, "Hello-World");
 
   // Cloned once: the next lookup says so and offers the existing folder.
   await openAddProjectDialog(page);
@@ -311,5 +311,5 @@ test("GitHub: an existing destination is added as a folder instead", async ({ pa
   await page.getByTestId("add-project-add-existing").click();
   await expect(dialog(page)).toHaveCount(0);
   expect(await projectAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("already-here@main");
+  await expectProjectRevealed(page, "already-here");
 });

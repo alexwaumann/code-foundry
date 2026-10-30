@@ -463,11 +463,9 @@ test("panel state is per selection; a thread or worktree on a PR branch enables 
   await expect(tabs(page)).toHaveText(["#145"]);
   await expect(page.getByTestId("pr-title")).toContainText("resize race");
 
-  // The worktree tab on the Projects page: its branch PR row opens in that page's panel, beside it.
+  // The Projects page has its own panel: a worktree row's Changes tab.
   await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-  await page.getByTestId("overview-pr").locator('[data-nav-key="pr"]').click();
-  await expect(tabs(page)).toHaveText(["code-foundry · feat/sidebar", "#142"]);
-  await expect(page.getByTestId("pr-title")).toContainText("virtualized sidebar tree");
+  await expect(tabs(page)).toHaveText(["Changes · code-foundry · feat/sidebar"]);
 
   // Back on the Pull Requests page, its panel is as it was.
   await page.getByTestId("nav-pullrequests").click();

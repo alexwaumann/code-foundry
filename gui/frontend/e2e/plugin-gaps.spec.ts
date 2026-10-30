@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The plugin GUI gaps (docs/notes/plugins-11-gui-gaps.md): a flagged row opens the
- * plugin's surface, the thread header's flag chip, secrets in Settings → Plugins, a
+ * plugin's surface, the flags on the thread info card, secrets in Settings → Plugins, a
  * dismissable install failure, and the daemon's real plugin folders.
  */
 
@@ -33,21 +33,21 @@ test("a row whose line 2 shows a plugin's flag opens the thread and the plugin's
   await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
 });
 
-test("the thread header shows the top flag in its colour; a click opens the surface, the × clears it", async ({ page }) => {
+test("the thread info card's project row carries the flags in their colour, in its hover card", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
+  await page.getByTestId("thread-info-toggle").click();
+  const project = page.getByTestId("thread-info-card").getByTestId("ti-project");
+  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
   await flag("s-3", "hello", "Hello", "error", "build failed");
-  const chip = page.getByTestId("thread-flag");
-  await expect(chip).toHaveText("Hello: build failed");
-  await expect(chip).toHaveAttribute("data-level", "error");
-  await expect(chip).toHaveClass(/text-cf-error-text/);
-  await chip.getByTestId("thread-flag-open").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");
-  await chip.getByTestId("thread-flag-clear").click();
-  await expect(chip).toHaveCount(0);
-  await expect(row(page, "s:s-3").getByTestId("row-status")).toHaveCount(0);
-  const calls = await invocations();
-  expect(calls.filter((c) => c.name === "thread.flag.clear").map((c) => c.args)).toEqual([{ id: "s-3", plugin: "hello" }]);
+  // The header has no flag chip (docs/notes/thread-header-crumb.md).
+  await expect(page.getByTestId("thread-flag")).toHaveCount(0);
+  await expect(project.getByTestId("ti-project-mark")).toHaveClass(/text-cf-error-text/);
+  await project.hover();
+  const flagged = page.getByTestId("ti-project-notes").getByTestId("ti-project-flag");
+  await expect(flagged).toHaveText("Hello: build failed");
+  await expect(flagged).toHaveAttribute("data-level", "error");
+  await expect(flagged).toHaveClass(/text-cf-error-text/);
 });
 
 test("Settings → Plugins lists a plugin's secrets by name and deletes one after the confirm", async ({ page }) => {

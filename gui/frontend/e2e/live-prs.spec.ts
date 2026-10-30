@@ -53,8 +53,7 @@ test("worktree overview of a GitHub-backed clone", async ({ page }) => {
   await page.getByTestId("nav-projects").click();
   const project = page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(PROJECT, { exact: true }) }).locator("[data-nav-key^='p:']");
   await project.dblclick();
-  await expect(page.getByTestId("worktree-surface")).toBeVisible();
-  await expect(page.getByTestId("worktree-facts")).toBeVisible();
+  await expect(page.getByTestId("changes-surface")).toBeVisible();
   await expect(page.getByTestId("worktree-changes")).toContainText("Changes");
   await page.waitForTimeout(300);
   await shot(page, "live-overview-project");
@@ -71,7 +70,7 @@ test("worktree overview of this worktree (files and log vs origin/main)", async 
   await expect(page.getByTestId("worktree-changes")).toContainText("vs main");
   await page.getByTestId("worktree-commits").locator('[data-nav-key="commits"]').click();
   await expect(page.getByTestId("commits-list").locator("[data-nav-key]").first()).toBeVisible();
-  const list = page.getByTestId("overview-list");
+  const list = page.getByTestId("changes-nav");
   await list.press("ArrowDown");
   await page.waitForTimeout(300);
   await shot(page, "live-overview-worktree");

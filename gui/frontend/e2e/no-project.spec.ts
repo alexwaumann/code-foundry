@@ -41,8 +41,8 @@ test("No project: picker row first, composer without worktree, thread placed now
   await page.keyboard.type("Reply with just OK");
   await page.keyboard.press("Enter");
 
-  await expect(page.getByTestId("thread-project")).toHaveText("No project");
-  await expect(page.getByTestId("thread-branch")).toHaveCount(0);
+  await expect(page.getByTestId("thread-crumb-place")).toHaveText("No project");
+  await expect(page.getByTestId("thread-crumb")).toHaveAttribute("data-icon", "house");
   const created = (await invocations()).filter((i) => i.name === "thread.new").at(-1);
   expect(created?.args).toMatchObject({ "no-project": "true", prompt: "Reply with just OK" });
   expect(created?.args).not.toHaveProperty("project");
@@ -51,11 +51,10 @@ test("No project: picker row first, composer without worktree, thread placed now
   await expect(id.getByTestId("row-project")).toHaveText("No project");
   await expect(id.getByTestId("row-branch")).toHaveCount(0);
 
-  // The side panel lists thread surfaces only.
+  // The side panel lists no project surfaces (files, diff, pull request).
   await page.getByTestId("panel-toggle").click();
-  await expect(page.locator("[data-surface=usage]")).toBeVisible();
-  await expect(page.locator("[data-surface=mcp]")).toBeVisible();
-  for (const kind of ["files", "diff", "pullrequest", "workspace", "worktree"]) await expect(page.locator(`[data-surface=${kind}]`)).toHaveCount(0);
+  await expect(page.getByTestId("panel-empty")).toBeVisible();
+  for (const kind of ["files", "diff", "pullrequest", "changes", "worktree"]) await expect(page.locator(`[data-surface=${kind}]`)).toHaveCount(0);
 
   // A shell of the thread starts in home and is titled No project.
   await page.keyboard.press("Meta+t");

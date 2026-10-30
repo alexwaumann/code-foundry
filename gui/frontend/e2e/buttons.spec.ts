@@ -78,7 +78,7 @@ test("status row buttons toggle settings, open help and the palette; so does the
   expect((await invocations()).some((i) => i.name === "ui.palette.open")).toBe(false);
 });
 
-test("thread pane header: the name renames, the location opens the worktree; no Close; fork is palette-only", async ({ page }) => {
+test("thread pane header: the title's menu renames; the crumb is not a button; no Close; fork is palette-only", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const header = page.getByTestId("thread-header");
@@ -87,21 +87,19 @@ test("thread pane header: the name renames, the location opens the worktree; no 
   expect((await header.boundingBox())?.height).toBe(44);
   // The thread's commands only: no Kill Terminal (a thread has no terminal).
   await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
-  // No rename (the name is the button) or fork buttons.
+  // No rename or fork buttons.
   await expect(header.getByRole("button", { name: "Rename Thread" })).toHaveCount(0);
   await expect(header.getByRole("button", { name: "Fork Thread" })).toHaveCount(0);
 
-  // A click on the name: rename, presented inline in the sidebar, as from the palette.
+  // The title's menu: Rename, presented inline in the sidebar, as from the palette.
   await header.getByTestId("thread-title").click();
+  await page.getByTestId("thread-title-menu").getByTestId("menu-rename").click();
   await expect(page.getByTestId("rename-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  // A click on project @ branch: the Worktree surface in the side panel (view.panel.worktree).
-  await expect(header.getByTestId("thread-location")).toHaveText("code-foundry@main");
-  await header.getByTestId("thread-location").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
-  await page.keyboard.press("Meta+w");
-  await expect(page.getByTestId("side-panel")).toHaveCount(0);
+  // The crumb's place is text: where the thread runs (its branch is the card's).
+  await expect(header.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
+  await expect(header.getByTestId("thread-crumb").locator("button")).toHaveCount(0);
 
   // Fork stays in the palette.
   await page.keyboard.press("Meta+k");

@@ -371,8 +371,8 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   await openApp(page);
   await row(page, `s:${t.id}`).click();
   await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
-  await page.getByTestId("pane-thread-menu").click();
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace"]);
+  await page.getByTestId("thread-title").click();
+  await expect(page.getByTestId("thread-title-menu").locator('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')).toHaveText(["New thread on this branch", "Save as workspace"]);
   await page.getByTestId("menu-save-workspace").click();
   const dialog = page.getByTestId("save-workspace-dialog");
   await expect(dialog).toBeVisible();
@@ -387,8 +387,8 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   // Line 2 keeps the run-in project; the workspace's name shows on the card.
   await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   // Saved: the set matches a workspace now, so the item is gone.
-  await page.getByTestId("pane-thread-menu").click();
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
+  await page.getByTestId("thread-title").click();
+  await expect(page.getByTestId("thread-title-menu").locator('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')).toHaveText(["New thread on this branch"]);
 });
 
 test("Save as workspace refuses a taken name in place", async ({ page }) => {
@@ -396,7 +396,7 @@ test("Save as workspace refuses a taken name in place", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await page.getByTestId("pane-thread-menu").click();
+  await page.getByTestId("thread-title").click();
   await page.getByTestId("menu-save-workspace").click();
   await expect(page.getByTestId("save-workspace-name")).toBeFocused();
   await page.keyboard.type("Taken");
@@ -457,13 +457,13 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("feat/parser");
 });
 
-test("New thread on this branch from the header menu and the palette; Escape goes back to the thread", async ({ page }) => {
+test("New thread on this branch from the title menu and the palette; Escape goes back to the thread", async ({ page }) => {
   const t = (await mockPost("set-thread?projects=repo-cf&name=Solo")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await page.getByTestId("pane-thread-menu").click();
+  await page.getByTestId("thread-title").click();
   // A single project: nothing to save.
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
+  await expect(page.getByTestId("thread-title-menu").locator('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')).toHaveText(["New thread on this branch"]);
   await page.getByTestId("menu-new-like").click();
   await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
   // In place on main: the heading names the project; one chip; no primary picker.

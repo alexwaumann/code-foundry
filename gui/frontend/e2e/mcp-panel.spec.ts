@@ -75,14 +75,23 @@ test("the palette opens it: one card per server in every state, the header count
   }
 });
 
-test("M and the command open it; tools expand with hint icons and their tooltips", async ({ page }) => {
+test("the card's row and the command open it, not M or the + list; tools expand with hint icons and their tooltips", async ({ page }) => {
   await openThread(page);
-  // M in the panel's surface list (the header's toggle opens the panel and focuses it).
+  // Not in the panel's surface list, and M opens nothing (docs/notes/thread-header-crumb.md).
   await page.getByTestId("thread-pane").getByRole("button", { name: "Toggle Side Panel" }).click();
-  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toBeVisible();
+  await expect(page.getByTestId("panel-empty")).toBeVisible();
+  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toHaveCount(0);
   await page.keyboard.press("m");
+  await expect(page.getByTestId("panel-empty")).toBeVisible();
+  // Open, the toggle sits in the panel's header.
+  await panel(page).getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveCount(0);
+  // The thread info card's MCP row.
+  await page.getByTestId("thread-info-toggle").click();
+  await page.getByTestId("thread-info-card").getByTestId("ti-mcp").click();
   await expectMcpTab(page);
-  await page.keyboard.press("Meta+w");
+  await page.getByTestId("thread-info-toggle").click();
+  await panel(page).getByTestId("panel-toggle").click();
   await expect(panel(page)).toHaveCount(0);
   // view.panel.mcp from the CLI (a ShowView intent).
   expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
@@ -213,13 +222,9 @@ test("a thread Claude never reported for says so without mentioning running; Ref
   await expect(surface(page).getByTestId("mcp-count")).toHaveText("2 of 6 connected");
 });
 
-test("listed for every thread; hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
+test("hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
   await openThread(page);
-  // A seeded thread lists it too.
-  await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+Shift+e");
-  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toBeVisible();
-  // The Projects page does not.
+  // The Projects page does not list it.
   await page.getByTestId("nav-projects").click();
   await expect(page.getByTestId("projects-page")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
