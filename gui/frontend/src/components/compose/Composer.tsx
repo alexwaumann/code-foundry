@@ -80,6 +80,7 @@ import {
   type DraftPhase,
 } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
+import { usePlacementRefusals } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -567,9 +568,15 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   });
 
   // Work in's existing branches (W2): every git project's, merged by name, newest first, minus the default branches.
+  const branchNames = useMemo(() => mergedBranches(branchLists.lists, branchLists.defaults), [branchLists]);
+  // A branch the Create would refuse (a main checkout on it, its worktree moved): greyed, the refusal as its tooltip.
+  const refusals = usePlacementRefusals(gitIds, branchNames, !like && !home);
   const branchGroup = useMemo<PickerGroup>(
-    () => ({ options: mergedBranches(branchLists.lists, branchLists.defaults).map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true })), status: branchLists.status || undefined }),
-    [branchLists],
+    () => ({
+      options: branchNames.map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true, unavailable: refusals[b] })),
+      status: branchLists.status || undefined,
+    }),
+    [branchNames, refusals, branchLists.status],
   );
   const worktreeGroups = useMemo<PickerGroup[]>(() => {
     if (isSet) {

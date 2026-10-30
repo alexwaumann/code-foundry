@@ -14,11 +14,8 @@ import { sendErrorMessage } from "@/api/stream";
 import { copyText } from "@/lib/clipboard";
 import { otherModelWorksIn, type MemberPick } from "@/lib/threadInfo";
 import { useActionsStore } from "./actions";
-import { runAction, type ActionOwner } from "./actionActions";
-import { revealShell } from "./bottomActions";
+import { runAction } from "./actionActions";
 import { invokeConfirmed, refreshCommands } from "./commands";
-import { useProjectsStore } from "./projects";
-import { useUiStore } from "./ui";
 import { holdFailedNotice } from "./failedNotice";
 import { createResource, useResource } from "./resource";
 import { THREAD_COMMANDS, threadContext } from "./threadActions";
@@ -165,24 +162,12 @@ export async function sendThreadPrompt(threadId: string, text: string): Promise<
 }
 
 /**
- * Runs an action from the card. The cwd's project's runs for the thread, in its bottom
- * panel. Another member's runs as that member's worktree run (the daemon runs a thread's
- * actions in its cwd's project only), so its tab opens in the Projects page's panel: a toast
- * says where, and its Show reveals the run's terminal (else the Projects page).
+ * Runs an action from the card, for the thread: an action of any project of its set runs
+ * in the thread's checkout of that project (the daemon's action/thread_run.go), in the
+ * thread's bottom panel, and counts for the card's last-run pick.
  */
-export async function runCardAction(actionId: string, owner: ActionOwner): Promise<void> {
-  const terminalId = await runAction(actionId, owner);
-  if (owner.kind === "thread" || terminalId === null) return;
-  const name = useActionsStore.getState().byId[actionId]?.name ?? actionId;
-  const project = useProjectsStore.getState().byId[owner.projectId]?.name ?? owner.projectId;
-  toast(`Running ${name} in ${project}`, {
-    action: {
-      label: "Show",
-      onClick: () => {
-        if (!revealShell(terminalId)) useUiStore.getState().select({ kind: "view", name: "projects" });
-      },
-    },
-  });
+export async function runCardAction(actionId: string, threadId: string): Promise<void> {
+  await runAction(actionId, { kind: "thread", threadId });
 }
 
 /** Copies a branch name, with the copy toast the pull request's link uses. */
