@@ -76,7 +76,7 @@ export interface DockAlertsInput {
   /** useThreadsStore's epoch: a change means the set was replaced (startup, reconnect). */
   epoch: number;
   /**
-   * attentionIds of the current threads: the bell and window title count. Threads hidden
+   * attentionIds of the current threads: what the window title counts. Threads hidden
    * from the sidebar (lib/inSidebar.ts) are not in it: they neither badge nor alert.
    */
   attention: readonly string[];

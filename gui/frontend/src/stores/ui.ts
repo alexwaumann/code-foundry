@@ -51,7 +51,7 @@ export type PalettePage = "commands" | "projects" | "runin" | "prompts";
 
 /**
  * The sidebar band must fit the 80px traffic-light gutter and the app name
- * (components/sidebar/Sidebar.tsx); the toolbar below it is four icon buttons.
+ * (components/sidebar/Sidebar.tsx).
  */
 export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;

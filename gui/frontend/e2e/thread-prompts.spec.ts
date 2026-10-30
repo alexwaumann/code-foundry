@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { expectAttention, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -125,15 +125,15 @@ for (const scheme of schemes) {
   });
 }
 
-test("Allow answers at once; the sidebar and the bell stop asking", async ({ page }) => {
+test("Allow answers at once; the sidebar and the window title stop asking", async ({ page }) => {
   await openThread(page, "permission");
   await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
   // s-2 (its seeded Bash permission) and this thread need the user.
-  await expect(page.getByTestId("attention-badge")).toHaveText("2");
+  await expectAttention(page, 2);
   await composer(page).getByTestId("thread-permission-allow").click();
   await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
   await expect.poll(responds).toEqual(["respond s-r1 allow req-push"]);
-  await expect(page.getByTestId("attention-badge")).toHaveText("1");
+  await expectAttention(page, 1);
   await expect(row(page, "s:s-r1")).not.toContainText("Needs input");
   await expect(lastText(page)).toContainText("Pushed. PR #63 now has the fix.");
   await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toBeVisible();

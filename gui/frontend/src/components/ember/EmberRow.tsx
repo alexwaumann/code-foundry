@@ -101,8 +101,8 @@ function EmberLine({ threadId }: { threadId: string }) {
 }
 
 /**
- * Ember's pinned row (docs/notes/ember-3-gui.md): above New thread, while Ember is on and
- * its thread exists. The flame in its state, "Ember", and a line like a thread row's
+ * Ember's pinned row (docs/notes/ember-3-gui.md): under the menu pane, above the threads, while
+ * Ember is on and its thread exists. The flame in its state, "Ember", and a line like a thread row's
  * status line. A click (or Enter from the thread list, whose arrows reach it) opens its
  * chat; its menu opens the board or Ember's settings. Never archived, snoozed or renamed.
  * Holds the board stream (inline) while shown.
@@ -129,7 +129,7 @@ function EmberRowShown({ threadId }: { threadId: string }) {
           data-cursor={cursor || undefined}
           data-flame={flame}
           className={cn(
-            "mt-1.5 flex h-12.5 shrink-0 cursor-default items-center gap-2.5 rounded-md px-2 select-none [--wails-draggable:no-drag]",
+            "flex h-12.5 shrink-0 cursor-default items-center gap-2.5 rounded-md px-2 select-none [--wails-draggable:no-drag]",
             selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
             // The keyboard cursor while the thread list has focus (its arrows reach this row).
             cursor && "[[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-1 [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-cf-focus [[data-testid=sidebar-body]:has([data-testid=thread-list]:focus)_&]:ring-inset",

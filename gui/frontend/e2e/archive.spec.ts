@@ -146,7 +146,6 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   // docs/notes/put-away-focuses-dashboard.md).
   await expect(page.getByTestId("start-heading")).toBeVisible();
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
-  await expect(page.getByTestId("sidebar-dashboard")).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(
@@ -223,17 +222,15 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
 test("archiving, snoozing or removing the selected thread selects the dashboard; another thread's leaves it (docs/notes/put-away-focuses-dashboard.md)", async ({ page }) => {
   await openApp(page);
   const pane = page.getByTestId("thread-pane");
-  const dashboard = page.getByTestId("sidebar-dashboard");
 
-  // Archive the selected idle thread from its row menu: the start page shows and the
-  // Dashboard button is current. The thread stays in the archived list.
+  // Archive the selected idle thread from its row menu: the start page shows. The thread
+  // stays in the archived list.
   await row(page, "s:s-3").click();
   await expect(pane).toHaveAttribute("data-thread-id", "s-3");
   let menu = await openMenu(page, "s:s-3");
   await menu.getByTestId("menu-archive").click();
   await expect(page.getByTestId("start-heading")).toBeVisible();
   await expect(pane).toHaveCount(0);
-  await expect(dashboard).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("archived-count")).toHaveText("2");
 
   // Another thread's archive (as from the CLI) leaves the selection alone.

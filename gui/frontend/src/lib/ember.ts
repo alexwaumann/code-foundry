@@ -413,7 +413,7 @@ export function workingThreads(tasks: readonly EmberTaskView[]): number {
 /**
  * Threads waiting on the user's answer (a permission request or question) among the
  * workers of doing and blocked tasks and their teams: the pinned row's "Needs input" and
- * Ember's place in the bell. Only answering clears it, not opening Ember's chat.
+ * Ember's place in cmd+shift+a. Only answering clears it, not opening Ember's chat.
  */
 export function waitingThreads(tasks: readonly EmberTaskView[]): number {
   return countThreads(tasks, workerAsks, (th) => th.descendantsWaiting, (t) => t.state === "doing" || t.state === "blocked");

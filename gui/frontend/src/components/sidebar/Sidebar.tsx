@@ -2,8 +2,6 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
-import { ProjectsNav } from "@/components/projects/ProjectsPage";
-import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
@@ -24,7 +22,7 @@ import { useSidebarDashboard } from "./useLinkedPrs";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
-import { SidebarNewThread, SidebarToolbar } from "./SidebarToolbar";
+import { SidebarMenu } from "./SidebarMenu";
 
 /** The most of the sidebar body a footer (header and rows) takes before its rows scroll. */
 const FOOTER_CAPS: Readonly<Record<FooterSection, number>> = { working: 0.4, snoozed: 0.25, archived: 0.3 };
@@ -213,7 +211,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const unavailable = useThreadsStore((s) => s.availability === "unavailable");
   const streamError = useEventsStore((s) => s.streamError);
   const rowHeight = useRowHeight();
-  // Ember's pinned row (above New thread, components/ember/EmberRow.tsx) is the first stop
+  // Ember's pinned row (under the menu pane, components/ember/EmberRow.tsx) is the first stop
   // of the arrows: above the first thread, and where they start while its chat is selected.
   const emberId = useShownEmberThreadId();
   const emberSelected = useUiStore((s) => emberId !== "" && s.selection.kind === "thread" && s.selection.id === emberId);
@@ -428,8 +426,8 @@ function ThreadsUnavailable() {
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
  * traffic-light gutter, kept empty for the lights, then the app name. The whole band
- * drags the window (Wails runtime, `--wails-draggable`); the controls are in the toolbar
- * below it (SidebarToolbar). See docs/notes/sidebar-toolbar.md.
+ * drags the window (Wails runtime, `--wails-draggable`); the menu pane below it
+ * (SidebarMenu) holds the nav rows. See docs/notes/sidebar-menu-pane.md.
  *
  * The band is a shell gap plus a pane header tall (56px). The name sits in the lower
  * 44px (pt-shell), so it centres on the pane headers beside it (TITLE_BAND_CENTER, 34px
@@ -475,18 +473,8 @@ function SidebarShown({ width }: { width: number }) {
           m-shell). Rows run to the sidebar's edges, so the same gap on the left (pl-shell)
           keeps them as far from the window edge as from the pane. */}
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-shell" data-testid="sidebar-body">
-        <SidebarToolbar />
+        <SidebarMenu />
         <EmberRow />
-        <SidebarNewThread />
-        <nav className="flex shrink-0 flex-col" aria-label="Pages">
-          <PullRequestsNav />
-          <ProjectsNav />
-        </nav>
-        {/* Pages above, threads below: a pane-border rule from the window's edge (through the
-            body's pl-shell) to the sidebar's. cf-sidebar-border is the sidebar's own colour
-            (no visible edge), so not that. mt-2 is the gap under Projects; mb-1 plus the main
-            list's 4px paddingStart is the same gap above the first row. */}
-        <div className="mt-2 mb-1 -ml-shell h-px shrink-0 bg-cf-border" data-testid="sidebar-divider" aria-hidden />
         <SidebarList bodyHeight={bodyHeight} />
         <ThreadsUnavailable />
         <SidebarStatus />

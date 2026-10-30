@@ -1,5 +1,5 @@
 // Plugins' flags on threads (docs/notes/plugins-3-events-flags-env.md): the effective
-// attention / error the sidebar sort, line 2, the bell and the dock read.
+// attention / error the sidebar sort, line 2, the window title and the dock read.
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
 import { toThreadView, type ThreadFlagView, type ThreadStateView, type ThreadStatusView, type ThreadView } from "@/api/threads";

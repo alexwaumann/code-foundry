@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { expectAttention, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Snoozed threads in the GUI (docs/notes/snooze-threads-2-sidebar.md). The default world
 // has two snoozed threads: s-8 ("Refactor the gh poller", a finished turn, wakes in 2.5 h)
@@ -62,8 +62,8 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 1"]);
   expect((await box(page, "sidebar-snoozed")).top).toBeGreaterThanOrEqual((await box(page, "sidebar-working")).bottom - 0.5);
   expect((await box(page, "sidebar-archived")).top).toBeGreaterThanOrEqual((await box(page, "sidebar-snoozed")).bottom - 0.5);
-  // s-8's finished turn does not count while snoozed: the bell shows s-2 alone.
-  await expect(page.getByTestId("sidebar-notifications").getByTestId("attention-badge")).toHaveText("1");
+  // s-8's finished turn does not count while snoozed: the window title counts s-2 alone.
+  await expectAttention(page, 1);
 
   await header.click();
   await expect(header).toHaveAttribute("aria-expanded", "true");
@@ -100,7 +100,7 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect(page.getByTestId("sidebar-snoozed")).toHaveCount(0);
   await expect(row(page, "s:s-8")).toHaveAttribute("data-section", "done");
   // Unsnoozing early is not a wake: s-8 is its finished turn again, and counts.
-  await expect(page.getByTestId("sidebar-notifications").getByTestId("attention-badge")).toHaveText("2");
+  await expectAttention(page, 2);
 });
 
 test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes without asking; Unsnooze brings it back", async ({ page }) => {
@@ -174,7 +174,6 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   // docs/notes/put-away-focuses-dashboard.md), its panels dropped.
   await expect(page.getByTestId("start-heading")).toBeVisible();
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
-  await expect(page.getByTestId("sidebar-dashboard")).toHaveAttribute("aria-current", "page");
   // Opened from the Snoozed section: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
   await page.getByTestId("snoozed-header").click();
   await row(page, "s:s-1").click();
@@ -229,10 +228,9 @@ test("Pick a date and time… opens the dialog for the row's thread; Snooze send
   expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
 });
 
-test("a wake brings the thread back needing attention: Snooze ended in amber, counted by the bell; snooze it again from the header", async ({ page }) => {
+test("a wake brings the thread back needing attention: Snooze ended in amber, counted in the window title; snooze it again from the header", async ({ page }) => {
   await openApp(page);
-  const bell = page.getByTestId("sidebar-notifications");
-  await expect(bell.getByTestId("attention-badge")).toHaveText("1");
+  await expectAttention(page, 1);
   await mockPost("thread/wake?id=s-8");
   await expect(page.getByTestId("snoozed-count")).toHaveText("1");
   // Back in the main list, in the attention group (prompts: s-2, then s-8 by creation).
@@ -241,8 +239,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(s8).toHaveAttribute("data-section", "attention");
   await expect(s8.getByTestId("row-status")).toHaveText("Snooze ended · just now");
   await expect(s8.getByTestId("row-status")).toHaveClass(/text-cf-warning-text/);
-  await expect(bell.getByTestId("attention-badge")).toHaveText("2");
-  await expectTooltip(page, bell, "2 threads need attention");
+  await expectAttention(page, 2);
 
   // Its page: the composer's note says so, in amber.
   await s8.click();
@@ -255,7 +252,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await page.getByTestId("thread-header").getByRole("button", { name: "Snooze Thread", exact: true }).click();
   await page.getByTestId("pane-snooze-presets").locator('[data-preset="3h"]').click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
-  await expect(bell.getByTestId("attention-badge")).toHaveText("1");
+  await expectAttention(page, 1);
   // Snoozing the selected thread selects the dashboard (#119); open it from the Snoozed section.
   await expect(page.getByTestId("start-heading")).toBeVisible();
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);

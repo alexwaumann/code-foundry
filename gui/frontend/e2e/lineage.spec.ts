@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { emit, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { emit, expectAttention, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Thread lineage in the GUI (docs/notes/agents-3-lineage-gui.md) over the mock's
@@ -251,7 +251,6 @@ test.describe("hidden children", () => {
   const LOGS = "s-l-logs";
   const HIDDEN = [C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-metrics", "s-l-grand"];
   const sidebarKeys = (page: Page) => page.getByTestId("thread-list").locator('[data-row-key^="s:"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  const badge = (page: Page) => page.getByTestId("attention-badge");
   const toggleIn = (page: Page, id: string) => lineageRow(page, id).locator("xpath=..").getByTestId("lineage-sidebar");
 
   async function invoke(name: string, args: Record<string, string>, context: Record<string, string> | null = null, confirmed = true): Promise<{ message?: string }> {
@@ -279,7 +278,7 @@ test.describe("hidden children", () => {
     await expectThreadsTab(page, id);
   }
 
-  test("are in no sidebar list, footers included, nor the bell; the setting shows them live, from the settings page too", async ({ page }) => {
+  test("are in no sidebar list, footers included, nor the attention count; the setting shows them live, from the settings page too", async ({ page }) => {
     await openApp(page);
     await page.getByTestId("archived-header").click();
     await expect(row(page, `s:${P}`)).toBeVisible();
@@ -287,7 +286,7 @@ test.describe("hidden children", () => {
     await expect(row(page, `s:${LOGS}`).getByTestId("row-created-by")).toBeVisible();
     for (const id of HIDDEN) await expect(row(page, `s:${id}`)).toHaveCount(0);
     // C's finished turn, s-l-cookie's permission prompt and s-l-allow's API error are not counted.
-    const before = Number(await badge(page).textContent());
+    const before = Number(/\((\d+)\)/.exec(await page.title())?.[1] ?? "0");
 
     // Settings › General › Threads: the toggle, off; on, every created thread joins the list.
     await page.keyboard.press("Meta+Comma");
@@ -299,12 +298,12 @@ test.describe("hidden children", () => {
     for (const id of HIDDEN) await expect(row(page, `s:${id}`)).toHaveCount(1);
     await expect(row(page, `s:s-l-e2e`)).toHaveAttribute("data-section", "working");
     await expect(row(page, `s:s-l-spike`)).toHaveAttribute("data-section", "archived");
-    await expect(badge(page)).toHaveText(String(before + 3));
+    await expectAttention(page, before + 3);
 
     // Off again (a hand edit of the file, as the CLI's settings set does).
     await mockPost("settings/external?threads.show_created_threads=false");
     for (const id of HIDDEN) await expect(row(page, `s:${id}`)).toHaveCount(0);
-    await expect(badge(page)).toHaveText(String(before));
+    await expectAttention(page, before);
   });
 
   test("cmd+shift+a and cmd+1..9 walk the shown rows only", async ({ page }) => {

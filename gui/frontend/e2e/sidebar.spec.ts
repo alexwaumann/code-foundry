@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, DEFAULT_ORDER, expectTooltip, holdThreads, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, composeProject, DEFAULT_ORDER, emit, expectAttention, holdThreads, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -47,48 +47,38 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the window starts on the dashboard; the toolbar's Dashboard button returns to it and shows it is current", async ({ page }) => {
+test("the window starts on the dashboard; the menu pane marks the current page: Projects, Pull Requests, New thread on the composer", async ({ page }) => {
   await openApp(page);
-  const dashboard = page.getByTestId("sidebar-dashboard");
   await expect(page.getByTestId("start-page")).toBeVisible();
-  await expect(dashboard).toHaveAttribute("aria-current", "page");
-  await expect(dashboard).toHaveClass(/bg-cf-sidebar-row-selected/);
+  const menu = page.getByTestId("sidebar-menu");
+  const current = menu.locator('[aria-current="page"]');
+  // No toolbar: the dashboard is the start page and a palette command (view.dashboard).
+  await expect(page.getByTestId("sidebar-toolbar")).toHaveCount(0);
+  await expect(current).toHaveCount(0);
 
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  await expect(dashboard).not.toHaveAttribute("aria-current", "page");
+  for (const id of ["nav-projects", "nav-pullrequests"]) {
+    await page.getByTestId(id).click();
+    await expect(page.getByTestId(id)).toHaveAttribute("aria-current", "page");
+    await expect(page.getByTestId(id)).toHaveClass(/bg-cf-sidebar-row-selected/);
+    await expect(current).toHaveCount(1);
+  }
+  // The new-thread composer: New thread is the current row.
+  await composeProject(page);
+  const newThread = page.getByTestId("sidebar-new-thread");
+  await expect(newThread).toHaveAttribute("aria-current", "page");
+  await expect(newThread).toHaveClass(/bg-cf-sidebar-row-selected/);
+  await expect(current).toHaveCount(1);
 
-  // view.dashboard through the daemon (ShowView), like the Pull Requests and Projects chords.
-  await dashboard.click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("view.dashboard");
+  // view.dashboard (the palette) shows the start page again, no row current.
+  expect(await emit({ showView: { name: "dashboard" } })).toBeGreaterThan(0);
   await expect(page.getByTestId("start-page")).toBeVisible();
-  await expect(dashboard).toHaveAttribute("aria-current", "page");
+  await expect(current).toHaveCount(0);
 
   // A selected thread is not restored: a reload starts on the dashboard again.
   await row(page, "s:s-2").click();
-  await expect(dashboard).not.toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("start-page")).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("start-page")).toBeVisible();
-  await expect(dashboard).toHaveAttribute("aria-current", "page");
-});
-
-test("Notifications: the count over the bell jumps to the waiting thread; with none it is a no-op", async ({ page }) => {
-  await openApp(page);
-  const bell = page.getByTestId("sidebar-notifications");
-  // The mock's s-2 waits on the user.
-  await expect(bell.getByTestId("attention-badge")).toHaveText("1");
-  await expectTooltip(page, bell, "1 thread needs attention");
-  await bell.click();
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-
-  await mockPost("thread/status?id=s-2&status=idle");
-  await expectTooltip(page, bell, "No threads need attention");
-  await expect(bell).toHaveAttribute("aria-disabled", "true");
-  await expect(bell.getByTestId("attention-badge")).toHaveCount(0);
-  // aria-disabled, not disabled, so the tooltip still shows; a forced click does nothing.
-  await page.getByTestId("nav-projects").click();
-  await bell.click({ force: true });
-  await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
 test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace thread's run-in project on line 2 (no badge), no project or worktree rows", async ({ page }) => {
@@ -335,7 +325,7 @@ test("status kinds: each thread's second line says its status in words and colou
   await expect(row(page, "s:s-k-plan")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-k-approval")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("attention-badge")).toHaveText("7");
+  await expectAttention(page, 7);
 });
 
 test("Working section: a header with the count collapses and expands its rows, persists across a reload, and cmd+N skips hidden rows", async ({ page }) => {
@@ -433,29 +423,41 @@ test("thread rows sit 4px apart at both densities, each row's box (and its selec
   await mockPost("settings/external?appearance.density=");
 });
 
-test("a 1px pane-border rule runs edge to edge between the page nav and the thread list, 8px from each", async ({ page }) => {
+test("the menu pane: under the band, gutter to edge, surface fill, divider border, pane radius, 4px inside; the threads 8px below", async ({ page }) => {
   await openApp(page);
   await expect(row(page, "s:s-2")).toBeVisible();
+  await expect(page.getByTestId("sidebar-divider")).toHaveCount(0);
   const m = await page.evaluate(() => {
     const r = (id: string) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
-    const [divider, projects, sidebar] = [r("sidebar-divider"), r("nav-projects"), r("sidebar")];
+    const [menu, band, body, sidebar, newThread, projects] = [r("sidebar-menu"), r("sidebar-band"), r("sidebar-body"), r("sidebar"), r("sidebar-new-thread"), r("nav-projects")];
     const first = document.querySelector('[data-testid="sidebar-main"] [role="option"]')?.getBoundingClientRect();
-    const el = document.querySelector('[data-testid="sidebar-divider"]');
-    const probe = document.createElement("div");
-    probe.style.backgroundColor = "var(--cf-border)";
-    document.body.append(probe);
-    const border = getComputedStyle(probe).backgroundColor;
-    probe.remove();
+    const el = document.querySelector('[data-testid="sidebar-menu"]');
+    const resolve = (prop: "backgroundColor" | "borderTopColor", v: string) => {
+      const probe = document.createElement("div");
+      probe.style.border = "1px solid";
+      probe.style[prop] = v;
+      document.body.append(probe);
+      const c = getComputedStyle(probe)[prop];
+      probe.remove();
+      return c;
+    };
+    const cs = el ? getComputedStyle(el) : null;
     return {
-      left: divider?.left === sidebar?.left,
-      right: divider?.right === sidebar?.right,
-      height: divider?.height,
-      above: (divider?.top ?? 0) - (projects?.bottom ?? 0),
-      below: (first?.top ?? 0) - (divider?.bottom ?? 0),
-      colour: el ? getComputedStyle(el).backgroundColor === border : false,
+      top: (menu?.top ?? 0) - (band?.bottom ?? 0),
+      left: (menu?.left ?? 0) - (body?.left ?? 0),
+      right: menu?.right === sidebar?.right,
+      radius: cs?.borderTopLeftRadius,
+      border: cs?.borderTopWidth,
+      fill: cs?.backgroundColor === resolve("backgroundColor", "var(--cf-surface)"),
+      edge: cs?.borderTopColor === resolve("borderTopColor", "var(--cf-divider)"),
+      inset: [(newThread?.top ?? 0) - (menu?.top ?? 0), (newThread?.left ?? 0) - (menu?.left ?? 0), (menu?.bottom ?? 0) - (projects?.bottom ?? 0)],
+      rows: [newThread?.height, projects?.height],
+      below: (first?.top ?? 0) - (menu?.bottom ?? 0),
     };
   });
-  expect(m).toEqual({ left: true, right: true, height: 1, above: 8, below: 8, colour: true });
+  // 12px gutter (pl-shell) on the left; 1px border + 4px padding to the rows; 8px gap plus the
+  // list's 4px paddingStart to the first thread row.
+  expect(m).toEqual({ top: 0, left: 12, right: true, radius: "12px", border: "1px", fill: true, edge: true, inset: [5, 5, 5], rows: [28, 28], below: 12 });
 });
 
 test("Working section: the header counts threads as they start and stop working, and goes away with the last one", async ({ page }) => {

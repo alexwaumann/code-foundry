@@ -43,15 +43,17 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the row shows only while Ember is on, above New thread", async ({ page }) => {
+test("the row shows only while Ember is on, under the menu pane and above the threads", async ({ page }) => {
   await openApp(page);
   await expect(emberRow(page)).toHaveCount(0);
   await enable();
   await expect(emberRow(page)).toBeVisible();
-  // Directly under the toolbar, above New thread.
+  // 8px under the menu pane, above the first thread row.
   const rowBox = await emberRow(page).boundingBox();
-  const newBox = await page.getByTestId("sidebar-new-thread").boundingBox();
-  expect(rowBox && newBox && rowBox.y < newBox.y).toBe(true);
+  const menuBox = await page.getByTestId("sidebar-menu").boundingBox();
+  const firstBox = await page.locator('[data-testid="sidebar-main"] [role="option"]').first().boundingBox();
+  expect(rowBox && menuBox && rowBox.y - (menuBox.y + menuBox.height)).toBe(8);
+  expect(rowBox && firstBox && rowBox.y + rowBox.height <= firstBox.y).toBe(true);
   // "<Status> · <first doing task> · N threads"; the flame works while a task is doing.
   await expect(emberRow(page).getByTestId("ember-row-status")).toHaveText("Working");
   await expect(emberRow(page).getByTestId("ember-row-task")).toHaveText("Add release notes for 0.20");
@@ -298,37 +300,31 @@ test("a lead's team: worker rows under its card, counted as working", async ({ p
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ember-team-put");
 });
 
-test("a worker waiting on the user: Needs input on the row, Ember in the bell until it is answered", async ({ page }) => {
+test("a worker waiting on the user: Needs input on the row until it is answered; cmd+shift+a goes to Ember first", async ({ page }) => {
   await enable();
   await openApp(page);
-  const bell = page.getByTestId("sidebar-notifications");
   const status = emberRow(page).getByTestId("ember-row-status");
   await expect(status).toHaveText("Working");
-  await expect(bell).toHaveAttribute("data-count", "1");
   // A lead's worker asks a question.
   await mockPost(`thread/status?id=s-ember-team-put&status=attention&reason=${encodeURIComponent("question: 404 or 422 for a bad id?")}`);
   await expect(status).toHaveText("Needs input");
   await expect(status).toHaveClass(/text-cf-warning-text/);
   await expect(emberRow(page)).toHaveAttribute("data-flame", "attention");
-  await expect(bell).toHaveAttribute("data-count", "2");
   if (process.env.SHOTS) await page.getByTestId("sidebar-body").screenshot({ path: `${process.env.SHOTS}/ember-row-needs-input.png` });
-  // The bell goes to Ember (its row is the first that needs the user).
-  await bell.click();
+  // cmd+shift+a goes to Ember (its row is the first that needs the user).
+  await page.keyboard.press("Meta+Shift+a");
   await expect(pane(page)).toBeVisible();
   // Opening the chat does not clear it: only an answer does.
   await expect(status).toHaveText("Needs input");
-  await expect(bell).toHaveAttribute("data-count", "2");
   await page.getByTestId("ember-board-toggle").click();
   await expect(board(page).locator('[data-testid="ember-worker"][data-thread="s-ember-team-put"]').getByTestId("ember-worker-meta")).toHaveText("Needs input");
   await expect(board(page).locator('[data-testid="ember-task"][data-task="t-4c5d6e7f"]').getByTestId("ember-task-meta")).toHaveText("Needs input");
   // A task's own worker asking counts too, once with the team's.
   await mockPost(`thread/status?id=s-ember-notes&status=attention&reason=${encodeURIComponent("permission: Bash git push")}`);
-  await expect(bell).toHaveAttribute("data-count", "2");
   await mockPost("thread/status?id=s-ember-notes&status=busy");
   await mockPost("thread/status?id=s-ember-team-put&status=busy");
   await expect(status).toHaveText("Working");
   await expect(emberRow(page)).toHaveAttribute("data-flame", "working");
-  await expect(bell).toHaveAttribute("data-count", "1");
 });
 
 test("paths in Ember's chat: an absolute one under a project is a chip; relative ones and git ranges stay code", async ({ page }) => {

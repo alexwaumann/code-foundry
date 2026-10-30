@@ -182,7 +182,7 @@ export function useToCheckCount(): number {
   return useEmberStore((s) => unclosedTasks(s.board?.tasks ?? NO_TASKS));
 }
 
-/** Worker threads (leads' teams included) waiting on the user's answer: the row's Needs input, the bell's Ember. */
+/** Worker threads (leads' teams included) waiting on the user's answer: the row's Needs input, Ember's attention. */
 export function useWaitingThreads(): number {
   return useEmberStore((s) => waitingThreads(s.board?.tasks ?? NO_TASKS));
 }
@@ -264,8 +264,8 @@ export function useFlameState(threadId: string): FlameState {
 
 /**
  * Ember's thread when it needs the user (a prompt, a reply not seen yet, or a worker of
- * its board waiting on an answer: `workersWaiting`) and Ember is on; "" otherwise. The
- * bell counts it once and cmd+shift+a reaches it first (its row is the sidebar's first);
+ * its board waiting on an answer: `workersWaiting`) and Ember is on; "" otherwise.
+ * cmd+shift+a reaches it first (its row is the sidebar's first);
  * the Dock badge and the start page leave it out, as every resident. A worker's prompt
  * stays until it is answered: opening Ember's chat does not clear it.
  */
@@ -280,8 +280,3 @@ export function getEmberAttentionId(): string {
   return emberAttentionId(useThreadsStore.getState(), useSettingsStore.getState().snapshot?.values[EMBER_ENABLED] === "true", waiting);
 }
 
-export function useEmberAttention(): boolean {
-  const enabled = useEmberEnabled();
-  const waiting = useWaitingThreads();
-  return useThreadsStore((s) => emberAttentionId(s, enabled, waiting) !== "");
-}
