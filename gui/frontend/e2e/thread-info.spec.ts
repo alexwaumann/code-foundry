@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * The thread info card (docs/notes/thread-info-card.md) over the mock's
@@ -82,15 +82,49 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k3"]')).toHaveAttribute("data-state", "done");
 
   await expect(c.getByTestId("ti-mcp")).toContainText("2 connected");
-  await expect(c.getByTestId("ti-context")).toContainText("Context · cache 41m");
+  // Context: the row says only "Context"; its value column holds the warm cache's minutes, then the bar and share.
+  await expect(c.getByTestId("ti-context").locator("> span").nth(0)).toHaveText("Context");
+  await expect(c.getByTestId("ti-context-meta")).toHaveText(/^cache 41m\s*22%$/);
+  await expect(c.getByTestId("ti-context-cache")).toHaveText("cache 41m");
   await expect(c.getByTestId("ti-context-pct")).toHaveText("22%");
-  await expectTooltip(page, c.getByTestId("ti-context"), /221K of 1M tokens used/);
+  await expectTooltip(page, c.getByTestId("ti-context"), /^221K of 1M tokens used\s*Cache expires in 41 min\s*\$2\.21 to re-read it after that$/);
 
-  // Usage folds out its token kinds and requests.
+  // Usage: the row's value is the total cost in cents (no token count); the hover card splits it by model, one line each.
+  const usage = c.getByTestId("ti-usage");
+  await expect(usage.locator("> span").nth(0)).toHaveText("Usage");
+  const cost = c.getByTestId("ti-usage-meta");
+  await expect(cost).toHaveText(/^\$[\d,]+\.\d\d$/);
+  await page.mouse.move(0, 0);
+  await usage.hover();
+  const tip = openTooltip(page);
+  await expect(tip).toContainText("By model");
+  await expect(tip.getByTestId("ti-usage-model-share")).toHaveCount(2);
+  for (let i = 0; i < 2; i++) {
+    await expect(tip.getByTestId("ti-usage-model-cost").nth(i)).toHaveText(/^\$[\d,]+\.\d\d$/);
+    await expect(tip.getByTestId("ti-usage-model-share").nth(i)).toHaveText(/^\d+\.\d%$/);
+    // The share sits on its cost's line, never wrapped under it.
+    const [a, b] = await Promise.all([tip.getByTestId("ti-usage-model-cost").nth(i).boundingBox(), tip.getByTestId("ti-usage-model-share").nth(i).boundingBox()]);
+    expect(Math.abs((a?.y ?? 0) - (b?.y ?? -100))).toBeLessThan(1);
+  }
+  await expect(tip).not.toContainText(/saved/i);
+  await page.mouse.move(0, 0);
+
+  // The fold: the token kinds, their total (the row's cost), what cache reads saved, the requests.
   await expect(c.getByTestId("ti-usage-detail")).toHaveCount(0);
-  await c.getByTestId("ti-usage").click();
+  await usage.click();
+  await expect(usage).toHaveAttribute("aria-expanded", "true");
+  await expect(c.getByTestId("ti-usage-chevron")).toHaveAttribute("data-open", "");
   await expect(c.getByTestId("ti-usage-kind")).toHaveCount(4);
+  await expect(c.getByTestId("ti-usage-kind")).toHaveText([/^Input.*\$/, /^Output.*\$/, /^Cache read.*\$/, /^Cache write.*\$/]);
+  const total = c.getByTestId("ti-usage-total");
+  await expect(total.locator("span")).toHaveText(["Total", /^[\d.]+[KMB]$/, (await cost.textContent()) ?? ""]);
+  await expect(c.getByTestId("ti-usage-saved")).toHaveText(/^Saved by cache reads\$[\d,]+\.\d\d$/);
+  await expect(c.getByTestId("ti-usage-saved").locator("span").last()).toHaveClass(/text-cf-success-text/);
   await expect(c.getByTestId("ti-usage-detail")).toContainText("Requests");
+  // An open fold is not selected: with the pointer elsewhere it has a closed row's background, only its chevron says open.
+  await page.mouse.move(0, 0);
+  const bg = (l: typeof usage) => l.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect.poll(async () => bg(usage)).toBe(await bg(c.getByTestId("ti-context")));
 
   // Changes opens the cwd's Changes tab (its files and commits); a pull request its PR tab.
   await c.getByTestId("ti-changes").click();
@@ -264,4 +298,30 @@ test("servers: a listening shell is a row that opens its port and stops the shel
   await expect(servers).toHaveCount(0);
   await expect(c.getByTestId("ti-shells")).toContainText("2 shells");
   expect(await opened()).toEqual(["http://localhost:9399"]);
+});
+
+test("an expired cache: the context row and its hover card say nothing of it", async ({ page }) => {
+  const id = await openWithCard(page, "single");
+  const c = card(page);
+  await expect(c.getByTestId("ti-context-cache")).toHaveText("cache 41m");
+  await mockPost(`thread/cache?id=${id}&ago=3700`);
+  await expect(c.getByTestId("ti-context-cache")).toHaveCount(0);
+  await expect(c.getByTestId("ti-context-meta")).toHaveText("22%");
+  await expectTooltip(page, c.getByTestId("ti-context"), /^221K of 1M tokens used$/);
+});
+
+test("a thread under a cent: the row reads <$0.01, the kinds show no cost, nothing saved", async ({ page }) => {
+  await mockPost("usage?thread=s-2&model=claude-haiku-5-5&requests=2&input=900&output=350&cacheRead=4000&cacheWrite5m=1200");
+  await openApp(page);
+  await row(page, "s:s-2").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+  await toggle(page).click();
+  const c = card(page);
+  await expect(c.getByTestId("ti-usage-meta")).toHaveText("<$0.01");
+  await expectTooltip(page, c.getByTestId("ti-usage"), /^By model\s*Haiku 5\.5\s*<\$0\.01\s*100\.0%$/);
+  await c.getByTestId("ti-usage").click();
+  await expect(c.getByTestId("ti-usage-kind")).toHaveText(["Input900", "Output350", "Cache read4K", "Cache write1.2K"]);
+  await expect(c.getByTestId("ti-usage-total")).toHaveText(/^Total6\.5K<\$0\.01$/);
+  await expect(c.getByTestId("ti-usage-saved")).toHaveCount(0);
+  await expect(c.getByTestId("ti-usage-detail")).toContainText(/Requests\s*2/);
 });

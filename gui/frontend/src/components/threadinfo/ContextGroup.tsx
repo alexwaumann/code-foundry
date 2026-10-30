@@ -3,8 +3,8 @@ import type { UsageBucketView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
 import { useNowSelect } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
-import { cacheMinutesLeft, cacheSuffix, contextPercent } from "@/lib/threadInfo";
-import { fmtShare, fmtTok, fmtUsd, totalUsage, usageByModel } from "@/lib/usage";
+import { cacheMinutesLeft, cacheSuffix, cardUsd, contextPercent, foldUsd, USD_SHOWN } from "@/lib/threadInfo";
+import { fmtShare, fmtTok, totalUsage, usageByModel } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useModelChoices } from "@/stores/settings";
 import { sameUsage, useThreadsStore } from "@/stores/threads";
@@ -14,8 +14,10 @@ const NONE: readonly UsageBucketView[] = [];
 
 /**
  * Context: how full the context window is (a 56px bar and the percentage; neither when the
- * window is unknown) and how long the prompt cache stays warm. No click; the hover card
- * gives the tokens and the cache.
+ * window is unknown) and, while the prompt cache is warm, how long it stays so. No click;
+ * the hover card gives the tokens and, warm, the cache's expiry and what re-reading the
+ * context costs after it. An expired cache is the composer's ColdCacheNote to say: the row
+ * and the card say nothing of it.
  */
 function ContextRow({ threadId }: { threadId: string }) {
   const tokens = useThreadsStore((s) => s.byId[threadId]?.contextTokens ?? 0);
@@ -30,14 +32,8 @@ function ContextRow({ threadId }: { threadId: string }) {
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
       <div>{window > 0 ? `${fmtTok(tokens)} of ${fmtTok(window)} tokens used` : `${fmtTok(tokens)} tokens used`}</div>
-      {warm && <div>{fmtTok(tokens)} cached</div>}
-      <div>
-        {expires === null
-          ? "No prompt cache yet"
-          : warm
-            ? `Cache expires in ${String(minutes)} min`
-            : `Cache expired${reread > 0 ? `: the next message re-reads it for ${fmtUsd(reread)}` : ""}`}
-      </div>
+      {warm && <div>Cache expires in {String(minutes)} min</div>}
+      {warm && reread > 0 && <div>{cardUsd(reread)} to re-read it after that</div>}
     </div>
   );
   return (
@@ -45,19 +41,27 @@ function ContextRow({ threadId }: { threadId: string }) {
       <Row
         hoverable
         meta={
-          pct !== null && (
+          (suffix || pct !== null) && (
             <>
-              <span className="inline-block h-1 w-14 overflow-hidden rounded-full bg-cf-border" aria-hidden>
-                <span className="block h-full bg-cf-text-muted" style={{ width: `${String(pct)}%` }} />
-              </span>
-              <span data-testid="ti-context-pct">{pct}%</span>
+              {suffix && (
+                <span className="text-cf-text-muted" data-testid="ti-context-cache">
+                  {suffix}
+                </span>
+              )}
+              {pct !== null && (
+                <>
+                  <span className="inline-block h-1 w-14 overflow-hidden rounded-full bg-cf-border" aria-hidden>
+                    <span className="block h-full bg-cf-text-muted" style={{ width: `${String(pct)}%` }} />
+                  </span>
+                  <span data-testid="ti-context-pct">{pct}%</span>
+                </>
+              )}
             </>
           )
         }
         testId="ti-context"
       >
         Context
-        {suffix && <span className="text-cf-text-muted"> · {suffix}</span>}
       </Row>
     </Tip>
   );
@@ -74,26 +78,31 @@ function useUsage(threadId: string): readonly UsageBucketView[] {
 }
 
 /**
- * Usage: the thread's cost and tokens, the Usage tab's totals (lib/usage). The hover card
- * splits the cost by model; the fold gives each token kind's tokens and cost, then the
- * requests.
+ * Usage: the thread's cost, the Usage tab's total (lib/usage). The hover card splits it by
+ * model; the fold gives each token kind's tokens and cost, their total, what the cache
+ * reads saved against reading those tokens as input, then the requests.
  */
 function UsageRow({ threadId }: { threadId: string }) {
   const usage = useUsage(threadId);
   const total = useMemo(() => totalUsage(usage), [usage]);
   const models = useMemo(() => usageByModel(usage), [usage]);
+  const saved = useMemo(() => usage.reduce((s, b) => s + b.cacheSavingsUsd, 0), [usage]);
   const choices = useModelChoices();
   const [open, setOpen] = useState(false);
-  const cost = total.allUnpriced ? "unpriced" : fmtUsd(total.costUsd);
+  const cost = total.allUnpriced ? "unpriced" : cardUsd(total.costUsd);
   const card =
     models.length > 0 ? (
-      <div className={cn(HOVER_CARD, "flex w-56 flex-col gap-0.5")}>
-        <div className="font-medium">By model</div>
+      <div className={cn(HOVER_CARD, "grid w-56 grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 gap-y-0.5 whitespace-nowrap tabular-nums")}>
+        <div className="col-span-3 font-medium">By model</div>
         {models.map((m) => (
-          <div key={m.model} className="flex gap-2 tabular-nums">
-            <span className="min-w-0 flex-1 truncate">{canonicalModelName(choices, m.model)}</span>
-            <span>{m.allUnpriced ? "—" : fmtUsd(m.costUsd)}</span>
-            <span className="w-11 text-right text-cf-text-muted">{m.allUnpriced ? "—" : fmtShare(m.costUsd, total.costUsd)}</span>
+          <div key={m.model} className="contents">
+            <span className="truncate">{canonicalModelName(choices, m.model)}</span>
+            <span className="text-right" data-testid="ti-usage-model-cost">
+              {m.allUnpriced ? "—" : cardUsd(m.costUsd)}
+            </span>
+            <span className="w-11 text-right text-cf-text-muted" data-testid="ti-usage-model-share">
+              {m.allUnpriced ? "—" : fmtShare(m.costUsd, total.costUsd)}
+            </span>
           </div>
         ))}
       </div>
@@ -113,13 +122,10 @@ function UsageRow({ threadId }: { threadId: string }) {
             setOpen((o) => !o);
           }}
           aria-expanded={open}
+          meta={<span className="text-cf-text-muted">{cost}</span>}
           testId="ti-usage"
         >
           Usage
-          <span className="text-cf-text-muted">
-            {" · "}
-            {cost} · {fmtTok(total.tokens)} tokens
-          </span>
         </Row>
       </Tip>
       {open && (
@@ -128,9 +134,20 @@ function UsageRow({ threadId }: { threadId: string }) {
             <div key={label} className="contents" data-testid="ti-usage-kind">
               <span>{label}</span>
               <span className="text-right text-cf-text">{fmtTok(tokens)}</span>
-              <span className="text-right">{total.allUnpriced ? "—" : fmtUsd(usd)}</span>
+              <span className="text-right">{foldUsd(usd, total.allUnpriced)}</span>
             </div>
           ))}
+          <div className="contents" data-testid="ti-usage-total">
+            <span className="text-cf-text">Total</span>
+            <span className="text-right text-cf-text">{fmtTok(total.tokens)}</span>
+            <span className="text-right text-cf-text">{total.allUnpriced ? "—" : cardUsd(total.costUsd)}</span>
+          </div>
+          {saved >= USD_SHOWN && (
+            <div className="contents" data-testid="ti-usage-saved">
+              <span className="col-span-2">Saved by cache reads</span>
+              <span className="text-right text-cf-success-text">{cardUsd(saved)}</span>
+            </div>
+          )}
           <span>Requests</span>
           <span className="text-right text-cf-text">{total.requests.toLocaleString("en-US")}</span>
           <span />
