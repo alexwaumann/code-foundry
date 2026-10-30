@@ -40,8 +40,10 @@ snapshot whenever the runner publishes a change (`publishBgShells`, `detach`), s
 no started/ended plumbing. Cadence: nothing while no shell runs; a burst at +1 s, +3 s and
 +10 s after any shell starts; then every 10 s from the last probe. A shell's end drops it at
 once (the runner publishes the list without it, ports and all). Only changed ports are
-published. lsof missing or failing (anything but exit 1) logs one warning and turns the
-watch off until the daemon restarts; the stop still tries a mapping of its own.
+published. A failed call (anything but lsof's exit 1, or a sysctl error) skips the rest of
+that tick; lsof missing (`exec.ErrNotFound`, `fs.ErrNotExist`) or 3 failures in a row
+(`serverFailLimit`) log one warning and turn the watch off until the daemon restarts. A
+success resets the count. The stop does its own lookup either way.
 
 ### Publish
 
@@ -53,13 +55,21 @@ die with the process. The runner publishes the whole list on every start or end
 
 ### Stop
 
-`ThreadService.StopShell` / `thread.shell.stop <task> [--id]` (NoPalette, NoKeybinding):
-the shell's group (mapped then if not yet) gets SIGTERM, then SIGKILL after
-`ShellStopGrace` (3 s), in the background (`procscan.StopGroups`, which never signals group
-≤ 1 or the daemon's own). A note "Stopped background shell: <command>" goes into the
-timeline first; Claude then reports the shell killed like any end. NOT_FOUND for an unknown
-task, FAILED_PRECONDITION when its process cannot be found. Not in the guide (it is near its
-byte cap): `leftOut` lists it.
+`ThreadService.StopShell` / `thread.shell.stop <task> [--id]` (NoPalette, NoKeybinding).
+The cached group is never trusted at kill time (review fix): `shellGroupNow` requires the
+shell's `ClaudePID` to still be the runner's current process (`claudePID`, read under the
+stream's `connMu`; 0 while a restart swaps it), then looks the group up again with
+`ShellGroups` (one more sysctl and lsof per stop) and refuses with FAILED_PRECONDITION
+unless the fresh group is above 1 and equals the cached one (or is the group, when none was
+cached). A pid reused since the shell ended is so never signalled. Then a note "Stopped
+background shell: <command>" goes into the timeline, and the group gets SIGTERM, then
+SIGKILL after `ShellStopGrace` (3 s), in the background (`procscan.StopGroups`, which never
+signals group ≤ 1 or the daemon's own); Claude reports the shell killed like any end.
+
+A stop for a shell already being stopped (`Manager.shellStops`, until the SIGKILL step
+returns) answers the thread without a second lookup, signal or note: a double click is one
+stop. NOT_FOUND for an unknown task. Not in the guide (it is near its byte cap): `leftOut`
+lists it.
 
 ## Card (`components/threadinfo/ShellsGroup.tsx`)
 
@@ -74,7 +84,10 @@ byte cap): `leftOut` lists it.
 * A click runs `view.open.url` with `http://localhost:<port>` (`openUrl`). The stop square
   (error colour) is the row's sibling laid over the value column, as in the lineage group:
   hover or keyboard focus shows it, Enter stops without opening. It runs
-  `thread.shell.stop` (`stopShell` in `stores/threadActions.ts`).
+  `thread.shell.stop` (`stopShell` in `stores/threadActions.ts`) through `holdOnce`
+  (`stores/threadInfo.ts`, beside `runOnce`): the square is pending (half opacity,
+  `aria-disabled`) from the press until the shell leaves the list and its row unmounts
+  (`releasePending`), or at once again when the command fails.
 * Shells without a port stay in the "N shells · running" fold, "N more shells" below server
   rows.
 * `sameThread` compares the shells by value (each Updated event carries new objects).
@@ -88,11 +101,15 @@ byte cap): `leftOut` lists it.
 * Go: `parseListen`, `Ports`, a live `ListeningIn`/`Children`/`Stdouts` over a python
   listener; `taskOfOutput`; the watch's schedule on a fake clock (map retries, burst,
   cadence, one call for all groups, only changes published, give-up after the last retry);
-  lsof failing turns it off; through the fake Claude stream: group and ports on the Thread,
-  stop ends a real process group and writes the note, the end drops the shell; the API
-  mapper; the command and `thread get` lines.
+  the failure rule (lsof missing when mapping or probing, killed every time, killed twice
+  then fine, sysctl failing once); through the fake Claude stream: group and ports on the
+  Thread, stop ends a real process group and writes one note, a second stop does nothing,
+  the end drops the shell; the refusals (`TestStopShellRefuses`: no group, group 1, a
+  group changed since it was found, another Claude process) signal no group and write no
+  note; the API mapper; the command and `thread get` lines.
 * GUI: `shellRuntime`, `shellCount(n, more)`; e2e `servers`: two rows, line 2, `+1` and the
-  hover, "2 more shells", click opens `http://localhost:9399`, stop by click and by Enter.
+  hover, "2 more shells", click opens `http://localhost:9399`, stop by double click (one
+  command) and by Enter; `holdOnce`.
 
 ## Measured
 
@@ -126,7 +143,15 @@ probe).
 
 ## Follow-ups
 
-* Tell Claude a stop was the user's (the resume note path, as for interrupts) so it does not
-  report the stopped server as a crash.
+* Tell Claude the user stopped the shell, so it does not report the stopped server as a
+  crash: a steer sent just before the SIGTERM. How it orders with the wake turn Claude
+  starts for the shell's end (wake.go) is still to be designed. Not built.
 * Shells a subagent started (owned_by_subagent) are not listed, so their servers are not
   either.
+
+## Review fixes (PR #416)
+
+One commit each: the stop looks the group up again right before the kill and refuses unless
+it is the cached group under the same Claude process; table tests for the refusals; a
+double stop is one stop (daemon `shellStops`, card `holdOnce`); the watch turns off only
+when lsof is missing or after 3 failures in a row.
