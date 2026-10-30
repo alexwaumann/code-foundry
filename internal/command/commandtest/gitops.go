@@ -17,6 +17,8 @@ type GitOps struct {
 	Calls
 	Err error
 	Op  *v1.GitOp
+	// Apps is what ListEditorApps returns.
+	Apps []*v1.EditorApp
 }
 
 var _ command.GitOpsBackend = (*GitOps)(nil)
@@ -102,4 +104,13 @@ func (f *GitOps) OpenUrl(_ context.Context, r *connect.Request[v1.OpenUrlRequest
 		return nil, err
 	}
 	return connect.NewResponse(&v1.OpenUrlResponse{Op: op}), nil
+}
+
+// ListEditorApps implements command.GitOpsBackend: Apps.
+func (f *GitOps) ListEditorApps(_ context.Context, r *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return connect.NewResponse(&v1.ListEditorAppsResponse{Apps: f.Apps}), nil
 }

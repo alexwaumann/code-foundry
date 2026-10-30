@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/model"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -309,6 +310,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.BackgroundShellsRunning = int32(s.BackgroundShellsRunning)
 	p.BackgroundWakePending = s.WakePending
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
+	p.ContextWindow = model.ContextWindow(s.Model)
 	if !s.CacheExpiresAt.IsZero() {
 		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)
 	}

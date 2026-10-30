@@ -940,13 +940,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		return err // not exec's ENOENT, which reads as a missing claude (cwd.go)
 	}
 
-	if !m.opts.DisablePreTrust {
-		if changed, err := trustWorktree(m.opts.Paths.Config, s.WorktreePath); err != nil {
-			m.log.Warn("pre-trust worktree failed", "thread", id, "path", s.WorktreePath, "err", err)
-		} else if changed {
-			m.log.Info("pre-trusted worktree in claude config", "thread", id, "path", realPath(s.WorktreePath))
-		}
-	}
+	m.preTrustCheckouts(s)
 
 	r := newRunner(m, id, s.WorktreePath, l)
 	if l.resume == "" {

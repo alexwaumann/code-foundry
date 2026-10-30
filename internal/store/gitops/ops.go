@@ -296,7 +296,7 @@ func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
 }
 
 // OpenEditor implements Store: the worktree, or o.File (at o.Line where the editor
-// takes one; editorArgs), in the configured editor.
+// takes one; editorArgs), in the configured editor, or with o.App in that app.
 func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 	t, err := m.resolve(o.WorktreePath)
 	if err != nil {
@@ -305,6 +305,19 @@ func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 	file, err := m.resolveFile(t, o.File)
 	if err != nil {
 		return Op{}, err
+	}
+	if o.App != "" {
+		app, err := m.editorApp(ctx, o.App)
+		if err != nil {
+			return Op{}, err
+		}
+		p := cmp.Or(file, t.path)
+		return m.submit(ctx, KindOpenEditor, "Open "+filepath.Base(p)+" in "+app.Name, t, false, func(ctx context.Context, x *run) (string, string, error) {
+			if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-b", app.BundleID, p}}); err != nil {
+				return "", "", err
+			}
+			return "opened " + filepath.Base(p) + " in " + app.Name, "", nil
+		})
 	}
 	env := systemEditorEnv()
 	if m.opts.editorEnv != nil {

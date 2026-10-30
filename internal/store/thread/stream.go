@@ -811,8 +811,10 @@ func (r *runner) onViewers() {
 	}
 }
 
-// streamCd moves the conversation to req's member with set_cwd (RunIn). The member is
-// pre-trusted first: set_cwd refuses an untrusted folder ("needs_trust").
+// streamCd moves the conversation to req's member with set_cwd (RunIn). set_cwd refuses
+// an untrusted folder ("needs_trust"), and the running claude may not see trust written
+// now yet: spawn pre-trusted every member (preTrustCheckouts); this covers a member
+// recorded since.
 func (r *runner) streamCd(req cdRequest) {
 	fail := func(msg string) {
 		r.log().warn("run in failed", "path", req.path, "err", msg)

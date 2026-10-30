@@ -824,7 +824,11 @@ type OpenEditorRequest struct {
 	File string `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
 	// 1-based line to open file at; 0 for none. VS Code, Cursor and Windsurf get
 	// `-g file:line`, Zed and Sublime Text `file:line`; other editors only the file.
-	Line          uint32 `protobuf:"varint,3,opt,name=line,proto3" json:"line,omitempty"`
+	Line uint32 `protobuf:"varint,3,opt,name=line,proto3" json:"line,omitempty"`
+	// The bundle id of an installed editor app (EditorApp.bundle_id) to open with
+	// (`open -b`) instead of the configured editor; line is then ignored. An id
+	// ListEditorApps does not list is INVALID_ARGUMENT.
+	App           string `protobuf:"bytes,4,opt,name=app,proto3" json:"app,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -880,6 +884,167 @@ func (x *OpenEditorRequest) GetLine() uint32 {
 	return 0
 }
 
+func (x *OpenEditorRequest) GetApp() string {
+	if x != nil {
+		return x.App
+	}
+	return ""
+}
+
+type ListEditorAppsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Detect again instead of answering from the cache.
+	Refresh       bool `protobuf:"varint,1,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListEditorAppsRequest) Reset() {
+	*x = ListEditorAppsRequest{}
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEditorAppsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEditorAppsRequest) ProtoMessage() {}
+
+func (x *ListEditorAppsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEditorAppsRequest.ProtoReflect.Descriptor instead.
+func (*ListEditorAppsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListEditorAppsRequest) GetRefresh() bool {
+	if x != nil {
+		return x.Refresh
+	}
+	return false
+}
+
+type ListEditorAppsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// In the daemon's registry order (editors, then JetBrains IDEs, then Xcode).
+	Apps          []*EditorApp `protobuf:"bytes,1,rep,name=apps,proto3" json:"apps,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListEditorAppsResponse) Reset() {
+	*x = ListEditorAppsResponse{}
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEditorAppsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEditorAppsResponse) ProtoMessage() {}
+
+func (x *ListEditorAppsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEditorAppsResponse.ProtoReflect.Descriptor instead.
+func (*ListEditorAppsResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListEditorAppsResponse) GetApps() []*EditorApp {
+	if x != nil {
+		return x.Apps
+	}
+	return nil
+}
+
+// EditorApp is an editor installed as an app bundle.
+type EditorApp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Display name: "VS Code", "Cursor", "GoLand", "Xcode".
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// CFBundleIdentifier: OpenEditorRequest.app.
+	BundleId string `protobuf:"bytes,2,opt,name=bundle_id,json=bundleId,proto3" json:"bundle_id,omitempty"`
+	// The .app found.
+	Path          string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorApp) Reset() {
+	*x = EditorApp{}
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorApp) ProtoMessage() {}
+
+func (x *EditorApp) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorApp.ProtoReflect.Descriptor instead.
+func (*EditorApp) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EditorApp) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EditorApp) GetBundleId() string {
+	if x != nil {
+		return x.BundleId
+	}
+	return ""
+}
+
+func (x *EditorApp) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
 type OpenEditorResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Op            *GitOp                 `protobuf:"bytes,1,opt,name=op,proto3" json:"op,omitempty"`
@@ -889,7 +1054,7 @@ type OpenEditorResponse struct {
 
 func (x *OpenEditorResponse) Reset() {
 	*x = OpenEditorResponse{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -901,7 +1066,7 @@ func (x *OpenEditorResponse) String() string {
 func (*OpenEditorResponse) ProtoMessage() {}
 
 func (x *OpenEditorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -914,7 +1079,7 @@ func (x *OpenEditorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenEditorResponse.ProtoReflect.Descriptor instead.
 func (*OpenEditorResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OpenEditorResponse) GetOp() *GitOp {
@@ -936,7 +1101,7 @@ type RevealRequest struct {
 
 func (x *RevealRequest) Reset() {
 	*x = RevealRequest{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +1113,7 @@ func (x *RevealRequest) String() string {
 func (*RevealRequest) ProtoMessage() {}
 
 func (x *RevealRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +1126,7 @@ func (x *RevealRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealRequest.ProtoReflect.Descriptor instead.
 func (*RevealRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RevealRequest) GetWorktreePath() string {
@@ -987,7 +1152,7 @@ type RevealResponse struct {
 
 func (x *RevealResponse) Reset() {
 	*x = RevealResponse{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -999,7 +1164,7 @@ func (x *RevealResponse) String() string {
 func (*RevealResponse) ProtoMessage() {}
 
 func (x *RevealResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1012,7 +1177,7 @@ func (x *RevealResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealResponse.ProtoReflect.Descriptor instead.
 func (*RevealResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RevealResponse) GetOp() *GitOp {
@@ -1032,7 +1197,7 @@ type OpenUrlRequest struct {
 
 func (x *OpenUrlRequest) Reset() {
 	*x = OpenUrlRequest{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1044,7 +1209,7 @@ func (x *OpenUrlRequest) String() string {
 func (*OpenUrlRequest) ProtoMessage() {}
 
 func (x *OpenUrlRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1057,7 +1222,7 @@ func (x *OpenUrlRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenUrlRequest.ProtoReflect.Descriptor instead.
 func (*OpenUrlRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *OpenUrlRequest) GetUrl() string {
@@ -1076,7 +1241,7 @@ type OpenUrlResponse struct {
 
 func (x *OpenUrlResponse) Reset() {
 	*x = OpenUrlResponse{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1088,7 +1253,7 @@ func (x *OpenUrlResponse) String() string {
 func (*OpenUrlResponse) ProtoMessage() {}
 
 func (x *OpenUrlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1101,7 +1266,7 @@ func (x *OpenUrlResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenUrlResponse.ProtoReflect.Descriptor instead.
 func (*OpenUrlResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *OpenUrlResponse) GetOp() *GitOp {
@@ -1119,7 +1284,7 @@ type ListGitOpsRequest struct {
 
 func (x *ListGitOpsRequest) Reset() {
 	*x = ListGitOpsRequest{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1131,7 +1296,7 @@ func (x *ListGitOpsRequest) String() string {
 func (*ListGitOpsRequest) ProtoMessage() {}
 
 func (x *ListGitOpsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1144,7 +1309,7 @@ func (x *ListGitOpsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGitOpsRequest.ProtoReflect.Descriptor instead.
 func (*ListGitOpsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{20}
 }
 
 type ListGitOpsResponse struct {
@@ -1157,7 +1322,7 @@ type ListGitOpsResponse struct {
 
 func (x *ListGitOpsResponse) Reset() {
 	*x = ListGitOpsResponse{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1169,7 +1334,7 @@ func (x *ListGitOpsResponse) String() string {
 func (*ListGitOpsResponse) ProtoMessage() {}
 
 func (x *ListGitOpsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1182,7 +1347,7 @@ func (x *ListGitOpsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGitOpsResponse.ProtoReflect.Descriptor instead.
 func (*ListGitOpsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListGitOpsResponse) GetOps() []*GitOp {
@@ -1200,7 +1365,7 @@ type WatchGitOpsRequest struct {
 
 func (x *WatchGitOpsRequest) Reset() {
 	*x = WatchGitOpsRequest{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1212,7 +1377,7 @@ func (x *WatchGitOpsRequest) String() string {
 func (*WatchGitOpsRequest) ProtoMessage() {}
 
 func (x *WatchGitOpsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1225,7 +1390,7 @@ func (x *WatchGitOpsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchGitOpsRequest.ProtoReflect.Descriptor instead.
 func (*WatchGitOpsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{22}
 }
 
 type GitOpsEvent struct {
@@ -1243,7 +1408,7 @@ type GitOpsEvent struct {
 
 func (x *GitOpsEvent) Reset() {
 	*x = GitOpsEvent{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1255,7 +1420,7 @@ func (x *GitOpsEvent) String() string {
 func (*GitOpsEvent) ProtoMessage() {}
 
 func (x *GitOpsEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1268,7 +1433,7 @@ func (x *GitOpsEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitOpsEvent.ProtoReflect.Descriptor instead.
 func (*GitOpsEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GitOpsEvent) GetEvent() isGitOpsEvent_Event {
@@ -1356,7 +1521,7 @@ type GitOpsSnapshot struct {
 
 func (x *GitOpsSnapshot) Reset() {
 	*x = GitOpsSnapshot{}
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1368,7 +1533,7 @@ func (x *GitOpsSnapshot) String() string {
 func (*GitOpsSnapshot) ProtoMessage() {}
 
 func (x *GitOpsSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_gitops_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_gitops_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1381,7 +1546,7 @@ func (x *GitOpsSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitOpsSnapshot.ProtoReflect.Descriptor instead.
 func (*GitOpsSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_gitops_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GitOpsSnapshot) GetOps() []*GitOp {
@@ -1443,11 +1608,20 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\x16OpenPullRequestRequest\x12#\n" +
 	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\"@\n" +
 	"\x17OpenPullRequestResponse\x12%\n" +
-	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"`\n" +
+	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"r\n" +
 	"\x11OpenEditorRequest\x12#\n" +
 	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\x12\x12\n" +
 	"\x04file\x18\x02 \x01(\tR\x04file\x12\x12\n" +
-	"\x04line\x18\x03 \x01(\rR\x04line\";\n" +
+	"\x04line\x18\x03 \x01(\rR\x04line\x12\x10\n" +
+	"\x03app\x18\x04 \x01(\tR\x03app\"1\n" +
+	"\x15ListEditorAppsRequest\x12\x18\n" +
+	"\arefresh\x18\x01 \x01(\bR\arefresh\"G\n" +
+	"\x16ListEditorAppsResponse\x12-\n" +
+	"\x04apps\x18\x01 \x03(\v2\x19.codefoundry.v1.EditorAppR\x04apps\"P\n" +
+	"\tEditorApp\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
+	"\tbundle_id\x18\x02 \x01(\tR\bbundleId\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\";\n" +
 	"\x12OpenEditorResponse\x12%\n" +
 	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"H\n" +
 	"\rRevealRequest\x12#\n" +
@@ -1487,7 +1661,7 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\x13GIT_OP_STATE_QUEUED\x10\x01\x12\x18\n" +
 	"\x14GIT_OP_STATE_RUNNING\x10\x02\x12\x1a\n" +
 	"\x16GIT_OP_STATE_SUCCEEDED\x10\x03\x12\x17\n" +
-	"\x13GIT_OP_STATE_FAILED\x10\x042\xd4\x06\n" +
+	"\x13GIT_OP_STATE_FAILED\x10\x042\xb7\a\n" +
 	"\rGitOpsService\x12L\n" +
 	"\x05Fetch\x12\x1f.codefoundry.v1.GitFetchRequest\x1a .codefoundry.v1.GitFetchResponse\"\x00\x12I\n" +
 	"\x04Pull\x12\x1e.codefoundry.v1.GitPullRequest\x1a\x1f.codefoundry.v1.GitPullResponse\"\x00\x12I\n" +
@@ -1495,7 +1669,8 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\x11CreatePullRequest\x12(.codefoundry.v1.CreatePullRequestRequest\x1a).codefoundry.v1.CreatePullRequestResponse\"\x00\x12d\n" +
 	"\x0fOpenPullRequest\x12&.codefoundry.v1.OpenPullRequestRequest\x1a'.codefoundry.v1.OpenPullRequestResponse\"\x00\x12U\n" +
 	"\n" +
-	"OpenEditor\x12!.codefoundry.v1.OpenEditorRequest\x1a\".codefoundry.v1.OpenEditorResponse\"\x00\x12I\n" +
+	"OpenEditor\x12!.codefoundry.v1.OpenEditorRequest\x1a\".codefoundry.v1.OpenEditorResponse\"\x00\x12a\n" +
+	"\x0eListEditorApps\x12%.codefoundry.v1.ListEditorAppsRequest\x1a&.codefoundry.v1.ListEditorAppsResponse\"\x00\x12I\n" +
 	"\x06Reveal\x12\x1d.codefoundry.v1.RevealRequest\x1a\x1e.codefoundry.v1.RevealResponse\"\x00\x12L\n" +
 	"\aOpenUrl\x12\x1e.codefoundry.v1.OpenUrlRequest\x1a\x1f.codefoundry.v1.OpenUrlResponse\"\x00\x12O\n" +
 	"\x04List\x12!.codefoundry.v1.ListGitOpsRequest\x1a\".codefoundry.v1.ListGitOpsResponse\"\x00\x12L\n" +
@@ -1515,7 +1690,7 @@ func file_codefoundry_v1_gitops_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_gitops_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_gitops_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_codefoundry_v1_gitops_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_codefoundry_v1_gitops_proto_goTypes = []any{
 	(GitOpKind)(0),                    // 0: codefoundry.v1.GitOpKind
 	(GitOpState)(0),                   // 1: codefoundry.v1.GitOpState
@@ -1531,63 +1706,69 @@ var file_codefoundry_v1_gitops_proto_goTypes = []any{
 	(*OpenPullRequestRequest)(nil),    // 11: codefoundry.v1.OpenPullRequestRequest
 	(*OpenPullRequestResponse)(nil),   // 12: codefoundry.v1.OpenPullRequestResponse
 	(*OpenEditorRequest)(nil),         // 13: codefoundry.v1.OpenEditorRequest
-	(*OpenEditorResponse)(nil),        // 14: codefoundry.v1.OpenEditorResponse
-	(*RevealRequest)(nil),             // 15: codefoundry.v1.RevealRequest
-	(*RevealResponse)(nil),            // 16: codefoundry.v1.RevealResponse
-	(*OpenUrlRequest)(nil),            // 17: codefoundry.v1.OpenUrlRequest
-	(*OpenUrlResponse)(nil),           // 18: codefoundry.v1.OpenUrlResponse
-	(*ListGitOpsRequest)(nil),         // 19: codefoundry.v1.ListGitOpsRequest
-	(*ListGitOpsResponse)(nil),        // 20: codefoundry.v1.ListGitOpsResponse
-	(*WatchGitOpsRequest)(nil),        // 21: codefoundry.v1.WatchGitOpsRequest
-	(*GitOpsEvent)(nil),               // 22: codefoundry.v1.GitOpsEvent
-	(*GitOpsSnapshot)(nil),            // 23: codefoundry.v1.GitOpsSnapshot
-	(*timestamppb.Timestamp)(nil),     // 24: google.protobuf.Timestamp
+	(*ListEditorAppsRequest)(nil),     // 14: codefoundry.v1.ListEditorAppsRequest
+	(*ListEditorAppsResponse)(nil),    // 15: codefoundry.v1.ListEditorAppsResponse
+	(*EditorApp)(nil),                 // 16: codefoundry.v1.EditorApp
+	(*OpenEditorResponse)(nil),        // 17: codefoundry.v1.OpenEditorResponse
+	(*RevealRequest)(nil),             // 18: codefoundry.v1.RevealRequest
+	(*RevealResponse)(nil),            // 19: codefoundry.v1.RevealResponse
+	(*OpenUrlRequest)(nil),            // 20: codefoundry.v1.OpenUrlRequest
+	(*OpenUrlResponse)(nil),           // 21: codefoundry.v1.OpenUrlResponse
+	(*ListGitOpsRequest)(nil),         // 22: codefoundry.v1.ListGitOpsRequest
+	(*ListGitOpsResponse)(nil),        // 23: codefoundry.v1.ListGitOpsResponse
+	(*WatchGitOpsRequest)(nil),        // 24: codefoundry.v1.WatchGitOpsRequest
+	(*GitOpsEvent)(nil),               // 25: codefoundry.v1.GitOpsEvent
+	(*GitOpsSnapshot)(nil),            // 26: codefoundry.v1.GitOpsSnapshot
+	(*timestamppb.Timestamp)(nil),     // 27: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_gitops_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.GitOp.kind:type_name -> codefoundry.v1.GitOpKind
 	1,  // 1: codefoundry.v1.GitOp.state:type_name -> codefoundry.v1.GitOpState
-	24, // 2: codefoundry.v1.GitOp.queued_at:type_name -> google.protobuf.Timestamp
-	24, // 3: codefoundry.v1.GitOp.started_at:type_name -> google.protobuf.Timestamp
-	24, // 4: codefoundry.v1.GitOp.finished_at:type_name -> google.protobuf.Timestamp
+	27, // 2: codefoundry.v1.GitOp.queued_at:type_name -> google.protobuf.Timestamp
+	27, // 3: codefoundry.v1.GitOp.started_at:type_name -> google.protobuf.Timestamp
+	27, // 4: codefoundry.v1.GitOp.finished_at:type_name -> google.protobuf.Timestamp
 	2,  // 5: codefoundry.v1.GitFetchResponse.op:type_name -> codefoundry.v1.GitOp
 	2,  // 6: codefoundry.v1.GitPullResponse.op:type_name -> codefoundry.v1.GitOp
 	2,  // 7: codefoundry.v1.GitPushResponse.op:type_name -> codefoundry.v1.GitOp
 	2,  // 8: codefoundry.v1.CreatePullRequestResponse.op:type_name -> codefoundry.v1.GitOp
 	2,  // 9: codefoundry.v1.OpenPullRequestResponse.op:type_name -> codefoundry.v1.GitOp
-	2,  // 10: codefoundry.v1.OpenEditorResponse.op:type_name -> codefoundry.v1.GitOp
-	2,  // 11: codefoundry.v1.RevealResponse.op:type_name -> codefoundry.v1.GitOp
-	2,  // 12: codefoundry.v1.OpenUrlResponse.op:type_name -> codefoundry.v1.GitOp
-	2,  // 13: codefoundry.v1.ListGitOpsResponse.ops:type_name -> codefoundry.v1.GitOp
-	23, // 14: codefoundry.v1.GitOpsEvent.snapshot:type_name -> codefoundry.v1.GitOpsSnapshot
-	2,  // 15: codefoundry.v1.GitOpsEvent.queued:type_name -> codefoundry.v1.GitOp
-	2,  // 16: codefoundry.v1.GitOpsEvent.started:type_name -> codefoundry.v1.GitOp
-	2,  // 17: codefoundry.v1.GitOpsEvent.finished:type_name -> codefoundry.v1.GitOp
-	2,  // 18: codefoundry.v1.GitOpsSnapshot.ops:type_name -> codefoundry.v1.GitOp
-	3,  // 19: codefoundry.v1.GitOpsService.Fetch:input_type -> codefoundry.v1.GitFetchRequest
-	5,  // 20: codefoundry.v1.GitOpsService.Pull:input_type -> codefoundry.v1.GitPullRequest
-	7,  // 21: codefoundry.v1.GitOpsService.Push:input_type -> codefoundry.v1.GitPushRequest
-	9,  // 22: codefoundry.v1.GitOpsService.CreatePullRequest:input_type -> codefoundry.v1.CreatePullRequestRequest
-	11, // 23: codefoundry.v1.GitOpsService.OpenPullRequest:input_type -> codefoundry.v1.OpenPullRequestRequest
-	13, // 24: codefoundry.v1.GitOpsService.OpenEditor:input_type -> codefoundry.v1.OpenEditorRequest
-	15, // 25: codefoundry.v1.GitOpsService.Reveal:input_type -> codefoundry.v1.RevealRequest
-	17, // 26: codefoundry.v1.GitOpsService.OpenUrl:input_type -> codefoundry.v1.OpenUrlRequest
-	19, // 27: codefoundry.v1.GitOpsService.List:input_type -> codefoundry.v1.ListGitOpsRequest
-	21, // 28: codefoundry.v1.GitOpsService.Watch:input_type -> codefoundry.v1.WatchGitOpsRequest
-	4,  // 29: codefoundry.v1.GitOpsService.Fetch:output_type -> codefoundry.v1.GitFetchResponse
-	6,  // 30: codefoundry.v1.GitOpsService.Pull:output_type -> codefoundry.v1.GitPullResponse
-	8,  // 31: codefoundry.v1.GitOpsService.Push:output_type -> codefoundry.v1.GitPushResponse
-	10, // 32: codefoundry.v1.GitOpsService.CreatePullRequest:output_type -> codefoundry.v1.CreatePullRequestResponse
-	12, // 33: codefoundry.v1.GitOpsService.OpenPullRequest:output_type -> codefoundry.v1.OpenPullRequestResponse
-	14, // 34: codefoundry.v1.GitOpsService.OpenEditor:output_type -> codefoundry.v1.OpenEditorResponse
-	16, // 35: codefoundry.v1.GitOpsService.Reveal:output_type -> codefoundry.v1.RevealResponse
-	18, // 36: codefoundry.v1.GitOpsService.OpenUrl:output_type -> codefoundry.v1.OpenUrlResponse
-	20, // 37: codefoundry.v1.GitOpsService.List:output_type -> codefoundry.v1.ListGitOpsResponse
-	22, // 38: codefoundry.v1.GitOpsService.Watch:output_type -> codefoundry.v1.GitOpsEvent
-	29, // [29:39] is the sub-list for method output_type
-	19, // [19:29] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	16, // 10: codefoundry.v1.ListEditorAppsResponse.apps:type_name -> codefoundry.v1.EditorApp
+	2,  // 11: codefoundry.v1.OpenEditorResponse.op:type_name -> codefoundry.v1.GitOp
+	2,  // 12: codefoundry.v1.RevealResponse.op:type_name -> codefoundry.v1.GitOp
+	2,  // 13: codefoundry.v1.OpenUrlResponse.op:type_name -> codefoundry.v1.GitOp
+	2,  // 14: codefoundry.v1.ListGitOpsResponse.ops:type_name -> codefoundry.v1.GitOp
+	26, // 15: codefoundry.v1.GitOpsEvent.snapshot:type_name -> codefoundry.v1.GitOpsSnapshot
+	2,  // 16: codefoundry.v1.GitOpsEvent.queued:type_name -> codefoundry.v1.GitOp
+	2,  // 17: codefoundry.v1.GitOpsEvent.started:type_name -> codefoundry.v1.GitOp
+	2,  // 18: codefoundry.v1.GitOpsEvent.finished:type_name -> codefoundry.v1.GitOp
+	2,  // 19: codefoundry.v1.GitOpsSnapshot.ops:type_name -> codefoundry.v1.GitOp
+	3,  // 20: codefoundry.v1.GitOpsService.Fetch:input_type -> codefoundry.v1.GitFetchRequest
+	5,  // 21: codefoundry.v1.GitOpsService.Pull:input_type -> codefoundry.v1.GitPullRequest
+	7,  // 22: codefoundry.v1.GitOpsService.Push:input_type -> codefoundry.v1.GitPushRequest
+	9,  // 23: codefoundry.v1.GitOpsService.CreatePullRequest:input_type -> codefoundry.v1.CreatePullRequestRequest
+	11, // 24: codefoundry.v1.GitOpsService.OpenPullRequest:input_type -> codefoundry.v1.OpenPullRequestRequest
+	13, // 25: codefoundry.v1.GitOpsService.OpenEditor:input_type -> codefoundry.v1.OpenEditorRequest
+	14, // 26: codefoundry.v1.GitOpsService.ListEditorApps:input_type -> codefoundry.v1.ListEditorAppsRequest
+	18, // 27: codefoundry.v1.GitOpsService.Reveal:input_type -> codefoundry.v1.RevealRequest
+	20, // 28: codefoundry.v1.GitOpsService.OpenUrl:input_type -> codefoundry.v1.OpenUrlRequest
+	22, // 29: codefoundry.v1.GitOpsService.List:input_type -> codefoundry.v1.ListGitOpsRequest
+	24, // 30: codefoundry.v1.GitOpsService.Watch:input_type -> codefoundry.v1.WatchGitOpsRequest
+	4,  // 31: codefoundry.v1.GitOpsService.Fetch:output_type -> codefoundry.v1.GitFetchResponse
+	6,  // 32: codefoundry.v1.GitOpsService.Pull:output_type -> codefoundry.v1.GitPullResponse
+	8,  // 33: codefoundry.v1.GitOpsService.Push:output_type -> codefoundry.v1.GitPushResponse
+	10, // 34: codefoundry.v1.GitOpsService.CreatePullRequest:output_type -> codefoundry.v1.CreatePullRequestResponse
+	12, // 35: codefoundry.v1.GitOpsService.OpenPullRequest:output_type -> codefoundry.v1.OpenPullRequestResponse
+	17, // 36: codefoundry.v1.GitOpsService.OpenEditor:output_type -> codefoundry.v1.OpenEditorResponse
+	15, // 37: codefoundry.v1.GitOpsService.ListEditorApps:output_type -> codefoundry.v1.ListEditorAppsResponse
+	19, // 38: codefoundry.v1.GitOpsService.Reveal:output_type -> codefoundry.v1.RevealResponse
+	21, // 39: codefoundry.v1.GitOpsService.OpenUrl:output_type -> codefoundry.v1.OpenUrlResponse
+	23, // 40: codefoundry.v1.GitOpsService.List:output_type -> codefoundry.v1.ListGitOpsResponse
+	25, // 41: codefoundry.v1.GitOpsService.Watch:output_type -> codefoundry.v1.GitOpsEvent
+	31, // [31:42] is the sub-list for method output_type
+	20, // [20:31] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_gitops_proto_init() }
@@ -1595,7 +1776,7 @@ func file_codefoundry_v1_gitops_proto_init() {
 	if File_codefoundry_v1_gitops_proto != nil {
 		return
 	}
-	file_codefoundry_v1_gitops_proto_msgTypes[20].OneofWrappers = []any{
+	file_codefoundry_v1_gitops_proto_msgTypes[23].OneofWrappers = []any{
 		(*GitOpsEvent_Snapshot)(nil),
 		(*GitOpsEvent_Queued)(nil),
 		(*GitOpsEvent_Started)(nil),
@@ -1607,7 +1788,7 @@ func file_codefoundry_v1_gitops_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_gitops_proto_rawDesc), len(file_codefoundry_v1_gitops_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   22,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

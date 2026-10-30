@@ -43,18 +43,23 @@ export const groups: GroupInit[] = [
 
 const S = SettingType;
 
-/** internal/model's registry, in order: values for --model and their labels. */
-export const MODELS: readonly { value: string; label: string }[] = [
-  { value: "claude-opus-5-5[1m]", label: "Opus 5.5" },
-  { value: "claude-opus-4-8[1m]", label: "Opus 4.8" },
-  { value: "claude-opus-4-7[1m]", label: "Opus 4.7" },
-  { value: "claude-sonnet-5-5[1m]", label: "Sonnet 5.5" },
-  { value: "claude-sonnet-5[1m]", label: "Sonnet 5" },
-  { value: "claude-sonnet-4-6[1m]", label: "Sonnet 4.6" },
-  { value: "claude-haiku-5-5[1m]", label: "Haiku 5.5" },
-  { value: "claude-4.5-haiku[1m]", label: "Haiku 4.5" },
+/** internal/model's registry, in order: values for --model, their labels and context windows (tokens). */
+export const MODELS: readonly { value: string; label: string; contextWindow: number }[] = [
+  { value: "claude-opus-5-5[1m]", label: "Opus 5.5", contextWindow: 1_000_000 },
+  { value: "claude-opus-4-8[1m]", label: "Opus 4.8", contextWindow: 1_000_000 },
+  { value: "claude-opus-4-7[1m]", label: "Opus 4.7", contextWindow: 1_000_000 },
+  { value: "claude-sonnet-5-5[1m]", label: "Sonnet 5.5", contextWindow: 1_000_000 },
+  { value: "claude-sonnet-5[1m]", label: "Sonnet 5", contextWindow: 1_000_000 },
+  { value: "claude-sonnet-4-6[1m]", label: "Sonnet 4.6", contextWindow: 1_000_000 },
+  { value: "claude-haiku-5-5[1m]", label: "Haiku 5.5", contextWindow: 1_000_000 },
+  { value: "claude-4.5-haiku[1m]", label: "Haiku 4.5", contextWindow: 200_000 },
 ];
 export const MODEL_VALUES: string[] = MODELS.map((m) => m.value);
+
+/** Thread.context_window: the registry's window for a model value, 0 when it is not listed. */
+export function contextWindow(model: string): bigint {
+  return BigInt(MODELS.find((m) => m.value === model)?.contextWindow ?? 0);
+}
 
 /** Like settings.Pages: display order; the keybindings page's sections come from the command categories (pages()). */
 export const staticPages: PageInit[] = [

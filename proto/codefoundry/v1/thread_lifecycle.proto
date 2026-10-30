@@ -200,6 +200,10 @@ message Thread {
   // the first result. Persisted. See
   // docs/notes/rendered-threads-cold-cache.md.
   int64 context_tokens = 33;
+  // The context window of the thread's current model (Thread.model) in tokens, from the
+  // daemon's model registry (internal/model); 0 when the registry does not list the
+  // model. context_tokens over it is how full the context is.
+  int64 context_window = 71;
   // When the prompt cache of the thread's conversation expires: its last result
   // plus the threads.cache_ttl_seconds setting (the cache refreshes on every hit, so
   // the last request is what counts). Recomputed when the setting changes. Unset
@@ -972,6 +976,51 @@ message ThreadCheckout {
   // checkout.
   string created_branch = 15;
   bool moved = 16;
+}
+
+message CheckPlacementRequest {
+  // Project ids or names, as CreateThreadRequest.project_ids ("<ref>[:<base>]").
+  repeated string project_ids = 1;
+  // The branch a new worktree asks for (NewWorktree.branch): with a slash, or an existing
+  // branch's name, it is used as is; a slug is wrapped by the branch naming settings.
+  // Empty: the namer names it at Create.
+  string branch = 2;
+  // In place: each project's own checkout (checkout_mode on Create); else new worktrees.
+  bool checkout_mode = 3;
+}
+
+enum PlacementOutcome {
+  PLACEMENT_OUTCOME_UNSPECIFIED = 0;
+  // A new worktree would be made at path (empty while the branch is named at Create).
+  PLACEMENT_OUTCOME_NEW = 1;
+  // The thread would work in the existing checkout at path, on branch: the branch's
+  // worktree (another thread may use it), or in checkout mode the project's own checkout.
+  PLACEMENT_OUTCOME_SHARE = 2;
+  // A plain folder (no git): threads run in it.
+  PLACEMENT_OUTCOME_FOLDER = 3;
+  // Create would be refused; message is its error.
+  PLACEMENT_OUTCOME_REFUSED = 4;
+}
+
+message MemberPlacement {
+  string project_id = 1;
+  string project_name = 2;
+  PlacementOutcome outcome = 3;
+  // NEW: the new worktree's path and branch; SHARE: the checkout and its HEAD branch
+  // (empty when detached); FOLDER: the folder.
+  string path = 4;
+  string branch = 5;
+  // REFUSED: Create's error message.
+  string message = 6;
+}
+
+message CheckPlacementResponse {
+  // The branch a worktree-mode Create would use. Empty in checkout mode, and when
+  // branch_named_at_create (the namer picks it from the prompt).
+  string branch = 1;
+  bool branch_named_at_create = 2;
+  // One per project, in project id order.
+  repeated MemberPlacement members = 3;
 }
 
 message ThreadCheckoutsResponse {

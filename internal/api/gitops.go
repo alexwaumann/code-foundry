@@ -88,12 +88,22 @@ func (h *GitOps) OpenPullRequest(ctx context.Context, req *connect.Request[v1.Op
 // OpenEditor implements GitOpsServiceHandler.
 func (h *GitOps) OpenEditor(ctx context.Context, req *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error) {
 	op, err := h.store.OpenEditor(ctx, gitops.OpenOptions{
-		WorktreePath: req.Msg.GetWorktreePath(), File: req.Msg.GetFile(), Line: int(req.Msg.GetLine()),
+		WorktreePath: req.Msg.GetWorktreePath(), File: req.Msg.GetFile(), Line: int(req.Msg.GetLine()), App: req.Msg.GetApp(),
 	})
 	if err != nil {
 		return nil, gitopsError(err)
 	}
 	return connect.NewResponse(&v1.OpenEditorResponse{Op: gitOpToProto(op)}), nil
+}
+
+// ListEditorApps implements GitOpsServiceHandler.
+func (h *GitOps) ListEditorApps(ctx context.Context, req *connect.Request[v1.ListEditorAppsRequest]) (*connect.Response[v1.ListEditorAppsResponse], error) {
+	apps := h.store.EditorApps(ctx, req.Msg.GetRefresh())
+	out := &v1.ListEditorAppsResponse{Apps: make([]*v1.EditorApp, len(apps))}
+	for i, a := range apps {
+		out.Apps[i] = &v1.EditorApp{Name: a.Name, BundleId: a.BundleID, Path: a.Path}
+	}
+	return connect.NewResponse(out), nil
 }
 
 // Reveal implements GitOpsServiceHandler.

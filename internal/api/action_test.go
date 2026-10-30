@@ -110,8 +110,36 @@ func TestActionUnary(t *testing.T) {
 	if other, _ := c.List(ctx, connect.NewRequest(&v1.ListActionsRequest{ProjectId: "api"})); len(other.Msg.GetActions())+len(other.Msg.GetRuns()) != 0 {
 		t.Errorf("List api = %v", other.Msg)
 	}
+	if lr := list.Msg.GetLastRuns(); len(lr) != 1 || lr[0].GetRunId() != r.GetId() || lr[0].GetThreadId() != "s1" ||
+		lr[0].GetMode() != v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL || lr[0].GetStartedAt() == nil {
+		t.Errorf("List last runs = %v", lr)
+	}
+	// The card's pick: the thread's last run, else the project's, else the first action.
+	pick := func(project, thread string) *v1.LastActionRunResponse {
+		t.Helper()
+		res, err := c.LastRun(ctx, connect.NewRequest(&v1.LastActionRunRequest{ProjectId: project, ThreadId: thread}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Msg
+	}
+	if p := pick("web", "s1"); p.GetSource() != v1.ActionPickSource_ACTION_PICK_SOURCE_THREAD || p.GetAction().GetId() != a.GetId() || p.GetLast().GetRunId() != r.GetId() {
+		t.Errorf("LastRun s1 = %v", p)
+	}
+	if p := pick("web", "s2"); p.GetSource() != v1.ActionPickSource_ACTION_PICK_SOURCE_PROJECT || p.GetAction().GetId() != a.GetId() {
+		t.Errorf("LastRun s2 = %v", p)
+	}
+	if p := pick("api", "s1"); p.GetSource() != v1.ActionPickSource_ACTION_PICK_SOURCE_UNSPECIFIED || p.GetAction() != nil {
+		t.Errorf("LastRun without actions = %v", p)
+	}
+	if _, err := c.LastRun(ctx, connect.NewRequest(&v1.LastActionRunRequest{ThreadId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("LastRun without a project: %v", err)
+	}
 	if _, err := c.Delete(ctx, connect.NewRequest(&v1.DeleteActionRequest{Id: a.GetId()})); err != nil {
 		t.Fatal(err)
+	}
+	if p := pick("web", "s1"); p.GetSource() != v1.ActionPickSource_ACTION_PICK_SOURCE_FIRST || p.GetAction().GetName() != "Build" || p.GetLast() != nil {
+		t.Errorf("LastRun after the delete = %v", p)
 	}
 	if _, err := c.GetRun(ctx, connect.NewRequest(&v1.GetActionRunRequest{RunId: "r-nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("GetRun unknown: %v", err)

@@ -34,6 +34,8 @@ type Fake struct {
 	LocalOnlyProjects map[string]bool
 	// Calls records calls, e.g. "Push /w force=true".
 	Calls []string
+	// Apps is what EditorApps returns.
+	Apps []gitops.EditorApp
 }
 
 var _ gitops.Store = (*Fake)(nil)
@@ -125,9 +127,25 @@ func (f *Fake) OpenPR(_ context.Context, path string) (gitops.Op, error) {
 }
 
 // OpenEditor implements gitops.Store. It records "OpenEditor <worktree>", plus
-// " <file>:<line>" with a file.
+// " <file>:<line>" with a file and " app=<bundle id>" with an app.
 func (f *Fake) OpenEditor(_ context.Context, o gitops.OpenOptions) (gitops.Op, error) {
-	return f.do(gitops.KindOpenEditor, o.WorktreePath, "OpenEditor "+o.WorktreePath+fileSuffix(o, true))
+	call := "OpenEditor " + o.WorktreePath + fileSuffix(o, true)
+	if o.App != "" {
+		call += " app=" + o.App
+	}
+	return f.do(gitops.KindOpenEditor, o.WorktreePath, call)
+}
+
+// EditorApps implements gitops.Store: Apps. It records "EditorApps" (" refresh").
+func (f *Fake) EditorApps(_ context.Context, refresh bool) []gitops.EditorApp {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	call := "EditorApps"
+	if refresh {
+		call += " refresh"
+	}
+	f.Calls = append(f.Calls, call)
+	return append([]gitops.EditorApp(nil), f.Apps...)
 }
 
 // Reveal implements gitops.Store. It records "Reveal <worktree>", plus " <file>" with

@@ -562,6 +562,9 @@ type Store interface {
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds
 	// the cwd, the deepest winning) and lists its checkouts (checkouts.go).
 	Checkouts(ctx context.Context, ref CheckoutsRef) (ThreadCheckouts, error)
+	// CheckPlacement reports where a new thread would go, per project, without making
+	// anything (placement_check.go).
+	CheckPlacement(ctx context.Context, c PlacementCheck) (PlacementReport, error)
 	// CheckoutHints are the collision hints for t's checkouts: members another thread
 	// that is not archived also has (checkouts.go). Never an error; nil when none.
 	CheckoutHints(t Thread) []string

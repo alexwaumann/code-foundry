@@ -31,7 +31,7 @@ import (
 //     cancels it, times out or goes. action.wait may record a lost terminal run as
 //     finished, which is the end it already had, not one it causes.
 var readOnly = []string{
-	"action.list", "action.runs", "action.wait",
+	"action.last", "action.list", "action.runs", "action.wait",
 	"app.version",
 	"daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.status",
@@ -43,11 +43,11 @@ var readOnly = []string{
 	"settings.get", "settings.path",
 	"terminal.list",
 	"theme.check", "theme.list", "theme.show",
-	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.prompts", "thread.read",
+	"thread.agents", "thread.checkouts", "thread.commands", "thread.flags", "thread.get", "thread.items", "thread.list", "thread.placement.check", "thread.prompts", "thread.read",
 	"thread.reports", "thread.subscriptions", "thread.wait",
 	"ui.presence",
 	"usage.show",
-	"workspace.list",
+	"workspace.list", "worktree.editors",
 }
 
 // Every registered command is classified on purpose: the read-only ones are exactly the

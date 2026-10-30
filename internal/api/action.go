@@ -32,17 +32,46 @@ func (h *Action) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// List returns a project's actions (every project's without project_id) and the runs.
-func (h *Action) List(_ context.Context, req *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
+// List returns a project's actions (every project's without project_id), the runs and
+// each action's newest run record.
+func (h *Action) List(ctx context.Context, req *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
 	snap := h.store.Snapshot()
 	projectID := req.Msg.GetProjectId()
-	out := &v1.ListActionsResponse{Actions: actionsToProto(snap.ForProject(projectID))}
+	acts := snap.ForProject(projectID)
+	out := &v1.ListActionsResponse{Actions: actionsToProto(acts)}
 	for _, r := range snap.Runs {
 		if projectID == "" || r.ProjectID == projectID {
 			out.Runs = append(out.Runs, actionRunToProto(r))
 		}
 	}
+	recs, err := h.store.RunRecords(ctx, projectID)
+	if err != nil {
+		return nil, actionError(err)
+	}
+	latest := action.LatestByAction(recs)
+	listed := make(map[string]bool, len(acts))
+	for _, a := range acts {
+		listed[a.ID] = true
+	}
+	for _, r := range recs {
+		if l, ok := latest[r.ActionID]; ok && l.RunID == r.RunID && listed[r.ActionID] {
+			out.LastRuns = append(out.LastRuns, actionRunRecordToProto(r))
+		}
+	}
 	return connect.NewResponse(out), nil
+}
+
+// LastRun picks the action a thread's card offers (action.PickAction).
+func (h *Action) LastRun(ctx context.Context, req *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error) {
+	projectID := req.Msg.GetProjectId()
+	if projectID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id is required"))
+	}
+	recs, err := h.store.RunRecords(ctx, projectID)
+	if err != nil {
+		return nil, actionError(err)
+	}
+	return connect.NewResponse(actionPickToProto(action.PickAction(h.store.Snapshot().ForProject(projectID), recs, req.Msg.GetThreadId()))), nil
 }
 
 // Create adds an action.
@@ -271,6 +300,36 @@ func actionRunToProto(r action.Run) *v1.ActionRun {
 		p.FinishedAt = timestamppb.New(r.FinishedAt)
 	}
 	return p
+}
+
+func actionRunRecordToProto(r action.RunRecord) *v1.ActionRunRecord {
+	p := &v1.ActionRunRecord{
+		RunId: r.RunID, ActionId: r.ActionID, ProjectId: r.ProjectID, ThreadId: r.ThreadID,
+		Mode: actionModeToProto(r.Mode), Trigger: actionTriggerToProto(r.Trigger),
+	}
+	if !r.StartedAt.IsZero() {
+		p.StartedAt = timestamppb.New(r.StartedAt)
+	}
+	return p
+}
+
+// actionPickSources maps action.PickSource to the proto enum.
+var actionPickSources = map[action.PickSource]v1.ActionPickSource{
+	action.PickThread:  v1.ActionPickSource_ACTION_PICK_SOURCE_THREAD,
+	action.PickProject: v1.ActionPickSource_ACTION_PICK_SOURCE_PROJECT,
+	action.PickFirst:   v1.ActionPickSource_ACTION_PICK_SOURCE_FIRST,
+}
+
+func actionPickToProto(p action.Pick) *v1.LastActionRunResponse {
+	out := &v1.LastActionRunResponse{Source: actionPickSources[p.Source]}
+	if p.Source == action.PickNone {
+		return out
+	}
+	out.Action = actionToProto(p.Action)
+	if p.Last.RunID != "" {
+		out.Last = actionRunRecordToProto(p.Last)
+	}
+	return out
 }
 
 // actionError maps store errors to Connect codes.

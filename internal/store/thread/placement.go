@@ -525,7 +525,7 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	}
 	if len(git) == 0 {
 		// Before the namer: a project without git runs threads in its one checkout.
-		return p, fmt.Errorf("%w: %s is not a git repository; threads run in its current checkout", ErrFailedPrecondition, plain.Name)
+		return p, noGitForWorktree(*plain)
 	}
 	var nw NewWorktree
 	if o.NewWorktree != nil {
@@ -689,16 +689,10 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 	// finding A7): the thread would need a second worktree on that branch. So does the
 	// branch's default path holding a worktree switched to another branch: that is another
 	// thread's checkout now, never shared as the branch's (thread-checkouts).
+	// worktreeFor is also the placement check's (placement_check.go), on disk too, so the
+	// check and the Create refuse with the same message before anything is made.
 	for _, r := range projects {
-		if _, ok := m.memberWorktree(r, branch); ok {
-			continue
-		}
-		if cur, ok := m.opts.Projects.Snapshot().Project(r.ID); ok {
-			r = cur
-		}
-		if err := mainCheckoutBusy(r, branch); err != nil {
-			errs = append(errs, err)
-		} else if err := m.defaultPathTaken(r, branch, false); err != nil {
+		if _, _, err := m.worktreeFor(r, branch, true); err != nil {
 			errs = append(errs, err)
 		}
 	}

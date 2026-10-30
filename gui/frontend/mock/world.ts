@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
-import { PermissionMode, ThreadFlagLevel, ThreadKind, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -20,7 +20,7 @@ import { cloneExists } from "./clone";
 import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
-import { MockSettings, MODEL_VALUES } from "./settings";
+import { contextWindow, MockSettings, MODEL_VALUES } from "./settings";
 import { MockBackdrops } from "./backdrops";
 import { themesFor } from "../src/themes";
 import { MockUpdater, type RestartCost } from "./update";
@@ -1066,6 +1066,58 @@ export class World {
     return out;
   }
 
+  /**
+   * ThreadService.CheckPlacement like the daemon's (thread/placement_check.go), simplified:
+   * a branch with a slash is used as is, any other non-empty one too (no naming settings
+   * here), "" is named at create; per project an existing worktree on the branch is
+   * shared, a main checkout on it or a default path holding another branch refuses, else
+   * a new worktree at the default path. Checkout mode shares each project's own checkout.
+   */
+  checkPlacement(refs: readonly string[], branch: string, checkoutMode: boolean) {
+    const projects = refs.map((r) => this.projects.get(r) ?? [...this.projects.values()].find((p) => p.name === r));
+    if (projects.length === 0) throw new ConnectError("invalid argument: a project is required", Code.InvalidArgument);
+    const list = projects.map((p, i) => {
+      if (!p) throw new ConnectError(`invalid argument: no project "${refs[i] ?? ""}"`, Code.InvalidArgument);
+      return p;
+    });
+    list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    const main = (p: MockProject) => p.worktrees.find((w) => w.isMain) ?? p.worktrees[0];
+    const base = (p: MockProject) => ({ projectId: p.id, projectName: p.name });
+    if (checkoutMode) {
+      return {
+        members: list.map((p) => ({ ...base(p), outcome: p.git === false ? PlacementOutcome.FOLDER : PlacementOutcome.SHARE, path: main(p)?.path ?? p.path, branch: main(p)?.branch ?? "" })),
+      };
+    }
+    const git = list.filter((p) => p.git !== false);
+    if (git.length === 0) {
+      const first = list.find((p) => p.id === projects[0]?.id) ?? list[0];
+      const message = `failed precondition: ${first?.name ?? ""} is not a git repository; threads run in its current checkout`;
+      return { members: list.map((p) => ({ ...base(p), outcome: PlacementOutcome.REFUSED, message })) };
+    }
+    const b = branch.trim();
+    return {
+      branch: b,
+      branchNamedAtCreate: b === "",
+      members: list.map((p) => {
+        if (p.git === false) return { ...base(p), outcome: PlacementOutcome.FOLDER, path: main(p)?.path ?? p.path };
+        if (!b) return { ...base(p), outcome: PlacementOutcome.NEW };
+        const want = this.worktreePathFor(p, b);
+        const onBranch = p.worktrees.find((w) => !w.isMain && !w.detached && w.branch === b);
+        if (onBranch) return { ...base(p), outcome: PlacementOutcome.SHARE, path: onBranch.path, branch: b };
+        const m = main(p);
+        if (m && m.branch === b) {
+          return { ...base(p), outcome: PlacementOutcome.REFUSED, message: `failed precondition: ${p.name}'s main checkout at ${m.path} is on ${b}; switch it to another branch, or start the thread in place (--new-worktree=false)` };
+        }
+        const taken = p.worktrees.find((w) => w.path === want);
+        if (taken) {
+          const head = taken.detached || !taken.branch ? `a detached HEAD at ${taken.head.slice(0, 7)}` : taken.branch;
+          return { ...base(p), outcome: PlacementOutcome.REFUSED, message: `failed precondition: ${p.name}'s worktree for ${b} at ${want} has ${head} checked out now; switch it back to ${b}, or pick another branch` };
+        }
+        return { ...base(p), outcome: PlacementOutcome.NEW, path: want, branch: b };
+      }),
+    };
+  }
+
   /** Where the daemon makes `project`'s worktree for `branch` (DefaultWorktreePath). */
   private worktreePathFor(project: MockProject, branch: string): string {
     return `${HOME}/.code-foundry/worktrees/${project.githubSlug || `_local/${project.name}`}/${branch.replace(/\//g, "-")}`;
@@ -1703,6 +1755,7 @@ export class World {
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
+      contextWindow: contextWindow(s.model),
       ...agentCounts(this.logs.agentRunsOf(s.id)),
       agentRuns: listRuns(this.logs.agentRunsOf(s.id)),
       // Shells die with the thread's process (mock/shells.ts).

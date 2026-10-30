@@ -69,6 +69,7 @@ type Options struct {
 	Root string
 
 	editorEnv *editorEnv // tests
+	appEnv    *appEnv    // tests
 }
 
 // Manager is the daemon's Store.
@@ -86,6 +87,7 @@ type Manager struct {
 	finished []Op  // newest first, at most KeepFinished
 	snap     atomic.Pointer[Snapshot]
 	bg       sync.WaitGroup // post-op refreshes
+	apps     editorApps     // EditorApps' cache
 }
 
 var _ Store = (*Manager)(nil)

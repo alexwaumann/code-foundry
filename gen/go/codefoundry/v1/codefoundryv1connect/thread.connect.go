@@ -55,6 +55,9 @@ const (
 	ThreadServiceRunInProcedure = "/codefoundry.v1.ThreadService/RunIn"
 	// ThreadServiceCheckoutsProcedure is the fully-qualified name of the ThreadService's Checkouts RPC.
 	ThreadServiceCheckoutsProcedure = "/codefoundry.v1.ThreadService/Checkouts"
+	// ThreadServiceCheckPlacementProcedure is the fully-qualified name of the ThreadService's
+	// CheckPlacement RPC.
+	ThreadServiceCheckPlacementProcedure = "/codefoundry.v1.ThreadService/CheckPlacement"
 	// ThreadServicePinProcedure is the fully-qualified name of the ThreadService's Pin RPC.
 	ThreadServicePinProcedure = "/codefoundry.v1.ThreadService/Pin"
 	// ThreadServiceArchiveProcedure is the fully-qualified name of the ThreadService's Archive RPC.
@@ -182,6 +185,12 @@ type ThreadServiceClient interface {
 	// folder the folder; otherwise each member's own checkout. See
 	// docs/notes/workspaces-v2-1-threads.md.
 	Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error)
+	// CheckPlacement reports where a new thread with these projects, branch and mode would
+	// go, per project, without making or changing anything: a new worktree at a path, an
+	// existing checkout it would share, a plain folder, or the refusal Create would give
+	// (with its message). It runs Create's own placement checks, so the two agree; like and
+	// creator inheritance are not considered. See docs/notes/thread-info-facts.md.
+	CheckPlacement(context.Context, *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error)
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
@@ -457,6 +466,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Checkouts")),
 			connect.WithClientOptions(opts...),
 		),
+		checkPlacement: connect.NewClient[v1.CheckPlacementRequest, v1.CheckPlacementResponse](
+			httpClient,
+			baseURL+ThreadServiceCheckPlacementProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("CheckPlacement")),
+			connect.WithClientOptions(opts...),
+		),
 		pin: connect.NewClient[v1.PinThreadRequest, v1.PinThreadResponse](
 			httpClient,
 			baseURL+ThreadServicePinProcedure,
@@ -677,6 +692,7 @@ type threadServiceClient struct {
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
 	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
+	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
 	setSidebar        *connect.Client[v1.SetThreadSidebarRequest, v1.SetThreadSidebarResponse]
@@ -766,6 +782,11 @@ func (c *threadServiceClient) RunIn(ctx context.Context, req *connect.Request[v1
 // Checkouts calls codefoundry.v1.ThreadService.Checkouts.
 func (c *threadServiceClient) Checkouts(ctx context.Context, req *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
 	return c.checkouts.CallUnary(ctx, req)
+}
+
+// CheckPlacement calls codefoundry.v1.ThreadService.CheckPlacement.
+func (c *threadServiceClient) CheckPlacement(ctx context.Context, req *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error) {
+	return c.checkPlacement.CallUnary(ctx, req)
 }
 
 // Pin calls codefoundry.v1.ThreadService.Pin.
@@ -980,6 +1001,12 @@ type ThreadServiceHandler interface {
 	// folder the folder; otherwise each member's own checkout. See
 	// docs/notes/workspaces-v2-1-threads.md.
 	Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error)
+	// CheckPlacement reports where a new thread with these projects, branch and mode would
+	// go, per project, without making or changing anything: a new worktree at a path, an
+	// existing checkout it would share, a plain folder, or the refusal Create would give
+	// (with its message). It runs Create's own placement checks, so the two agree; like and
+	// creator inheritance are not considered. See docs/notes/thread-info-facts.md.
+	CheckPlacement(context.Context, *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error)
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
@@ -1251,6 +1278,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Checkouts")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceCheckPlacementHandler := connect.NewUnaryHandler(
+		ThreadServiceCheckPlacementProcedure,
+		svc.CheckPlacement,
+		connect.WithSchema(threadServiceMethods.ByName("CheckPlacement")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServicePinHandler := connect.NewUnaryHandler(
 		ThreadServicePinProcedure,
 		svc.Pin,
@@ -1479,6 +1512,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRunInHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckoutsProcedure:
 			threadServiceCheckoutsHandler.ServeHTTP(w, r)
+		case ThreadServiceCheckPlacementProcedure:
+			threadServiceCheckPlacementHandler.ServeHTTP(w, r)
 		case ThreadServicePinProcedure:
 			threadServicePinHandler.ServeHTTP(w, r)
 		case ThreadServiceArchiveProcedure:
@@ -1598,6 +1633,10 @@ func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request
 
 func (UnimplementedThreadServiceHandler) Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Checkouts is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) CheckPlacement(context.Context, *connect.Request[v1.CheckPlacementRequest]) (*connect.Response[v1.CheckPlacementResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.CheckPlacement is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {

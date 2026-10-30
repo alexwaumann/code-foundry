@@ -75,6 +75,8 @@ type ThreadBackend interface {
 	ThemeCardShower
 	// CheckoutsBackend backs thread.checkouts (commands_thread_checkouts.go).
 	CheckoutsBackend
+	// PlacementBackend backs thread.placement.check (commands_thread_placement.go).
+	PlacementBackend
 	// PromptsBackend backs thread.prompts (commands_thread_prompts.go).
 	PromptsBackend
 }

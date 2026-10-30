@@ -19,6 +19,9 @@ type OpenOptions struct {
 	File string
 	// Line is 1-based (OpenEditor only); 0 for none.
 	Line int
+	// App (OpenEditor only) is the bundle id of a detected editor (EditorApps) to open
+	// with (`open -b`) instead of the configured editor; Line is then ignored.
+	App string
 }
 
 // resolveFile makes file absolute against the worktree and checks it (symlinks

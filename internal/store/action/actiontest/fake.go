@@ -248,3 +248,18 @@ func (f *Fake) Wait(ctx context.Context, id string) (action.Run, error) {
 		return action.Run{}, ctx.Err()
 	}
 }
+
+// RunRecords implements action.Store: a record of every run Run started, newest first.
+func (f *Fake) RunRecords(_ context.Context, projectID string) ([]action.RunRecord, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []action.RunRecord
+	for i := len(f.runs) - 1; i >= 0; i-- {
+		r := f.runs[i]
+		if projectID == "" || r.ProjectID == projectID {
+			out = append(out, action.RunRecord{RunID: r.ID, ActionID: r.ActionID, ProjectID: r.ProjectID, ThreadID: r.ThreadID,
+				Mode: r.Mode, Trigger: r.Trigger, StartedAt: r.StartedAt})
+		}
+	}
+	return out, nil
+}

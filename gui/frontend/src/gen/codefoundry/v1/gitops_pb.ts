@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/gitops.proto.
  */
 export const file_codefoundry_v1_gitops: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9naXRvcHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIoQDCgVHaXRPcBIKCgJpZBgBIAEoCRInCgRraW5kGAIgASgOMhkuY29kZWZvdW5kcnkudjEuR2l0T3BLaW5kEikKBXN0YXRlGAMgASgOMhouY29kZWZvdW5kcnkudjEuR2l0T3BTdGF0ZRINCgV0aXRsZRgEIAEoCRIVCg13b3JrdHJlZV9wYXRoGAUgASgJEhIKCnByb2plY3RfaWQYBiABKAkSDgoGYnJhbmNoGAcgASgJEi0KCXF1ZXVlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc3RhcnRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLZmluaXNoZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2R1cmF0aW9uX21zGAsgASgDEg8KB3N1bW1hcnkYDCABKAkSDgoGb3V0cHV0GA0gASgJEgsKA3VybBgOIAEoCSJICg9HaXRGZXRjaFJlcXVlc3QSFQoNd29ya3RyZWVfcGF0aBgBIAEoCRIOCgZyZW1vdGUYAiABKAkSDgoGYnJhbmNoGAMgASgJIjUKEEdpdEZldGNoUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCI3Cg5HaXRQdWxsUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEg4KBnJlYmFzZRgCIAEoCCI0Cg9HaXRQdWxsUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCJBCg5HaXRQdXNoUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEhgKEGZvcmNlX3dpdGhfbGVhc2UYAiABKAgiNAoPR2l0UHVzaFJlc3BvbnNlEiEKAm9wGAEgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3AiawoYQ3JlYXRlUHVsbFJlcXVlc3RSZXF1ZXN0EhUKDXdvcmt0cmVlX3BhdGgYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCRINCgVkcmFmdBgEIAEoCBIMCgRiYXNlGAUgASgJIj4KGUNyZWF0ZVB1bGxSZXF1ZXN0UmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCIvChZPcGVuUHVsbFJlcXVlc3RSZXF1ZXN0EhUKDXdvcmt0cmVlX3BhdGgYASABKAkiPAoXT3BlblB1bGxSZXF1ZXN0UmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCJGChFPcGVuRWRpdG9yUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEgwKBGZpbGUYAiABKAkSDAoEbGluZRgDIAEoDSI3ChJPcGVuRWRpdG9yUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCI0Cg1SZXZlYWxSZXF1ZXN0EhUKDXdvcmt0cmVlX3BhdGgYASABKAkSDAoEZmlsZRgCIAEoCSIzCg5SZXZlYWxSZXNwb25zZRIhCgJvcBgBIAEoCzIVLmNvZGVmb3VuZHJ5LnYxLkdpdE9wIh0KDk9wZW5VcmxSZXF1ZXN0EgsKA3VybBgBIAEoCSI0Cg9PcGVuVXJsUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCITChFMaXN0R2l0T3BzUmVxdWVzdCI4ChJMaXN0R2l0T3BzUmVzcG9uc2USIgoDb3BzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuR2l0T3AiFAoSV2F0Y2hHaXRPcHNSZXF1ZXN0IsgBCgtHaXRPcHNFdmVudBIyCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc1NuYXBzaG90SAASJwoGcXVldWVkGAIgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3BIABIoCgdzdGFydGVkGAMgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3BIABIpCghmaW5pc2hlZBgEIAEoCzIVLmNvZGVmb3VuZHJ5LnYxLkdpdE9wSABCBwoFZXZlbnQiNAoOR2l0T3BzU25hcHNob3QSIgoDb3BzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuR2l0T3Aq7gEKCUdpdE9wS2luZBIbChdHSVRfT1BfS0lORF9VTlNQRUNJRklFRBAAEhUKEUdJVF9PUF9LSU5EX0ZFVENIEAESFAoQR0lUX09QX0tJTkRfUFVMTBACEhQKEEdJVF9PUF9LSU5EX1BVU0gQAxIZChVHSVRfT1BfS0lORF9QUl9DUkVBVEUQBBIXChNHSVRfT1BfS0lORF9QUl9PUEVOEAUSGwoXR0lUX09QX0tJTkRfT1BFTl9FRElUT1IQBhIWChJHSVRfT1BfS0lORF9SRVZFQUwQBxIYChRHSVRfT1BfS0lORF9PUEVOX1VSTBAIKpIBCgpHaXRPcFN0YXRlEhwKGEdJVF9PUF9TVEFURV9VTlNQRUNJRklFRBAAEhcKE0dJVF9PUF9TVEFURV9RVUVVRUQQARIYChRHSVRfT1BfU1RBVEVfUlVOTklORxACEhoKFkdJVF9PUF9TVEFURV9TVUNDRUVERUQQAxIXChNHSVRfT1BfU1RBVEVfRkFJTEVEEAQy1AYKDUdpdE9wc1NlcnZpY2USTAoFRmV0Y2gSHy5jb2RlZm91bmRyeS52MS5HaXRGZXRjaFJlcXVlc3QaIC5jb2RlZm91bmRyeS52MS5HaXRGZXRjaFJlc3BvbnNlIgASSQoEUHVsbBIeLmNvZGVmb3VuZHJ5LnYxLkdpdFB1bGxSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2l0UHVsbFJlc3BvbnNlIgASSQoEUHVzaBIeLmNvZGVmb3VuZHJ5LnYxLkdpdFB1c2hSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2l0UHVzaFJlc3BvbnNlIgASagoRQ3JlYXRlUHVsbFJlcXVlc3QSKC5jb2RlZm91bmRyeS52MS5DcmVhdGVQdWxsUmVxdWVzdFJlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5DcmVhdGVQdWxsUmVxdWVzdFJlc3BvbnNlIgASZAoPT3BlblB1bGxSZXF1ZXN0EiYuY29kZWZvdW5kcnkudjEuT3BlblB1bGxSZXF1ZXN0UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLk9wZW5QdWxsUmVxdWVzdFJlc3BvbnNlIgASVQoKT3BlbkVkaXRvchIhLmNvZGVmb3VuZHJ5LnYxLk9wZW5FZGl0b3JSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuT3BlbkVkaXRvclJlc3BvbnNlIgASSQoGUmV2ZWFsEh0uY29kZWZvdW5kcnkudjEuUmV2ZWFsUmVxdWVzdBoeLmNvZGVmb3VuZHJ5LnYxLlJldmVhbFJlc3BvbnNlIgASTAoHT3BlblVybBIeLmNvZGVmb3VuZHJ5LnYxLk9wZW5VcmxSZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuT3BlblVybFJlc3BvbnNlIgASTwoETGlzdBIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RHaXRPcHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdEdpdE9wc1Jlc3BvbnNlIgASTAoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEdpdE9wc1JlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILR2l0b3BzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9naXRvcHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIoQDCgVHaXRPcBIKCgJpZBgBIAEoCRInCgRraW5kGAIgASgOMhkuY29kZWZvdW5kcnkudjEuR2l0T3BLaW5kEikKBXN0YXRlGAMgASgOMhouY29kZWZvdW5kcnkudjEuR2l0T3BTdGF0ZRINCgV0aXRsZRgEIAEoCRIVCg13b3JrdHJlZV9wYXRoGAUgASgJEhIKCnByb2plY3RfaWQYBiABKAkSDgoGYnJhbmNoGAcgASgJEi0KCXF1ZXVlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc3RhcnRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLZmluaXNoZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2R1cmF0aW9uX21zGAsgASgDEg8KB3N1bW1hcnkYDCABKAkSDgoGb3V0cHV0GA0gASgJEgsKA3VybBgOIAEoCSJICg9HaXRGZXRjaFJlcXVlc3QSFQoNd29ya3RyZWVfcGF0aBgBIAEoCRIOCgZyZW1vdGUYAiABKAkSDgoGYnJhbmNoGAMgASgJIjUKEEdpdEZldGNoUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCI3Cg5HaXRQdWxsUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEg4KBnJlYmFzZRgCIAEoCCI0Cg9HaXRQdWxsUmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCJBCg5HaXRQdXNoUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEhgKEGZvcmNlX3dpdGhfbGVhc2UYAiABKAgiNAoPR2l0UHVzaFJlc3BvbnNlEiEKAm9wGAEgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3AiawoYQ3JlYXRlUHVsbFJlcXVlc3RSZXF1ZXN0EhUKDXdvcmt0cmVlX3BhdGgYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCRINCgVkcmFmdBgEIAEoCBIMCgRiYXNlGAUgASgJIj4KGUNyZWF0ZVB1bGxSZXF1ZXN0UmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCIvChZPcGVuUHVsbFJlcXVlc3RSZXF1ZXN0EhUKDXdvcmt0cmVlX3BhdGgYASABKAkiPAoXT3BlblB1bGxSZXF1ZXN0UmVzcG9uc2USIQoCb3AYASABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCJTChFPcGVuRWRpdG9yUmVxdWVzdBIVCg13b3JrdHJlZV9wYXRoGAEgASgJEgwKBGZpbGUYAiABKAkSDAoEbGluZRgDIAEoDRILCgNhcHAYBCABKAkiKAoVTGlzdEVkaXRvckFwcHNSZXF1ZXN0Eg8KB3JlZnJlc2gYASABKAgiQQoWTGlzdEVkaXRvckFwcHNSZXNwb25zZRInCgRhcHBzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRWRpdG9yQXBwIjoKCUVkaXRvckFwcBIMCgRuYW1lGAEgASgJEhEKCWJ1bmRsZV9pZBgCIAEoCRIMCgRwYXRoGAMgASgJIjcKEk9wZW5FZGl0b3JSZXNwb25zZRIhCgJvcBgBIAEoCzIVLmNvZGVmb3VuZHJ5LnYxLkdpdE9wIjQKDVJldmVhbFJlcXVlc3QSFQoNd29ya3RyZWVfcGF0aBgBIAEoCRIMCgRmaWxlGAIgASgJIjMKDlJldmVhbFJlc3BvbnNlEiEKAm9wGAEgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3AiHQoOT3BlblVybFJlcXVlc3QSCwoDdXJsGAEgASgJIjQKD09wZW5VcmxSZXNwb25zZRIhCgJvcBgBIAEoCzIVLmNvZGVmb3VuZHJ5LnYxLkdpdE9wIhMKEUxpc3RHaXRPcHNSZXF1ZXN0IjgKEkxpc3RHaXRPcHNSZXNwb25zZRIiCgNvcHMYASADKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCIUChJXYXRjaEdpdE9wc1JlcXVlc3QiyAEKC0dpdE9wc0V2ZW50EjIKCHNuYXBzaG90GAEgASgLMh4uY29kZWZvdW5kcnkudjEuR2l0T3BzU25hcHNob3RIABInCgZxdWV1ZWQYAiABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcEgAEigKB3N0YXJ0ZWQYAyABKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcEgAEikKCGZpbmlzaGVkGAQgASgLMhUuY29kZWZvdW5kcnkudjEuR2l0T3BIAEIHCgVldmVudCI0Cg5HaXRPcHNTbmFwc2hvdBIiCgNvcHMYASADKAsyFS5jb2RlZm91bmRyeS52MS5HaXRPcCruAQoJR2l0T3BLaW5kEhsKF0dJVF9PUF9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRR0lUX09QX0tJTkRfRkVUQ0gQARIUChBHSVRfT1BfS0lORF9QVUxMEAISFAoQR0lUX09QX0tJTkRfUFVTSBADEhkKFUdJVF9PUF9LSU5EX1BSX0NSRUFURRAEEhcKE0dJVF9PUF9LSU5EX1BSX09QRU4QBRIbChdHSVRfT1BfS0lORF9PUEVOX0VESVRPUhAGEhYKEkdJVF9PUF9LSU5EX1JFVkVBTBAHEhgKFEdJVF9PUF9LSU5EX09QRU5fVVJMEAgqkgEKCkdpdE9wU3RhdGUSHAoYR0lUX09QX1NUQVRFX1VOU1BFQ0lGSUVEEAASFwoTR0lUX09QX1NUQVRFX1FVRVVFRBABEhgKFEdJVF9PUF9TVEFURV9SVU5OSU5HEAISGgoWR0lUX09QX1NUQVRFX1NVQ0NFRURFRBADEhcKE0dJVF9PUF9TVEFURV9GQUlMRUQQBDK3BwoNR2l0T3BzU2VydmljZRJMCgVGZXRjaBIfLmNvZGVmb3VuZHJ5LnYxLkdpdEZldGNoUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLkdpdEZldGNoUmVzcG9uc2UiABJJCgRQdWxsEh4uY29kZWZvdW5kcnkudjEuR2l0UHVsbFJlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5HaXRQdWxsUmVzcG9uc2UiABJJCgRQdXNoEh4uY29kZWZvdW5kcnkudjEuR2l0UHVzaFJlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5HaXRQdXNoUmVzcG9uc2UiABJqChFDcmVhdGVQdWxsUmVxdWVzdBIoLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVB1bGxSZXF1ZXN0UmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVB1bGxSZXF1ZXN0UmVzcG9uc2UiABJkCg9PcGVuUHVsbFJlcXVlc3QSJi5jb2RlZm91bmRyeS52MS5PcGVuUHVsbFJlcXVlc3RSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuT3BlblB1bGxSZXF1ZXN0UmVzcG9uc2UiABJVCgpPcGVuRWRpdG9yEiEuY29kZWZvdW5kcnkudjEuT3BlbkVkaXRvclJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5PcGVuRWRpdG9yUmVzcG9uc2UiABJhCg5MaXN0RWRpdG9yQXBwcxIlLmNvZGVmb3VuZHJ5LnYxLkxpc3RFZGl0b3JBcHBzUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkxpc3RFZGl0b3JBcHBzUmVzcG9uc2UiABJJCgZSZXZlYWwSHS5jb2RlZm91bmRyeS52MS5SZXZlYWxSZXF1ZXN0Gh4uY29kZWZvdW5kcnkudjEuUmV2ZWFsUmVzcG9uc2UiABJMCgdPcGVuVXJsEh4uY29kZWZvdW5kcnkudjEuT3BlblVybFJlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5PcGVuVXJsUmVzcG9uc2UiABJPCgRMaXN0EiEuY29kZWZvdW5kcnkudjEuTGlzdEdpdE9wc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5MaXN0R2l0T3BzUmVzcG9uc2UiABJMCgVXYXRjaBIiLmNvZGVmb3VuZHJ5LnYxLldhdGNoR2l0T3BzUmVxdWVzdBobLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50IgAwAULDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtHaXRvcHNQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * GitOp is one operation and, once finished, its result.
@@ -365,6 +365,15 @@ export type OpenEditorRequest = Message<"codefoundry.v1.OpenEditorRequest"> & {
    * @generated from field: uint32 line = 3;
    */
   line: number;
+
+  /**
+   * The bundle id of an installed editor app (EditorApp.bundle_id) to open with
+   * (`open -b`) instead of the configured editor; line is then ignored. An id
+   * ListEditorApps does not list is INVALID_ARGUMENT.
+   *
+   * @generated from field: string app = 4;
+   */
+  app: string;
 };
 
 /**
@@ -373,6 +382,79 @@ export type OpenEditorRequest = Message<"codefoundry.v1.OpenEditorRequest"> & {
  */
 export const OpenEditorRequestSchema: GenMessage<OpenEditorRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_gitops, 11);
+
+/**
+ * @generated from message codefoundry.v1.ListEditorAppsRequest
+ */
+export type ListEditorAppsRequest = Message<"codefoundry.v1.ListEditorAppsRequest"> & {
+  /**
+   * Detect again instead of answering from the cache.
+   *
+   * @generated from field: bool refresh = 1;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.ListEditorAppsRequest.
+ * Use `create(ListEditorAppsRequestSchema)` to create a new message.
+ */
+export const ListEditorAppsRequestSchema: GenMessage<ListEditorAppsRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gitops, 12);
+
+/**
+ * @generated from message codefoundry.v1.ListEditorAppsResponse
+ */
+export type ListEditorAppsResponse = Message<"codefoundry.v1.ListEditorAppsResponse"> & {
+  /**
+   * In the daemon's registry order (editors, then JetBrains IDEs, then Xcode).
+   *
+   * @generated from field: repeated codefoundry.v1.EditorApp apps = 1;
+   */
+  apps: EditorApp[];
+};
+
+/**
+ * Describes the message codefoundry.v1.ListEditorAppsResponse.
+ * Use `create(ListEditorAppsResponseSchema)` to create a new message.
+ */
+export const ListEditorAppsResponseSchema: GenMessage<ListEditorAppsResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gitops, 13);
+
+/**
+ * EditorApp is an editor installed as an app bundle.
+ *
+ * @generated from message codefoundry.v1.EditorApp
+ */
+export type EditorApp = Message<"codefoundry.v1.EditorApp"> & {
+  /**
+   * Display name: "VS Code", "Cursor", "GoLand", "Xcode".
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * CFBundleIdentifier: OpenEditorRequest.app.
+   *
+   * @generated from field: string bundle_id = 2;
+   */
+  bundleId: string;
+
+  /**
+   * The .app found.
+   *
+   * @generated from field: string path = 3;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.EditorApp.
+ * Use `create(EditorAppSchema)` to create a new message.
+ */
+export const EditorAppSchema: GenMessage<EditorApp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gitops, 14);
 
 /**
  * @generated from message codefoundry.v1.OpenEditorResponse
@@ -389,7 +471,7 @@ export type OpenEditorResponse = Message<"codefoundry.v1.OpenEditorResponse"> & 
  * Use `create(OpenEditorResponseSchema)` to create a new message.
  */
 export const OpenEditorResponseSchema: GenMessage<OpenEditorResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 12);
+  messageDesc(file_codefoundry_v1_gitops, 15);
 
 /**
  * @generated from message codefoundry.v1.RevealRequest
@@ -414,7 +496,7 @@ export type RevealRequest = Message<"codefoundry.v1.RevealRequest"> & {
  * Use `create(RevealRequestSchema)` to create a new message.
  */
 export const RevealRequestSchema: GenMessage<RevealRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 13);
+  messageDesc(file_codefoundry_v1_gitops, 16);
 
 /**
  * @generated from message codefoundry.v1.RevealResponse
@@ -431,7 +513,7 @@ export type RevealResponse = Message<"codefoundry.v1.RevealResponse"> & {
  * Use `create(RevealResponseSchema)` to create a new message.
  */
 export const RevealResponseSchema: GenMessage<RevealResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 14);
+  messageDesc(file_codefoundry_v1_gitops, 17);
 
 /**
  * @generated from message codefoundry.v1.OpenUrlRequest
@@ -450,7 +532,7 @@ export type OpenUrlRequest = Message<"codefoundry.v1.OpenUrlRequest"> & {
  * Use `create(OpenUrlRequestSchema)` to create a new message.
  */
 export const OpenUrlRequestSchema: GenMessage<OpenUrlRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 15);
+  messageDesc(file_codefoundry_v1_gitops, 18);
 
 /**
  * @generated from message codefoundry.v1.OpenUrlResponse
@@ -467,7 +549,7 @@ export type OpenUrlResponse = Message<"codefoundry.v1.OpenUrlResponse"> & {
  * Use `create(OpenUrlResponseSchema)` to create a new message.
  */
 export const OpenUrlResponseSchema: GenMessage<OpenUrlResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 16);
+  messageDesc(file_codefoundry_v1_gitops, 19);
 
 /**
  * @generated from message codefoundry.v1.ListGitOpsRequest
@@ -480,7 +562,7 @@ export type ListGitOpsRequest = Message<"codefoundry.v1.ListGitOpsRequest"> & {
  * Use `create(ListGitOpsRequestSchema)` to create a new message.
  */
 export const ListGitOpsRequestSchema: GenMessage<ListGitOpsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 17);
+  messageDesc(file_codefoundry_v1_gitops, 20);
 
 /**
  * @generated from message codefoundry.v1.ListGitOpsResponse
@@ -499,7 +581,7 @@ export type ListGitOpsResponse = Message<"codefoundry.v1.ListGitOpsResponse"> & 
  * Use `create(ListGitOpsResponseSchema)` to create a new message.
  */
 export const ListGitOpsResponseSchema: GenMessage<ListGitOpsResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 18);
+  messageDesc(file_codefoundry_v1_gitops, 21);
 
 /**
  * @generated from message codefoundry.v1.WatchGitOpsRequest
@@ -512,7 +594,7 @@ export type WatchGitOpsRequest = Message<"codefoundry.v1.WatchGitOpsRequest"> & 
  * Use `create(WatchGitOpsRequestSchema)` to create a new message.
  */
 export const WatchGitOpsRequestSchema: GenMessage<WatchGitOpsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 19);
+  messageDesc(file_codefoundry_v1_gitops, 22);
 
 /**
  * @generated from message codefoundry.v1.GitOpsEvent
@@ -562,7 +644,7 @@ export type GitOpsEvent = Message<"codefoundry.v1.GitOpsEvent"> & {
  * Use `create(GitOpsEventSchema)` to create a new message.
  */
 export const GitOpsEventSchema: GenMessage<GitOpsEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 20);
+  messageDesc(file_codefoundry_v1_gitops, 23);
 
 /**
  * @generated from message codefoundry.v1.GitOpsSnapshot
@@ -579,7 +661,7 @@ export type GitOpsSnapshot = Message<"codefoundry.v1.GitOpsSnapshot"> & {
  * Use `create(GitOpsSnapshotSchema)` to create a new message.
  */
 export const GitOpsSnapshotSchema: GenMessage<GitOpsSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gitops, 21);
+  messageDesc(file_codefoundry_v1_gitops, 24);
 
 /**
  * @generated from enum codefoundry.v1.GitOpKind
@@ -747,7 +829,7 @@ export const GitOpsService: GenService<{
   },
   /**
    * OpenEditor opens the worktree in the configured editor, or with file one file of
-   * it (at line, for editors that take one).
+   * it (at line, for editors that take one); with app, in that installed editor app.
    *
    * @generated from rpc codefoundry.v1.GitOpsService.OpenEditor
    */
@@ -755,6 +837,19 @@ export const GitOpsService: GenService<{
     methodKind: "unary";
     input: typeof OpenEditorRequestSchema;
     output: typeof OpenEditorResponseSchema;
+  },
+  /**
+   * ListEditorApps lists the known editors installed as app bundles (VS Code, Cursor,
+   * Zed, JetBrains IDEs, Xcode, ...) under /Applications and ~/Applications: what an
+   * "Open in" menu offers. Detected on first use and cached; a settings change or
+   * refresh detects again.
+   *
+   * @generated from rpc codefoundry.v1.GitOpsService.ListEditorApps
+   */
+  listEditorApps: {
+    methodKind: "unary";
+    input: typeof ListEditorAppsRequestSchema;
+    output: typeof ListEditorAppsResponseSchema;
   },
   /**
    * Reveal shows the worktree (or file in it) in Finder (`open -R`).

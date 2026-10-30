@@ -10,7 +10,9 @@ import "google/protobuf/timestamp.proto";
 // combined output captured. Every run gets CODE_FOUNDRY_PROJECT_ROOT (the project's main
 // checkout) and CODE_FOUNDRY_WORKTREE (where it runs) in its environment, and runs
 // `$SHELL -lc <command>` in the worktree. Runs live in memory only (the newest 50 per
-// project). See docs/notes/actions-1-daemon.md.
+// project); each is also recorded when it starts (ActionRunRecord: action, thread,
+// runner, start), which outlives a restart. See docs/notes/actions-1-daemon.md and
+// docs/notes/thread-info-facts.md.
 service ActionService {
   // List returns a project's actions in order (every project's when project_id is empty)
   // and the runs the daemon remembers, without their output.
@@ -36,6 +38,12 @@ service ActionService {
   // SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
   // end. Stopping a finished run does nothing.
   rpc StopRun(StopActionRunRequest) returns (StopActionRunResponse) {}
+  // LastRun picks the action a thread's info card offers to run: the action the user
+  // last ran in the thread (thread_id), else the project's most recently run action (in
+  // any thread or worktree), else the project's first action. Only runs the user started
+  // count (not on_worktree_create runs), and only actions that still exist. Read from
+  // the run records, which outlive a daemon restart.
+  rpc LastRun(LastActionRunRequest) returns (LastActionRunResponse) {}
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
   // snapshot.
   rpc Watch(WatchActionsRequest) returns (stream ActionEvent) {}
@@ -134,6 +142,49 @@ message ListActionsResponse {
   repeated Action actions = 1;
   // Newest first.
   repeated ActionRun runs = 2;
+  // Each listed action's newest run record (any trigger), newest first; actions that
+  // never ran have none. Unlike runs, these outlive a daemon restart.
+  repeated ActionRunRecord last_runs = 3;
+}
+
+// ActionRunRecord is the persisted record of a run, written when it starts: the action,
+// the thread (empty for a worktree's run), the runner and the start. The daemon keeps the
+// newest 500 per project; forgetting an action forgets its records.
+message ActionRunRecord {
+  string run_id = 1;
+  string action_id = 2;
+  string project_id = 3;
+  string thread_id = 4;
+  // TERMINAL or BACKGROUND: the runner.
+  ActionRunMode mode = 5;
+  ActionRunTrigger trigger = 6;
+  google.protobuf.Timestamp started_at = 7;
+}
+
+// ActionPickSource says why LastRun chose its action.
+enum ActionPickSource {
+  // The project has no actions; nothing was picked.
+  ACTION_PICK_SOURCE_UNSPECIFIED = 0;
+  // The action the user ran last in the thread.
+  ACTION_PICK_SOURCE_THREAD = 1;
+  // Nothing ran in the thread: the action the user ran last in the project.
+  ACTION_PICK_SOURCE_PROJECT = 2;
+  // No action of the project ran yet: its first action.
+  ACTION_PICK_SOURCE_FIRST = 3;
+}
+
+message LastActionRunRequest {
+  string project_id = 1;
+  // Empty: the project's most recent run, else its first action.
+  string thread_id = 2;
+}
+
+message LastActionRunResponse {
+  ActionPickSource source = 1;
+  // Unset with UNSPECIFIED.
+  Action action = 2;
+  // The run that chose the action; unset with FIRST and UNSPECIFIED.
+  ActionRunRecord last = 3;
 }
 
 message CreateActionRequest {

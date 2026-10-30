@@ -117,9 +117,12 @@ var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 // environment changed), and the GUI's thread.new-like ("New thread on this branch":
 // agents use `thread new --like`) and thread.workspace (Save as workspace), and
 // thread.prompts, the user's own prompt history (docs/notes/prompt-history-1-daemon.md),
-// with the GUI's composer.history, its picker (docs/notes/prompt-history-2-picker.md)
+// with the GUI's composer.history, its picker (docs/notes/prompt-history-2-picker.md),
+// and the thread info card's queries: thread.placement.check (the composer's Work in
+// picker), action.last and worktree.editors (docs/notes/thread-info-facts.md)
 // (`code-foundry commands` and `help <command>` show them).
-var leftOut = []string{"pr.checks", "thread.restart", "thread.new-like", "thread.workspace", "thread.prompts", "composer.history"}
+var leftOut = []string{"pr.checks", "thread.restart", "thread.new-like", "thread.workspace", "thread.prompts", "composer.history",
+	"thread.placement.check", "action.last", "worktree.editors"}
 
 // LeftOut reports whether the guide leaves c out: the plugin namespace, the Skills
 // marketplace (skill.*: the user's settings, not an agent's work; docs/notes/

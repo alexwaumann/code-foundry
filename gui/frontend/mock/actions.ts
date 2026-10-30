@@ -25,6 +25,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
   ActionIcon,
+  ActionPickSource,
   ActionRunMode,
   ActionRunSchema,
   ActionRunState,
@@ -32,6 +33,8 @@ import {
   ActionSchema,
   ListActionsResponseSchema,
   type ActionEventSchema,
+  type ActionRunRecordSchema,
+  type LastActionRunResponseSchema,
 } from "../src/gen/codefoundry/v1/action_pb";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { CommandError } from "./errors";
@@ -40,6 +43,8 @@ import type { InvokeOut } from "./gitops";
 export type ActionEventInit = MessageInitShape<typeof ActionEventSchema>;
 type ActionInit = MessageInitShape<typeof ActionSchema>;
 type RunInit = MessageInitShape<typeof ActionRunSchema>;
+type RecordInit = MessageInitShape<typeof ActionRunRecordSchema>;
+type PickInit = MessageInitShape<typeof LastActionRunResponseSchema>;
 
 /** What the world offers MockActions. */
 export interface ActionHost {
@@ -68,6 +73,17 @@ interface MockAction {
   position: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A run's persisted record (the daemon's action_runs row), newest first in MockActions.records. */
+interface MockRecord {
+  runId: string;
+  actionId: string;
+  projectId: string;
+  threadId: string;
+  mode: ActionRunMode;
+  trigger: ActionRunTrigger;
+  startedAt: Date;
 }
 
 interface MockRun {
@@ -300,10 +316,16 @@ function table(rows: string[][]): string {
   return rows.map((r) => r.map((c, i) => (i === r.length - 1 ? c : c.padEnd((widths[i] ?? 0) + 2))).join("")).join("\n");
 }
 
+function recordMsg(r: MockRecord): RecordInit {
+  return { runId: r.runId, actionId: r.actionId, projectId: r.projectId, threadId: r.threadId, mode: r.mode, trigger: r.trigger, startedAt: timestampFromDate(r.startedAt) };
+}
+
 export class MockActions {
   private actions = new Map<string, MockAction>();
   /** Newest first. */
   private runs: MockRun[] = [];
+  /** Every run's record, newest first; unlike runs they survive a reset of the runs. */
+  private records: MockRecord[] = [];
   private nextAction = 1;
   private nextRun = 1;
   /** Bumped by reset and restart, so a worktree-create chain from before stops. */
@@ -357,11 +379,30 @@ export class MockActions {
     return [...this.actions.values()].filter((a) => !projectId || a.projectId === projectId).sort((a, b) => (a.projectId === b.projectId ? a.position - b.position : a.projectId < b.projectId ? -1 : 1));
   }
 
-  list(projectId: string): { actions: ActionInit[]; runs: RunInit[] } {
+  list(projectId: string): { actions: ActionInit[]; runs: RunInit[]; lastRuns: RecordInit[] } {
+    const lastRuns = new Map<string, MockRecord>();
+    for (const r of this.records) {
+      if ((!projectId || r.projectId === projectId) && this.actions.has(r.actionId) && !lastRuns.has(r.actionId)) lastRuns.set(r.actionId, r);
+    }
     return {
       actions: this.sorted(projectId).map((a) => this.actionMsg(a)),
       runs: this.runs.filter((r) => !projectId || r.projectId === projectId).map((r) => this.runMsg(r, false)),
+      lastRuns: [...lastRuns.values()].map(recordMsg),
     };
+  }
+
+  /** ActionService.LastRun, like action.PickAction: the thread's last user run, else the project's, else its first action. */
+  lastRun(projectId: string, threadId: string): PickInit {
+    if (!projectId) throw new ConnectError("project_id is required", Code.InvalidArgument);
+    const actions = this.sorted(projectId);
+    const first = actions[0];
+    if (!first) return {};
+    const mine = this.records.filter((r) => r.projectId === projectId && r.trigger === ActionRunTrigger.USER && this.actions.has(r.actionId));
+    const inThread = threadId ? mine.find((r) => r.threadId === threadId) : undefined;
+    const last = inThread ?? mine[0];
+    const a = last && this.actions.get(last.actionId);
+    if (!last || !a) return { source: ActionPickSource.FIRST, action: this.actionMsg(first) };
+    return { source: inThread ? ActionPickSource.THREAD : ActionPickSource.PROJECT, action: this.actionMsg(a), last: recordMsg(last) };
   }
 
   actionMsg(a: MockAction): ActionInit {
@@ -579,6 +620,7 @@ export class MockActions {
       ignoresHangup: script.ignoresHangup === true,
     };
     this.runs.unshift(r);
+    this.records.unshift({ runId: r.id, actionId: r.actionId, projectId: r.projectId, threadId: r.threadId, mode: r.mode, trigger: r.trigger, startedAt: r.startedAt });
     if (mode === ActionRunMode.TERMINAL) {
       const labels: Record<string, string> = { kind: "action", project: owner.projectId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": r.id };
       if (owner.threadId) labels.thread = owner.threadId;

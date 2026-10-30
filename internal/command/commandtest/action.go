@@ -26,6 +26,11 @@ type Action struct {
 	WaitBlocks bool
 	// Stopped is what StopRun returns. Default: the run, still running.
 	Stopped *v1.ActionRun
+	// LastRuns is List's last_runs (filtered by project).
+	LastRuns []*v1.ActionRunRecord
+	// Pick is what LastRun returns. Default: the project's first action in Actions
+	// (source FIRST), else nothing.
+	Pick *v1.LastActionRunResponse
 }
 
 var _ command.ActionBackend = (*Action)(nil)
@@ -46,7 +51,28 @@ func (f *Action) List(_ context.Context, r *connect.Request[v1.ListActionsReques
 			out.Actions = append(out.Actions, a)
 		}
 	}
+	for _, l := range f.LastRuns {
+		if r.Msg.GetProjectId() == "" || l.GetProjectId() == r.Msg.GetProjectId() {
+			out.LastRuns = append(out.LastRuns, l)
+		}
+	}
 	return connect.NewResponse(out), nil
+}
+
+// LastRun returns Pick (default: the project's first action, source FIRST).
+func (f *Action) LastRun(_ context.Context, r *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error) {
+	if err := f.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if f.Pick != nil {
+		return connect.NewResponse(proto.CloneOf(f.Pick)), nil
+	}
+	for _, a := range f.Actions {
+		if a.GetProjectId() == r.Msg.GetProjectId() {
+			return connect.NewResponse(&v1.LastActionRunResponse{Source: v1.ActionPickSource_ACTION_PICK_SOURCE_FIRST, Action: a}), nil
+		}
+	}
+	return connect.NewResponse(&v1.LastActionRunResponse{}), nil
 }
 
 // Create returns the action as requested, id "a-new".

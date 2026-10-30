@@ -15,6 +15,9 @@ type Model struct {
 	Value string
 	// Label is what the app shows.
 	Label string
+	// ContextWindow is the model's context window in tokens with Value's suffix (what
+	// Thread.context_window publishes beside context_tokens); 0 when unknown.
+	ContextWindow int64
 }
 
 // registry is in display order: per family, newest first. Every entry asks for the 1M
@@ -24,18 +27,24 @@ type Model struct {
 //
 // The 5.5 entries are listed before managed settings offer them, so they show up
 // without an app update; until then picking one fails at thread start.
-// claude-4.5-haiku[1m] is the id the work Bedrock setup accepts; claude-haiku-4-5 is
+// claude-4.5-haiku[1m] is the id a Bedrock setup accepts; claude-haiku-4-5 is
 // refused there. Edit this list to add or retire models.
+//
+// Context windows are Anthropic's published ones (the models overview, as of 2026-10):
+// 1M for every listed model but Haiku 4.5, whose window is 200K with or without the
+// suffix (it has no 1M variant).
 var registry = []Model{
-	{"claude-opus-5-5[1m]", "Opus 5.5"},
-	{"claude-opus-4-8[1m]", "Opus 4.8"},
-	{"claude-opus-4-7[1m]", "Opus 4.7"},
-	{"claude-sonnet-5-5[1m]", "Sonnet 5.5"},
-	{"claude-sonnet-5[1m]", "Sonnet 5"},
-	{"claude-sonnet-4-6[1m]", "Sonnet 4.6"},
-	{"claude-haiku-5-5[1m]", "Haiku 5.5"},
-	{"claude-4.5-haiku[1m]", "Haiku 4.5"},
+	{"claude-opus-5-5[1m]", "Opus 5.5", oneM},
+	{"claude-opus-4-8[1m]", "Opus 4.8", oneM},
+	{"claude-opus-4-7[1m]", "Opus 4.7", oneM},
+	{"claude-sonnet-5-5[1m]", "Sonnet 5.5", oneM},
+	{"claude-sonnet-5[1m]", "Sonnet 5", oneM},
+	{"claude-sonnet-4-6[1m]", "Sonnet 4.6", oneM},
+	{"claude-haiku-5-5[1m]", "Haiku 5.5", oneM},
+	{"claude-4.5-haiku[1m]", "Haiku 4.5", 200_000},
 }
+
+const oneM = 1_000_000
 
 // Default is the model for new threads when the settings do not pick one.
 const Default = "claude-sonnet-5[1m]"
@@ -88,4 +97,15 @@ func Label(value string) string {
 		}
 	}
 	return value
+}
+
+// ContextWindow returns value's context window in tokens, or 0 when the registry does
+// not list it (an alias, a full name the API accepted, claude's default).
+func ContextWindow(value string) int64 {
+	for _, m := range registry {
+		if m.Value == value {
+			return m.ContextWindow
+		}
+	}
+	return 0
 }

@@ -22,7 +22,7 @@ import (
 // terminal.kill run in one Enter on the active one). thread.interrupt stays for the
 // keyboard; thread.budget is an Ember and agent knob, so it is out.
 var noPalette = []string{
-	"action.edit", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
+	"action.edit", "action.last", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
 	"action.wait", "app.version", "daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.start", "dictation.status", "dictation.stop",
 	"ember.board", "ember.disable", "ember.enable", "ember.remember", "ember.reseed",
@@ -39,13 +39,13 @@ var noPalette = []string{
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",
 	"thread.agents", "thread.budget", "thread.checkouts", "thread.commands", "thread.flag.clear",
 	"thread.flags", "thread.focus", "thread.get", "thread.items", "thread.label", "thread.list",
-	"thread.mcp", "thread.mcp-reconnect", "thread.prompts", "thread.read", "thread.report", "thread.reports",
+	"thread.mcp", "thread.mcp-reconnect", "thread.placement.check", "thread.prompts", "thread.read", "thread.report", "thread.reports",
 	"thread.reseed", "thread.respond", "thread.send", "thread.subscribe", "thread.subscriptions",
 	"thread.unsubscribe", "thread.wait", "thread.workspace", "ui.focus.project",
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",
 	"view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.pr",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
-	"workspace.set-primary",
+	"workspace.set-primary", "worktree.editors",
 }
 
 // Every registered command is classified on purpose: the unlisted ones are exactly the
