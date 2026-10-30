@@ -23,7 +23,7 @@ import (
 // keyboard; thread.budget is an Ember and agent knob, so it is out.
 var noPalette = []string{
 	"action.edit", "action.last", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
-	"action.wait", "app.version", "daemon.capabilities", "daemon.status", "daemon.version",
+	"action.wait", "app.version", "composer.stage", "daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.start", "dictation.status", "dictation.stop",
 	"ember.board", "ember.disable", "ember.enable", "ember.remember", "ember.reseed",
 	"ember.status", "ember.task.add", "ember.task.cancel", "ember.task.done", "ember.task.list",

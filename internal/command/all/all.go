@@ -163,7 +163,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPresence(r, d.Presence),
 		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
 		command.RegisterProject(r, d.Project, d.NotGit),
-		command.RegisterProjectAdd(r, d.Project, d.Clone),
+		command.RegisterProjectAdd(r, d.Project, d.Clone, command.AddProjectDialog{Emitter: d.Emitter, Viewed: d.Presence.Viewed}),
 		command.RegisterProjectAddWorkspace(r, d.Project, d.Workspace),
 		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterNewProjects(r, d.NewProjects),
@@ -188,7 +188,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, command.ViewDeps{
 			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, Diffs: d.FileDiffs,
-			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread,
+			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread, Settings: d.Settings,
 		}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
