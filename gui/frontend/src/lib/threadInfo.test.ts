@@ -6,9 +6,11 @@ import {
   cardFits,
   cacheMinutesLeft,
   cacheSuffix,
+  cardUsd,
   chooseAction,
   contextPercent,
   fixPrompt,
+  foldUsd,
   gitButtonsBlocked,
   gitStateRow,
   lineageElapsedMs,
@@ -25,6 +27,7 @@ import {
   shellCount,
   shellRuntime,
   splitLineage,
+  USD_SHOWN,
   type GitStateRow,
   type LineageRow,
   type MemberPick,
@@ -202,8 +205,29 @@ describe("small figures", () => {
     expect(cacheSuffix(cacheMinutesLeft(null, 0))).toBe("");
     expect(cacheSuffix(cacheMinutesLeft(41 * 60_000, 0))).toBe("cache 41m");
     expect(cacheSuffix(cacheMinutesLeft(30_000, 0))).toBe("cache 1m");
-    expect(cacheSuffix(cacheMinutesLeft(0, 10))).toBe("cache expired");
-    expect(cacheSuffix(cacheMinutesLeft(0, 0))).toBe("cache expired");
+    // Expired: nothing (the composer's ColdCacheNote says so).
+    expect(cacheSuffix(cacheMinutesLeft(0, 10))).toBe("");
+    expect(cacheSuffix(cacheMinutesLeft(0, 0))).toBe("");
+    expect(cacheSuffix(-3)).toBe("");
+  });
+
+  it.each([
+    // usd, a total (cardUsd), a token kind (foldUsd)
+    [0, "$0.00", ""],
+    [0.00002, "<$0.01", ""],
+    [0.004, "<$0.01", ""],
+    [0.005, "$0.01", "$0.01"],
+    [0.07, "$0.07", "$0.07"],
+    [1234.567, "$1,234.57", "$1,234.57"],
+  ])("costs in cents: %s is %j as a total, %j as a kind", (usd, total, kind) => {
+    expect(cardUsd(usd)).toBe(total);
+    expect(foldUsd(usd, false)).toBe(kind);
+  });
+
+  it("an unpriced kind is a dash, whatever its figure", () => {
+    expect(foldUsd(0, true)).toBe("—");
+    expect(foldUsd(0.07, true)).toBe("—");
+    expect(USD_SHOWN).toBe(0.005);
   });
 
   it("the context share, none without a window", () => {

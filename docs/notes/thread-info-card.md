@@ -99,11 +99,14 @@ window. The toggle stays on and pressed, its tooltip says "Not enough room"
   the row laid over its value, keyboard-usable (Enter interrupts, it does not open the
   child). **Subagent rows have no stop square**: no command stops one run. The dots menu's Show hidden threads toggles
   `threads.show_created_threads`; Archive finished is disabled (nothing does it in bulk).
-* **Context**: the hover card's "N cached" is the context while the cache is warm. The
-  daemon publishes no per-turn cached figure; a warm cache serves the whole context to the
-  next turn. Expired, it says what re-reading costs (`contextRereadUsd`).
-* **Usage**: the Usage tab's totals (`lib/usage`); Cache write sums the 5m and 1h kinds;
-  the hover card lists models by their label (`canonicalModelName`), cost and share.
+* **Context**: the bar, the share and, while the prompt cache is warm, its minutes; the
+  hover card gives the tokens and, warm, the expiry and the re-read cost
+  (`contextRereadUsd`). An expired cache is the composer's to say. See
+  `docs/notes/thread-info-usage-rows.md`.
+* **Usage**: the Usage tab's totals (`lib/usage`), the cost in cents on the row; Cache
+  write sums the 5m and 1h kinds; the hover card lists models by their label
+  (`canonicalModelName`), cost and share; the fold adds Total and Saved by cache reads.
+  See `docs/notes/thread-info-usage-rows.md`.
 * **Finder icon**: lucide has no Finder face; `icons/FinderMark.tsx` draws the sketch's.
 
 ## Follow-ups

@@ -75,6 +75,8 @@ html[data-thread-width="full"] {
 }
 .cf-thread .scroller {
   padding-right: var(--ti-inset, 0px);
+  /* The gutter is there whether the list scrolls or not, so a short conversation centres with the composer. */
+  scrollbar-gutter: stable;
 }
 .cf-thread .scroller::-webkit-scrollbar {
   width: var(--ti-gutter);
