@@ -157,10 +157,21 @@ describe("SidebarRow archived", () => {
     expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
   });
 
-  it("the name is text-body semibold, like a two-line row's", () => {
+  it("quiet: the name keeps text-body but is regular and muted, and so is the age", () => {
     renderArchived({ name: "Old work", archivedAtMs: Date.now() });
     const cls = screen.getByTestId("thread-name").className.split(" ");
-    expect(cls).toEqual(expect.arrayContaining(["text-body", "font-semibold", "text-inherit"]));
+    expect(cls).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground"]));
+    expect(cls).not.toContain("font-semibold");
+    expect(cls).not.toContain("text-inherit");
+    expect(screen.getByTestId("row-archived-age").className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground"]));
+    expect(screen.getByTestId("row-archived-age").querySelector("svg")).toBeNull();
+  });
+
+  it("a provisional name stays italic on the quiet row", () => {
+    renderArchived({ name: "fix the login redirect", nameProvisional: true, archivedAtMs: Date.now() });
+    const cls = screen.getByTestId("thread-name").className.split(" ");
+    expect(cls).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground", "italic"]));
+    expect(cls).not.toContain("font-semibold");
   });
 
   it("an unnamed thread shows its id, muted", () => {
@@ -197,6 +208,20 @@ describe("SidebarRow snoozed", () => {
     expect(screen.getByTestId("row-snooze-left").className).toContain("text-caption-sm");
     expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
     expect(screen.getByTestId("thread-body").hasAttribute("data-snoozed")).toBe(true);
+  });
+
+  it("quiet: regular muted name; the countdown is an alarm clock then the time left, muted", () => {
+    renderSnoozed({ name: "Later work", snoozedUntilMs: Date.now() + 2 * 3_600_000 + 60_000 });
+    const name = screen.getByTestId("thread-name").className.split(" ");
+    expect(name).toEqual(expect.arrayContaining(["text-body", "text-cf-sidebar-muted-foreground"]));
+    expect(name).not.toContain("font-semibold");
+    const left = screen.getByTestId("row-snooze-left");
+    expect(left.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground", "gap-1"]));
+    const icon = screen.getByTestId("row-snooze-icon");
+    expect(left.firstElementChild).toBe(icon);
+    expect(icon.getAttribute("class")).toContain("lucide-alarm-clock");
+    expect(icon.getAttribute("class")).toContain("size-3");
+    expect(left.textContent).toBe("2h");
   });
 
   it("an unnamed thread shows its id, muted", () => {

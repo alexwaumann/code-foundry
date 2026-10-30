@@ -9,7 +9,7 @@ import { agentsLabel } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
-import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
+import { shortRemaining } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
@@ -190,9 +190,18 @@ function MadeByThreadGlyph({ id }: { id: string }) {
  * sidebar and selection tokens). The id stands in, muted, while there is no name; a
  * provisional name (the daemon's cut of the first prompt, until the naming model's title
  * lands) is muted and italic.
+ *
+ * A quiet row (Archived, Snoozed) keeps the size but not the weight or the row's colour:
+ * regular and muted, so those sections recede behind the live list
+ * (docs/notes/sidebar-quiet-rows.md).
  */
-function nameClass(name: string, provisional: boolean): string {
-  return cn("truncate text-body font-semibold text-inherit", (!name || provisional) && "text-cf-sidebar-muted-foreground", provisional && "italic");
+function nameClass(name: string, provisional: boolean, quiet = false): string {
+  return cn(
+    "truncate text-body",
+    quiet ? "text-cf-sidebar-muted-foreground" : "font-semibold text-inherit",
+    (!name || provisional) && "text-cf-sidebar-muted-foreground",
+    provisional && "italic",
+  );
 }
 
 function ThreadLabel({ id }: { id: string }) {
@@ -266,22 +275,6 @@ function TipStatus({ id }: { id: string }) {
 }
 
 /**
- * A snoozed thread's wake time in full ("Snoozed until Thu, Oct 15, 9:00 AM"): its row
- * shows only the time left. Nothing for a thread that is not snoozed.
- */
-function TipSnooze({ id }: { id: string }) {
-  const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
-  const now = useNow(30_000);
-  if (until === null) return null;
-  return (
-    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-snooze">
-      <AlarmClock className="mt-[3px] size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
-      <span className="min-w-0 break-words">Snoozed until {snoozeTimeFull(until, now)}</span>
-    </div>
-  );
-}
-
-/**
  * "↳ Created by <name>" for a thread an agent created (the creator's current name); a
  * removed creator keeps the name it had then, muted and marked so. Nothing for the user's
  * threads.
@@ -332,13 +325,11 @@ function TipSet({ id }: { id: string }) {
 }
 
 /**
- * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
- * time instead; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
+ * The tooltip's body: name, status (attention or error only; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
  * the projects of a multi-project thread (TipSet), branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
-  const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
@@ -356,8 +347,8 @@ function ThreadTipBody({ id }: { id: string }) {
       <div className="mb-[5px] truncate text-subheading" data-testid="tip-name">
         {name || id}
       </div>
-      {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
-      {!snoozed && <TipWaiting id={id} />}
+      <TipStatus id={id} />
+      <TipWaiting id={id} />
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.inFolder ? Layers : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
@@ -465,27 +456,31 @@ function ArchivedAge({ id }: { id: string }) {
   const now = useNow(30_000);
   if (at === null) return null;
   return (
-    <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums" data-testid="row-archived-age">
+    <span className="ml-auto shrink-0 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-archived-age">
       {shortAge(at, now)}
     </span>
   );
 }
 
-/** How long until the snoozed thread wakes ("45m", "2h", "4d"; "<1m"), on the shared 30 s clock. */
+/**
+ * How long until the snoozed thread wakes ("45m", "2h", "4d"; "<1m"), on the shared 30 s
+ * clock, after an alarm clock that says it is a countdown (the tooltip no longer repeats it).
+ */
 function SnoozeLeft({ id }: { id: string }) {
   const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const now = useNow(30_000);
   if (until === null) return null;
   return (
-    <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums" data-testid="row-snooze-left">
+    <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-snooze-left">
+      <AlarmClock className="size-3 shrink-0" aria-hidden data-testid="row-snooze-icon" />
       {shortRemaining(until, now)}
     </span>
   );
 }
 
 /**
- * An archived or snoozed thread's single line: the name (the id, muted, while unnamed) and,
- * on the right, how long ago it was archived or how long until it wakes. No status line,
+ * An archived or snoozed thread's single line: the name, quiet (regular and muted; the id
+ * while unnamed) and, on the right, how long ago it was archived or how long until it wakes. No status line,
  * badges or pin (such a thread is unpinned): the whole section is such threads.
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
@@ -499,7 +494,7 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
       ) : (
         <>
           <MadeByThreadGlyph id={id} />
-          <span className={nameClass(name, provisional)} data-testid="thread-name" data-provisional={provisional || undefined}>
+          <span className={nameClass(name, provisional, true)} data-testid="thread-name" data-provisional={provisional || undefined}>
             {name || id}
           </span>
           {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}
