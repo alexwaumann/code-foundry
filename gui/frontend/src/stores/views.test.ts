@@ -204,11 +204,11 @@ describe("showView", () => {
     expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "skills" });
   });
 
-  it("\"project.add\" opens the Add Project dialog on Local folder", async () => {
-    useAddProjectStore.setState({ open: false, tab: "github" });
+  it("\"project.add\" opens the Add Project dialog on Local folder, to stay where the window is", async () => {
+    useAddProjectStore.setState({ open: false, tab: "github", stay: false });
     expect(showView("project.add")).toBe(true);
     await Promise.resolve();
-    expect(useAddProjectStore.getState()).toMatchObject({ open: true, tab: "local" });
+    expect(useAddProjectStore.getState()).toMatchObject({ open: true, tab: "local", stay: true });
   });
 });
 

@@ -26,18 +26,29 @@ interface AddProjectState {
   created: CreatedProject | null;
   /** The New tab is creating or publishing: the dialog cannot be closed meanwhile. */
   busy: boolean;
+  /**
+   * The dialog was opened by project.add's intent (a page in a thread, or the CLI): what it
+   * adds is not shown on the Projects page, so the window stays where it is. Kept until the
+   * next open.
+   */
+  stay: boolean;
 }
 
-export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false }));
+export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false, stay: false }));
+
+export interface OpenAddProjectOptions {
+  /** Do not move the window to what gets added (see AddProjectState.stay). */
+  stay?: boolean;
+}
 
 /**
  * Opens the Add Project dialog (project.add's presenter; project.clone opens it on GitHub,
  * project.create on New), on Local folder unless the caller says. Deferred, so that a
  * palette closing after its presenter ran does not take focus back from the dialog.
  */
-export function openAddProject(tab: AddProjectTab = "local"): void {
+export function openAddProject(tab: AddProjectTab = "local", { stay = false }: OpenAddProjectOptions = {}): void {
   queueMicrotask(() => {
-    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1, created: null, busy: false }));
+    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1, created: null, busy: false, stay }));
   });
 }
 
@@ -154,17 +165,23 @@ export function addProjectEscapeBack(): boolean {
   return true;
 }
 
-/** Shows a workspace just added: the Projects page, its cursor on the new card (scrolled into view) once the card is there. */
+/**
+ * Shows a workspace just added: the Projects page, its cursor on the new card (scrolled into
+ * view) once the card is there. Nothing when the dialog was opened to stay.
+ */
 export function showAddedWorkspace(workspaceId: string): void {
+  if (useAddProjectStore.getState().stay) return;
   showWorkspaceCard(workspaceId);
 }
 
 /**
  * Shows a project just added (its overview) once the projects store has it: the command or
  * clone answers before the project event arrives on the event stream. Gives up after
- * timeoutMs (the user can open it from the Projects page).
+ * timeoutMs (the user can open it from the Projects page). Nothing when the dialog was
+ * opened to stay: the project shows wherever projects are listed.
  */
 export function selectAddedProject(projectId: string, timeoutMs = 5000): void {
+  if (useAddProjectStore.getState().stay) return;
   if (useProjectsStore.getState().byId[projectId]) {
     showWorktreeOnProjectsPage(projectId);
     return;

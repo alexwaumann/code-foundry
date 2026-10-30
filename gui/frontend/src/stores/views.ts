@@ -218,8 +218,9 @@ export function showView(name: string): boolean {
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();
     case "project.add":
-      // project.add without a folder from the CLI or a page: the Add Project dialog.
-      openAddProject();
+      // project.add without a folder from the CLI or a page: the Add Project dialog, which
+      // leaves the window where it is once the project is added (a page asked for it).
+      openAddProject("local", { stay: true });
       return true;
     case "dictation.toggle":
       // dictation.toggle from the CLI: the focused composer's dictation, else the content pane's.
