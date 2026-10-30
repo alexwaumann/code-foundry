@@ -35,10 +35,12 @@ describe("level bars", () => {
   it.each([
     { rms: 0, want: 0 },
     { rms: Number.NaN, want: 0 },
-    { rms: 0.003, want: 0 }, // a quiet room, below the -50 dBFS floor
-    { rms: 0.00316, want: 0 },
-    { rms: 0.02, want: 0.46 }, // speech, as PR 3 measured it
-    { rms: 0.05, want: 0.69 },
+    { rms: 0.003, want: 0 }, // a quiet room, below the -45 dBFS floor
+    { rms: 0.0056, want: 0 },
+    { rms: 0.009, want: 0.14 }, // a room's hum
+    { rms: 0.02, want: 0.37 }, // quiet speech
+    { rms: 0.05, want: 0.63 },
+    { rms: 0.1, want: 0.83 }, // a near voice
     { rms: 0.178, want: 1 },
     { rms: 1, want: 1 },
   ])("maps rms $rms to $want on the dBFS scale", ({ rms, want }) => {

@@ -30,11 +30,15 @@ export const LEVEL_GAP_MS = 250;
 export const LEVEL_HALF_LIFE_MS = 140;
 /** How fast a drawn bar follows its level: it closes 63% of the gap in this many ms, so 10 levels a second move smoothly. */
 export const LEVEL_EASE_MS = 60;
-/** The level scale in dBFS: the floor is silence in a quiet room (rms ~0.003), the top a raised voice close to the microphone. */
-export const LEVEL_FLOOR_DB = -50;
+/**
+ * The level scale in dBFS. The floor sits just above a room's hum on a MacBook's built-in
+ * microphone (rms 0.005 to 0.012 measured, -46 to -38 dBFS), so pauses draw near flat;
+ * the top is a voice close to the microphone.
+ */
+export const LEVEL_FLOOR_DB = -45;
 export const LEVEL_TOP_DB = -15;
 
-/** A level event's rms (0..1 of full scale) as a bar's height fraction (0..1), on a log (dBFS) scale: speech at 0.02 to 0.05 lands around half height. */
+/** A level event's rms (0..1 of full scale) as a bar's height fraction (0..1), on a log (dBFS) scale: quiet speech (0.02 to 0.05) lands around half height, a near voice (0.1 to 0.15) near the top. */
 export function levelOf(rms: number): number {
   if (!(rms > 0)) return 0;
   const db = 20 * Math.log10(rms);
