@@ -70,16 +70,36 @@ static void cfMicSinkWrite(CFMicSink* s, const char* p, size_t n) {
 	pthread_mutex_unlock(&s->mu);
 }
 
-// cfMic is an open microphone: the engine and the sink (both retained).
+// cfMic is an open microphone: the engine, the audio sink, the change sink and the
+// configuration-change observer (all retained).
 typedef struct {
 	AVAudioEngine* engine;
 	CFMicSink* sink;
+	CFMicSink* change;
+	void* observer; // id; cgo cannot size an id field
 } cfMic;
+
+static CFMicSink* cfMicSinkNew(int fd) {
+	CFMicSink* s = [[CFMicSink alloc] init];
+	pthread_mutex_init(&s->mu, NULL);
+	s->fd = dup(fd);
+	if (s->fd >= 0) fcntl(s->fd, F_SETNOSIGPIPE, 1);
+	return s;
+}
+
+static void cfMicSinkClose(CFMicSink* s) {
+	pthread_mutex_lock(&s->mu);
+	if (s->fd >= 0) close(s->fd);
+	s->fd = -1;
+	pthread_mutex_unlock(&s->mu);
+}
 
 // cfMicStart opens the default input with AVAudioEngine and writes its audio to fd
 // (duplicated) as 16 kHz mono int16 little-endian, converted by AVAudioConverter on the
-// tap's thread. NULL with *err (malloc'd) on failure.
-static cfMic* cfMicStart(int fd, char** err) {
+// tap's thread. A configuration change (AVAudioEngineConfigurationChangeNotification:
+// a headset connected, the default input switched; the engine has stopped) writes one
+// byte to changeFd (duplicated, non-blocking). NULL with *err (malloc'd) on failure.
+static cfMic* cfMicStart(int fd, int changeFd, char** err) {
 	@autoreleasepool {
 		AVAudioEngine* engine = [[AVAudioEngine alloc] init];
 		AVAudioInputNode* input = [engine inputNode];
@@ -97,10 +117,7 @@ static cfMic* cfMicStart(int fd, char** err) {
 			return NULL;
 		}
 		conv.downmix = YES;
-		CFMicSink* sink = [[CFMicSink alloc] init];
-		pthread_mutex_init(&sink->mu, NULL);
-		sink->fd = dup(fd);
-		if (sink->fd >= 0) fcntl(sink->fd, F_SETNOSIGPIPE, 1);
+		CFMicSink* sink = cfMicSinkNew(fd);
 		double ratio = 16000.0 / inFmt.sampleRate;
 		// ~100 ms at 48 kHz; AVAudioEngine treats the size as a hint. The variant with an
 		// error parameter is macOS 27 and up; this one still works there.
@@ -136,23 +153,31 @@ static cfMic* cfMicStart(int fd, char** err) {
 			[sink release];
 			return NULL;
 		}
+		CFMicSink* change = cfMicSinkNew(changeFd);
+		if (change->fd >= 0) fcntl(change->fd, F_SETFL, fcntl(change->fd, F_GETFL) | O_NONBLOCK);
+		id observer = [[NSNotificationCenter defaultCenter] addObserverForName:AVAudioEngineConfigurationChangeNotification object:engine queue:nil usingBlock:^(NSNotification* note) {
+			cfMicSinkWrite(change, "c", 1);
+		}];
 		cfMic* m = calloc(1, sizeof *m);
 		m->engine = engine;
 		m->sink = sink;
+		m->change = change;
+		m->observer = (void*)[observer retain];
 		return m;
 	}
 }
 
-// cfMicStop closes the microphone and the pipe (the reader then sees EOF), and frees m.
+// cfMicStop closes the microphone and both pipes (the readers then see EOF), and frees m.
 static void cfMicStop(cfMic* m) {
 	@autoreleasepool {
+		[[NSNotificationCenter defaultCenter] removeObserver:(id)m->observer];
+		[(id)m->observer release];
 		[[m->engine inputNode] removeTapOnBus:0];
 		[m->engine stop];
-		pthread_mutex_lock(&m->sink->mu);
-		if (m->sink->fd >= 0) close(m->sink->fd);
-		m->sink->fd = -1;
-		pthread_mutex_unlock(&m->sink->mu);
+		cfMicSinkClose(m->sink);
+		cfMicSinkClose(m->change);
 		[m->sink release];
+		[m->change release];
 		[m->engine release];
 		free(m);
 	}
@@ -255,16 +280,21 @@ func (m *avMicrophone) Start() (micCapture, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open microphone: %w", err)
 	}
+	cr, cw, err := os.Pipe()
+	if err != nil {
+		_, _ = r.Close(), w.Close()
+		return nil, fmt.Errorf("open microphone: %w", err)
+	}
 	var (
 		mic  *C.cfMic
 		cerr *C.char
 	)
-	m.do(func() { mic = C.cfMicStart(C.int(w.Fd()), &cerr) })
-	// The C side holds its own copy of the write end; it closes it on stop, which ends
-	// the reader below.
-	_ = w.Close()
+	m.do(func() { mic = C.cfMicStart(C.int(w.Fd()), C.int(cw.Fd()), &cerr) })
+	// The C side holds its own copies of the write ends; it closes them on stop, which
+	// ends the readers below.
+	_, _ = w.Close(), cw.Close()
 	if mic == nil {
-		_ = r.Close()
+		_, _ = r.Close(), cr.Close()
 		msg := C.GoString(cerr)
 		C.free(unsafe.Pointer(cerr))
 		return nil, fmt.Errorf("open microphone: %s", msg)
@@ -274,18 +304,26 @@ func (m *avMicrophone) Start() (micCapture, error) {
 		pumpFrames(r, frames)
 		_ = r.Close()
 	}()
-	return &avCapture{m: m, mic: mic, frames: frames}, nil
+	changed := make(chan struct{}, 1)
+	go func() {
+		pumpSignals(cr, changed)
+		_ = cr.Close()
+	}()
+	return &avCapture{m: m, mic: mic, frames: frames, changed: changed}, nil
 }
 
 // avCapture is an open AVAudioEngine capture.
 type avCapture struct {
-	m      *avMicrophone
-	mic    *C.cfMic
-	frames chan micFrame
-	once   sync.Once
+	m       *avMicrophone
+	mic     *C.cfMic
+	frames  chan micFrame
+	changed chan struct{}
+	once    sync.Once
 }
 
 func (c *avCapture) Frames() <-chan micFrame { return c.frames }
+
+func (c *avCapture) Changed() <-chan struct{} { return c.changed }
 
 func (c *avCapture) Stop() {
 	c.once.Do(func() {

@@ -38,6 +38,20 @@ type fakeMic struct {
 	perm     micPermission
 	answer   bool  // RequestAccess's answer; it also sets perm
 	startErr error // Start fails with it
+	last     *fakeCapture
+}
+
+func (m *fakeMic) setStartErr(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.startErr = err
+}
+
+// capture is the last capture Start opened.
+func (m *fakeMic) capture() *fakeCapture {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.last
 }
 
 func (m *fakeMic) setPermission(p micPermission) {
@@ -65,23 +79,29 @@ func (m *fakeMic) RequestAccess(context.Context) (bool, error) {
 }
 
 func (m *fakeMic) Start() (micCapture, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.log.add("mic.start")
 	if m.startErr != nil {
 		return nil, m.startErr
 	}
-	c := &fakeCapture{log: m.log, frames: make(chan micFrame, 2)}
+	c := &fakeCapture{log: m.log, frames: make(chan micFrame, 2), changed: make(chan struct{}, 1)}
 	c.frames <- micFrame{pcm: []byte{1, 0}, rms: 0.1}
 	c.frames <- micFrame{pcm: []byte{2, 0}, rms: 0.2}
+	m.last = c
 	return c, nil
 }
 
 type fakeCapture struct {
-	log    *eventLog
-	frames chan micFrame
-	once   sync.Once
+	log     *eventLog
+	frames  chan micFrame
+	changed chan struct{}
+	once    sync.Once
 }
 
 func (c *fakeCapture) Frames() <-chan micFrame { return c.frames }
+
+func (c *fakeCapture) Changed() <-chan struct{} { return c.changed }
 
 func (c *fakeCapture) Stop() {
 	c.once.Do(func() {
@@ -89,6 +109,9 @@ func (c *fakeCapture) Stop() {
 		close(c.frames)
 	})
 }
+
+// lose ends the capture's frames as a failed audio device would, without Stop.
+func (c *fakeCapture) lose() { c.once.Do(func() { close(c.frames) }) }
 
 // fakeDaemon is DictationService: each Watch reads the next stream of snapshots the
 // test feeds; ending one makes the next dial a reconnect.
@@ -187,12 +210,17 @@ var (
 )
 
 // dictStep feeds snap to the current Watch stream (or ends the stream when end is set;
-// or changes the permission when perm is set), then waits for the log to be want.
+// or changes the permission when perm is set; or signals a hardware change on the open
+// capture when change is set, after setting Start's error to startErr; or ends the
+// capture's frames when lose is set), then waits for the log to be want.
 type dictStep struct {
-	snap *v1.DictationSnapshot
-	end  bool
-	perm *micPermission
-	want []string
+	snap     *v1.DictationSnapshot
+	end      bool
+	perm     *micPermission
+	change   bool
+	startErr error
+	lose     bool
+	want     []string
 }
 
 func permission(p micPermission) *micPermission { return &p }
@@ -293,6 +321,34 @@ func TestDictationWatcher(t *testing.T) {
 			},
 		},
 		{
+			name: "hardware change: reopens and keeps streaming the session",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapListening("s1", false), want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1"}},
+				{change: true, want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1",
+					"mic.stop", "mic.start", "frame:s1", "frame:s1"}},
+				{snap: snapReady, want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1",
+					"mic.stop", "mic.start", "frame:s1", "frame:s1", "mic.stop", "audio.close"}},
+			},
+		},
+		{
+			name: "hardware change, no input to reopen: tries, then stops the session",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapListening("s1", false), want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1"}},
+				{change: true, startErr: errors.New("no microphone"), want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1",
+					"mic.stop", "mic.start", "mic.start", "mic.start", "stop:s1", "audio.close"}},
+			},
+		},
+		{
+			name: "the microphone stops by itself: stop the session",
+			perm: micGranted,
+			steps: []dictStep{
+				{snap: snapListening("s1", false), want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1"}},
+				{lose: true, want: []string{"watch", "permission", "mic.start", "audio.open", "frame:s1", "frame:s1", "stop:s1", "audio.close"}},
+			},
+		},
+		{
 			name: "daemon restart: capture stops, the watcher reconnects",
 			perm: micGranted,
 			steps: []dictStep{
@@ -308,10 +364,11 @@ func TestDictationWatcher(t *testing.T) {
 			mic := &fakeMic{log: log, perm: tt.perm, answer: tt.answer, startErr: tt.start}
 			daemon := &fakeDaemon{log: log}
 			w := dictationWatcher{
-				dial:  func(context.Context) (dictationConn, error) { return daemon, nil },
-				mic:   mic,
-				log:   slog.New(slog.DiscardHandler),
-				retry: time.Millisecond,
+				dial:       func(context.Context) (dictationConn, error) { return daemon, nil },
+				mic:        mic,
+				log:        slog.New(slog.DiscardHandler),
+				retry:      time.Millisecond,
+				reopenWait: time.Millisecond,
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			done := make(chan struct{})
@@ -331,6 +388,11 @@ func TestDictationWatcher(t *testing.T) {
 					stream++
 				case st.perm != nil:
 					mic.setPermission(*st.perm)
+				case st.change:
+					mic.setStartErr(st.startErr)
+					mic.capture().changed <- struct{}{}
+				case st.lose:
+					mic.capture().lose()
 				default:
 					// Unbuffered: returns once the watcher has taken it.
 					daemon.stream(stream) <- st.snap

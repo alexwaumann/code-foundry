@@ -57,6 +57,10 @@ type microphone interface {
 type micCapture interface {
 	// Frames delivers the audio; it is closed once Stop has run (or capture failed).
 	Frames() <-chan micFrame
+	// Changed receives when the audio hardware's configuration changed (a headset
+	// connected, the default input switched). The capture then delivers nothing more;
+	// the caller stops it and opens a new one.
+	Changed() <-chan struct{}
 	// Stop closes the microphone. Safe to call more than once.
 	Stop()
 }
@@ -109,6 +113,25 @@ func pumpFrames(r io.Reader, out chan<- micFrame) {
 		for _, f := range c.push(buf[:n]) {
 			select {
 			case out <- micFrame{pcm: f, rms: pcmRMS(f)}:
+			default:
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+// pumpSignals reads r until it ends, turning its bytes into signals on out (buffered;
+// signals already pending coalesce). out is never closed: a closed channel would read
+// as a signal forever.
+func pumpSignals(r io.Reader, out chan<- struct{}) {
+	buf := make([]byte, 16)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			select {
+			case out <- struct{}{}:
 			default:
 			}
 		}
