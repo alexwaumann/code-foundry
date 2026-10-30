@@ -86,6 +86,13 @@ side-panel surface the card replaces goes, with its entry points.
   "Show changes"; into the page's panel; "Changes · web · cf/x" off the main worktree).
   Never listed in "+", no hotkey (`available` is "hidden", the PR surface's convention).
   A project without git says so (the Projects page's menu has Initialize git and Publish).
+* **Saved tabs**: the panel store goes to version 4 (`stores/panel.ts migratePanelV3`, run
+  on a repaired version 3 store). A Worktree tab is its worktree's Changes tab (same
+  `{ project, path }`, a new id, titled "Changes · <old title>"); a workspace folder's
+  Worktree tab and the Usage, Linked PRs, Threads and Agents tabs are dropped. Active tabs
+  and pickFrom follow the new ids; a group that lost its active tab shows its first tab
+  left; a split whose group emptied is one group again. Without it those tabs came back
+  blank (GroupBody renders nothing for a kind it does not know).
 * **MCP** leaves "+" and loses M the same way; the card's MCP row and `view.panel.mcp` open it.
 * "+" now lists Ember's Board (Ember only), File, Diff, Pull request, then plugins.
 * `ui.focus.project` and a project just added used to open the project's overview on the
