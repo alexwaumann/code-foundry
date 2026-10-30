@@ -11,6 +11,7 @@ import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { dropdownMenuKit, keepFocusAfterMenu } from "./menuKit";
 import { ThreadMenuItems } from "./ThreadMenuItems";
+import { TranscriptDeletedChip } from "./TranscriptDeleted";
 
 const crumbIcons: Readonly<Record<CrumbIcon, LucideIcon>> = { folder: Folder, layers: Layers, folders: Folders, house: House };
 
@@ -151,12 +152,16 @@ function ThreadTitleMenu({ id }: { id: string }) {
   );
 }
 
-/** Left side of a thread's header: the crumb (where it runs, its parent), then the title and its menu. */
+/**
+ * Left side of a thread's header: the crumb (where it runs, its parent), then the title
+ * and its menu, then "Transcript deleted" when Claude Code deleted the transcript.
+ */
 export function ThreadTitle({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="thread-title-bar">
       <ThreadCrumb id={id} />
       <ThreadTitleMenu id={id} />
+      <TranscriptDeletedChip id={id} />
     </span>
   );
 }

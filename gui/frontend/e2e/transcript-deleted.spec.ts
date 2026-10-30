@@ -22,6 +22,8 @@ test("line 2, header and composer say it cannot continue; nothing can be sent", 
   await r.click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await expect(page.getByTestId("thread-transcript-deleted")).toHaveText("Transcript deleted");
+  // In the header's left bar, right after the title, not beside the toggles.
+  await expect(page.getByTestId("thread-title-bar").getByTestId("thread-transcript-deleted")).toBeVisible();
 
   const note = page.getByTestId("thread-transcript-note");
   await expect(note).toContainText("This thread can't continue.");

@@ -81,6 +81,13 @@ describe("the thread header's crumb", () => {
     expect(tooltipText(screen.getByTestId("thread-title"))).toBe("Plugin environment changed · Restart Claude from this menu");
   });
 
+  it("Transcript deleted sits in the bar right after the title", () => {
+    show({ transcriptMissing: true });
+    const chip = screen.getByTestId("thread-transcript-deleted");
+    expect(chip.parentElement).toBe(screen.getByTestId("thread-title-bar"));
+    expect(chip.previousElementSibling).toBe(screen.getByTestId("thread-title"));
+  });
+
   it("a provisional name is muted and italic", () => {
     show({ nameProvisional: true });
     expect(screen.getByTestId("thread-title-name").className).toContain("italic");

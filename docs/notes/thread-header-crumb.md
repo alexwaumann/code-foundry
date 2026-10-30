@@ -8,7 +8,8 @@ side-panel surface the card replaces goes, with its entry points.
 ## The header
 
 * **Left**: the crumb, then the title (`components/thread/ThreadParts.tsx`). The
-  "Transcript deleted" chip stays after the title.
+  "Transcript deleted" chip is in the same bar right after the title (ThreadTitle renders
+  it; the bar is `flex-1`, so beside it the chip would sit by the toggles).
 * **Crumb** (`lib/threadCrumb.ts`, pure, table-tested): no project → House, "No project";
   a workspace the store knows → Layers, its name (a thread in the workspace's folder too);
   several projects in no known workspace (a removed workspace included) → Folders,
