@@ -63,6 +63,34 @@ html[data-thread-width="full"] {
 .cf-thread .col {
   margin: 0 auto;
 }
+/* The thread info card (components/threadinfo/ThreadInfoCard.tsx) lays over the right of
+   the conversation: --ti-card is its column (320 + a 12px gutter), --ti-inset that or 0
+   (ThreadPane). The list and the dock keep clear of it; the list's scrollbar stays at the
+   pane's edge, drawn in the gutter, a thin line clear of the dock's fade. */
+.cf-thread {
+  --ti-card: 332px;
+  --ti-gutter: 12px;
+  /* ThreadPane's body sets it while the card shows; a thread view nested in one starts clear. */
+  --ti-inset: 0px;
+}
+.cf-thread .scroller {
+  padding-right: var(--ti-inset, 0px);
+}
+.cf-thread .scroller::-webkit-scrollbar {
+  width: var(--ti-gutter);
+}
+.cf-thread .scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cf-thread .scroller::-webkit-scrollbar-thumb {
+  border: 4px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--cf-text) 16%, transparent);
+  background-clip: padding-box;
+}
+.cf-thread .scroller::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--cf-text) 28%, transparent);
+}
 .cf-thread .col,
 .cf-thread-col {
   width: 100%;
@@ -815,7 +843,7 @@ html[data-thread-width="full"] {
 /* ---------- jump to bottom: floats above the composer while the list is scrolled up ---------- */
 .cf-thread .jump-bottom {
   position: absolute;
-  left: 50%;
+  left: calc((100% - var(--ti-inset, 0px) - var(--ti-gutter)) / 2);
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -870,7 +898,7 @@ html[data-thread-width="full"] {
 .cf-thread .dock {
   position: absolute;
   left: 0;
-  right: 0;
+  right: calc(var(--ti-inset, 0px) + var(--ti-gutter));
   bottom: 0;
   padding: 32px 40px 16px;
   background: linear-gradient(to top, var(--cf-surface) 55%, transparent);

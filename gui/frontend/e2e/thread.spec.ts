@@ -726,13 +726,12 @@ test("scrolled up, a Jump to bottom chip floats above the composer; a click scro
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
   await expect(chip).toBeVisible();
   await expect(chip).toHaveText("Jump to bottom");
-  // Centred, clear of the composer.
+  // Centred on the composer (the space left of the list's scrollbar gutter), clear of it.
   await expect
     .poll(async () => {
       const c = await chip.boundingBox();
       const composer = await page.getByTestId("thread-composer").boundingBox();
-      const t = await timeline.boundingBox();
-      return !!c && !!composer && !!t && c.y + c.height <= composer.y && Math.abs(c.x + c.width / 2 - (t.x + t.width / 2)) <= 2;
+      return !!c && !!composer && c.y + c.height <= composer.y && Math.abs(c.x + c.width / 2 - (composer.x + composer.width / 2)) <= 2;
     })
     .toBe(true);
   await shot(page, "thread-jump-bottom");

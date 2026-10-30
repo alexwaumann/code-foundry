@@ -19,6 +19,17 @@ export function dockTop(pane: HTMLElement): number {
   return tops.length > 0 ? Math.min(...tops) : pane.getBoundingClientRect().bottom;
 }
 
+/**
+ * A thread body's box less the thread info card laid over its right (ThreadInfoCard, a
+ * sibling of the body): where the cite surfaces may hang. The whole body without the card.
+ */
+export function paneBox(pane: HTMLElement): DOMRect {
+  const box = pane.getBoundingClientRect();
+  const card = pane.parentElement?.querySelector(':scope > [data-testid="thread-info"] > [data-testid="thread-info-card"]')?.getBoundingClientRect();
+  if (!card || card.left >= box.right) return box;
+  return DOMRect.fromRect({ x: box.left, y: box.top, width: Math.max(0, card.left - box.left), height: box.height });
+}
+
 /** Whether an item is one of the thread's items (Go to source needs it on screen). */
 export function hasItem(threadId: string, itemId: string): boolean {
   return useThreadStore.getState().logs[threadId]?.byId[itemId] !== undefined;

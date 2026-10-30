@@ -24,7 +24,9 @@ rows are PR 5.
 ## Layout
 
 `ThreadPane`'s body is a row: the existing column (timeline, dock, cite layer, page
-overlay) then `ThreadInfoCard` when open: `w-80`, `py-3 pr-3`, scrolling. The card is
+overlay) then `ThreadInfoCard` when open: `w-80`, `py-3 pr-3`, scrolling. (Since
+`docs/notes/thread-info-scroll.md` the card lays over the column's right instead, and the
+list's scrollbar stays at the pane's edge.) The card is
 `bg-cf-sidebar`, a border, `rounded-lg`, no shadow. The conversation and composer stay one
 column, so they stay aligned and narrow together. Ember's chat and the subagent view have
 no card.

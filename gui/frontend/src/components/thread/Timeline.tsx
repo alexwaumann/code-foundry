@@ -392,7 +392,7 @@ export function TimelineList<R extends ListRow>({
       <HoldTopContext.Provider value={holdTop}>
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="scroller min-h-0 flex-1 overflow-y-auto"
           data-testid="thread-timeline"
           data-at-bottom={atBottom || undefined}
           onWheel={markInput}

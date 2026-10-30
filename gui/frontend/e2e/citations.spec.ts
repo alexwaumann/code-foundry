@@ -310,3 +310,26 @@ test("Go to source is not replayed when the thread is shown again; a quote no dr
   await expect(page.getByTestId("thread-composer-error")).toHaveText("Nothing to send: the quote is no longer in any draft.");
   expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(before);
 });
+
+test("with the thread info card shown, the Cite button and popover hang left of the card", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await openThread(page);
+  await page.getByTestId("thread-info-toggle").click();
+  const card = await page.getByTestId("thread-info-card").boundingBox();
+  if (!card) throw new Error("no card");
+  // A selection let go over the card (the card lays over the body's right): the button is clamped to the conversation's side.
+  const { from } = await textPoints(answer(page), "the branch is pushed");
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(card.x + 60, from.y, { steps: 6 });
+  await page.mouse.up();
+  await expect(citeButton(page)).toBeVisible();
+  const btn = await page.getByTestId("cite-button-surface").boundingBox();
+  expect(btn).not.toBeNull();
+  if (btn) expect(btn.x + btn.width).toBeLessThanOrEqual(card.x);
+  await citeButton(page).click();
+  await expect(popover(page)).toBeVisible();
+  const pop = await popover(page).boundingBox();
+  expect(pop).not.toBeNull();
+  if (pop) expect(pop.x + pop.width).toBeLessThanOrEqual(card.x);
+});

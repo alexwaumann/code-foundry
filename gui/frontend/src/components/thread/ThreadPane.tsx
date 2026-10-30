@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { EmberBody } from "@/components/ember/EmberPane";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
@@ -105,24 +105,25 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <HeaderActions />
           </span>
         </PaneHeader>
-        <div className="flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef}>
+        <div className="relative flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>
+          {/* The card lays over this column's right side: the list and the dock keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
             {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
             <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
               {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
               {loaded && catchingUp && (
                 <div
-                  className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                  className="pointer-events-none absolute top-2 right-[calc(var(--ti-inset)+1rem)] z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
                   data-testid="thread-catching-up"
                 >
                   <Loader2 className="size-3 animate-spin" />
                   catching up…
                 </div>
               )}
-              {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+              {!loaded && <p className="absolute top-10 right-(--ti-inset) left-0 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
               {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
               {loaded && empty && !working && (
-                <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
+                <p className="absolute top-10 right-(--ti-inset) left-0 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
                   No messages yet.
                 </p>
               )}
@@ -134,8 +135,8 @@ function ThreadBody({ threadId }: { threadId: string }) {
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
             </PaneOverlay>
           </div>
-          {/* The thread info card: a column right of the conversation and its composer (view.thread-info). */}
-          {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} />}
+          {/* The thread info card (view.thread-info), over the column's right: the column's own messages, chips and page modal keep clear of it. */}
+          {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} scrollerRef={bodyRef} />}
         </div>
       </section>
     </ThreadContext.Provider>
