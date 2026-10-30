@@ -6,6 +6,7 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   ActionIcon,
+  ActionPickSource,
   ActionRunMode,
   ActionRunState,
   ActionRunTrigger,
@@ -14,6 +15,8 @@ import {
   type ActionEvent,
   type ActionRun,
   type ActionRunFinished,
+  type ActionRunRecord,
+  type LastActionRunResponse,
 } from "@/gen/codefoundry/v1/action_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 
@@ -168,6 +171,60 @@ export function toActionEventView(ev: ActionEvent): ActionEventView | null {
     default:
       return null;
   }
+}
+
+/** A run's persisted record (written when it starts; outlives a daemon restart). */
+export interface ActionRunRecordView {
+  runId: string;
+  actionId: string;
+  projectId: string;
+  /** "" for a worktree's run. */
+  threadId: string;
+  mode: ActionRunModeView;
+  trigger: ActionRunTriggerView;
+  startedAtMs: number | null;
+}
+
+/** Why ActionService.LastRun chose its action: the thread's last run, the project's, or the project's first action. */
+export type ActionPickSourceView = "thread" | "project" | "first";
+
+/** The action a thread's info card offers to run; null when the project has no actions. */
+export interface ActionPickView {
+  source: ActionPickSourceView;
+  action: ActionView;
+  /** The run that chose it; null with "first". */
+  last: ActionRunRecordView | null;
+}
+
+const pickSources: Record<ActionPickSource, ActionPickSourceView | null> = {
+  [ActionPickSource.UNSPECIFIED]: null,
+  [ActionPickSource.THREAD]: "thread",
+  [ActionPickSource.PROJECT]: "project",
+  [ActionPickSource.FIRST]: "first",
+};
+
+export function toActionRunRecordView(r: ActionRunRecord): ActionRunRecordView {
+  return {
+    runId: r.runId,
+    actionId: r.actionId,
+    projectId: r.projectId,
+    threadId: r.threadId,
+    mode: modeNames[r.mode],
+    trigger: triggerNames[r.trigger],
+    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
+  };
+}
+
+export function toActionPickView(p: LastActionRunResponse): ActionPickView | null {
+  const source = pickSources[p.source];
+  if (!source || !p.action) return null;
+  return { source, action: toActionView(p.action), last: p.last ? toActionRunRecordView(p.last) : null };
+}
+
+/** ActionService.LastRun: the action a thread's card offers (a read). */
+export async function getActionPick(projectId: string, threadId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ActionPickView | null> {
+  const c = await conn.client(ActionService);
+  return toActionPickView(await c.lastRun({ projectId, threadId }, { signal }));
 }
 
 /** A run with its captured output (a background run's last 64 KiB). */

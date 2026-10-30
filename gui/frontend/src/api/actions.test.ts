@@ -1,8 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { ActionEventSchema, ActionIcon, ActionRunMode, ActionRunState, ActionRunTrigger } from "@/gen/codefoundry/v1/action_pb";
-import { runFromResult, toActionEventView } from "./actions";
+import { ActionEventSchema, ActionIcon, ActionPickSource, ActionRunMode, ActionRunState, ActionRunTrigger, LastActionRunResponseSchema } from "@/gen/codefoundry/v1/action_pb";
+import { runFromResult, toActionEventView, toActionPickView } from "./actions";
 
 describe("toActionEventView", () => {
   it("maps a snapshot's actions and runs", () => {
@@ -79,5 +79,25 @@ describe("runFromResult", () => {
     ["not JSON", "started", null],
   ])("%s", (_n, json, want) => {
     expect(runFromResult(json)).toEqual(want);
+  });
+});
+
+describe("toActionPickView", () => {
+  const action = { id: "a-1", projectId: "r", name: "Build", command: "make", icon: ActionIcon.BUILD, position: 0 };
+  it("maps the thread's last run", () => {
+    const p = create(LastActionRunResponseSchema, {
+      source: ActionPickSource.THREAD,
+      action,
+      last: { runId: "r-9", actionId: "a-1", projectId: "r", threadId: "s-1", mode: ActionRunMode.BACKGROUND, trigger: ActionRunTrigger.USER, startedAt: timestampFromMs(4000) },
+    });
+    expect(toActionPickView(p)).toEqual({
+      source: "thread",
+      action: { id: "a-1", projectId: "r", name: "Build", command: "make", icon: "build", inTerminal: false, onWorktreeCreate: false, position: 0 },
+      last: { runId: "r-9", actionId: "a-1", projectId: "r", threadId: "s-1", mode: "background", trigger: "user", startedAtMs: 4000 },
+    });
+  });
+  it("maps the first action without a run, and nothing without actions", () => {
+    expect(toActionPickView(create(LastActionRunResponseSchema, { source: ActionPickSource.FIRST, action }))).toMatchObject({ source: "first", last: null });
+    expect(toActionPickView(create(LastActionRunResponseSchema, {}))).toBeNull();
   });
 });

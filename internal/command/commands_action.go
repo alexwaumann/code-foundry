@@ -26,6 +26,7 @@ type ActionBackend interface {
 	Run(context.Context, *connect.Request[v1.RunActionRequest]) (*connect.Response[v1.RunActionResponse], error)
 	WaitRun(context.Context, *connect.Request[v1.WaitActionRunRequest]) (*connect.Response[v1.WaitActionRunResponse], error)
 	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
+	LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error)
 }
 
 var (
@@ -91,7 +92,7 @@ func canUseActions(c Context) bool {
 const noProject = "actions belong to a project: pass --project, select a thread or a worktree, or run inside a registered project"
 
 // RegisterAction registers action.list, action.add, action.edit, action.remove,
-// action.run, action.wait and action.runs.
+// action.run, action.wait, action.runs and action.last.
 func RegisterAction(r *Registry, d ActionDeps) error {
 	r.SetIDLister(RunID, runIDs(d.Action))
 	projectArg := ArgSpec{Name: "project", Type: String, Context: ContextProject,
@@ -123,7 +124,16 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: formatActions(res.Msg.GetActions()), JSON: res.Msg}, nil
+				pick, err := d.Action.LastRun(ctx, connect.NewRequest(&v1.LastActionRunRequest{ProjectId: projectID, ThreadId: c.ActiveThreadID}))
+				if err != nil {
+					return Result{}, err
+				}
+				now := time.Now()
+				msg := formatActions(res.Msg.GetActions(), res.Msg.GetLastRuns(), c.ActiveThreadID, now)
+				if line := formatPick(pick.Msg, c.ActiveThreadID, now); line != "" {
+					msg += "\n" + line
+				}
+				return Result{Message: msg, JSON: res.Msg}, nil
 			},
 		},
 		Command{
@@ -357,6 +367,38 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				return Result{Message: formatRuns(res.Msg.GetRuns()), JSON: res.Msg}, nil
 			},
 		},
+		Command{
+			Name:      "action.last",
+			NoPalette: true,
+			ReadOnly:  true,
+			Title:     "Action to Run Again",
+			Description: "The action a thread's info card offers: the one last run in the thread, else the project's most " +
+				"recently run one, else the project's first. Runs started for a new worktree do not count.",
+			Category:     "Action",
+			NoKeybinding: true,
+			Args: []ArgSpec{
+				{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID, Description: "Thread id (default: the active thread; none: the project's pick)" + IDHelp},
+				projectArg, hereArg,
+			},
+			When:           canUseActions,
+			WhyUnavailable: whyNoProject,
+			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
+				thread := a.String("thread")
+				projectID, err := actionProject(ctx, d, c.With(ContextThread, thread), a)
+				if err != nil {
+					return Result{}, err
+				}
+				res, err := d.Action.LastRun(ctx, connect.NewRequest(&v1.LastActionRunRequest{ProjectId: projectID, ThreadId: thread}))
+				if err != nil {
+					return Result{}, err
+				}
+				msg := formatPick(res.Msg, thread, time.Now())
+				if msg == "" {
+					msg = "no actions in this project (add one: code-foundry action add <name> --command '<command line>')"
+				}
+				return Result{Message: msg, JSON: res.Msg}, nil
+			},
+		},
 	)
 }
 
@@ -490,14 +532,19 @@ func waitRun(ctx context.Context, d ActionDeps, id string) (Result, error) {
 	return Result{Message: sb.String(), JSON: run, ExitCode: code}, nil
 }
 
-// formatActions is action.list's table.
-func formatActions(acts []*v1.Action) string {
+// formatActions is action.list's table: each action and when it last ran (its newest
+// run record), relative to now; "here" is a run in thread.
+func formatActions(acts []*v1.Action, last []*v1.ActionRunRecord, thread string, now time.Time) string {
 	if len(acts) == 0 {
 		return "no actions in this project (add one: code-foundry action add <name> --command '<command line>')"
 	}
+	lastOf := make(map[string]*v1.ActionRunRecord, len(last))
+	for _, r := range last {
+		lastOf[r.GetActionId()] = r
+	}
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "NAME\tID\tICON\tRUNS IN\tON NEW WORKTREE\tCOMMAND")
+	_, _ = fmt.Fprintln(tw, "NAME\tID\tICON\tRUNS IN\tON NEW WORKTREE\tLAST RUN\tCOMMAND")
 	for _, a := range acts {
 		where, onCreate := "background", "no"
 		if a.GetInTerminal() {
@@ -506,10 +553,50 @@ func formatActions(acts []*v1.Action) string {
 		if a.GetOnWorktreeCreate() {
 			onCreate = "yes"
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", a.GetName(), a.GetId(), actionIconName(a.GetIcon()), where, onCreate, oneLine(a.GetCommand()))
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a.GetName(), a.GetId(), actionIconName(a.GetIcon()), where, onCreate,
+			lastRunCell(lastOf[a.GetId()], thread, now), oneLine(a.GetCommand()))
 	}
 	_ = tw.Flush()
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// lastRunCell is "never", else when and where: "3 min ago, here", "2 h ago, thread s-1",
+// "just now, worktree".
+func lastRunCell(r *v1.ActionRunRecord, thread string, now time.Time) string {
+	if r == nil || r.GetStartedAt() == nil {
+		return "never"
+	}
+	where := "worktree"
+	switch {
+	case thread != "" && r.GetThreadId() == thread:
+		where = "here"
+	case r.GetThreadId() != "":
+		where = "thread " + r.GetThreadId()
+	}
+	return mcpAgo(now.Sub(r.GetStartedAt().AsTime())) + ", " + where
+}
+
+// actionPickReasons is why LastRun chose its action, by source.
+var actionPickReasons = map[v1.ActionPickSource]string{
+	v1.ActionPickSource_ACTION_PICK_SOURCE_THREAD:  "ran last in this thread",
+	v1.ActionPickSource_ACTION_PICK_SOURCE_PROJECT: "ran last in this project",
+	v1.ActionPickSource_ACTION_PICK_SOURCE_FIRST:   "the project's first action; none has run yet",
+}
+
+// formatPick is the action a thread's card offers and why; "" without one.
+func formatPick(p *v1.LastActionRunResponse, thread string, now time.Time) string {
+	if p.GetAction() == nil {
+		return ""
+	}
+	who := "the project"
+	if thread != "" {
+		who = "thread " + thread
+	}
+	line := fmt.Sprintf("to run again for %s: %s (%s), %s", who, p.GetAction().GetName(), p.GetAction().GetId(), actionPickReasons[p.GetSource()])
+	if l := p.GetLast(); l != nil && l.GetStartedAt() != nil {
+		line += ", " + mcpAgo(now.Sub(l.GetStartedAt().AsTime()))
+	}
+	return line
 }
 
 // formatRuns is action.runs' table.

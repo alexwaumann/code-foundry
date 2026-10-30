@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/action.proto.
  */
 export const file_codefoundry_v1_action: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9hY3Rpb24ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIpQCCgZBY3Rpb24SCgoCaWQYASABKAkSEgoKcHJvamVjdF9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEg8KB2NvbW1hbmQYBCABKAkSKAoEaWNvbhgFIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkljb24SEwoLaW5fdGVybWluYWwYBiABKAgSGgoSb25fd29ya3RyZWVfY3JlYXRlGAcgASgIEhAKCHBvc2l0aW9uGAggASgFEi4KCmNyZWF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItADCglBY3Rpb25SdW4SCgoCaWQYASABKAkSEQoJYWN0aW9uX2lkGAIgASgJEhMKC2FjdGlvbl9uYW1lGAMgASgJEg8KB2NvbW1hbmQYBCABKAkSEgoKcHJvamVjdF9pZBgFIAEoCRIRCgl0aHJlYWRfaWQYBiABKAkSFQoNd29ya3RyZWVfcGF0aBgHIAEoCRIrCgRtb2RlGAggASgOMh0uY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuTW9kZRITCgt0ZXJtaW5hbF9pZBgJIAEoCRItCgVzdGF0ZRgKIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blN0YXRlEhEKCWV4aXRfY29kZRgLIAEoBRIuCgpzdGFydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtmaW5pc2hlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMQoHdHJpZ2dlchgOIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blRyaWdnZXISDgoGb3V0cHV0GA8gASgJEhgKEG91dHB1dF90cnVuY2F0ZWQYECABKAgiKAoSTGlzdEFjdGlvbnNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkiZwoTTGlzdEFjdGlvbnNSZXNwb25zZRInCgdhY3Rpb25zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuQWN0aW9uEicKBHJ1bnMYAiADKAsyGS5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW4iowEKE0NyZWF0ZUFjdGlvblJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2NvbW1hbmQYAyABKAkSKAoEaWNvbhgEIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkljb24SEwoLaW5fdGVybWluYWwYBSABKAgSGgoSb25fd29ya3RyZWVfY3JlYXRlGAYgASgIIj4KFENyZWF0ZUFjdGlvblJlc3BvbnNlEiYKBmFjdGlvbhgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbiKdAgoTVXBkYXRlQWN0aW9uUmVxdWVzdBIKCgJpZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESFAoHY29tbWFuZBgDIAEoCUgBiAEBEi0KBGljb24YBCABKA4yGi5jb2RlZm91bmRyeS52MS5BY3Rpb25JY29uSAKIAQESGAoLaW5fdGVybWluYWwYBSABKAhIA4gBARIfChJvbl93b3JrdHJlZV9jcmVhdGUYBiABKAhIBIgBARIVCghwb3NpdGlvbhgHIAEoBUgFiAEBQgcKBV9uYW1lQgoKCF9jb21tYW5kQgcKBV9pY29uQg4KDF9pbl90ZXJtaW5hbEIVChNfb25fd29ya3RyZWVfY3JlYXRlQgsKCV9wb3NpdGlvbiI+ChRVcGRhdGVBY3Rpb25SZXNwb25zZRImCgZhY3Rpb24YASABKAsyFi5jb2RlZm91bmRyeS52MS5BY3Rpb24iIQoTRGVsZXRlQWN0aW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIWChREZWxldGVBY3Rpb25SZXNwb25zZSKNAQoQUnVuQWN0aW9uUmVxdWVzdBIOCgZhY3Rpb24YASABKAkSEQoJdGhyZWFkX2lkGAIgASgJEhUKDXdvcmt0cmVlX3BhdGgYAyABKAkSEgoKcHJvamVjdF9pZBgEIAEoCRIrCgRtb2RlGAUgASgOMh0uY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuTW9kZSI7ChFSdW5BY3Rpb25SZXNwb25zZRImCgNydW4YASABKAsyGS5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW4iJQoTR2V0QWN0aW9uUnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkiPgoUR2V0QWN0aW9uUnVuUmVzcG9uc2USJgoDcnVuGAEgASgLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuIiYKFFdhaXRBY3Rpb25SdW5SZXF1ZXN0Eg4KBnJ1bl9pZBgBIAEoCSI/ChVXYWl0QWN0aW9uUnVuUmVzcG9uc2USJgoDcnVuGAEgASgLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuIiYKFFN0b3BBY3Rpb25SdW5SZXF1ZXN0Eg4KBnJ1bl9pZBgBIAEoCSI/ChVTdG9wQWN0aW9uUnVuUmVzcG9uc2USJgoDcnVuGAEgASgLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuIhUKE1dhdGNoQWN0aW9uc1JlcXVlc3QikgIKC0FjdGlvbkV2ZW50EjIKCHNuYXBzaG90GAEgASgLMh4uY29kZWZvdW5kcnkudjEuQWN0aW9uU25hcHNob3RIABIpCgd1cGRhdGVkGAIgASgLMhYuY29kZWZvdW5kcnkudjEuQWN0aW9uSAASFAoKcmVtb3ZlZF9pZBgDIAEoCUgAEjAKC3J1bl91cGRhdGVkGAQgASgLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuSAASGAoOcnVuX3JlbW92ZWRfaWQYBSABKAlIABI5CgxydW5fZmluaXNoZWQYBiABKAsyIS5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW5GaW5pc2hlZEgAQgcKBWV2ZW50ImIKDkFjdGlvblNuYXBzaG90EicKB2FjdGlvbnMYASADKAsyFi5jb2RlZm91bmRyeS52MS5BY3Rpb24SJwoEcnVucxgCIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1biL6AQoRQWN0aW9uUnVuRmluaXNoZWQSDgoGcnVuX2lkGAEgASgJEhEKCWFjdGlvbl9pZBgCIAEoCRITCgthY3Rpb25fbmFtZRgDIAEoCRISCgpwcm9qZWN0X2lkGAQgASgJEhEKCXRocmVhZF9pZBgFIAEoCRIRCglleGl0X2NvZGUYBiABKAUSKwoEbW9kZRgHIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1bk1vZGUSMQoHdHJpZ2dlchgIIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blRyaWdnZXISEwoLdGVybWluYWxfaWQYCSABKAkqtAEKCkFjdGlvbkljb24SGwoXQUNUSU9OX0lDT05fVU5TUEVDSUZJRUQQABIUChBBQ1RJT05fSUNPTl9QTEFZEAESFAoQQUNUSU9OX0lDT05fVEVTVBACEhQKEEFDVElPTl9JQ09OX0xJTlQQAxIZChVBQ1RJT05fSUNPTl9DT05GSUdVUkUQBBIVChFBQ1RJT05fSUNPTl9CVUlMRBAFEhUKEUFDVElPTl9JQ09OX0RFQlVHEAYqbgoNQWN0aW9uUnVuTW9kZRIfChtBQ1RJT05fUlVOX01PREVfVU5TUEVDSUZJRUQQABIcChhBQ1RJT05fUlVOX01PREVfVEVSTUlOQUwQARIeChpBQ1RJT05fUlVOX01PREVfQkFDS0dST1VORBACKm0KDkFjdGlvblJ1blN0YXRlEiAKHEFDVElPTl9SVU5fU1RBVEVfVU5TUEVDSUZJRUQQABIcChhBQ1RJT05fUlVOX1NUQVRFX1JVTk5JTkcQARIbChdBQ1RJT05fUlVOX1NUQVRFX0VYSVRFRBACKnsKEEFjdGlvblJ1blRyaWdnZXISIgoeQUNUSU9OX1JVTl9UUklHR0VSX1VOU1BFQ0lGSUVEEAASGwoXQUNUSU9OX1JVTl9UUklHR0VSX1VTRVIQARImCiJBQ1RJT05fUlVOX1RSSUdHRVJfV09SS1RSRUVfQ1JFQVRFEAIyjwYKDUFjdGlvblNlcnZpY2USUQoETGlzdBIiLmNvZGVmb3VuZHJ5LnYxLkxpc3RBY3Rpb25zUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkxpc3RBY3Rpb25zUmVzcG9uc2UiABJVCgZDcmVhdGUSIy5jb2RlZm91bmRyeS52MS5DcmVhdGVBY3Rpb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQ3JlYXRlQWN0aW9uUmVzcG9uc2UiABJVCgZVcGRhdGUSIy5jb2RlZm91bmRyeS52MS5VcGRhdGVBY3Rpb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuVXBkYXRlQWN0aW9uUmVzcG9uc2UiABJVCgZEZWxldGUSIy5jb2RlZm91bmRyeS52MS5EZWxldGVBY3Rpb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuRGVsZXRlQWN0aW9uUmVzcG9uc2UiABJMCgNSdW4SIC5jb2RlZm91bmRyeS52MS5SdW5BY3Rpb25SZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuUnVuQWN0aW9uUmVzcG9uc2UiABJVCgZHZXRSdW4SIy5jb2RlZm91bmRyeS52MS5HZXRBY3Rpb25SdW5SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuR2V0QWN0aW9uUnVuUmVzcG9uc2UiABJYCgdXYWl0UnVuEiQuY29kZWZvdW5kcnkudjEuV2FpdEFjdGlvblJ1blJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5XYWl0QWN0aW9uUnVuUmVzcG9uc2UiABJYCgdTdG9wUnVuEiQuY29kZWZvdW5kcnkudjEuU3RvcEFjdGlvblJ1blJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5TdG9wQWN0aW9uUnVuUmVzcG9uc2UiABJNCgVXYXRjaBIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoQWN0aW9uc1JlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5BY3Rpb25FdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILQWN0aW9uUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9hY3Rpb24ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIpQCCgZBY3Rpb24SCgoCaWQYASABKAkSEgoKcHJvamVjdF9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEg8KB2NvbW1hbmQYBCABKAkSKAoEaWNvbhgFIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkljb24SEwoLaW5fdGVybWluYWwYBiABKAgSGgoSb25fd29ya3RyZWVfY3JlYXRlGAcgASgIEhAKCHBvc2l0aW9uGAggASgFEi4KCmNyZWF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItADCglBY3Rpb25SdW4SCgoCaWQYASABKAkSEQoJYWN0aW9uX2lkGAIgASgJEhMKC2FjdGlvbl9uYW1lGAMgASgJEg8KB2NvbW1hbmQYBCABKAkSEgoKcHJvamVjdF9pZBgFIAEoCRIRCgl0aHJlYWRfaWQYBiABKAkSFQoNd29ya3RyZWVfcGF0aBgHIAEoCRIrCgRtb2RlGAggASgOMh0uY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuTW9kZRITCgt0ZXJtaW5hbF9pZBgJIAEoCRItCgVzdGF0ZRgKIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blN0YXRlEhEKCWV4aXRfY29kZRgLIAEoBRIuCgpzdGFydGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtmaW5pc2hlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMQoHdHJpZ2dlchgOIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blRyaWdnZXISDgoGb3V0cHV0GA8gASgJEhgKEG91dHB1dF90cnVuY2F0ZWQYECABKAgiKAoSTGlzdEFjdGlvbnNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkimwEKE0xpc3RBY3Rpb25zUmVzcG9uc2USJwoHYWN0aW9ucxgBIAMoCzIWLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbhInCgRydW5zGAIgAygLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuEjIKCWxhc3RfcnVucxgDIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blJlY29yZCLrAQoPQWN0aW9uUnVuUmVjb3JkEg4KBnJ1bl9pZBgBIAEoCRIRCglhY3Rpb25faWQYAiABKAkSEgoKcHJvamVjdF9pZBgDIAEoCRIRCgl0aHJlYWRfaWQYBCABKAkSKwoEbW9kZRgFIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1bk1vZGUSMQoHdHJpZ2dlchgGIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1blRyaWdnZXISLgoKc3RhcnRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiPQoUTGFzdEFjdGlvblJ1blJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIRCgl0aHJlYWRfaWQYAiABKAkioAEKFUxhc3RBY3Rpb25SdW5SZXNwb25zZRIwCgZzb3VyY2UYASABKA4yIC5jb2RlZm91bmRyeS52MS5BY3Rpb25QaWNrU291cmNlEiYKBmFjdGlvbhgCIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbhItCgRsYXN0GAMgASgLMh8uY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuUmVjb3JkIqMBChNDcmVhdGVBY3Rpb25SZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgdjb21tYW5kGAMgASgJEigKBGljb24YBCABKA4yGi5jb2RlZm91bmRyeS52MS5BY3Rpb25JY29uEhMKC2luX3Rlcm1pbmFsGAUgASgIEhoKEm9uX3dvcmt0cmVlX2NyZWF0ZRgGIAEoCCI+ChRDcmVhdGVBY3Rpb25SZXNwb25zZRImCgZhY3Rpb24YASABKAsyFi5jb2RlZm91bmRyeS52MS5BY3Rpb24inQIKE1VwZGF0ZUFjdGlvblJlcXVlc3QSCgoCaWQYASABKAkSEQoEbmFtZRgCIAEoCUgAiAEBEhQKB2NvbW1hbmQYAyABKAlIAYgBARItCgRpY29uGAQgASgOMhouY29kZWZvdW5kcnkudjEuQWN0aW9uSWNvbkgCiAEBEhgKC2luX3Rlcm1pbmFsGAUgASgISAOIAQESHwoSb25fd29ya3RyZWVfY3JlYXRlGAYgASgISASIAQESFQoIcG9zaXRpb24YByABKAVIBYgBAUIHCgVfbmFtZUIKCghfY29tbWFuZEIHCgVfaWNvbkIOCgxfaW5fdGVybWluYWxCFQoTX29uX3dvcmt0cmVlX2NyZWF0ZUILCglfcG9zaXRpb24iPgoUVXBkYXRlQWN0aW9uUmVzcG9uc2USJgoGYWN0aW9uGAEgASgLMhYuY29kZWZvdW5kcnkudjEuQWN0aW9uIiEKE0RlbGV0ZUFjdGlvblJlcXVlc3QSCgoCaWQYASABKAkiFgoURGVsZXRlQWN0aW9uUmVzcG9uc2UijQEKEFJ1bkFjdGlvblJlcXVlc3QSDgoGYWN0aW9uGAEgASgJEhEKCXRocmVhZF9pZBgCIAEoCRIVCg13b3JrdHJlZV9wYXRoGAMgASgJEhIKCnByb2plY3RfaWQYBCABKAkSKwoEbW9kZRgFIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1bk1vZGUiOwoRUnVuQWN0aW9uUmVzcG9uc2USJgoDcnVuGAEgASgLMhkuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuIiUKE0dldEFjdGlvblJ1blJlcXVlc3QSDgoGcnVuX2lkGAEgASgJIj4KFEdldEFjdGlvblJ1blJlc3BvbnNlEiYKA3J1bhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1biImChRXYWl0QWN0aW9uUnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkiPwoVV2FpdEFjdGlvblJ1blJlc3BvbnNlEiYKA3J1bhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1biImChRTdG9wQWN0aW9uUnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkiPwoVU3RvcEFjdGlvblJ1blJlc3BvbnNlEiYKA3J1bhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1biIVChNXYXRjaEFjdGlvbnNSZXF1ZXN0IpICCgtBY3Rpb25FdmVudBIyCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblNuYXBzaG90SAASKQoHdXBkYXRlZBgCIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkgAEhQKCnJlbW92ZWRfaWQYAyABKAlIABIwCgtydW5fdXBkYXRlZBgEIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkFjdGlvblJ1bkgAEhgKDnJ1bl9yZW1vdmVkX2lkGAUgASgJSAASOQoMcnVuX2ZpbmlzaGVkGAYgASgLMiEuY29kZWZvdW5kcnkudjEuQWN0aW9uUnVuRmluaXNoZWRIAEIHCgVldmVudCJiCg5BY3Rpb25TbmFwc2hvdBInCgdhY3Rpb25zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuQWN0aW9uEicKBHJ1bnMYAiADKAsyGS5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW4i+gEKEUFjdGlvblJ1bkZpbmlzaGVkEg4KBnJ1bl9pZBgBIAEoCRIRCglhY3Rpb25faWQYAiABKAkSEwoLYWN0aW9uX25hbWUYAyABKAkSEgoKcHJvamVjdF9pZBgEIAEoCRIRCgl0aHJlYWRfaWQYBSABKAkSEQoJZXhpdF9jb2RlGAYgASgFEisKBG1vZGUYByABKA4yHS5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW5Nb2RlEjEKB3RyaWdnZXIYCCABKA4yIC5jb2RlZm91bmRyeS52MS5BY3Rpb25SdW5UcmlnZ2VyEhMKC3Rlcm1pbmFsX2lkGAkgASgJKrQBCgpBY3Rpb25JY29uEhsKF0FDVElPTl9JQ09OX1VOU1BFQ0lGSUVEEAASFAoQQUNUSU9OX0lDT05fUExBWRABEhQKEEFDVElPTl9JQ09OX1RFU1QQAhIUChBBQ1RJT05fSUNPTl9MSU5UEAMSGQoVQUNUSU9OX0lDT05fQ09ORklHVVJFEAQSFQoRQUNUSU9OX0lDT05fQlVJTEQQBRIVChFBQ1RJT05fSUNPTl9ERUJVRxAGKm4KDUFjdGlvblJ1bk1vZGUSHwobQUNUSU9OX1JVTl9NT0RFX1VOU1BFQ0lGSUVEEAASHAoYQUNUSU9OX1JVTl9NT0RFX1RFUk1JTkFMEAESHgoaQUNUSU9OX1JVTl9NT0RFX0JBQ0tHUk9VTkQQAiptCg5BY3Rpb25SdW5TdGF0ZRIgChxBQ1RJT05fUlVOX1NUQVRFX1VOU1BFQ0lGSUVEEAASHAoYQUNUSU9OX1JVTl9TVEFURV9SVU5OSU5HEAESGwoXQUNUSU9OX1JVTl9TVEFURV9FWElURUQQAip7ChBBY3Rpb25SdW5UcmlnZ2VyEiIKHkFDVElPTl9SVU5fVFJJR0dFUl9VTlNQRUNJRklFRBAAEhsKF0FDVElPTl9SVU5fVFJJR0dFUl9VU0VSEAESJgoiQUNUSU9OX1JVTl9UUklHR0VSX1dPUktUUkVFX0NSRUFURRACKpMBChBBY3Rpb25QaWNrU291cmNlEiIKHkFDVElPTl9QSUNLX1NPVVJDRV9VTlNQRUNJRklFRBAAEh0KGUFDVElPTl9QSUNLX1NPVVJDRV9USFJFQUQQARIeChpBQ1RJT05fUElDS19TT1VSQ0VfUFJPSkVDVBACEhwKGEFDVElPTl9QSUNLX1NPVVJDRV9GSVJTVBADMukGCg1BY3Rpb25TZXJ2aWNlElEKBExpc3QSIi5jb2RlZm91bmRyeS52MS5MaXN0QWN0aW9uc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5MaXN0QWN0aW9uc1Jlc3BvbnNlIgASVQoGQ3JlYXRlEiMuY29kZWZvdW5kcnkudjEuQ3JlYXRlQWN0aW9uUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZUFjdGlvblJlc3BvbnNlIgASVQoGVXBkYXRlEiMuY29kZWZvdW5kcnkudjEuVXBkYXRlQWN0aW9uUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUFjdGlvblJlc3BvbnNlIgASVQoGRGVsZXRlEiMuY29kZWZvdW5kcnkudjEuRGVsZXRlQWN0aW9uUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkRlbGV0ZUFjdGlvblJlc3BvbnNlIgASTAoDUnVuEiAuY29kZWZvdW5kcnkudjEuUnVuQWN0aW9uUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLlJ1bkFjdGlvblJlc3BvbnNlIgASVQoGR2V0UnVuEiMuY29kZWZvdW5kcnkudjEuR2V0QWN0aW9uUnVuUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkdldEFjdGlvblJ1blJlc3BvbnNlIgASWAoHV2FpdFJ1bhIkLmNvZGVmb3VuZHJ5LnYxLldhaXRBY3Rpb25SdW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuV2FpdEFjdGlvblJ1blJlc3BvbnNlIgASWAoHU3RvcFJ1bhIkLmNvZGVmb3VuZHJ5LnYxLlN0b3BBY3Rpb25SdW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuU3RvcEFjdGlvblJ1blJlc3BvbnNlIgASWAoHTGFzdFJ1bhIkLmNvZGVmb3VuZHJ5LnYxLkxhc3RBY3Rpb25SdW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuTGFzdEFjdGlvblJ1blJlc3BvbnNlIgASTQoFV2F0Y2gSIy5jb2RlZm91bmRyeS52MS5XYXRjaEFjdGlvbnNSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuQWN0aW9uRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0FjdGlvblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Action
@@ -234,6 +234,14 @@ export type ListActionsResponse = Message<"codefoundry.v1.ListActionsResponse"> 
    * @generated from field: repeated codefoundry.v1.ActionRun runs = 2;
    */
   runs: ActionRun[];
+
+  /**
+   * Each listed action's newest run record (any trigger), newest first; actions that
+   * never ran have none. Unlike runs, these outlive a daemon restart.
+   *
+   * @generated from field: repeated codefoundry.v1.ActionRunRecord last_runs = 3;
+   */
+  lastRuns: ActionRunRecord[];
 };
 
 /**
@@ -242,6 +250,114 @@ export type ListActionsResponse = Message<"codefoundry.v1.ListActionsResponse"> 
  */
 export const ListActionsResponseSchema: GenMessage<ListActionsResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_action, 3);
+
+/**
+ * ActionRunRecord is the persisted record of a run, written when it starts: the action,
+ * the thread (empty for a worktree's run), the runner and the start. The daemon keeps the
+ * newest 500 per project; forgetting an action forgets its records.
+ *
+ * @generated from message codefoundry.v1.ActionRunRecord
+ */
+export type ActionRunRecord = Message<"codefoundry.v1.ActionRunRecord"> & {
+  /**
+   * @generated from field: string run_id = 1;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: string action_id = 2;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: string project_id = 3;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: string thread_id = 4;
+   */
+  threadId: string;
+
+  /**
+   * TERMINAL or BACKGROUND: the runner.
+   *
+   * @generated from field: codefoundry.v1.ActionRunMode mode = 5;
+   */
+  mode: ActionRunMode;
+
+  /**
+   * @generated from field: codefoundry.v1.ActionRunTrigger trigger = 6;
+   */
+  trigger: ActionRunTrigger;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 7;
+   */
+  startedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.ActionRunRecord.
+ * Use `create(ActionRunRecordSchema)` to create a new message.
+ */
+export const ActionRunRecordSchema: GenMessage<ActionRunRecord> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_action, 4);
+
+/**
+ * @generated from message codefoundry.v1.LastActionRunRequest
+ */
+export type LastActionRunRequest = Message<"codefoundry.v1.LastActionRunRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * Empty: the project's most recent run, else its first action.
+   *
+   * @generated from field: string thread_id = 2;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.LastActionRunRequest.
+ * Use `create(LastActionRunRequestSchema)` to create a new message.
+ */
+export const LastActionRunRequestSchema: GenMessage<LastActionRunRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_action, 5);
+
+/**
+ * @generated from message codefoundry.v1.LastActionRunResponse
+ */
+export type LastActionRunResponse = Message<"codefoundry.v1.LastActionRunResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.ActionPickSource source = 1;
+   */
+  source: ActionPickSource;
+
+  /**
+   * Unset with UNSPECIFIED.
+   *
+   * @generated from field: codefoundry.v1.Action action = 2;
+   */
+  action?: Action | undefined;
+
+  /**
+   * The run that chose the action; unset with FIRST and UNSPECIFIED.
+   *
+   * @generated from field: codefoundry.v1.ActionRunRecord last = 3;
+   */
+  last?: ActionRunRecord | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.LastActionRunResponse.
+ * Use `create(LastActionRunResponseSchema)` to create a new message.
+ */
+export const LastActionRunResponseSchema: GenMessage<LastActionRunResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_action, 6);
 
 /**
  * @generated from message codefoundry.v1.CreateActionRequest
@@ -285,7 +401,7 @@ export type CreateActionRequest = Message<"codefoundry.v1.CreateActionRequest"> 
  * Use `create(CreateActionRequestSchema)` to create a new message.
  */
 export const CreateActionRequestSchema: GenMessage<CreateActionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 4);
+  messageDesc(file_codefoundry_v1_action, 7);
 
 /**
  * @generated from message codefoundry.v1.CreateActionResponse
@@ -302,7 +418,7 @@ export type CreateActionResponse = Message<"codefoundry.v1.CreateActionResponse"
  * Use `create(CreateActionResponseSchema)` to create a new message.
  */
 export const CreateActionResponseSchema: GenMessage<CreateActionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 5);
+  messageDesc(file_codefoundry_v1_action, 8);
 
 /**
  * @generated from message codefoundry.v1.UpdateActionRequest
@@ -353,7 +469,7 @@ export type UpdateActionRequest = Message<"codefoundry.v1.UpdateActionRequest"> 
  * Use `create(UpdateActionRequestSchema)` to create a new message.
  */
 export const UpdateActionRequestSchema: GenMessage<UpdateActionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 6);
+  messageDesc(file_codefoundry_v1_action, 9);
 
 /**
  * @generated from message codefoundry.v1.UpdateActionResponse
@@ -370,7 +486,7 @@ export type UpdateActionResponse = Message<"codefoundry.v1.UpdateActionResponse"
  * Use `create(UpdateActionResponseSchema)` to create a new message.
  */
 export const UpdateActionResponseSchema: GenMessage<UpdateActionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 7);
+  messageDesc(file_codefoundry_v1_action, 10);
 
 /**
  * @generated from message codefoundry.v1.DeleteActionRequest
@@ -389,7 +505,7 @@ export type DeleteActionRequest = Message<"codefoundry.v1.DeleteActionRequest"> 
  * Use `create(DeleteActionRequestSchema)` to create a new message.
  */
 export const DeleteActionRequestSchema: GenMessage<DeleteActionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 8);
+  messageDesc(file_codefoundry_v1_action, 11);
 
 /**
  * @generated from message codefoundry.v1.DeleteActionResponse
@@ -402,7 +518,7 @@ export type DeleteActionResponse = Message<"codefoundry.v1.DeleteActionResponse"
  * Use `create(DeleteActionResponseSchema)` to create a new message.
  */
 export const DeleteActionResponseSchema: GenMessage<DeleteActionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 9);
+  messageDesc(file_codefoundry_v1_action, 12);
 
 /**
  * @generated from message codefoundry.v1.RunActionRequest
@@ -450,7 +566,7 @@ export type RunActionRequest = Message<"codefoundry.v1.RunActionRequest"> & {
  * Use `create(RunActionRequestSchema)` to create a new message.
  */
 export const RunActionRequestSchema: GenMessage<RunActionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 10);
+  messageDesc(file_codefoundry_v1_action, 13);
 
 /**
  * @generated from message codefoundry.v1.RunActionResponse
@@ -467,7 +583,7 @@ export type RunActionResponse = Message<"codefoundry.v1.RunActionResponse"> & {
  * Use `create(RunActionResponseSchema)` to create a new message.
  */
 export const RunActionResponseSchema: GenMessage<RunActionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 11);
+  messageDesc(file_codefoundry_v1_action, 14);
 
 /**
  * @generated from message codefoundry.v1.GetActionRunRequest
@@ -484,7 +600,7 @@ export type GetActionRunRequest = Message<"codefoundry.v1.GetActionRunRequest"> 
  * Use `create(GetActionRunRequestSchema)` to create a new message.
  */
 export const GetActionRunRequestSchema: GenMessage<GetActionRunRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 12);
+  messageDesc(file_codefoundry_v1_action, 15);
 
 /**
  * @generated from message codefoundry.v1.GetActionRunResponse
@@ -501,7 +617,7 @@ export type GetActionRunResponse = Message<"codefoundry.v1.GetActionRunResponse"
  * Use `create(GetActionRunResponseSchema)` to create a new message.
  */
 export const GetActionRunResponseSchema: GenMessage<GetActionRunResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 13);
+  messageDesc(file_codefoundry_v1_action, 16);
 
 /**
  * @generated from message codefoundry.v1.WaitActionRunRequest
@@ -518,7 +634,7 @@ export type WaitActionRunRequest = Message<"codefoundry.v1.WaitActionRunRequest"
  * Use `create(WaitActionRunRequestSchema)` to create a new message.
  */
 export const WaitActionRunRequestSchema: GenMessage<WaitActionRunRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 14);
+  messageDesc(file_codefoundry_v1_action, 17);
 
 /**
  * @generated from message codefoundry.v1.WaitActionRunResponse
@@ -535,7 +651,7 @@ export type WaitActionRunResponse = Message<"codefoundry.v1.WaitActionRunRespons
  * Use `create(WaitActionRunResponseSchema)` to create a new message.
  */
 export const WaitActionRunResponseSchema: GenMessage<WaitActionRunResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 15);
+  messageDesc(file_codefoundry_v1_action, 18);
 
 /**
  * @generated from message codefoundry.v1.StopActionRunRequest
@@ -552,7 +668,7 @@ export type StopActionRunRequest = Message<"codefoundry.v1.StopActionRunRequest"
  * Use `create(StopActionRunRequestSchema)` to create a new message.
  */
 export const StopActionRunRequestSchema: GenMessage<StopActionRunRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 16);
+  messageDesc(file_codefoundry_v1_action, 19);
 
 /**
  * @generated from message codefoundry.v1.StopActionRunResponse
@@ -569,7 +685,7 @@ export type StopActionRunResponse = Message<"codefoundry.v1.StopActionRunRespons
  * Use `create(StopActionRunResponseSchema)` to create a new message.
  */
 export const StopActionRunResponseSchema: GenMessage<StopActionRunResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 17);
+  messageDesc(file_codefoundry_v1_action, 20);
 
 /**
  * @generated from message codefoundry.v1.WatchActionsRequest
@@ -582,7 +698,7 @@ export type WatchActionsRequest = Message<"codefoundry.v1.WatchActionsRequest"> 
  * Use `create(WatchActionsRequestSchema)` to create a new message.
  */
 export const WatchActionsRequestSchema: GenMessage<WatchActionsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 18);
+  messageDesc(file_codefoundry_v1_action, 21);
 
 /**
  * @generated from message codefoundry.v1.ActionEvent
@@ -647,7 +763,7 @@ export type ActionEvent = Message<"codefoundry.v1.ActionEvent"> & {
  * Use `create(ActionEventSchema)` to create a new message.
  */
 export const ActionEventSchema: GenMessage<ActionEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 19);
+  messageDesc(file_codefoundry_v1_action, 22);
 
 /**
  * @generated from message codefoundry.v1.ActionSnapshot
@@ -671,7 +787,7 @@ export type ActionSnapshot = Message<"codefoundry.v1.ActionSnapshot"> & {
  * Use `create(ActionSnapshotSchema)` to create a new message.
  */
 export const ActionSnapshotSchema: GenMessage<ActionSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 20);
+  messageDesc(file_codefoundry_v1_action, 23);
 
 /**
  * ActionRunFinished is sent once per run when it ends.
@@ -730,7 +846,7 @@ export type ActionRunFinished = Message<"codefoundry.v1.ActionRunFinished"> & {
  * Use `create(ActionRunFinishedSchema)` to create a new message.
  */
 export const ActionRunFinishedSchema: GenMessage<ActionRunFinished> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_action, 21);
+  messageDesc(file_codefoundry_v1_action, 24);
 
 /**
  * ActionIcon is the icon an action shows with.
@@ -871,13 +987,56 @@ export const ActionRunTriggerSchema: GenEnum<ActionRunTrigger> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_action, 3);
 
 /**
+ * ActionPickSource says why LastRun chose its action.
+ *
+ * @generated from enum codefoundry.v1.ActionPickSource
+ */
+export enum ActionPickSource {
+  /**
+   * The project has no actions; nothing was picked.
+   *
+   * @generated from enum value: ACTION_PICK_SOURCE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The action the user ran last in the thread.
+   *
+   * @generated from enum value: ACTION_PICK_SOURCE_THREAD = 1;
+   */
+  THREAD = 1,
+
+  /**
+   * Nothing ran in the thread: the action the user ran last in the project.
+   *
+   * @generated from enum value: ACTION_PICK_SOURCE_PROJECT = 2;
+   */
+  PROJECT = 2,
+
+  /**
+   * No action of the project ran yet: its first action.
+   *
+   * @generated from enum value: ACTION_PICK_SOURCE_FIRST = 3;
+   */
+  FIRST = 3,
+}
+
+/**
+ * Describes the enum codefoundry.v1.ActionPickSource.
+ */
+export const ActionPickSourceSchema: GenEnum<ActionPickSource> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_action, 4);
+
+/**
  * ActionService manages actions: per-project commands the user defines (modelled on T3
  * Code's Actions) and runs them. A run either opens as a terminal in its owner's bottom
  * panel (labels kind=action, see Terminal.labels) or runs in the background with its
  * combined output captured. Every run gets CODE_FOUNDRY_PROJECT_ROOT (the project's main
  * checkout) and CODE_FOUNDRY_WORKTREE (where it runs) in its environment, and runs
  * `$SHELL -lc <command>` in the worktree. Runs live in memory only (the newest 50 per
- * project). See docs/notes/actions-1-daemon.md.
+ * project); each is also recorded when it starts (ActionRunRecord: action, thread,
+ * runner, start), which outlives a restart. See docs/notes/actions-1-daemon.md and
+ * docs/notes/thread-info-facts.md.
  *
  * @generated from service codefoundry.v1.ActionService
  */
@@ -969,6 +1128,20 @@ export const ActionService: GenService<{
     methodKind: "unary";
     input: typeof StopActionRunRequestSchema;
     output: typeof StopActionRunResponseSchema;
+  },
+  /**
+   * LastRun picks the action a thread's info card offers to run: the action the user
+   * last ran in the thread (thread_id), else the project's most recently run action (in
+   * any thread or worktree), else the project's first action. Only runs the user started
+   * count (not on_worktree_create runs), and only actions that still exist. Read from
+   * the run records, which outlive a daemon restart.
+   *
+   * @generated from rpc codefoundry.v1.ActionService.LastRun
+   */
+  lastRun: {
+    methodKind: "unary";
+    input: typeof LastActionRunRequestSchema;
+    output: typeof LastActionRunResponseSchema;
   },
   /**
    * Watch sends a snapshot, then every change. A client that falls behind gets a new

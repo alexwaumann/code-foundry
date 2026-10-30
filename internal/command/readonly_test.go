@@ -31,7 +31,7 @@ import (
 //     cancels it, times out or goes. action.wait may record a lost terminal run as
 //     finished, which is the end it already had, not one it causes.
 var readOnly = []string{
-	"action.list", "action.runs", "action.wait",
+	"action.last", "action.list", "action.runs", "action.wait",
 	"app.version",
 	"daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.status",

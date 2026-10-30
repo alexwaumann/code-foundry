@@ -15,7 +15,8 @@
 //   - Background: a child process of the daemon in its own process group, with its
 //     combined output captured into a bounded buffer (the last 64 KiB).
 //
-// Runs live in memory only, newest RunHistory per project. Background runs are killed
+// Runs live in memory only, newest RunHistory per project; each is also recorded when it
+// starts (RunRecord: action, thread, runner, start), which outlives a restart. Background runs are killed
 // when the store closes (daemon shutdown), when their project is unregistered
 // (ProjectRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
 // away). See docs/notes/actions-1-daemon.md.
@@ -311,4 +312,8 @@ type Store interface {
 	// SIGKILL; a terminal run's terminal: killed) and returns it, usually still running:
 	// Wait waits for the end. A finished run is returned as it is.
 	StopRun(ctx context.Context, id string) (Run, error)
+	// RunRecords returns projectID's run records (every project's when empty), newest
+	// first: every run since migration 0050, the newest RecordHistory per project, across
+	// daemon restarts.
+	RunRecords(ctx context.Context, projectID string) ([]RunRecord, error)
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -247,8 +248,11 @@ func TestActionProject(t *testing.T) {
 				t.Fatal(err)
 			}
 			reqs := act.Requests()
-			if len(reqs) != 1 || reqs[0].(*v1.ListActionsRequest).GetProjectId() != tt.wantProject {
-				t.Errorf("requests = %v, want List in %s", reqs, tt.wantProject)
+			if len(reqs) != 2 || reqs[0].(*v1.ListActionsRequest).GetProjectId() != tt.wantProject {
+				t.Fatalf("requests = %v, want List in %s", reqs, tt.wantProject)
+			}
+			if lr := reqs[1].(*v1.LastActionRunRequest); lr.GetProjectId() != tt.wantProject || lr.GetThreadId() != tt.ctx.ActiveThreadID {
+				t.Errorf("LastRun = %v, want %s for thread %q", lr, tt.wantProject, tt.ctx.ActiveThreadID)
 			}
 		})
 	}
@@ -306,6 +310,64 @@ func TestActionAddEditRemove(t *testing.T) {
 			reqs := act.Requests()
 			if len(reqs) == 0 || !proto.Equal(reqs[len(reqs)-1], tt.want) {
 				t.Errorf("requests = %v, want last %v", reqs, tt.want)
+			}
+		})
+	}
+}
+
+// action.list shows when each action last ran and the action a thread's card offers;
+// action.last is that pick alone.
+func TestActionLastRun(t *testing.T) {
+	ago := func(d time.Duration) *timestamppb.Timestamp { return timestamppb.New(time.Now().Add(-d)) }
+	acts := []*v1.Action{
+		{Id: "a-1", ProjectId: "r1", Name: "Test", Command: "go test ./...", InTerminal: true},
+		{Id: "a-2", ProjectId: "r1", Name: "Build", Command: "make"},
+		{Id: "a-3", ProjectId: "r1", Name: "Lint", Command: "golangci-lint run"},
+	}
+	last := []*v1.ActionRunRecord{
+		{RunId: "r-2", ActionId: "a-2", ProjectId: "r1", ThreadId: "s1", StartedAt: ago(3 * time.Minute)},
+		{RunId: "r-1", ActionId: "a-1", ProjectId: "r1", ThreadId: "s9", StartedAt: ago(2 * time.Hour)},
+		{RunId: "r-3", ActionId: "a-3", ProjectId: "r1", StartedAt: ago(5 * time.Hour)},
+	}
+	tests := []struct {
+		name string
+		cmd  string
+		ctx  command.Context
+		args map[string]string
+		pick *v1.LastActionRunResponse
+		want []string
+		req  *v1.LastActionRunRequest
+	}{
+		{name: "list in a thread", cmd: "action.list", ctx: command.Context{ActiveThreadID: "s1"},
+			pick: &v1.LastActionRunResponse{Source: v1.ActionPickSource_ACTION_PICK_SOURCE_THREAD, Action: acts[1], Last: last[0]},
+			want: []string{"LAST RUN", "3 min ago, here", "2 h ago, thread s9", "5 h ago, worktree",
+				"to run again for thread s1: Build (a-2), ran last in this thread, 3 min ago"},
+			req: &v1.LastActionRunRequest{ProjectId: "r1", ThreadId: "s1"}},
+		{name: "last for another thread", cmd: "action.last", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "projects"}, args: map[string]string{"thread": "s2"},
+			pick: &v1.LastActionRunResponse{Source: v1.ActionPickSource_ACTION_PICK_SOURCE_PROJECT, Action: acts[1], Last: last[0]},
+			want: []string{"to run again for thread s2: Build (a-2), ran last in this project, 3 min ago"},
+			req:  &v1.LastActionRunRequest{ProjectId: "r1", ThreadId: "s2"}},
+		{name: "last with nothing run", cmd: "action.last", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "projects"},
+			want: []string{"to run again for the project: Test (a-1), the project's first action; none has run yet"},
+			req:  &v1.LastActionRunRequest{ProjectId: "r1"}},
+		{name: "last without actions", cmd: "action.last", ctx: command.Context{ActiveProjectID: "r2", ActiveView: "projects"},
+			want: []string{"no actions in this project"}, req: &v1.LastActionRunRequest{ProjectId: "r2"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			act := &commandtest.Action{Actions: acts, LastRuns: last, Pick: tt.pick}
+			res, err := actionRegistry(t, act, nil).Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(res.Message, w) {
+					t.Errorf("message lacks %q:\n%s", w, res.Message)
+				}
+			}
+			reqs := act.Requests()
+			if got := reqs[len(reqs)-1]; !proto.Equal(got, tt.req) {
+				t.Errorf("LastRun request = %v, want %v", got, tt.req)
 			}
 		})
 	}

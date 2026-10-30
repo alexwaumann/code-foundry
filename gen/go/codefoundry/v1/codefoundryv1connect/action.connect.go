@@ -49,6 +49,8 @@ const (
 	ActionServiceWaitRunProcedure = "/codefoundry.v1.ActionService/WaitRun"
 	// ActionServiceStopRunProcedure is the fully-qualified name of the ActionService's StopRun RPC.
 	ActionServiceStopRunProcedure = "/codefoundry.v1.ActionService/StopRun"
+	// ActionServiceLastRunProcedure is the fully-qualified name of the ActionService's LastRun RPC.
+	ActionServiceLastRunProcedure = "/codefoundry.v1.ActionService/LastRun"
 	// ActionServiceWatchProcedure is the fully-qualified name of the ActionService's Watch RPC.
 	ActionServiceWatchProcedure = "/codefoundry.v1.ActionService/Watch"
 )
@@ -79,6 +81,12 @@ type ActionServiceClient interface {
 	// SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
 	// end. Stopping a finished run does nothing.
 	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
+	// LastRun picks the action a thread's info card offers to run: the action the user
+	// last ran in the thread (thread_id), else the project's most recently run action (in
+	// any thread or worktree), else the project's first action. Only runs the user started
+	// count (not on_worktree_create runs), and only actions that still exist. Read from
+	// the run records, which outlive a daemon restart.
+	LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error)
@@ -143,6 +151,12 @@ func NewActionServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(actionServiceMethods.ByName("StopRun")),
 			connect.WithClientOptions(opts...),
 		),
+		lastRun: connect.NewClient[v1.LastActionRunRequest, v1.LastActionRunResponse](
+			httpClient,
+			baseURL+ActionServiceLastRunProcedure,
+			connect.WithSchema(actionServiceMethods.ByName("LastRun")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchActionsRequest, v1.ActionEvent](
 			httpClient,
 			baseURL+ActionServiceWatchProcedure,
@@ -162,6 +176,7 @@ type actionServiceClient struct {
 	getRun  *connect.Client[v1.GetActionRunRequest, v1.GetActionRunResponse]
 	waitRun *connect.Client[v1.WaitActionRunRequest, v1.WaitActionRunResponse]
 	stopRun *connect.Client[v1.StopActionRunRequest, v1.StopActionRunResponse]
+	lastRun *connect.Client[v1.LastActionRunRequest, v1.LastActionRunResponse]
 	watch   *connect.Client[v1.WatchActionsRequest, v1.ActionEvent]
 }
 
@@ -205,6 +220,11 @@ func (c *actionServiceClient) StopRun(ctx context.Context, req *connect.Request[
 	return c.stopRun.CallUnary(ctx, req)
 }
 
+// LastRun calls codefoundry.v1.ActionService.LastRun.
+func (c *actionServiceClient) LastRun(ctx context.Context, req *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error) {
+	return c.lastRun.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.ActionService.Watch.
 func (c *actionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -236,6 +256,12 @@ type ActionServiceHandler interface {
 	// SIGKILL). It returns the run at once, usually still running: WaitRun waits for the
 	// end. Stopping a finished run does nothing.
 	StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error)
+	// LastRun picks the action a thread's info card offers to run: the action the user
+	// last ran in the thread (thread_id), else the project's most recently run action (in
+	// any thread or worktree), else the project's first action. Only runs the user started
+	// count (not on_worktree_create runs), and only actions that still exist. Read from
+	// the run records, which outlive a daemon restart.
+	LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error
@@ -296,6 +322,12 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(actionServiceMethods.ByName("StopRun")),
 		connect.WithHandlerOptions(opts...),
 	)
+	actionServiceLastRunHandler := connect.NewUnaryHandler(
+		ActionServiceLastRunProcedure,
+		svc.LastRun,
+		connect.WithSchema(actionServiceMethods.ByName("LastRun")),
+		connect.WithHandlerOptions(opts...),
+	)
 	actionServiceWatchHandler := connect.NewServerStreamHandler(
 		ActionServiceWatchProcedure,
 		svc.Watch,
@@ -320,6 +352,8 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 			actionServiceWaitRunHandler.ServeHTTP(w, r)
 		case ActionServiceStopRunProcedure:
 			actionServiceStopRunHandler.ServeHTTP(w, r)
+		case ActionServiceLastRunProcedure:
+			actionServiceLastRunHandler.ServeHTTP(w, r)
 		case ActionServiceWatchProcedure:
 			actionServiceWatchHandler.ServeHTTP(w, r)
 		default:
@@ -361,6 +395,10 @@ func (UnimplementedActionServiceHandler) WaitRun(context.Context, *connect.Reque
 
 func (UnimplementedActionServiceHandler) StopRun(context.Context, *connect.Request[v1.StopActionRunRequest]) (*connect.Response[v1.StopActionRunResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.StopRun is not implemented"))
+}
+
+func (UnimplementedActionServiceHandler) LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.LastRun is not implemented"))
 }
 
 func (UnimplementedActionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error {

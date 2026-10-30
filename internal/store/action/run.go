@@ -198,6 +198,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	close(rec.started)
 	out := rec.public(true)
 	m.mu.Unlock()
+	m.record(ctx, out)
 	m.log.Info("action run started", "run", id, "action", a.ID, "name", a.Name, "mode", mode.String(),
 		"thread", owner.ThreadID, "worktree", owner.Worktree, "terminal", out.TerminalID)
 	return out, nil

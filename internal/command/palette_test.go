@@ -22,7 +22,7 @@ import (
 // terminal.kill run in one Enter on the active one). thread.interrupt stays for the
 // keyboard; thread.budget is an Ember and agent knob, so it is out.
 var noPalette = []string{
-	"action.edit", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
+	"action.edit", "action.last", "action.list", "action.remove", "action.run", "action.runs", "action.stop",
 	"action.wait", "app.version", "daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.start", "dictation.status", "dictation.stop",
 	"ember.board", "ember.disable", "ember.enable", "ember.remember", "ember.reseed",

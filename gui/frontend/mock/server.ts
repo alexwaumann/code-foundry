@@ -585,6 +585,7 @@ function routes(router: ConnectRouter): void {
     delete: (req) => guard(() => (world.actions.delete(req.id), {})),
     run: (req) => guard(() => ({ run: world.actions.run(req) })),
     getRun: (req) => guard(() => ({ run: world.actions.getRun(req.runId) })),
+    lastRun: (req) => world.actions.lastRun(req.projectId, req.threadId),
     waitRun: async (req, ctx) => {
       try {
         return { run: await world.actions.waitRun(req.runId, ctx.signal) };
