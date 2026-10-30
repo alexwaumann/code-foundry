@@ -634,6 +634,10 @@ type Thread struct {
 	// the first result. Persisted. See
 	// docs/notes/rendered-threads-cold-cache.md.
 	ContextTokens int64 `protobuf:"varint,33,opt,name=context_tokens,json=contextTokens,proto3" json:"context_tokens,omitempty"`
+	// The context window of the thread's current model (Thread.model) in tokens, from the
+	// daemon's model registry (internal/model); 0 when the registry does not list the
+	// model. context_tokens over it is how full the context is.
+	ContextWindow int64 `protobuf:"varint,71,opt,name=context_window,json=contextWindow,proto3" json:"context_window,omitempty"`
 	// When the prompt cache of the thread's conversation expires: its last result
 	// plus the threads.cache_ttl_seconds setting (the cache refreshes on every hit, so
 	// the last request is what counts). Recomputed when the setting changes. Unset
@@ -1063,6 +1067,13 @@ func (x *Thread) GetEffortPending() bool {
 func (x *Thread) GetContextTokens() int64 {
 	if x != nil {
 		return x.ContextTokens
+	}
+	return 0
+}
+
+func (x *Thread) GetContextWindow() int64 {
+	if x != nil {
+		return x.ContextWindow
 	}
 	return 0
 }
@@ -5525,7 +5536,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\x8a\x17\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1ccodefoundry/v1/project.proto\"\xb1\x17\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -5567,7 +5578,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"agent_runs\x18\x1e \x03(\v2\x18.codefoundry.v1.AgentRunR\tagentRuns\x12%\n" +
 	"\x0eeffort_pending\x18  \x01(\bR\reffortPending\x12%\n" +
-	"\x0econtext_tokens\x18! \x01(\x03R\rcontextTokens\x12D\n" +
+	"\x0econtext_tokens\x18! \x01(\x03R\rcontextTokens\x12%\n" +
+	"\x0econtext_window\x18G \x01(\x03R\rcontextWindow\x12D\n" +
 	"\x10cache_expires_at\x18\" \x01(\v2\x1a.google.protobuf.TimestampR\x0ecacheExpiresAt\x12,\n" +
 	"\x12context_reread_usd\x18# \x01(\x01R\x10contextRereadUsd\x12.\n" +
 	"\x05retry\x18$ \x01(\v2\x18.codefoundry.v1.ApiRetryR\x05retry\x12;\n" +

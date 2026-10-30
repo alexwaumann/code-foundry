@@ -20,7 +20,7 @@ import { cloneExists } from "./clone";
 import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
-import { MockSettings, MODEL_VALUES } from "./settings";
+import { contextWindow, MockSettings, MODEL_VALUES } from "./settings";
 import { MockBackdrops } from "./backdrops";
 import { themesFor } from "../src/themes";
 import { MockUpdater, type RestartCost } from "./update";
@@ -1703,6 +1703,7 @@ export class World {
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
+      contextWindow: contextWindow(s.model),
       ...agentCounts(this.logs.agentRunsOf(s.id)),
       agentRuns: listRuns(this.logs.agentRunsOf(s.id)),
       // Shells die with the thread's process (mock/shells.ts).

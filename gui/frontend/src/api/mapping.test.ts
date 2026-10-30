@@ -489,9 +489,10 @@ describe("events mapping", () => {
   });
 
   it("maps a thread's context totals and cache expiry", () => {
-    expect(toThreadView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
-    expect(toThreadView(create(ThreadSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
+    expect(toThreadView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, contextWindow: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
+    expect(toThreadView(create(ThreadSchema, { id: "s1", contextTokens: 25_700n, contextWindow: 1_000_000n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
       contextTokens: 25_700,
+      contextWindow: 1_000_000,
       cacheExpiresAtMs: 3_600_000,
       contextRereadUsd: 0.0514,
     });

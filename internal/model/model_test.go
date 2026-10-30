@@ -69,3 +69,32 @@ func TestRegistry(t *testing.T) {
 		t.Error("All() shares the registry's backing array")
 	}
 }
+
+func TestContextWindow(t *testing.T) {
+	tests := []struct {
+		value string
+		want  int64
+	}{
+		{"claude-opus-5-5[1m]", 1_000_000},
+		{"claude-opus-4-8[1m]", 1_000_000},
+		{"claude-opus-4-7[1m]", 1_000_000},
+		{"claude-sonnet-5-5[1m]", 1_000_000},
+		{"claude-sonnet-5[1m]", 1_000_000},
+		{"claude-sonnet-4-6[1m]", 1_000_000},
+		{"claude-haiku-5-5[1m]", 1_000_000},
+		{"claude-4.5-haiku[1m]", 200_000},
+		// Not listed: unknown.
+		{"opus", 0},
+		{"", 0},
+	}
+	for _, tt := range tests {
+		if got := ContextWindow(tt.value); got != tt.want {
+			t.Errorf("ContextWindow(%q) = %d, want %d", tt.value, got, tt.want)
+		}
+	}
+	for _, m := range All() {
+		if m.ContextWindow <= 0 {
+			t.Errorf("%s has no context window", m.Value)
+		}
+	}
+}

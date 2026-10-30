@@ -142,6 +142,8 @@ export interface ThreadView {
    * docs/notes/rendered-threads-cold-cache.md.
    */
   contextTokens: number;
+  /** The context window of the thread's model in tokens (the daemon's model registry); 0 when unknown. */
+  contextWindow: number;
   /**
    * When the conversation's prompt cache expires (its last result plus the
    * threads.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
@@ -419,6 +421,7 @@ export function toThreadView(s: Thread): ThreadView {
     unpriced: s.unpriced,
     agentRuns: s.agentRuns.map(toAgentRunView),
     contextTokens: Number(s.contextTokens),
+    contextWindow: Number(s.contextWindow),
     cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
     contextRereadUsd: s.contextRereadUsd,
     agentsRunning: s.agentsRunning,

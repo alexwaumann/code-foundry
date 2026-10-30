@@ -47,6 +47,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     unpriced: false,
     agentRuns: [],
     contextTokens: 0,
+    contextWindow: 0,
     cacheExpiresAtMs: null,
     contextRereadUsd: 0,
     agentsRunning: 0,

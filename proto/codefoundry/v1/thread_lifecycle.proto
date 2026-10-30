@@ -200,6 +200,10 @@ message Thread {
   // the first result. Persisted. See
   // docs/notes/rendered-threads-cold-cache.md.
   int64 context_tokens = 33;
+  // The context window of the thread's current model (Thread.model) in tokens, from the
+  // daemon's model registry (internal/model); 0 when the registry does not list the
+  // model. context_tokens over it is how full the context is.
+  int64 context_window = 71;
   // When the prompt cache of the thread's conversation expires: its last result
   // plus the threads.cache_ttl_seconds setting (the cache refreshes on every hit, so
   // the last request is what counts). Recomputed when the setting changes. Unset
