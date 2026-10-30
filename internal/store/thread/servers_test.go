@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -64,8 +65,9 @@ type fakeServerProbe struct {
 	groups  map[string]int
 	mapFrom int
 	ports   map[int][]int
-	mapErr  error
-	lisErr  error
+	// mapErr and lisErr fail the calls: all of them, or only the first mapErrN / lisErrN.
+	mapErr, lisErr   error
+	mapErrN, lisErrN int
 
 	mapCalls []int   // the pids asked
 	listens  [][]int // the groups asked, sorted
@@ -75,7 +77,7 @@ func (f *fakeServerProbe) ShellGroups(_ context.Context, pid int) (map[string]in
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.mapCalls = append(f.mapCalls, pid)
-	if f.mapErr != nil {
+	if f.mapErr != nil && (f.mapErrN == 0 || len(f.mapCalls) <= f.mapErrN) {
 		return nil, f.mapErr
 	}
 	if len(f.mapCalls) < f.mapFrom {
@@ -92,7 +94,7 @@ func (f *fakeServerProbe) Listening(_ context.Context, pgids []int) (map[int][]i
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.listens = append(f.listens, slices.Sorted(slices.Values(pgids)))
-	if f.lisErr != nil {
+	if f.lisErr != nil && (f.lisErrN == 0 || len(f.listens) <= f.lisErrN) {
 		return nil, f.lisErr
 	}
 	out := map[int][]int{}
@@ -218,32 +220,43 @@ func TestServerWatchSchedule(t *testing.T) {
 	}
 }
 
-// lsof failing turns the watch off for good: no more calls.
-func TestServerWatchOffWhenLsofFails(t *testing.T) {
+// lsof missing turns the watch off at once, three failures in a row do too; a single
+// failure only skips that tick.
+func TestServerWatchFailures(t *testing.T) {
+	missing := &fs.PathError{Op: "fork/exec", Path: "/usr/sbin/lsof", Err: fs.ErrNotExist}
+	killed := errors.New("signal: killed")
 	tests := []struct {
-		name string
-		fail func(f *fakeServerProbe)
+		name      string
+		fail      func(f *fakeServerProbe)
+		off       bool
+		maps, lis int // the calls made, -1: more than 3 (it keeps going)
 	}{
-		{"mapping", func(f *fakeServerProbe) { f.mapErr = errors.New("exec: no lsof") }},
-		{"probing", func(f *fakeServerProbe) { f.lisErr = errors.New("signal: killed") }},
+		{"lsof missing when mapping", func(f *fakeServerProbe) { f.mapErr = missing }, true, 1, 0},
+		{"lsof not on the path when probing", func(f *fakeServerProbe) { f.lisErr = exec.ErrNotFound }, true, 1, 1},
+		{"lsof killed every time", func(f *fakeServerProbe) { f.lisErr = killed }, true, 1, 3},
+		{"lsof killed twice, then fine", func(f *fakeServerProbe) { f.lisErr, f.lisErrN = killed, 2 }, false, 1, -1},
+		{"sysctl failing once when mapping", func(f *fakeServerProbe) { f.mapErr, f.mapErrN = errors.New("procscan: list processes: EPERM"), 1 }, false, 2, -1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			probe := &fakeServerProbe{groups: map[string]int{"b1": 101}}
+			probe := &fakeServerProbe{groups: map[string]int{"b1": 101}, ports: map[int][]int{101: {3000}}}
 			tt.fail(probe)
 			h := newShellWatchHarness(probe)
 			h.threads = []Thread{{ID: "t1", BackgroundShells: []BackgroundShell{{TaskID: "b1", ClaudePID: 50}}}}
 			t0 := time.Unix(1000, 0)
-			h.w.step(context.Background(), t0)
-			h.w.step(context.Background(), t0.Add(time.Second))
-			m, l := probe.counts()
-			for i := 2; i < 40; i++ {
-				if at := h.w.step(context.Background(), t0.Add(time.Duration(i)*time.Second)); !at.IsZero() {
-					t.Fatalf("off, but next at %v", at)
-				}
+			var at time.Time
+			for i := range 90 {
+				at = h.w.step(context.Background(), t0.Add(time.Duration(i)*time.Second))
 			}
-			if m2, l2 := probe.counts(); m2 != m || l2 != l || m+l > 2 {
-				t.Errorf("calls after the failure: %d+%d then %d+%d", m, l, m2, l2)
+			if h.w.off != tt.off || at.IsZero() != tt.off {
+				t.Errorf("off = %v (next %v), want %v", h.w.off, at, tt.off)
+			}
+			m, l := probe.counts()
+			if m != tt.maps || (tt.lis >= 0 && l != tt.lis) || (tt.lis < 0 && l <= 3) {
+				t.Errorf("calls: %d maps, %d probes; want %d, %d", m, l, tt.maps, tt.lis)
+			}
+			if got := slices.Contains(h.takeSets(), "t1/b1 pgid=0 ports=[3000]"); got == tt.off {
+				t.Errorf("ports published = %v with off = %v", got, tt.off)
 			}
 		})
 	}

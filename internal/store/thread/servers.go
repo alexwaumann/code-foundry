@@ -2,8 +2,11 @@ package thread
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -136,8 +139,10 @@ type serverWatch struct {
 	// while no shell runs.
 	probeAt []time.Time
 	next    time.Time
-	// off: lsof failed; the watch does nothing more.
-	off bool
+	// failures are the failed calls in a row; off: lsof is missing or kept failing, the
+	// watch does nothing more.
+	failures int
+	off      bool
 }
 
 func newServerWatch(m *Manager, probe ServerProbe) *serverWatch {
@@ -265,6 +270,7 @@ func (w *serverWatch) mapDue(ctx context.Context, now time.Time) {
 			w.fail(ctx, "find background shells' processes", err)
 			return
 		}
+		w.failures = 0
 		for _, k := range keys {
 			ws := w.shells[k]
 			g := groups[k.task]
@@ -297,6 +303,7 @@ func (w *serverWatch) probePorts(ctx context.Context) {
 		w.fail(ctx, "probe background shells' ports", err)
 		return
 	}
+	w.failures = 0
 	w.log.Debug("probed background shells' ports", "groups", len(pgids), "took", time.Since(start))
 	for k, ws := range w.shells {
 		if ws.pgid == 0 {
@@ -329,9 +336,19 @@ func (m *Manager) setShell(k shellKey, fn func(*BackgroundShell)) {
 	})
 }
 
-// fail turns the watch off: lsof is missing or failing. Not at shutdown.
+// serverFailLimit is how many lsof (or sysctl) failures in a row turn the watch off.
+const serverFailLimit = 3
+
+// fail skips the rest of this tick after a failed call, and turns the watch off when lsof
+// is missing or after serverFailLimit failures in a row (a timeout or a sysctl error once
+// is no reason to stop looking). Not at shutdown.
 func (w *serverWatch) fail(ctx context.Context, what string, err error) {
 	if ctx.Err() != nil {
+		return
+	}
+	w.failures++
+	if !errors.Is(err, exec.ErrNotFound) && !errors.Is(err, fs.ErrNotExist) && w.failures < serverFailLimit {
+		w.log.Info("background shells' servers: "+what+"; skipped this time", "err", err, "in_a_row", w.failures)
 		return
 	}
 	w.off = true
