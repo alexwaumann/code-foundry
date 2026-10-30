@@ -18,14 +18,16 @@ type Health struct {
 	started time.Time
 	pid     int32
 	info    version.Info
+	welcome string
 	now     func() time.Time
 }
 
 var _ codefoundryv1connect.HealthServiceHandler = (*Health)(nil)
 
-// NewHealth returns a HealthService handler for a daemon that started at started.
-func NewHealth(started time.Time, info version.Info) *Health {
-	return &Health{started: started, pid: int32(os.Getpid()), info: info, now: time.Now}
+// NewHealth returns a HealthService handler for a daemon that started at started;
+// welcomePage is where the daemon places the first-run welcome page.
+func NewHealth(started time.Time, info version.Info, welcomePage string) *Health {
+	return &Health{started: started, pid: int32(os.Getpid()), info: info, welcome: welcomePage, now: time.Now}
 }
 
 // Route mounts the service.
@@ -43,11 +45,12 @@ func (h *Health) Ping(context.Context, *connect.Request[v1.PingRequest]) (*conne
 	}), nil
 }
 
-// Version reports build information.
+// Version reports build information and the welcome page's path.
 func (h *Health) Version(context.Context, *connect.Request[v1.VersionRequest]) (*connect.Response[v1.VersionResponse], error) {
 	return connect.NewResponse(&v1.VersionResponse{
-		Version:   h.info.Version,
-		Commit:    h.info.Commit,
-		GoVersion: h.info.GoVersion,
+		Version:     h.info.Version,
+		Commit:      h.info.Commit,
+		GoVersion:   h.info.GoVersion,
+		WelcomePage: h.welcome,
 	}), nil
 }

@@ -32,4 +32,7 @@ message VersionResponse {
   string commit = 2;
   // Go toolchain version the daemon was built with.
   string go_version = 3;
+  // Absolute path of the first-run welcome page the daemon places at every start
+  // (<home>/pages/welcome.html); the GUI's zero-projects composer names it.
+  string welcome_page = 4;
 }

@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/health.proto.
  */
 export const file_codefoundry_v1_health: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9oZWFsdGgucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIg0KC1BpbmdSZXF1ZXN0IlcKDFBpbmdSZXNwb25zZRILCgNwaWQYASABKAUSDwoHdmVyc2lvbhgCIAEoCRIpCgZ1cHRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24iEAoOVmVyc2lvblJlcXVlc3QiRgoPVmVyc2lvblJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAkSDgoGY29tbWl0GAIgASgJEhIKCmdvX3ZlcnNpb24YAyABKAkyogEKDUhlYWx0aFNlcnZpY2USQwoEUGluZxIbLmNvZGVmb3VuZHJ5LnYxLlBpbmdSZXF1ZXN0GhwuY29kZWZvdW5kcnkudjEuUGluZ1Jlc3BvbnNlIgASTAoHVmVyc2lvbhIeLmNvZGVmb3VuZHJ5LnYxLlZlcnNpb25SZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuVmVyc2lvblJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILSGVhbHRoUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_duration]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9oZWFsdGgucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIg0KC1BpbmdSZXF1ZXN0IlcKDFBpbmdSZXNwb25zZRILCgNwaWQYASABKAUSDwoHdmVyc2lvbhgCIAEoCRIpCgZ1cHRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24iEAoOVmVyc2lvblJlcXVlc3QiXAoPVmVyc2lvblJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAkSDgoGY29tbWl0GAIgASgJEhIKCmdvX3ZlcnNpb24YAyABKAkSFAoMd2VsY29tZV9wYWdlGAQgASgJMqIBCg1IZWFsdGhTZXJ2aWNlEkMKBFBpbmcSGy5jb2RlZm91bmRyeS52MS5QaW5nUmVxdWVzdBocLmNvZGVmb3VuZHJ5LnYxLlBpbmdSZXNwb25zZSIAEkwKB1ZlcnNpb24SHi5jb2RlZm91bmRyeS52MS5WZXJzaW9uUmVxdWVzdBofLmNvZGVmb3VuZHJ5LnYxLlZlcnNpb25SZXNwb25zZSIAQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0hlYWx0aFByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_duration]);
 
 /**
  * @generated from message codefoundry.v1.PingRequest
@@ -97,6 +97,14 @@ export type VersionResponse = Message<"codefoundry.v1.VersionResponse"> & {
    * @generated from field: string go_version = 3;
    */
   goVersion: string;
+
+  /**
+   * Absolute path of the first-run welcome page the daemon places at every start
+   * (<home>/pages/welcome.html); the GUI's zero-projects composer names it.
+   *
+   * @generated from field: string welcome_page = 4;
+   */
+  welcomePage: string;
 };
 
 /**

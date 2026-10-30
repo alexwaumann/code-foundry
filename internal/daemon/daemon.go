@@ -39,6 +39,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
+	"github.com/alexwaumann/code-foundry/internal/skills"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -323,7 +324,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), p.Pages(), opts.Version, commandAPI, settingsAPI, st.settings)
 	placeWelcome(log.With("component", "skills"), p.Pages())
 	routes := []api.Route{
-		api.NewHealth(started, opts.Version).Route(),
+		api.NewHealth(started, opts.Version, skills.WelcomePath(p.Pages())).Route(),
 		commandAPI.Route(),
 		api.NewUI(events, liveTheme, themeReports).Route(),
 		terminalAPI.Route(),
