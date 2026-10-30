@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -119,14 +120,14 @@ type Options struct {
 	WorktreeCreated func(threadID, projectID, worktree string)
 	// Archived, when set, is called with each thread an archive just archived (the
 	// cascade's included), under the store's lock: it must return at once and not call
-	// back into the store. The daemon removes the thread's derived worktrees nobody else
-	// has from it, in the background (docs/notes/workspaces-v2-1-threads.md).
+	// back into the store. The daemon removes the thread's worktree-mode worktrees nobody
+	// else has from it, in the background (docs/notes/workspaces-v2-1-threads.md).
 	Archived func(t Thread)
 	// Removed, when set, is called with the thread Remove just removed, as it was (a
 	// removal does not cascade: its children are adopted, orphans.go), after its
 	// tombstone is in and its row is gone from the snapshot, under the store's lock: it
 	// must return at once and not call back into the store. The daemon removes the
-	// thread's derived worktrees nobody else has from it, as for an archive
+	// thread's worktree-mode worktrees nobody else has from it, as for an archive
 	// (docs/notes/remove-cleans-worktrees.md).
 	Removed func(t Thread)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
@@ -694,6 +695,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 		s.ProjectID, s.ProjectIDs, s.WorktreePath, s.WorkspaceID = p.projectID, p.projectIDs, p.path, p.workspaceID
+		s.CheckoutPaths = p.checkouts
 		s.BaseRef, s.CreatedWorktree, s.Branch = p.baseRef, p.createdWorktree, p.branch
 		if p.name != "" {
 			s.Name, s.AutoNamed = p.name, true
@@ -703,6 +705,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		report = CreateReport{MadeWorktree: p.madePrimary, MadeBranch: p.madeBranch, ExistingWorktree: p.reusedPrimary, DroppedWorktreeMode: p.droppedWorktreeMode}
 	}
 	s.ProjectIDs = CleanProjectIDs(s.ProjectID, s.ProjectIDs)
+	if s.ProjectID != "" {
+		s = s.withCheckout(s.ProjectID, s.WorktreePath) // the primary's is the cwd
+	}
 	if s.Name == "" {
 		// Until the namer answers (provisional.go); namingTried stays false so it runs.
 		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)
@@ -836,10 +841,11 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	now := m.opts.Now()
 	s := Thread{
 		ID: newID, ProjectID: parent.ProjectID, ProjectIDs: parent.Projects(), WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
-		// The fork runs in the parent's worktree, so it inherits what the worktree was made
+		// The fork runs in the parent's checkouts, so it inherits what the worktree was made
 		// for: a cleanup that removes it is undone when either resumes (recreate.go).
 		BaseRef: parent.BaseRef, CreatedWorktree: parent.CreatedWorktree, Branch: parent.Branch,
-		Name: name, AutoNamed: autoNamed,
+		CheckoutPaths: maps.Clone(parent.CheckoutPaths),
+		Name:          name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Epoch: 1,
 		// The fork resumes the parent's conversation, system prompt and all (memory.go).

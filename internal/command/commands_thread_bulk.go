@@ -140,7 +140,7 @@ func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 }
 
 // madeWorktrees reports whether one of ids is a worktree-mode thread (created_worktree
-// on a branch): its derived worktrees are Code Foundry's, and the daemon removes the
+// on a branch): its worktree-mode worktrees are Code Foundry's, and the daemon removes the
 // clean ones after the removal. A thread in place or in a folder has none. False when the
 // list fails.
 func madeWorktrees(ctx context.Context, b ThreadBackend, ids []string) bool {

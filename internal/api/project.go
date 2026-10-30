@@ -290,7 +290,14 @@ func projectToProto(r project.Project) *v1.Project {
 }
 
 func worktreeToProto(w project.Worktree) *v1.Worktree {
-	s := w.Status
+	return &v1.Worktree{
+		ProjectId: w.ProjectID, Path: w.Path, Branch: w.Branch, Head: w.Head,
+		IsMain: w.IsMain, Detached: w.Detached, Status: gitStatusToProto(w.Status), MergedClean: w.MergedClean(time.Now()),
+	}
+}
+
+// gitStatusToProto is a worktree's status (a project's worktree, a thread's checkout).
+func gitStatusToProto(s project.Status) *v1.GitStatus {
 	st := &v1.GitStatus{
 		Upstream: s.Upstream, Ahead: int32(s.Ahead), Behind: int32(s.Behind),
 		Staged: int32(s.Staged), Modified: int32(s.Modified), Untracked: int32(s.Untracked),
@@ -302,8 +309,5 @@ func worktreeToProto(w project.Worktree) *v1.Worktree {
 	if !s.RefreshedAt.IsZero() {
 		st.RefreshedAt = timestamppb.New(s.RefreshedAt)
 	}
-	return &v1.Worktree{
-		ProjectId: w.ProjectID, Path: w.Path, Branch: w.Branch, Head: w.Head,
-		IsMain: w.IsMain, Detached: w.Detached, Status: st, MergedClean: w.MergedClean(time.Now()),
-	}
+	return st
 }

@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,9 +10,12 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// A thread's checkouts are derived: the primary at its cwd; in worktree mode a git
-// member's worktree on the branch (the default path when none is listed), a plain folder
-// the folder; in checkout mode each member's own checkout.
+// A thread's checkouts are the paths it records (the primary at its cwd), read from the
+// project snapshot there: HEAD, detached, main, status, and for a worktree-mode one the
+// branch it was made for and whether it moved. A member with none recorded is resolved by
+// the creation rule: in worktree mode a git member's worktree on the branch (the default
+// path when none is listed), a plain folder the folder; in checkout mode each member's
+// own checkout.
 func TestCheckoutsOf(t *testing.T) {
 	dir := t.TempDir()
 	mk := func(p string) string {
@@ -26,67 +30,121 @@ func TestCheckoutsOf(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(webWT, "CLAUDE.md"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	ahead := project.Status{Upstream: "origin/feat/y", Ahead: 2, Behind: 1, Operation: project.OpRebase, OperationStep: 1, OperationTotal: 3}
 	snap := &project.Snapshot{Projects: []project.Project{
 		{ID: "web", Name: "web", Path: webMain, Git: true, Worktrees: []project.Worktree{
-			{ProjectID: "web", Path: webMain, IsMain: true, Branch: "main"},
-			{ProjectID: "web", Path: webWT, Branch: "feat/x"},
+			{ProjectID: "web", Path: webMain, IsMain: true, Branch: "main", Head: "m1"},
+			{ProjectID: "web", Path: webWT, Branch: "feat/x", Head: "w1"},
 		}},
 		{ID: "api", Name: "api", Path: apiMain, Git: true, Worktrees: []project.Worktree{
-			{ProjectID: "api", Path: apiMain, IsMain: true, Branch: "dev"},
+			{ProjectID: "api", Path: apiMain, IsMain: true, Branch: "dev", Head: "a1"},
 		}},
 		{ID: "docs", Name: "docs", Path: docs, Worktrees: []project.Worktree{{ProjectID: "docs", Path: docs, IsMain: true}}},
 	}}
 	pathFor := func(id, branch string) string { return filepath.Join(dir, "wt", id, "feat-x") }
-	withAPIElsewhere := &project.Snapshot{Projects: slices.Clone(snap.Projects)}
-	withAPIElsewhere.Projects[1].Worktrees = append(slices.Clone(snap.Projects[1].Worktrees), project.Worktree{ProjectID: "api", Path: apiOther, Branch: "feat/x"})
-	withAPIMainOnBranch := &project.Snapshot{Projects: slices.Clone(snap.Projects)}
-	withAPIMainOnBranch.Projects[1].Worktrees = []project.Worktree{{ProjectID: "api", Path: apiMain, IsMain: true, Branch: "feat/x"}}
+	with := func(i int, wts ...project.Worktree) *project.Snapshot {
+		out := &project.Snapshot{Projects: slices.Clone(snap.Projects)}
+		out.Projects[i].Worktrees = wts
+		return out
+	}
+	withAPIElsewhere := with(1, snap.Projects[1].Worktrees[0], project.Worktree{ProjectID: "api", Path: apiOther, Branch: "feat/x", Head: "a2"})
+	apiTwo := with(1, snap.Projects[1].Worktrees[0], project.Worktree{ProjectID: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Branch: "feat/x", Head: "a4"},
+		project.Worktree{ProjectID: "api", Path: apiOther, Branch: "feat/z", Head: "a2"})
+	withAPIMainOnBranch := with(1, project.Worktree{ProjectID: "api", Path: apiMain, IsMain: true, Branch: "feat/x", Head: "a1"})
+	// git switch in both worktrees: web's to another branch, api's (by hand, elsewhere) to
+	// feat/y mid-rebase.
+	moved := with(0, snap.Projects[0].Worktrees[0], project.Worktree{ProjectID: "web", Path: webWT, Branch: "other", Head: "w2"})
+	moved.Projects[1].Worktrees = []project.Worktree{snap.Projects[1].Worktrees[0], {ProjectID: "api", Path: apiOther, Branch: "feat/y", Head: "a3", Status: ahead}}
+	detached := with(0, snap.Projects[0].Worktrees[0], project.Worktree{ProjectID: "web", Path: webWT, Detached: true, Head: "w3"})
+	// The user switched the main checkout of an in-place thread.
+	switched := with(0, project.Worktree{ProjectID: "web", Path: webMain, IsMain: true, Branch: "hotfix", Head: "m2"}, snap.Projects[0].Worktrees[1])
 
+	webPrimary := func(c Checkout) Checkout {
+		c.ProjectID, c.ProjectName, c.Path, c.Primary, c.Git, c.Registered, c.Recorded = "web", "web", webWT, true, true, true, true
+		c.Instructions = filepath.Join(webWT, "CLAUDE.md")
+		return c
+	}
+	wtThread := Thread{ProjectID: "web", ProjectIDs: []string{"api", "docs", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"}
 	tests := []struct {
 		name string
 		t    Thread
 		snap *project.Snapshot
 		want []Checkout
 	}{
-		{name: "worktree mode: derived worktrees, a missing one at the default path, a folder as itself",
-			t: Thread{ProjectID: "web", ProjectIDs: []string{"api", "docs", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"},
+		{name: "nothing recorded, worktree mode: resolved worktrees, a missing one at the default path, a folder as itself",
+			t: wtThread,
 			want: []Checkout{
-				{ProjectID: "api", ProjectName: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Branch: "feat/x", Git: true, Registered: true, Derived: true, Missing: true},
-				{ProjectID: "docs", ProjectName: "docs", Path: docs, Registered: true},
-				{ProjectID: "web", ProjectName: "web", Path: webWT, Branch: "feat/x", Primary: true, Git: true, Registered: true, Derived: true,
-					Instructions: filepath.Join(webWT, "CLAUDE.md")},
+				{ProjectID: "api", ProjectName: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x", Missing: true},
+				{ProjectID: "docs", ProjectName: "docs", Path: docs, Registered: true, Listed: true, Main: true},
+				webPrimary(Checkout{Listed: true, Branch: "feat/x", Head: "w1", WorktreeMode: true, CreatedBranch: "feat/x"}),
 			}},
-		{name: "worktree mode: a worktree on the branch elsewhere is the member's",
+		{name: "nothing recorded, worktree mode: a worktree on the branch elsewhere is the member's",
 			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"},
 			snap: withAPIElsewhere,
 			want: []Checkout{
-				{ProjectID: "api", ProjectName: "api", Path: apiOther, Branch: "feat/x", Git: true, Registered: true, Derived: true},
-				{ProjectID: "web", ProjectName: "web", Path: webWT, Branch: "feat/x", Primary: true, Git: true, Registered: true, Derived: true,
-					Instructions: filepath.Join(webWT, "CLAUDE.md")},
+				{ProjectID: "api", ProjectName: "api", Path: apiOther, Listed: true, Branch: "feat/x", Head: "a2", Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x"},
+				webPrimary(Checkout{Listed: true, Branch: "feat/x", Head: "w1", WorktreeMode: true, CreatedBranch: "feat/x"}),
 			}},
 		// Fuzz finding A7: the user may switch the main checkout to another branch.
-		{name: "worktree mode: a main checkout on the branch is never the member's",
+		{name: "nothing recorded, worktree mode: a main checkout on the branch is never the member's",
 			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"},
 			snap: withAPIMainOnBranch,
 			want: []Checkout{
-				{ProjectID: "api", ProjectName: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Branch: "feat/x", Git: true, Registered: true, Derived: true, Missing: true},
-				{ProjectID: "web", ProjectName: "web", Path: webWT, Branch: "feat/x", Primary: true, Git: true, Registered: true, Derived: true,
-					Instructions: filepath.Join(webWT, "CLAUDE.md")},
+				{ProjectID: "api", ProjectName: "api", Path: filepath.Join(dir, "wt/api/feat-x"), Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x", Missing: true},
+				webPrimary(Checkout{Listed: true, Branch: "feat/x", Head: "w1", WorktreeMode: true, CreatedBranch: "feat/x"}),
 			}},
-		{name: "checkout mode: each member's own checkout",
+		{name: "nothing recorded, checkout mode: each member's own checkout",
 			t: Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webMain},
 			want: []Checkout{
-				{ProjectID: "api", ProjectName: "api", Path: apiMain, Branch: "dev", Git: true, Registered: true},
-				{ProjectID: "web", ProjectName: "web", Path: webMain, Branch: "main", Primary: true, Git: true, Registered: true},
+				{ProjectID: "api", ProjectName: "api", Path: apiMain, Listed: true, Main: true, Branch: "dev", Head: "a1", Git: true, Registered: true},
+				{ProjectID: "web", ProjectName: "web", Path: webMain, Recorded: true, Listed: true, Main: true, Branch: "main", Head: "m1", Primary: true, Git: true, Registered: true},
 			}},
-		{name: "a project no longer registered",
+		{name: "recorded: the branches moved; still the thread's checkouts, with HEAD, status and the branch they were made for",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x", CheckoutPaths: map[string]string{"api": apiOther, "web": webWT}},
+			snap: moved,
+			want: []Checkout{
+				{ProjectID: "api", ProjectName: "api", Path: apiOther, Recorded: true, Listed: true, Branch: "feat/y", Head: "a3", Status: ahead, Git: true, Registered: true,
+					WorktreeMode: true, CreatedBranch: "feat/x", Moved: true},
+				webPrimary(Checkout{Listed: true, Branch: "other", Head: "w2", WorktreeMode: true, CreatedBranch: "feat/x", Moved: true}),
+			}},
+		{name: "recorded: detached HEAD has moved",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x", CheckoutPaths: map[string]string{"web": webWT}},
+			snap: detached,
+			want: []Checkout{webPrimary(Checkout{Listed: true, Detached: true, Head: "w3", WorktreeMode: true, CreatedBranch: "feat/x", Moved: true})},
+		},
+		{name: "recorded: a recorded path wins over the branch's worktree at the default path",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x", CheckoutPaths: map[string]string{"api": apiOther}},
+			snap: apiTwo,
+			want: []Checkout{
+				{ProjectID: "api", ProjectName: "api", Path: apiOther, Recorded: true, Listed: true, Branch: "feat/z", Head: "a2", Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x", Moved: true},
+				webPrimary(Checkout{Listed: true, Branch: "feat/x", Head: "w1", WorktreeMode: true, CreatedBranch: "feat/x"}),
+			}},
+		{name: "recorded empty: resolved, as a member with nothing recorded",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x", CheckoutPaths: map[string]string{"api": "", "web": webWT}},
+			snap: withAPIElsewhere,
+			want: []Checkout{
+				{ProjectID: "api", ProjectName: "api", Path: apiOther, Listed: true, Branch: "feat/x", Head: "a2", Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x"},
+				webPrimary(Checkout{Listed: true, Branch: "feat/x", Head: "w1", WorktreeMode: true, CreatedBranch: "feat/x"}),
+			}},
+		{name: "in place: the main checkout whatever it has checked out, never moved",
+			t:    Thread{ProjectID: "web", ProjectIDs: []string{"web"}, WorktreePath: webMain, CheckoutPaths: map[string]string{"web": webMain}},
+			snap: switched,
+			want: []Checkout{{ProjectID: "web", ProjectName: "web", Path: webMain, Recorded: true, Listed: true, Main: true, Branch: "hotfix", Head: "m2", Primary: true, Git: true, Registered: true}},
+		},
+		{name: "a project no longer registered: its recorded path is kept",
+			t: Thread{ProjectID: "web", ProjectIDs: []string{"gone", "web"}, WorktreePath: webMain, CheckoutPaths: map[string]string{"gone": filepath.Join(dir, "gone"), "web": webMain}},
+			want: []Checkout{
+				{ProjectID: "gone", Path: filepath.Join(dir, "gone"), Recorded: true, Missing: true},
+				{ProjectID: "web", ProjectName: "web", Path: webMain, Recorded: true, Listed: true, Main: true, Branch: "main", Head: "m1", Primary: true, Git: true, Registered: true},
+			}},
+		{name: "a project no longer registered, nothing recorded",
 			t: Thread{ProjectID: "web", ProjectIDs: []string{"gone", "web"}, WorktreePath: webMain},
 			want: []Checkout{
 				{ProjectID: "gone", Missing: true},
-				{ProjectID: "web", ProjectName: "web", Path: webMain, Branch: "main", Primary: true, Git: true, Registered: true},
+				{ProjectID: "web", ProjectName: "web", Path: webMain, Recorded: true, Listed: true, Main: true, Branch: "main", Head: "m1", Primary: true, Git: true, Registered: true},
 			}},
 		{name: "a row from before the set has its project", t: Thread{ProjectID: "web", WorktreePath: webMain},
-			want: []Checkout{{ProjectID: "web", ProjectName: "web", Path: webMain, Branch: "main", Primary: true, Git: true, Registered: true}}},
+			want: []Checkout{{ProjectID: "web", ProjectName: "web", Path: webMain, Recorded: true, Listed: true, Main: true, Branch: "main", Head: "m1", Primary: true, Git: true, Registered: true}}},
 		{name: "no project, no checkouts", t: Thread{WorktreePath: dir}, want: []Checkout{}},
 	}
 	for _, tt := range tests {
@@ -98,6 +156,94 @@ func TestCheckoutsOf(t *testing.T) {
 			got := CheckoutsOf(tt.t, s, pathFor, isDir)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("checkouts\n got %+v\nwant %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// The fill of a row from before migration 0049 records the derivation it replaces: a
+// missing worktree gets "", a project that has not listed its worktrees waits (unless
+// forced), an unregistered one gets "".
+func TestFillPaths(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(p string) string {
+		p = filepath.Join(dir, p)
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	webMain, webWT, apiMain, apiWT, docs := mk("web"), mk("wt/web/feat-x"), mk("api"), mk("wt/api/feat-x"), mk("docs")
+	pathFor := func(id, branch string) string { return filepath.Join(dir, "wt", id, "feat-x") }
+	listed := &project.Snapshot{Projects: []project.Project{
+		{ID: "web", Name: "web", Path: webMain, Git: true, Worktrees: []project.Worktree{{Path: webMain, IsMain: true, Branch: "main"}, {Path: webWT, Branch: "feat/x"}}},
+		{ID: "api", Name: "api", Path: apiMain, Git: true, Worktrees: []project.Worktree{{Path: apiMain, IsMain: true, Branch: "dev"}, {Path: apiWT, Branch: "moved"}}},
+		{ID: "docs", Name: "docs", Path: docs, Worktrees: []project.Worktree{{Path: docs, IsMain: true}}},
+	}}
+	apiMissing := &project.Snapshot{Projects: slices.Clone(listed.Projects)}
+	apiMissing.Projects[1].Worktrees = listed.Projects[1].Worktrees[:1]
+	notListed := &project.Snapshot{Projects: slices.Clone(listed.Projects)}
+	notListed.Projects[1].Worktrees = nil
+	wt := Thread{ProjectID: "web", ProjectIDs: []string{"api", "docs", "web"}, WorktreePath: webWT, CreatedWorktree: true, Branch: "feat/x"}
+	tests := []struct {
+		name    string
+		t       Thread
+		snap    *project.Snapshot
+		exists  func(string) bool
+		force   bool
+		want    map[string]string
+		decided bool
+	}{
+		{"worktree mode: the worktree at the default path, even moved; the folder", wt, listed, isDir, false,
+			map[string]string{"api": apiWT, "docs": docs, "web": webWT}, true},
+		{"worktree mode: a missing worktree is empty", wt, apiMissing, func(p string) bool { return p != apiWT && isDir(p) }, false,
+			map[string]string{"api": "", "docs": docs, "web": webWT}, true},
+		{"a project that has not listed its worktrees waits", wt, notListed, isDir, false, nil, false},
+		{"past the wait it is empty", wt, notListed, isDir, true, map[string]string{"api": "", "docs": docs, "web": webWT}, true},
+		{"checkout mode: the main checkouts", Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: webWT}, listed, isDir, false,
+			map[string]string{"api": apiMain, "web": webWT}, true},
+		{"an unregistered member is empty; a missing primary keeps its path", Thread{ProjectID: "web", ProjectIDs: []string{"gone", "web"}, WorktreePath: "/nope"}, listed, isDir, false,
+			map[string]string{"gone": "", "web": "/nope"}, true},
+		{"no projects", Thread{WorktreePath: dir}, listed, isDir, false, map[string]string{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, decided := fillPaths(tt.t, tt.snap, pathFor, tt.exists, tt.force)
+			if decided != tt.decided || !maps.Equal(got, tt.want) {
+				t.Errorf("fillPaths = %v, %v; want %v, %v", got, decided, tt.want, tt.decided)
+			}
+		})
+	}
+}
+
+// Moving the cwd keeps the checkout it leaves recorded and records the one it moves to.
+func TestMovedTo(t *testing.T) {
+	tests := []struct {
+		name             string
+		t                Thread
+		project, path    string
+		want             map[string]string
+		wantPrimary      string
+		wantWorktreePath string
+	}{
+		{"to another member", Thread{ProjectID: "web", WorktreePath: "/u/web-wt", CheckoutPaths: map[string]string{"api": "/api", "web": "/u/web-wt"}},
+			"api", "/api", map[string]string{"api": "/api", "web": "/u/web-wt"}, "api", "/api"},
+		{"a row with nothing recorded records both", Thread{ProjectID: "web", WorktreePath: "/u/web-wt"},
+			"api", "/api", map[string]string{"api": "/api", "web": "/u/web-wt"}, "api", "/api"},
+		{"to the workspace's folder", Thread{ProjectID: "web", WorktreePath: "/w", CheckoutPaths: map[string]string{"web": "/w"}},
+			"", "/ws", map[string]string{"web": "/w"}, "", "/ws"},
+		{"from the workspace's folder", Thread{WorktreePath: "/ws", CheckoutPaths: map[string]string{"web": "/w"}},
+			"web", "/w", map[string]string{"web": "/w"}, "web", "/w"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := maps.Clone(tt.t.CheckoutPaths)
+			got := tt.t.movedTo(tt.project, tt.path)
+			if !maps.Equal(got.CheckoutPaths, tt.want) || got.ProjectID != tt.wantPrimary || got.WorktreePath != tt.wantWorktreePath {
+				t.Errorf("movedTo = %v %q %q; want %v %q %q", got.CheckoutPaths, got.ProjectID, got.WorktreePath, tt.want, tt.wantPrimary, tt.wantWorktreePath)
+			}
+			if !maps.Equal(tt.t.CheckoutPaths, before) {
+				t.Errorf("movedTo changed the original's paths: %v", tt.t.CheckoutPaths)
 			}
 		})
 	}

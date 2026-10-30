@@ -7,7 +7,7 @@ import (
 
 // A spawn's working directory (docs/notes/workspaces-v2-fix-1-workspace.md). Claude is
 // exec'd with the thread's cwd as its directory, and a missing one fails as ENOENT,
-// which reads as a missing claude binary. Every spawn checks it first: a derived
+// which reads as a missing claude binary. Every spawn checks it first: a worktree-mode
 // worktree a cleanup removed was made again before (ensureWorktree at a start); a
 // workspace's managed dir is made again here (EnsureDirs, empty: a synthetic
 // workspace's files went with it); anything else, a workspace's moved root included, is

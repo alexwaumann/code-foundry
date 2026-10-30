@@ -110,7 +110,7 @@ type stores struct {
 	// stopWorkspaceProjects stops the glue that drops unregistered projects from
 	// workspaces (workspace_projects.go).
 	stopWorkspaceProjects func()
-	// archived removes an archived thread's derived worktrees nobody else has, in the
+	// archived removes an archived thread's worktree-mode worktrees nobody else has, in the
 	// background (cleanup_archived.go); stopped after thread, before project.
 	archived *archiveCleaner
 	// stopBranchLinks stops the glue that links each thread to the pull requests on its
@@ -288,7 +288,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// their pull requests in its poll (wake_pr.go).
 		PullRequest:       pullRequestForWake(s.gh),
 		WatchPullRequests: watchPullRequestsForWake(log.With("store", "gh"), s.gh),
-		// An archived thread's derived worktrees nobody else has go (cleanup_archived.go).
+		// An archived thread's worktree-mode worktrees nobody else has go (cleanup_archived.go).
 		Archived: s.archived.archived,
 		// And a removed thread's, the same way (docs/notes/remove-cleans-worktrees.md).
 		Removed: s.archived.removed,

@@ -177,7 +177,7 @@ func (r *runner) respawn() {
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
 	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
-	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a derived worktree
+	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a worktree-mode worktree
 	// is made again at the next start (a message), as a cleanup's is.
 	var proc *claudestream.Process
 	err := r.m.ensureCwd(context.Background(), s)

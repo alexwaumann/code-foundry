@@ -6,6 +6,7 @@ package threadtest
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -352,6 +353,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 		ProjectID: parent.ProjectID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
 		CreatedWorktree: parent.CreatedWorktree, BaseRef: parent.BaseRef, Branch: parent.Branch,
+		CheckoutPaths: maps.Clone(parent.CheckoutPaths),
 	})
 }
 

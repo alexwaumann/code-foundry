@@ -259,6 +259,9 @@ type placedThread struct {
 	projectID, path, baseRef, branch string
 	createdWorktree                  bool
 	workspaceID                      string
+	// checkouts is every member's checkout (Thread.CheckoutPaths): "" for one that could
+	// not be placed (a project no longer registered), resolved at its first start.
+	checkouts map[string]string
 	// name is the namer's title when it arrived within SlugTimeout; namerCalled: the
 	// namer was started for this thread; late delivers its answer when it was late.
 	name        string
@@ -318,6 +321,10 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 	if err != nil {
 		return p, err
 	}
+	var shared map[string]string
+	if src != nil && pl.from == src.ID {
+		shared = sharedCheckouts(*src, pl, srcCheckouts)
+	}
 	if pl.from != "" {
 		m.log.Info("new thread placed like another", "thread", id, "from", pl.from, "explicit", explicit,
 			"projects", pl.projectIDs, "worktree_mode", pl.worktreeMode, "branch", pl.branch, "new_branch", pl.newBranch)
@@ -337,19 +344,67 @@ func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o
 		}
 		p.path = w.Dir()
 		if !pl.worktreeMode {
+			p.checkouts = m.ownCheckouts(pl.projectIDs, "", "", shared)
 			return p, nil
 		}
 	}
 	if !pl.worktreeMode {
-		p.path = pl.primaryPath
+		p.path = cmp.Or(pl.primaryPath, shared[pl.primary])
 		if p.path == "" {
 			if _, p.path, err = m.resolveWorktree(pl.primary, ""); err != nil {
 				return p, err
 			}
 		}
+		p.checkouts = m.ownCheckouts(pl.projectIDs, pl.primary, p.path, shared)
 		return p, nil
 	}
-	return m.placeWorktrees(ctx, id, name, o, pl, bases, p)
+	return m.placeWorktrees(ctx, id, name, o, pl, bases, shared, p)
+}
+
+// sharedCheckouts are the checkouts a thread placed like src shares with it: when it
+// keeps src's mode (and in worktree mode src's branch, not a new one), each of src's
+// checkouts that is on disk, by project id. A member src does not have, or whose
+// checkout is gone, is placed by the creation rule. nil when nothing is shared (a new
+// branch, or another mode). Pure.
+func sharedCheckouts(src Thread, pl placement, srcCheckouts []Checkout) map[string]string {
+	if pl.newBranch || pl.worktreeMode != src.worktreeMode() || (pl.worktreeMode && pl.branch != src.Branch) {
+		return nil
+	}
+	var out map[string]string
+	for _, c := range srcCheckouts {
+		if c.Path == "" || c.Missing || !c.Registered || !slices.Contains(pl.projectIDs, c.ProjectID) {
+			continue
+		}
+		if out == nil {
+			out = map[string]string{}
+		}
+		out[c.ProjectID] = c.Path
+	}
+	return out
+}
+
+// ownCheckouts records a checkout-mode placement's checkouts: the primary's is the cwd,
+// a member shared with the copied thread its checkout there, every other member its own
+// checkout (the main worktree, or the folder); "" for a project no longer registered.
+func (m *Manager) ownCheckouts(ids []string, primary, cwd string, shared map[string]string) map[string]string {
+	var snap *project.Snapshot
+	if m.opts.Projects != nil {
+		snap = m.opts.Projects.Snapshot()
+	}
+	out := make(map[string]string, len(ids))
+	for _, id := range ids {
+		switch r, ok := snap.Project(id); {
+		case id == primary:
+			out[id] = cwd
+		case shared[id] != "":
+			out[id] = shared[id]
+		case ok:
+			out[id] = mainCheckout(r)
+		default:
+			out[id] = ""
+		}
+	}
+	return out
 }
 
 // placeRequest resolves o's project refs: ProjectIDs (each "<ref>[:<base>]"; bases by
@@ -445,8 +500,9 @@ func (m *Manager) placeRequest(o CreateOptions) (placeRequest, map[string]string
 }
 
 // placeWorktrees carries out a worktree-mode placement: the branch (named for a new
-// one), then every git member's worktree, made in parallel where missing.
-func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateOptions, pl placement, bases map[string]string, p placedThread) (placedThread, error) {
+// one), then every git member's worktree, made in parallel where missing; a member in
+// shared keeps the copied thread's worktree, whatever it has checked out now.
+func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateOptions, pl placement, bases map[string]string, shared map[string]string, p placedThread) (placedThread, error) {
 	if m.opts.Projects == nil {
 		return p, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
 	}
@@ -506,21 +562,40 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 		fresh = !existing
 	}
 	fromOrigin := m.fromOrigin(nw.BaseFromOrigin)
-	made, err := m.makeWorktrees(ctx, git, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, fromOrigin)
+	var todo []project.Project
+	for _, r := range git {
+		if shared[r.ID] == "" {
+			todo = append(todo, r)
+		}
+	}
+	made, err := m.makeWorktrees(ctx, todo, branch, func(pid string) string { return cmp.Or(bases[pid], base) }, fresh, fromOrigin)
 	if err != nil {
 		return p, err
 	}
 	p.made, p.branch, p.createdWorktree = made, branch, true
+	// The plain folders are their folders (or the copied thread's); each git member's
+	// worktree is the one made, shared or reused.
+	p.checkouts = m.ownCheckouts(pl.projectIDs, "", "", shared)
 	for _, r := range git {
+		var wt project.Worktree
+		var start string
+		i := slices.IndexFunc(made, func(w madeWorktree) bool { return w.projectID == r.ID })
+		switch {
+		case i >= 0:
+			wt, start = made[i].worktree, made[i].startPoint
+			wt.Path = made[i].path
+		case shared[r.ID] != "":
+			wt, _ = m.opts.Projects.Snapshot().Worktree(r.ID, shared[r.ID])
+			wt.Path = shared[r.ID]
+		default:
+			wt, _ = m.memberWorktree(r, branch)
+		}
+		p.checkouts[r.ID] = wt.Path
 		if r.ID != pl.primary {
 			continue
 		}
-		wt, _ := m.memberWorktree(r, branch)
 		p.path = wt.Path
-		var start string
-		if i := slices.IndexFunc(made, func(w madeWorktree) bool { return w.projectID == r.ID }); i >= 0 {
-			wt, start = made[i].worktree, made[i].startPoint
-			p.path = made[i].path
+		if i >= 0 {
 			p.madePrimary, p.madeBranch = true, made[i].newBranch
 		} else {
 			p.reusedPrimary = true
@@ -539,13 +614,13 @@ func (m *Manager) placeWorktrees(ctx context.Context, id, name string, o CreateO
 	return p, nil
 }
 
-// memberWorktree is r's existing worktree for branch (derivedWorktree) when it is on
+// memberWorktree is r's existing worktree for branch (branchWorktree) when it is on
 // disk.
 func (m *Manager) memberWorktree(r project.Project, branch string) (project.Worktree, bool) {
 	if cur, ok := m.opts.Projects.Snapshot().Project(r.ID); ok {
 		r = cur
 	}
-	w, ok := derivedWorktree(r, branch, m.opts.Projects.DefaultWorktreePath(r.ID, branch))
+	w, ok := branchWorktree(r, branch, m.opts.Projects.DefaultWorktreePath(r.ID, branch))
 	if !ok || !isDir(w.Path) {
 		return project.Worktree{}, false
 	}
@@ -608,7 +683,7 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 // for Claude. Two threads making the same (project, branch) wait for each other, and the
 // second finds the first's: under the lock a fresh branch that exists now (another
 // Create with the same --branch made it meanwhile) is no longer new, and its worktree is
-// shared. The project's main checkout is never the thread's worktree (derivedWorktree);
+// shared. The project's main checkout is never the thread's worktree (branchWorktree);
 // makeWorktrees refuses a branch checked out there (mainCheckoutBusy).
 func (m *Manager) makeWorktree(ctx context.Context, r project.Project, branch, base string, fresh, fromOrigin bool) (madeWorktree, bool, error) {
 	unlock := m.lockWorktree(r.ID, branch)
@@ -664,31 +739,53 @@ func (m *Manager) lockWorktree(projectID, branch string) (unlock func()) {
 	return mu.Unlock
 }
 
-// ensureMembers makes the missing worktrees of a worktree-mode thread's other members
-// again (a cleanup or a hand removed them) before it starts, in parallel, and returns
-// what it made. The primary's is recreate.go's (ensureWorktree).
+// ensureMembers makes s's other members' checkouts whole before it starts and returns
+// the worktrees it made. In worktree mode a missing worktree (a cleanup or a hand removed
+// it, or none was recorded) is made again on the thread's branch, in parallel; a member
+// with none recorded gets the checkout the creation rule gives (resolveMember). What it
+// made or resolved is recorded on the thread (persisted with the start's next save), so
+// the checkout stays the thread's when its branch moves. The primary's is recreate.go's
+// (ensureWorktree).
 func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, error) {
-	if !s.worktreeMode() || m.opts.Projects == nil {
+	if m.opts.Projects == nil || len(s.Projects()) == 0 {
 		return nil, nil
 	}
 	snap := m.opts.Projects.Snapshot()
+	found := map[string]string{}
 	var todo []project.Project
 	for _, c := range m.checkouts(s) {
-		if c.Primary || !c.Derived || !c.Missing || !c.Registered {
+		if c.Primary || !c.Registered {
 			continue
 		}
-		if r, ok := snap.Project(c.ProjectID); ok {
-			todo = append(todo, r)
+		switch {
+		case c.WorktreeMode && c.Missing:
+			if r, ok := snap.Project(c.ProjectID); ok {
+				todo = append(todo, r)
+			}
+		case !c.Recorded && !c.Missing:
+			found[c.ProjectID] = c.Path
 		}
 	}
-	if len(todo) == 0 {
-		return nil, nil
-	}
-	m.update(s.ID, false, func(*record) {}) // STARTING now: the fetches may take seconds
-	m.log.Info("member worktrees of thread are gone; making them again", "thread", s.ID, "projects", len(todo), "branch", s.Branch)
-	made, err := m.makeWorktrees(ctx, todo, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin())
-	if err != nil {
-		return nil, err
+	var made []madeWorktree
+	if len(todo) > 0 {
+		m.update(s.ID, false, func(*record) {}) // STARTING now: the fetches may take seconds
+		m.log.Info("member worktrees of thread are gone; making them again", "thread", s.ID, "projects", len(todo), "branch", s.Branch)
+		var err error
+		if made, err = m.makeWorktrees(ctx, todo, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin()); err != nil {
+			return nil, err
+		}
+		for _, r := range todo {
+			path := ""
+			if i := slices.IndexFunc(made, func(w madeWorktree) bool { return w.projectID == r.ID }); i >= 0 {
+				path = made[i].path
+			} else if wt, ok := m.memberWorktree(r, s.Branch); ok {
+				path = wt.Path // another start made it meanwhile
+			}
+			if was, _ := s.CheckoutPath(r.ID); path != "" && was != "" && !samePath(was, path) {
+				m.log.Info("member worktree made again at another path", "thread", s.ID, "project", r.ID, "was", was, "now", path)
+			}
+			found[r.ID] = path
+		}
 	}
 	for i := range made {
 		if made[i].newBranch && made[i].startPoint == "" {
@@ -697,6 +794,18 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 				made[i].startPoint = cmp.Or(made[i].worktree.Status.BaseRef, "origin/"+cmp.Or(r.DefaultBranch, "main"))
 			}
 		}
+	}
+	if len(found) > 0 {
+		m.update(s.ID, false, func(r *record) {
+			for id, path := range found {
+				if path != "" {
+					r.s = r.s.withCheckout(id, path)
+				}
+			}
+			if r.s.ProjectID != "" {
+				r.s = r.s.withCheckout(r.s.ProjectID, r.s.WorktreePath)
+			}
+		})
 	}
 	return made, nil
 }

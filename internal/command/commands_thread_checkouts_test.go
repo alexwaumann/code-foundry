@@ -17,10 +17,10 @@ func TestThreadCheckouts(t *testing.T) {
 	resp := &v1.ThreadCheckoutsResponse{
 		Thread: &v1.Thread{Id: "s1", Name: "login", CreatedWorktree: true, Branch: "feat/login"},
 		Checkouts: []*v1.ThreadCheckout{
-			{ProjectId: "api", ProjectName: "api", Path: "/wt/api/feat-login", Branch: "feat/login", Missing: true, Git: true, Derived: true},
+			{ProjectId: "api", ProjectName: "api", Path: "/wt/api/feat-login", Branch: "feat/login", Missing: true, Git: true, WorktreeMode: true},
 			{ProjectId: "docs", ProjectName: "docs", Path: "/src/docs"},
 			{ProjectId: "web", ProjectName: "web", Path: "/wt/web/feat-login", Branch: "feat/login", Primary: true, Current: true,
-				Instructions: "/wt/web/feat-login/CLAUDE.md", Git: true, Derived: true},
+				Instructions: "/wt/web/feat-login/CLAUDE.md", Git: true, WorktreeMode: true},
 		},
 		WorkspaceId: "w-1", WorkspaceName: "shop",
 	}
