@@ -1661,8 +1661,8 @@ export class World {
     let path = this.mainPathOf(p.id);
     let made = false;
     if (s.createdWorktree && s.branch && p.git !== false) {
-      const m = this.checkPlacement([p.id], s.branch, false).members[0];
-      if (m?.outcome === PlacementOutcome.REFUSED) throw new CommandError("unavailable", m.message.replace(/^failed precondition: /, ""));
+      const m: { outcome: PlacementOutcome; path?: string; message?: string } | undefined = this.checkPlacement([p.id], s.branch, false).members[0];
+      if (m?.outcome === PlacementOutcome.REFUSED) throw new CommandError("unavailable", (m.message ?? "").replace(/^failed precondition: /, ""));
       made = m?.outcome === PlacementOutcome.NEW;
       path = made ? this.addWorktree(p, s.branch, "").path : (m?.path ?? path);
     }
