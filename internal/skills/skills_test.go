@@ -237,7 +237,7 @@ func TestRender(t *testing.T) {
 	// check, ui.presence only decides what to mention, no ui.notify, page verbs only
 	// when asked (control-7-skill-routing). It offers actions in the user's words.
 	for _, want := range []string{"asks to see something, or before you show something in the app's side panel", "\n## Showing things in the app\n",
-		"open it in your own thread's side panel", "A \"show me\" is asking: just open it", "Add `--focus` only when\nthey ask to be taken there",
+		"open it in your own thread's side panel", "A \"show me\" is asking", "Add `--focus` only when they ask to be taken there",
 		"`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`", "Do not `ui.notify`",
 		"`code-foundry ui.presence --json` is only for deciding whether to mention", "refused from a thread no window shows",
 		"`code-foundry daemon.capabilities --group panel`", "unless a saved preference says not to",
@@ -268,7 +268,7 @@ func TestRender(t *testing.T) {
 	// A page shows inline in the conversation (inline-html): both skills name the verb,
 	// --panel and that /cf/bridge.js sizes the card (never a hand-posted cf:resize:
 	// page-library-fixes-b).
-	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it beside the thread", "/cf/bridge.js", "sizes its card"} {
+	for _, want := range []string{"`code-foundry view.inline <path>`", "`--panel` also opens it", "/cf/bridge.js", "sizes its card"} {
 		if !strings.Contains(helpSkill, want) {
 			t.Errorf("help SKILL.md lacks %q", want)
 		}

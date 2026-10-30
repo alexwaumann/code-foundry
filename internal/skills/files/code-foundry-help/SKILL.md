@@ -84,13 +84,13 @@ skills); Save as workspace in a thread's title menu makes one (`code-foundry wor
 ## Showing things in the app
 
 When the user asks to see something, open it in your own thread's side panel:
-`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`,
-`view.panel.mcp`; `code-foundry daemon.capabilities --group panel` lists every surface. A "show me" is asking: just open it. Add `--focus` only when
-they ask to be taken there; it selects this thread in every window. A page, chart, form or
-checklist you make (asked "as a page", or one they can fill in) is an `.html` file in
-`$CODE_FOUNDRY_PAGES` (not markdown, no server, no browser, never the repository or home
-folder): show it inline with `code-foundry view.inline <path>` (`--panel` also opens it beside the thread);
-one that reads or changes the app: the code-foundry-pages skill. Have it link
+`view.panel.file <path>`, `view.panel.diff <path>`, `view.panel.pr <number>`, `view.panel.mcp`;
+`code-foundry daemon.capabilities --group panel` lists every surface. A "show me" is asking: just
+open it. Add `--focus` only when they ask to be taken there; it selects this thread in every
+window. A page, chart, form or checklist you make (asked "as a page", or one they can fill in) is
+an `.html` file in `$CODE_FOUNDRY_PAGES` (not markdown, no server, no browser, never the repository
+or home folder): show it inline with `code-foundry view.inline <path>` (`--panel` also opens it
+beside the thread); one that reads or changes the app: the code-foundry-pages skill. Have it link
 `<link rel="stylesheet" href="/cf/theme.css">` and paint with its `--cf-*` variables
 (the code-foundry skill names them; every slot and what it paints: reference/themes.md) or the
 type-role classes (`text-title`, `text-body`…), never fixed colours or
