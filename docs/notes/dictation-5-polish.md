@@ -33,6 +33,11 @@ the earlier notes left open.
     Tab reaches Send.
   * usage-sheet.spec.ts:42: ed01dbc22 raised the sheet's height cap to 1280. The settings spec
     was updated then; the usage spec was not.
+* **A flake on main found on the way:** settings.spec.ts:409 failed 4 times in 6 on clean
+  main. The sheet ignored every Escape aimed at a keybinding recorder, so after recording
+  a chord (focus stays on the recorder) Escape did not close Settings. It passed only when
+  the button's brief `disabled` while saving happened to drop focus. Now only a recorder
+  that is recording (`data-recording`) keeps Escape; the spec checks the sheet closes.
 * **Guide:** one sentence in docs/GETTING-STARTED.md's "Start a thread" (the Guide tab and
   the help skill's copy both come from that file): dictation exists, where to turn it on,
   and the mic and ⇧⌘M. `dictation.*` stays out of the agent guide.
