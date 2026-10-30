@@ -135,6 +135,16 @@ func TestDictationStatus(t *testing.T) {
 			s.Model.Download = &v1.DictationDownload{ReceivedBytes: 557_000_000, TotalBytes: 874_188_075, BytesPerSecond: 11_000_000}
 			s.Hardware = nil
 		}), "dictation: downloading the model: 557 MB of 874 MB at 11 MB/s"},
+		{"download failed from every source", dictationSnapshot(v1.DictationState_DICTATION_STATE_DISABLED, func(s *v1.DictationSnapshot) {
+			s.Model.Downloaded = false
+			s.Error = "Download failed:\nGitHub: gh is not logged in (run gh auth login)\nhuggingface.co: the server answered 403 Forbidden"
+			s.Hardware = nil
+		}), "dictation: off; the model is not downloaded (dictation.download)\nDownload failed:\nGitHub: gh is not logged in (run gh auth login)\nhuggingface.co: the server answered 403 Forbidden"},
+		{"download failed", dictationSnapshot(v1.DictationState_DICTATION_STATE_DISABLED, func(s *v1.DictationSnapshot) {
+			s.Model.Downloaded = false
+			s.Error = "Download failed: the downloaded model is damaged (sha256 mismatch)"
+			s.Hardware = nil
+		}), "dictation: off; the model is not downloaded (dictation.download); Download failed: the downloaded model is damaged (sha256 mismatch)"},
 		{"failed", dictationSnapshot(v1.DictationState_DICTATION_STATE_ERROR, func(s *v1.DictationSnapshot) {
 			s.Error = "the dictation engine is not installed"
 			s.Hardware = nil

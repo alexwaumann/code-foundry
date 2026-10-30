@@ -6,9 +6,10 @@
  * first when the script has one. Download fills in over about 1.5 s and turns dictation on.
  *
  * Controls (mock/server.ts):
- *   POST /__mock/dictation?state=off|no-model|downloading|ready|unloaded|listening|error[&m1=true][&denied=true]
- *        (off: dictation off, no model; downloading: a static 557 MB of 874 MB; listening: the
- *        CLI holds a session; unloaded: Start loads for loadMs first)
+ *   POST /__mock/dictation?state=off|no-model|downloading|download-failed|ready|unloaded|listening|error[&m1=true][&denied=true]
+ *        (off: dictation off, no model; downloading: a static 557 MB of 874 MB; download-failed:
+ *        off, no model, every source failed; listening: the CLI holds a session; unloaded: Start
+ *        loads for loadMs first)
  *   POST /__mock/dictation/script?phrases=One.|Two.[&gap=1000][&flush=Tail.][&loadMs=800][&silence=1]
  *        (silence=1: the session ends "silence" after its phrases)
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
@@ -26,7 +27,9 @@ type SnapshotInit = MessageInitShape<typeof DictationSnapshotSchema>;
 type SessionEventInit = MessageInitShape<typeof DictationSessionEventSchema>;
 
 export const MODEL_NAME = "ggml-large-v3-turbo-q8_0.bin";
-export const MODEL_SIZE = 874_188_075;
+export /** The daemon's message when every source failed: the prefix once, a line per source. */
+const DOWNLOAD_FAILED = "Download failed:\nGitHub: gh is not logged in (run gh auth login)\nhuggingface.co: the server answered 403 Forbidden";
+const MODEL_SIZE = 874_188_075;
 const M4 = { chip: "Apple M4 Pro", memoryBytes: 48 * 2 ** 30, m1Family: false };
 const M1 = { chip: "Apple M1 Pro", memoryBytes: 16 * 2 ** 30, m1Family: true };
 const DEFAULT_PHRASES = ["Then add a table test for the race.", "And run it with the detector on."];
@@ -302,12 +305,14 @@ export class MockDictation {
       this.error = "";
       this.unloaded = false;
       this.loading = false;
-      const on = state !== "off" && state !== "downloading";
-      this.downloaded = !["off", "no-model", "downloading"].includes(state);
+      const on = !["off", "downloading", "download-failed"].includes(state);
+      this.downloaded = !["off", "no-model", "downloading", "download-failed"].includes(state);
       if (state === "downloading") this.download = { received: 557_000_000, total: MODEL_SIZE, bps: 11_200_000, timer: null };
       if (state === "unloaded") this.unloaded = true;
       if (state === "error") this.error = "the engine exited 3 times in a row: signal: killed";
       if (this.deps.enabled() !== on) this.deps.setEnabled(on);
+      // After the setting: turning it off clears the error.
+      if (state === "download-failed") this.error = DOWNLOAD_FAILED;
       if (state === "listening") {
         const s: MockSession = { id: `dict-${String(this.nextId++)}`, clientId: "cli", startedAt: new Date(), hub: new Hub<SessionEventInit>(), timers: [], ended: null };
         this.session = s;

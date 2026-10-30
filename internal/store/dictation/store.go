@@ -201,8 +201,10 @@ type Options struct {
 	Attended func() bool
 	// Launch starts the engine.
 	Launch Launcher
-	// Client downloads the model (default http.DefaultClient).
+	// Client downloads the model from a URL source (default http.DefaultClient).
 	Client *http.Client
+	// Gh fetches a GitHub release source (default ExecGh{} with gh from PATH).
+	Gh GhRunner
 	// Clock defaults to the real one.
 	Clock Clock
 	// Hardware defaults to ReadHardware.
@@ -292,6 +294,9 @@ func New(opts Options) *Store {
 	}
 	if opts.Client == nil {
 		opts.Client = http.DefaultClient
+	}
+	if opts.Gh == nil {
+		opts.Gh = ExecGh{}
 	}
 	if opts.Hardware == nil {
 		opts.Hardware = ReadHardware
@@ -445,9 +450,10 @@ func (s *Store) runDownload(ctx context.Context, dl *download) {
 	defer dl.cancel()
 	m := s.opts.Model
 	s.log.Info("downloading the dictation model", "model", m.Name, "bytes", m.Size)
+	var source string
 	err := os.MkdirAll(s.opts.Dir, 0o700)
 	if err == nil {
-		f := fetcher{client: s.opts.Client, now: s.clock.Now, progress: func(p Progress) {
+		f := fetcher{client: s.opts.Client, gh: s.opts.Gh, log: s.log, now: s.clock.Now, progress: func(p Progress) {
 			s.mu.Lock()
 			if s.dl == dl {
 				dl.progress = p
@@ -455,23 +461,24 @@ func (s *Store) runDownload(ctx context.Context, dl *download) {
 			}
 			s.mu.Unlock()
 		}}
-		err = f.fetch(ctx, m, s.ModelPath())
+		source, err = f.fetch(ctx, m, s.ModelPath())
 	}
 	s.mu.Lock()
 	s.dl = nil
-	close(dl.done)
 	switch {
 	case err == nil:
 		s.onDisk = true
 		s.clearFailureLocked()
-		s.log.Info("dictation model downloaded", "path", s.ModelPath())
+		s.log.Info("dictation model downloaded", "path", s.ModelPath(), "source", source)
 	case ctx.Err() != nil:
 		s.log.Info("dictation model download cancelled")
 	default:
-		s.dlErr = "download failed: " + err.Error()
+		s.dlErr = downloadMessage(err)
 		s.log.Warn("dictation model download failed", "err", err)
 	}
 	s.publishLocked()
+	// After the publish: CancelDownload returns the snapshot it waited for.
+	close(dl.done)
 	s.mu.Unlock()
 	if err == nil && s.opts.Enable != nil {
 		if err := s.opts.Enable(); err != nil {
@@ -479,6 +486,15 @@ func (s *Store) runDownload(ctx context.Context, dl *download) {
 		}
 	}
 	s.poke()
+}
+
+// downloadMessage is a failed download's snapshot error. A *DownloadError says
+// "Download failed: " itself; the GUI and CLI show the message as it is.
+func downloadMessage(err error) string {
+	if de, ok := errors.AsType[*DownloadError](err); ok {
+		return de.Error()
+	}
+	return "Download failed: " + err.Error()
 }
 
 // CancelDownload stops a running download and waits for it, keeping the partial file

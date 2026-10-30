@@ -176,7 +176,8 @@ export function DictationModelRow({ className }: { className?: string | undefine
   const snap = useSnapshot();
   const dir = useModelDir();
   const hw = snap?.hardware;
-  // A download's failure (the engine's shows as the switch's chip).
+  // A download's failure (the engine's shows as the switch's chip). The daemon's message
+  // starts "Download failed:" and gives each source's failure a line.
   const downloadError = snap && snap.state !== "error" && !snap.model.downloaded ? snap.error : "";
   return (
     <div className={cn("grid grid-cols-[minmax(0,1fr)_18rem] items-center gap-x-6 gap-y-1 px-4 py-3", className)} data-testid="dictation-model-row" data-state={snap?.state}>
@@ -198,8 +199,8 @@ export function DictationModelRow({ className }: { className?: string | undefine
           </p>
         )}
         {downloadError && (
-          <p className="mt-1 text-caption break-words text-cf-error-text" role="alert" data-testid="dictation-download-error">
-            Download failed: {downloadError}
+          <p className="mt-1 text-caption break-words whitespace-pre-line text-cf-error-text" role="alert" data-testid="dictation-download-error">
+            {downloadError}
           </p>
         )}
       </div>

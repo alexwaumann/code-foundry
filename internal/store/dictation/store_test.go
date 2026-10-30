@@ -25,7 +25,7 @@ import (
 var testModel = func() dictation.Model {
 	body := modelBody()
 	sum := sha256.Sum256(body)
-	return dictation.Model{Name: "test.bin", Title: "Test", URL: "http://invalid/test.bin", Size: int64(len(body)), SHA256: hex.EncodeToString(sum[:])}
+	return dictation.Model{Name: "test.bin", Title: "Test", Sources: []dictation.Source{{URL: "http://invalid/test.bin"}}, Size: int64(len(body)), SHA256: hex.EncodeToString(sum[:])}
 }()
 
 func modelBody() []byte {
