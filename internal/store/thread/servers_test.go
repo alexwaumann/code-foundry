@@ -321,3 +321,74 @@ func TestShellStopNote(t *testing.T) {
 		}
 	}
 }
+
+// startGroup starts a sleep leading a process group of its own, standing in for a shell.
+func startGroup(t *testing.T) int {
+	t.Helper()
+	c := exec.Command("sleep", "60")
+	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := c.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Process.Kill(); _ = c.Wait() })
+	return c.Process.Pid
+}
+
+// alive reports whether process pid still runs (it is our child: reaped only by Wait).
+func alive(pid int) bool {
+	var ws syscall.WaitStatus
+	got, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil)
+	return err == nil && got == 0
+}
+
+// StopShell signals nothing unless the group it finds right before the kill is the
+// shell's, under the Claude process that started it.
+func TestStopShellRefuses(t *testing.T) {
+	const task = "by3gxdr0o"
+	tests := []struct {
+		name string
+		// groups is what the probe maps the task to from the start (0: nothing);
+		// then changes what it says once the shell was looked for.
+		groups func(pgid, other int) int
+		then   func(e *env, p *fakeServerProbe, id string, pgid, other int)
+	}{
+		{name: "no group found", groups: func(int, int) int { return 0 }},
+		{name: "group 1", groups: func(int, int) int { return 1 }},
+		{name: "the group changed since it was found", groups: func(pgid, _ int) int { return pgid },
+			then: func(_ *env, p *fakeServerProbe, _ string, _, other int) {
+				p.set(func(f *fakeServerProbe) { f.groups = map[string]int{task: other} })
+			}},
+		{name: "another Claude process", groups: func(pgid, _ int) int { return pgid },
+			then: func(e *env, _ *fakeServerProbe, id string, _, _ int) {
+				e.m.setShell(shellKey{id, task}, func(sh *BackgroundShell) { sh.ClaudePID++ })
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pgid, other := startGroup(t), startGroup(t)
+			probe := &fakeServerProbe{groups: map[string]int{}}
+			if g := tt.groups(pgid, other); g != 0 {
+				probe.groups[task] = g
+			}
+			gates := t.TempDir()
+			e := newFixtureEnvAt(t, fixturePath("shells"), []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates},
+				func(o *Options) { o.ServerProbe = probe })
+			s := e.create(CreateOptions{InitialPrompt: "launch"})
+			e.waitFor(s.ID, "the shell", func(s Thread) bool { return len(s.BackgroundShells) == 1 })
+			if tt.then != nil {
+				e.waitFor(s.ID, "its group", func(s Thread) bool { return s.BackgroundShells[0].PGID == pgid })
+				tt.then(e, probe, s.ID, pgid, other)
+			}
+			if _, err := e.m.StopShell(e.ctx(), s.ID, task); !errors.Is(err, ErrFailedPrecondition) {
+				t.Fatalf("stop: %v, want ErrFailedPrecondition", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+			if !alive(pgid) || !alive(other) {
+				t.Errorf("a group was signalled")
+			}
+			if slices.ContainsFunc(e.items(s.ID).Items, func(it Item) bool { return it.Kind == KindNote }) {
+				t.Errorf("a stop note without a stop")
+			}
+		})
+	}
+}
