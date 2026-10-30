@@ -522,7 +522,7 @@ type ThreadCreateParams struct {
 	// data dir. With ProjectID it must be one of that project's worktrees.
 	Cwd string `json:"cwd,omitempty"`
 	// ProjectID makes it a thread of that project (its scope for session environments,
-	// pull requests and worktree panels).
+	// pull requests and Changes tabs).
 	ProjectID string `json:"projectId,omitempty"`
 	// AddDirs are --add-dir directories (a SKILL.md tree, say), after the host's own.
 	AddDirs []string `json:"addDirs,omitempty"`

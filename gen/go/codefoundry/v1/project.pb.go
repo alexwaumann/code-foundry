@@ -87,7 +87,7 @@ type DiffScope int32
 
 const (
 	DiffScope_DIFF_SCOPE_UNSPECIFIED DiffScope = 0
-	// The merge base against the working tree (the worktree panel's file list).
+	// The merge base against the working tree (the Changes tab's file list).
 	DiffScope_DIFF_SCOPE_WORKING DiffScope = 1
 	// The merge base against HEAD (what is committed on the branch).
 	DiffScope_DIFF_SCOPE_BRANCH DiffScope = 2

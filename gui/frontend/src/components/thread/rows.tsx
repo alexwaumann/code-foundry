@@ -219,8 +219,8 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
 /**
  * A tool call: its row, and when open its detail. Open by default: a file edit waiting for
  * permission. An Agent call stays one line: it never opens by itself, and while its run
- * works it has nothing to open (the run's work is in the subagent view, Open ›, and the
- * Agents tab, never under the row); once ended it opens to the report the run handed back.
+ * works it has nothing to open (the run's work is in the subagent view, Open ›, never
+ * under the row); once ended it opens to the report the run handed back.
  */
 const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type: "tool" }> }) {
   const { threadId, cwd } = useThreadCtx();

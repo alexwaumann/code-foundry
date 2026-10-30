@@ -8,7 +8,7 @@ import { invocations, mockPost, mockUrl, openApp, resetMock, row, threadPrompt }
  * a0 (its work and report), the running background "PR 1" a1 (a work log with a nested
  * Agent call a1b, a running test and a streaming reply), the running "PR 2" a2 and the
  * failed a3 (a short log and its error, with its "Agent failed" note). The view opens from
- * the Agent rows' Open, the notes' Open, the strip's names, the Agents tab's rows and the
+ * the Agent rows' Open, the notes' Open, the strip's names, the thread info card's agent rows and the
  * CLI (thread.agent.open); Escape, the back buttons, the crumb and the CLI
  * (thread.agent.up) go back up.
  */

@@ -60,7 +60,7 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
 
 /**
  * Makes a fresh copy the composer's default Work in choice (the default is the project
- * folder itself), for specs that exercise the new-worktree flow: the base picker, Also in,
+ * folder itself), for specs that exercise the new-worktree flow: the base picker,
  * thread.new --new-worktree.
  */
 export async function freshCopyByDefault(): Promise<void> {

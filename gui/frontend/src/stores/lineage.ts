@@ -36,7 +36,7 @@ export function useNoteCreator(createdBy: string, recorded: string): Creator {
 /**
  * Whether a thread another thread created is shown in the sidebar (lib/inSidebar.ts, with
  * threads.show_created_threads); null for the user's own thread (always shown, no override).
- * The Show / Hide in sidebar actions and the Threads tab's "hidden" mark.
+ * The thread menu's Show / Hide in sidebar item.
  */
 export function useSidebarShown(id: string): boolean | null {
   const showCreated = useShowCreatedThreads();

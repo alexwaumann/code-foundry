@@ -2,7 +2,7 @@
  * Hidden child threads (docs/notes/hidden-children-2-gui.md). A thread another thread
  * created (ThreadView.createdBy) is managed by its creator: by default it stays out of the
  * sidebar, its footers, keyboard order and attention counts, and is reached through its
- * creator's Threads tab, the palette and links instead. In the sidebar means managed by
+ * creator's thread info card (its lineage group), the palette and links instead. In the sidebar means managed by
  * the user; hidden means managed by a thread.
  */
 import type { ThreadView } from "@/api/threads";

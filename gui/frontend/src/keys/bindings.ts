@@ -48,7 +48,7 @@ export function jumpToAttention(): boolean {
   const waiting = new Set(attentionIds(useThreadsStore.getState(), showCreated));
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
-  // A hidden thread selected (from its creator's Threads tab) starts from its creator's row.
+  // A hidden thread selected (from its creator's thread info card) starts from its creator's row.
   const order = threadOrder(getListThreads(showCreated), getListOptions());
   const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id, showCreated) : null;
   // Ember's row is the sidebar's first; it counts while it waits on the user (stores/ember.ts).

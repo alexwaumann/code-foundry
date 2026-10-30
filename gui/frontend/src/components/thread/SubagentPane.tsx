@@ -62,7 +62,7 @@ function useRunModel(threadId: string, model: string): string {
   return id ? canonicalModelName(choices, id) : "";
 }
 
-/** "Running · 4m 12s" (live), "Done · 5 min ago", "Failed · 3 min ago": the Agents tab's words and tones. */
+/** "Running · 4m 12s" (live), "Done · 5 min ago", "Failed · 3 min ago": the run's status words and tones. */
 function RunStatus({ run }: { run: AgentRunView }) {
   const running = run.status === "running";
   const now = useNow(running ? 1000 : 30_000);

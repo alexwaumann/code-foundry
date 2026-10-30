@@ -29,7 +29,7 @@ export function useThreadPlaceInput(id: string): ThreadPlaceInput {
  * returning a primitive: "project @ branch", or for several projects "<workspace name> @
  * <branch>" / "<N projects> @ <branch>" (set), and a queued Run in move. The sidebar
  * row's line 2 (the run-in project only, the set label only for a workspace folder:
- * inFolder) and the Threads tab read it.
+ * inFolder) reads it.
  */
 export function useThreadPlace(id: string) {
   const s = useThreadPlaceInput(id);

@@ -1,7 +1,6 @@
 /**
- * The Agents surface's pure helpers (docs/notes/agents-2-gui.md, docs/sketches/agents-panel
- * variant L1): the list's order and nesting, names, meta and status words, elapsed time,
- * the header's counts, the strip's line, the daemon's "Agent finished · …" notes, and
+ * Subagent runs' pure helpers (docs/notes/agents-2-gui.md): names, status words, elapsed
+ * time, the strip's line above the composer, the daemon's "Agent finished · …" notes, and
  * structural sharing so a progress update re-renders only the row whose run changed.
  */
 import type { AgentRunView } from "@/api/agents";

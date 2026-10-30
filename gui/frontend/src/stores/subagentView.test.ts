@@ -7,7 +7,7 @@ import type { ThreadView } from "@/api/threads";
 
 vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 
-const { getViewing, leaveSubagent, showAgentRun, useIsViewing, useRunTimelineKeys, useShownRun, useSubagentViewStore, useViewingRun } = await import("./subagentView");
+const { getViewing, leaveSubagent, showAgentRun, useRunTimelineKeys, useShownRun, useSubagentViewStore, useViewingRun } = await import("./subagentView");
 const { applyIntent } = await import("./intents");
 const { getUiContext } = await import("./context");
 const { inPalette, presentCommand } = await import("@/keys/bindings");
@@ -144,18 +144,18 @@ describe("the view goes", () => {
 });
 
 describe("selectors", () => {
-  it("useViewingRun, useIsViewing and useShownRun follow the viewing state and the log", () => {
-    const { result } = renderHook(() => [useViewingRun("s1"), useViewingRun("s2"), useIsViewing("s1", "a1"), useIsViewing("s1", "a2"), useShownRun("s1")]);
-    expect(result.current).toEqual(["", "", false, false, ""]);
+  it("useViewingRun and useShownRun follow the viewing state and the log", () => {
+    const { result } = renderHook(() => [useViewingRun("s1"), useViewingRun("s2"), useShownRun("s1")]);
+    expect(result.current).toEqual(["", "", ""]);
     act(() => {
       showAgentRun("s1", "a1");
     });
-    expect(result.current).toEqual(["a1", "", true, false, "a1"]);
+    expect(result.current).toEqual(["a1", "", "a1"]);
     // A view state the log no longer backs shows the thread (before the subscription drops it).
     act(() => {
       useSubagentViewStore.setState({ viewing: { threadId: "s1", runId: "n1" } });
     });
-    expect(result.current[4]).toBe("");
+    expect(result.current[2]).toBe("");
   });
 
   it("useRunTimelineKeys: the run's own items, stable across text deltas and progress", () => {

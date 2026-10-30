@@ -63,7 +63,7 @@ function ContextRow({ threadId }: { threadId: string }) {
   );
 }
 
-/** The thread's usage buckets, kept by identity while their content is the same (UsageSurface's rule). */
+/** The thread's usage buckets, kept by identity while their content is the same (the Usage sheet's rule). */
 function useUsage(threadId: string): readonly UsageBucketView[] {
   const last = useRef<readonly UsageBucketView[]>(NONE);
   return useThreadsStore((s) => {

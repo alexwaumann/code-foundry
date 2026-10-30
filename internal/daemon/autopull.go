@@ -15,7 +15,7 @@ import (
 // Auto pull (docs/notes/auto-pull.md): the project store picks the checkouts after
 // each scheduled fetch; the daemon reads projects.auto_pull, decides what is busy from
 // the thread, action and gitops snapshots, and pulls through gitops so the op shows in
-// the worktree panel and gitops history.
+// the thread info card and gitops history.
 
 // autoPullSources is what the auto pull hooks read; each func returns the store's
 // current snapshot (nil while that store does not exist).

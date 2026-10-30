@@ -268,7 +268,7 @@ func TestStartBranchLinks(t *testing.T) {
 	// At start: the cached dashboard.
 	waitCalls("t1 #1")
 
-	// A branch list in the cache (the worktree panel asked for it).
+	// A branch list in the cache (the Pull request surface asked for it).
 	g.SetBranchPullRequests(gh.BranchPullRequests{Slug: "o/api", HeadRef: "cf/x", PullRequests: []gh.PullRequest{branchPR("o/api", 5, "cf/x")}})
 	waitCalls("t1 #1", "t1 #5")
 

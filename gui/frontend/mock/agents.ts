@@ -285,8 +285,7 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
 
 /**
  * The thread list's agent_runs for a thread's runs, like the daemon's Thread.agent_runs:
- * open while running, closed once ended, no usage (the mock prices none per run). The GUI
- * lists the Agents surface only for a thread with some (docs/notes/panel-polish.md).
+ * open while running, closed once ended, no usage (the mock prices none per run).
  */
 export function listRuns(runs: readonly AgentRunInit[]): AgentRunListInit[] {
   return runs.map((r) => ({

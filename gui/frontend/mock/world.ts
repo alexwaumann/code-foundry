@@ -1343,8 +1343,7 @@ export class World {
   /**
    * Scenario: thread lineage (docs/notes/agents-3-lineage-gui.md). "Fix login redirect"
    * (working) created "Add retry to login redirect" (finished; its log starts with the
-   * daemon's "Created by" note) and six siblings of it, one archived, so the Threads tab
-   * caps them at five; "Add retry…" created "Write retry backoff tests". All held (the
+   * daemon's "Created by" note) and six siblings of it, one archived; "Add retry…" created "Write retry backoff tests". All held (the
    * clock leaves them alone). Every created thread follows threads.show_created_threads
    * (hidden from the sidebar by default) except "Tidy redirect logging", shown by its
    * override (docs/notes/hidden-children-2-gui.md). POST /__mock/lineage. Idempotent.
@@ -1359,7 +1358,7 @@ export class World {
     const PN = "Fix login redirect";
     const C = "s-l-child";
     const CN = "Add retry to login redirect";
-    // Models and efforts vary, for the Threads tab's model words (docs/notes/threads-tab-model.md); Haiku 4.5 at medium otherwise.
+    // Models and efforts vary, for the thread info card's lineage rows (their hover cards); Haiku 4.5 at medium otherwise.
     type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
     const specs: Spec[] = [
       { id: P, name: PN, model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },

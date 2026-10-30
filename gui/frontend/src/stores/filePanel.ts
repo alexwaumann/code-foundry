@@ -1,8 +1,7 @@
 /**
  * Opening files and diffs as side panel tabs (surfaces/files.ts, surfaces/diff.ts). GUI
- * state only: no daemon command. The worktree panel's Changes rows open a Diff tab; the
- * Diff tab's Open file opens a File tab; path chips (file viewer PR 4) will open File tabs
- * through openFileInPanel too.
+ * state only: no daemon command. The Changes tab's rows open a Diff tab; the Diff tab's
+ * Open file opens a File tab; path chips open File tabs through openFileInPanel too.
  */
 import { diffTab, fileTab, type DiffTarget, type FileTarget } from "@/surfaces/fileTarget";
 import { allTabs, getPanel, openSurface, usePanelStore, type PanelTarget, type Tab } from "./panel";

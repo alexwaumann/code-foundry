@@ -36,7 +36,7 @@ function Dot({ dot, className }: { dot: TaskDot; className?: string }) {
   return <span className={cn("block size-2 shrink-0 rounded-full", DOT[dot], className)} data-dot={dot} aria-hidden />;
 }
 
-/** Opens a worker thread, as a Threads tab row does (it is a hidden child of Ember's). */
+/** Opens a worker thread, as a lineage row of the thread info card does (it is a hidden child of Ember's). */
 function openThread(id: string): void {
   useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }

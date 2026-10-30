@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
- * The Projects page's workspace cards and the Worktree tab's Also in list (workspaces v2,
+ * The Projects page's workspace cards (workspaces v2,
  * docs/notes/workspaces-v2-4-projects-page.md). The mock's projects: code-foundry
  * (repo-cf) and ghostty-playground (repo-gp) on GitHub, dotfiles (repo-dot), sketches
  * (repo-sk) and writing (repo-wr, no git).

@@ -3,7 +3,7 @@ package thread
 import "context"
 
 // Children of a removed thread. A hidden child (InSidebar false) is reached through its
-// creator: the creator's Threads tab, its wakes. Removing a thread removes its hidden
+// creator: the creator's thread info card (its lineage group), its wakes. Removing a thread removes its hidden
 // children with it (Remove's cascade, docs/notes/remove-cascades.md); one the cascade
 // could not remove, or a child created in the moment between the last pass and the
 // thread's own removal, would be out of reach, so it is handed to the user: it gets the
