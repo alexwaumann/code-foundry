@@ -145,7 +145,7 @@ const UNKNOWN_PROJECT = { githubSlug: "", remotes: [] };
 function WorktreeRow({ projectId, path, cleanupSlot }: { projectId: string; path: string; cleanupSlot: boolean }) {
   const isMain = useProjectsStore((s) => findWorktree(s, projectId, path)?.isMain ?? false);
   const cleanable = useCleanable(projectId, path);
-  const show: OverflowItem = { label: "Show changes", icon: Diff, testId: "worktree-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } };
+  const show: OverflowItem = { label: "Show changes", icon: Diff, testId: "changes-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } };
   const items: OverflowItem[] = isMain
     ? [show]
     : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) }];

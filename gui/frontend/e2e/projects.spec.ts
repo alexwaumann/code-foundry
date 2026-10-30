@@ -216,7 +216,7 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
 
   // Show changes opens the worktree's Changes tab; the list keeps the keyboard.
   await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
-  await page.getByTestId("worktree-show-panel").click();
+  await page.getByTestId("changes-show-panel").click();
   await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry · fix/resize");
   await expect(list).toBeFocused();
 });
