@@ -35,8 +35,8 @@ side-panel surface the card replaces goes, with its entry points.
   branch's composer keep focus when the menu closes). `RowMenu` renders it in the sidebar's
   `ContextMenuContent`, the title in a `DropdownMenuContent`.
 * Order: Rename, Pin/Unpin, Snooze ▸ (Unsnooze while snoozed) | New thread on this branch,
-  Save as workspace, Run in ▸, Hide from sidebar / Show in sidebar, Restart Claude |
-  Archive/Unarchive. An item a thread cannot use is left out (the middle group and its
+  Save as workspace, Run in ▸, Hide from sidebar / Show in sidebar, Restart Claude, Clear
+  flag | Archive/Unarchive. An item a thread cannot use is left out (the middle group and its
   divider go when empty: a no-project thread).
 * Run in ▸ was not in the design's order; it sits in the middle group after Save as
   workspace (the brief lists it among the title menu's items).
@@ -58,11 +58,13 @@ side-panel surface the card replaces goes, with its entry points.
   (`components/threadinfo/PlaceGroup.tsx`): a mark before its value (the worst flag's
   OctagonX/CircleAlert in its colour, else Plug) and a hover card listing each flag
   ("<plugin>: <reason>", red or amber) and "Plugin environment changed" with what changed
-  (`lib/envStale.ts envStaleTip`). The header chip's × (clear) and its click (open the
-  plugin's surface) have no GUI place now: `thread.flag.clear` stays in the palette and
-  the CLI, and a click on the sidebar row still opens the flag's surface
-  (`stores/flagSurface.ts openFlagSurface`). `useFlagSurfaceKind` and `clearThreadFlag`
-  went with the chip.
+  (`lib/envStale.ts envStaleTip`). The header chip's × becomes the title menu's **Clear
+  flag** (Clear flags with several), next to Restart Claude and shown only while the thread
+  has flags: `thread.flag.clear` without `--plugin`, every plugin's flag. The command stays
+  NoPalette, so this is its one GUI place; without it a stale flag would hold the thread in
+  the attention group for good. The chip's click (open the plugin's surface) has no header
+  place: a click on the sidebar row still opens it (`stores/flagSurface.ts
+  openFlagSurface`). `useFlagSurfaceKind` and `clearThreadFlag` went with the chip.
 * The env note's Restart → the title menu's Restart Claude.
 * **Linked PRs** → the card's PR rows. The sidebar row's PR tag stays; its click now turns
   the card on (it opened the Linked PRs surface) and goes on to select the row.

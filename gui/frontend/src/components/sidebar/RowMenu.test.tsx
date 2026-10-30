@@ -11,7 +11,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useCommandsStore } = await import("@/stores/commands");
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, flags: [], ...o }) as ThreadView;
 
 function openMenu(o: Partial<ThreadView>): void {
   useThreadsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });

@@ -55,7 +55,7 @@ function setThread(o: Partial<ThreadView>, others: ThreadView[] = []): void {
 const PROJECT = (id: string) => ({ id, name: id, git: true, worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
 beforeEach(() => {
-  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.sidebar"), cmd("thread.restart")] });
+  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.sidebar"), cmd("thread.restart"), cmd("thread.flag.clear")] });
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
@@ -129,6 +129,27 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     expect(item.textContent).toBe("Restart Claude");
     fireEvent.click(item);
     expect(runCommand).toHaveBeenCalledWith("thread.restart", {}, expect.objectContaining({ activeThreadId: "s-1" }));
+  });
+
+  it("Clear flag only while plugins flagged the thread, after Restart Claude; it clears every flag of the thread", () => {
+    setThread({});
+    expect(within(openTitleMenu()).queryByTestId("menu-clear-flags")).toBeNull();
+    cleanup();
+    const flag = (plugin: string): ThreadView["flags"][number] => ({ plugin, pluginName: plugin, level: "attention", reason: "deploy needs approval", setAtMs: 1, untilSeen: false });
+    setThread({ pluginEnvStale: true, flags: [flag("hello"), flag("gh-actions")] });
+    const menu = openTitleMenu();
+    expect(entries(menu)).toEqual(["Rename", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
+    fireEvent.click(within(menu).getByTestId("menu-clear-flags"));
+    expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }));
+    cleanup();
+    setThread({ flags: [flag("hello")] });
+    expect(within(openTitleMenu()).getByTestId("menu-clear-flags").textContent).toBe("Clear flag");
+  });
+
+  it("no Clear flag where the daemon does not list thread.flag.clear", () => {
+    useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "thread.flag.clear") });
+    setThread({ flags: [{ plugin: "hello", pluginName: "Hello", level: "error", reason: "x" }] as unknown as ThreadView["flags"] });
+    expect(within(openTitleMenu()).queryByTestId("menu-clear-flags")).toBeNull();
   });
 
   it.each([

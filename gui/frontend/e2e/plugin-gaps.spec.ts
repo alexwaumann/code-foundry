@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The plugin GUI gaps (docs/notes/plugins-11-gui-gaps.md): a flagged row opens the
@@ -33,7 +33,7 @@ test("a row whose line 2 shows a plugin's flag opens the thread and the plugin's
   await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
 });
 
-test("the thread info card's project row carries the flags in their colour, in its hover card", async ({ page }) => {
+test("the thread info card's project row carries the flags in their colour, in its hover card; the title menu clears them", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
   await page.getByTestId("thread-info-toggle").click();
@@ -48,6 +48,15 @@ test("the thread info card's project row carries the flags in their colour, in i
   await expect(flagged).toHaveText("Hello: build failed");
   await expect(flagged).toHaveAttribute("data-level", "error");
   await expect(flagged).toHaveClass(/text-cf-error-text/);
+
+  // The title menu clears it: the mark, the row's status and the attention go.
+  await page.mouse.move(0, 0);
+  await page.getByTestId("thread-header").getByTestId("thread-title").click();
+  await page.getByTestId("thread-title-menu").getByTestId("menu-clear-flags").click();
+  await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
+  await expect(row(page, "s:s-3").getByTestId("row-status")).toHaveCount(0);
+  const calls = await invocations();
+  expect(calls.filter((c) => c.name === "thread.flag.clear").map((c) => c.args)).toEqual([{ id: "s-3" }]);
 });
 
 test("Settings → Plugins lists a plugin's secrets by name and deletes one after the confirm", async ({ page }) => {

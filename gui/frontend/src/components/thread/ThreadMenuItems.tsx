@@ -1,4 +1,4 @@
-import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FolderGit2, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw } from "lucide-react";
+import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, ArrowRightLeft, Eye, EyeOff, FlagOff, FolderGit2, GitBranchPlus, Layers, Pencil, Pin, PinOff, RotateCw } from "lucide-react";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
@@ -88,8 +88,9 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * rename that commits one): Rename, Pin, Snooze ▸ (and Unsnooze while snoozed); New
  * thread on this branch, Save as workspace, Run in ▸, Hide or Show in sidebar (a thread
  * another created, while thread.sidebar is listed), Restart Claude (while a plugin's
- * environment changed since Claude started: thread.restart); Archive. An item a thread
- * cannot use is left out.
+ * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
+ * flagged the thread: thread.flag.clear, every plugin's); Archive. An item a thread cannot
+ * use is left out.
  */
 export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const noProject = useNoProjectThread(id);
@@ -97,6 +98,8 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
+  // Plugin flags hold the thread in the attention group until a plugin or the user clears them.
+  const flags = useThreadsStore((s) => s.byId[id]?.flags.length ?? 0);
   // The palette's and the daemon's rules (lib/threadRow): somewhere else to run; a project or workspace to copy.
   const runIn = useThreadsStore((s) => canRunElsewhere(s.byId[id]));
   const newLike = useThreadsStore((s) => canNewLike(s.byId[id])) && !noProject;
@@ -105,7 +108,8 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const shown = useSidebarShown(id);
   const sidebarListed = useCommandsStore((s) => s.commands.some((c) => c.name === THREAD_COMMANDS.sidebar));
   const restartListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.restart"));
-  const second = newLike || canSave || runIn || (shown !== null && sidebarListed) || (stale && restartListed);
+  const clearListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.flag.clear"));
+  const second = newLike || canSave || runIn || (shown !== null && sidebarListed) || (stale && restartListed) || (flags > 0 && clearListed);
   return (
     <>
       <kit.Item
@@ -190,6 +194,17 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         >
           <RotateCw />
           Restart Claude
+        </kit.Item>
+      )}
+      {flags > 0 && clearListed && (
+        <kit.Item
+          data-testid="menu-clear-flags"
+          onSelect={() => {
+            void runCommand("thread.flag.clear", { id }, threadContext(id));
+          }}
+        >
+          <FlagOff />
+          {flags === 1 ? "Clear flag" : "Clear flags"}
         </kit.Item>
       )}
       <kit.Separator />
