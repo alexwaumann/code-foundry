@@ -68,8 +68,9 @@
   projects, opening with projects, Escape and the heading picker staying home, cmd+[,
   backdrops) replaces `start.spec.ts`; archive, snooze, sidebar, layout, buttons,
   bottom-panel, app, theme-editor-fuzz and transcript-deleted specs moved to HOME.
-* `e2e/actions.spec.ts:60` (the header's Play menu next to the bottom toggle) fails on
-  origin/main too: the thread info toggle sits between them. Not this change.
+* Full run: 724 passed, 42 skipped, 1 failed. The failure, `e2e/actions.spec.ts:60`
+  (the header's Play menu right before the bottom toggle), fails on origin/main too: the
+  thread info toggle sits between them. Not this change; left for its own fix.
 * Live: `make build && make gui-build`, the real app on a scratch `CODE_FOUNDRY_HOME`:
   the window opens on the No project composer with no picker; a one-word No project
   thread, focused then archived from the CLI, lands on it; `view.back` (cmd+[) three
