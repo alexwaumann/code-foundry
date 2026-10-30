@@ -667,7 +667,7 @@ func (m *Manager) defaultPathTaken(r project.Project, branch string, onDisk bool
 			head = "a detached HEAD at " + w.Head[:min(7, len(w.Head))]
 		}
 		return fmt.Errorf("%w: %s's worktree for %s at %s has %s checked out now%s; switch it back to %s, or pick another branch",
-			ErrFailedPrecondition, name, branch, want, head, holder(), branch)
+			ErrFailedPrecondition, name, branch, w.Path, head, holder(), branch) // the path as git lists it
 	case onDisk && pathExists(filepath.Join(want, ".git")):
 		return fmt.Errorf("%w: %s's worktree for %s would go to %s, which holds a git checkout %s does not list on %s%s; move it away, or pick another branch",
 			ErrFailedPrecondition, name, branch, want, name, branch, holder())
