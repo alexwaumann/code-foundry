@@ -49,7 +49,7 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 		ReadOnly:  true,
 		Title:     "Wait for Thread",
 		Description: "Wait until a thread settles: its turn ended, or it asks for a permission or an answer " +
-			"(or with --until: idle, attention, error, disconnected); returns at once when it already has. " +
+			"(another condition with --until); returns at once when it already has. " +
 			"Prints the thread's status and any pending request with the thread respond line that answers it " +
 			"(--json: the thread). Exits 1 on timeout or removal.",
 		Category:     "Thread",
