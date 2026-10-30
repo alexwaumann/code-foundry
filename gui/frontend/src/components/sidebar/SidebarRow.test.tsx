@@ -376,7 +376,7 @@ describe("SidebarRow linked PRs tag", () => {
 
 describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
   const SLUG = "o/r";
-  const link = (number: number, at: number) => ({ slug: SLUG, number, url: `https://github.com/${SLUG}/pull/${String(number)}`, linkedAt: new Date(at) });
+  const link = (number: number, at: number) => ({ slug: SLUG, number, url: `https://github.com/${SLUG}/pull/${String(number)}`, linkedAt: at });
   const pr = (number: number, state: PullRequestView["state"], o: Partial<PullRequestView> = {}) =>
     ({ repoSlug: SLUG, number, state, draft: false, title: `PR ${String(number)}`, updatedAtMs: 1, partial: false, ...o }) as PullRequestView;
   const dashboard = (authored: PullRequestView[], recentlyMerged: PullRequestView[] = []) =>
