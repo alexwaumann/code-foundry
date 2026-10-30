@@ -400,7 +400,7 @@ interface MemberChanges {
  * Changes: added and deleted lines and files against the base, the Worktree tab's Changes
  * (a click opens that tab, whose list opens each file's Diff tab). With several projects:
  * the lines over all, the dirty projects counted, and a fold with a row per dirty project.
- * "No changes" when clean.
+ * "No changes" when clean; nothing until every checkout's detail has been read.
  */
 function ChangesRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members, paths } = useMembers(threadId);
@@ -410,8 +410,10 @@ function ChangesRow({ threadId }: { threadId: string }) {
   const totals = worktreeDetailResource.store(
     useShallow((s) =>
       keys.map((k) => {
-        const f = s.entries[k]?.data?.files;
-        if (!f) return "";
+        const e = s.entries[k];
+        const f = e?.data?.files;
+        // Not read yet: "" (the row waits); a read that failed counts as no changes.
+        if (!f) return e?.error ? "0,0,0" : "";
         const t = fileTotals(f);
         return `${String(t.added)},${String(t.deleted)},${String(t.count)}`;
       }),
@@ -419,6 +421,8 @@ function ChangesRow({ threadId }: { threadId: string }) {
   );
   const [open, setOpen] = useState(false);
   const cwd = paths[cwdProjectId] ?? "";
+  // Nothing until every checkout's detail is read: not "No changes" first, then counts.
+  if (keys.length === 0 || totals.some((t) => t === "")) return null;
   const dirty: MemberChanges[] = gitMembers.flatMap((id, i) => {
     const [added = 0, deleted = 0, count = 0] = (totals[i] ?? "").split(",").map(Number);
     return count > 0 ? [{ projectId: id, path: paths[id] ?? "", added, deleted, count }] : [];
