@@ -101,6 +101,9 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `DropdownMenuLabel`: a heading in the menu.
 - `DropdownMenuSeparator`: a line.
 - `DropdownMenuShortcut`: a key hint at an entry's right.
+- `DropdownMenuSub`: a submenu inside a menu.
+- `DropdownMenuSubTrigger`: the entry that opens it (a chevron at its right).
+- `DropdownMenuSubContent`: the submenu's entries.
 - `ContextMenu`: a right-click menu around an area.
 - `ContextMenuTrigger`: the area.
 - `ContextMenuContent`: the menu.
