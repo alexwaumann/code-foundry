@@ -391,6 +391,8 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const editorRef = useRef<PromptEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // The Work in list is open: only then are its branches checked with the daemon (as the card's Run in menu).
+  const [workInOpen, setWorkInOpen] = useState(false);
 
   const busy = phase !== "idle";
   // No project: no worktree, base, branch or chips; "/" completes, "@" does not.
@@ -570,7 +572,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   // Work in's existing branches (W2): every git project's, merged by name, newest first, minus the default branches.
   const branchNames = useMemo(() => mergedBranches(branchLists.lists, branchLists.defaults), [branchLists]);
   // A branch the Create would refuse (a main checkout on it, its worktree moved): greyed, the refusal as its tooltip.
-  const refusals = usePlacementRefusals(gitIds, branchNames, !like && !home);
+  const refusals = usePlacementRefusals(gitIds, branchNames, workInOpen && !like && !home);
   const branchGroup = useMemo<PickerGroup>(
     () => ({
       options: branchNames.map((b) => ({ value: BRANCH_VALUE + b, label: b, icon: GitBranch, mono: true, unavailable: refusals[b] })),
@@ -895,6 +897,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
                   }}
                   filterPlaceholder={hasBranchSearch ? "Find existing branch" : undefined}
                   onOpen={hasBranchSearch ? loadLists : undefined}
+                  onOpenChange={setWorkInOpen}
                   disabled={busy}
                   contentClassName="w-90"
                   listClassName="max-h-96"
