@@ -53,7 +53,7 @@ test("Fork is disabled in the row menu", async ({ page }) => {
   await expect(page.getByTestId("menu-fork")).toHaveAttribute("data-disabled", "");
 });
 
-test("Archive archives it (the dashboard shows, as for any archive); opened again, Remove asks, then forgets it", async ({ page }) => {
+test("Archive archives it (home shows, as for any archive); opened again, Remove asks, then forgets it", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
   const note = page.getByTestId("thread-transcript-note");

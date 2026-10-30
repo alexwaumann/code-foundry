@@ -99,7 +99,7 @@ func TestThreadArchive(t *testing.T) {
 		{name: "the CLI archives the thread it runs in given --id", ctx: command.Context{ActiveThreadID: "s5"},
 			args: map[string]string{"id": "s5", "archived": "true"}, current: live(v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"),
 			wantMsg: "archived thread drv (s5)"},
-		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		// The CLI may name its threads with ids alone, so Run says what is missing.
 		{name: "the CLI without a thread names what is missing", wantErr: command.ErrInvalidArgs},
 		{name: "an unknown thread fails in Run, not with a confirmation", args: map[string]string{"id": "s5", "archived": "true"},

@@ -32,7 +32,7 @@ import {
   type BottomEntry,
 } from "./bottomPanel";
 import type { TerminalsData } from "./terminals";
-import { DASHBOARD, useUiStore, type Selection } from "./ui";
+import { HOME, useUiStore, type Selection } from "./ui";
 
 function term(id: string, labels: Record<string, string>, extra: Partial<TerminalView> = {}): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
@@ -48,7 +48,7 @@ describe("bottomKeyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["a thread", { kind: "thread", id: "s1" }, "thread:s1"],
     ["the Projects page", { kind: "view", name: "projects" }, "view:projects"],
-    ["the dashboard", DASHBOARD, null],
+    ["HOME (the No project composer)", HOME, null],
     ["nothing", { kind: "none" }, null],
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, null],
     ["the composer", { kind: "compose", projectId: "r" }, null],

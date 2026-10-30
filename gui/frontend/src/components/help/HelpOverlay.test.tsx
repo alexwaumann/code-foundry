@@ -28,7 +28,7 @@ describe("help tab", () => {
     ["view.help (cmd+/) opens on the guide", () => { toggleHelp(); }, "guide"],
     ["a ShowView intent opens on the guide", () => showView("help"), "guide"],
     ["openHelp defaults to the guide", () => { openHelp(); }, "guide"],
-    ["the start page link opens on the shortcuts", () => { openHelp("shortcuts"); }, "shortcuts"],
+    ["openHelp on a tab opens on it (the shortcuts)", () => { openHelp("shortcuts"); }, "shortcuts"],
   ])("%s", (_name, open, want) => {
     // Left on the other tab last time: opening resets it.
     useViewsStore.setState({ helpTab: want === "guide" ? "shortcuts" : "guide" });

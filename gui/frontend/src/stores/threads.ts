@@ -207,7 +207,7 @@ export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pi
 
 /**
  * Thread ids that need the user, in `order`. An archived or snoozed thread never counts
- * (the window title, the dock badge, cmd+shift+a, the start page): archiving one
+ * (the window title, the dock badge, cmd+shift+a): archiving one
  * that was waiting (usually a finished turn) says the user is done with it, snoozing says
  * not until later, and it sits in a collapsed section. A snoozed thread counts again once
  * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared). Neither does a
@@ -229,7 +229,7 @@ export function isRunning(s: Pick<ThreadView, "status" | "state"> & Partial<Pick
   return !isAttention(s) && threadBadge(s) === "busy";
 }
 
-/** Threads that are running (isRunning), in `order`, hidden ones left out (attentionIds); none of them in attentionIds. */
+/** Threads that are running (isRunning), in `order`, hidden ones left out (attentionIds). */
 function runningIds(data: ThreadsData, showCreated: boolean): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
@@ -240,17 +240,6 @@ function runningIds(data: ThreadsData, showCreated: boolean): string[] {
 /** Threads that are running (isRunning), hidden ones left out. */
 export function runningCount(data: ThreadsData, showCreated: boolean): number {
   return runningIds(data, showCreated).length;
-}
-
-/**
- * The start page's thread list: threads waiting on the user, then running ones, each in
- * `order`, hidden ones left out. An id is never in both (attention wins): the list keys
- * rows by id.
- */
-export function activeThreadIds(data: ThreadsData, showCreated: boolean): string[] {
-  const waiting = attentionIds(data, showCreated);
-  const seen = new Set(waiting);
-  return [...waiting, ...runningIds(data, showCreated).filter((id) => !seen.has(id))];
 }
 
 /** Number of threads needing attention (a narrow, primitive selector); `showCreated` is useShowCreatedThreads. */

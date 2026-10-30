@@ -71,7 +71,7 @@ func TestActionRunOwnerAndMode(t *testing.T) {
 		{name: "outside every project", args: map[string]string{"action": "dev", "here": "/cf-test/elsewhere"},
 			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/elsewhere is not inside a registered project"},
 		{name: "no owner at all", args: map[string]string{"action": "dev"}, wantErr: command.ErrInvalidArgs, wantMsg: "action.run needs a thread"},
-		{name: "the dashboard does not offer it", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"action": "dev"},
+		{name: "the Pull Requests page does not offer it", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"action": "dev"},
 			wantErr: command.ErrUnavailable},
 		{name: "no action", ctx: command.Context{ActiveThreadID: "s1"}, wantErr: command.ErrInvalidArgs},
 	}
@@ -231,7 +231,7 @@ func TestActionProject(t *testing.T) {
 		{name: "a thread without a project", ctx: command.Context{ActiveThreadID: "s1"}, thread: &v1.Thread{WorktreePath: "/cf-test/home"},
 			wantErr: command.ErrInvalidArgs, wantMsg: "has no project"},
 		{name: "nothing to go on", wantErr: command.ErrInvalidArgs, wantMsg: "actions belong to a project"},
-		{name: "the dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "the Pull Requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -320,7 +320,7 @@ test("14: Cancel on leaving through a selection change puts the selection back",
   expect(await emit({ showView: { name: "thread.next" } })).toBeGreaterThan(0);
   await page.getByTestId("confirm-cancel").click();
   await expect(inspector(page)).toBeVisible();
-  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
   await page.getByRole("button", { name: "Close themes" }).click();
   await page.getByTestId("confirm-ok").click();
   // Back to Settings (the page was opened from there), not to the thread clicked and cancelled.

@@ -179,9 +179,14 @@ function terminalYields(chord: string): CommandView | undefined {
  */
 const fieldYielded: ReadonlySet<string> = new Set(["view.back", "view.forward", "view.settings", "dictation.toggle"]);
 
+/** A chord that moves or deletes text in a field (cmd+arrows, cmd+backspace, …). */
+function editingChord(chord: string): boolean {
+  return /\+(arrow\w+|backspace|delete|home|end|enter|tab)$/.test(chord);
+}
+
 /** The command a focused text field yields this chord to (see fieldYielded). */
 function fieldYields(chord: string): CommandView | undefined {
-  if (!terminalYieldable(chord) || /\+(arrow\w+|backspace|delete|home|end|enter|tab)$/.test(chord)) return undefined;
+  if (!terminalYieldable(chord) || editingChord(chord)) return undefined;
   const c = commandBindings(useCommandsStore.getState().commands).get(chord);
   return c && fieldYielded.has(c.name) ? c : undefined;
 }
@@ -472,11 +477,13 @@ export function handleKeyDown(e: KeyboardEvent): void {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (terminalYieldable(chord) && (shell || declaredChord(chord))) {
+    } else if (terminalYieldable(chord) && (shell || declaredChord(chord) || (useCommandsStore.getState().contextKey === null && !editingChord(chord)))) {
       // Focusing a shell or selecting a thread changes the context (a Projects-page shell
       // brings its worktree): cmd+t or cmd+r right after it must not be lost to the
       // debounced re-list. In a prompt only for a chord some command declares: the
-      // others edit (cmd+arrows, cmd+backspace) and must not be held.
+      // others edit (cmd+arrows, cmd+backspace) and must not be held. Before the first
+      // list (the window opens on the composer, its prompt focused) nothing is declared
+      // yet: a chord that does not edit waits for it, as it would outside the prompt.
       startWhenListed(e, chord);
     }
     return;

@@ -242,9 +242,9 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "280");
 });
 
-test("no bottom panel on the dashboard, the Pull Requests page, or under an expanded side panel; it stays under the settings and usage sheets", async ({ page }) => {
+test("no bottom panel on the composer, the Pull Requests page, or under an expanded side panel; it stays under the settings and usage sheets", async ({ page }) => {
   await openApp(page);
-  // The dashboard: no toggle, and cmd+j does nothing.
+  // Home (the No project composer): no toggle, and cmd+j does nothing.
   await page.keyboard.press("Meta+j");
   await expect(bottom(page)).toHaveCount(0);
   await expect(page.getByTestId("bottom-toggle")).toHaveCount(0);

@@ -76,7 +76,7 @@ func hasTerminal(c Context) bool { return c.ActiveTerminalID != "" }
 // canStartShell is terminal.new's availability: a thread or a worktree to own the shell
 // (the GUI passes the selected one), or the CLI (ActiveView is empty only there), which
 // sends its working directory as --here and is refused outside every registered project.
-// The dashboard and the Pull Requests page never offer it.
+// The composer and the Pull Requests page never offer it.
 func canStartShell(c Context) bool {
 	return hasThread(c) || c.ActiveWorktreePath != "" || c.ActiveView == ""
 }

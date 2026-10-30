@@ -208,7 +208,7 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="bottom-toggle"]', '[data-testid="panel-toggle"]']);
 });
 
-test("headerless panes (start page, composer) drag the window from the same 44px band", async ({ page }) => {
+test("the headerless composer (home and a project's) drags the window from the same 44px band", async ({ page }) => {
   await openApp(page);
   const check = async (band: string, content: string) => {
     const b = await page.locator(band).first().evaluate((el) => {
@@ -219,8 +219,8 @@ test("headerless panes (start page, composer) drag the window from the same 44px
     expect(await drag(page, band)).toBe("drag");
     expect(await drag(page, content)).toBe("");
   };
-  await expect(page.getByTestId("start-page")).toBeVisible();
-  await check('[data-testid="start-page"] ~ [data-testid="pane-drag-band"]', '[data-testid="welcome-actions"]');
+  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
+  await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
   await composeProject(page);
   await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
 });

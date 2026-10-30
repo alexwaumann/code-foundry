@@ -21,7 +21,6 @@ const OWN_TITLE: { file: string; component: string; why: string }[] = [
   { file: "/src/components/pr/PrMenu.tsx", component: "Item", why: "the menu item's label" },
   { file: "/src/components/pr/ReviewButton.tsx", component: "Item", why: "the Review menu item's label (PrMenu's Item)" },
   { file: "/src/components/pr/PullRequestSurface.tsx", component: "Centered", why: "the empty state's heading" },
-  { file: "/src/components/start/StartPage.tsx", component: "Header", why: "the page's greeting" },
 ];
 
 interface Hit {

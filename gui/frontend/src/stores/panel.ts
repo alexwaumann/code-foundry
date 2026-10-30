@@ -14,7 +14,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { panelKeepOpen } from "./settings";
-import { PANEL_DEFAULT, clampPanelWidth, isDashboard, useUiStore, visibleSidebarWidth, type Selection } from "./ui";
+import { PANEL_DEFAULT, clampPanelWidth, useUiStore, visibleSidebarWidth, type Selection } from "./ui";
 
 /**
  * What a panel tab shows: a SurfaceSpec kind from surfaces/registry.ts. A plain string,
@@ -91,9 +91,11 @@ export const RATIO_DEFAULT = 0.5;
 export const RATIO_MIN = 0.2;
 export const RATIO_MAX = 0.8;
 
-/** Panel key for a selection; null for the dashboard (or `none`), which has no panel. */
+/**
+ * Panel key for a selection; null for `none` (nothing sets it; App.tsx renders HOME's
+ * composer for it, without a panel).
+ */
 export function keyOf(sel: Selection): string | null {
-  if (isDashboard(sel)) return null;
   switch (sel.kind) {
     case "none":
       return null;

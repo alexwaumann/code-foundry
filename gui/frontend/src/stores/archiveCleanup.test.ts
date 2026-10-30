@@ -4,7 +4,7 @@ import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiv
 import { useBottomStore } from "./bottomPanel";
 import { emptyEntry, makeTab, usePanelStore } from "./panel";
 import { applyThreadListEvent, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
-import { DASHBOARD, useUiStore, type Selection } from "./ui";
+import { HOME, useUiStore, type Selection } from "./ui";
 
 const thread = (id: string, archivedAtMs: number | null = null, snoozedUntilMs: number | null = null) =>
   ({ id, createdAtMs: 1, archivedAtMs, snoozedUntilMs, linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
@@ -70,7 +70,7 @@ describe("putAwaySelected", () => {
   it.each<[string, Selection, boolean]>([
     ["the put-away thread is selected", { kind: "thread", id: "a" }, true],
     ["another thread is selected", { kind: "thread", id: "b" }, false],
-    ["the dashboard is selected", DASHBOARD, false],
+    ["HOME is selected", HOME, false],
     ["a composer is selected", { kind: "compose", projectId: "r" }, false],
     ["nothing is selected", { kind: "none" }, false],
   ])("%s", (_name, sel, want) => {
@@ -135,28 +135,28 @@ describe("startArchiveCleanup", () => {
     const select = (sel: Selection) => useUiStore.setState({ selection: sel });
     const selection = () => useUiStore.getState().selection;
 
-    it("archiving the selected thread selects the dashboard", () => {
+    it("archiving the selected thread selects HOME (the No project composer)", () => {
       select({ kind: "thread", id: "a" });
       useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-      expect(selection()).toEqual(DASHBOARD);
+      expect(selection()).toEqual(HOME);
     });
 
-    it("snoozing the selected thread selects the dashboard", () => {
+    it("snoozing the selected thread selects HOME (the No project composer)", () => {
       select({ kind: "thread", id: "a" });
       useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("a", 42) }));
-      expect(selection()).toEqual(DASHBOARD);
+      expect(selection()).toEqual(HOME);
     });
 
-    it("a removed event for the selected thread selects the dashboard", () => {
+    it("a removed event for the selected thread selects HOME (the No project composer)", () => {
       select({ kind: "thread", id: "a" });
       useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "removed", id: "a" }));
-      expect(selection()).toEqual(DASHBOARD);
+      expect(selection()).toEqual(HOME);
     });
 
-    it("a snapshot without the selected thread selects the dashboard", () => {
+    it("a snapshot without the selected thread selects HOME (the No project composer)", () => {
       select({ kind: "thread", id: "a" });
       useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "snapshot", threads: [thread("b")], retiredUsage: [] }));
-      expect(selection()).toEqual(DASHBOARD);
+      expect(selection()).toEqual(HOME);
     });
 
     it("putting away or removing another thread leaves the selection alone", () => {

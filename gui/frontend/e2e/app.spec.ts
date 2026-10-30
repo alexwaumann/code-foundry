@@ -53,7 +53,7 @@ test("palette opens with cmd+k and lists only commands available in context", as
   const palette = page.getByTestId("palette");
   // thread.new is unavailable with nothing selected, but its project picker supplies the project.
   await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
-  // A terminal belongs to a thread or a worktree: the dashboard offers none.
+  // A terminal belongs to a thread or a worktree: the No project composer offers none.
   await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
   await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
   await page.keyboard.press("Escape");

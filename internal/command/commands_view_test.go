@@ -12,7 +12,6 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 	tests := []struct {
 		command, view string
 	}{
-		{command: "view.dashboard", view: command.ViewDashboard},
 		{command: "view.usage", view: command.ViewUsage},
 		{command: "view.pullrequests", view: command.ViewPullRequests},
 		{command: "view.projects", view: command.ViewProjects},
@@ -73,7 +72,7 @@ func TestViewPanelDiffAvailability(t *testing.T) {
 		{name: "worktree page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},
 		{name: "projects page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/src", ActiveView: "projects"}, want: false},
 		{name: "composer", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, want: false},
-		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
+		{name: "nothing selected", ctx: command.Context{ActiveView: "pullrequests"}, want: false},
 		{name: "CLI without context", ctx: command.Context{}, want: false},
 		{name: "CLI with --context-thread, --context-project and --context-worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, want: true},
 		// Run reads the thread's worktree (commands_view_thread.go).

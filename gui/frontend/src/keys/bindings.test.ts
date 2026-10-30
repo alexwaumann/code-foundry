@@ -4,7 +4,7 @@ import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useThreadsStore } from "@/stores/threads";
-import { useUiStore } from "@/stores/ui";
+import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { chordFires, commandBindings, handleKeyDown, inPalette, isGlobalChord, openRunInPicker } from "./bindings";
 
@@ -192,6 +192,23 @@ describe("handleKeyDown precedence", () => {
     });
   });
 
+  it("thread prompt focus before the first list: a cmd chord waits for it (cmd+t as the window opens on the composer); an editing chord does not", async () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const prompt = document.getElementById("pr") as HTMLElement;
+    const commands = useCommandsStore.getState().commands;
+    useCommandsStore.setState({ commands: [], contextKey: null });
+    relist.run = () => {
+      useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+    };
+    expect(press(prompt, { key: "Backspace", code: "Backspace", metaKey: true }).defaultPrevented).toBe(false);
+    expect(useCommandsStore.getState().contextKey).toBeNull();
+    const e = press(prompt, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => {
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    });
+  });
+
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
     const commands = useCommandsStore.getState().commands;
     useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
@@ -326,7 +343,7 @@ describe("handleKeyDown precedence", () => {
         },
         order: ["a", "b", "c", "d", "e", "f"],
       });
-      useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+      useUiStore.setState({ selection: HOME });
     });
     const step = (by: 1 | -1, target: Element = outside) => {
       const e = by === 1 ? press(target, { key: "}", code: "BracketRight", metaKey: true, shiftKey: true }) : press(target, { key: "{", code: "BracketLeft", metaKey: true, shiftKey: true });
@@ -335,12 +352,12 @@ describe("handleKeyDown precedence", () => {
       return sel.kind === "thread" ? sel.id : sel.kind;
     };
 
-    it("next from the dashboard selects the first row, then walks down and wraps", () => {
+    it("next from HOME selects the first row, then walks down and wraps", () => {
       expect([1, 2, 3, 4, 5, 6, 7].map(() => step(1))).toEqual(["f", "d", "b", "e", "c", "a", "f"]);
       expect(runCommandForResult).not.toHaveBeenCalled();
     });
 
-    it("previous from the dashboard selects the last row, then walks up and wraps", () => {
+    it("previous from HOME selects the last row, then walks up and wraps", () => {
       expect([1, 2, 3, 4, 5, 6, 7].map(() => step(-1))).toEqual(["a", "c", "e", "b", "d", "f", "a"]);
     });
 
@@ -362,12 +379,12 @@ describe("handleKeyDown precedence", () => {
 
     it("does nothing with no rows", () => {
       useThreadsStore.setState({ byId: {}, order: [] });
-      expect(step(1)).toBe("view");
-      expect(step(-1)).toBe("view");
+      expect(step(1)).toBe("compose");
+      expect(step(-1)).toBe("compose");
     });
 
     it("works from a focused shell, and lands in the window's history", () => {
-      useUiStore.setState({ history: [{ kind: "view", name: "dashboard" }], historyIndex: 0 });
+      useUiStore.setState({ history: [HOME], historyIndex: 0 });
       expect(step(1, terminal)).toBe("f");
       expect(step(1, terminal)).toBe("d");
       useUiStore.getState().back();
@@ -376,7 +393,7 @@ describe("handleKeyDown precedence", () => {
 
     it("a plain text field keeps them (only back and forward leave one)", () => {
       expect(press(input, { key: "}", code: "BracketRight", metaKey: true, shiftKey: true }).defaultPrevented).toBe(false);
-      expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+      expect(useUiStore.getState().selection).toEqual(HOME);
     });
   });
 
@@ -392,10 +409,10 @@ describe("handleKeyDown precedence", () => {
     ["back rebound to alt+[ stays with the field (no cmd)", "alt+[", { key: "[", code: "BracketLeft", altKey: true }, false],
   ])("%s", (_name, chord, init, leaves) => {
     useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: chord === "cmd+]" ? "view.forward" : "view.back", keybindings: [chord] })] }));
-    useUiStore.setState({ selection: { kind: "view", name: "projects" }, history: [{ kind: "view", name: "dashboard" }, { kind: "view", name: "projects" }], historyIndex: 1 });
+    useUiStore.setState({ selection: { kind: "view", name: "projects" }, history: [HOME, { kind: "view", name: "projects" }], historyIndex: 1 });
     const e = press(input, init);
     expect(e.defaultPrevented).toBe(leaves);
-    if (chord === "cmd+[") expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    if (chord === "cmd+[") expect(useUiStore.getState().selection).toEqual(HOME);
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
@@ -410,7 +427,7 @@ describe("handleKeyDown precedence", () => {
 
   it("view.back's chord does not leave the palette's input", () => {
     useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "view.back", keybindings: ["cmd+["] })] }));
-    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" }, history: [{ kind: "view", name: "dashboard" }, { kind: "view", name: "projects" }], historyIndex: 1 });
+    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" }, history: [HOME, { kind: "view", name: "projects" }], historyIndex: 1 });
     expect(press(input, { key: "[", code: "BracketLeft", metaKey: true }).defaultPrevented).toBe(false);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
   });

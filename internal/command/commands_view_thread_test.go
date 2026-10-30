@@ -256,7 +256,7 @@ func TestPageVerbs(t *testing.T) {
 		{name: "no presence", ctx: inThread, deps: panelDeps{windows: 1}, wantMsg: "windows=1"},
 	}
 	pages := map[string]string{
-		"view.dashboard": command.ViewDashboard, "view.usage": command.ViewUsage, "view.pullrequests": command.ViewPullRequests,
+		"view.usage": command.ViewUsage, "view.pullrequests": command.ViewPullRequests,
 		"view.projects": command.ViewProjects, "view.settings": command.ViewSettings, "view.help": command.ViewHelp,
 	}
 	for verb, view := range pages {

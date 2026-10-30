@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useAddProjectStore } from "./addProject";
 import { getBottom, useBottomStore } from "./bottomPanel";
 import { getPanel, makeTab, usePanelStore } from "./panel";
-import { useUiStore, type FocusRegion } from "./ui";
+import { HOME, useUiStore, type FocusRegion } from "./ui";
 import { closeUsage, expandPanelCommand, newPanelTabCommand, setSettingsPage, showView, startViewSync, toggleBottomCommand, togglePanelCommand, toggleView, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
@@ -188,12 +188,20 @@ describe("newPanelTabCommand", () => {
 });
 
 describe("showView", () => {
-  it("\"dashboard\" selects the dashboard and closes settings", () => {
+  it("\"projects\" selects the Projects page and closes settings", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     useViewsStore.setState({ settingsOpen: true, helpOpen: false });
-    expect(showView("dashboard")).toBe(true);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(showView("projects")).toBe(true);
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
     expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+
+  it("\"dashboard\" (removed, docs/notes/remove-dashboard.md) is an unknown name: ignored", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
+    useViewsStore.setState({ settingsOpen: true, helpOpen: false });
+    expect(showView("dashboard")).toBe(false);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "a" });
+    expect(useViewsStore.getState().settingsOpen).toBe(true);
   });
 
   it("\"settings.<page>\" opens settings on that page, and moves an open one there (view.settings --page)", () => {
@@ -320,7 +328,7 @@ describe("toggleBottomCommand", () => {
   });
 
   const noops: [string, () => void][] = [
-    ["a selection without a bottom panel (the dashboard)", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } })],
+    ["a selection without a bottom panel (HOME, the No project composer)", () => useUiStore.setState({ selection: HOME })],
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
     ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } })],
   ];

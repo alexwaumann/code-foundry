@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SHELL_GAP } from "@/design/tokens";
-import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, expandedPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
+import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, HOME, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, expandedPanelWidth, panelMax, viewNames, useUiStore, type FocusRegion } from "./ui";
 
 describe("shell gaps", () => {
   it("the panes' horizontal gaps are three shell gaps (sidebar | gap | content | gap | panel | gap), 36px", () => {
@@ -96,10 +96,17 @@ describe("ui persistence", () => {
     expect(merged).toMatchObject({ sidebarVisible: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
   });
 
-  it("does not save the selection: the window always starts on the dashboard", () => {
+  it("does not save the selection: the window always starts on HOME, the No project composer", () => {
     const saved = useUiStore.persist.getOptions().partialize?.(useUiStore.getState());
     expect(saved).not.toHaveProperty("selection");
-    expect(useUiStore.getInitialState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(HOME).toEqual({ kind: "compose", projectId: "", noProject: true });
+    expect(useUiStore.getInitialState().selection).toEqual(HOME);
+    expect(useUiStore.getInitialState().history).toEqual([HOME]);
+    expect(useUiStore.getInitialState().historyIndex).toBe(0);
+  });
+
+  it("landing on HOME leaves the project picker closed", () => {
+    expect(useUiStore.getInitialState().palette).toMatchObject({ open: false, page: "commands" });
   });
 
   it("does not save a panel width", () => {
@@ -236,14 +243,8 @@ describe("closePalette", () => {
   });
 });
 
-describe("isDashboard", () => {
-  const cases: [string, Selection, boolean][] = [
-    ["the dashboard view", DASHBOARD, true],
-    ["nothing selected (renders the dashboard too)", { kind: "none" }, true],
-    ["another page", { kind: "view", name: "projects" }, false],
-    ["a thread", { kind: "thread", id: "s-1" }, false],
-  ];
-  it.each(cases)("%s", (_name, sel, want) => {
-    expect(isDashboard(sel)).toBe(want);
+describe("viewNames", () => {
+  it("has no dashboard: a ShowView of it is an unknown name, ignored", () => {
+    expect(viewNames).toEqual(["pullrequests", "projects", "ember"]);
   });
 });

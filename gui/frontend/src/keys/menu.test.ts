@@ -17,7 +17,7 @@ vi.mock("@/api/app", async (orig) => ({
 const { runMenuCommand, startMenuCommands } = await import("./menu");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useThreadsStore } = await import("@/stores/threads");
-const { useUiStore } = await import("@/stores/ui");
+const { HOME, useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 
 function cmd(over: Partial<CommandView>): CommandView {
@@ -30,7 +30,7 @@ beforeEach(() => {
     commands: [cmd({ name: "ui.palette.open", title: "Open Command Palette" }), cmd({ name: "thread.rename", title: "Rename Thread", available: false })],
   });
   useThreadsStore.setState({ byId: {}, order: [] });
-  useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+  useUiStore.setState({ selection: HOME });
   useUiStore.getState().closePalette();
 });
 

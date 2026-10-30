@@ -540,8 +540,7 @@ export function toggleHelp(): void {
 
 /**
  * Opens the help overlay on a tab (the guide by default), or switches the open overlay
- * to it: Help > Getting Started, Help > Keyboard Shortcuts and Help, and the start page's
- * Keyboard Shortcuts link.
+ * to it: Help > Getting Started, Help > Keyboard Shortcuts and Help.
  */
 export function openHelp(tab: HelpTab = "guide"): void {
   useViewsStore.setState({ helpOpen: true, helpTab: tab });

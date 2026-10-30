@@ -36,7 +36,7 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 		{name: "workspace: clear by id", cmd: "thread.workspace", args: map[string]string{"id": "s-c"},
 			wantMsg:  "thread s-c references no workspace; it applies from the thread's next start",
 			wantReqs: []proto.Message{&v1.SetThreadWorkspaceRequest{Id: "s-c"}}},
-		{name: "workspace: no thread in the GUI", cmd: "thread.workspace", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"workspace": "shop"}, wantErr: command.ErrUnavailable},
+		{name: "workspace: no thread in the GUI", cmd: "thread.workspace", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"workspace": "shop"}, wantErr: command.ErrUnavailable},
 
 		{name: "new-like: the context thread, only a prompt", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread", ActiveProjectID: "web"},
 			args:      map[string]string{"prompt": "next step"},
@@ -52,7 +52,7 @@ func TestThreadWorkspaceAndNewLike(t *testing.T) {
 				PermissionMode: v1.PermissionMode_PERMISSION_MODE_SUPERVISED, InitialPrompt: "p", ComposerPrompt: "p [/x](cf-skill://x)",
 				Attachments: []string{"/a/1.png", "/a/2.pdf"}, Name: "n"}},
 			wantWarns: []string{"web @ feat/x is also open in fix (s-src)"}},
-		{name: "new-like: no thread in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"prompt": "p"}, wantErr: command.ErrUnavailable},
+		{name: "new-like: no thread in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"prompt": "p"}, wantErr: command.ErrUnavailable},
 		{name: "new-like: a thread without a project in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread"},
 			args: map[string]string{"prompt": "p"}, wantErr: command.ErrUnavailable},
 		{name: "new-like: a thread in its workspace's folder in the GUI", cmd: "thread.new-like", ctx: command.Context{ActiveThreadID: "s-src", ActiveView: "thread", ActiveWorkspaceID: "w-1"},

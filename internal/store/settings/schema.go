@@ -447,7 +447,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyBackdrop, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Backdrop",
-		Description: "Faint artwork behind the start page and the new-thread composer.",
+		Description: "Faint artwork behind the new-thread composer.",
 		Enum:        []string{BackdropForest, BackdropNone, BackdropCustom}, EnumLabels: []string{"Forest", "None", "Custom"}, Default: BackdropForest,
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
 	},

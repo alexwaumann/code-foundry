@@ -109,8 +109,8 @@ func TestGitOpsUnavailableSaysWhy(t *testing.T) {
 		{"pr.create", command.Context{ActiveWorktreePath: "/local"}, nil, "pr.create: not available in this context: repository has no remote"},
 		{"pr.open", command.Context{ActiveWorktreePath: "/local"}, nil, "pr.open: not available in this context: repository has no remote"},
 		{"pr.open", command.Context{ActiveWorktreePath: "/wt"}, nil, "pr.open: not available in this context: repository is not on GitHub"},
-		{"git.fetch", command.Context{ActiveView: "dashboard"}, nil, "git.fetch: not available in this context"},
-		{"pr.create", command.Context{ActiveView: "dashboard"}, nil, "pr.create: not available in this context"},
+		{"git.fetch", command.Context{ActiveView: "pullrequests"}, nil, "git.fetch: not available in this context"},
+		{"pr.create", command.Context{ActiveView: "pullrequests"}, nil, "pr.create: not available in this context"},
 		{"git.push", command.Context{ActiveWorktreePath: "/plain"}, nil, "git.push: not available in this context: project is not a git repository"},
 		{"pr.open", command.Context{ActiveWorktreePath: "/plain"}, nil, "pr.open: not available in this context: project is not a git repository"},
 	}

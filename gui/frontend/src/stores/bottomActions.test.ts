@@ -18,7 +18,7 @@ const { closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTermi
 const { getBottom, markPendingFocus, markStarting, useBottomStore } = await import("./bottomPanel");
 const { usePanelStore } = await import("./panel");
 const { useTerminalsStore } = await import("./terminals");
-const { useUiStore } = await import("./ui");
+const { HOME, useUiStore } = await import("./ui");
 const { useViewsStore } = await import("./views");
 
 function term(id: string, labels: Record<string, string>, extra: Partial<TerminalView> = {}): TerminalView {
@@ -123,7 +123,7 @@ describe("revealShell (focusTerminal)", () => {
 
   it("an unknown terminal is revealed when it arrives as a shell", () => {
     expect(revealShell("later")).toBe(false);
-    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    useUiStore.setState({ selection: HOME });
     // The events handler adds the terminal to the store, then calls onNewTerminal.
     const later = term("later", shell("s2"));
     setTerminals([later]);
@@ -465,7 +465,7 @@ describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
       true,
       true,
     ],
-    ["the dashboard: a no-op", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } }), false, false],
+    ["HOME (the No project composer): a no-op", () => useUiStore.setState({ selection: HOME }), false, false],
     [
       "before the terminals are listed: just opens",
       () => {

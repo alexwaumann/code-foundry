@@ -146,7 +146,7 @@ func TestCommandInvoke(t *testing.T) {
 			0, "killed t2", `{"id":"t2"}`},
 		{"no json", &v1.InvokeCommandRequest{Name: "fake.register", Args: map[string]string{"path": "/r"}}, 0, "", ""},
 		{"unknown", &v1.InvokeCommandRequest{Name: "nope.nope"}, connect.CodeNotFound, "", ""},
-		{"unavailable", &v1.InvokeCommandRequest{Name: "terminal.kill", Context: &v1.UiContext{ActiveView: "dashboard"}}, connect.CodeFailedPrecondition, "", ""},
+		{"unavailable", &v1.InvokeCommandRequest{Name: "terminal.kill", Context: &v1.UiContext{ActiveView: "pullrequests"}}, connect.CodeFailedPrecondition, "", ""},
 		{"missing context arg from the CLI", &v1.InvokeCommandRequest{Name: "terminal.kill"}, connect.CodeInvalidArgument, "", ""},
 		{"missing arg", &v1.InvokeCommandRequest{Name: "fake.register"}, connect.CodeInvalidArgument, "", ""},
 		{"bad arg", &v1.InvokeCommandRequest{Name: "fake.register", Args: map[string]string{"path": "rel"}}, connect.CodeInvalidArgument, "", ""},

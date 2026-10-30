@@ -12,7 +12,6 @@ import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { ConsentDialog } from "@/components/plugin/ConsentDialog";
-import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsSheet } from "@/components/settings/SettingsSheet";
 import { UsageSheet } from "@/components/usage/UsageSheet";
@@ -39,7 +38,7 @@ import { usePanelExpanded } from "@/stores/panel";
 import { useShowCreatedThreads } from "@/stores/settings";
 import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
-import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
+import { CONTENT_MIN, HOME, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync } from "@/stores/views";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startDockAlerts } from "@/stores/dockAlerts";
@@ -95,27 +94,26 @@ function startApp(): () => void {
 
 /**
  * Exactly one thing fills the content area. A thread shows its conversation
- * (components/thread), connected or not; "compose" is the new-thread composer. Shells
- * never show here: they live in the bottom panel.
+ * (components/thread), connected or not; "compose" is the new-thread composer, and HOME
+ * (`none` too, and an unknown page) its No project draft. Shells never show here: they
+ * live in the bottom panel.
  */
 function Content() {
-  const sel = useUiStore((s) => s.selection);
-  if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
-  if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
-  if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
-  if (sel.kind === "view" && sel.name === EMBER_VIEW) return <EmberView />;
-  if (sel.kind === "compose")
-    return (
-      <Composer
-        key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
-        projectId={sel.projectId}
-        workspaceId={sel.workspaceId}
-        noProject={sel.noProject}
-        likeThreadId={sel.likeThreadId}
-      />
-    );
-  if (sel.kind === "thread") return <ThreadPane threadId={sel.id} />;
-  return <StartPage />;
+  const selected = useUiStore((s) => s.selection);
+  if (selected.kind === "thread") return <ThreadPane threadId={selected.id} />;
+  if (selected.kind === "view" && selected.name === "pullrequests") return <PullRequestsPage />;
+  if (selected.kind === "view" && selected.name === "projects") return <ProjectsPage />;
+  if (selected.kind === "view" && selected.name === EMBER_VIEW) return <EmberView />;
+  const sel = selected.kind === "compose" ? selected : HOME;
+  return (
+    <Composer
+      key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
+      projectId={sel.projectId}
+      workspaceId={sel.workspaceId}
+      noProject={sel.noProject}
+      likeThreadId={sel.likeThreadId}
+    />
+  );
 }
 
 /**
@@ -214,7 +212,7 @@ export function App() {
     <TooltipProvider>
       <div className="relative flex h-full flex-col overflow-hidden bg-cf-canvas text-cf-text">
         {/* The sheet above the panes drags the window too (as the sidebar band and the pane
-            headers do), so a page without a header (dashboard, composer) still has a drag
+            headers do), so a page without a header (the composer) still has a drag
             surface when the sidebar is hidden. It is the shell gap tall: the sheet above the panes. */}
         <div className="absolute inset-x-0 top-0 h-shell [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
         <div className="flex min-h-0 flex-1">

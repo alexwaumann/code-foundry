@@ -40,12 +40,8 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 });
 
-test("status row buttons toggle settings, open help and the palette; so does the welcome panel's palette button", async ({ page }) => {
+test("status row buttons toggle settings, open help and the palette", async ({ page }) => {
   await openApp(page);
-  await page.getByTestId("welcome-actions").getByRole("button", { name: "Command palette" }).click();
-  await expect(page.getByTestId("palette")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("palette")).toHaveCount(0);
 
   const status = page.getByTestId("sidebar-status");
   await expect(status.getByTestId("daemon-status")).toBeVisible();
