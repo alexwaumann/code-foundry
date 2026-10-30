@@ -25,7 +25,7 @@ cherry-pick, revert, bisect; no status for a path the project does not list).
   (0 for a value the registry does not list: an alias, a full name the API accepted,
   claude's default). Values are Anthropic's published windows (models overview, as of
   October 2026): 1M for every listed model, including Haiku 5.5, and **200K for
-  Haiku 4.5**, which has no 1M variant (its `[1m]` id is listed for the work Bedrock
+  Haiku 4.5**, which has no 1M variant (its `[1m]` id is listed for a Bedrock
   setup; the suffix does not make it 1M).
 * `Thread.context_window` (71) is filled from the thread's current model (`Thread.model`,
   not the model that answered the last turn, `ContextModel`: the card shows the window the
@@ -89,7 +89,7 @@ cherry-pick, revert, bisect; no status for a path the project does not list).
 * `thread.Manager.CheckPlacement(PlacementCheck{ProjectIDs, Branch, CheckoutMode})` →
   per project, in id order: `new` (a worktree would be made at the default path; path ""
   while the branch is named at the Create), `share` (the existing checkout and its
-  branch), `folder` (a plain folder), `refused` (the Create's error, verbatim), plus the
+  branch), `folder` (a plain folder), `refused` (the Create's refusal for that project; the Create joins several), plus the
   branch the Create would use (or `branch_named_at_create`).
 * **The same code paths**: project refs go through `placeRequest` (unknown project, one
   listed twice, a bad base); the branch through `newBranchChoice` +

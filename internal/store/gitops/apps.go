@@ -144,7 +144,9 @@ func (m *Manager) EditorApps(ctx context.Context, refresh bool) []EditorApp {
 		if m.opts.appEnv != nil {
 			env = *m.opts.appEnv
 		}
-		m.apps.apps, m.apps.done, m.apps.stale = detectEditorApps(ctx, env), true, false
+		// Detection outlives the request: a cancelled one must not cache the registry's
+		// fallback ids until the next settings change.
+		m.apps.apps, m.apps.done, m.apps.stale = detectEditorApps(context.WithoutCancel(ctx), env), true, false
 		m.log.Debug("editor apps detected", "count", len(m.apps.apps))
 	}
 	return slices.Clone(m.apps.apps)

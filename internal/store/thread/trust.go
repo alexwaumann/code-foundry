@@ -35,10 +35,21 @@ const (
 // trustWorktree marks dir (symlinks resolved) as trusted in Claude's config file. It
 // reports whether the file was changed.
 func trustWorktree(configPath, dir string) (bool, error) {
-	key := realPath(dir)
+	changed, err := trustWorktrees(configPath, dir)
+	return len(changed) > 0, err
+}
+
+// trustWorktrees marks every dir (symlinks resolved) as trusted in Claude's config
+// file under one lock, one read and one write (a spawn pre-trusts every member; the
+// file can be large and other processes take the same lock). It returns the dirs that
+// were not trusted before.
+func trustWorktrees(configPath string, dirs ...string) ([]string, error) {
+	if len(dirs) == 0 {
+		return nil, nil
+	}
 	unlock, err := lockFile(configPath)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	defer unlock()
 
@@ -48,36 +59,46 @@ func trustWorktree(configPath, dir string) (bool, error) {
 	case errors.Is(err, fs.ErrNotExist):
 		data = []byte("{}")
 	case err != nil:
-		return false, fmt.Errorf("trust: read %s: %w", configPath, err)
+		return nil, fmt.Errorf("trust: read %s: %w", configPath, err)
 	default:
 		if fi, err := os.Stat(configPath); err == nil {
 			mode = fi.Mode().Perm()
 		}
 	}
-	out, changed, err := setTrusted(data, key)
-	if err != nil || !changed {
-		return false, err
+	var changed []string
+	out := data
+	for _, dir := range dirs {
+		next, did, err := setTrusted(out, realPath(dir))
+		if err != nil {
+			return nil, err
+		}
+		if did {
+			out, changed = next, append(changed, dir)
+		}
+	}
+	if len(changed) == 0 {
+		return nil, nil
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(configPath), filepath.Base(configPath)+".code-foundry-*")
 	if err != nil {
-		return false, fmt.Errorf("trust: %w", err)
+		return nil, fmt.Errorf("trust: %w", err)
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
 	if _, err := tmp.Write(out); err != nil {
 		_ = tmp.Close()
-		return false, fmt.Errorf("trust: write: %w", err)
+		return nil, fmt.Errorf("trust: write: %w", err)
 	}
 	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
-		return false, fmt.Errorf("trust: chmod: %w", err)
+		return nil, fmt.Errorf("trust: chmod: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return false, fmt.Errorf("trust: close: %w", err)
+		return nil, fmt.Errorf("trust: close: %w", err)
 	}
 	if err := os.Rename(tmp.Name(), configPath); err != nil {
-		return false, fmt.Errorf("trust: replace %s: %w", configPath, err)
+		return nil, fmt.Errorf("trust: replace %s: %w", configPath, err)
 	}
-	return true, nil
+	return changed, nil
 }
 
 // setTrusted sets projects[key].hasTrustDialogAccepted = true in a Claude config
@@ -170,12 +191,13 @@ func (m *Manager) preTrustCheckouts(t Thread) {
 		return
 	}
 	dirs, _ := m.memberDirs(t)
-	for _, dir := range append([]string{t.WorktreePath}, dirs...) {
-		if changed, err := trustWorktree(m.opts.Paths.Config, dir); err != nil {
-			m.log.Warn("pre-trust worktree failed", "thread", t.ID, "path", dir, "err", err)
-		} else if changed {
-			m.log.Info("pre-trusted worktree in claude config", "thread", t.ID, "path", realPath(dir))
-		}
+	changed, err := trustWorktrees(m.opts.Paths.Config, append([]string{t.WorktreePath}, dirs...)...)
+	if err != nil {
+		m.log.Warn("pre-trust checkouts failed", "thread", t.ID, "err", err)
+		return
+	}
+	for _, dir := range changed {
+		m.log.Info("pre-trusted worktree in claude config", "thread", t.ID, "path", realPath(dir))
 	}
 }
 

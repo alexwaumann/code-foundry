@@ -689,9 +689,10 @@ func (m *Manager) makeWorktrees(ctx context.Context, projects []project.Project,
 	// finding A7): the thread would need a second worktree on that branch. So does the
 	// branch's default path holding a worktree switched to another branch: that is another
 	// thread's checkout now, never shared as the branch's (thread-checkouts).
-	// worktreeFor is also the placement check's (placement_check.go).
+	// worktreeFor is also the placement check's (placement_check.go), on disk too, so the
+	// check and the Create refuse with the same message before anything is made.
 	for _, r := range projects {
-		if _, _, err := m.worktreeFor(r, branch, false); err != nil {
+		if _, _, err := m.worktreeFor(r, branch, true); err != nil {
 			errs = append(errs, err)
 		}
 	}

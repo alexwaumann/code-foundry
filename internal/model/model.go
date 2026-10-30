@@ -27,7 +27,7 @@ type Model struct {
 //
 // The 5.5 entries are listed before managed settings offer them, so they show up
 // without an app update; until then picking one fails at thread start.
-// claude-4.5-haiku[1m] is the id the work Bedrock setup accepts; claude-haiku-4-5 is
+// claude-4.5-haiku[1m] is the id a Bedrock setup accepts; claude-haiku-4-5 is
 // refused there. Edit this list to add or retire models.
 //
 // Context windows are Anthropic's published ones (the models overview, as of 2026-10):
