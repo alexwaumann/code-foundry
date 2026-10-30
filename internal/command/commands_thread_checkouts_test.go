@@ -17,18 +17,21 @@ func TestThreadCheckouts(t *testing.T) {
 	resp := &v1.ThreadCheckoutsResponse{
 		Thread: &v1.Thread{Id: "s1", Name: "login", CreatedWorktree: true, Branch: "feat/login"},
 		Checkouts: []*v1.ThreadCheckout{
-			{ProjectId: "api", ProjectName: "api", Path: "/wt/api/feat-login", Branch: "feat/login", Missing: true, Git: true, WorktreeMode: true},
+			{ProjectId: "api", ProjectName: "api", Path: "/wt/api/feat-login", Missing: true, Git: true, WorktreeMode: true, CreatedBranch: "feat/login"},
+			{ProjectId: "cli", ProjectName: "cli", Path: "/wt/cli/feat-login", Detached: true, Head: "0badc0ffee", Git: true, WorktreeMode: true,
+				CreatedBranch: "feat/login", Moved: true},
 			{ProjectId: "docs", ProjectName: "docs", Path: "/src/docs"},
-			{ProjectId: "web", ProjectName: "web", Path: "/wt/web/feat-login", Branch: "feat/login", Primary: true, Current: true,
-				Instructions: "/wt/web/feat-login/CLAUDE.md", Git: true, WorktreeMode: true},
+			{ProjectId: "web", ProjectName: "web", Path: "/wt/web/feat-login", Branch: "feat/login-2", Primary: true, Current: true,
+				Instructions: "/wt/web/feat-login/CLAUDE.md", Git: true, WorktreeMode: true, CreatedBranch: "feat/login", Moved: true},
 		},
 		WorkspaceId: "w-1", WorkspaceName: "shop",
 	}
-	const want = "thread login (s1): worktrees on branch feat/login\n" +
-		"PROJECT  PATH                BRANCH                INSTRUCTIONS\n" +
-		"api      /wt/api/feat-login  feat/login (missing)  -\n" +
-		"docs     /src/docs           (folder)              -\n" +
-		"web      /wt/web/feat-login  feat/login (current)  /wt/web/feat-login/CLAUDE.md\n" +
+	const want = "thread login (s1): worktrees made for branch feat/login\n" +
+		"PROJECT  PATH                BRANCH                                          INSTRUCTIONS\n" +
+		"api      /wt/api/feat-login  feat/login (missing)                            -\n" +
+		"cli      /wt/cli/feat-login  (detached 0badc0f) (moved from feat/login)      -\n" +
+		"docs     /src/docs           (folder)                                        -\n" +
+		"web      /wt/web/feat-login  feat/login-2 (moved from feat/login) (current)  /wt/web/feat-login/CLAUDE.md\n" +
 		"WORKSPACE shop  -"
 	tests := []struct {
 		name    string

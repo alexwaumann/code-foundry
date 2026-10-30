@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
@@ -264,5 +265,96 @@ func TestCleanProjectIDs(t *testing.T) {
 		if got := CleanProjectIDs(tt.primary, tt.ids); !slices.Equal(got, tt.want) {
 			t.Errorf("CleanProjectIDs(%q, %q) = %q, want %q", tt.primary, tt.ids, got, tt.want)
 		}
+	}
+}
+
+// Collision is the same checkout path: a moved worktree is still its thread's, another
+// worktree on the thread's branch is not; archived threads and the thread itself hold
+// nothing. A row with nothing recorded resolves by its branch until it is filled.
+func TestHolderOf(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a"), filepath.Join(dir, "b")
+	snap := &project.Snapshot{Projects: []project.Project{{ID: "r1", Name: "repo", Path: dir, Git: true, Worktrees: []project.Worktree{
+		{ProjectID: "r1", Path: dir, IsMain: true, Branch: "main"},
+		{ProjectID: "r1", Path: a, Branch: "other"}, // was feat/x: git switch
+		{ProjectID: "r1", Path: b, Branch: "feat/x"},
+	}}}}
+	pathFor := func(string, string) string { return filepath.Join(dir, "default") }
+	cos := func(t Thread) []Checkout { return CheckoutsOf(t, snap, pathFor, func(string) bool { return true }) }
+	member := func(id string, rec map[string]string) Thread {
+		return Thread{ID: id, ProjectID: "r2", ProjectIDs: []string{"r1", "r2"}, WorktreePath: "/r2/" + id, CreatedWorktree: true, Branch: "feat/x", CheckoutPaths: rec}
+	}
+	moved := member("moved", map[string]string{"r1": a})
+	inB := Thread{ID: "in-b", ProjectID: "r1", WorktreePath: b, CheckoutPaths: map[string]string{"r1": b}}
+	archived := member("archived", map[string]string{"r1": a})
+	archived.ArchivedAt = time.Unix(1, 0)
+	legacy := member("legacy", nil)
+	tests := []struct {
+		name     string
+		threads  []Thread
+		self     string
+		path     string
+		wantFrom string // "" when nobody holds it
+	}{
+		{"a moved worktree is still its thread's", []Thread{moved}, "x", a, "moved"},
+		{"another worktree on the thread's branch is not", []Thread{moved}, "x", b, ""},
+		{"the thread at the path", []Thread{moved, inB}, "x", b, "in-b"},
+		{"the thread itself does not count", []Thread{moved}, "moved", a, ""},
+		{"archived threads hold nothing", []Thread{archived}, "x", a, ""},
+		{"nothing recorded: resolved by the branch until filled", []Thread{legacy}, "x", b, "legacy"},
+		{"a primary's cwd", []Thread{moved}, "x", "/r2/moved", "moved"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := holderOf(tt.threads, tt.self, tt.path, cos)
+			if ok != (tt.wantFrom != "") || got.ID != tt.wantFrom {
+				t.Errorf("holderOf = %q, %v; want %q", got.ID, ok, tt.wantFrom)
+			}
+		})
+	}
+}
+
+// A thread placed like another shares its checkouts when it keeps its mode and branch:
+// each one on disk, of a registered project in the new set.
+func TestSharedCheckouts(t *testing.T) {
+	src := Thread{ID: "src", ProjectID: "web", ProjectIDs: []string{"api", "docs", "web"}, WorktreePath: "/wt/web", CreatedWorktree: true, Branch: "feat/x"}
+	cos := []Checkout{
+		{ProjectID: "api", Path: "/wt/api-moved", Registered: true},
+		{ProjectID: "docs", Path: "/docs", Registered: true},
+		{ProjectID: "web", Path: "/wt/web", Registered: true, Primary: true},
+	}
+	missing := slices.Clone(cos)
+	missing[0].Missing = true
+	gone := slices.Clone(cos)
+	gone[1].Registered = false
+	inPlace := Thread{ID: "src", ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: "/u/web-mine"}
+	inPlaceCos := []Checkout{{ProjectID: "api", Path: "/api", Registered: true}, {ProjectID: "web", Path: "/u/web-mine", Registered: true, Primary: true}}
+	all := []string{"api", "docs", "web"}
+	tests := []struct {
+		name string
+		src  Thread
+		pl   placement
+		cos  []Checkout
+		want map[string]string
+	}{
+		{"same mode and branch: every checkout", src, placement{projectIDs: all, worktreeMode: true, branch: "feat/x"}, cos,
+			map[string]string{"api": "/wt/api-moved", "docs": "/docs", "web": "/wt/web"}},
+		{"a narrowed set: its members only", src, placement{projectIDs: []string{"api"}, worktreeMode: true, branch: "feat/x"}, cos,
+			map[string]string{"api": "/wt/api-moved"}},
+		{"a missing worktree is made, not shared", src, placement{projectIDs: all, worktreeMode: true, branch: "feat/x"}, missing,
+			map[string]string{"docs": "/docs", "web": "/wt/web"}},
+		{"an unregistered project is not shared", src, placement{projectIDs: all, worktreeMode: true, branch: "feat/x"}, gone,
+			map[string]string{"api": "/wt/api-moved", "web": "/wt/web"}},
+		{"a new branch shares nothing", src, placement{projectIDs: all, worktreeMode: true, newBranch: true}, cos, nil},
+		{"checkout mode from worktree mode shares nothing", src, placement{projectIDs: all}, cos, nil},
+		{"in place: the same checkouts, a user's worktree included", inPlace, placement{projectIDs: []string{"api", "web"}}, inPlaceCos,
+			map[string]string{"api": "/api", "web": "/u/web-mine"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sharedCheckouts(tt.src, tt.pl, tt.cos); !maps.Equal(got, tt.want) {
+				t.Errorf("sharedCheckouts = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

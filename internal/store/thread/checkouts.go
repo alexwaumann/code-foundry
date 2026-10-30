@@ -540,11 +540,18 @@ func (m *Manager) outsideWorkspaceHint(t Thread, cos []Checkout) []string {
 
 // otherHolder is a thread other than id, not archived, with a checkout at path.
 func (m *Manager) otherHolder(id, path string) (Thread, bool) {
-	for _, o := range m.Snapshot().Threads {
+	return holderOf(m.Snapshot().Threads, id, path, m.checkouts)
+}
+
+// holderOf is the first of threads other than id, not archived or being removed, with a
+// checkout at path (a collision: the same checkout, whatever either has checked out).
+// Pure apart from checkouts.
+func holderOf(threads []Thread, id, path string, checkouts func(Thread) []Checkout) (Thread, bool) {
+	for _, o := range threads {
 		if o.ID == id || !o.ArchivedAt.IsZero() || o.Removing {
 			continue
 		}
-		for _, c := range m.checkouts(o) {
+		for _, c := range checkouts(o) {
 			if c.Path != "" && samePath(c.Path, path) {
 				return o, true
 			}
