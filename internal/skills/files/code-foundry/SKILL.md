@@ -37,6 +37,7 @@ Never tell the user skill or command names: say what you will do, not which comm
 | Work in parallel, on several branches or PRs, or anything about other threads | the code-foundry-orchestrate skill |
 | To build, debug or publish a plugin | the code-foundry-plugin skill |
 | To know what exists here | `code-foundry daemon.capabilities`, then `--group <name>` (build, commands, pages, panel, rendering, skills, plugins, settings, memory, presence; `--json`): it reads the running app |
+| A first run ("I just installed", "welcome tutorial", no projects yet) | the code-foundry-pages skill's `reference/welcome.md`: that page, adapted, then ask for the first folder or repository |
 | How something works inside the app | its source at the ref in the line under this title, as the help skill's "Reading the source" says |
 
 ## Showing things
