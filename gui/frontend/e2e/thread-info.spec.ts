@@ -143,7 +143,8 @@ test("nine projects in a workspace: Run in menu, other projects' pull requests, 
 
   // Diverged: Fix sends the thread its prompt, the composer's draft untouched.
   await expect(c.getByTestId("ti-git")).toHaveAttribute("data-kind", "diverged");
-  await c.getByTestId("ti-git-fix").click();
+  // A double click sends once (the button waits for the send).
+  await c.getByTestId("ti-git-fix").dblclick();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.send").map((i) => [i.args.id, i.args.text])).toEqual([
     [id, expect.stringContaining("diverged from its upstream (3 ahead, 1 behind)") as unknown as string],
   ]);

@@ -6,6 +6,7 @@
  */
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { getActionPick } from "@/api/actions";
 import { listEditorApps, type EditorAppView } from "@/api/gitops";
@@ -15,6 +16,7 @@ import type { MemberPick } from "@/lib/threadInfo";
 import { isRunningThread } from "@/lib/thread";
 import { useActionsStore } from "./actions";
 import { invokeConfirmed, refreshCommands } from "./commands";
+import { holdFailedNotice } from "./failedNotice";
 import { createResource, useResource } from "./resource";
 import { THREAD_COMMANDS, threadContext } from "./threadActions";
 import { useThreadsStore } from "./threads";
@@ -95,15 +97,47 @@ export function useCheckoutShared(threadId: string, path: string): boolean {
 }
 
 /**
+ * The card's sends and git commands in flight, by `pendingKey`: a second press while one
+ * runs does nothing, and its button shows disabled until it settles (the `rerunning` rule
+ * of stores/actionActions.ts, kept in a store so the button re-renders).
+ */
+const usePending = create<{ pending: Readonly<Record<string, true>> }>()(() => ({ pending: {} }));
+
+/** A card row's key in the pending set: one per thread and row. */
+export const pendingKey = (threadId: string, row: string): string => `${threadId}${SEP}${row}`;
+
+/** Whether the row's send or command is in flight. */
+export function useCardPending(key: string): boolean {
+  return usePending((s) => s.pending[key] === true);
+}
+
+/** Runs `run` unless the row has one in flight; the row is pending until it settles. */
+export async function runOnce(key: string, run: () => Promise<unknown>): Promise<void> {
+  if (usePending.getState().pending[key]) return;
+  usePending.setState((s) => ({ pending: { ...s.pending, [key]: true } }));
+  try {
+    await run();
+  } finally {
+    usePending.setState((s) => {
+      const { [key]: _done, ...rest } = s.pending;
+      return { pending: rest };
+    });
+  }
+}
+
+/**
  * Sends `text` to the thread as the user's message (thread.send, the composer's path: a
- * stopped thread starts, a working one picks it up mid-turn). The draft is left alone; a
- * failure toasts.
+ * stopped thread starts, a working one picks it up mid-turn), hiding the composer's
+ * failed-prompt notice as a composer send does. The draft is left alone; a failure toasts.
  */
 export async function sendThreadPrompt(threadId: string, text: string): Promise<boolean> {
+  const release = holdFailedNotice(threadId);
   try {
     const res = await invokeConfirmed(THREAD_COMMANDS.send, { id: threadId, text }, threadContext(threadId));
+    if (!res) release();
     return res !== null;
   } catch (err) {
+    release();
     toast.error("Send failed", { description: sendErrorMessage(err) });
     return false;
   } finally {

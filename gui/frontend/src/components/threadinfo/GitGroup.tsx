@@ -43,7 +43,7 @@ import { runCommand } from "@/stores/commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
 import { useProjectsStore } from "@/stores/projects";
-import { copyBranchName, sendThreadPrompt, useCheckoutShared, useWatchKeys } from "@/stores/threadInfo";
+import { copyBranchName, pendingKey, runOnce, sendThreadPrompt, useCardPending, useCheckoutShared, useWatchKeys } from "@/stores/threadInfo";
 import { threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -85,6 +85,8 @@ function RowButton({
       data-testid={testId}
       onClick={(e) => {
         e.stopPropagation();
+        // A double click's second click is not a second send (the first may have settled already).
+        if (e.detail > 1) return;
         onClick();
       }}
     >
@@ -274,11 +276,14 @@ function GitStateRowView({ threadId }: { threadId: string }) {
   });
   const agentsRunning = useThreadsStore((s) => s.byId[threadId]?.agentsRunning ?? 0);
   const collision = useCheckoutShared(threadId, cwd);
+  // One git state row at a time: one pending key for its button (or the row, for Push and Pull).
+  const key = pendingKey(threadId, "git");
+  const pending = useCardPending(key);
   const row = gitStateRow(wt?.status ?? null);
   if (!row) return null;
   const blocked = gitButtonsBlocked({ working, agentsRunning, collision });
-  const send = (text: string) => void sendThreadPrompt(threadId, text);
-  const git = (name: "git.push" | "git.pull") => () => void runCommand(name, { worktree: cwd }, threadContext(threadId));
+  const send = (text: string) => void runOnce(key, () => sendThreadPrompt(threadId, text));
+  const git = (name: "git.push" | "git.pull") => () => void runOnce(key, () => runCommand(name, { worktree: cwd }, threadContext(threadId)));
   switch (row.kind) {
     case "conflicts":
       return (
@@ -289,6 +294,7 @@ function GitStateRowView({ threadId }: { threadId: string }) {
             <RowButton
               label="Resolve"
               testId="ti-git-resolve"
+              disabled={pending}
               onClick={() => {
                 send(RESOLVE_PROMPT);
               }}
@@ -309,6 +315,7 @@ function GitStateRowView({ threadId }: { threadId: string }) {
             <RowButton
               label="Fix"
               testId="ti-git-fix"
+              disabled={pending}
               onClick={() => {
                 send(fixPrompt(row.ahead, row.behind));
               }}
@@ -336,14 +343,15 @@ function GitStateRowView({ threadId }: { threadId: string }) {
         <Row
           icon={push ? <Upload /> : <Download />}
           meta={push ? commits(row.ahead) : `${commits(row.behind)} behind`}
-          onActivate={blocked ? undefined : git(push ? "git.push" : "git.pull")}
+          onActivate={blocked || pending ? undefined : git(push ? "git.push" : "git.pull")}
           hoverable={blocked !== null}
           testId="ti-git"
           data-kind={row.kind}
-          data-disabled={blocked ? "" : undefined}
-          aria-disabled={blocked ? true : undefined}
+          data-disabled={blocked || pending ? "" : undefined}
+          data-pending={pending ? "" : undefined}
+          aria-disabled={blocked || pending ? true : undefined}
         >
-          <span className={cn(blocked && "text-cf-text-muted")}>{push ? "Push" : "Pull"}</span>
+          <span className={cn((blocked || pending) && "text-cf-text-muted")}>{push ? "Push" : "Pull"}</span>
         </Row>
       );
       return blocked ? (
@@ -363,7 +371,7 @@ function GitStateRowView({ threadId }: { threadId: string }) {
             <RowButton
               label="Rebase"
               testId="ti-git-rebase"
-              disabled={blocked !== null}
+              disabled={blocked !== null || pending}
               reason={blocked}
               onClick={() => {
                 send(rebasePrompt(row.base));

@@ -82,6 +82,8 @@ export function Row({
       }}
       onClick={(e) => {
         rest.onClick?.(e);
+        // A double click activates once: Push or Pull runs once, a fold does not open and close.
+        if (e.detail > 1) return;
         if (clicks(e)) onActivate?.();
       }}
     >
