@@ -25,6 +25,8 @@
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
             <string>(c) 2026 Alejandro Waumann</string>
+        <key>NSMicrophoneUsageDescription</key>
+            <string>Code Foundry transcribes your voice on this Mac to dictate into a composer. Audio never leaves your Mac.</string>
         <key>NSAppTransportSecurity</key>
         <dict>
             <key>NSAllowsLocalNetworking</key>
