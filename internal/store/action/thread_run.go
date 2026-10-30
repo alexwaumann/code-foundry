@@ -44,7 +44,7 @@ func (m *Manager) threadRun(threadID, projectID, ref string) (Action, Owner, err
 		}
 		a, err = snap.Resolve(projectID, ref)
 	} else {
-		a, err = resolveForThread(snap, place.ProjectID, members, threadID, ref)
+		a, err = resolveForThread(snap, place.ProjectID, members, threadID, ref, m.projectName)
 	}
 	if err != nil {
 		return Action{}, Owner{}, err
@@ -58,12 +58,12 @@ func (m *Manager) threadRun(threadID, projectID, ref string) (Action, Owner, err
 
 // resolveForThread is ref among the actions of members (project id → checkout): an id
 // of any member's action, else a name in cwdProject first, then in exactly one other
-// member. Pure.
-func resolveForThread(snap *Snapshot, cwdProject string, members map[string]string, threadID, ref string) (Action, error) {
+// member. name gives a project's name for the messages. Pure.
+func resolveForThread(snap *Snapshot, cwdProject string, members map[string]string, threadID, ref string, name func(string) string) (Action, error) {
 	ref = strings.TrimSpace(ref)
 	if a, ok := snap.Action(ref); ok {
 		if _, member := members[a.ProjectID]; !member {
-			return Action{}, &resolveError{kind: ErrFailedPrecondition, msg: "action " + a.Name + " (" + a.ID + ") belongs to project " + a.ProjectID +
+			return Action{}, &resolveError{kind: ErrFailedPrecondition, msg: "action " + a.Name + " (" + a.ID + ") belongs to project " + name(a.ProjectID) +
 				", which is not one of thread " + threadID + "'s projects"}
 		}
 		return a, nil
@@ -94,10 +94,18 @@ func resolveForThread(snap *Snapshot, cwdProject string, members map[string]stri
 	}
 	ids := make([]string, len(found))
 	for i, a := range found {
-		ids[i] = a.ID + " (" + a.ProjectID + ")"
+		ids[i] = a.ID + " (" + name(a.ProjectID) + ")"
 	}
 	return Action{}, &resolveError{kind: ErrInvalidArgument, msg: "action " + quote(ref) + " is in several of thread " + threadID +
 		"'s projects: " + strings.Join(ids, ", ") + "; pass its id"}
+}
+
+// projectName is the registered project's name, else its id.
+func (m *Manager) projectName(id string) string {
+	if r, ok := m.opts.Projects.Snapshot().Project(id); ok && r.Name != "" {
+		return r.Name
+	}
+	return id
 }
 
 func idList(m map[string]string) string { return strings.Join(slices.Sorted(maps.Keys(m)), ", ") }

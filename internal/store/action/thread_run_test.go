@@ -73,7 +73,7 @@ func TestResolveForThread(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a, err := resolveForThread(snap, tt.cwd, members, "s", tt.ref)
+			a, err := resolveForThread(snap, tt.cwd, members, "s", tt.ref, func(id string) string { return id })
 			if tt.err != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.err) {
 					t.Fatalf("= %+v, %v; want an error with %q", a, err, tt.err)
