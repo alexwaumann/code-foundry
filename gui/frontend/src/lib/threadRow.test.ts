@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canNewLike, canRunElsewhere, isNoProject, modelLabel, NO_PROJECT, projectOfPath, setLabel, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
+import { canNewLike, canRunElsewhere, isNoProject, modelLabel, NO_PROJECT, projectOfPath, setLabel, threadPlace, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
 
 const projects: ProjectLookup & { order: string[] } = {
   order: ["api", "notes", "web"],
@@ -70,13 +70,33 @@ describe("threadRowModel", () => {
 
   it("a thread without a project: No project, no branch, no worktree", () => {
     const s = { projectId: "", worktreePath: "/Users/dev", workspaceId: "", pendingWorktreePath: "" };
-    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false });
+    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false, place: null });
   });
 
   it("a project without git: no branch, the No git badge; in a set the set label instead", () => {
     const s = { projectId: "notes", worktreePath: "/Users/dev/writing", workspaceId: "", pendingWorktreePath: "" };
-    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: "notes", noProject: false, branch: "", noGit: true, set: null, movingTo: null, worktree: false });
+    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: "notes", noProject: false, branch: "", noGit: true, set: null, movingTo: null, worktree: false, place: "folder" });
     expect(threadRowModel({ ...s, projectCount: 2, branch: "feat/x", createdWorktree: true }, projects, workspaces)).toMatchObject({ noGit: false, set: "2 projects", branch: "feat/x" });
+  });
+});
+
+describe("threadPlace (the card's Fresh copy / Project folder chip)", () => {
+  it.each<[string, Parameters<typeof threadPlace>[1], ReturnType<typeof threadPlace>]>([
+    ["the project's main checkout: folder", { projectId: "web", worktreePath: "/src/web", createdWorktree: false }, "folder"],
+    ["the main checkout in worktree mode (a set member that has no worktree there): folder", { projectId: "web", worktreePath: "/src/web", createdWorktree: true }, "folder"],
+    ["a worktree made for it: fresh", { projectId: "web", worktreePath: "/wt/web/cf-login", createdWorktree: true }, "fresh"],
+    ["a made worktree missing until its next start: fresh", { projectId: "web", worktreePath: "/wt/web/gone", createdWorktree: true }, "fresh"],
+    ["a worktree the user picked: none", { projectId: "web", worktreePath: "/wt/web/cf-login", createdWorktree: false }, null],
+    ["a worktree whose main flag is unknown, picked: none", { projectId: "api", worktreePath: "/wt/api/cf-login", createdWorktree: false }, null],
+    ["a project without git: folder", { projectId: "notes", worktreePath: "/Users/dev/writing", createdWorktree: true }, "folder"],
+    ["a workspace's folder (no project id): none", { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", createdWorktree: true }, null],
+  ])("%s", (_name, s, want) => {
+    expect(threadPlace(projects, s)).toBe(want);
+  });
+
+  it("threadRowModel carries it; a thread without a project has none", () => {
+    expect(threadRowModel({ projectId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "", projectCount: 2, branch: "cf/login", createdWorktree: true }, projects, workspaces).place).toBe("fresh");
+    expect(threadRowModel({ projectId: "", worktreePath: "/Users/dev", workspaceId: "", pendingWorktreePath: "" }, projects, workspaces).place).toBeNull();
   });
 });
 
