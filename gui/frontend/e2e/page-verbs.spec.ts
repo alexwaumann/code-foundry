@@ -59,5 +59,5 @@ test("a project added in the dialog project.add opened leaves the window on its 
   await expect(row(page, "s:s-6")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("thread-header")).toBeVisible();
   await expect(page.getByTestId("projects-page")).toHaveCount(0);
-  await expect(page.getByTestId("worktree-surface")).toHaveCount(0);
+  await expect(page.getByTestId("changes-surface")).toHaveCount(0);
 });

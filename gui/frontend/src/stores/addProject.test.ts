@@ -2,11 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectView } from "@/api/project";
 import { finishAddProject, openAddProject, selectAddedProject, showAddedWorkspace, useAddProjectStore } from "./addProject";
 import { useProjectsStore } from "./projects";
-import { showWorkspaceCard } from "./projectsPage";
-import { showWorktreeOnProjectsPage } from "./worktreePanel";
+import { showProjectOnProjectsPage, showWorkspaceCard } from "./projectsPage";
 
-vi.mock("./worktreePanel", () => ({ showWorktreeOnProjectsPage: vi.fn(() => true) }));
-vi.mock("./projectsPage", () => ({ showWorkspaceCard: vi.fn() }));
+vi.mock("./projectsPage", () => ({ showWorkspaceCard: vi.fn(), showProjectOnProjectsPage: vi.fn(() => true) }));
 
 const project = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
 
@@ -26,22 +24,22 @@ describe("what the Add Project dialog shows once a project is added", () => {
     vi.useRealTimers();
   });
 
-  it("opened in the app, it shows the project's worktree on the Projects page", async () => {
+  it("opened in the app, it shows the project on the Projects page", async () => {
     openAddProject();
     await Promise.resolve();
     expect(useAddProjectStore.getState().stay).toBe(false);
     useProjectsStore.setState({ byId: { web: project("web") }, order: ["web"] });
     added("web");
-    expect(showWorktreeOnProjectsPage).toHaveBeenCalledWith("web");
+    expect(showProjectOnProjectsPage).toHaveBeenCalledWith("web");
   });
 
   it("opened in the app, it waits for the project event before showing it", async () => {
     openAddProject();
     await Promise.resolve();
     added("web");
-    expect(showWorktreeOnProjectsPage).not.toHaveBeenCalled();
+    expect(showProjectOnProjectsPage).not.toHaveBeenCalled();
     useProjectsStore.setState({ byId: { web: project("web") }, order: ["web"] });
-    expect(showWorktreeOnProjectsPage).toHaveBeenCalledWith("web");
+    expect(showProjectOnProjectsPage).toHaveBeenCalledWith("web");
   });
 
   it("opened to stay (project.add's intent), the window stays where it is", async () => {
@@ -54,7 +52,7 @@ describe("what the Add Project dialog shows once a project is added", () => {
     // A project that arrives after the answer is not shown either.
     added("api");
     useProjectsStore.setState({ byId: { web: project("web"), api: project("api") }, order: ["web", "api"] });
-    expect(showWorktreeOnProjectsPage).not.toHaveBeenCalled();
+    expect(showProjectOnProjectsPage).not.toHaveBeenCalled();
   });
 
   it("a workspace is shown on the Projects page unless the dialog was opened to stay", async () => {

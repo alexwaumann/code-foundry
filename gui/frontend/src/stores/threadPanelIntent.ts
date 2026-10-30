@@ -8,8 +8,9 @@
  *
  * Unlike the window's own panel commands (stores/views.ts), they never take keyboard
  * focus (the user may be typing in another thread's prompt), never toast (about a thread
- * the user is not looking at it would puzzle them; the action is just a no-op), and apply under a sheet (Settings, Themes, Usage), since what they
- * change is the thread's panel, not the screen.
+ * the user is not looking at it would puzzle them; the action is just a no-op), and apply
+ * under a sheet (Settings, Themes, Usage), since what they change is the thread's panel,
+ * not the screen.
  *
  * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
  * daemon checked it exists first (internal/command/commands_view_items.go).
