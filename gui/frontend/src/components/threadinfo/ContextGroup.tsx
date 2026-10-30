@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import type { UsageBucketView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
-import { useNow } from "@/lib/clock";
+import { useNowSelect } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
-import { cacheSuffix, contextPercent } from "@/lib/threadInfo";
+import { cacheMinutesLeft, cacheSuffix, contextPercent } from "@/lib/threadInfo";
 import { fmtShare, fmtTok, fmtUsd, totalUsage, usageByModel } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useModelChoices } from "@/stores/settings";
@@ -22,10 +22,11 @@ function ContextRow({ threadId }: { threadId: string }) {
   const window = useThreadsStore((s) => s.byId[threadId]?.contextWindow ?? 0);
   const expires = useThreadsStore((s) => s.byId[threadId]?.cacheExpiresAtMs ?? null);
   const reread = useThreadsStore((s) => s.byId[threadId]?.contextRereadUsd ?? 0);
-  const now = useNow(15_000);
-  const suffix = cacheSuffix(expires, now);
+  // Re-renders when the minute count changes, not on every tick.
+  const minutes = useNowSelect(15_000, (now) => cacheMinutesLeft(expires, now));
+  const suffix = cacheSuffix(minutes);
   const pct = contextPercent(tokens, window);
-  const warm = expires !== null && expires > now;
+  const warm = minutes !== null && minutes > 0;
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
       <div>{window > 0 ? `${fmtTok(tokens)} of ${fmtTok(window)} tokens used` : `${fmtTok(tokens)} tokens used`}</div>
@@ -34,7 +35,7 @@ function ContextRow({ threadId }: { threadId: string }) {
         {expires === null
           ? "No prompt cache yet"
           : warm
-            ? `Cache expires in ${String(Math.max(1, Math.ceil((expires - now) / 60_000)))} min`
+            ? `Cache expires in ${String(minutes)} min`
             : `Cache expired${reread > 0 ? `: the next message re-reads it for ${fmtUsd(reread)}` : ""}`}
       </div>
     </div>

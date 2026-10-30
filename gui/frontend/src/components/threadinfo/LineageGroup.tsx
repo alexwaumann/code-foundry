@@ -4,7 +4,7 @@ import { ArrowRight, Bot, CornerLeftUp, Ellipsis, Square } from "lucide-react";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName, fmtElapsed } from "@/lib/agents";
-import { useNow } from "@/lib/clock";
+import { useNowSelect } from "@/lib/clock";
 import { childIds, lineageStatus } from "@/lib/lineage";
 import {
   agentRowState,
@@ -96,10 +96,12 @@ function useChildRows(threadId: string): readonly string[] {
  * does not open. Subagent runs have none (nothing stops one run).
  */
 function LineageItem({ threadId, row, sub = false }: { threadId: string; row: LineageRow; sub?: boolean }) {
-  const now = useNow(1000);
+  // A finished row's time is fixed: only a live one ticks.
+  const live = row.state === "working" || row.state === "attention";
+  const now = useNowSelect(1000, (n) => (live ? n : 0));
   const ms = lineageElapsedMs(row, now);
   const elapsed = ms === null ? "" : fmtElapsed(ms);
-  const stoppable = row.kind === "thread" && (row.state === "working" || row.state === "attention");
+  const stoppable = row.kind === "thread" && live;
   const open = () => {
     if (row.kind === "agent") void openAgentRun(threadId, row.id);
     else useUiStore.getState().select({ kind: "thread", id: row.id }, { focusPrompt: true });

@@ -280,12 +280,15 @@ export function moreProjects(setSize: number, named: boolean): string {
   return !named && setSize > 1 ? `+${String(setSize - 1)}` : "";
 }
 
+/** Whole minutes until the prompt cache expires (rounded up; 0 or less once expired); null before the first result. */
+export function cacheMinutesLeft(expiresAtMs: number | null, now: number): number | null {
+  return expiresAtMs === null ? null : Math.ceil((expiresAtMs - now) / 60_000);
+}
+
 /** The context row's muted suffix: "cache 41m" while the prompt cache is warm, "cache expired" after, "" before the first result. */
-export function cacheSuffix(expiresAtMs: number | null, now: number): string {
-  if (expiresAtMs === null) return "";
-  const left = expiresAtMs - now;
-  if (left <= 0) return "cache expired";
-  return `cache ${String(Math.max(1, Math.ceil(left / 60_000)))}m`;
+export function cacheSuffix(minutesLeft: number | null): string {
+  if (minutesLeft === null) return "";
+  return minutesLeft <= 0 ? "cache expired" : `cache ${String(minutesLeft)}m`;
 }
 
 /** How full the context is, 0-100, rounded; null when the window is unknown. */

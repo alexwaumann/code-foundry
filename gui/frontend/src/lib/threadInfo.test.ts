@@ -4,6 +4,7 @@ import type { CheckRollupView, PullRequestView } from "@/api/gh";
 import type { GitStatusView } from "@/api/project";
 import {
   cardFits,
+  cacheMinutesLeft,
   cacheSuffix,
   chooseAction,
   contextPercent,
@@ -196,10 +197,11 @@ describe("small figures", () => {
   });
 
   it("the cache countdown", () => {
-    expect(cacheSuffix(null, 0)).toBe("");
-    expect(cacheSuffix(41 * 60_000, 0)).toBe("cache 41m");
-    expect(cacheSuffix(30_000, 0)).toBe("cache 1m");
-    expect(cacheSuffix(0, 10)).toBe("cache expired");
+    expect(cacheSuffix(cacheMinutesLeft(null, 0))).toBe("");
+    expect(cacheSuffix(cacheMinutesLeft(41 * 60_000, 0))).toBe("cache 41m");
+    expect(cacheSuffix(cacheMinutesLeft(30_000, 0))).toBe("cache 1m");
+    expect(cacheSuffix(cacheMinutesLeft(0, 10))).toBe("cache expired");
+    expect(cacheSuffix(cacheMinutesLeft(0, 0))).toBe("cache expired");
   });
 
   it("the context share, none without a window", () => {
