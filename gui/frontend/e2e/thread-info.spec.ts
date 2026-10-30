@@ -81,8 +81,14 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   // Changes opens the cwd's Worktree tab; a pull request its PR tab.
   await c.getByTestId("ti-changes").click();
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+  // At 1280px the side panel leaves the conversation too little room: the card steps aside until it closes.
+  await expect(page.getByTestId("thread-info")).toHaveCount(0);
+  await page.getByTestId("panel-toggle").click();
+  await expect(card(page)).toBeVisible();
   await prs.nth(0).click();
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
+  await page.getByTestId("panel-toggle").click();
+  await expect(card(page)).toBeVisible();
 
   // The branch row copies the branch.
   await c.getByTestId("ti-branch").click();
@@ -169,6 +175,20 @@ test("a child thread: its parent row leads the lineage and goes to the parent", 
   await expect(parent.getByTestId("ti-parent-meta")).toHaveText("Done");
   await parent.click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ti-1");
+});
+
+test("a narrow pane: the card steps aside, the toggle stays on and says why, and the card returns with room", async ({ page }) => {
+  await openWithCard(page, "single");
+  await page.setViewportSize({ width: 900, height: 800 });
+  await expect(page.getByTestId("thread-info")).toHaveCount(0);
+  await expect(toggle(page)).toHaveAttribute("aria-pressed", "true");
+  await expectTooltip(page, toggle(page), "Not enough room");
+  // The conversation keeps its width: the whole thread body.
+  const body = await page.getByTestId("thread-pane-body").boundingBox();
+  expect(body?.width ?? 0).toBeLessThan(800);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(card(page)).toBeVisible();
+  await expectTooltip(page, toggle(page), "Toggle Thread Info");
 });
 
 test("a folder without git: no git group", async ({ page }) => {

@@ -10,6 +10,19 @@ import type { GitStatusView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import { isWorkingThread } from "./thread";
 
+/** The card's column, its right gutter included (ThreadInfoCard w-80). */
+export const CARD_WIDTH = 320;
+/** The conversation is never narrowed below this to make room for the card. */
+export const CONVERSATION_MIN = 480;
+
+/** Whether the card fits beside the conversation in a thread body this wide. */
+export function cardFits(bodyWidth: number): boolean {
+  return bodyWidth - CARD_WIDTH >= CONVERSATION_MIN;
+}
+
+/** The toggle's tooltip while the card is on but has no room. */
+export const NO_ROOM_REASON = "Not enough room";
+
 /** The git state row: at most one, in this priority (gitStateRow). */
 export type GitStateRow =
   | { kind: "conflicts"; files: number }

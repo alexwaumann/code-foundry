@@ -3,6 +3,7 @@ import type { ActionPickView, ActionView } from "@/api/actions";
 import type { CheckRollupView, PullRequestView } from "@/api/gh";
 import type { GitStatusView } from "@/api/project";
 import {
+  cardFits,
   cacheSuffix,
   chooseAction,
   contextPercent,
@@ -180,6 +181,12 @@ describe("prRows", () => {
 });
 
 describe("small figures", () => {
+  it("the card fits while the conversation keeps 480px beside its 320px", () => {
+    expect(cardFits(800)).toBe(true);
+    expect(cardFits(799)).toBe(false);
+    expect(cardFits(594)).toBe(false);
+  });
+
   it("+N only for an unnamed set of several", () => {
     expect(moreProjects(9, false)).toBe("+8");
     expect(moreProjects(9, true)).toBe("");

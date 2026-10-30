@@ -10,7 +10,10 @@ import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
+import { setCardRoom } from "@/stores/threadInfo";
 import { useUiStore } from "@/stores/ui";
+import { cardFits } from "@/lib/threadInfo";
+import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
@@ -83,6 +86,18 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
+  // The card shows only while the conversation keeps CONVERSATION_MIN beside it; the toggle stays on.
+  const [rowRef, rowWidth] = useWidth(1280);
+  const infoFits = cardFits(rowWidth);
+  useEffect(() => {
+    setCardRoom(infoFits);
+  }, [infoFits]);
+  useEffect(
+    () => () => {
+      setCardRoom(true);
+    },
+    [],
+  );
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
@@ -95,7 +110,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef}>
             {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
             <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
@@ -125,7 +140,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
             </PaneOverlay>
           </div>
           {/* The thread info card: a column right of the conversation and its composer (view.thread-info). */}
-          {infoOpen && <ThreadInfoCard threadId={threadId} />}
+          {infoOpen && infoFits && <ThreadInfoCard threadId={threadId} />}
         </div>
       </section>
     </ThreadContext.Provider>
