@@ -133,8 +133,8 @@ test("Add project multi-selects: chips by id, the primary picker, sent as projec
   });
   const id = await selectedThreadId(page);
   expect((await threads()).find((t) => t.id === id)).toMatchObject({ projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], workspaceId: "", createdWorktree: false });
-  // Line 2: "2 projects @ <the primary checkout's branch>" (no workspace badge).
-  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("2 projects");
+  // Line 2: the run-in project @ its checkout's branch, never the set's "2 projects" (no workspace badge).
+  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("main");
 });
 
@@ -370,7 +370,7 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&project=repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("2 projects");
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   await page.getByTestId("pane-thread-menu").click();
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace"]);
   await page.getByTestId("menu-save-workspace").click();
@@ -384,7 +384,8 @@ test("Save as workspace: offered for an unsaved set of two or more, names it and
   expect(await lastInvoked("workspace.new")).toEqual({ name: "parser pair", projects: "repo-cf,repo-gp", primary: "repo-gp" });
   expect(await lastInvoked("thread.workspace")).toEqual({ workspace: "w-000000000001" });
   await expect.poll(async () => (await threads()).find((x) => x.id === t.id)?.workspaceId).toBe("w-000000000001");
-  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("parser pair");
+  // Line 2 keeps the run-in project; the workspace's name shows on the card.
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   // Saved: the set matches a workspace now, so the item is gone.
   await page.getByTestId("pane-thread-menu").click();
   await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
@@ -408,7 +409,7 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&branch=feat/parser&name=Parser")) as ThreadSummary;
   await openApp(page);
-  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("shop");
+  await expect(row(page, `s:${t.id}`).getByTestId("row-project")).toHaveText("code-foundry");
   await expect(row(page, `s:${t.id}`).getByTestId("row-branch")).toHaveText("feat/parser");
   await row(page, `s:${t.id}`).click({ button: "right" });
   await page.getByTestId("row-menu").getByTestId("menu-new-like").click();
@@ -452,7 +453,7 @@ test("New thread on this branch: the row menu opens the composer prefilled; only
   const id = await selectedThreadId(page);
   expect(id).not.toBe(t.id);
   expect((await threads()).find((x) => x.id === id)).toMatchObject({ projectId: "repo-gp", projectIds: ["repo-cf", "repo-gp"], workspaceId: "w-000000000001", branch: "feat/parser", createdWorktree: true });
-  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("shop");
+  await expect(row(page, `s:${id}`).getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(row(page, `s:${id}`).getByTestId("row-branch")).toHaveText("feat/parser");
 });
 

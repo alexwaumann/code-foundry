@@ -64,6 +64,28 @@ export interface ThreadRowModel {
   movingTo: string | null;
   /** The cwd is a linked worktree, not the project's main checkout (false when unknown or without git). */
   worktree: boolean;
+  /**
+   * Where the thread runs, in the composer's Work in words (threadPlace): "fresh" in a
+   * worktree Code Foundry made for it, "folder" in the project's own checkout (or a project
+   * without git); null in a worktree the user picked, a workspace's folder, or no project.
+   */
+  place: ThreadPlace;
+}
+
+/** ThreadRowModel.place. */
+export type ThreadPlace = "fresh" | "folder" | null;
+
+/**
+ * Where a thread with a project runs: its project's checkout ("folder": the main checkout,
+ * or the folder of a project without git), else a worktree made for it ("fresh": worktree
+ * mode, createdWorktree, including one missing until its next start), else null (a worktree
+ * the user picked, the cwd unknown). The words are lib/compose's FRESH_COPY and PROJECT_FOLDER.
+ */
+export function threadPlace(projects: ProjectLookup, s: Pick<ThreadPlaceInput, "projectId" | "worktreePath" | "createdWorktree">): ThreadPlace {
+  if (s.projectId === "") return null;
+  if (isNoGit(projects, s.projectId)) return "folder";
+  if (projects.byId[s.projectId]?.worktrees.find((w) => w.path === s.worktreePath)?.isMain === true) return "folder";
+  return s.createdWorktree === true ? "fresh" : null;
 }
 
 /**
@@ -108,7 +130,7 @@ export function setLabel(s: Pick<ThreadPlaceInput, "projectId" | "workspaceId" |
 }
 
 export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, workspaces: WorkspaceLookup): ThreadRowModel {
-  if (isNoProject(s, projects)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false };
+  if (isNoProject(s, projects)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false, place: null };
   const set = setLabel(s, workspaces);
   // The cwd's HEAD, even when the branch moved; a multi-project thread whose cwd has no git (its workspace's folder, a plain folder) shows the branch it was created for.
   const here = worktreeBranch(projects, s.projectId, s.worktreePath);
@@ -122,6 +144,7 @@ export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, wor
     set,
     movingTo: s.pendingWorktreePath && s.pendingWorktreePath !== s.worktreePath ? projectOfPath(projects, s.pendingWorktreePath) : null,
     worktree: !isNoGit(projects, s.projectId) && projects.byId[s.projectId]?.worktrees.find((w) => w.path === s.worktreePath)?.isMain === false,
+    place: threadPlace(projects, s),
   };
 }
 

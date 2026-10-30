@@ -28,7 +28,8 @@ export function useThreadPlaceInput(id: string): ThreadPlaceInput {
  * A thread's place line (lib/threadRow threadRowModel), each part from a narrow selector
  * returning a primitive: "project @ branch", or for several projects "<workspace name> @
  * <branch>" / "<N projects> @ <branch>" (set), and a queued Run in move. The sidebar
- * row's line 2 and the Threads tab read it.
+ * row's line 2 (the run-in project only, the set label only for a workspace folder:
+ * inFolder) and the Threads tab read it.
  */
 export function useThreadPlace(id: string) {
   const s = useThreadPlaceInput(id);
@@ -38,5 +39,7 @@ export function useThreadPlace(id: string) {
   const noGit = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
   const noProject = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
   const movingTo = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).movingTo);
-  return { project, branch, noGit, noProject, movingTo, set: noProject ? null : set };
+  // A thread in its workspace's folder (no project id): the place is the folder, named by the set label.
+  const inFolder = !noProject && s.projectId === "" && s.workspaceId !== "";
+  return { project, branch, noGit, noProject, movingTo, set: noProject ? null : set, inFolder };
 }

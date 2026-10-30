@@ -221,6 +221,38 @@ test("the sidebar tag: one PR's state and number, a count in the worst state's t
   await expect(page.getByTestId("row-linked-prs-tip").first()).toContainText("#142 · Open #145 · Draft #138 · Merged");
 });
 
+test("the thread card lists the linked PRs below the model, newest first, closed ones left out", async ({ page }) => {
+  await linkFour();
+  await link("s-1", 131);
+  await openApp(page);
+  const card = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const hoverName = async () => {
+    await page.mouse.move(0, 0);
+    await row(page, "s:s-1").getByTestId("thread-name").hover();
+    await expect(card).toHaveAttribute("data-thread-id", "s-1");
+  };
+  await hoverName();
+  const prs = card.getByTestId("tip-prs");
+  await expect(prs).toBeVisible();
+  // After the model; #147 and #131 are on no dashboard: unknown, the bare number.
+  expect(await card.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")).at(-1))).toBe("tip-prs");
+  await expect(prs.getByTestId("tip-pr")).toHaveText(["#131", "#142feat(gui): virtualized sidebar tree with thread rows", "#147", /^#145/, /^#138/]);
+  await expect(prs.getByTestId("tip-pr").first()).toHaveAttribute("data-state", "unknown");
+  // Opening the list reads every detail: #131 is closed and leaves the card, #147 gets its state and title.
+  await row(page, "s:s-1").getByTestId("row-linked-prs").click();
+  await expectLinkedTab(page);
+  await expect(list(page).locator('[data-testid="linkedpr-state"][data-state="closed"]')).toHaveCount(1);
+  await hoverName();
+  await expect(prs.getByTestId("tip-pr")).toHaveCount(4);
+  await expect(prs.getByTestId("tip-pr").evaluateAll((els) => els.map((e) => e.getAttribute("data-state")))).resolves.toEqual(["open", "open", "draft", "merged"]);
+  await expect(prs.getByTestId("tip-prs-more")).toHaveCount(0);
+  await page.mouse.move(0, 0);
+  // A thread without links: no section.
+  await row(page, "s:s-2").getByTestId("thread-name").hover();
+  await expect(card).toHaveAttribute("data-thread-id", "s-2");
+  await expect(card.getByTestId("tip-prs")).toHaveCount(0);
+});
+
 test("hover actions: open on GitHub and copy the link", async ({ page }) => {
   await linkFour();
   await openApp(page);

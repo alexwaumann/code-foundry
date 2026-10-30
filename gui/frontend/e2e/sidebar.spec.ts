@@ -91,7 +91,7 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
-test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace's name on line 2 (no badge), no project or worktree rows", async ({ page }) => {
+test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace thread's run-in project on line 2 (no badge), no project or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
@@ -102,10 +102,10 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(list(page).locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
-  // A thread of a workspace's projects: the workspace's name and the branch, no badge.
+  // A thread of a workspace's projects: the project it runs in and the branch, like a single-project row; no badge.
   const d = row(page, `s:${driver}`);
   await expect(d.getByTestId("thread-name")).toHaveText("driver");
-  await expect(d.getByTestId("row-project")).toHaveText("login");
+  await expect(d.getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   await expect(d.getByTestId("row-workspace")).toHaveCount(0);
   // No model on the row any more.
@@ -178,7 +178,8 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   // Queued until the thread is idle at its prompt (the mock: ~2s), then the row's worktree changes.
   await expect(d.getByTestId("row-moving")).toHaveText("moving to code-foundry…");
   await expect(d.getByTestId("row-moving")).toHaveCount(0, { timeout: 8000 });
-  await expect(d.getByTestId("row-project")).toHaveText("login");
+  // Line 2 names the project it runs in now.
+  await expect(d.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   expect(await thread(driver)).toMatchObject({ projectId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
 });
@@ -480,33 +481,34 @@ test("Working section: the header counts threads as they start and stop working,
   expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
 });
 
-test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {
+test("hovering a thread row shows its tooltip: name, project with where it runs, branch, model and effort", async ({ page }) => {
   await mockPost("threads?project=repo-wr&count=1&status=idle&prefix=Notes");
   await openApp(page);
   // The open one: the previous tooltip may still be fading out.
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
 
-  // s-3 runs in a linked worktree of code-foundry.
+  // s-3 runs in a linked worktree of code-foundry that it did not make (a picked one): no chip.
   await row(page, "s:s-3").hover();
   await expect(tip).toBeVisible();
   await expect(tip).toHaveAttribute("data-thread-id", "s-3");
   await expect(tip.getByTestId("tip-name")).toHaveText("Fix resize race");
   await expect(tip.getByTestId("tip-project")).toHaveText("code-foundry");
-  await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resizeworktree");
-  await expect(tip.getByTestId("tip-branch-chip")).toHaveText("worktree");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resize");
+  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
   await expect(tip.getByTestId("tip-model")).toHaveText("Opus 4.8 (medium)");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
+  await expect(tip.getByTestId("tip-workspace")).toHaveCount(0);
   // To the right of the sidebar, 260px wide.
   const sidebar = await page.getByTestId("sidebar").boundingBox();
   const box = await tip.boundingBox();
   expect(box && sidebar && box.x >= sidebar.x + sidebar.width - 1).toBe(true);
   expect(Math.round(box?.width ?? 0)).toBe(260);
 
-  // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort.
+  // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort: Project folder.
   await row(page, "s:s-2").hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-2");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Project folder");
   await expect(tip.getByTestId("tip-branch")).toHaveText("main");
-  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
   await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet 5");
 
   // A project without git: a plain folder, the no git chip, no branch row.
@@ -536,6 +538,45 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(tip).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
+});
+
+test("a multi-project thread's card: workspace (or N projects), the run-in project with where it runs, branch, model; line 2 the run-in only", async ({ page }) => {
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
+  const ws = (await mockPost("workspace-thread?workspace=login&project=repo-gp&name=Login%20flow&status=idle")) as { id: string };
+  const set = (await mockPost("multi-thread?projects=repo-cf,repo-gp&project=repo-gp&branch=feat/x&name=Unsaved%20set")) as { id: string };
+  const folder = (await mockPost("workspace-thread?workspace=login&project=workspace&name=In%20the%20folder")) as { id: string };
+  await openApp(page);
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  const card = async (id: string) => {
+    await page.mouse.move(0, 0);
+    await row(page, `s:${id}`).getByTestId("thread-name").hover();
+    await expect(tip).toHaveAttribute("data-thread-id", id);
+    return tip.locator("> div").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+  };
+
+  await expect(row(page, `s:${ws.id}`).getByTestId("row-place")).toHaveText("ghostty-playground @ cf/login");
+  await expect(row(page, `s:${set.id}`).getByTestId("row-place")).toHaveText("ghostty-playground @ feat/x");
+  // A thread in its workspace's folder: the folder is the place, named by the workspace.
+  await expect(row(page, `s:${folder.id}`).getByTestId("row-project")).toHaveText("login");
+
+  expect(await card(ws.id)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("login");
+  await expect(tip.getByTestId("tip-project")).toHaveText("ghostty-playgroundFresh copy");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("cf/login");
+  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
+  await expect(tip.getByTestId("tip-set")).toHaveCount(0);
+
+  await card(set.id);
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("2 projects");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("feat/x");
+
+  await card(folder.id);
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("login");
+  await expect(tip.getByTestId("tip-project")).toHaveText("Workspace folder");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
+  await page.mouse.move(0, 0);
 });
 
 test("the tooltip shows the full status, wrapped, under the name for threads that need input or failed; not for finished, working or idle", async ({ page }) => {

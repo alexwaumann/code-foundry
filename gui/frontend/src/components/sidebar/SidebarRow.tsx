@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { modelLabel, threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { FRESH_COPY, PROJECT_FOLDER } from "@/lib/compose";
+import { WORKSPACE_FOLDER } from "@/lib/projectSet";
+import { modelLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useMadeByThread } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
@@ -24,6 +26,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
 import { LinkedPrsBadge } from "./LinkedPrsBadge";
+import { TipLinkedPrs } from "./TipLinkedPrs";
 
 interface RowProps {
   row: Row;
@@ -118,14 +121,16 @@ function AgentsRunning({ id, more }: { id: string; more: boolean }) {
 
 /**
  * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
- * "project @ branch" where the status leaves room for it (working, idle); "No
- * project" alone for a thread without one. A queued "Run in…" move replaces it until the
+ * "project @ branch" where the status leaves room for it (working, idle): the project it
+ * runs in, for a multi-project thread too (its workspace shows on the card); the
+ * workspace's name for a thread in its workspace's folder; "No project" alone for a
+ * thread without one. A queued "Run in…" move replaces it until the
  * thread's worktree changes.
  */
 function ThreadLine({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const badge = useThreadsStore((st) => threadBadge(st.byId[id]));
-  const { project, branch, noGit, noProject, movingTo, set } = useThreadPlace(id);
+  const { project, branch, noGit, noProject, movingTo, set, inFolder } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
     <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
@@ -148,7 +153,7 @@ function ThreadLine({ id }: { id: string }) {
             <>
               {status && <span aria-hidden> · </span>}
               <span data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
-                {set ?? project}
+                {inFolder ? set : project}
               </span>
               {noProject || (set !== null && !branch) ? null : noGit ? (
                 <>
@@ -308,25 +313,16 @@ function TipMoving({ id }: { id: string }) {
   );
 }
 
-/**
- * The projects of a multi-project thread, by name, with its workspace's name
- * as the chip (none without one): the row's line 2 only says "N projects".
- */
-function TipSet({ id }: { id: string }) {
-  const ids = useThreadsStore(useShallow((s) => s.byId[id]?.projectIds ?? []));
-  const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
-  const names = useProjectsStore(useShallow((s) => ids.map((p) => s.byId[p]?.name ?? p).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))));
-  const workspace = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : null));
-  return (
-    <TipRow icon={<TipIcon icon={Layers} />} chip={workspace} testId="tip-set">
-      {names.join(", ")}
-    </TipRow>
-  );
-}
+/** The project row's chip: where the thread runs, in the composer's Work in words (lib/threadRow threadPlace). */
+const placeWords: Readonly<Record<NonNullable<ThreadPlace>, string>> = { fresh: FRESH_COPY, folder: PROJECT_FOLDER };
 
 /**
- * The tooltip's body: name, status (attention or error only; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
- * the projects of a multi-project thread (TipSet), branch (git only) and model. Mounted only while open.
+ * The tooltip's body: name, status (attention or error only; a thread waiting on its child
+ * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
+ * the workspace of a multi-project thread (its name, else "N projects"), the project it runs in ("No project" with
+ * the House icon for a thread without one; "Workspace folder" for its workspace's folder) with where it runs as the
+ * chip (Fresh copy, Project folder), branch (git only), model, and the linked pull requests (TipLinkedPrs).
+ * Mounted only while open (docs/notes/sidebar-thread-card.md).
  */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
@@ -334,12 +330,12 @@ function ThreadTipBody({ id }: { id: string }) {
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
   const where = useThreadPlaceInput(id);
-  // A thread in its workspace's folder is in no project: the first row names the workspace (never its w-<id>).
+  // A thread in its workspace's folder is in no project: the workspace row names it (never its w-<id>).
   const wsName = useWorkspacesStore((s) => (where.workspaceId ? (s.byId[where.workspaceId]?.name ?? "") : ""));
   const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, wsName ? { byId: { [where.workspaceId]: { name: wsName } } } : NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree, multi: r.set !== null, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "" };
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, place: r.place, set: r.set, inFolder: !r.noProject && where.projectId === "" && where.workspaceId !== "" };
     }),
   );
   return (
@@ -351,12 +347,20 @@ function ThreadTipBody({ id }: { id: string }) {
       <TipWaiting id={id} />
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
-      <TipRow icon={<TipIcon icon={m.noProject ? House : m.inFolder ? Layers : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
-        {m.project}
+      {m.set !== null && (
+        <TipRow icon={<TipIcon icon={Layers} />} testId="tip-workspace">
+          {m.set}
+        </TipRow>
+      )}
+      <TipRow
+        icon={<TipIcon icon={m.noProject ? House : m.inFolder ? Layers : m.noGit ? Folder : FolderGit2} />}
+        chip={m.noGit ? "no git" : m.place === null ? null : placeWords[m.place]}
+        testId="tip-project"
+      >
+        {m.inFolder ? WORKSPACE_FOLDER : m.project}
       </TipRow>
-      {m.multi && <TipSet id={id} />}
       {!m.noGit && !m.noProject && m.branch !== "" && (
-        <TipRow icon={<TipIcon icon={GitBranch} />} chip={m.worktree ? "worktree" : null} testId="tip-branch">
+        <TipRow icon={<TipIcon icon={GitBranch} />} testId="tip-branch">
           <span className="font-mono">{m.branch}</span>
         </TipRow>
       )}
@@ -364,6 +368,7 @@ function ThreadTipBody({ id }: { id: string }) {
         {modelLabel(model, models)}
         {effort && <span className="text-cf-text-muted"> ({effort})</span>}
       </TipRow>
+      <TipLinkedPrs id={id} />
     </>
   );
 }
