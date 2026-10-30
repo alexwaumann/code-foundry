@@ -192,6 +192,7 @@ describe("ui intent mapping", () => {
     ],
     [{ case: "playAlertSound" as const, value: { volume: 15 } }, { kind: "playAlertSound", volume: 15 }],
     [{ case: "showAgentRun" as const, value: { threadId: "s1", runId: "a1" } }, { kind: "showAgentRun", threadId: "s1", runId: "a1" }],
+    [{ case: "stageComposer" as const, value: { threadId: "s1", text: "Add a project" } }, { kind: "stageComposer", threadId: "s1", text: "Add a project" }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
   });

@@ -16,3 +16,7 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `thread.new` | `prompt`, `name`, `project` id, `new-worktree` true, `sidebar` true |
 | `settings.get` (read), `settings.set` | `key`; `value` as a string |
 | `usage.show` (read) | `thread` an id, or `all` true |
+| `composer.stage` | `text` goes in the composer for the user to send (never sent); `thread` defaults to this one |
+| `project.add` | no args opens the Add Project dialog; `path` adds a folder without it |
+| `view.settings` | `page` general, appearance, memory, plugins, skills…; an unknown one lists them |
+| `theme.reset` | `slot` dark or light (default: the one in use) back to the default theme; the user's themes stay |

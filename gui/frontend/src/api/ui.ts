@@ -93,6 +93,8 @@ export type UiIntentView =
   | { kind: "playAlertSound"; volume: number }
   /** thread.agent.open: select the thread and show one of its own subagent runs read-only. */
   | { kind: "showAgentRun"; threadId: string; runId: string }
+  /** composer.stage: text in the thread's composer, not sent, in a window that shows the thread. */
+  | { kind: "stageComposer"; threadId: string; text: string }
   /**
    * A plugin's host/invoke with confirm "ask": run the command through runCommand, so the
    * daemon's own confirm dialog asks the user. `caller` is who asked ("plugin:hello").
@@ -138,6 +140,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "playAlertSound", volume: e.value.volume };
     case "showAgentRun":
       return { kind: "showAgentRun", threadId: e.value.threadId, runId: e.value.runId };
+    case "stageComposer":
+      return { kind: "stageComposer", threadId: e.value.threadId, text: e.value.text };
     case "invokeCommand": {
       const c = e.value.context;
       return {

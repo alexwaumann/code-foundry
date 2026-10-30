@@ -16,6 +16,8 @@ const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
 const { useSettingsStore } = await import("./settings");
+const { getDraft, updateDraft } = await import("./compose");
+const { threadDraftKey } = await import("./threadActions");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
@@ -203,6 +205,35 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, latest: made("latest", {}) }, order: [...s.order, "latest"] }));
     expect(selected()).toEqual({ kind: "view", name: "dashboard" });
+  });
+});
+
+describe("the stageComposer intent (composer.stage)", () => {
+  const stage = (text: string, threadId = "s1") => {
+    applyIntent({ kind: "stageComposer", threadId, text });
+  };
+  beforeEach(() => {
+    updateDraft(threadDraftKey("s1"), { text: "" });
+  });
+
+  it("fills an empty draft of the thread the window shows and focuses its prompt", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
+    stage("Add my first project");
+    expect(getDraft(threadDraftKey("s1")).text).toBe("Add my first project");
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
+  });
+
+  it("goes on a new line after a draft that has text", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
+    updateDraft(threadDraftKey("s1"), { text: "I was typing  \n" });
+    stage("then this");
+    expect(getDraft(threadDraftKey("s1")).text).toBe("I was typing\nthen this");
+  });
+
+  it("a window showing something else leaves the thread and its selection alone", () => {
+    stage("hello");
+    expect(getDraft(threadDraftKey("s1")).text).toBe("");
+    expect(useUiStore.getState()).toMatchObject({ selection: { kind: "view", name: "dashboard" }, promptFocusSeq: 0 });
   });
 });
 
