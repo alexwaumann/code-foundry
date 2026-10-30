@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FileChangeView } from "@/api/worktreeDetail";
-import { buildFileRows, fileTotals, splitPath } from "./files";
+import { buildFileRows, fileTotals, shortRef, splitPath } from "./files";
 
 const f = (path: string, over: Partial<FileChangeView> = {}): FileChangeView => ({
   path,
@@ -49,5 +49,16 @@ describe("buildFileRows", () => {
 describe("fileTotals", () => {
   it("counts files and sums the changes", () => {
     expect(fileTotals([f("a", { added: 3, deleted: 1 }), f("b", { added: 2 })])).toEqual({ count: 2, added: 5, deleted: 1 });
+  });
+});
+
+describe("shortRef", () => {
+  it.each([
+    ["origin/main", ["origin"], "main"],
+    ["upstream/release/1.0", ["origin", "upstream"], "release/1.0"],
+    ["main", [], "main"],
+    ["feature/x", ["origin"], "feature/x"],
+  ])("shortRef(%s) is %s", (ref, remotes, want) => {
+    expect(shortRef(ref, remotes)).toBe(want);
   });
 });

@@ -7,26 +7,20 @@
  * there when the user opens the thread.
  *
  * Unlike the window's own panel commands (stores/views.ts), they never take keyboard
- * focus (the user may be typing in another thread's prompt), never toast (a "No linked
- * PRs yet" about a thread the user is not looking at would puzzle them; the action is
- * just a no-op), and apply under a sheet (Settings, Themes, Usage), since what they
+ * focus (the user may be typing in another thread's prompt), never toast (about a thread
+ * the user is not looking at it would puzzle them; the action is just a no-op), and apply under a sheet (Settings, Themes, Usage), since what they
  * change is the thread's panel, not the screen.
  *
  * The item actions (panel.file, panel.diff, panel.pr) open what their params name; the
  * daemon checked it exists first (internal/command/commands_view_items.go).
  */
 import type { DiffScopeView } from "@/api/fileDiff";
-import { openAgentsSurface } from "./agentsPanel";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
-import { openLinkedPrsSurface } from "./linkedPrsPanel";
 import { openMcpSurface } from "./mcpPanel";
 import { expandPanel, getPanel, isSplit, keyOf, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
-import { openThreadsSurface } from "./threadsPanel";
 import type { Selection } from "./ui";
-import { openUsageSurface } from "./usagePanel";
-import { openWorktreeSurface } from "./worktreePanel";
 
 /** A ShowView's params: what an item action opens. */
 type Params = Readonly<Record<string, string>>;
@@ -78,12 +72,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     else splitPanel(key, { focus: false });
     return true;
   },
-  "panel.worktree": surface(openWorktreeSurface),
-  "panel.linked-prs": surface(openLinkedPrsSurface),
-  "panel.usage": surface(openUsageSurface),
   "panel.mcp": surface(openMcpSurface),
-  "panel.agents": surface(openAgentsSurface),
-  "panel.threads": surface(openThreadsSurface),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
   // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts).
   "panel.file": item((key, p) => {

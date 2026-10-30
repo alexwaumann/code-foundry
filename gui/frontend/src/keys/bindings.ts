@@ -22,7 +22,7 @@ import { getShowCreatedThreads, zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, historyCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -298,16 +298,6 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Same for splitting or joining the panel's tab groups: this window's panel for its selection.
   "view.panel.split": () => {
     splitPanelCommand();
-    return true;
-  },
-  // And for the Linked PRs surface: this window's thread's panel (or a toast without links).
-  "view.panel.linked-prs": () => {
-    linkedPrsPanelCommand();
-    return true;
-  },
-  // And for the Worktree surface: this window's thread's own worktree in its panel.
-  "view.panel.worktree": () => {
-    worktreePanelCommand();
     return true;
   },
   // Window-local like view.panel.toggle: this window's own selection history (the CLI's

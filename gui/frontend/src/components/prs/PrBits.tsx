@@ -1,10 +1,10 @@
 import { CircleCheck, CircleDashed, CircleDot, CircleX } from "lucide-react";
-import type { CheckRollupView, PrStateView, ReviewView } from "@/api/gh";
+import type { CheckRollupView, PrStateView } from "@/api/gh";
 import { prStateText, toneText } from "@/components/pr/tones";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { checksSummary, freshness, reviewLabel, shortAge, updatedAgo } from "./format";
+import { checksSummary, freshness, shortAge, updatedAgo } from "./format";
 import { prStateLook } from "./prState";
 
 export function ChecksBadge({ checks, compact = false }: { checks: CheckRollupView; compact?: boolean }) {
@@ -19,17 +19,6 @@ export function ChecksBadge({ checks, compact = false }: { checks: CheckRollupVi
       </span>
     </Tip>
   );
-}
-
-const reviewClass: Record<NonNullable<ReviewView> | "none", string> = {
-  approved: toneText.success,
-  changes_requested: toneText.failure,
-  review_required: toneText.pending,
-  none: toneText.neutral,
-};
-
-export function ReviewBadge({ review }: { review: ReviewView }) {
-  return <span className={cn("truncate text-body-sm", reviewClass[review ?? "none"])}>{reviewLabel(review)}</span>;
 }
 
 export function PrStateIcon({ state, draft }: { state: PrStateView; draft: boolean }) {

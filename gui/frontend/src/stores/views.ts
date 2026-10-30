@@ -11,17 +11,12 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
-import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, isSplit, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
-import { agentsPanelTarget, openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
-import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
-import { openUsageSurface } from "./usagePanel";
-import { openWorktreeSurface } from "./worktreePanel";
 import { presentPromptHistory } from "./historyComposers";
 import { presentDictationToggle } from "./dictation";
 import { openAddProject } from "./addProject";
@@ -162,29 +157,9 @@ export function showView(name: string): boolean {
       // view.panel.split: splits or joins the current selection's panel's tab groups.
       splitPanelCommand();
       return true;
-    case "panel.linked-prs":
-      // view.panel.linked-prs: the Linked PRs surface in the current thread's panel.
-      linkedPrsPanelCommand();
-      return true;
-    case "panel.usage":
-      // view.panel.usage: the Usage surface in the current thread's panel.
-      usagePanelCommand();
-      return true;
     case "panel.mcp":
       // view.panel.mcp: the MCP surface in the current thread's panel.
       mcpPanelCommand();
-      return true;
-    case "panel.agents":
-      // view.panel.agents: the Agents surface in the current thread's panel.
-      agentsPanelCommand();
-      return true;
-    case "panel.threads":
-      // view.panel.threads: the Threads surface (lineage) in the current thread's panel.
-      threadsPanelCommand();
-      return true;
-    case "panel.worktree":
-      // view.panel.worktree: the thread's own worktree in the current thread's panel.
-      worktreePanelCommand();
       return true;
     case "bottom.toggle":
       // view.bottom.toggle: the current selection's bottom terminal panel.
@@ -386,115 +361,13 @@ export function splitPanelCommand(): boolean {
 }
 
 /**
- * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
- * the selected thread's own worktree in its panel and shows the panel. A no-op when the
- * selection is not in a registered worktree (a page, a composer, a thread whose cwd is
- * elsewhere; a window reached through the CLI's ShowView may have anything selected).
- *
- * Focus moves to the panel, like toggling it on; with the palette open, its return target
- * moves there instead.
- */
-export function worktreePanelCommand(): boolean {
-  const key = openWorktreeSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.linked-prs for the current selection: opens (or activates) the Linked PRs tab
- * in the selected thread's panel and shows the panel, like view.panel.worktree. A thread
- * without linked pull requests gets a brief "No linked PRs yet" toast instead. A no-op
- * when the selection is no thread.
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
- */
-export function linkedPrsPanelCommand(): boolean {
-  const target = linkedPrsTarget();
-  if (target !== "linked") {
-    if (target === "none") toast("No linked PRs yet", { description: "Pull requests this thread creates or mentions show up here." });
-    return false;
-  }
-  const key = openLinkedPrsSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
- * selected thread's panel and shows the panel, like view.panel.worktree. A thread
- * without usage opens it too (the surface says "No usage yet"). A no-op when the
- * selection is no thread.
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
- */
-export function usagePanelCommand(): boolean {
-  const key = openUsageSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
  * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
- * selected thread's panel and shows the panel, like view.panel.usage. A no-op
- * when no thread is selected.
+ * selected thread's panel and shows the panel. A no-op when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function mcpPanelCommand(): boolean {
   const key = openMcpSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.agents for the current selection: opens (or activates) the Agents tab in the
- * selected thread's panel and shows the panel, like view.panel.mcp. A thread without
- * subagent runs (the surface is hidden) gets a brief "No agents yet" toast instead, like
- * view.panel.linked-prs. A no-op when no thread is selected.
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
- */
-export function agentsPanelCommand(): boolean {
-  const target = agentsPanelTarget();
-  if (target !== "agents") {
-    if (target === "none") toast("No agents yet", { description: "Claude's subagents (the Agent tool) show here as they run." });
-    return false;
-  }
-  const key = openAgentsSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.threads for the current selection: opens (or activates) the Threads tab in
- * the selected thread's panel and shows the panel, like view.panel.agents. A thread
- * without lineage (no creator, siblings or children: the surface is hidden) gets a brief
- * "No related threads" toast instead. A no-op when no thread is selected.
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
- */
-export function threadsPanelCommand(): boolean {
-  const target = threadsPanelTarget();
-  if (target !== "related") {
-    if (target === "none") toast("No related threads", { description: "Threads an agent here creates (code-foundry thread new) show up here." });
-    return false;
-  }
-  const key = openThreadsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });

@@ -87,7 +87,7 @@ function showTimeline(items: ThreadItemView[], agents: AgentRunView[]) {
 
 beforeEach(() => {
   openAgentRun.mockClear();
-  useCommandsStore.setState({ commands: [cmd("thread.agent.open"), cmd("view.panel.agents")] });
+  useCommandsStore.setState({ commands: [cmd("thread.agent.open")] });
 });
 
 afterEach(cleanup);
@@ -160,7 +160,7 @@ describe("the strip's run names", () => {
   });
 
   it("are plain text where thread.agent.open is not listed", () => {
-    useCommandsStore.setState({ commands: [cmd("view.panel.agents")] });
+    useCommandsStore.setState({ commands: [] });
     useThreadsStore.setState({ byId: { s: thread }, order: ["s"] });
     setLog([], [run("a1", { description: "PR 1" }), run("a2", { description: "PR 2" })]);
     render(<AgentsStrip threadId="s" />);

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Check, Code, FolderOpen, Layers, Play, Plus, Save, SquareTerminal } from "lucide-react";
+import { Check, CircleAlert, Code, FolderOpen, Layers, OctagonX, Play, Plug, Plus, Save, SquareTerminal } from "lucide-react";
 import { FinderMark } from "@/components/icons/FinderMark";
 import { ACTION_ICON } from "@/components/actions/actionIcons";
 import {
@@ -13,6 +13,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
+import { envStaleTip } from "@/lib/envStale";
 import { chooseAction, moreProjects } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import type { ActionOwner } from "@/stores/actionActions";
@@ -26,7 +28,7 @@ import { runCardAction, useActionPicks, useEditorApps } from "@/stores/threadInf
 import { runThreadIn, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { Group, Row, RowMenu, SubLine } from "./Row";
+import { Group, HOVER_CARD, Row, RowMenu, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
 /** A named workspace: its name and the set's size. */
@@ -69,10 +71,63 @@ function RunInItem({ threadId, projectId, path, cwd, cwdBranch }: { threadId: st
   );
 }
 
+/** What the project row's hover card says: the thread's plugin flags and a changed plugin environment. */
+function useProjectNotes(threadId: string) {
+  const flags = useThreadsStore(
+    useShallow((s) => (s.byId[threadId]?.flags ?? []).map((f) => `${f.level}\u0000${f.pluginName}\u0000${f.reason}`)),
+  );
+  const envChange = useThreadsStore((s) => {
+    const t = s.byId[threadId];
+    return t?.pluginEnvStale ? (t.pluginEnvChange ?? "") : null;
+  });
+  return { flags: flags.map((f) => f.split("\u0000") as [string, string, string]), envChange };
+}
+
+/**
+ * The project row's notes (once the thread header's flag chip and environment note): each
+ * plugin flag, red for an error and amber for attention, then "Plugin environment changed"
+ * with what changed. Restart Claude is the title menu's (components/thread/ThreadMenuItems).
+ */
+function ProjectNotes({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
+  return (
+    <span className={cn(HOVER_CARD, "flex flex-col gap-1.5")} data-testid="ti-project-notes">
+      {flags.map(([level, plugin, reason]) => (
+        <span key={plugin} className={cn("flex items-start gap-1.5", level === "error" ? "text-cf-error-text" : "text-cf-warning-text")} data-testid="ti-project-flag" data-level={level}>
+          {level === "error" ? <OctagonX className="mt-0.5 size-3 shrink-0" aria-hidden /> : <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />}
+          <span>
+            <span className="font-medium">{plugin}</span>: {reason}
+          </span>
+        </span>
+      ))}
+      {envChange !== null && (
+        <span className="flex items-start gap-1.5" data-testid="ti-project-env-stale">
+          <Plug className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span className="whitespace-pre-line">
+            <span className="font-medium">Plugin environment changed</span>
+            {"\n"}
+            {envStaleTip(envChange)}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The mark before the project row's value while it has notes: the worst flag's icon, else the plug. */
+function NotesMark({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
+  const error = flags.some(([level]) => level === "error");
+  if (flags.length > 0) {
+    const Icon = error ? OctagonX : CircleAlert;
+    return <Icon className={cn("size-3 shrink-0", error ? "text-cf-error-text" : "text-cf-warning-text")} aria-hidden data-testid="ti-project-mark" />;
+  }
+  return envChange !== null ? <Plug className="size-3 shrink-0" aria-hidden data-testid="ti-project-mark" /> : null;
+}
+
 /**
  * The cwd's project: its name (bold without a workspace row; "+N" when an unnamed set has
  * more), "Fresh copy" or "Project folder". With several projects it opens a menu: Add
- * project and Save as workspace (placeholders until the card's PR 4), then Run in.
+ * project and Save as workspace (placeholders until the card's PR 4), then Run in. The
+ * thread's plugin flags and a changed plugin environment mark it, and show on hover.
  */
 function ProjectRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members, paths } = useMembers(threadId);
@@ -84,7 +139,18 @@ function ProjectRow({ threadId }: { threadId: string }) {
   const git = useProjectsStore((s) => s.byId[cwdProjectId]?.git ?? false);
   const cwdBranch = useProjectsStore((s) => s.byId[cwdProjectId]?.worktrees.find((w) => w.path === cwd)?.branch ?? "");
   const [open, setOpen] = useState(false);
+  const notes = useProjectNotes(threadId);
   if (!cwdProjectId) return null;
+  const noted = notes.flags.length > 0 || notes.envChange !== null;
+  // The hover card wraps the row (outside a menu trigger, as Tip asks).
+  const withNotes = (row: ReactElement) =>
+    noted ? (
+      <Tip label={<ProjectNotes {...notes} />} side="left">
+        {row}
+      </Tip>
+    ) : (
+      row
+    );
   const more = moreProjects(members.length, named);
   const label = (
     <>
@@ -92,21 +158,28 @@ function ProjectRow({ threadId }: { threadId: string }) {
       {more && <span className="text-cf-text-muted"> {more}</span>}
     </>
   );
-  const meta = worktreeMode && git ? "Fresh copy" : "Project folder";
+  const meta = (
+    <>
+      {noted && <NotesMark {...notes} />}
+      {worktreeMode && git ? "Fresh copy" : "Project folder"}
+    </>
+  );
   if (members.length <= 1) {
-    return (
-      <Row icon={<FolderOpen />} meta={meta} testId="ti-project">
+    return withNotes(
+      <Row icon={<FolderOpen />} meta={meta} hoverable={noted} testId="ti-project">
         {label}
-      </Row>
+      </Row>,
     );
   }
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Row icon={<FolderOpen />} meta={meta} chevron={open ? "open" : "closed"} testId="ti-project">
-          {label}
-        </Row>
-      </DropdownMenuTrigger>
+      {withNotes(
+        <DropdownMenuTrigger asChild>
+          <Row icon={<FolderOpen />} meta={meta} chevron={open ? "open" : "closed"} testId="ti-project">
+            {label}
+          </Row>
+        </DropdownMenuTrigger>,
+      )}
       <RowMenu testId="ti-project-menu">
         <DropdownMenuItem disabled data-testid="ti-add-project">
           <Plus aria-hidden />

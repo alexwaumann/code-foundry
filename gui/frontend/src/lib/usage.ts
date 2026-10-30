@@ -198,7 +198,3 @@ export function fmtShare(part: number, total: number): string {
   return `${pct.toFixed(1)}%`;
 }
 
-/** "1 request", "3 requests". */
-export function fmtRequests(n: number): string {
-  return `${n.toLocaleString("en-US")} ${n === 1 ? "request" : "requests"}`;
-}

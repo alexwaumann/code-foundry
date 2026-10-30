@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Broom, CloudUpload, Folder, FolderGit2, FolderPlus, GitBranchPlus, Layers, PanelRight, Play, RefreshCw, Search, SquarePen, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { Broom, CloudUpload, Diff, Folder, FolderGit2, FolderPlus, GitBranchPlus, Layers, Play, RefreshCw, Search, SquarePen, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
@@ -51,7 +51,7 @@ import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/proje
 import { clearProjectsPageReveal, useProjectsPageStore } from "@/stores/projectsPage";
 import { useUiStore } from "@/stores/ui";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
-import { showWorktreeInPanel } from "@/stores/worktreePanel";
+import { openChangesTab } from "@/stores/changesPanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { CollapseToggle } from "./CollapseToggle";
 import { useCleanable, useCleanableCount } from "./useCleanable";
@@ -145,7 +145,7 @@ const UNKNOWN_PROJECT = { githubSlug: "", remotes: [] };
 function WorktreeRow({ projectId, path, cleanupSlot }: { projectId: string; path: string; cleanupSlot: boolean }) {
   const isMain = useProjectsStore((s) => findWorktree(s, projectId, path)?.isMain ?? false);
   const cleanable = useCleanable(projectId, path);
-  const show: OverflowItem = { label: "Show in side panel", icon: PanelRight, testId: "worktree-show-panel", onSelect: () => { showWorktreeInPanel(projectId, path); } };
+  const show: OverflowItem = { label: "Show changes", icon: Diff, testId: "worktree-show-panel", onSelect: () => { openChangesTab("current", projectId, path); } };
   const items: OverflowItem[] = isMain
     ? [show]
     : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) }];
@@ -165,7 +165,7 @@ function WorktreeRow({ projectId, path, cleanupSlot }: { projectId: string; path
         <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(projectId, path)}>
           <SquareTerminal />
         </RowAction>
-        <ActionsMenu projectId={projectId} owner={{ kind: "worktree", projectId, path }} from="projects" variant="row" testId="worktree-actions-menu" />
+        <ActionsMenu projectId={projectId} owner={{ kind: "worktree", projectId, path }} from="projects" testId="worktree-actions-menu" />
         {cleanable ? (
           <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-cf-success-text hover:text-cf-success-text" onClick={() => void cleanupWorktree(projectId, path)}>
             <Broom />
@@ -338,22 +338,22 @@ export function ProjectsPage() {
     () =>
       items.map((it) => {
         switch (it.kind) {
-          // Enter or double-click shows the worktree (a project's main one) in the page's side panel.
+          // Enter or double-click shows the worktree's (a project's main one's) Changes tab in the page's side panel.
           case "project":
             return {
               key: it.key,
-              activate: () => { showWorktreeInPanel(it.projectId, mainWorktreePath(useProjectsStore.getState(), it.projectId)); },
+              activate: () => { openChangesTab("current", it.projectId, mainWorktreePath(useProjectsStore.getState(), it.projectId)); },
               toggle: (open) => !filtering && useUiStore.getState().setProjectCollapsed(it.projectId, !open),
             };
           case "worktree":
-            return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, it.path); } };
-          // A workspace member: its project's main worktree; an unregistered one (no worktree to show) opens nothing.
+            return { key: it.key, activate: () => { openChangesTab("current", it.projectId, it.path); } };
+          // A workspace member: its project's main worktree's changes; an unregistered one (no worktree to show) opens nothing.
           case "member":
             return {
               key: it.key,
               activate: () => {
                 const at = mainWorktreePath(useProjectsStore.getState(), it.projectId);
-                if (at) showWorktreeInPanel(it.projectId, at);
+                if (at) openChangesTab("current", it.projectId, at);
               },
             };
           case "workspace":

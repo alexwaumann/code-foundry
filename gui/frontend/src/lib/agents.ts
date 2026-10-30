@@ -17,11 +17,6 @@ export function agentMode(r: Pick<AgentRunView, "background">): string {
   return r.background ? "background" : "foreground";
 }
 
-/** The row's second line: type · model · effort · foreground|background (empty parts left out; no model: the thread's). */
-export function agentMeta(r: Pick<AgentRunView, "agentType" | "model" | "effort" | "background">): string[] {
-  return [r.agentType, r.model, r.effort, agentMode(r)].filter((p) => p !== "");
-}
-
 /** "0s", "38s", "1m 03s", "4m 12s", "1h 05m". */
 export function fmtElapsed(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -53,42 +48,14 @@ export function agentStatusText(r: Pick<AgentRunView, "status" | "endedAtMs">, n
   return `${word} · ${formatAgo(r.endedAtMs, now)}`;
 }
 
-/** The header's figures: running runs (nested ones too, like Thread.agents_running and the CLI), all runs, and the thread's own running background runs. */
-export function agentCounts(runs: readonly AgentRunView[]): { running: number; total: number; background: number } {
-  let running = 0;
-  let background = 0;
-  for (const r of runs) {
-    if (r.status !== "running") continue;
-    running++;
-    if (r.background && r.spawnDepth <= 1) background++;
-  }
-  return { running, total: runs.length, background };
-}
-
 /** "1 agent", "3 agents". */
 export function agentsLabel(n: number): string {
   return `${String(n)} ${n === 1 ? "agent" : "agents"}`;
 }
 
-/** "1 shell", "3 shells". */
-export function shellsLabel(n: number): string {
-  return `${String(n)} ${n === 1 ? "shell" : "shells"}`;
-}
-
-/**
- * The strip's sentence: "2 agents and 1 shell running in the background", "1 agent …",
- * "2 shells …"; "" when nothing runs.
- */
-export function backgroundLabel(agents: number, shells: number): string {
-  const parts = [...(agents > 0 ? [agentsLabel(agents)] : []), ...(shells > 0 ? [shellsLabel(shells)] : [])];
-  return parts.length === 0 ? "" : `${parts.join(" and ")} running in the background`;
-}
-
-/** The header's second line: why runs keep going after the turn, or that none run. */
-export function agentsSubline(c: { running: number; background: number }): string {
-  if (c.background > 0) return `${String(c.background)} in the background ${c.background === 1 ? "keeps" : "keep"} running after the turn ends`;
-  if (c.running > 0) return `${String(c.running)} in the foreground, part of the turn`;
-  return "No agents running";
+/** The strip's sentence: "1 agent running in the background", "3 agents …"; "" when none runs. */
+export function backgroundLabel(agents: number): string {
+  return agents > 0 ? `${agentsLabel(agents)} running in the background` : "";
 }
 
 /** The running background runs the strip names (the thread's own, spawn depth 1), in spawn order. */
@@ -100,37 +67,6 @@ export function stripRuns(runs: readonly AgentRunView[]): AgentRunView[] {
 export function stripPart(r: Pick<AgentRunView, "description" | "agentType" | "activity">): string {
   const name = agentName(r);
   return r.activity && r.activity !== name ? `${name} · ${r.activity}` : name;
-}
-
-/**
- * The list's rows in order: the runs in spawn order (never by status), each run's nested
- * runs right under it (in spawn order among themselves), with their nesting level (0 for
- * the thread's own). A run whose parent is not in the list stays where it started, at the
- * level its spawn depth says.
- */
-export function agentRows(runs: readonly Pick<AgentRunView, "id" | "parentId" | "spawnDepth">[]): { id: string; level: number }[] {
-  const ids = new Set(runs.map((r) => r.id));
-  const kids = new Map<string, string[]>();
-  const roots: { id: string; level: number }[] = [];
-  for (const r of runs) {
-    if (r.parentId && r.parentId !== r.id && ids.has(r.parentId)) {
-      const list = kids.get(r.parentId) ?? [];
-      list.push(r.id);
-      kids.set(r.parentId, list);
-    } else roots.push({ id: r.id, level: Math.max(0, r.spawnDepth - 1) });
-  }
-  const out: { id: string; level: number }[] = [];
-  const seen = new Set<string>();
-  const walk = (id: string, level: number) => {
-    if (seen.has(id)) return; // a cycle (never from the daemon): each run once
-    seen.add(id);
-    out.push({ id, level });
-    for (const k of kids.get(id) ?? []) walk(k, level + 1);
-  };
-  for (const r of roots) walk(r.id, r.level);
-  // Runs only reachable through a cycle: at the end, flat.
-  for (const r of runs) if (!seen.has(r.id)) walk(r.id, 0);
-  return out;
 }
 
 /** Structural equality of two runs (every field). */

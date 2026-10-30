@@ -1,7 +1,7 @@
 import type { FileChangeView } from "@/api/worktreeDetail";
 
 /**
- * One row of the worktree panel's Changes list: a changed path, flat (no folders), its
+ * One row of the Changes tab's list: a changed path, flat (no folders), its
  * directory part apart from its name so the row can truncate the directory and keep the
  * name.
  */
@@ -58,3 +58,13 @@ export const statusColor: Readonly<Record<string, string>> = {
   U: "text-cf-error-text",
   "?": "text-cf-text-muted",
 };
+
+/**
+ * A remote-tracking ref without its remote: "origin/main" → "main" when "origin" is one
+ * of the project's remotes; anything else (a local base, "main") as it is.
+ */
+export function shortRef(ref: string, remotes: readonly string[]): string {
+  const slash = ref.indexOf("/");
+  if (slash > 0 && remotes.includes(ref.slice(0, slash))) return ref.slice(slash + 1);
+  return ref;
+}

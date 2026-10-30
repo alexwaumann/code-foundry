@@ -1,222 +1,98 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CommandView } from "@/api/command";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
-import { useWorkspacesStore } from "@/stores/workspaces";
-import { useProjectsPageStore } from "@/stores/projectsPage";
 import { useUiStore } from "@/stores/ui";
+import { useWorkspacesStore } from "@/stores/workspaces";
+import { HeaderActions } from "./HeaderActions";
 import { ThreadTitle } from "./ThreadParts";
 
-const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));
+const thread = (id: string, o: Partial<ThreadView> = {}) =>
+  ({ id, name: `Thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], pendingWorktreePath: "", createdBy: "", createdByName: "", parentId: "", checkoutPaths: [], flags: [], ...o }) as ThreadView;
+const PROJECT = (id: string) => ({ id, name: id, git: true, worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
-const cmd = (name: string): CommandView => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
-
-const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "Fix the stale PR badge", projectId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", projectIds: ["cf"], branch: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
-
-type Worktree = { path: string; branch: string; head: string; isMain?: boolean };
-function project(name: string, worktrees: Worktree[], git = true) {
-  return { id: name, name, git, worktrees } as unknown as ReturnType<typeof useProjectsStore.getState>["byId"][string];
+function show(o: Partial<ThreadView>, others: ThreadView[] = []): void {
+  const all = [thread("s-1", o), ...others];
+  useThreadsStore.setState({ byId: Object.fromEntries(all.map((t) => [t.id, t])), order: all.map((t) => t.id) });
+  render(<ThreadTitle id="s-1" />);
 }
 
+const crumb = () => screen.getByTestId("thread-crumb");
+
 beforeEach(() => {
-  useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree")] });
-  useProjectsStore.setState({
-    byId: {
-      cf: project("code-foundry", [
-        { path: "/src/cf", branch: "main", head: "abc", isMain: true },
-        { path: "/src/cf.worktrees/pr-badge", branch: "cf/pr-badge-stale", head: "def", isMain: false },
-      ]),
-      notes: project("scratch notes", [{ path: "/src/notes", branch: "", head: "", isMain: true }], false),
-    },
-    order: ["cf", "notes"],
-  });
-  useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+  useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
+  useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "platform", members: [] } } as never, order: ["w-1"] });
+  useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
 });
 
-afterEach(() => {
-  cleanup();
-  startCommandNamed.mockClear();
-});
+afterEach(cleanup);
 
-const title = () => screen.getByTestId("thread-title");
-const location = () => screen.getByTestId("thread-location");
-
-describe("ThreadTitle", () => {
-  it("names the thread; a click renames it through thread.rename", () => {
-    render(<ThreadTitle id="s-1" />);
-    expect(title().tagName).toBe("BUTTON");
-    expect(title().textContent).toBe("Fix the stale PR badge");
-    expect(title().getAttribute("title")).toBeNull();
-    fireEvent.click(title());
-    expect(startCommandNamed).toHaveBeenCalledWith("thread.rename");
+describe("the thread header's crumb", () => {
+  it.each<[string, Partial<ThreadView>, string, string]>([
+    ["one project", {}, "folder", "web"],
+    ["a named workspace", { workspaceId: "w-1", projectIds: ["web", "api"] }, "layers", "platform"],
+    ["an unnamed set", { projectIds: ["web", "api"] }, "folders", "web +1"],
+    ["no project", { projectId: "", projectIds: [], worktreePath: "/Users/me" }, "house", "No project"],
+  ])("%s: its icon and place, then the title", (_n, o, icon, label) => {
+    show(o);
+    expect(crumb().dataset.icon).toBe(icon);
+    expect(screen.getByTestId("thread-crumb-place").textContent).toBe(label);
+    expect(screen.queryByTestId("thread-crumb-parent")).toBeNull();
+    expect(screen.getByTestId("thread-title-name").textContent).toBe("Thread s-1");
   });
 
-  it("a provisional name is muted and italic until the naming model's title lands", () => {
-    useThreadsStore.setState({ byId: { "s-1": thread({ name: "fix the stale pr badge", nameProvisional: true }) }, order: ["s-1"] });
-    render(<ThreadTitle id="s-1" />);
-    expect(title().textContent).toBe("fix the stale pr badge");
-    expect(title().className).toContain("italic");
-    expect(title().className).toContain("text-cf-text-muted");
-    expect(title().className).not.toContain("text-cf-text ");
+  it("a child: the place, then its parent, which opens on a click", () => {
+    show({ createdBy: "s-0" }, [thread("s-0", { name: "Auth rollout plan" })]);
+    const parent = screen.getByTestId("thread-crumb-parent");
+    expect(parent.textContent).toBe("Auth rollout plan");
+    fireEvent.click(parent);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-0" });
+  });
+
+  it("the parent follows a rename, and a removed creator is plain text", () => {
+    show({ createdBy: "s-0", createdByName: "At creation" }, [thread("s-0", { name: "Plan" })]);
     act(() => {
-      useThreadsStore.setState({ byId: { "s-1": thread({ name: "Fix the stale PR badge", nameProvisional: false }) } });
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", { name: "Plan v2" }) } }));
     });
-    expect(title().textContent).toBe("Fix the stale PR badge");
-    expect(title().className).not.toContain("italic");
-    expect(title().className).toContain("text-cf-text");
+    expect(screen.getByTestId("thread-crumb-parent").textContent).toBe("Plan v2");
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { "s-1": s.byId["s-1"] as ThreadView }, order: ["s-1"] }));
+    });
+    const removed = screen.getByTestId("thread-crumb-parent");
+    expect(removed.textContent).toBe("At creation");
+    expect(removed.tagName).toBe("SPAN");
+    expect(removed.dataset.removed).toBe("true");
   });
 
-  it("shows no status, badge text, model or path", () => {
-    render(<ThreadTitle id="s-1" />);
-    const text = document.body.textContent;
-    expect(text).not.toContain("opus");
-    expect(text).not.toContain("Connected");
-    expect(text).not.toContain("/src/cf");
-    expect(screen.queryByRole("img")).toBeNull();
+  it("a provisional name is muted and italic", () => {
+    show({ nameProvisional: true });
+    expect(screen.getByTestId("thread-title-name").className).toContain("italic");
   });
 
-  it.each([
-    ["a linked worktree: project @ branch and the worktree chip", "/src/cf.worktrees/pr-badge", "cf", "code-foundry@cf/pr-badge-staleworktree", true],
-    ["the main checkout: no chip", "/src/cf", "cf", "code-foundry@main", false],
-    ["no git: the folder and No git, no branch", "/src/notes", "notes", "scratch notesNo git", false],
-  ])("%s", (_name, worktreePath, projectId, text, chip) => {
-    useThreadsStore.setState({ byId: { "s-1": thread({ worktreePath, projectId }) } });
-    render(<ThreadTitle id="s-1" />);
-    expect(location().textContent).toBe(text);
-    expect(screen.queryByTestId("thread-worktree-chip") !== null).toBe(chip);
-    expect(screen.queryByTestId("thread-branch") === null).toBe(projectId === "notes");
-    expect(screen.queryByTestId("no-git-badge") !== null).toBe(projectId === "notes");
-  });
-
-  it("opens the worktree surface through view.panel.worktree; plain text where it is unavailable", () => {
-    render(<ThreadTitle id="s-1" />);
-    expect(location().tagName).toBe("BUTTON");
-    expect(location().getAttribute("title")).toBeNull();
-    fireEvent.click(location());
-    expect(startCommandNamed).toHaveBeenCalledWith("view.panel.worktree");
-    cleanup();
-
-    useCommandsStore.setState({ commands: [] });
-    render(<ThreadTitle id="s-1" />);
-    expect(location().tagName).toBe("SPAN");
-    expect(location().textContent).toBe("code-foundry@cf/pr-badge-staleworktree");
-    expect(title().tagName).toBe("SPAN");
-    expect(title().textContent).toBe("Fix the stale PR badge");
-  });
-
-  it("no project: the House icon and No project, no branch or chip, plain text without view.panel.worktree", () => {
-    useCommandsStore.setState({ commands: [cmd("thread.rename")] });
-    useThreadsStore.setState({ byId: { "s-1": thread({ projectId: "", worktreePath: "/Users/dev" }) } });
-    render(<ThreadTitle id="s-1" />);
-    expect(location().tagName).toBe("SPAN");
-    expect(location().textContent).toBe("No project");
-    expect(location().querySelector("svg.lucide-house")).not.toBeNull();
-    expect(screen.queryByTestId("thread-branch")).toBeNull();
-    expect(screen.queryByTestId("thread-worktree-chip")).toBeNull();
-  });
-
-  it("a thread in its workspace's folder: the workspace's name, its branch only in worktree mode; never the folder's id", () => {
-    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "shop", members: ["cf", "api"] } as never }, order: ["w-1"] });
-    const ws = { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", workspaceId: "w-1", projectIds: ["api", "cf"] };
-    useThreadsStore.setState({ byId: { "s-1": thread(ws) } });
-    render(<ThreadTitle id="s-1" />);
-    expect(screen.getByTestId("thread-project").textContent).toBe("shop");
-    expect(screen.queryByTestId("thread-branch")).toBeNull();
-    cleanup();
-    useThreadsStore.setState({ byId: { "s-1": thread({ ...ws, createdWorktree: true, branch: "feat/x" }) } });
-    render(<ThreadTitle id="s-1" />);
-    expect(location().textContent).toBe("shop@feat/x");
-    expect(location().querySelector("svg.lucide-layers")).not.toBeNull();
-  });
-
-  it("a place that names the thread's workspace opens the Projects page on its card; others open the Worktree tab", () => {
-    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "shop", members: ["cf", "api"] } as never }, order: ["w-1"] });
-    // In its workspace's folder, and a set with the workspace: the place reads "shop".
-    for (const t of [
-      { projectId: "", worktreePath: "/Users/dev/.code-foundry/workspaces/w-1", workspaceId: "w-1", projectIds: ["api", "cf"] },
-      { projectId: "cf", worktreePath: "/src/cf", workspaceId: "w-1", projectIds: ["api", "cf"] },
-    ]) {
-      useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
-      useProjectsPageStore.setState({ reveal: null });
-      useThreadsStore.setState({ byId: { "s-1": thread(t) } });
-      render(<ThreadTitle id="s-1" />);
-      expect(location().textContent).toContain("shop");
-      expect(location().dataset.opens).toBe("workspace");
-      fireEvent.click(location());
-      expect(startCommandNamed).not.toHaveBeenCalled();
-      expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
-      expect(useProjectsPageStore.getState().reveal).toBe("ws:w-1");
-      cleanup();
-    }
-    // A thread without a workspace (and one whose place is its single project): the Worktree tab, as before.
-    for (const t of [{ projectIds: ["api", "cf"], projectId: "cf", worktreePath: "/src/cf" }, { workspaceId: "w-1" }]) {
-      useThreadsStore.setState({ byId: { "s-1": thread(t) } });
-      render(<ThreadTitle id="s-1" />);
-      expect(location().dataset.opens).toBeUndefined();
-      fireEvent.click(location());
-      expect(startCommandNamed).toHaveBeenLastCalledWith("view.panel.worktree");
-      cleanup();
-    }
-  });
-
-  it("an unnamed thread shows its id", () => {
-    useThreadsStore.setState({ byId: { "s-1": thread({ name: "" }) } });
-    render(<ThreadTitle id="s-1" />);
-    expect(title().textContent).toBe("s-1");
+  it("the title is a menu button with its chevron; Enter opens the thread's menu", () => {
+    show({});
+    const title = screen.getByTestId("thread-title");
+    expect(title.tagName).toBe("BUTTON");
+    expect(title.querySelector(".lucide-chevron-down")).not.toBeNull();
+    expect(title.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.keyDown(title, { key: "Enter" });
+    expect(title.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByTestId("thread-title-menu")).toBeTruthy();
   });
 });
 
-describe("ThreadTitle created-by chip", () => {
-  const chip = () => screen.queryByTestId("thread-created-by");
-  const child = { createdBy: "s-p", createdByName: "Fix login redirect" };
-
-  it("is absent for the user's thread", () => {
-    render(<ThreadTitle id="s-1" />);
-    expect(chip()).toBeNull();
-  });
-
-  it("names the creator after the thread's name, before the location; a click opens the Threads surface", () => {
-    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree"), cmd("view.panel.threads")] });
-    useThreadsStore.setState({ byId: { "s-1": thread(child), "s-p": thread({ id: "s-p", name: "Fix login redirect", archivedAtMs: 5 }) }, order: ["s-p", "s-1"] });
-    const { container } = render(<ThreadTitle id="s-1" />);
-    const c = chip() as HTMLElement;
-    expect(c.tagName).toBe("BUTTON");
-    expect(c.textContent).toBe("from Fix login redirect");
-    expect(c.querySelector("svg.lucide-corner-down-right")).not.toBeNull();
-    expect(c.getAttribute("data-removed")).toBeNull();
-    // Name, chip, location in that order.
-    expect([...container.children].map((e) => e.getAttribute("data-testid"))).toEqual(["thread-title", "thread-created-by", "thread-location"]);
-    fireEvent.click(c);
-    expect(startCommandNamed).toHaveBeenCalledWith("view.panel.threads");
-  });
-
-  it("shows a renamed creator's current name, and follows a later rename", () => {
-    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.threads")] });
-    useThreadsStore.setState({ byId: { "s-1": thread(child), "s-p": thread({ id: "s-p", name: "Login redirect" }) }, order: ["s-p", "s-1"] });
-    render(<ThreadTitle id="s-1" />);
-    expect(chip()?.textContent).toBe("from Login redirect");
-    act(() => {
-      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-p": { ...s.byId["s-p"], name: "Login redirect, v2" } as ThreadView } }));
-    });
-    expect(chip()?.textContent).toBe("from Login redirect, v2");
-  });
-
-  it("is inert and muted once the creator was removed, keeping its recorded name", () => {
-    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.threads")] });
-    useThreadsStore.setState({ byId: { "s-1": thread(child) }, order: ["s-1"] });
-    render(<ThreadTitle id="s-1" />);
-    const c = chip() as HTMLElement;
-    expect(c.tagName).toBe("SPAN");
-    expect(c.getAttribute("data-removed")).toBe("true");
-    expect(c.className).toContain("opacity-60");
-    expect(c.className).not.toContain("hover:");
-    expect(c.textContent).toBe("from Fix login redirect");
-    fireEvent.click(c);
-    expect(startCommandNamed).not.toHaveBeenCalled();
+describe("the thread header's right side", () => {
+  it("is the three toggles only", () => {
+    const cmd = (name: string) => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
+    useCommandsStore.setState({ commands: ["view.thread-info", "view.bottom.toggle", "view.panel.toggle", "thread.snooze", "thread.archive", "thread.sidebar"].map(cmd) });
+    useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
+    render(<HeaderActions />);
+    expect([...screen.getByTestId("pane-actions").querySelectorAll("button")].map((b) => b.dataset.testid)).toEqual([
+      "thread-info-toggle",
+      "bottom-toggle",
+      "panel-toggle",
+    ]);
   });
 });

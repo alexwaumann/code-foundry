@@ -6,7 +6,7 @@ import { invokeConfirmed, refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
 import { useProjectsStore } from "./projects";
 import { showWorkspaceCard } from "./projectsPage";
-import { showWorktreeOnProjectsPage } from "./worktreePanel";
+import { showProjectOnProjectsPage } from "./projectsPage";
 
 /** The Add Project dialog's tabs, in display order. */
 export type AddProjectTab = "new" | "local" | "github";
@@ -175,7 +175,7 @@ export function showAddedWorkspace(workspaceId: string): void {
 }
 
 /**
- * Shows a project just added (its overview) once the projects store has it: the command or
+ * Shows a project just added (its row on the Projects page) once the projects store has it: the command or
  * clone answers before the project event arrives on the event stream. Gives up after
  * timeoutMs (the user can open it from the Projects page). Nothing when the dialog was
  * opened to stay: the project shows wherever projects are listed.
@@ -183,7 +183,7 @@ export function showAddedWorkspace(workspaceId: string): void {
 export function selectAddedProject(projectId: string, timeoutMs = 5000): void {
   if (useAddProjectStore.getState().stay) return;
   if (useProjectsStore.getState().byId[projectId]) {
-    showWorktreeOnProjectsPage(projectId);
+    showProjectOnProjectsPage(projectId);
     return;
   }
   const timer = setTimeout(() => {
@@ -193,6 +193,6 @@ export function selectAddedProject(projectId: string, timeoutMs = 5000): void {
     if (!s.byId[projectId]) return;
     clearTimeout(timer);
     unsub();
-    showWorktreeOnProjectsPage(projectId);
+    showProjectOnProjectsPage(projectId);
   });
 }

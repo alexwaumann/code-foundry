@@ -17,8 +17,6 @@ import { useWidth } from "@/lib/useWidth";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
-import { EnvStaleNote } from "./EnvStaleNote";
-import { FlagChip } from "./FlagChip";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
@@ -47,8 +45,9 @@ function ThreadMissing() {
 
 /**
  * A thread in the content pane (docs/notes/rendered-threads-2-gui.md, design
- * docs/sketches/rendered-thread variant A): a header (name, project @ branch, workspace,
- * linked PRs and the pane's commands; docs/notes/thread-header.md), the conversation as a dense work log, and the follow-up composer floating
+ * docs/sketches/rendered-thread variant A): a header (where it runs › its title, whose menu
+ * holds the thread's actions, then the window's toggles; docs/notes/thread-header-crumb.md),
+ * the conversation as a dense work log, and the follow-up composer floating
  * over its bottom, the same whether Claude's process runs or not (the daemon starts it on
  * a message and stops it at cache expiry; docs/notes/hide-connection-state.md). While
  * shown it holds the thread's ThreadService.WatchThread (which also marks finished turns seen).
@@ -104,10 +103,8 @@ function ThreadBody({ threadId }: { threadId: string }) {
         <PaneHeader className="gap-2 px-3" data-testid="thread-header">
           <ThreadTitle id={threadId} />
           <TranscriptDeletedChip id={threadId} />
-          <FlagChip id={threadId} />
-          <EnvStaleNote id={threadId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
-            <HeaderActions threadId={threadId} />
+            <HeaderActions />
           </span>
         </PaneHeader>
         <div className="flex min-h-0 flex-1" ref={rowRef} data-testid="thread-pane-body" data-info-room={infoFits ? "" : undefined}>

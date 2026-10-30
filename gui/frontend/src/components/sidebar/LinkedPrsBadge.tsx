@@ -3,7 +3,7 @@ import { toneText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { openLinkedPrsSurface } from "@/stores/linkedPrsPanel";
+import { useUiStore } from "@/stores/ui";
 import { linkedPrTag, linkedPrTagText, linkedPrTip } from "./linkedPrTag";
 import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
@@ -30,8 +30,8 @@ export function LinkedPrsBadge({ id }: { id: string }) {
   const look = tag.kind === "one" ? prStateLook(tag.state === "draft" ? "open" : tag.state, tag.state === "draft") : null;
   return (
     <Tip label={linkedPrTip(facts)} side="right" data-testid="row-linked-prs-tip">
-      {/* Like the workspace badge: a click opens the Linked PRs surface in the thread's side
-          panel, and goes on to the row, which selects the thread (and so shows that panel). */}
+      {/* A click shows the thread info card, whose pull request rows list these, and goes on
+          to the row, which selects the thread (and so shows the card beside it). */}
       <span
         className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm px-1 text-caption-sm font-medium tabular-nums", toneText[tag.tone], toneTint[tag.tone])}
         data-testid="row-linked-prs"
@@ -39,7 +39,7 @@ export function LinkedPrsBadge({ id }: { id: string }) {
         data-state={tag.kind === "one" ? tag.state : undefined}
         data-tone={tag.tone}
         onClick={() => {
-          openLinkedPrsSurface({ kind: "thread", id });
+          useUiStore.setState({ threadInfoOpen: true });
         }}
       >
         {look && <look.icon className="size-3 shrink-0" aria-label={look.label} />}

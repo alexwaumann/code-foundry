@@ -75,20 +75,22 @@ afterEach(() => {
 });
 
 describe("MCP surface", () => {
-  it("is listed with M for a thread and hidden for a page", () => {
+  it("is never listed (the card's MCP row and view.panel.mcp open it), and opens nothing for a page", () => {
     render(<SidePanel />);
-    expect(row()?.getAttribute("data-availability")).toBe("enabled");
-    expect(row()?.textContent).toContain("MCP");
+    expect(row()).toBeNull();
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
+    expect(getPanel("thread:s-r").groups[0]?.activeTabId ?? null).toBeNull();
     act(() => {
       useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     });
-    expect(row()).toBeNull();
     expect(mcpPanelCommand()).toBe(false);
   });
 
   it("shows the header and one card per server in every state", () => {
     render(<SidePanel />);
-    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
+    act(() => {
+      mcpPanelCommand();
+    });
     expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("mcp");
     expect(screen.getByTestId("mcp-count").textContent).toBe("1 of 5 connected");
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, at the start of the last turn");

@@ -8,6 +8,7 @@ vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof impor
 const { ContextMenu, ContextMenuTrigger } = await import("@/components/ui/context-menu");
 const { RowMenu } = await import("./RowMenu");
 const { useThreadsStore } = await import("@/stores/threads");
+const { useCommandsStore } = await import("@/stores/commands");
 
 const thread = (o: Partial<ThreadView>) =>
   ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], branch: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", inSidebar: null, ...o }) as ThreadView;
@@ -25,6 +26,7 @@ function openMenu(o: Partial<ThreadView>): void {
 
 beforeEach(() => {
   setThreadSidebar.mockClear();
+  useCommandsStore.setState({ commands: [{ name: "thread.sidebar", title: "", description: "", category: "", args: [], keybindings: [], available: true }] });
 });
 
 afterEach(cleanup);
@@ -42,10 +44,10 @@ describe("RowMenu: Fork (docs/notes/transcript-deleted.md)", () => {
 });
 
 describe("RowMenu: Hide from sidebar (docs/notes/hidden-children-2-gui.md)", () => {
-  it("a thread another thread created (shown, since its row is listed): Hide from sidebar after Archive, hiding it", () => {
+  it("a thread another thread created (shown, since its row is listed): Hide from sidebar before Archive, hiding it", () => {
     openMenu({ createdBy: "s-0", inSidebar: true });
     const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
-    expect(items.indexOf("Hide from sidebar")).toBe(items.indexOf("Archive") + 1);
+    expect(items.indexOf("Hide from sidebar")).toBe(items.indexOf("Archive") - 1);
     const item = screen.getByTestId("menu-sidebar-hide");
     expect(item.querySelector("svg")?.getAttribute("class")).toContain("lucide-eye-off");
     fireEvent.click(item);
