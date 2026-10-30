@@ -93,6 +93,7 @@
  *   thread.new --like and thread.new-like copy a thread's set, branch, workspace and mode; thread.new's
  *   sets and thread.new-like return the collision hints as warnings (mock/projectSets.ts);
  *   thread.workspace sets a thread's workspace reference.
+ *   POST /__mock/thread-info?scenario=single|ws9|busy|child|nogit   (the thread info card's fixtures; World.addThreadInfo)
  *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login]
  *                                                 (a worktree-mode thread over several projects, its worktrees made)
  *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
@@ -1236,6 +1237,14 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
           name: q.get("name") ?? "set thread",
         });
         json(res, 200, threadSummary(s.id));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/thread-info":
+      // scenario=single|ws9|busy|child|nogit: the thread info card's fixtures (World.addThreadInfo).
+      try {
+        json(res, 200, { id: world.addThreadInfo(q.get("scenario") ?? "single") });
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

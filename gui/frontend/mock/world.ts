@@ -6,6 +6,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
+import { ActionIcon, ActionRunMode } from "../src/gen/codefoundry/v1/action_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
@@ -1442,7 +1443,7 @@ export class World {
    * worktrees made in every git project now (the daemon makes them at spawn), running in
    * `project`'s (else the first's). POST /__mock/multi-thread.
    */
-  addMultiThread(refs: readonly string[], project: string, branch: string, name: string, workspace = ""): MockThread {
+  addMultiThread(refs: readonly string[], project: string, branch: string, name: string, workspace = "", id = ""): MockThread {
     const ids = refs.map((r) => this.projectRef(r).id);
     if (ids.length === 0) throw new CommandError("invalid", "name the projects");
     const primary = project ? this.projectRef(project).id : (ids[0] ?? "");
@@ -1454,9 +1455,148 @@ export class World {
       if (id === primary) cwd = path;
     }
     const ws = workspace ? this.workspaceRef(workspace) : undefined;
-    const s = this.addThread({ id: `s-mp-${String(this.nextId++)}`, projectId: primary, worktreePath: cwd, projectIds: ids, branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws?.id ?? "", createdAt: new Date() });
+    const s = this.addThread({ id: id || `s-mp-${String(this.nextId++)}`, projectId: primary, worktreePath: cwd, projectIds: ids, branch, createdWorktree: true, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws?.id ?? "", createdAt: new Date() });
     this.publishThread(s);
     return s;
+  }
+
+  /**
+   * Test control: the thread info card's scenarios (POST /__mock/thread-info?scenario=…;
+   * docs/notes/thread-info-card.md). Each adds its threads (held: the clock leaves them
+   * alone) and returns the id to open:
+   *   single  s-ti-1 "Fix the stale PR badge": repo-cf, a fresh copy on cf/sidebar-tree 3
+   *           ahead, two linked PRs (#78 open, #63 merged), 4 changed files, the agents
+   *           script (subagents, one background shell, MCP servers), three child threads
+   *           (working, needs you, finished), context 221K with the cache warm for 41 min;
+   *   ws9     s-ti-ws "Roll out refresh tokens": workspace "platform" over nine projects
+   *           (api … cli), cwd api diverged 3/1, auth-lib moved to cf/auth-tokens-2,
+   *           mobile mid-rebase, seven PRs over four projects (#58 stacked on #57), a
+   *           Typecheck run in web (the action row names web);
+   *   busy    single, working (Push waits for the model);
+   *   child   single, then s-ti-child made by s-ti-1 (its parent row);
+   *   nogit   s-ti-nogit in "writing" (no git: no git group).
+   */
+  addThreadInfo(scenario: string): string {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const base = { model: "claude-opus-4-8[1m]", effort: "high", held: true, createdAt: ago(45), lastActivityAt: ago(19), usage: sampleUsage(), contextModel: "claude-opus-4-8" } as const;
+    const status = (path: string, over: Partial<MockWorktree["status"]>) => {
+      for (const project of this.projects.values()) {
+        const w = project.worktrees.find((x) => x.path === path);
+        if (!w) continue;
+        w.status = { ...w.status, ...over };
+        this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
+      }
+    };
+    const single = (): MockThread => {
+      if (this.threads.has("s-ti-1")) return this.thread("s-ti-1");
+      const cf = this.projectRef("repo-cf");
+      const wt = cf.worktrees.find((w) => w.branch === "cf/sidebar-tree") ?? this.addWorktree(cf, "cf/sidebar-tree", "origin/main");
+      status(wt.path, { upstream: "origin/cf/sidebar-tree", ahead: 3, baseAhead: 3 });
+      const s = this.addThread({ ...base, id: "s-ti-1", projectId: "repo-cf", worktreePath: wt.path, name: "Fix the stale PR badge", createdWorktree: true, branch: "cf/sidebar-tree", contextTokens: 221_000, lastResultAt: ago(19) });
+      this.logs.load(s.id, "agents");
+      const slug = cf.githubSlug;
+      this.gh.addCardPullRequest(slug, 78, "Include the head SHA in the fingerprint", { head: "cf/sidebar-tree", state: "open", checks: "ok" });
+      this.gh.addCardPullRequest(slug, 63, "Sidebar tree rows", { head: "cf/sidebar-tree-1", state: "merged", ageMs: 30 * 3_600_000 });
+      s.linkedPullRequests = [63, 78].map((n) => ({ slug, number: n, url: `https://github.com/${slug}/pull/${String(n)}`, linkedAt: ago(30) }));
+      this.gh.setCardDetail("repo-cf", wt.path, [
+        { path: "gui/frontend/src/lib/tree.ts", added: 30, deleted: 6 },
+        { path: "gui/frontend/src/components/sidebar/Sidebar.tsx", added: 8, deleted: 3 },
+        { path: "gui/frontend/src/lib/tree.test.ts", added: 3, deleted: 0 },
+        { path: "docs/notes/sidebar-tree.md", added: 1, deleted: 0, uncommitted: true },
+      ]);
+      const kids: [string, string, ThreadStatus, string, number][] = [
+        ["s-ti-k1", "Mobile token storage", ThreadStatus.BUSY, "working: Mobile token storage", 14],
+        ["s-ti-k2", "Billing webhook retry", ThreadStatus.NEEDS_ATTENTION, "question: Retry on 409?", 62],
+        ["s-ti-k3", "Docs for refresh tokens", ThreadStatus.IDLE, "finished", 40],
+      ];
+      for (const [id, name, st, reason, min] of kids) {
+        const k = this.addThread({ ...base, id, projectId: "repo-cf", worktreePath: CF, name, model: "claude-sonnet-5[1m]", effort: "medium", status: st, statusReason: reason, createdAt: ago(min), statusChangedAt: ago(min - 22), createdBy: s.id, createdByName: s.name, branch: `cf/${id}` });
+        this.publishThread(k);
+      }
+      this.publishThread(s);
+      return s;
+    };
+    switch (scenario) {
+      case "single":
+        return single().id;
+      case "busy": {
+        const s = single();
+        this.setStatus(s, ThreadStatus.BUSY, "working: Fix the stale PR badge");
+        this.publishThread(s);
+        return s.id;
+      }
+      case "child": {
+        const p = single();
+        const c = this.addThread({ ...base, id: "s-ti-child", projectId: "repo-cf", worktreePath: CF, name: "Port the rotation to web", createdBy: p.id, createdByName: p.name, inSidebar: true, status: ThreadStatus.BUSY, statusReason: "working: Port the rotation to web" });
+        this.publishThread(c);
+        return c.id;
+      }
+      case "nogit": {
+        const s = this.addThread({ ...base, id: "s-ti-nogit", projectId: "repo-wr", worktreePath: WR, name: "Outline the essay" });
+        this.publishThread(s);
+        return s.id;
+      }
+      case "ws9": {
+        const names = ["api", "web", "auth-lib", "docs", "mobile", "infra", "billing", "notify", "cli"];
+        for (const n of names) {
+          if (this.projects.has(`repo-${n}`)) continue;
+          const path = `${HOME}/src/${n}`;
+          const r: MockProject = { id: `repo-${n}`, path, name: n, defaultBranch: "main", githubSlug: `acme/${n}`, remotes: ["origin"], worktrees: [{ path, branch: "main", head: "a1b2c3d4", isMain: true, status: clean() }] };
+          this.projects.set(r.id, r);
+          this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(r) } });
+        }
+        if (![...this.workspaces.values()].some((w) => w.name === "platform")) this.addWorkspace("platform", names);
+        const branch = "cf/auth-tokens";
+        const s = this.threads.get("s-ti-ws") ?? this.addMultiThread(names, "web", branch, "Roll out refresh tokens", "platform", "s-ti-ws");
+        s.held = true;
+        s.model = "claude-opus-4-8[1m]";
+        s.effort = "high";
+        s.contextModel = "claude-opus-4-8";
+        s.contextTokens = 410_000;
+        s.lastResultAt = ago(5);
+        s.usage = sampleUsage();
+        const path = (n: string) => this.projectRef(`repo-${n}`).worktrees.find((w) => w.branch === branch)?.path ?? "";
+        // Typecheck ran in this thread while it worked in web; then it moved to api (Run in).
+        const typecheck = this.actions.create({ projectId: "repo-web", name: "Typecheck", command: "pnpm check", icon: ActionIcon.LINT, inTerminal: false, onWorktreeCreate: false });
+        this.actions.create({ projectId: "repo-web", name: "e2e", command: "pnpm e2e", icon: ActionIcon.TEST, inTerminal: false, onWorktreeCreate: false });
+        this.actions.create({ projectId: "repo-api", name: "Test", command: "go test ./...", icon: ActionIcon.TEST, inTerminal: false, onWorktreeCreate: false });
+        this.actions.create({ projectId: "repo-api", name: "Migrate", command: "make migrate", icon: ActionIcon.CONFIGURE, inTerminal: false, onWorktreeCreate: false });
+        this.actions.run({ action: typecheck.id ?? "", threadId: s.id, mode: ActionRunMode.BACKGROUND });
+        const authLib = path("auth-lib");
+        this.moveTo(s, "repo-api", path("api"));
+        status(path("api"), { upstream: `origin/${branch}`, ahead: 3, behind: 1, baseAhead: 4 });
+        status(path("web"), { upstream: `origin/${branch}`, ahead: 1, baseAhead: 1 });
+        status(path("mobile"), { operation: "rebase", operationStep: 3, operationTotal: 7 });
+        this.checkout(authLib, "cf/auth-tokens-2");
+        this.gh.setCardDetail("repo-api", path("api"), [
+          { path: "auth/refresh.go", added: 30, deleted: 6 },
+          { path: "auth/refresh_test.go", added: 8, deleted: 0 },
+          { path: "auth/store.go", added: 3, deleted: 3 },
+          { path: "README.md", added: 1, deleted: 0 },
+        ]);
+        this.gh.setCardDetail("repo-web", path("web"), [
+          { path: "src/auth.ts", added: 12, deleted: 3 },
+          { path: "src/auth.test.ts", added: 6, deleted: 0 },
+        ]);
+        this.gh.setCardDetail("repo-auth-lib", authLib, Array.from({ length: 7 }, (_, i) => ({ path: `rotate/${String(i)}.go`, added: [40, 30, 20, 10, 10, 5, 5][i] ?? 0, deleted: [20, 15, 10, 6, 5, 3, 2][i] ?? 0 })));
+        this.gh.setCardDetail("repo-docs", path("docs"), [{ path: "refresh-tokens.md", added: 6, deleted: 0 }]);
+        const prs: [string, number, string, Parameters<GhWorld["addCardPullRequest"]>[3]][] = [
+          ["acme/api", 412, "Token refresh endpoint", { head: branch, state: "open", checks: "ok", review: "approved" }],
+          ["acme/api", 398, "Token table", { head: "cf/token-table", state: "merged", ageMs: 50 * 3_600_000 }],
+          ["acme/web", 1088, "Use refresh tokens", { head: branch, state: "open", checks: "running" }],
+          ["acme/auth-lib", 58, "Rotate on refresh", { head: "cf/auth-tokens-2", base: branch, state: "open", checks: "running" }],
+          ["acme/auth-lib", 57, "Rotate refresh tokens", { head: branch, state: "open", checks: "failed" }],
+          ["acme/auth-lib", 51, "Token helpers", { head: "cf/token-helpers", state: "merged", ageMs: 70 * 3_600_000 }],
+          ["acme/docs", 19, "Refresh token docs", { head: branch, state: "draft" }],
+        ];
+        for (const [slug, n, title, o] of prs) this.gh.addCardPullRequest(slug, n, title, o);
+        s.linkedPullRequests = prs.map(([slug, n]) => ({ slug, number: n, url: `https://github.com/${slug}/pull/${String(n)}`, linkedAt: ago(20) }));
+        this.publishThread(s);
+        return s.id;
+      }
+      default:
+        throw new CommandError("invalid", "scenario must be single, ws9, busy, child or nogit");
+    }
   }
 
   /** Test control: a thread's project set. POST /__mock/thread/project-ids. */
@@ -4074,6 +4214,11 @@ export class World {
         cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: ["cmd+j"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
+      },
+      {
+        cmd: { name: "view.thread-info", title: "Toggle Thread Info", category: "View", description: "Show or hide the thread info card beside a thread's conversation: its checkout, branch and pull requests, git state, shells, related threads and agents, MCP servers, context and usage.", keybindings: ["cmd+shift+i"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread-info" } } }))}`,
       },
       {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },

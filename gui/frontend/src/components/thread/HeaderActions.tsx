@@ -7,6 +7,7 @@ import { PanelToggle } from "@/components/panel/PanelToggle";
 import { prStateText } from "@/components/pr/tones";
 import { prStateLook } from "@/components/prs/prState";
 import { SnoozeButton } from "@/components/snooze/SnoozeMenu";
+import { ThreadInfoToggle } from "@/components/threadinfo/ThreadInfoToggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
@@ -85,7 +86,8 @@ function SidebarButton({ threadId }: { threadId: string }) {
 
 /**
  * The thread header's right side: the linked pull requests (the workspace is the left side's place name, ThreadParts), then the
- * thread's commands (its "More" menu among them: ThreadMenu) and the window's, run against the current selection (this thread) exactly
+ * thread's commands (its "More" menu among them: ThreadMenu) and the window's (the thread
+ * info card's toggle among them), run against the current selection (this thread) exactly
  * as the palette runs them. Each command button hides when the daemon does not list it as
  * available.
  */
@@ -98,6 +100,7 @@ export function HeaderActions({ threadId }: { threadId: string }) {
       <ArchiveButton threadId={threadId} />
       <ThreadMenu threadId={threadId} />
       <ThreadActionsMenu threadId={threadId} />
+      <ThreadInfoToggle />
       <BottomToggle />
       <PanelToggle />
     </span>

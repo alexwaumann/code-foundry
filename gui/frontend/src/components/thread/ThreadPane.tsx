@@ -5,10 +5,12 @@ import { EmberBody } from "@/components/ember/EmberPane";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
+import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { useIsEmberThread } from "@/stores/ember";
 import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
+import { useUiStore } from "@/stores/ui";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
@@ -80,6 +82,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const [dockRef, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
+  const infoOpen = useUiStore((s) => s.threadInfoOpen);
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
@@ -92,33 +95,37 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
-        <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
-          {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
-          <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
-            {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
-            {loaded && catchingUp && (
-              <div
-                className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
-                data-testid="thread-catching-up"
-              >
-                <Loader2 className="size-3 animate-spin" />
-                catching up…
+        <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef}>
+            {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
+            <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
+              {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
+              {loaded && catchingUp && (
+                <div
+                  className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-cf-surface-overlay/90 px-2 py-0.5 text-caption-sm"
+                  data-testid="thread-catching-up"
+                >
+                  <Loader2 className="size-3 animate-spin" />
+                  catching up…
+                </div>
+              )}
+              {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+              {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
+              {loaded && empty && !working && (
+                <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
+                  No messages yet.
+                </p>
+              )}
+              <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} rail />
+              <div className="dock" ref={dockRef}>
+                <AgentsStrip threadId={threadId} />
+                <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
               </div>
-            )}
-            {!loaded && <p className="absolute inset-x-0 top-10 text-center text-body text-cf-text-muted">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
-            {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
-            {loaded && empty && !working && (
-              <p className="absolute inset-x-0 top-10 px-10 text-center text-body text-cf-text-muted" data-testid="thread-empty">
-                No messages yet.
-              </p>
-            )}
-            <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} rail />
-            <div className="dock" ref={dockRef}>
-              <AgentsStrip threadId={threadId} />
-              <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
-            </div>
-            <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
-          </PaneOverlay>
+              <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
+            </PaneOverlay>
+          </div>
+          {/* The thread info card: a column right of the conversation and its composer (view.thread-info). */}
+          {infoOpen && <ThreadInfoCard threadId={threadId} />}
         </div>
       </section>
     </ThreadContext.Provider>

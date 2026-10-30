@@ -180,6 +180,11 @@ interface UiState {
   collapsedWorkspaces: string[];
   /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
   emberShowWork: boolean;
+  /**
+   * The thread info card shows beside every thread's conversation and composer in this
+   * window (view.thread-info; components/threadinfo, docs/notes/thread-info-card.md).
+   */
+  threadInfoOpen: boolean;
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
   select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
@@ -218,6 +223,8 @@ interface UiState {
   toggleArchivedCollapsed: () => void;
   toggleSnoozedCollapsed: () => void;
   setEmberShowWork: (on: boolean) => void;
+  /** view.thread-info: shows or hides the thread info card; returns the new state. */
+  toggleThreadInfo: () => boolean;
   /** Collapses (true) or expands a project on the Projects page; false when it already was. */
   setProjectCollapsed: (projectId: string, collapsed: boolean) => boolean;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
@@ -404,6 +411,7 @@ export const useUiStore = create<UiState>()(
       collapsedProjects: [],
       collapsedWorkspaces: [],
       emberShowWork: false,
+      threadInfoOpen: false,
 
       select: (sel, opts) => {
         set((s) => selectionUpdate(s, sel, { focusPrompt: opts?.focusPrompt, push: true }));
@@ -484,6 +492,11 @@ export const useUiStore = create<UiState>()(
       setEmberShowWork: (emberShowWork) => {
         set({ emberShowWork });
       },
+      toggleThreadInfo: () => {
+        const open = !get().threadInfoOpen;
+        set({ threadInfoOpen: open });
+        return open;
+      },
       setProjectCollapsed: (projectId, collapsed) => {
         const prev = get().collapsedProjects;
         const next = withMember(prev, projectId, collapsed);
@@ -536,6 +549,7 @@ export const useUiStore = create<UiState>()(
           collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
           collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
           emberShowWork: bool(p.emberShowWork, current.emberShowWork),
+          threadInfoOpen: bool(p.threadInfoOpen, current.threadInfoOpen),
         };
       },
       partialize: (s) => ({
@@ -550,6 +564,7 @@ export const useUiStore = create<UiState>()(
         collapsedProjects: s.collapsedProjects,
         collapsedWorkspaces: s.collapsedWorkspaces,
         emberShowWork: s.emberShowWork,
+        threadInfoOpen: s.threadInfoOpen,
       }),
     },
   ),
