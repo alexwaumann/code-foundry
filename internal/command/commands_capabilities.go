@@ -290,9 +290,10 @@ type CapabilityView struct {
 	Description string `json:"description"`
 }
 
-// notPages are the view.<name> verbs that act on a window rather than show a page, and
-// view.inline, which shows a page in a thread's conversation (the panel group tells it).
-var notPages = []string{ViewBack, ViewForward, "inline"}
+// notPages are the view.<name> verbs that act on a window rather than show a page
+// (back, forward, the thread info card's toggle), and view.inline, which shows a page in
+// a thread's conversation (the panel group tells it).
+var notPages = []string{ViewBack, ViewForward, ViewThreadInfo, "inline"}
 
 // pageCommands are the main-pane pages: the view.<name> verbs (one segment after view.)
 // but those in notPages.

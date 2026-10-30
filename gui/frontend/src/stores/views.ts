@@ -204,6 +204,10 @@ export function showView(name: string): boolean {
       // thread.next: the thread below the current one in the sidebar, wrapping.
       jumpToNeighbour(1);
       return true;
+    case "thread-info":
+      // view.thread-info: the thread info card beside every thread in this window.
+      useUiStore.getState().toggleThreadInfo();
+      return true;
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();

@@ -70,6 +70,7 @@ func TestPanelKeybindings(t *testing.T) {
 		"view.panel.toggle":  "cmd+shift+e",
 		"view.bottom.toggle": "cmd+j",
 		"terminal.new":       "cmd+t",
+		"view.thread-info":   "cmd+shift+i",
 	}
 	for name, chord := range want {
 		c, ok := f.reg.Get(name)

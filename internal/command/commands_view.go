@@ -165,7 +165,8 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 //     view.panel.pr;
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
 //     conversation (category Thread);
-//   - composer.history (commands_view_composer.go), the Previous prompts picker.
+//   - composer.history (commands_view_composer.go), the Previous prompts picker;
+//   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
 //
 // Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, d ViewDeps) error {
@@ -386,5 +387,5 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:  panel(ViewPanelWorktree, inWorktreeOrFolder),
 		},
 	}
-	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.composerHistoryCommand())...)
+	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.composerHistoryCommand(), d.threadInfoCommand())...)
 }

@@ -341,6 +341,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     toggleBottomFromHere();
     return true;
   },
+  // Window-local: this window's thread info card (the CLI's reaches every window through ShowView).
+  "view.thread-info": () => {
+    useUiStore.getState().toggleThreadInfo();
+    return true;
+  },
   // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
   // the palette, a button), the shell it starts takes focus in the bottom panel.
   "terminal.new": () => {

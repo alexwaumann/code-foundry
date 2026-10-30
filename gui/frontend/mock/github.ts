@@ -390,6 +390,36 @@ export class GhWorld {
     this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
   }
 
+  /**
+   * The thread info card's fixtures (World.addThreadInfo): a pull request on `head` (into
+   * `base`) beside the branch's others, with its checks and review, so its detail resolves.
+   */
+  addCardPullRequest(slug: string, number: number, title: string, o: { head: string; base?: string; state: "open" | "draft" | "merged"; checks?: "ok" | "failed" | "running"; review?: "approved" | "required"; requested?: string[]; ageMs?: number }): void {
+    const ageMs = o.ageMs ?? 2 * HOUR;
+    const merged = o.state === "merged";
+    const checks = o.checks === "failed" ? rollup(CheckRollupState.FAILURE, 9, 2) : o.checks === "running" ? rollup(CheckRollupState.PENDING, 4, 0, 5) : rollup(CheckRollupState.SUCCESS, 12);
+    const pr = this.pr(slug, number, title, {
+      headRef: o.head,
+      baseRef: o.base ?? "main",
+      ageMs,
+      draft: o.state === "draft",
+      state: merged ? PullRequestState.MERGED : PullRequestState.OPEN,
+      mergedAt: merged ? this.at(ageMs) : undefined,
+      checks,
+      reviewDecision: o.review === "approved" ? ReviewDecision.APPROVED : ReviewDecision.REVIEW_REQUIRED,
+      reviewRequests: o.requested ?? [],
+    });
+    const key = `${slug}\u0000${o.head}`;
+    this.branches.set(key, [...(this.branches.get(key) ?? []).filter((p) => p.number !== number), pr]);
+  }
+
+  /** The thread info card's fixtures: a worktree's changes against its base (its detail's files). */
+  setCardDetail(projectId: string, path: string, files: { path: string; added: number; deleted: number; uncommitted?: boolean }[]): void {
+    const d = this.detail(path, "origin/main", files.map((f) => ({ status: f.added > 0 && f.deleted === 0 ? "A" : "M", ...f })), []);
+    this.details.set(path, { ...d, projectId });
+    this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId, path, computedAt: d.computedAt } } });
+  }
+
   /** A pull request any dashboard list or watched branch holds. */
   findPr(slug: string, number: number): PrInit | undefined {
     const d = this.dashboard;
