@@ -950,9 +950,10 @@ message ThreadCheckout {
   string instructions = 8;
   // The project has git; false for a plain folder (one checkout, shared by every thread).
   bool git = 9;
-  // A worktree-mode git member, never the project's main checkout: the app makes this
-  // worktree again (on created_branch, at the same path) when missing, and an archive may
-  // remove it (never its branch). Was derived.
+  // A worktree-mode git member, never the project's main checkout: when it is missing a
+  // start makes the member's worktree again on created_branch, at the default path for
+  // it (the same path when the worktree was made there; the cwd always keeps its path),
+  // and records where it went; an archive may remove it (never its branch). Was derived.
   bool worktree_mode = 10;
   // The commit checked out (HEAD); empty when unknown or on an unborn branch.
   string head = 11;

@@ -4180,9 +4180,10 @@ type ThreadCheckout struct {
 	Instructions string `protobuf:"bytes,8,opt,name=instructions,proto3" json:"instructions,omitempty"`
 	// The project has git; false for a plain folder (one checkout, shared by every thread).
 	Git bool `protobuf:"varint,9,opt,name=git,proto3" json:"git,omitempty"`
-	// A worktree-mode git member, never the project's main checkout: the app makes this
-	// worktree again (on created_branch, at the same path) when missing, and an archive may
-	// remove it (never its branch). Was derived.
+	// A worktree-mode git member, never the project's main checkout: when it is missing a
+	// start makes the member's worktree again on created_branch, at the default path for
+	// it (the same path when the worktree was made there; the cwd always keeps its path),
+	// and records where it went; an archive may remove it (never its branch). Was derived.
 	WorktreeMode bool `protobuf:"varint,10,opt,name=worktree_mode,json=worktreeMode,proto3" json:"worktree_mode,omitempty"`
 	// The commit checked out (HEAD); empty when unknown or on an unborn branch.
 	Head string `protobuf:"bytes,11,opt,name=head,proto3" json:"head,omitempty"`

@@ -83,8 +83,8 @@ func samePath(a, b string) bool {
 }
 
 // DefaultWorktreePath is where CreateWorktree puts project id's worktree for branch: the
-// same path every caller computes, so threads on one branch share one worktree (a
-// thread's derived checkouts, docs/notes/workspaces-v2-1-threads.md). It reads the
+// same path every caller computes, so threads made for one branch share one worktree (the
+// thread store records it as their checkout, docs/notes/thread-checkouts.md). It reads the
 // GitHub slug of the project's last reconcile (CreateWorktree reads origin afresh, so
 // before the first reconcile of a project with a GitHub origin the two can differ;
 // callers look for an existing worktree on the branch first). "" for an unknown project

@@ -2308,9 +2308,10 @@ export type ThreadCheckout = Message<"codefoundry.v1.ThreadCheckout"> & {
   git: boolean;
 
   /**
-   * A worktree-mode git member, never the project's main checkout: the app makes this
-   * worktree again (on created_branch, at the same path) when missing, and an archive may
-   * remove it (never its branch). Was derived.
+   * A worktree-mode git member, never the project's main checkout: when it is missing a
+   * start makes the member's worktree again on created_branch, at the default path for
+   * it (the same path when the worktree was made there; the cwd always keeps its path),
+   * and records where it went; an archive may remove it (never its branch). Was derived.
    *
    * @generated from field: bool worktree_mode = 10;
    */

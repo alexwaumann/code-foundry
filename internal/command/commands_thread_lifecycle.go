@@ -154,7 +154,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name: its projects (unless projects) and instructions; project workspace runs it in its folder (a project named workspace wins)"},
 				{Name: "projects", Type: String, Description: "Comma-separated projects it works in (project:base with new-worktree); it runs in the first unless project"},
-				{Name: "like", Type: String, ID: ThreadID, Description: "Thread to copy projects, branch and mode from"},
+				{Name: "like", Type: String, ID: ThreadID, Description: "Thread to copy projects, branch, mode and checkouts from"},
 				{Name: "new-branch", Type: Bool, Description: "With like, or in a thread: a new branch, new worktrees"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
