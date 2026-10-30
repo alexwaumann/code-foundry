@@ -4,7 +4,7 @@
 
 For the code-foundry-pages skill. A new install prefills the composer with "I just installed
 Code Foundry and have no projects yet. This is the welcome tutorial: open the page
-~/.code-foundry/pages/welcome.html in the side panel." The app writes that page at every
+~/.code-foundry/pages/welcome.html in the side panel and walk me through it." The app writes that page at every
 start, in the home's `pages` folder: here `{{cf.welcomePage}}` (the path the prompt names). Only
 if that file is missing, copy `welcome.html` beside this file to
 `$CODE_FOUNDRY_PAGES/welcome.html` and show the copy. Do not write or rewrite it, and build

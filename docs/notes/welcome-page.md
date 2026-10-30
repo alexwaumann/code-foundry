@@ -4,9 +4,10 @@ A first-run tutorial for a user with no projects: one HTML page of four steps (s
 something to it, point it at your work, put several agents on it, make it yours), shown in
 the side panel of the thread the user starts with. It was iterated live with a user over
 six rounds on a scratch home; this PR ships that v1 and the pieces the app needs around it.
-The composer's prefilled first-run prompt is a later PR; it will read: "I just installed
-Code Foundry and have no projects yet. This is the welcome tutorial: open the page
-~/.code-foundry/pages/welcome.html in the side panel."
+The composer's prefilled first-run prompt is a later PR. Its wording matters (see Live
+runs): "I just installed Code Foundry and have no projects yet. This is the welcome
+tutorial: open the page ~/.code-foundry/pages/welcome.html in the side panel and walk me
+through it."
 
 ## What shipped
 
@@ -96,4 +97,25 @@ Code Foundry and have no projects yet. This is the welcome tutorial: open the pa
   `TestRenderPagesSkill` (the placed path in welcome.md and the help skill).
 - Playwright: welcome-page.spec.ts; without the FileTab change its reload step fails.
   file-tabs, page-verbs-panel and page-card-reload still pass.
-- Real daemon and GUI on a scratch home: see the PR body.
+- Real daemon and GUI on a scratch home (`~/cf-scratch-welcome`): `pages/welcome.html` is
+  written at start (byte-identical to the embedded page, "welcome page placed" logged after
+  "skills installed"), the rendered skills name its absolute path, and a `sed -i` rewrite
+  of it reloaded the open panel tab within the second.
+
+## Live runs (Sonnet 5, medium, the default)
+
+The prompt decides whether the thread reads a skill. Without one it acts on the system
+prompt's page rule ("shown with view.inline <file>") and never sees the prescribed reply.
+
+| Prompt ends with | Runs | Result |
+|---|---|---|
+| "… open the page <path> in the side panel." | 2 | `view.inline` (an inline card, no panel), no skill read, its own one-line reply |
+| same, with "the welcome tutorial" added to the help skill's description | 1 | `view.inline --panel`, no skill read |
+| same, naming "(the code-foundry-help skill says how to show it)" | 1 | `view.inline`, no skill read |
+| same, with a ThreadPrompt clause "the welcome tutorial: skill code-foundry-help first" | 2 | once exact (help skill, `view.panel.page`, the two lines); once `view.panel.page` with its own reply |
+| "… in the side panel and walk me through it." | 2 | both exact: help skill (or the entry skill, then the pages skill's welcome.md), `view.panel.page`, the two prescribed lines |
+
+So the shipped skills are unchanged in their routing and the prompt carries "and walk me
+through it" (a how-to request, which the help skill's description catches). The
+description and ThreadPrompt variants were reverted: neither was reliable, and the
+ThreadPrompt is at its byte cap ("grow it only by cutting").
