@@ -208,6 +208,9 @@ type Options struct {
 	// McpPollInterval is how often an unsettled MCP status is asked again (mcp.go
 	// settleMcp). Default 3s.
 	McpPollInterval time.Duration
+	// ServerProbe maps background shells to their process groups and finds the TCP ports
+	// those listen on (servers.go). Default: procscan, with lsof.
+	ServerProbe ServerProbe
 	// Attended reports whether the user is looking at the app now (a GUI window is
 	// visible and key). Only then does a viewer acknowledge a thread and see its
 	// until-seen flags; the daemon calls AttendedChanged on each change (attended.go).
@@ -289,6 +292,9 @@ func (o Options) withDefaults() (Options, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	if o.ServerProbe == nil {
+		o.ServerProbe = lsofProbe{}
+	}
 	if o.WakeLimit <= 0 {
 		o.WakeLimit = WakeLimit
 	}
@@ -337,6 +343,14 @@ type Manager struct {
 	// createDefaults picks the model and effort of threads some threads create
 	// (residenthooks.go); nil: none.
 	createDefaults atomic.Pointer[CreateDefaultsFunc]
+	// servers maps the threads' background shells to their processes and probes the
+	// ports they listen on (servers.go).
+	servers *serverWatch
+	// shellStops are the background shells StopShell is stopping (servers.go).
+	shellStops struct {
+		sync.Mutex
+		keys map[shellKey]bool
+	}
 	// wtLocks serialize making one (project, branch) worktree (placement.go): key ->
 	// *sync.Mutex.
 	wtLocks sync.Map
@@ -408,6 +422,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	m.servers = newServerWatch(m, opts.ServerProbe)
 	// Threads whose creator was removed are the user's now (orphans.go).
 	if err := adoptLoadedOrphans(ctx, m, rows); err != nil {
 		return nil, err
@@ -486,6 +501,12 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		defer m.wg.Done()
 		defer timerTicker.Stop()
 		m.fireTimersLoop(timerTicker.C)
+	}()
+	// Background shells' servers (servers.go): idle until a shell runs.
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.servers.run(m.ctx)
 	}()
 	// Idle threads stop at their cache expiry (lifecycle.go). Nothing runs at startup.
 	idleTicker := time.NewTicker(opts.IdleCheckInterval)
@@ -1351,6 +1372,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 			archivedStatus(&rec.s, m.opts.Now())
 		}
 	})
+	m.servers.changed() // its shells are gone (servers.go)
 }
 
 // startNaming names a thread from its first user message, once.

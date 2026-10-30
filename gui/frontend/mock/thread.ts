@@ -49,7 +49,7 @@ import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
-import { scriptShells, shellSummary, type ShellCall } from "./shells";
+import { scriptServers, scriptShells, shellSummary, type ShellCall } from "./shells";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
@@ -136,14 +136,15 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 );
 
 /**
- * The scripted conversation's states. stopped: idle's conversation, the thread stopped at
+ * The scripted conversation's states. servers: the shells state with two dev servers
+ * listening beside them (mock/shells.ts scriptServers). stopped: idle's conversation, the thread stopped at
  * its prompt cache expiry (no process; mock/world.ts backdates its last result so the
  * cache has expired); crashed: Claude did not start for a message (its item, the error
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "html-repeat" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed", "html", "html-idle", "html-scroll", "html-repeat", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "html-repeat" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -374,14 +375,32 @@ export class MockThreadLogs {
     return this.shells.get(id)?.length ?? 0;
   }
 
+  /** The thread's running background shells, oldest first (Thread.background_shells). */
+  backgroundShellsOf(id: string): readonly ShellCall[] {
+    return this.shells.get(id) ?? [];
+  }
+
   /**
-   * POST /__mock/thread/shell-end: the oldest running shell ends like the daemon ends it:
-   * its call finishes with Claude's summary (an error when failed), the count is published.
+   * thread.shell.stop: the stop note, then the shell ends killed, as the daemon's stop
+   * does once Claude reports it.
    */
-  endShell(id: string, failed: boolean): void {
+  stopShell(id: string, taskId: string): void {
+    const shell = (this.shells.get(id) ?? []).find((c) => c.taskId === taskId);
+    if (!shell) throw new CommandError("notfound", `thread ${id} runs no background shell "${taskId}"`);
+    this.append(id, this.item(id, { case: "note", value: { text: `Stopped background shell: ${shell.command || shell.description}` } }));
+    this.endShell(id, true, taskId);
+  }
+
+  /**
+   * POST /__mock/thread/shell-end: the oldest running shell (or taskId's) ends like the
+   * daemon ends it: its call finishes with Claude's summary (an error when failed), the
+   * count is published.
+   */
+  endShell(id: string, failed: boolean, taskId?: string): void {
     this.world.worktreeOf(id);
-    const running = this.shells.get(id) ?? [];
-    const shell = running[0];
+    const all = this.shells.get(id) ?? [];
+    const shell = taskId === undefined ? all[0] : all.find((c) => c.taskId === taskId);
+    const running = shell ? [shell, ...all.filter((c) => c !== shell)] : all;
     if (!shell) throw new CommandError("invalid", `thread ${id} has no background shell running`);
     const call = this.log(id).items.find((x) => x.id === shell.toolUseId);
     if (call?.payload?.case === "toolCall") {
@@ -838,9 +857,10 @@ export class MockThreadLogs {
       this.world.agentsChanged(id);
       return;
     }
-    if (state === "shells") {
-      // Background shells only (mock/shells.ts): idle at its prompt, two shells running.
-      this.shells.set(id, scriptShells({ cwd, it, tool }));
+    if (state === "shells" || state === "servers") {
+      // Background shells only (mock/shells.ts): idle at its prompt, two shells running
+      // (and two servers listening).
+      this.shells.set(id, state === "servers" ? scriptServers({ cwd, it, tool }) : scriptShells({ cwd, it, tool }));
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       this.world.agentsChanged(id);

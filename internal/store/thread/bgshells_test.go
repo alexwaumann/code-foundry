@@ -55,7 +55,7 @@ func playShells(t *testing.T, fixture string) *shellFeed {
 		p.event(ev)
 		switch e := ev.(type) {
 		case *claudestream.Task:
-			ch := f.set.task(e, time.Now(), call)
+			ch := f.set.task(e, time.Now(), 0, call)
 			ch.apply(p)
 			if ch.handled && e.Subtype == claudestream.TaskStarted {
 				f.started = append(f.started, *f.set.running[e.TaskID])
@@ -413,7 +413,7 @@ func TestBgShellOrphanKeepsTheUpdatedEnd(t *testing.T) {
 				ev := claudestream.Parse(line)
 				p.event(ev)
 				if tk, ok := ev.(*claudestream.Task); ok {
-					set.task(tk, time.Now(), nil).apply(p)
+					set.task(tk, time.Now(), 0, nil).apply(p)
 					if tk.Subtype == claudestream.TaskUpdated {
 						break // the process ends before the notification
 					}

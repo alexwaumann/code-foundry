@@ -63,6 +63,8 @@ type ThreadBackend interface {
 	FlagsBackend
 	// RestartBackend backs thread.restart (commands_thread_restart.go).
 	RestartBackend
+	// ShellBackend backs thread.shell.stop (commands_thread_shell.go).
+	ShellBackend
 	// SidebarBackend backs thread.sidebar (commands_thread_sidebar.go).
 	SidebarBackend
 	// WorkspaceRefBackend backs thread.workspace (commands_thread_workspace.go).

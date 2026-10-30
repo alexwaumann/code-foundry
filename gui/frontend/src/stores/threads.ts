@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentRunView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
+import type { AgentRunView, BackgroundShellView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { inSidebar } from "@/lib/inSidebar";
 import { threadBadge } from "@/lib/thread";
 
@@ -69,6 +69,8 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return sameReport(a[k], b[k]);
       case "flags":
         return sameFlags(a[k], b[k]);
+      case "backgroundShells":
+        return sameShells(a[k], b[k]);
       default:
         return a[k] === b[k];
     }
@@ -83,6 +85,26 @@ function sameCheckoutPath(a: ThreadView["checkoutPaths"][number], b: ThreadView[
 /** Field-by-field equality of flags (every Updated event carries new objects). */
 export function sameFlags(a: readonly ThreadFlagView[], b: readonly ThreadFlagView[]): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof ThreadFlagView)[]).every((k) => x[k] === b[i]?.[k])));
+}
+
+/** Field-by-field equality of background shells, their ports by value (every Updated event carries new objects). */
+function sameShells(a: readonly BackgroundShellView[], b: readonly BackgroundShellView[]): boolean {
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every((x, i) => {
+        const y = b[i];
+        return (
+          y !== undefined &&
+          x.taskId === y.taskId &&
+          x.description === y.description &&
+          x.command === y.command &&
+          x.startedAtMs === y.startedAtMs &&
+          x.ports.length === y.ports.length &&
+          x.ports.every((p, j) => p === y.ports[j])
+        );
+      }))
+  );
 }
 
 /** Field-by-field equality of reports (every Updated event carries a new object). */

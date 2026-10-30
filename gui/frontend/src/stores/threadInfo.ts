@@ -114,16 +114,34 @@ export function useCardPending(key: string): boolean {
 
 /** Runs `run` unless the row has one in flight; the row is pending until it settles. */
 export async function runOnce(key: string, run: () => Promise<unknown>): Promise<void> {
+  await holdOnce(key, async () => {
+    await run();
+    return false;
+  });
+}
+
+/**
+ * runOnce for an action whose effect shows later: a run that answers true keeps the row
+ * pending until releasePending (a stopped shell's row, until the shell leaves the list).
+ */
+export async function holdOnce(key: string, run: () => Promise<boolean>): Promise<void> {
   if (usePending.getState().pending[key]) return;
   usePending.setState((s) => ({ pending: { ...s.pending, [key]: true } }));
+  let held = false;
   try {
-    await run();
+    held = await run();
   } finally {
-    usePending.setState((s) => {
-      const { [key]: _done, ...rest } = s.pending;
-      return { pending: rest };
-    });
+    if (!held) releasePending(key);
   }
+}
+
+/** Ends a row's pending state (holdOnce). */
+export function releasePending(key: string): void {
+  if (!usePending.getState().pending[key]) return;
+  usePending.setState((s) => {
+    const { [key]: _done, ...rest } = s.pending;
+    return { pending: rest };
+  });
 }
 
 /**

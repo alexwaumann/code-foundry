@@ -307,10 +307,12 @@ export interface AgentThreads {
   agentsOf(id: string): AgentRunInit[];
   /** The thread's running background shells (mock/shells.ts). */
   shellsOf(id: string): number;
+  /** thread.shell.stop (mock/shells.ts shellCommands). */
+  stopShell(id: string, taskId: string): void;
   calls: string[];
 }
 
-type Command = {
+export type Command = {
   cmd: { name: string; title: string; category: string; description: string; keybindings: string[]; noPalette?: boolean; args: { name: string; type: ArgType; required: boolean; description: string }[] };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;

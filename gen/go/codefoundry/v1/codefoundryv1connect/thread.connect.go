@@ -120,6 +120,8 @@ const (
 	ThreadServiceRestartProcedure = "/codefoundry.v1.ThreadService/Restart"
 	// ThreadServiceReseedProcedure is the fully-qualified name of the ThreadService's Reseed RPC.
 	ThreadServiceReseedProcedure = "/codefoundry.v1.ThreadService/Reseed"
+	// ThreadServiceStopShellProcedure is the fully-qualified name of the ThreadService's StopShell RPC.
+	ThreadServiceStopShellProcedure = "/codefoundry.v1.ThreadService/StopShell"
 	// ThreadServiceMcpStatusProcedure is the fully-qualified name of the ThreadService's McpStatus RPC.
 	ThreadServiceMcpStatusProcedure = "/codefoundry.v1.ThreadService/McpStatus"
 	// ThreadServiceMcpReconnectProcedure is the fully-qualified name of the ThreadService's
@@ -338,6 +340,12 @@ type ThreadServiceClient interface {
 	// at any stop; the MCP status is kept until the new process reports. Any thread may be
 	// reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
 	Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error)
+	// StopShell stops one of the thread's own background shells (Thread.background_shells):
+	// its process group gets SIGTERM, then SIGKILL 3 seconds later. A note in the thread's
+	// conversation records it, and Claude learns of it as of any shell that ends. NOT_FOUND
+	// when the thread runs no such shell; FAILED_PRECONDITION when its process cannot be
+	// found. See docs/notes/thread-servers.md.
+	StopShell(context.Context, *connect.Request[v1.StopThreadShellRequest]) (*connect.Response[v1.StopThreadShellResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -633,6 +641,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Reseed")),
 			connect.WithClientOptions(opts...),
 		),
+		stopShell: connect.NewClient[v1.StopThreadShellRequest, v1.StopThreadShellResponse](
+			httpClient,
+			baseURL+ThreadServiceStopShellProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("StopShell")),
+			connect.WithClientOptions(opts...),
+		),
 		mcpStatus: connect.NewClient[v1.McpStatusRequest, v1.McpStatusResponse](
 			httpClient,
 			baseURL+ThreadServiceMcpStatusProcedure,
@@ -724,6 +738,7 @@ type threadServiceClient struct {
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
 	restart           *connect.Client[v1.RestartThreadRequest, v1.RestartThreadResponse]
 	reseed            *connect.Client[v1.ReseedThreadRequest, v1.ReseedThreadResponse]
+	stopShell         *connect.Client[v1.StopThreadShellRequest, v1.StopThreadShellResponse]
 	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
@@ -922,6 +937,11 @@ func (c *threadServiceClient) Restart(ctx context.Context, req *connect.Request[
 // Reseed calls codefoundry.v1.ThreadService.Reseed.
 func (c *threadServiceClient) Reseed(ctx context.Context, req *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error) {
 	return c.reseed.CallUnary(ctx, req)
+}
+
+// StopShell calls codefoundry.v1.ThreadService.StopShell.
+func (c *threadServiceClient) StopShell(ctx context.Context, req *connect.Request[v1.StopThreadShellRequest]) (*connect.Response[v1.StopThreadShellResponse], error) {
+	return c.stopShell.CallUnary(ctx, req)
 }
 
 // McpStatus calls codefoundry.v1.ThreadService.McpStatus.
@@ -1159,6 +1179,12 @@ type ThreadServiceHandler interface {
 	// at any stop; the MCP status is kept until the new process reports. Any thread may be
 	// reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
 	Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error)
+	// StopShell stops one of the thread's own background shells (Thread.background_shells):
+	// its process group gets SIGTERM, then SIGKILL 3 seconds later. A note in the thread's
+	// conversation records it, and Claude learns of it as of any shell that ends. NOT_FOUND
+	// when the thread runs no such shell; FAILED_PRECONDITION when its process cannot be
+	// found. See docs/notes/thread-servers.md.
+	StopShell(context.Context, *connect.Request[v1.StopThreadShellRequest]) (*connect.Response[v1.StopThreadShellResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -1450,6 +1476,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Reseed")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceStopShellHandler := connect.NewUnaryHandler(
+		ThreadServiceStopShellProcedure,
+		svc.StopShell,
+		connect.WithSchema(threadServiceMethods.ByName("StopShell")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceMcpStatusHandler := connect.NewUnaryHandler(
 		ThreadServiceMcpStatusProcedure,
 		svc.McpStatus,
@@ -1576,6 +1608,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRestartHandler.ServeHTTP(w, r)
 		case ThreadServiceReseedProcedure:
 			threadServiceReseedHandler.ServeHTTP(w, r)
+		case ThreadServiceStopShellProcedure:
+			threadServiceStopShellHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpStatusProcedure:
 			threadServiceMcpStatusHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpReconnectProcedure:
@@ -1751,6 +1785,10 @@ func (UnimplementedThreadServiceHandler) Restart(context.Context, *connect.Reque
 
 func (UnimplementedThreadServiceHandler) Reseed(context.Context, *connect.Request[v1.ReseedThreadRequest]) (*connect.Response[v1.ReseedThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Reseed is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) StopShell(context.Context, *connect.Request[v1.StopThreadShellRequest]) (*connect.Response[v1.StopThreadShellResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.StopShell is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {

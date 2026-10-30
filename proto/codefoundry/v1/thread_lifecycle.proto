@@ -364,6 +364,28 @@ message Thread {
   // when they were), which the next start resolves and records. What each has checked
   // out is ProjectService's worktree at the path. See docs/notes/thread-checkouts.md.
   repeated ThreadCheckoutPath checkout_paths = 70;
+  // The thread's own background shells running now (background_shells_running of
+  // them), oldest first: what the thread info card lists, with the TCP ports each one's
+  // process group listens on. Empty once the process ended and after a daemon restart.
+  // Not persisted. See docs/notes/thread-servers.md.
+  repeated BackgroundShell background_shells = 72;
+}
+
+// BackgroundShell is one of a thread's own background shells while it runs: a Bash call
+// with run_in_background or a Monitor call (docs/notes/background-shells.md).
+message BackgroundShell {
+  // Claude's task id ("b…"); ThreadService.StopShell takes it.
+  string task_id = 1;
+  // The call's description and command.
+  string description = 2;
+  string command = 3;
+  google.protobuf.Timestamp started_at = 4;
+  // The TCP ports the shell's process group listens on, distinct, in the order found
+  // (any address, IPv4 or IPv6 loopback: each is localhost:<port> to a browser). The
+  // daemon probes while a shell runs: 1, 3 and 10 seconds after any shell starts, then
+  // every 10 seconds, so a server shows within seconds of listening. Empty when none (or
+  // the probe is off: lsof missing or failing). See docs/notes/thread-servers.md.
+  repeated uint32 ports = 5;
 }
 
 // One member's checkout as the thread records it (Thread.checkout_paths).

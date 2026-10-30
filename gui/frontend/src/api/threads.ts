@@ -35,6 +35,17 @@ export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknow
 /** claude --permission-mode, as thread.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
+/** One of a thread's own background shells while it runs (Thread.background_shells). */
+export interface BackgroundShellView {
+  /** Claude's task id; thread.shell.stop takes it. */
+  taskId: string;
+  description: string;
+  command: string;
+  startedAtMs: number | null;
+  /** The TCP ports it listens on, distinct; [] for none. */
+  ports: number[];
+}
+
 /** View model for a thread (Claude Code session plus its worktree and status). Generated types stay inside src/api. */
 export interface ThreadView {
   id: string;
@@ -164,6 +175,11 @@ export interface ThreadView {
    * (docs/notes/background-shells.md).
    */
   backgroundShellsRunning: number;
+  /**
+   * Those shells, oldest first, with the TCP ports each one's process group listens on
+   * (the daemon probes them; docs/notes/thread-servers.md). [] once the process ended.
+   */
+  backgroundShells: BackgroundShellView[];
   /**
    * A background run or shell just ended at the prompt and Claude's turn reporting it has
    * not ended yet (a few seconds): a restart would lose that report (restartCutsOff).
@@ -427,6 +443,13 @@ export function toThreadView(s: Thread): ThreadView {
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
     backgroundShellsRunning: s.backgroundShellsRunning,
+    backgroundShells: s.backgroundShells.map((b) => ({
+      taskId: b.taskId,
+      description: b.description,
+      command: b.command,
+      startedAtMs: b.startedAt ? timestampMs(b.startedAt) : null,
+      ports: [...b.ports],
+    })),
     backgroundWakePending: s.backgroundWakePending,
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }

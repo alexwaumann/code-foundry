@@ -211,6 +211,12 @@ service ThreadService {
   // at any stop; the MCP status is kept until the new process reports. Any thread may be
   // reseeded; a resident thread is the main user. See docs/notes/ember-1-primitives.md.
   rpc Reseed(ReseedThreadRequest) returns (ReseedThreadResponse) {}
+  // StopShell stops one of the thread's own background shells (Thread.background_shells):
+  // its process group gets SIGTERM, then SIGKILL 3 seconds later. A note in the thread's
+  // conversation records it, and Claude learns of it as of any shell that ends. NOT_FOUND
+  // when the thread runs no such shell; FAILED_PRECONDITION when its process cannot be
+  // found. See docs/notes/thread-servers.md.
+  rpc StopShell(StopThreadShellRequest) returns (StopThreadShellResponse) {}
   // McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
   // (mcp_status) at the start of every turn, again every few seconds while a server is
   // still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
@@ -917,6 +923,16 @@ message RestartThreadResponse {
   Thread thread = 1;
   // False when Claude was not running for the thread (nothing to restart).
   bool restarted = 2;
+}
+
+message StopThreadShellRequest {
+  string thread_id = 1;
+  // BackgroundShell.task_id.
+  string task_id = 2;
+}
+
+message StopThreadShellResponse {
+  Thread thread = 1;
 }
 
 message ReseedThreadRequest {
