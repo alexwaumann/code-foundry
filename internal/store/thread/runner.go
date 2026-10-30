@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -27,6 +29,15 @@ type runner struct {
 	done     chan struct{}
 	// ready is closed once Claude first answered the handshake (lifecycle.go running).
 	ready chan struct{}
+	// dirsStale: the thread's project set changed since this process started
+	// (members.go); maybeRestart restarts it for the new --add-dir list once it is quiet.
+	// Set by changeMembers under Manager.mu, so a set change whose note never reached the
+	// runner still restarts it at the next idle.
+	dirsStale atomic.Bool
+	// notes are timeline lines from outside the run goroutine that could not go through a
+	// command (members.go noteFailed), added by the next maybeRestart.
+	notesMu sync.Mutex
+	notes   []string
 
 	// ---- run goroutine only (st and tail are set by spawnStream before run starts) ----
 	st    *streamState

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
@@ -108,6 +109,10 @@ func memberEnv(t *testing.T, mutate ...func(*Options)) (*env, *recordingProjects
 	return e, rr, lib
 }
 
+func hasDirsRestartNote(items []Item) bool {
+	return slices.ContainsFunc(items, func(it Item) bool { return it.Kind == KindCommandOutput && it.Text == DirsRestartNote })
+}
+
 func hasNote(prefix string) func([]Item) bool {
 	return func(items []Item) bool {
 		return slices.ContainsFunc(items, func(it Item) bool { return it.Kind == KindNote && strings.HasPrefix(it.Text, prefix) })
@@ -144,7 +149,12 @@ func TestAddAndRemoveProjectLive(t *testing.T) {
 	if argOf(argv, "--resume") != cid {
 		t.Errorf("restart argv %q, want --resume %s", argv, cid)
 	}
-	e.waitItems(s.ID, "the add note", hasNote("Added project api to this thread (new worktree "+apiWT+"). The thread no longer follows workspace platform"))
+	e.waitItems(s.ID, "the add note and the restart's", func(items []Item) bool {
+		return hasNote("Added project api to this thread (new worktree "+apiWT+"). The thread no longer follows workspace platform")(items) &&
+			hasNote("")(items) && slices.ContainsFunc(items, func(it Item) bool {
+			return it.Kind == KindNote && strings.HasSuffix(it.Text, "Claude restarts with the new folders once it is idle.")
+		}) && hasDirsRestartNote(items)
+	})
 	if _, err := e.m.AddProject(e.ctx(), s.ID, "r2"); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("adding it again: %v", err)
 	}
@@ -161,7 +171,7 @@ func TestAddAndRemoveProjectLive(t *testing.T) {
 		t.Fatalf("after remove %+v", got)
 	}
 	e.waitArgv("the restart without api", func(a []string) bool { return !slices.Contains(addDirs(a), apiWT) })
-	e.waitItems(s.ID, "the remove note", hasNote("Removed project api from this thread. Its checkout ("+apiWT+") stays on disk."))
+	e.waitItems(s.ID, "the remove note", hasNote("Removed project api from this thread. Its checkout ("+apiWT+") stays on disk. Claude restarts with the new folders once it is idle; until then "+apiWT+" stays one of its folders."))
 	if !isDir(apiWT) {
 		t.Errorf("the removed member's worktree %s is gone", apiWT)
 	}
@@ -225,6 +235,11 @@ func TestAddProjectRefusals(t *testing.T) {
 	other := e.create(CreateOptions{ProjectID: "r2", NewWorktree: &NewWorktree{Branch: "feat/m"}})
 	switchBranch(rr, "r2", other.WorktreePath, "moved")
 	s := e.create(CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{Branch: "feat/m"}})
+	docs := filepath.Join(t.TempDir(), "docs")
+	if err := os.MkdirAll(docs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rr.Put(project.Project{ID: "r4", Path: docs, Name: "docs", Git: true, Worktrees: []project.Worktree{{ProjectID: "r4", Path: docs, IsMain: true, Branch: "feat/m"}}})
 	home := e.create(CreateOptions{NoProject: true})
 	inFolder := e.create(CreateOptions{WorkspaceID: "w-plat", ProjectID: workspace.PrimaryWorkspace})
 	calls := len(rr.created())
@@ -235,6 +250,7 @@ func TestAddProjectRefusals(t *testing.T) {
 		text          string
 	}{
 		{name: "moved default path", id: s.ID, ref: "api", want: ErrFailedPrecondition, text: "has moved checked out now"},
+		{name: "main checkout on the branch", id: s.ID, ref: "docs", want: ErrFailedPrecondition, text: "docs's main checkout at " + docs + " is on feat/m"},
 		{name: "unknown project", id: s.ID, ref: "nope", want: ErrNotFound},
 		{name: "no project", id: home.ID, ref: "api", want: ErrFailedPrecondition, text: "has no project"},
 		{name: "in its workspace's folder", id: inFolder.ID, ref: "lib", want: ErrFailedPrecondition, text: "folder"},
@@ -254,4 +270,56 @@ func TestAddProjectRefusals(t *testing.T) {
 	if n := len(rr.created()); n != calls {
 		t.Errorf("%d CreateWorktree calls after the refusals, want %d", n, calls)
 	}
+}
+
+// A set change while Claude works: the note at once, the restart only once the turn is
+// over (a permission request holds it), then the restart's own note.
+func TestAddProjectRestartWaitsForTheTurn(t *testing.T) {
+	e := newFixtureEnv(t, "write-allow")
+	api := filepath.Join(t.TempDir(), "api")
+	if err := os.MkdirAll(api, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.projects.Put(project.Project{ID: "r2", Path: api, Name: "api", Git: true, Worktrees: []project.Worktree{{ProjectID: "r2", Path: api, IsMain: true, Branch: "main"}}})
+	s := e.create(CreateOptions{ProjectID: "r1", PermissionMode: PermissionSupervised, InitialPrompt: "write"})
+	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
+	e.writeTranscript(argOf(e.argvOf(), "--session-id"), userLine("write"))
+	if _, err := e.m.AddProject(e.ctx(), s.ID, "api"); err != nil {
+		t.Fatal(err)
+	}
+	e.waitItems(s.ID, "the add note", hasNote("Added project api to this thread (checkout "+api+")."))
+	time.Sleep(50 * time.Millisecond)
+	if dirs := addDirs(e.argvOf()); slices.Contains(dirs, api) {
+		t.Fatalf("restarted mid-turn: add-dirs %q", dirs)
+	}
+	if hasDirsRestartNote(e.items(s.ID).Items) {
+		t.Fatal("the restart note came before the restart")
+	}
+	p := e.items(s.ID).Pending
+	if _, err := e.m.Respond(e.ctx(), s.ID, p[0].RequestID, Decision{Allow: true}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitArgv("the restart after the turn", func(a []string) bool { return slices.Contains(addDirs(a), api) && argOf(a, "--resume") != "" })
+	e.waitItems(s.ID, "the restart note", hasDirsRestartNote)
+}
+
+// A set change whose note cannot reach the running Claude's runner: the note and the
+// failure are queued on it and written at its next maybeRestart, and the flag still
+// restarts it once it is idle.
+func TestFailedSetChangeNoteRetriesTheRestart(t *testing.T) {
+	e, _, _ := memberEnv(t)
+	s := e.connected(CreateOptions{ProjectID: "r1"})
+	e.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
+	e.writeTranscript(argOf(e.argvOf(), "--session-id"), userLine("earlier"))
+	api, _ := e.m.opts.Projects.Snapshot().Project("r2")
+	// The row changes as changeMembers changes it; the note's command never arrives.
+	r := e.runnerOf(s.ID)
+	e.m.update(s.ID, true, func(rec *record) { rec.s = WithMember(rec.s, "r2", api.Path) })
+	r.dirsStale.Store(true)
+	e.m.noteFailed(r, "Added project api to this thread (checkout "+api.Path+")."+liveAddNote, context.DeadlineExceeded)
+	e.waitArgv("the restart", func(a []string) bool { return slices.Contains(addDirs(a), api.Path) })
+	e.waitItems(s.ID, "the queued notes and the restart's", func(items []Item) bool {
+		return hasNote("Added project api to this thread")(items) &&
+			hasNote("Could not restart Claude for the new project list: context deadline exceeded; it retries when idle")(items) && hasDirsRestartNote(items)
+	})
 }

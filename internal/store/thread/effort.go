@@ -92,13 +92,14 @@ func (r *runner) setEffort(effort string) Thread {
 }
 
 // maybeRestart begins a restart for a pending effort change (or a changed project set,
-// wantDirs: members.go) once nothing would be
+// runner.dirsStale: members.go) once nothing would be
 // lost: connected, idle at the prompt, nothing pending, streaming or running (a
 // background agent's tool call keeps running across turns), no background shell
 // running (it dies with the process), no turn Claude is about to start for a background
 // end (wake.go), no send on its way. A user's restart (restart.go) only waits for the
 // prompt: it interrupts a running turn first and cuts background work off.
 func (r *runner) maybeRestart() {
+	r.flushNotes()
 	if r.maybeReseed() { // a pending reseed stops the process instead (reseed.go)
 		return
 	}
@@ -112,7 +113,7 @@ func (r *runner) maybeRestart() {
 		r.interruptForRestart()
 		return
 	case user:
-	case st.wantEffort == st.effort && !st.wantDirs || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
+	case st.wantEffort == st.effort && !r.dirsStale.Load() || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
 		return
 	}
 	r.beginRestart(user)
@@ -179,8 +180,9 @@ func (r *runner) respawn() {
 	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
-	forDirs := st.wantDirs && st.wantEffort == st.effort
-	st.wantDirs = false // the row's set as it is now goes to the new process
+	// The row's set as it is now goes to the new process; a change after this read sets the flag again.
+	st.dirsApplied = r.dirsStale.Swap(false)
+	forDirs := st.dirsApplied && st.wantEffort == st.effort
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
 	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
 	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a worktree-mode worktree
@@ -257,6 +259,10 @@ func (r *runner) onRestarted() {
 	}
 	if st.effort != st.restartFrom {
 		st.proj.w.add(Item{ID: st.proj.nextID("effort"), Kind: KindCommandOutput, Text: "Set effort to " + label})
+	}
+	if st.dirsApplied {
+		st.dirsApplied = false
+		st.proj.w.add(Item{ID: st.proj.nextID("restart"), Kind: KindCommandOutput, Text: DirsRestartNote})
 	}
 	r.m.update(r.id, false, func(rec *record) { rec.s.EffortPending = st.wantEffort != st.effort })
 	held := st.held

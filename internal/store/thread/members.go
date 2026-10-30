@@ -73,7 +73,7 @@ func (m *Manager) AddProject(ctx context.Context, id, ref string) (Thread, error
 	if made != nil && m.opts.WorktreeCreated != nil {
 		m.opts.WorktreeCreated(id, r.ID, made.path)
 	}
-	m.noteMembers(ctx, id, addedNote(r.Name, path, made != nil, m.workspaceName(left)))
+	m.noteMembers(ctx, id, addedNote(r.Name, path, made != nil, m.workspaceName(left)), liveAddNote)
 	return s, nil
 }
 
@@ -102,7 +102,7 @@ func (m *Manager) RemoveProject(ctx context.Context, id, ref string) (Thread, er
 		return Thread{}, err
 	}
 	m.log.Info("project removed from thread", "thread", id, "project", pid, "checkout", path, "left_workspace", left)
-	m.noteMembers(ctx, id, removedNote(name, path, m.workspaceName(left)))
+	m.noteMembers(ctx, id, removedNote(name, path, m.workspaceName(left)), liveRemoveNote(path))
 	return s, nil
 }
 
@@ -182,6 +182,9 @@ func (m *Manager) changeMembers(id string, fn func(Thread) (Thread, error)) (Thr
 	left := rec.s.WorkspaceID
 	rec.s = next
 	m.commitLocked(rec, true)
+	if rec.run != nil {
+		rec.run.dirsStale.Store(true) // its next quiet moment restarts it (maybeRestart)
+	}
 	return rec.s, left, nil
 }
 
@@ -241,6 +244,27 @@ func removedNote(project, path, left string) string {
 	return "Removed project " + project + " from this thread." + where + leftNote(left)
 }
 
+// DirsRestartNote is the timeline's line once Claude restarted for a changed project set
+// (effort.go onRestarted).
+const DirsRestartNote = "Restarted Claude with the new project list"
+
+// liveAddNote and liveRemoveNote end a set change's note while Claude runs: it gets the
+// new list at its restart, and a removed folder stays one of its folders until then.
+const liveAddNote = " Claude restarts with the new folders once it is idle."
+
+func liveRemoveNote(path string) string {
+	if path == "" {
+		return liveAddNote
+	}
+	return " Claude restarts with the new folders once it is idle; until then " + path + " stays one of its folders."
+}
+
+// failedRestartNote follows a set change's note that could not reach the running
+// Claude's runner: the restart still comes at its next idle (runner.dirsStale).
+func failedRestartNote(err error) string {
+	return "Could not restart Claude for the new project list: " + err.Error() + "; it retries when idle"
+}
+
 func leftNote(workspace string) string {
 	if workspace == "" {
 		return ""
@@ -248,11 +272,11 @@ func leftNote(workspace string) string {
 	return " The thread no longer follows workspace " + workspace + ": its projects are its own set now."
 }
 
-// noteMembers writes the timeline note for a set change and, for a live thread, asks
-// its runner for the restart that gives Claude the new --add-dir list. A thread without
-// a process gets the note only: its next start passes the list.
-func (m *Manager) noteMembers(ctx context.Context, id, text string) {
-	it := Item{Kind: KindNote, Text: text}
+// noteMembers writes the timeline note for a set change: text, and for a live thread
+// liveText after it (changeMembers flagged its runner for the restart). A note that cannot
+// reach the runner is queued on it with the failure (noteFailed); a thread without a
+// process gets the note in its log.
+func (m *Manager) noteMembers(ctx context.Context, id, text, liveText string) {
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)
 		if err != nil {
@@ -260,10 +284,11 @@ func (m *Manager) noteMembers(ctx context.Context, id, text string) {
 		}
 		switch {
 		case live != nil:
-			if _, err := live.call(ctx, threadCmd{verb: &it, dirs: true}); errors.Is(err, errProcessGone) {
+			it := Item{Kind: KindNote, Text: text + liveText}
+			if _, err := live.call(ctx, threadCmd{verb: &it}); errors.Is(err, errProcessGone) {
 				continue
 			} else if err != nil {
-				m.log.Warn("note a project set change", "thread", id, "err", err)
+				m.noteFailed(live, it.Text, err)
 			}
 			return
 		case closing != nil:
@@ -285,8 +310,33 @@ func (m *Manager) noteMembers(ctx context.Context, id, text string) {
 			return
 		}
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
-		it.ID = string(it.Kind) + "-" + itemSuffix()
-		w.add(it)
+		w.add(Item{ID: string(KindNote) + "-" + itemSuffix(), Kind: KindNote, Text: text})
 		return
+	}
+}
+
+// noteFailed queues a set change's note and the failure on the running thread's runner
+// (its next maybeRestart writes them): the restart itself still comes at the next idle.
+func (m *Manager) noteFailed(r *runner, text string, err error) {
+	m.log.Warn("set change did not reach the running claude; it restarts at its next idle", "thread", r.id, "err", err)
+	r.queueNote(text)
+	r.queueNote(failedRestartNote(err))
+}
+
+// queueNote keeps a timeline line for the run goroutine (flushNotes). Any goroutine.
+func (r *runner) queueNote(text string) {
+	r.notesMu.Lock()
+	r.notes = append(r.notes, text)
+	r.notesMu.Unlock()
+}
+
+// flushNotes writes the queued lines (queueNote). Run goroutine.
+func (r *runner) flushNotes() {
+	r.notesMu.Lock()
+	notes := r.notes
+	r.notes = nil
+	r.notesMu.Unlock()
+	for _, t := range notes {
+		r.st.proj.w.add(Item{ID: r.st.proj.nextID("note"), Kind: KindNote, Text: t})
 	}
 }
