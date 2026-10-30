@@ -1,5 +1,8 @@
 # Put-away threads focus the dashboard
 
+> **Superseded in part (2026-10-30):** the dashboard is gone; a put-away selected thread
+> selects HOME, the No project composer. See `remove-dashboard.md`.
+
 2026-10-15. Archiving, snoozing or removing the thread a window is viewing now selects
 the dashboard. Before, an archived or snoozed thread stayed selected with its Reconnect
 card, and a removed one left a stale selection showing "This thread no longer exists."

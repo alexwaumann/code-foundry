@@ -47,14 +47,20 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the window starts on the dashboard; the menu pane marks the current page: Projects, Pull Requests, New thread on the composer", async ({ page }) => {
+test("the window starts on the No project composer; the menu pane marks the current page: New thread on the composer, Projects, Pull Requests", async ({ page }) => {
   await openApp(page);
-  await expect(page.getByTestId("start-page")).toBeVisible();
+  const composer = page.getByTestId("composer");
+  await expect(composer).toBeVisible();
+  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
+  // Home is the composer itself: the project picker stays closed.
+  await expect(page.getByTestId("palette")).toHaveCount(0);
   const menu = page.getByTestId("sidebar-menu");
   const current = menu.locator('[aria-current="page"]');
-  // No toolbar: the dashboard is the start page and a palette command (view.dashboard).
   await expect(page.getByTestId("sidebar-toolbar")).toHaveCount(0);
-  await expect(current).toHaveCount(0);
+  const newThread = page.getByTestId("sidebar-new-thread");
+  await expect(newThread).toHaveAttribute("aria-current", "page");
+  await expect(newThread).toHaveClass(/bg-cf-sidebar-row-selected/);
+  await expect(current).toHaveCount(1);
 
   for (const id of ["nav-projects", "nav-pullrequests"]) {
     await page.getByTestId(id).click();
@@ -62,23 +68,22 @@ test("the window starts on the dashboard; the menu pane marks the current page: 
     await expect(page.getByTestId(id)).toHaveClass(/bg-cf-sidebar-row-selected/);
     await expect(current).toHaveCount(1);
   }
-  // The new-thread composer: New thread is the current row.
+  // A project's composer: New thread is the current row.
   await composeProject(page);
-  const newThread = page.getByTestId("sidebar-new-thread");
   await expect(newThread).toHaveAttribute("aria-current", "page");
-  await expect(newThread).toHaveClass(/bg-cf-sidebar-row-selected/);
   await expect(current).toHaveCount(1);
 
-  // view.dashboard (the palette) shows the start page again, no row current.
+  // The removed dashboard is an unknown page name now: ignored.
   expect(await emit({ showView: { name: "dashboard" } })).toBeGreaterThan(0);
-  await expect(page.getByTestId("start-page")).toBeVisible();
-  await expect(current).toHaveCount(0);
+  await expect(composer).toBeVisible();
+  await expect(page.getByTestId("composer-project-name")).not.toHaveText("No project");
 
-  // A selected thread is not restored: a reload starts on the dashboard again.
+  // A selected thread is not restored: a reload starts on the No project composer again.
   await row(page, "s:s-2").click();
-  await expect(page.getByTestId("start-page")).toHaveCount(0);
+  await expect(composer).toHaveCount(0);
   await page.reload();
-  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
+  await expect(page.getByTestId("palette")).toHaveCount(0);
 });
 
 test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, a workspace thread's run-in project on line 2 (no badge), no project or worktree rows", async ({ page }) => {

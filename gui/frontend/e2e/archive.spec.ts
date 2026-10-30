@@ -143,9 +143,9 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("archived-count")).toHaveText("2");
   await expect(page.getByTestId("working-count")).toHaveText("1");
   await expect(row(page, "s:s-1")).toHaveCount(0);
-  // It was the selected thread, so the window lands on the dashboard (#119,
-  // docs/notes/put-away-focuses-dashboard.md).
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  // It was the selected thread, so the window lands home, the No project composer (#119,
+  // docs/notes/put-away-focuses-dashboard.md, remove-dashboard.md).
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
@@ -222,17 +222,17 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
   await expect.poll(async () => (await scrollState(page, "sidebar-main")).top).toBeLessThanOrEqual(4);
 });
 
-test("archiving, snoozing or removing the selected thread selects the dashboard; another thread's leaves it (docs/notes/put-away-focuses-dashboard.md)", async ({ page }) => {
+test("archiving, snoozing or removing the selected thread selects home (the No project composer); another thread's leaves it (docs/notes/put-away-focuses-dashboard.md)", async ({ page }) => {
   await openApp(page);
   const pane = page.getByTestId("thread-pane");
 
-  // Archive the selected idle thread from its row menu: the start page shows. The thread
+  // Archive the selected idle thread from its row menu: home shows. The thread
   // stays in the archived list.
   await row(page, "s:s-3").click();
   await expect(pane).toHaveAttribute("data-thread-id", "s-3");
   let menu = await openMenu(page, "s:s-3");
   await menu.getByTestId("menu-archive").click();
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(pane).toHaveCount(0);
   await expect(page.getByTestId("archived-count")).toHaveText("2");
 
@@ -243,19 +243,19 @@ test("archiving, snoozing or removing the selected thread selects the dashboard;
   await expect(page.getByTestId("archived-count")).toHaveText("3");
   await expect(pane).toHaveAttribute("data-thread-id", "s-2");
 
-  // The selected thread snoozed from the CLI: dashboard.
+  // The selected thread snoozed from the CLI: home.
   await mockPost("thread/snooze?id=s-2&until=2m");
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(pane).toHaveCount(0);
 
-  // Remove the selected thread (the daemon's confirmation): dashboard, no "no longer exists" pane.
+  // Remove the selected thread (the daemon's confirmation): home, no "no longer exists" pane.
   await row(page, "s:s-4").click();
   await expect(pane).toHaveAttribute("data-thread-id", "s-4");
   menu = await openMenu(page, "s:s-4");
   await menu.getByText("Remove…").click();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await page.getByTestId("confirm-ok").click();
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(page.getByTestId("thread-missing")).toHaveCount(0);
   await expect(row(page, "s:s-4")).toHaveCount(0);
 });

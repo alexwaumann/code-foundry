@@ -173,9 +173,9 @@ test("snoozing a working thread from the title menu asks first; it then drops it
   const until = new Date(confirmed[1]?.args.until ?? "");
   expect([until.getHours(), until.getMinutes()]).toEqual([9, 0]);
 
-  // It was the selected thread, so the window lands on the dashboard (#119,
-  // docs/notes/put-away-focuses-dashboard.md), its panels dropped.
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  // It was the selected thread, so the window lands home, the No project composer (#119,
+  // docs/notes/put-away-focuses-dashboard.md, remove-dashboard.md), its panels dropped.
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
   // Opened from the Snoozed section: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
   await page.getByTestId("snoozed-header").click();
@@ -260,8 +260,8 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await page.getByTestId("menu-snooze-presets").locator('[data-preset="3h"]').click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expectAttention(page, 1);
-  // Snoozing the selected thread selects the dashboard (#119); open it from the Snoozed section.
-  await expect(page.getByTestId("start-heading")).toBeVisible();
+  // Snoozing the selected thread selects home (#119); open it from the Snoozed section.
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build with No project?");
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
   await page.getByTestId("snoozed-header").click();
   await row(page, "s:s-8").click();

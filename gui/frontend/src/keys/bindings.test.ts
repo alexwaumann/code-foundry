@@ -192,6 +192,23 @@ describe("handleKeyDown precedence", () => {
     });
   });
 
+  it("thread prompt focus before the first list: a cmd chord waits for it (cmd+t as the window opens on the composer); an editing chord does not", async () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const prompt = document.getElementById("pr") as HTMLElement;
+    const commands = useCommandsStore.getState().commands;
+    useCommandsStore.setState({ commands: [], contextKey: null });
+    relist.run = () => {
+      useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+    };
+    expect(press(prompt, { key: "Backspace", code: "Backspace", metaKey: true }).defaultPrevented).toBe(false);
+    expect(useCommandsStore.getState().contextKey).toBeNull();
+    const e = press(prompt, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => {
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    });
+  });
+
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
     const commands = useCommandsStore.getState().commands;
     useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
