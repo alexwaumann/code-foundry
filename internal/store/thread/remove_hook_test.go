@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// Remove calls Options.Removed once with the removed thread as it was, after its row is
-// gone from the snapshot and its tombstone is in. A removal does not cascade: the
-// children it adopts are not passed. A failed removal calls nothing.
+// Remove calls Options.Removed with each removed thread as it was, after its row is
+// gone from the snapshot and its tombstone is in: the hidden children it takes with it
+// first, then the thread. A failed removal calls nothing.
 func TestRemoveCallsRemovedHook(t *testing.T) {
 	tests := []struct {
 		name string
@@ -18,7 +18,7 @@ func TestRemoveCallsRemovedHook(t *testing.T) {
 		wantCalls int
 	}{
 		{name: "a thread", wantCalls: 1},
-		{name: "with children: only the thread itself", children: 2, wantCalls: 1},
+		{name: "with hidden children: each of them, then the thread", children: 2, wantCalls: 3},
 		{name: "an unknown id calls nothing", missing: true},
 	}
 	for _, tt := range tests {
@@ -55,8 +55,12 @@ func TestRemoveCallsRemovedHook(t *testing.T) {
 			if len(calls) != tt.wantCalls {
 				t.Fatalf("Removed called %d times, want %d: %+v", len(calls), tt.wantCalls, calls)
 			}
-			for _, c := range calls {
-				if c.t.ID != s.ID || c.t.Name != "parent" || c.t.WorktreePath != s.WorktreePath || !slices.Equal(c.t.Projects(), s.Projects()) {
+			for i, c := range calls {
+				if i < tt.children {
+					if c.t.Name != "kid" || c.t.CreatedBy != s.ID {
+						t.Errorf("call %d: got %s (created by %s), want a hidden child first", i, c.t.Name, c.t.CreatedBy)
+					}
+				} else if c.t.ID != s.ID || c.t.Name != "parent" || c.t.WorktreePath != s.WorktreePath || !slices.Equal(c.t.Projects(), s.Projects()) {
 					t.Errorf("Removed got %+v, want the thread as it was (%+v)", c.t, s)
 				}
 				if c.inSnap || !c.tombstoned {

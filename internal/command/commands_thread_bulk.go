@@ -133,8 +133,8 @@ func removeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 			ask += " Their clean worktrees are removed; branches stay."
 		}
 	}
-	if n := orphanedWorking(ctx, b, ids); n > 0 {
-		ask += " " + orphanedWorkingText(n)
+	if clause := removedAlongText(removedAlong(ctx, b, ids)); clause != "" {
+		ask += " " + clause
 	}
 	return ask
 }
@@ -153,29 +153,59 @@ func madeWorktrees(ctx context.Context, b ThreadBackend, ids []string) bool {
 	})
 }
 
-// orphanedWorking counts the hidden threads that ids created, not among ids, that are
-// mid-turn (hiddenWorking): removing their creator leaves them running.
-func orphanedWorking(ctx context.Context, b ThreadBackend, ids []string) int {
-	removed := make(map[string]bool, len(ids))
+// removedAlong counts the hidden threads below ids that removing them takes along
+// (ThreadFilter.archive_cascade_of, the archive cascade's list: removing cascades the
+// same way), each once and not among ids, and how many of those are mid-turn
+// (hiddenWorking). An id the daemon does not know has none (Run reports it).
+func removedAlong(ctx context.Context, b ThreadBackend, ids []string) (hidden, working int) {
+	seen := make(map[string]bool, len(ids))
 	for _, id := range ids {
-		removed[id] = true
+		seen[id] = true
 	}
-	n := 0
-	for _, s := range hiddenWorking(ctx, b, ids) {
-		if removed[s.GetCreatedBy()] {
-			n++
+	for _, id := range ids {
+		res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{ArchiveCascadeOf: id, IncludeArchived: true}}))
+		if err != nil {
+			continue
+		}
+		for _, s := range res.Msg.GetThreads() {
+			if seen[s.GetId()] {
+				continue
+			}
+			seen[s.GetId()] = true
+			hidden++
+			if midTurn(s) != "" {
+				working++
+			}
 		}
 	}
-	return n
+	return hidden, working
 }
 
-// orphanedWorkingText is the clause thread.remove adds for n hidden child threads still
-// working.
-func orphanedWorkingText(n int) string {
-	if n == 1 {
-		return "1 hidden child thread is still working; it keeps running and is shown in the sidebar."
+// removedAlongText is the clause thread.remove adds for the hidden child threads it
+// removes along (hidden, of which working are mid-turn): removal forgets them too, so
+// they are named even when idle, and how to keep one.
+func removedAlongText(hidden, working int) string {
+	if hidden == 0 {
+		return ""
 	}
-	return fmt.Sprintf("%d hidden child threads are still working; they keep running and are shown in the sidebar.", n)
+	what := fmt.Sprintf("%d hidden child threads below it are", hidden)
+	if hidden == 1 {
+		what = "1 hidden child thread below it is"
+	}
+	switch {
+	case working == 0:
+	case working == hidden && hidden == 1:
+		what += " still working, and is"
+	case working == hidden:
+		what += " still working, and are"
+	default:
+		what += fmt.Sprintf(" (%d still working)", working)
+	}
+	keep := "To keep one, show it in the sidebar first."
+	if hidden == 1 {
+		keep = "To keep it, show it in the sidebar first."
+	}
+	return what + " removed too. " + keep
 }
 
 // removeThreads is thread.remove given ids.

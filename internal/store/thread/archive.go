@@ -103,11 +103,12 @@ type CascadeFailure struct {
 	Err error
 }
 
-// CascadeError is Archive's error when the thread was archived but some of the hidden
-// threads below it were not. It is an ErrFailedPrecondition.
+// CascadeError is Archive's (or Remove's) error when the thread was archived (removed)
+// but some of the hidden threads below it were not. It is an ErrFailedPrecondition.
 type CascadeError struct {
-	ID     string // the thread archived
+	ID     string // the thread archived or removed
 	Failed []CascadeFailure
+	Verb   string // "archived" (the default for "") or "removed"
 }
 
 func (e *CascadeError) Error() string {
@@ -119,7 +120,11 @@ func (e *CascadeError) Error() string {
 	if len(e.Failed) != 1 {
 		what = fmt.Sprintf("%d hidden threads below it were", len(e.Failed))
 	}
-	return fmt.Sprintf("archived thread %s, but %s not archived: %s", e.ID, what, strings.Join(parts, "; "))
+	verb := e.Verb
+	if verb == "" {
+		verb = "archived"
+	}
+	return fmt.Sprintf("%s thread %s, but %s not %s: %s", verb, e.ID, what, verb, strings.Join(parts, "; "))
 }
 
 // Unwrap makes a CascadeError an ErrFailedPrecondition.

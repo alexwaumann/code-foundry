@@ -42,7 +42,12 @@ service ThreadService {
   // prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
   // Kept for compatibility.
   rpc Reconnect(ReconnectThreadRequest) returns (ReconnectThreadResponse) {}
-  // Remove forgets a thread. Stops its Claude first if it runs.
+  // Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
+  // the same way and first, every thread below it that is not shown in the sidebar
+  // (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
+  // thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
+  // with include_archived). A thread of those that fails is skipped, shown in the
+  // sidebar and named in the error, which then comes after the thread itself was removed.
   rpc Remove(RemoveThreadRequest) returns (RemoveThreadResponse) {}
   // RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
   // becomes the primary. A live thread gets set_cwd once it is idle
