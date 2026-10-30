@@ -59,20 +59,34 @@ function byId(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** Whether two sets of project ids hold the same ids, whatever their order. */
+export function sameProjects(a: readonly string[], b: readonly string[]): boolean {
+  const x = unique(a).sort(byId);
+  const y = unique(b).sort(byId);
+  return x.length === y.length && x.every((id, i) => id === y[i]);
+}
+
 /**
- * The draft's set. Projects the registry no longer knows drop out. The primary is the
- * draft's pick while it is still in the set (WORKSPACE_PRIMARY only with a workspace),
+ * The draft's set. Projects the registry no longer knows drop out. A set picked from a
+ * named workspace that no longer matches its members (a project added or removed in the
+ * picks) leaves the workspace, as a thread's does (docs/notes/thread-project-set.md): the
+ * heading names the set, not the workspace, and the thread is created without the
+ * reference; picks that match again bring it back, since nothing was sent. The primary is
+ * the draft's pick while it is still in the set (WORKSPACE_PRIMARY only with a workspace),
  * else the workspace's default primary when that is the folder or in the set, else the
  * first picked project, else the workspace's folder (a workspace without projects).
  */
 export function resolveSet(d: SetChoice, defaults: SetDefaults, env: { workspace: (id: string) => SetWorkspace | undefined; known: (id: string) => boolean }): ResolvedSet {
-  const workspaceId = d.workspace ?? defaults.workspace;
-  const ws = workspaceId ? env.workspace(workspaceId) : undefined;
+  const named = d.workspace ?? defaults.workspace;
   const picked = unique(d.projects ?? defaults.projects).filter(env.known);
+  const found = named ? env.workspace(named) : undefined;
+  // An unknown workspace (not listed yet) keeps the reference: its members cannot be compared.
+  const workspaceId = found && !sameProjects(picked, found.members.filter(env.known)) ? "" : named;
   const projectIds = [...picked].sort(byId);
   const valid = (p: string | null | undefined): p is string => !!p && ((p === WORKSPACE_PRIMARY && workspaceId !== "") || projectIds.includes(p));
   const fallback = picked[0] ?? (workspaceId ? WORKSPACE_PRIMARY : "");
-  const primary = valid(d.primary) ? d.primary : valid(ws?.defaultPrimary) ? ws.defaultPrimary : fallback;
+  // A set that left its workspace keeps running where the workspace would (its default primary, while in the set).
+  const primary = valid(d.primary) ? d.primary : valid(found?.defaultPrimary) ? found.defaultPrimary : fallback;
   return { projectIds, picked, workspaceId, primary, isSet: projectIds.length > 1 || workspaceId !== "" };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { byName, canSaveAsWorkspace, matchingWorkspace, primaryOptions, resolveSet, setName, toggled, WORKSPACE_PRIMARY, type SetChoice, type SetDefaults, type SetWorkspace } from "./projectSet";
+import { byName, canSaveAsWorkspace, matchingWorkspace, primaryOptions, resolveSet, sameProjects, setName, toggled, WORKSPACE_PRIMARY, type SetChoice, type SetDefaults, type SetWorkspace } from "./projectSet";
 
 const known = new Set(["api", "web", "lib", "notes"]);
 const workspaces: Record<string, SetWorkspace> = {
@@ -7,6 +7,7 @@ const workspaces: Record<string, SetWorkspace> = {
   "w-root": { members: ["web", "lib"], defaultPrimary: WORKSPACE_PRIMARY },
   "w-odd": { members: ["web"], defaultPrimary: "gone" },
   "w-empty": { members: [] },
+  "w-gone": { members: ["web", "gone"] },
 };
 const env = { known: (id: string) => known.has(id), workspace: (id: string) => workspaces[id] };
 const none: SetChoice = { projects: null, workspace: null, primary: null };
@@ -33,12 +34,35 @@ describe("resolveSet", () => {
     ["a workspace without projects runs in its folder", { ...none, projects: [], workspace: "w-empty" }, project, { projectIds: [], picked: [], workspaceId: "w-empty", primary: WORKSPACE_PRIMARY, isSet: true }],
     ["the reference dropped: a plain set", { ...none, projects: ["web", "api"], workspace: "" }, shop, { projectIds: ["api", "web"], picked: ["web", "api"], workspaceId: "", primary: "web", isSet: true }],
     ["nothing at all", none, { projects: [], workspace: "" }, { projectIds: [], picked: [], workspaceId: "", primary: "", isSet: false }],
+    // A set that stops matching its workspace leaves it (docs/notes/thread-project-set.md).
+    [
+      "a project added to a workspace's set: no workspace, its default primary stays",
+      { ...none, projects: ["web", "api", "lib"] },
+      shop,
+      { projectIds: ["api", "lib", "web"], picked: ["web", "api", "lib"], workspaceId: "", primary: "api", isSet: true },
+    ],
+    ["a member taken out: no workspace", { ...none, projects: ["web"] }, shop, { projectIds: ["web"], picked: ["web"], workspaceId: "", primary: "web", isSet: false }],
+    ["picks in another order still match", { ...none, projects: ["api", "web"] }, shop, { projectIds: ["api", "web"], picked: ["api", "web"], workspaceId: "w-shop", primary: "api", isSet: true }],
+    [
+      "the folder picked, then a project added: the folder goes with the workspace",
+      { projects: ["web", "lib", "api"], workspace: "w-root", primary: WORKSPACE_PRIMARY },
+      project,
+      { projectIds: ["api", "lib", "web"], picked: ["web", "lib", "api"], workspaceId: "", primary: "web", isSet: true },
+    ],
+    ["a member the registry no longer knows is not compared", { ...none, projects: ["web"], workspace: "w-gone" }, project, { projectIds: ["web"], picked: ["web"], workspaceId: "w-gone", primary: "web", isSet: true }],
+    ["a workspace not listed yet keeps the reference", { ...none, projects: ["web"], workspace: "w-nope" }, project, { projectIds: ["web"], picked: ["web"], workspaceId: "w-nope", primary: "web", isSet: true }],
   ])("%s", (_name, d, defaults, want) => {
     expect(resolveSet(d, defaults, env)).toEqual(want);
   });
 });
 
 describe("helpers", () => {
+  it("sameProjects compares sets, not orders", () => {
+    expect(sameProjects(["a", "b"], ["b", "a", "a"])).toBe(true);
+    expect(sameProjects(["a"], ["a", "b"])).toBe(false);
+    expect(sameProjects([], [])).toBe(true);
+  });
+
   it("toggled adds at the end of the pick order, or removes", () => {
     expect(toggled(["web"], "api")).toEqual(["web", "api"]);
     expect(toggled(["web", "api"], "web")).toEqual(["api"]);

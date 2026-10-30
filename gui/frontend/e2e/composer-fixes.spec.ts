@@ -74,7 +74,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("1: taking out every project of a picked workspace drops it too; nothing sends until a project is picked", async ({ page }) => {
+test("1: a project taken out of a picked workspace leaves the workspace; the thread is sent without it", async ({ page }) => {
   await mockPost("workspace?name=shop&projects=repo-cf,repo-dot");
   await openApp(page);
   await composeIn(page, 1);
@@ -82,34 +82,44 @@ test("1: taking out every project of a picked workspace drops it too; nothing se
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
   await expect(chips(page)).toHaveCount(2);
   await chips(page).filter({ hasText: "code-foundry" }).getByTestId("composer-member-remove").click();
-  await chips(page).filter({ hasText: "dotfiles" }).getByTestId("composer-member-remove").click();
 
-  // The empty state: no workspace chip, no projects, nothing to run in, send disabled.
-  await expect(page.getByTestId("composer-heading")).toHaveText("Pick a project");
+  // The set no longer matches shop: no workspace chip, the heading names the lone project (thread-project-set).
   await expect(page.getByTestId("composer-workspace")).toHaveCount(0);
-  await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-empty-note")).toHaveText("Pick a project or a workspace to start the thread in.");
-  await expect(page.getByTestId("composer-worktree")).toHaveCount(0);
-  await expect(page.getByTestId("composer-primary")).toHaveCount(0);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in dotfiles?");
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Ship it");
-  await expect(page.getByTestId("composer-send")).toBeDisabled();
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(300);
-  expect(await invokedArgs("thread.new")).toEqual([]);
+  const args = await lastInvoked("thread.new");
+  expect(args).toMatchObject({ project: "repo-dot", prompt: "Ship it" });
+  expect(args).not.toHaveProperty("workspace");
+  expect(args).not.toHaveProperty("projects");
+});
 
-  // A project picked: the set again, sent without the workspace.
+test("1b: a project added to a picked workspace leaves it too; taken out again, the workspace is back", async ({ page }) => {
+  await mockPost("workspace?name=shop&projects=repo-cf,repo-dot");
+  await openApp(page);
+  await composeIn(page, 1);
+  await pickWorkspaceInHeading(page, "w-000000000001");
+  await page.getByTestId("composer-add-project").click();
+  const list = page.getByTestId("composer-add-project-list");
+  await list.getByRole("option").filter({ hasText: "ghostty-playground" }).click();
+  await expect(page.getByTestId("composer-workspace")).toHaveCount(0);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in 3 projects?");
+  await list.getByRole("option").filter({ hasText: "ghostty-playground" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("composer-workspace")).toHaveAttribute("data-workspace", "w-000000000001");
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in shop?");
+  // Added again and sent: the set, no workspace reference.
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "ghostty-playground" }).click();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
-  await expect(page.getByTestId("composer-send")).toBeEnabled();
   await page.getByTestId("composer-input").click();
+  await page.keyboard.type("Ship it");
   await page.keyboard.press("Enter");
   const args = await lastInvoked("thread.new");
-  expect(args).toMatchObject({ project: "repo-gp", prompt: "Ship it" });
+  expect(args).toMatchObject({ prompt: "Ship it" });
+  expect(String(args.projects).split(",").sort()).toEqual(["repo-cf", "repo-dot", "repo-gp"]);
   expect(args).not.toHaveProperty("workspace");
-  expect(args).not.toHaveProperty("projects");
 });
 
 test("2, 7, 8, 14, 15: New thread on this branch in place: heading, Workspace folder as the primary, the read-only pill's role", async ({ page }) => {
