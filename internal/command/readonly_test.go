@@ -108,6 +108,7 @@ func TestReadOnlyMarker(t *testing.T) {
 		// They move the user's screen.
 		{"view.inline", false},
 		{"view.panel.file", false},
+		{"view.panel.page", false},
 		{"view.dashboard", false},
 		{"thread.focus", false},
 		{"ui.notify", false},
@@ -143,6 +144,7 @@ func TestPageContextIsTheThreadsCLI(t *testing.T) {
 		{"thread.archive", true},
 		{"view.inline", true},
 		{"view.panel.file", true},
+		{"view.panel.page", true},
 		{"terminal.new", true},
 		{"action.run", true},
 		{"thread.new", true},

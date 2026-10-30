@@ -167,7 +167,8 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 //   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
 //     view.panel.pr;
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
-//     conversation (category Thread);
+//     conversation (category Thread), and view.panel.page (commands_view_panel_page.go),
+//     which shows one in its side panel only;
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
@@ -381,5 +382,5 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:  panel(ViewPanelWorktree, inWorktreeOrFolder),
 		},
 	}
-	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand())...)
+	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand())...)
 }

@@ -74,7 +74,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"view.settings", "view.help", "notifications.test", "theme.list", "theme.set-dark", "theme.set-light", "theme.pick", "theme.edit", "theme.show", "theme.save", "theme.duplicate", "theme.delete", "theme.ask", "theme.check", "theme.set-scheme", "theme.restore", "theme.reset",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.back", "view.forward", "thread.previous", "thread.next", "composer.history", "composer.stage", "view.panel.linked-prs", "view.panel.usage", "view.panel.threads", "view.panel.worktree", "view.thread-info",
-		"view.panel.file", "view.panel.diff", "view.panel.pr", "view.inline",
+		"view.panel.file", "view.panel.diff", "view.panel.pr", "view.inline", "view.panel.page",
 		"workspace.new", "workspace.list", "workspace.add-project", "workspace.remove-project", "workspace.rename", "workspace.set-primary", "workspace.set-root", "workspace.remove", "workspace.reveal",
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.stop", "action.runs", "action.last",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
