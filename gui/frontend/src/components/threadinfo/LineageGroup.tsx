@@ -88,42 +88,22 @@ function useChildRows(threadId: string): readonly string[] {
   );
 }
 
-/** A subagent run or a child thread; identical rows. A click opens the run or the thread; hovering swaps the elapsed time for a stop square. */
+/**
+ * A subagent run or a child thread; identical rows. A click opens the run or the thread.
+ * A live child thread swaps its elapsed time for a stop square on hover (or while the
+ * square has the keyboard), which interrupts it. The square is the row's sibling, laid
+ * over the value column, not a button inside the row's own: Enter on it interrupts, it
+ * does not open. Subagent runs have none (nothing stops one run).
+ */
 function LineageItem({ threadId, row, sub = false }: { threadId: string; row: LineageRow; sub?: boolean }) {
   const now = useNow(1000);
   const ms = lineageElapsedMs(row, now);
   const elapsed = ms === null ? "" : fmtElapsed(ms);
-  const live = row.state === "working" || row.state === "attention";
+  const stoppable = row.kind === "thread" && (row.state === "working" || row.state === "attention");
   const open = () => {
     if (row.kind === "agent") void openAgentRun(threadId, row.id);
     else useUiStore.getState().select({ kind: "thread", id: row.id }, { focusPrompt: true });
   };
-  const stop =
-    row.kind === "thread" ? (
-      <Tip label="Interrupt this thread" side="left">
-        <button
-          type="button"
-          className="hidden size-5 shrink-0 items-center justify-center rounded-sm text-cf-error-text group-hover/row:flex hover:bg-cf-text/10 [&_svg]:size-3 [&_svg]:fill-current"
-          data-testid="ti-lineage-stop"
-          onClick={(e) => {
-            e.stopPropagation();
-            void interruptThread(row.id);
-          }}
-        >
-          <Square aria-hidden />
-        </button>
-      </Tip>
-    ) : (
-      <Tip label="Stopping one subagent is not supported yet" side="left">
-        <span
-          className="hidden size-5 shrink-0 items-center justify-center text-cf-error-text/50 group-hover/row:flex [&_svg]:size-3 [&_svg]:fill-current"
-          data-testid="ti-lineage-stop"
-          data-disabled=""
-        >
-          <Square aria-hidden />
-        </span>
-      </Tip>
-    );
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
       <div className="font-medium">{row.name}</div>
@@ -136,21 +116,42 @@ function LineageItem({ threadId, row, sub = false }: { threadId: string; row: Li
     </div>
   );
   return (
-    <Tip label={card} side="left">
-      <Row
-        sub={sub}
-        icon={<Dot state={row.state} />}
-        meta={elapsed ? <span className={cn(live && "group-hover/row:hidden")}>{elapsed}</span> : null}
-        trailing={live ? stop : undefined}
-        onActivate={open}
-        testId="ti-lineage-row"
-        data-kind={row.kind}
-        data-id={row.id}
-        data-state={row.state}
-      >
-        {row.name}
-      </Row>
-    </Tip>
+    <div className="group/li relative flex flex-col">
+      <Tip label={card} side="left">
+        <Row
+          sub={sub}
+          icon={<Dot state={row.state} />}
+          meta={elapsed ? <span className={cn(stoppable && "group-focus-within/li:invisible group-hover/li:invisible")}>{elapsed}</span> : null}
+          onActivate={open}
+          testId="ti-lineage-row"
+          data-kind={row.kind}
+          data-id={row.id}
+          data-state={row.state}
+        >
+          {row.name}
+        </Row>
+      </Tip>
+      {stoppable && (
+        <Tip label="Interrupt this thread" side="left">
+          <button
+            type="button"
+            aria-label={`Interrupt ${row.name}`}
+            className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/li:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 [&_svg]:size-3 [&_svg]:fill-current"
+            data-testid="ti-lineage-stop"
+            data-id={row.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void interruptThread(row.id);
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Square aria-hidden />
+          </button>
+        </Tip>
+      )}
+    </div>
   );
 }
 

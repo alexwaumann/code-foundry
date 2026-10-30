@@ -64,6 +64,16 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k1"]')).toHaveAttribute("data-state", "working");
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k2"]')).toHaveAttribute("data-state", "attention");
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k3"]')).toHaveCount(0);
+  // Subagent runs have no stop square; a live child's interrupts it, by click or by Enter, without opening it.
+  await expect(c.locator('[data-testid="ti-lineage-stop"]')).toHaveCount(2);
+  await expect(c.locator('[data-testid="ti-lineage-row"][data-kind="agent"]').first()).toBeVisible();
+  const k1 = c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k1"]');
+  await k1.hover();
+  await c.locator('[data-testid="ti-lineage-stop"][data-id="s-ti-k1"]').click();
+  await c.locator('[data-testid="ti-lineage-stop"][data-id="s-ti-k2"]').focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.interrupt").map((i) => i.args.id)).toEqual(["s-ti-k1", "s-ti-k2"]);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
   await c.getByTestId("ti-previous").click();
   await expect(c.locator('[data-testid="ti-lineage-row"][data-id="s-ti-k3"]')).toHaveAttribute("data-state", "done");
 
