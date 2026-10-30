@@ -191,3 +191,18 @@ header's old tests, `SnoozeRowItems`/`SnoozeButton`, `agentsSubline`, `shellsLab
   light shots in the PR body. The daemon log had no warnings. The card toggle was on in
   the shared WebKit storage before and was left on; the panel opened for the check was
   closed again. Scratch repos, home and processes removed.
+
+## Review fixes (PR #412)
+
+One commit each: Clear flag in the title menu (thread.flag.clear is NoPalette, so it was
+the only way left); the panel store's version 4 migration for saved tabs of removed kinds;
+setting, proto and skill text that named the Threads tab; the stale-environment dot on
+the title's chevron; `api/checkouts.ts` and the mock's Checkouts handler removed; comments
+that pointed at removed surfaces (and `useIsViewing`, the Agents tab's only selector);
+the `changes-show-panel` test id; "Transcript deleted" inside the title bar; prompt focus
+after Pin, Snooze and Archive from the title menu; the help skill's long line rewrapped.
+Rebased onto #413 (the sidebar menu pane: the bell became a window-title count), whose
+lineage and snooze specs met this branch's. `make check` green; the specs both touched,
+and every spec these fixes touched, re-run clean on WebKit. `TestSurfaceAppendsAndCoalescing`
+(internal/store/plugin, untouched) failed once under `make check` load and passed 5 of 5
+alone.
