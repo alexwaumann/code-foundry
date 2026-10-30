@@ -800,7 +800,10 @@ export class World {
     projects: () => [...this.projects.values()].map((r) => ({ id: r.id, name: r.name, worktrees: r.worktrees.map((w) => w.path) })),
     thread: (id) => {
       const s = this.threads.get(id);
-      return s && { projectId: s.projectId, worktreePath: s.worktreePath };
+      if (!s) return undefined;
+      const checkouts: Record<string, string> = {};
+      for (const c of this.checkoutsOf(s)) if (c.path && !c.missing) checkouts[c.projectId] = c.path;
+      return { projectId: s.projectId, worktreePath: s.worktreePath, checkouts };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
     write: (id, text) => {

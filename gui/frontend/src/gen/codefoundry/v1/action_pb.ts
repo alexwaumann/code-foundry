@@ -525,14 +525,17 @@ export const DeleteActionResponseSchema: GenMessage<DeleteActionResponse> = /*@_
  */
 export type RunActionRequest = Message<"codefoundry.v1.RunActionRequest"> & {
   /**
-   * Action id, or its name (ignoring case) within the owner's project or project_id.
+   * Action id, or its name (ignoring case) within the owner's project or project_id. With
+   * a thread: an action of any project of its set; a name is looked up in the cwd's
+   * project first, then in the other members (one action, else INVALID_ARGUMENT).
    *
    * @generated from field: string action = 1;
    */
   action: string;
 
   /**
-   * The owning thread: the run uses its project and worktree. Wins over worktree_path.
+   * The owning thread: the run goes to the thread's checkout of the action's project
+   * (its bottom panel, its run records). Wins over worktree_path.
    *
    * @generated from field: string thread_id = 2;
    */
@@ -547,7 +550,8 @@ export type RunActionRequest = Message<"codefoundry.v1.RunActionRequest"> & {
   worktreePath: string;
 
   /**
-   * The project to find the action's name in; default: the owner's.
+   * The project to find the action's name in; default: the owner's (with a thread, one of
+   * its projects).
    *
    * @generated from field: string project_id = 4;
    */

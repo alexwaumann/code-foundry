@@ -225,14 +225,18 @@ message DeleteActionRequest {
 message DeleteActionResponse {}
 
 message RunActionRequest {
-  // Action id, or its name (ignoring case) within the owner's project or project_id.
+  // Action id, or its name (ignoring case) within the owner's project or project_id. With
+  // a thread: an action of any project of its set; a name is looked up in the cwd's
+  // project first, then in the other members (one action, else INVALID_ARGUMENT).
   string action = 1;
-  // The owning thread: the run uses its project and worktree. Wins over worktree_path.
+  // The owning thread: the run goes to the thread's checkout of the action's project
+  // (its bottom panel, its run records). Wins over worktree_path.
   string thread_id = 2;
   // The owning worktree when there is no thread: a registered worktree of the action's
   // project.
   string worktree_path = 3;
-  // The project to find the action's name in; default: the owner's.
+  // The project to find the action's name in; default: the owner's (with a thread, one of
+  // its projects).
   string project_id = 4;
   // UNSPECIFIED: the action's in_terminal.
   ActionRunMode mode = 5;

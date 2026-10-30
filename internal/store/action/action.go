@@ -281,11 +281,22 @@ type Owner struct {
 	Worktree  string
 }
 
+// ThreadPlace is where a thread works (Options.Thread): its cwd and the cwd's project
+// ("" for a thread in a workspace's folder or in no project), and the checkout of every
+// project of its set, the cwd's among them, by project id. A run a thread owns goes to
+// the checkout of the action's project (docs/notes/thread-project-set.md).
+type ThreadPlace struct {
+	ProjectID string
+	Worktree  string
+	Checkouts map[string]string
+}
+
 // RunOptions configures Store.Run.
 type RunOptions struct {
 	// Action is an action id, or its name within ProjectID (default: the owner's project).
 	Action string
-	// ThreadID makes the thread the owner; it wins over Worktree.
+	// ThreadID makes the thread the owner; it wins over Worktree. The action may be one of
+	// any project of the thread's set: it runs in that project's checkout.
 	ThreadID string
 	// Worktree is the owner when there is no thread: a registered worktree of the
 	// action's project.

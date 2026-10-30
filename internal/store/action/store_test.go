@@ -42,7 +42,7 @@ type harness struct {
 	web, feat, api string
 	// threads are the threads Options.Thread knows.
 	mu      sync.Mutex
-	threads map[string]Owner
+	threads map[string]ThreadPlace
 }
 
 func newHarness(t *testing.T, mut ...func(*Options)) *harness {
@@ -54,7 +54,7 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	}
 	t.Cleanup(func() { _ = d.Close() })
 	b := bus.New()
-	h := &harness{t: t, bus: b, projects: projecttest.New(b), terms: terminaltest.New(b), threads: map[string]Owner{}}
+	h := &harness{t: t, bus: b, projects: projecttest.New(b), terms: terminaltest.New(b), threads: map[string]ThreadPlace{}}
 	root := t.TempDir()
 	if r, err := filepath.EvalSymlinks(root); err == nil {
 		root = r
@@ -74,11 +74,14 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 			t.Fatal(err)
 		}
 	}
-	h.threads["s1"] = Owner{ProjectID: "web", Worktree: h.feat}
-	h.threads["home"] = Owner{Worktree: root}
+	h.threads["s1"] = ThreadPlace{ProjectID: "web", Worktree: h.feat}
+	h.threads["home"] = ThreadPlace{Worktree: root}
+	// s2 works in web's feat worktree and api's checkout; ws in a workspace's folder over both.
+	h.threads["s2"] = ThreadPlace{ProjectID: "web", Worktree: h.feat, Checkouts: map[string]string{"web": h.feat, "api": h.api}}
+	h.threads["ws"] = ThreadPlace{Worktree: root, Checkouts: map[string]string{"web": h.web, "api": h.api}}
 	opts := Options{
 		DB: d, Projects: h.projects, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh",
-		Thread: func(id string) (Owner, bool) {
+		Thread: func(id string) (ThreadPlace, bool) {
 			h.mu.Lock()
 			defer h.mu.Unlock()
 			o, ok := h.threads[id]
@@ -344,14 +347,33 @@ func TestRunOwnerAndAction(t *testing.T) {
 		{name: "another project's action by id", opts: RunOptions{Action: "#apiEcho", Worktree: "%web"}, wantErr: ErrFailedPrecondition,
 			wantMsg: "belongs to another project"},
 		{name: "no action", opts: RunOptions{Worktree: "%web"}, wantErr: ErrInvalidArgument},
+
+		// A thread over several projects runs any member's action in its checkout of it.
+		{name: "a member's action by id runs in the thread's checkout of it", opts: RunOptions{Action: "#apiBuild", ThreadID: "s2"},
+			wantOwner: Owner{ThreadID: "s2", ProjectID: "api", Worktree: "%api"}, wantName: "Build"},
+		{name: "a name in the cwd's project comes first", opts: RunOptions{Action: "echo", ThreadID: "s2"},
+			wantOwner: Owner{ThreadID: "s2", ProjectID: "web", Worktree: "%feat"}, wantName: "Echo"},
+		{name: "a name only another member has", opts: RunOptions{Action: "build", ThreadID: "s2"},
+			wantOwner: Owner{ThreadID: "s2", ProjectID: "api", Worktree: "%api"}, wantName: "Build"},
+		{name: "project picks the member", opts: RunOptions{Action: "echo", ThreadID: "s2", ProjectID: "api"},
+			wantOwner: Owner{ThreadID: "s2", ProjectID: "api", Worktree: "%api"}, wantName: "Echo"},
+		{name: "another project's action by id", opts: RunOptions{Action: "#apiEcho", ThreadID: "s1"}, wantErr: ErrFailedPrecondition,
+			wantMsg: "which is not one of thread s1's projects"},
+		{name: "a name no member has", opts: RunOptions{Action: "deploy", ThreadID: "s2"}, wantErr: ErrNotFound,
+			wantMsg: `no action "deploy" in thread s2's projects`},
+		{name: "in a workspace's folder: a name two members have", opts: RunOptions{Action: "echo", ThreadID: "ws"}, wantErr: ErrInvalidArgument,
+			wantMsg: "is in several of thread ws's projects"},
+		{name: "in a workspace's folder: one member's", opts: RunOptions{Action: "build", ThreadID: "ws"},
+			wantOwner: Owner{ThreadID: "ws", ProjectID: "api", Worktree: "%api"}, wantName: "Build"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.create(CreateOptions{ProjectID: "web", Name: "Echo", Command: "true"})
 			apiEcho := h.create(CreateOptions{ProjectID: "api", Name: "Echo", Command: "true"})
+			apiBuild := h.create(CreateOptions{ProjectID: "api", Name: "Build", Command: "true"})
 			sub := func(s string) string {
-				return strings.NewReplacer("%feat", h.feat, "%web", h.web, "%api", h.api, "#apiEcho", apiEcho.ID).Replace(s)
+				return strings.NewReplacer("%feat", h.feat, "%web", h.web, "%api", h.api, "#apiEcho", apiEcho.ID, "#apiBuild", apiBuild.ID).Replace(s)
 			}
 			o := tt.opts
 			o.Action, o.Worktree = sub(o.Action), sub(o.Worktree)

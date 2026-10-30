@@ -80,7 +80,14 @@ func (r *runRec) kill(grace time.Duration, wg *sync.WaitGroup) {
 
 // Run implements Store.
 func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
-	owner, err := m.owner(o.ThreadID, o.Worktree, o.ProjectID)
+	if o.ThreadID != "" {
+		a, owner, err := m.threadRun(o.ThreadID, o.ProjectID, o.Action)
+		if err != nil {
+			return Run{}, err
+		}
+		return m.start(ctx, a, owner, o.Mode, TriggerUser)
+	}
+	owner, err := m.owner(o.Worktree, o.ProjectID)
 	if err != nil {
 		return Run{}, err
 	}
@@ -91,26 +98,10 @@ func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
 	return m.start(ctx, a, owner, o.Mode, TriggerUser)
 }
 
-// owner resolves a run's owner: the thread threadID, else the registered worktree at
-// worktree (in projectID when given).
-func (m *Manager) owner(threadID, worktree, projectID string) (Owner, error) {
+// owner resolves a run's owner without a thread: the registered worktree at worktree
+// (in projectID when given).
+func (m *Manager) owner(worktree, projectID string) (Owner, error) {
 	switch {
-	case threadID != "":
-		if m.opts.Thread == nil {
-			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, threadID)
-		}
-		ow, ok := m.opts.Thread(threadID)
-		if !ok {
-			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, threadID)
-		}
-		if ow.ProjectID == "" {
-			return Owner{}, fmt.Errorf("%w: thread %s has no project; actions belong to a project", ErrFailedPrecondition, threadID)
-		}
-		if projectID != "" && projectID != ow.ProjectID {
-			return Owner{}, fmt.Errorf("%w: thread %s is in project %s, not %s", ErrInvalidArgument, threadID, ow.ProjectID, projectID)
-		}
-		ow.ThreadID = threadID
-		return ow, nil
 	case worktree != "":
 		for _, r := range m.opts.Projects.Snapshot().Projects {
 			if projectID != "" && r.ID != projectID {

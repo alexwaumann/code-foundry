@@ -49,9 +49,8 @@ type Options struct {
 	Projects ProjectSource
 	// Terminals runs terminal-mode actions. Nil refuses them.
 	Terminals terminal.Store
-	// Thread resolves a thread to its owner (project and worktree). Nil: runs need a
-	// worktree.
-	Thread func(id string) (Owner, bool)
+	// Thread resolves a thread to where it works. Nil: runs need a worktree.
+	Thread func(id string) (ThreadPlace, bool)
 	Bus    *bus.Bus     // default: a private bus
 	Log    *slog.Logger // default: slog.Default()
 	// Shell is the shell that runs commands (`<Shell> -lc <command>`). Default: $SHELL,
