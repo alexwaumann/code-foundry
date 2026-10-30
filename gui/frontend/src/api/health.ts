@@ -26,3 +26,9 @@ export async function ping(conn: DaemonConnection = daemon): Promise<HealthView>
     throw err;
   }
 }
+
+/** Where the daemon places the first-run welcome page (HealthService.Version; "" from a daemon that does not say). */
+export async function welcomePage(conn: DaemonConnection = daemon): Promise<string> {
+  const client = await conn.client(HealthService);
+  return (await client.version({})).welcomePage;
+}

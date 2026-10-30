@@ -41,6 +41,7 @@ import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, HOME, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync } from "@/stores/views";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
+import { startWelcomeSync } from "@/stores/welcome";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
 import { EmberView } from "@/components/ember/EmberView";
@@ -81,6 +82,7 @@ function startApp(): () => void {
     installKeybindings(),
     startViewSync(),
     startArchiveCleanup(),
+    startWelcomeSync(),
     startUpdateSync(),
     startMenuCommands(),
     startDockAlerts(),

@@ -242,7 +242,7 @@ import { emberStateNames } from "./ember";
 import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
-import { MockFiles } from "./files";
+import { MockFiles, WELCOME_PAGE } from "./files";
 import { mockPaint, publishMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
@@ -343,7 +343,7 @@ function trackedSlugs(): string[] {
 function routes(router: ConnectRouter): void {
   router.service(HealthService, {
     ping: () => ({ pid: process.pid, version: "mock", uptime: durationFromMs(Date.now() - world.startedAt) }),
-    version: () => ({ version: "mock", commit: "", goVersion: "" }),
+    version: () => ({ version: "mock", commit: "", goVersion: "", welcomePage: WELCOME_PAGE }),
   });
 
   router.service(TerminalService, {
