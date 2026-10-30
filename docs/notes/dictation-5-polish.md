@@ -30,7 +30,9 @@ the earlier notes left open.
   * compose.spec.ts:244 and :288: the Work in detail that no longer names the path.
   * compose.spec.ts:160: 6743f4beb's "focus goes to the prompt after every pick". The spec now
     expects the prompt focused after the base pick, then focuses the base pill and checks that
-    Tab reaches Send.
+    Tab reaches Send. That spec, and :291 (which focuses the Work in pill after a pick), first wait for
+    the picker's list to close: the picker focuses the prompt again when its exit animation ends, and
+    under load that took the keyboard back from the pill (seen failing 2 of 3 full runs).
   * usage-sheet.spec.ts:42: ed01dbc22 raised the sheet's height cap to 1280. The settings spec
     was updated then; the usage spec was not.
 * **A flake on main found on the way:** settings.spec.ts:409 failed 4 times in 6 on clean

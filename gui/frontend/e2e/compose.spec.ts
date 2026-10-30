@@ -224,7 +224,9 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.type("release");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-base")).toHaveText("From release/v0.3");
-  // A pick in the Work in row hands the keyboard back to the prompt (composer-set-picks.md).
+  // A pick in the Work in row hands the keyboard back to the prompt (composer-set-picks.md),
+  // again once the list's exit animation ends.
+  await expect(page.getByTestId("composer-base-list")).toHaveCount(0);
   await expect(page.getByTestId("composer-input")).toBeFocused();
 
   await page.getByTestId("composer-base").focus();
@@ -302,6 +304,10 @@ test("an existing worktree or the current checkout shows its branch, read-only a
 
   await worktree.click();
   await options.filter({ hasText: "Project folder" }).click();
+  // The pick hands the keyboard to the prompt, again once the list's exit animation ends;
+  // wait for that before moving focus by hand below.
+  await expect(page.getByTestId("composer-worktree-list")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await expect(indicator).toHaveText("On main");
   await expect(indicator).toHaveAccessibleName("Current checkout is on main");
