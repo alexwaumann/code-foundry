@@ -22,10 +22,10 @@ export { HTML_PREVIEW_SANDBOX } from "./HtmlFrame";
  * reloads when the file's text changes (the thread edited it). A footer says what the page
  * can reach.
  */
-export function HtmlPreview({ path, text, name }: { path: string; text: string; name: string }) {
+export function HtmlPreview({ path, text, name, page: own }: { path: string; text: string; name: string; page?: { title: string } | undefined }) {
   const grant = usePreviewGrant("", path);
-  // A page its panel's thread showed has that thread's bridge; any other file none.
-  const page = usePageThread(path);
+  // A page its panel's thread showed (or opened as its own) has that thread's bridge; any other file none.
+  const page = usePageThread(path, own);
   // A new key remounts the frame when the text changes (derived state, not an effect, so the first render loads once).
   const [prevText, setPrevText] = useState(text);
   const [version, setVersion] = useState(0);

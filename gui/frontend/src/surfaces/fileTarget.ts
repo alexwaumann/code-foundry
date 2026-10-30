@@ -20,17 +20,28 @@ export interface FileTarget {
   path: string;
   /** 1-based line to scroll to and mark; absent for none. */
   line?: number;
+  /**
+   * An HTML page its panel's thread opened as its own (view.panel.page): its bridge acts as
+   * that thread though no card in the conversation shows it (usePageThread). Absent for any
+   * other file.
+   */
+  page?: { title: string };
 }
 
 /**
- * A File tab: params { project, base, path, line? } with the path made absolute against
- * base when it can be, keyed by that path alone, titled with the file's name.
+ * A File tab: params { project, base, path, line?, page?, title? } with the path made
+ * absolute against base when it can be, keyed by that path alone, titled with the page's
+ * title or the file's name.
  */
 export function fileTab(t: FileTarget): Tab {
   const path = resolvePath(t.base, t.path);
   const params: Record<string, string> = { project: t.project, base: t.base, path };
   if (t.line !== undefined && t.line > 0) params.line = String(Math.floor(t.line));
-  return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: fileName(path) || path, params };
+  if (t.page) {
+    params.page = "1";
+    if (t.page.title) params.title = t.page.title;
+  }
+  return { id: tabId(FILE_KIND, { path }), kind: FILE_KIND, title: t.page?.title || fileName(path) || path, params };
 }
 
 /** The file a File tab names; null when its params are not one. */
@@ -38,7 +49,13 @@ export function fileOfTab(tab: Pick<Tab, "params">): FileTarget | null {
   const path = tab.params.path ?? "";
   if (!path) return null;
   const line = Number(tab.params.line ?? "");
-  return { project: tab.params.project ?? "", base: tab.params.base ?? "", path, ...(Number.isInteger(line) && line > 0 ? { line } : {}) };
+  return {
+    project: tab.params.project ?? "",
+    base: tab.params.base ?? "",
+    path,
+    ...(Number.isInteger(line) && line > 0 ? { line } : {}),
+    ...(tab.params.page === "1" ? { page: { title: tab.params.title ?? "" } } : {}),
+  };
 }
 
 /** One changed file of a worktree to diff. */

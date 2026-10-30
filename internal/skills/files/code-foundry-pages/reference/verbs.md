@@ -18,5 +18,6 @@ Args by name, values after them in plain text; `code-foundry help <verb>` has th
 | `usage.show` (read) | `thread` an id, or `all` true |
 | `composer.stage` | `text` goes in the composer for the user to send (never sent); `thread` defaults to this one |
 | `project.add` | no args opens the Add Project dialog; `path` adds a folder without it |
+| `view.panel.page` | `path` an .html page opens in this thread's side panel only (no card), with this bridge; `title` names its tab |
 | `view.settings` | `page` general, appearance, memory, plugins, skills…; an unknown one lists them |
 | `theme.reset` | `slot` dark or light (default: the one in use) back to the default theme; the user's themes stay |

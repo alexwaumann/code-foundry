@@ -84,11 +84,18 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   "panel.mcp": surface(openMcpSurface),
   "panel.agents": surface(openAgentsSurface),
   "panel.threads": surface(openThreadsSurface),
-  // view.panel.file: params path (absolute), line, project and base.
+  // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
+  // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts).
   "panel.file": item((key, p) => {
     if (!p.path) return false;
     const line = positive(p.line);
-    return openFileInPanel(key, { project: p.project ?? "", base: p.base ?? "", path: p.path, ...(line === undefined ? {} : { line }) });
+    return openFileInPanel(key, {
+      project: p.project ?? "",
+      base: p.base ?? "",
+      path: p.path,
+      ...(line === undefined ? {} : { line }),
+      ...(p.page === "1" ? { page: { title: p.title ?? "" } } : {}),
+    });
   }),
   // view.panel.diff: params project, worktree, path (worktree-relative) and scope.
   "panel.diff": item((key, p) => {

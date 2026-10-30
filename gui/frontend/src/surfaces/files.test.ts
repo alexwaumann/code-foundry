@@ -31,6 +31,26 @@ describe("fileTab", () => {
     expect(fileOfTab({ params: { path: "/a", line: "x" } })).toEqual({ project: "", base: "", path: "/a" });
     expect(fileOfTab({ params: {} })).toBeNull();
   });
+
+  it("a thread's own page (view.panel.page): flagged, titled with its title, the same tab as the file", () => {
+    const t = fileTab({ project: "", base: "/Users/me", path: "/Users/me/p/welcome.html", page: { title: "Welcome" } });
+    expect(t).toMatchObject({ id: fileTab({ project: "", base: "", path: "/Users/me/p/welcome.html" }).id, title: "Welcome" });
+    expect(t.params).toMatchObject({ page: "1", title: "Welcome" });
+    expect(fileOfTab(t)).toMatchObject({ page: { title: "Welcome" } });
+    const untitled = fileTab({ project: "", base: "", path: "/Users/me/p/a.html", page: { title: "" } });
+    expect(untitled.title).toBe("a.html");
+    expect(untitled.params).not.toHaveProperty("title");
+    expect(fileOfTab(untitled)?.page).toEqual({ title: "" });
+  });
+
+  it("opening the page's file again another way (a path chip) keeps it the thread's page", () => {
+    openFileInPanel(KEY, { project: "", base: "", path: "/Users/me/p/welcome.html", page: { title: "Welcome" } });
+    openFileInPanel(KEY, { project: "", base: "", path: "/Users/me/p/welcome.html", line: 3 });
+    const t = lastTabOf(FILE_KIND, KEY);
+    expect(t).toMatchObject({ title: "Welcome", params: { page: "1", title: "Welcome", line: "3" } });
+    openFileInPanel(KEY, { project: "", base: "", path: "/Users/me/p/other.html" });
+    expect(lastTabOf(FILE_KIND, KEY)?.params).not.toHaveProperty("page");
+  });
 });
 
 describe("diffTab", () => {

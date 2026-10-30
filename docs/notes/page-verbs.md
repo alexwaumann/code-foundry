@@ -1,6 +1,6 @@
 # Page verbs
 
-Four verbs a page shown in a thread can call through `cf.run` (the bridge runs them as the
+Five verbs a page shown in a thread can call through `cf.run` (the bridge runs them as the
 CLI in that thread), as pre-work for a first-run welcome page. Each one also works from a
 plain CLI.
 
@@ -38,6 +38,16 @@ plain CLI.
   published). With `system` and no window it is InvalidArgument and asks for `--slot`.
   It is in the palette (a user action; its optional slot is not prompted, so it resets
   the slot in use).
+- **`view.panel.page <path> [--title] [--thread] [--focus]`** opens an HTML page in the
+  side panel of every window showing the thread, with no card in the conversation. It is
+  view.inline `--panel`'s panel half alone: the same `showScoped(… ViewPanelFile,
+  fileCheck)` path, so the same File tab frame (reloaded on every edit), the same
+  home-directory rule (FilesystemService.ReadFile), the same preview grant, plus the
+  .html/.htm check view.inline makes. Its ShowView `panel.file` carries two more params,
+  `page=1` and `title`. `--thread` defaults to the calling thread, so a page's
+  `cf.run("view.panel.page", {path})` opens in its own thread's panel. It prints the page's
+  warnings like view.inline, except the card-height one (the panel frame fills its tab).
+  NoPalette (it takes a path, like view.panel.file) and NoKeybinding.
 
 ## Decisions
 
@@ -56,18 +66,37 @@ plain CLI.
 - **project.add from a thread that no window shows prints the hint rather than refusing.**
   The verb has no `--focus`, and a dialog popping up over what the user is doing because
   a model ran `project add` is the case the page-verb guard exists for.
+- **A panel-only page gets its bridge from its tab, not from the log.** The File tab gave a
+  page its thread's bridge only when the thread's log had an html item for that file
+  (`usePageThread`). A panel-only page has none, so its bridge would have refused every
+  call. Rather than a hidden html item in the log (a proto field, a renderer skip, and the
+  @thread and transcript projections to teach), the tab carries `page=1` and its title
+  (`surfaces/fileTarget.ts`). `usePageThread(abs, own)` trusts that flag only in a
+  `thread:<id>` panel. Only the daemon's verb sets it, through the thread-scoped intent,
+  so the trust is the same as an html item's: the thread asked to show the file as a page.
+  Storage follows (its key prefix is the thread id).
+- **The flag survives a second open.** `openFileInPanel` keeps `page` and `title` when the
+  same file opens again without them (a path chip in a reply), since openTab replaces a
+  tab's params and the page would lose its bridge.
 - **`dictation` is not a page.** It is a section of General. `--page general` reaches it.
 
 ## Verified
 
 - Go: table tests for each verb's branches (`commands_composer_stage_test.go`,
   `commands_view_settings_test.go`, `TestProjectAddOpensTheDialog`,
-  `commands_theme_reset_test.go` over a real settings store and themes directory).
-  palette_test, keybindings_test and the registry count are updated.
+  `commands_theme_reset_test.go` over a real settings store and themes directory,
+  `commands_view_panel_page_test.go`). palette_test, keybindings_test, readonly_test, the
+  capabilities panel count (10 surfaces) and the registry count are updated. The guide
+  stays under its soft cap of 25,600 with view.panel.page added, so the cap is unchanged.
 - Vitest: the intent mapping, staging (empty draft, appended, another thread),
-  `settings.<page>` and `project.add` in `showView`.
+  `settings.<page>` and `project.add` in `showView`; a page tab's params and title, the flag
+  kept on a second open, `panel.file` with `page=1`, and `usePageThread` (own page in a
+  thread's panel, not in another panel).
 - Playwright (mock daemon): `e2e/page-verbs.spec.ts` emits each intent and checks the
-  composer, the Settings nav and the dialog.
+  composer, the Settings nav and the dialog. `e2e/page-verbs-panel.spec.ts` runs
+  view.panel.page in s-1's context (as its bridge would): the panel opens on a tab titled
+  Welcome, the page's bridge is s-1's (a ui.notify through it answers ok), and the
+  conversation has no card. A file that is not a page is refused.
 - Real daemon with a scratch home and the CLI: the composer.stage refusals, project.add's
   hint with no window, `--page memory` ("no app window is open") and an unknown page,
   and theme.reset with and without `--slot`.
