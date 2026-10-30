@@ -344,3 +344,76 @@ func TestRemoveProjectArchived(t *testing.T) {
 		t.Errorf("set changed: %v", got.ProjectIDs)
 	}
 }
+
+func TestDropBranchLinks(t *testing.T) {
+	api := LinkedPullRequest{Slug: "acme/api", Number: 5, URL: "u5", Source: LinkBranch}
+	web := LinkedPullRequest{Slug: "acme/web", Number: 6, URL: "u6", Source: LinkBranch}
+	claude := LinkedPullRequest{Slug: "acme/api", Number: 7, URL: "u7", Source: LinkClaude}
+	child := LinkedPullRequest{Slug: "acme/api", Number: 8, URL: "u8", Source: LinkChild, ViaThreadID: "s-c"}
+	all := []LinkedPullRequest{api, web, claude, child}
+	tests := []struct {
+		name       string
+		slug       string
+		others     []string
+		kept, gone []string
+	}{
+		{name: "the member's branch links go", slug: "ACME/api", others: []string{"acme/web"}, kept: []string{"u6", "u7", "u8"}, gone: []string{"u5"}},
+		{name: "another member in the same repository keeps them", slug: "acme/api", others: []string{"acme/web", "acme/api"}, kept: []string{"u5", "u6", "u7", "u8"}},
+		{name: "no repository known: nothing goes", slug: "", kept: []string{"u5", "u6", "u7", "u8"}},
+		{name: "no branch link of that repository", slug: "acme/lib", kept: []string{"u5", "u6", "u7", "u8"}},
+	}
+	urls := func(ls []LinkedPullRequest) []string {
+		var out []string
+		for _, l := range ls {
+			out = append(out, l.URL)
+		}
+		return out
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kept, gone := dropBranchLinks(all, tt.slug, tt.others)
+			if !slices.Equal(urls(kept), tt.kept) || !slices.Equal(urls(gone), tt.gone) {
+				t.Errorf("kept %v dropped %v, want %v and %v", urls(kept), urls(gone), tt.kept, tt.gone)
+			}
+		})
+	}
+}
+
+// Removing api forgets the pull requests its branch gave the thread, also after a daemon
+// restart; Claude's own link and a child's link in the same repository stay, and so do
+// web's branch links.
+func TestRemoveProjectDropsItsBranchLinks(t *testing.T) {
+	e, rr, _ := memberEnv(t)
+	for _, id := range []string{"r1", "r2"} {
+		r, _ := rr.Snapshot().Project(id)
+		r.GitHubSlug = "acme/" + r.Name
+		rr.Put(r)
+	}
+	s := e.create(CreateOptions{ProjectID: "r1", ProjectIDs: []string{"r1", "r2"}})
+	e.m.LinkBranchPullRequests(s.ID, []LinkedPullRequest{
+		{Slug: "acme/api", Number: 5, URL: "https://github.com/acme/api/pull/5"},
+		{Slug: "acme/repo", Number: 6, URL: "https://github.com/acme/repo/pull/6"},
+	})
+	e.m.linkPullRequests(s.ID, []LinkedPullRequest{
+		{Slug: "acme/api", Number: 7, URL: "https://github.com/acme/api/pull/7", Source: LinkClaude},
+		{Slug: "acme/api", Number: 8, URL: "https://github.com/acme/api/pull/8", Source: LinkChild, ViaThreadID: "s-child"},
+	})
+	got, err := e.m.RemoveProject(e.ctx(), s.ID, "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	numbers := func(ls []LinkedPullRequest) []int {
+		var out []int
+		for _, l := range ls {
+			out = append(out, l.Number)
+		}
+		return out
+	}
+	if n := numbers(got.LinkedPullRequests); !slices.Equal(n, []int{6, 7, 8}) {
+		t.Fatalf("links %v, want 6, 7 and 8", n)
+	}
+	e.restart()
+	if after, _ := e.m.Get(e.ctx(), s.ID); !slices.Equal(numbers(after.LinkedPullRequests), []int{6, 7, 8}) {
+		t.Errorf("after a restart links %v", numbers(after.LinkedPullRequests))
+	}
+}

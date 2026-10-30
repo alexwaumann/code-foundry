@@ -91,17 +91,33 @@ func (m *Manager) RemoveProject(ctx context.Context, id, ref string) (Thread, er
 		return Thread{}, fmt.Errorf("%w: %q is not one of thread %s's projects (%s)", ErrFailedPrecondition, ref, id, strings.Join(cur.Projects(), ", "))
 	}
 	var path string
+	var dropped []LinkedPullRequest
 	s, left, err := m.changeMembers(id, func(s Thread) (Thread, error) {
 		if !slices.Contains(s.Projects(), pid) {
 			return s, fmt.Errorf("%w: %s is not one of thread %s's projects", ErrFailedPrecondition, name, id)
 		}
 		path, _ = s.CheckoutPath(pid)
-		return WithoutMember(s, pid, name)
+		next, err := WithoutMember(s, pid, name)
+		if err != nil {
+			return s, err
+		}
+		slug, others := m.memberSlugs(next, pid)
+		next.LinkedPullRequests, dropped = dropBranchLinks(next.LinkedPullRequests, slug, others)
+		return next, nil
 	})
 	if err != nil {
 		return Thread{}, err
 	}
-	m.log.Info("project removed from thread", "thread", id, "project", pid, "checkout", path, "left_workspace", left)
+	if len(dropped) > 0 && m.opts.DB != nil {
+		urls := make([]string, len(dropped))
+		for i, l := range dropped {
+			urls[i] = l.URL
+		}
+		if err := deleteLinks(context.WithoutCancel(ctx), m.opts.DB, id, urls); err != nil {
+			m.log.Error("forget the removed member's branch links", "thread", id, "err", err)
+		}
+	}
+	m.log.Info("project removed from thread", "thread", id, "project", pid, "checkout", path, "left_workspace", left, "branch_links_dropped", len(dropped))
 	m.noteMembers(ctx, id, removedNote(name, path, m.workspaceName(left)), liveRemoveNote(path))
 	return s, nil
 }
@@ -217,6 +233,45 @@ func WithoutMember(s Thread, projectID, name string) (Thread, error) {
 	}
 	s.WorkspaceID = ""
 	return s, nil
+}
+
+// memberSlugs is removed's GitHub repository ("" when unknown) and the repositories of
+// s's members (s is the thread without it).
+func (m *Manager) memberSlugs(s Thread, removed string) (string, []string) {
+	if m.opts.Projects == nil {
+		return "", nil
+	}
+	snap := m.opts.Projects.Snapshot()
+	r, _ := snap.Project(removed)
+	var others []string
+	for _, id := range s.Projects() {
+		if p, ok := snap.Project(id); ok && p.GitHubSlug != "" {
+			others = append(others, p.GitHubSlug)
+		}
+	}
+	return r.GitHubSlug, others
+}
+
+// dropBranchLinks is links without the branch links (LinkBranch) a removed member gave
+// the thread: those in its repository slug, unless another member works in the same
+// repository (the daemon matches branch links by repository and branch, and keeps no
+// project on the link). Links from Claude's records and from child threads stay; so does
+// everything when the slug is unknown. Pure; copy on write.
+func dropBranchLinks(links []LinkedPullRequest, slug string, others []string) (kept, dropped []LinkedPullRequest) {
+	if slug == "" || slices.ContainsFunc(others, func(o string) bool { return strings.EqualFold(o, slug) }) {
+		return links, nil
+	}
+	for _, l := range links {
+		if l.Source == LinkBranch && strings.EqualFold(l.Slug, slug) {
+			dropped = append(dropped, l)
+		} else {
+			kept = append(kept, l)
+		}
+	}
+	if len(dropped) == 0 {
+		return links, nil
+	}
+	return kept, dropped
 }
 
 // workspaceName is workspace id's name, else the id; "" for "".
