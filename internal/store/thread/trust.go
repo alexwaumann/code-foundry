@@ -24,8 +24,8 @@ import (
 // proper-lockfile, whose convention is a "<file>.lock" directory considered stale
 // after 10s; trustWorktree takes the same lock, re-reads, edits only the one entry,
 // and replaces the file atomically. claude -p skips the dialog itself, but set_cwd
-// (RunIn) refuses a folder that is not trusted ("needs_trust"), so spawn and RunIn
-// pre-trust.
+// (RunIn) refuses a folder that is not trusted ("needs_trust"), so spawn pre-trusts the
+// cwd and every member's checkout (preTrustCheckouts), and RunIn the target again.
 
 const (
 	trustLockStale = 10 * time.Second
@@ -154,6 +154,28 @@ func lockFile(path string) (func(), error) {
 			return nil, fmt.Errorf("trust: lock %s: held by another process", dir)
 		}
 		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+// preTrustCheckouts marks t's cwd and every other member's checkout as trusted in
+// Claude's config before spawn: claude -p skips the dialog for its cwd, but Run in moves
+// the live process to a member with set_cwd, which refuses an untrusted folder
+// ("needs_trust"), and a running claude sees trust written just before set_cwd only a
+// while later (thread-info-facts: a project's own folder, which no Create pre-trusts,
+// was refused, then accepted 20 seconds later). A member gets the rule its folder would
+// get as a thread's cwd: trusted, unless Options.DisablePreTrust. A failure is logged;
+// the start goes on.
+func (m *Manager) preTrustCheckouts(t Thread) {
+	if m.opts.DisablePreTrust {
+		return
+	}
+	dirs, _ := m.memberDirs(t)
+	for _, dir := range append([]string{t.WorktreePath}, dirs...) {
+		if changed, err := trustWorktree(m.opts.Paths.Config, dir); err != nil {
+			m.log.Warn("pre-trust worktree failed", "thread", t.ID, "path", dir, "err", err)
+		} else if changed {
+			m.log.Info("pre-trusted worktree in claude config", "thread", t.ID, "path", realPath(dir))
+		}
 	}
 }
 
