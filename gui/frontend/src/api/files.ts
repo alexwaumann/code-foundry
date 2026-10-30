@@ -80,6 +80,24 @@ export async function readFile(baseDir: string, path: string, conn: DaemonConnec
   }
 }
 
+/**
+ * What tells one version of a file from the next without reading it: "<size>:<mtime ms>",
+ * or "" when nothing is there. Any write moves the time (an editor's save, `cp` over the
+ * file, `touch`), so a write in between changes the stamp.
+ */
+export type FileStamp = string;
+
+/** The file's stamp (FileStamp): ReadFile for one byte, so only its head is read. */
+export async function statFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileStamp> {
+  const c = await conn.client(FilesystemService);
+  try {
+    const r = await c.readFile({ baseDir, path, maxBytes: 1n }, { signal });
+    return r.notFound ? "" : `${String(r.size)}:${String(r.modifiedAt)}`;
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
 /** Where the HTML preview loads a file from (FilesystemService.PreviewFile). */
 export interface FilePreview {
   /** Absolute URL on the daemon's loopback listener; no bearer token needed (the grant is in the path). */

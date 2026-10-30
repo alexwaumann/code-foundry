@@ -237,11 +237,16 @@ interface Entry {
   /** The size on disk when it is more than the data (a truncated read). */
   size?: number;
   dir?: boolean;
+  /** When it was last written (unix ms); unset: two minutes before the read. */
+  modifiedAt?: number;
 }
 
 function text(s: string, mime = "text/plain; charset=utf-8"): Entry {
   return { data: enc.encode(s), mime };
 }
+
+/** The fixtures' modification time: fixed, so a stamp (size and time) changes only with a write. */
+const FIXTURE_MTIME = Date.now() - 2 * 60_000;
 
 function fixtures(): Map<string, Entry> {
   return new Map<string, Entry>([
@@ -296,8 +301,15 @@ export class MockFiles {
     this.calls.length = 0;
   }
 
-  write(path: string, s: string): void {
-    this.disk.set(path, text(s, this.disk.get(path)?.mime ?? "text/plain; charset=utf-8"));
+  /** Writes a file's contents; with `touch`, only its modification time moves (touch(1); `s` is ignored). */
+  write(path: string, s: string, touch = false): void {
+    const was = this.disk.get(path);
+    const modifiedAt = Math.max(Date.now(), (was?.modifiedAt ?? 0) + 1);
+    if (touch && was) {
+      this.disk.set(path, { ...was, modifiedAt });
+      return;
+    }
+    this.disk.set(path, { ...text(s, was?.mime ?? "text/plain; charset=utf-8"), modifiedAt });
   }
 
   /** The worktree that has `abs` among its changed files, and that file. */
@@ -367,7 +379,7 @@ export class MockFiles {
     if (abs !== HOME && !abs.startsWith(`${HOME}/`)) throw new ConnectError(`${abs} is outside the home directory`, Code.InvalidArgument);
     const e = this.onDisk(abs);
     if (!e) return { resolvedPath: abs, notFound: true };
-    const modifiedAt = BigInt(Date.now() - 2 * 60_000);
+    const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
     if (e.dir) return { resolvedPath: abs, isDir: true, size: BigInt(e.size ?? 0), modifiedAt };
     const size = e.size ?? e.data.length;
     // Zero is 1 MiB; text never more than 1 MiB, anything else up to 32 MiB.

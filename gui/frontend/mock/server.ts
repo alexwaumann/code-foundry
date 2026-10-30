@@ -116,7 +116,7 @@
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   FilesystemService.ReadFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
- *   POST /__mock/fs/write?path=…&text=…           (a file's contents on disk; reset restores the fixtures)
+ *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   GET  /__mock/fs/calls                         ("read <path>", "diff <worktree> <file> <working|branch>")
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
@@ -1618,7 +1618,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, completionCalls);
       break;
     case "POST /__mock/fs/write":
-      mockFiles.write(q.get("path") ?? "", q.get("text") ?? "");
+      mockFiles.write(q.get("path") ?? "", q.get("text") ?? "", q.get("touch") === "1");
       json(res, 200, { ok: true });
       break;
     case "GET /__mock/fs/calls":

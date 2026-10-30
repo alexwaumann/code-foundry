@@ -6,7 +6,7 @@ import { CodeBody } from "@/components/files/CodeBody";
 import { HtmlFrame } from "@/components/files/HtmlFrame";
 import { PageErrors } from "@/components/files/PageErrors";
 import { usePreviewGrant, type PreviewGrant } from "@/components/files/previewGrant";
-import { useTabRead, useToolEdits } from "@/components/files/useTabRead";
+import { useFileChanges, useTabRead } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { SHELL_GAP } from "@/design/tokens";
@@ -300,8 +300,8 @@ function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string;
   const [version, setVersion] = useState(0);
   const [errors, setErrors] = useState<readonly PageError[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-  // The thread edited the file: load it again (the grant holds).
-  useToolEdits(page.abs, () => {
+  // The file was written (an edit, `cp` over it, `touch`): load it again (the grant holds).
+  useFileChanges(page.abs, () => {
     setVersion((v) => v + 1);
   });
   useEffect(() => {
@@ -409,7 +409,7 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
   const grant = usePreviewGrant(page.baseDir, page.path);
   const [version, setVersion] = useState(0);
   const [errors, setErrors] = useState<readonly PageError[]>([]);
-  useToolEdits(page.abs, () => {
+  useFileChanges(page.abs, () => {
     setVersion((v) => v + 1);
   });
   const close = () => {
