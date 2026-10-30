@@ -50,7 +50,16 @@ func TestThreadCheckoutsMigration(t *testing.T) {
 			t.Errorf("%s: branch %q, want the created-for branch kept", tt.id, branch)
 		}
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE threads SET checkouts = '{"api":"/wt/api/feat-x"}' WHERE id = 'wt'`); err != nil {
+	// The column takes what the thread store writes, and gives it back.
+	const recorded = `{"api":"/wt/api/feat-x","web":"/wt/web/feat-x"}`
+	if _, err := db.ExecContext(ctx, `UPDATE threads SET checkouts = ? WHERE id = 'wt'`, recorded); err != nil {
 		t.Fatal(err)
+	}
+	var got string
+	if err := db.QueryRowContext(ctx, `SELECT checkouts FROM threads WHERE id = 'wt'`).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != recorded {
+		t.Errorf("checkouts after a write = %q, want %q", got, recorded)
 	}
 }

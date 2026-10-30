@@ -358,3 +358,29 @@ func TestSharedCheckouts(t *testing.T) {
 		})
 	}
 }
+
+// ListedCheckouts reads the snapshot alone: no CLAUDE.md lookup, and an unrecorded member
+// whose worktree is not listed on the branch has no path (no path rule).
+func TestListedCheckouts(t *testing.T) {
+	dir := t.TempDir()
+	wt := filepath.Join(dir, "wt")
+	if err := os.MkdirAll(wt, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, "CLAUDE.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	snap := &project.Snapshot{Projects: []project.Project{
+		{ID: "web", Name: "web", Git: true, Worktrees: []project.Worktree{{ProjectID: "web", Path: wt, Branch: "other"}}},
+		{ID: "api", Name: "api", Git: true, Worktrees: []project.Worktree{{ProjectID: "api", Path: "/api", IsMain: true, Branch: "main"}}},
+	}}
+	th := Thread{ProjectID: "web", ProjectIDs: []string{"api", "web"}, WorktreePath: wt, CreatedWorktree: true, Branch: "feat/x"}
+	want := []Checkout{
+		{ProjectID: "api", ProjectName: "api", Git: true, Registered: true, WorktreeMode: true, CreatedBranch: "feat/x", Missing: true},
+		{ProjectID: "web", ProjectName: "web", Path: wt, Recorded: true, Listed: true, Branch: "other", Primary: true, Git: true, Registered: true,
+			WorktreeMode: true, CreatedBranch: "feat/x", Moved: true},
+	}
+	if got := ListedCheckouts(th, snap); !slices.Equal(got, want) {
+		t.Errorf("ListedCheckouts\n got %+v\nwant %+v", got, want)
+	}
+}

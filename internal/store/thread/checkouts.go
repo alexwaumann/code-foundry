@@ -142,8 +142,20 @@ func (t Thread) movedTo(projectID, path string) Thread {
 // each recorded path; a member with none recorded is resolved (resolveMember). pathFor
 // is where the project store puts a project's worktree for a branch
 // (project.Git.DefaultWorktreePath); exists reports whether a path is a directory. Pure
-// apart from what those two read.
+// apart from what those two read and the CLAUDE.md lookup (Instructions).
 func CheckoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool) []Checkout {
+	return checkoutsOf(t, snap, pathFor, exists, true)
+}
+
+// ListedCheckouts is CheckoutsOf from the snapshot alone, for a caller that reads only
+// what it lists (the daemon's branch links, on every pass): no path rule (an unrecorded
+// worktree-mode member not listed on the branch has no path), no stat (Missing only when
+// there is no path) and no CLAUDE.md lookup.
+func ListedCheckouts(t Thread, snap *project.Snapshot) []Checkout {
+	return checkoutsOf(t, snap, func(string, string) string { return "" }, func(string) bool { return true }, false)
+}
+
+func checkoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool, files bool) []Checkout {
 	ids := t.Projects()
 	out := make([]Checkout, 0, len(ids))
 	for _, id := range ids {
@@ -165,7 +177,7 @@ func CheckoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branc
 			c.Moved = c.Listed && (c.Detached || c.Branch != t.Branch)
 		}
 		c.Missing = c.Path == "" || !exists(c.Path)
-		if !c.Missing {
+		if !c.Missing && files {
 			if p := filepath.Join(c.Path, "CLAUDE.md"); fileExists(p) {
 				c.Instructions = p
 			}

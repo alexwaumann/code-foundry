@@ -70,9 +70,8 @@ func prsByHead(prs []gh.PullRequest) map[headKey][]gh.PullRequest {
 // thread without a project.
 func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 	var out []headKey
-	// No path rule and no stat: an unlisted checkout is "not on a branch now".
-	cos := thread.CheckoutsOf(th, projects, func(string, string) string { return "" }, func(string) bool { return true })
-	for _, c := range cos {
+	// From the snapshot alone (every pass): an unlisted checkout is "not on a branch now".
+	for _, c := range thread.ListedCheckouts(th, projects) {
 		r, ok := projects.Project(c.ProjectID)
 		if !ok || r.GitHubSlug == "" {
 			continue
