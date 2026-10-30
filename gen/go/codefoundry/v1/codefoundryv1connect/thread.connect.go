@@ -53,6 +53,12 @@ const (
 	ThreadServiceRemoveProcedure = "/codefoundry.v1.ThreadService/Remove"
 	// ThreadServiceRunInProcedure is the fully-qualified name of the ThreadService's RunIn RPC.
 	ThreadServiceRunInProcedure = "/codefoundry.v1.ThreadService/RunIn"
+	// ThreadServiceAddProjectProcedure is the fully-qualified name of the ThreadService's AddProject
+	// RPC.
+	ThreadServiceAddProjectProcedure = "/codefoundry.v1.ThreadService/AddProject"
+	// ThreadServiceRemoveProjectProcedure is the fully-qualified name of the ThreadService's
+	// RemoveProject RPC.
+	ThreadServiceRemoveProjectProcedure = "/codefoundry.v1.ThreadService/RemoveProject"
 	// ThreadServiceCheckoutsProcedure is the fully-qualified name of the ThreadService's Checkouts RPC.
 	ThreadServiceCheckoutsProcedure = "/codefoundry.v1.ThreadService/Checkouts"
 	// ThreadServiceCheckPlacementProcedure is the fully-qualified name of the ThreadService's
@@ -186,6 +192,19 @@ type ThreadServiceClient interface {
 	// row changes at once; the next start resumes there. Refused for a thread without a
 	// project and for a target that is not one of its checkouts.
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// AddProject adds a project to a thread's set. Its checkout is placed by Create's rule:
+	// in worktree mode a git project's worktree for the thread's branch (shared when one
+	// is on it, else made; Create's refusals for a main checkout on the branch or a
+	// default path holding another checkout), a plain folder its folder; in checkout mode
+	// the project's own checkout. RemoveProject drops a member: refused for the cwd's
+	// project; its checkout stays on disk. Either clears the thread's workspace_id (it no
+	// longer follows that workspace; the workspace is untouched) and adds a timeline
+	// note. A live Claude restarts, resuming the conversation, for its new --add-dir list
+	// once it is idle at its prompt; a stopped thread takes it at its next start. Refused
+	// for a thread without a project and for one running in its workspace's folder. See
+	// docs/notes/thread-project-set.md.
+	AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error)
+	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -473,6 +492,18 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("RunIn")),
 			connect.WithClientOptions(opts...),
 		),
+		addProject: connect.NewClient[v1.AddThreadProjectRequest, v1.AddThreadProjectResponse](
+			httpClient,
+			baseURL+ThreadServiceAddProjectProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("AddProject")),
+			connect.WithClientOptions(opts...),
+		),
+		removeProject: connect.NewClient[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse](
+			httpClient,
+			baseURL+ThreadServiceRemoveProjectProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("RemoveProject")),
+			connect.WithClientOptions(opts...),
+		),
 		checkouts: connect.NewClient[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse](
 			httpClient,
 			baseURL+ThreadServiceCheckoutsProcedure,
@@ -710,6 +741,8 @@ type threadServiceClient struct {
 	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
 	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
+	addProject        *connect.Client[v1.AddThreadProjectRequest, v1.AddThreadProjectResponse]
+	removeProject     *connect.Client[v1.RemoveThreadProjectRequest, v1.RemoveThreadProjectResponse]
 	checkouts         *connect.Client[v1.ThreadCheckoutsRequest, v1.ThreadCheckoutsResponse]
 	checkPlacement    *connect.Client[v1.CheckPlacementRequest, v1.CheckPlacementResponse]
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
@@ -797,6 +830,16 @@ func (c *threadServiceClient) Remove(ctx context.Context, req *connect.Request[v
 // RunIn calls codefoundry.v1.ThreadService.RunIn.
 func (c *threadServiceClient) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	return c.runIn.CallUnary(ctx, req)
+}
+
+// AddProject calls codefoundry.v1.ThreadService.AddProject.
+func (c *threadServiceClient) AddProject(ctx context.Context, req *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error) {
+	return c.addProject.CallUnary(ctx, req)
+}
+
+// RemoveProject calls codefoundry.v1.ThreadService.RemoveProject.
+func (c *threadServiceClient) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error) {
+	return c.removeProject.CallUnary(ctx, req)
 }
 
 // Checkouts calls codefoundry.v1.ThreadService.Checkouts.
@@ -1025,6 +1068,19 @@ type ThreadServiceHandler interface {
 	// row changes at once; the next start resumes there. Refused for a thread without a
 	// project and for a target that is not one of its checkouts.
 	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// AddProject adds a project to a thread's set. Its checkout is placed by Create's rule:
+	// in worktree mode a git project's worktree for the thread's branch (shared when one
+	// is on it, else made; Create's refusals for a main checkout on the branch or a
+	// default path holding another checkout), a plain folder its folder; in checkout mode
+	// the project's own checkout. RemoveProject drops a member: refused for the cwd's
+	// project; its checkout stays on disk. Either clears the thread's workspace_id (it no
+	// longer follows that workspace; the workspace is untouched) and adds a timeline
+	// note. A live Claude restarts, resuming the conversation, for its new --add-dir list
+	// once it is idle at its prompt; a stopped thread takes it at its next start. Refused
+	// for a thread without a project and for one running in its workspace's folder. See
+	// docs/notes/thread-project-set.md.
+	AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error)
+	RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds the
 	// cwd, the deepest winning) and lists one checkout per project in its set: the primary
 	// at its cwd; in worktree mode a git member's worktree on the thread's branch, a plain
@@ -1308,6 +1364,18 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("RunIn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceAddProjectHandler := connect.NewUnaryHandler(
+		ThreadServiceAddProjectProcedure,
+		svc.AddProject,
+		connect.WithSchema(threadServiceMethods.ByName("AddProject")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceRemoveProjectHandler := connect.NewUnaryHandler(
+		ThreadServiceRemoveProjectProcedure,
+		svc.RemoveProject,
+		connect.WithSchema(threadServiceMethods.ByName("RemoveProject")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceCheckoutsHandler := connect.NewUnaryHandler(
 		ThreadServiceCheckoutsProcedure,
 		svc.Checkouts,
@@ -1552,6 +1620,10 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRemoveHandler.ServeHTTP(w, r)
 		case ThreadServiceRunInProcedure:
 			threadServiceRunInHandler.ServeHTTP(w, r)
+		case ThreadServiceAddProjectProcedure:
+			threadServiceAddProjectHandler.ServeHTTP(w, r)
+		case ThreadServiceRemoveProjectProcedure:
+			threadServiceRemoveProjectHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckoutsProcedure:
 			threadServiceCheckoutsHandler.ServeHTTP(w, r)
 		case ThreadServiceCheckPlacementProcedure:
@@ -1673,6 +1745,14 @@ func (UnimplementedThreadServiceHandler) Remove(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RunIn is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) AddProject(context.Context, *connect.Request[v1.AddThreadProjectRequest]) (*connect.Response[v1.AddThreadProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.AddProject is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) RemoveProject(context.Context, *connect.Request[v1.RemoveThreadProjectRequest]) (*connect.Response[v1.RemoveThreadProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RemoveProject is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Checkouts(context.Context, *connect.Request[v1.ThreadCheckoutsRequest]) (*connect.Response[v1.ThreadCheckoutsResponse], error) {

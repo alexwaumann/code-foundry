@@ -99,6 +99,9 @@ type streamState struct {
 	// maybeRestart begins once the interrupted turn is over; restartInterrupted: its
 	// interrupt went out. userRestart: the restart under way is the user's.
 	wantRestart, restartInterrupted, userRestart bool
+	// wantDirs: the project set changed since this process started (members.go); it
+	// restarts for the new --add-dir list when quiet, as for an effort change.
+	wantDirs bool
 	// restartFrom is the effort of the process a restart replaced (onRestarted notes a
 	// change).
 	restartFrom  string
@@ -144,6 +147,9 @@ type threadCmd struct {
 	reseed    *seed   // Reseed (reseed.go)
 	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
 	verb      *Item   // ShowHTML, ShowTheme: an item a verb adds (html.go verbItem)
+	// dirs, with verb: the thread's project set changed (members.go); the process
+	// restarts for its new --add-dir list once it is quiet.
+	dirs bool
 	// reuse, with verb, may answer with an item already in the log instead.
 	reuse     func(itemWriter) (Item, bool)
 	requestID string
@@ -746,6 +752,10 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.item = r.onWakeLimit()
 	case cmd.verb != nil:
 		rep.item = r.onVerbItem(*cmd.verb, cmd.reuse)
+		if cmd.dirs {
+			r.st.wantDirs = true
+			r.log().info("thread project set changed; restarting claude once it is quiet")
+		}
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}

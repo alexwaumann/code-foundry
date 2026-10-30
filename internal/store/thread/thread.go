@@ -567,6 +567,13 @@ type Store interface {
 	// primary): set_cwd once the live thread is idle at its prompt (the row's cwd changes
 	// when Claude accepts), or the row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Thread, error)
+	// AddProject adds a project (an id or a name) to the thread's set, with a checkout
+	// placed by the creation rule; RemoveProject drops a member that is not the cwd,
+	// leaving its checkout on disk. Either leaves the workspace the thread referenced
+	// (WorkspaceID cleared) and notes the change in the timeline; a live Claude restarts
+	// for its new --add-dir list once it is quiet (members.go).
+	AddProject(ctx context.Context, id, ref string) (Thread, error)
+	RemoveProject(ctx context.Context, id, ref string) (Thread, error)
 	// Checkouts resolves a thread (by id, else the thread one of whose checkouts holds
 	// the cwd, the deepest winning) and lists its checkouts (checkouts.go).
 	Checkouts(ctx context.Context, ref CheckoutsRef) (ThreadCheckouts, error)

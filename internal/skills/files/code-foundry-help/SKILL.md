@@ -79,7 +79,8 @@ A workspace is a saved set of projects (a product's repos) with a folder for the
 skills that span them. The Projects page has a card per workspace (projects, instructions file,
 skills); Save as workspace in a thread's title menu makes one (`code-foundry workspace new <name>
 --projects a,b`). Its folder (`code-foundry workspace list`) holds `CLAUDE.md` and
-`.claude/skills/<name>/SKILL.md`: offer to write them (the code-foundry skill's "Scopes").
+`.claude/skills/<name>/SKILL.md`: offer to write them (the code-foundry skill's "Scopes"). Adding
+or removing a thread's project (card's project menu, `thread project add|remove`) leaves its workspace.
 
 ## The welcome tutorial
 

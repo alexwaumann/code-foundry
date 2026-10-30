@@ -91,7 +91,8 @@ func (r *runner) setEffort(effort string) Thread {
 	return s
 }
 
-// maybeRestart begins a restart for a pending effort change once nothing would be
+// maybeRestart begins a restart for a pending effort change (or a changed project set,
+// wantDirs: members.go) once nothing would be
 // lost: connected, idle at the prompt, nothing pending, streaming or running (a
 // background agent's tool call keeps running across turns), no background shell
 // running (it dies with the process), no turn Claude is about to start for a background
@@ -111,7 +112,7 @@ func (r *runner) maybeRestart() {
 		r.interruptForRestart()
 		return
 	case user:
-	case st.wantEffort == st.effort || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
+	case st.wantEffort == st.effort && !st.wantDirs || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending:
 		return
 	}
 	r.beginRestart(user)
@@ -127,9 +128,12 @@ func (r *runner) beginRestart(user bool) {
 	}
 	st.restart = restartClosing
 	st.setSwapping(true)
-	if user {
+	switch {
+	case user:
 		r.log().info("restarting claude for the user", "effort", st.wantEffort, "pid", st.proc.Pid(), "at_prompt", st.sd.AtPrompt())
-	} else {
+	case st.wantEffort == st.effort:
+		r.log().info("restarting claude for a changed project set", "pid", st.proc.Pid())
+	default:
 		r.log().info("restarting claude for an effort change", "from", st.effort, "to", st.wantEffort, "pid", st.proc.Pid())
 	}
 	conn := st.conn
@@ -175,6 +179,8 @@ func (r *runner) respawn() {
 	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
+	forDirs := st.wantDirs && st.wantEffort == st.effort
+	st.wantDirs = false // the row's set as it is now goes to the new process
 	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
 	argv, env, extras, mem := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
 	// A missing cwd fails as itself, not as exec's ENOENT (cwd.go); a worktree-mode worktree
@@ -189,6 +195,9 @@ func (r *runner) respawn() {
 	}
 	if err != nil {
 		msg := "Claude did not restart for the effort change: " + err.Error()
+		if forDirs {
+			msg = "Claude did not restart for the changed projects: " + err.Error()
+		}
 		if st.userRestart {
 			msg = "Claude did not restart: " + err.Error()
 		}

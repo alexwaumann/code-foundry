@@ -39,7 +39,7 @@ var noPalette = []string{
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",
 	"thread.agents", "thread.budget", "thread.checkouts", "thread.commands", "thread.flag.clear",
 	"thread.flags", "thread.focus", "thread.get", "thread.items", "thread.label", "thread.list",
-	"thread.mcp", "thread.mcp-reconnect", "thread.placement.check", "thread.prompts", "thread.read", "thread.report", "thread.reports",
+	"thread.mcp", "thread.mcp-reconnect", "thread.placement.check", "thread.project.add", "thread.project.remove", "thread.prompts", "thread.read", "thread.report", "thread.reports",
 	"thread.reseed", "thread.respond", "thread.send", "thread.shell.stop", "thread.subscribe", "thread.subscriptions",
 	"thread.unsubscribe", "thread.wait", "thread.workspace", "ui.focus.project",
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",

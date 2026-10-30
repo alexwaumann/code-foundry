@@ -698,6 +698,11 @@ export class MockThreadLogs {
     }, 300);
   }
 
+  /** A daemon note in the timeline (thread.project.add and remove). */
+  addNote(id: string, text: string): void {
+    this.append(id, this.item(id, { case: "note", value: { text } }));
+  }
+
   /**
    * thread.set-effort: at once when idle (after a short "restart"), else when the turn ends.
    * A stopped thread just keeps it for its next start, like the daemon (nothing restarts).

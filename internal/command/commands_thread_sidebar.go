@@ -28,8 +28,8 @@ func threadSidebarCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.sidebar",
 		Title: "Show or Hide Thread in Sidebar",
-		Description: "Show a thread another thread created in the sidebar, handing it to the user, or hide it again, handing it back to its creator " +
-			"(whatever settings threads.show_created_threads says). A hidden thread is archived with its creator; a shown one is not.",
+		Description: "Show a thread another thread created in the sidebar, handing it to the user, or hide it, handing it back " +
+			"(whatever threads.show_created_threads says). A hidden thread is archived with its creator; a shown one is not.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			positional(idArg),

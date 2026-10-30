@@ -63,8 +63,8 @@ func agentViewCommands(b AgentsBackend, e Emitter) []Command {
 			Name:      "thread.agent.open",
 			NoPalette: true,
 			Title:     "Open Subagent",
-			Description: "Show one of a thread's own subagent runs read-only in the GUI: its prompt, work log and report, under the thread. " +
-				"The run is its id from thread agents --json, or the start of it.",
+			Description: "Show one of a thread's subagent runs read-only in the GUI (prompt, work log, report). " +
+				"The run: its id from thread agents --json, or its start.",
 			Category: "Thread",
 			// A verb that drives the GUI with a run id the palette cannot pick: the GUI opens
 			// runs from their Agent rows, the strip above the composer and the Agents tab.
