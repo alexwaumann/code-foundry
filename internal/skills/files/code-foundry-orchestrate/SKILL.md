@@ -42,11 +42,11 @@ ones you create stay out of it unless you hand them over.
    It prints `created thread <name> (<id>) in <worktree>`; its branch follows settings
    (`feat/<slug>`, `-2` if taken; `--branch` sets it): take it from the child's report, never
    from its name. A child inherits your projects (`code-foundry thread checkouts`),
-   workspace, branch and mode: without `--new-worktree` (or `--new-branch`) it shares your
-   worktrees, and two threads in one checkout collide (`thread new` warns): one worker per
-   checkout. `--projects` keeps it to the projects its task touches (`a,b` for several;
-   `--project` picks where it starts), each in a worktree on its new branch
-   (`reference/patterns.md` §2c). The prompt is all the child knows
+   workspace, mode and checkouts: without `--new-worktree` (or `--new-branch`) it works in
+   your worktrees, whatever they have checked out, and two threads in one checkout collide
+   (`thread new` warns): one worker per checkout. `--projects` keeps it to the projects its
+   task touches (`a,b` for several; `--project` picks where it starts), each in a worktree
+   on its new branch (`reference/patterns.md` §2c). The prompt is all the child knows
    (`reference/patterns.md` §0 is the checklist): say what done means, which files it owns,
    and how to verify ("no new errors against the base", never "must pass"). Edits at one spot
    of one file conflict: new code and its tests go in the child's own new files, each child

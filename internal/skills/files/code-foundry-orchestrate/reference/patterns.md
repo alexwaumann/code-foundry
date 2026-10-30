@@ -138,18 +138,20 @@ has starts from origin's copy unless the local one is ahead of it, under the def
 
 A thread can work in several projects at once (a product's repos), often with a workspace
 that holds their shared instructions and skills. `code-foundry thread checkouts` lists
-yours: one row per project with its checkout, branch and `CLAUDE.md`, then the workspace.
+yours: one row per project with its checkout, the branch checked out there now and
+`CLAUDE.md`, then the workspace. The checkouts are the thread's: one you `git switch` to
+another branch stays yours, marked `(moved from <branch>)`.
 
 ```
 code-foundry thread checkouts
-# thread Checkout v2 (s-0a1b2c3d4e5f): worktrees on branch feat/checkout-v2
+# thread Checkout v2 (s-0a1b2c3d4e5f): worktrees made for branch feat/checkout-v2
 # PROJECT  PATH                                             BRANCH                      INSTRUCTIONS
 # api      ~/.code-foundry/worktrees/acme/api/checkout-v2   feat/checkout-v2 (current)  ~/.code-foundry/worktrees/acme/api/checkout-v2/CLAUDE.md
 # web      ~/.code-foundry/worktrees/acme/web/checkout-v2   feat/checkout-v2            ~/.code-foundry/worktrees/acme/web/checkout-v2/CLAUDE.md
 # WORKSPACE Shop  ~/.code-foundry/workspaces/w-3c4d5e6f7a8b
 ```
 
-A child inherits the whole set, the workspace and your branch. Split the change by
+A child inherits the whole set, the workspace and your checkouts. Split the change by
 project: each child gets `--projects` with only the projects its task touches and
 `--new-worktree` for a branch of its own (a worktree in each of its projects); `--project`
 picks where it starts when it has more than one.
