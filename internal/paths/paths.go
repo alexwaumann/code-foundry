@@ -215,6 +215,11 @@ func (p Paths) LegacyMemory() string { return filepath.Join(p.home, "memory.md")
 // load (gui/windowbg.go). Not under App(): an update replaces that directory.
 func (p Paths) WindowBackground() string { return filepath.Join(p.home, "window-background.json") }
 
+// WindowFrame is the GUI host's other state file: the window's last position and size,
+// which the next launch reopens in, fitted to the screens then attached
+// (gui/windowframe.go).
+func (p Paths) WindowFrame() string { return filepath.Join(p.home, "window-frame.json") }
+
 // Ensure creates the home and logs directories with 0700 permissions and checks that
 // the socket path fits in sun_path.
 func (p Paths) Ensure() error {
