@@ -122,7 +122,7 @@ function UsageRow({ threadId }: { threadId: string }) {
         </Row>
       </Tip>
       {open && (
-        <div className="grid grid-cols-[1fr_auto_3rem] gap-x-2 gap-y-0.5 pt-0.5 pr-7 pb-1.5 pl-2 text-caption-sm tabular-nums" data-testid="ti-usage-detail">
+        <div className="grid grid-cols-[1fr_auto_minmax(3rem,auto)] gap-x-2 gap-y-0.5 pt-0.5 pr-7 pb-1.5 pl-2 text-caption-sm tabular-nums" data-testid="ti-usage-detail">
           {kinds.map(([label, tokens, usd]) => (
             <div key={label} className="contents" data-testid="ti-usage-kind">
               <span>{label}</span>

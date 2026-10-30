@@ -118,6 +118,21 @@ folder without git. `GhWorld.addCardPullRequest` and `setCardDetail` are the fix
 * A Radix menu's open animation scales it: measure its width after it settles.
 * The repo has no Prettier config; its files are wrapped near 160 columns.
 
+* Live data showed what the mock did not: a cost of "<$0.0001" is wider than a 3rem
+  column; the usage fold's cost column is `minmax(3rem,auto)`.
+
 ## Verified
 
-See the PR body for screenshots.
+* `make check` green (it first caught the page library bundle, which carries
+  `ui/dropdown-menu`, and the pages skill's components reference, which must list every
+  `@cf/ui` export: both updated for the Sub parts).
+* `e2e/thread-info.spec.ts` green on WebKit; the mock scenarios also checked by hand
+  against the v14 shots.
+* The real app (`make gui-build`) on an isolated home (`CODE_FOUNDRY_HOME=/tmp/...`,
+  scratch repos `web` and `api` with local bare remotes, Sonnet 5.5 medium, one-word
+  prompts): a project-folder thread on `web` (main 1 ahead: Push; 3 changed files; the
+  Check action; MCP counts; context and usage from the turn) and a fresh-copy thread over
+  the `platform` workspace (2 projects; the project menu with Add project disabled and Run
+  in; Changes over 2 projects; "not pushed"). Dark and light screenshots in the PR body.
+  The card's toggle was put back off afterwards (the isolated app shares the installed
+  app's WebKit storage); scratch repos, home, binaries and the daemon removed.
