@@ -3,7 +3,7 @@ import { Loader2, Mic } from "lucide-react";
 import { openExternal } from "@/api/app";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
-import { barHeight, decayLevels, formatElapsed, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
+import { barHeight, decayLevels, easeLevels, formatElapsed, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
 import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
 import { onDictationLevel, stopDictationIn, toggleDictation, useDictationStore } from "@/stores/dictation";
@@ -24,33 +24,34 @@ function Elapsed({ since }: { since: number }) {
   return <span className="tabular-nums">{formatElapsed(since > 0 ? now - since : 0)}</span>;
 }
 
-/** Seven live level bars: levels push in from the right and fall back when they stop (lib/dictation), drawn without React renders. */
+/** Seven live level bars: levels push in from the right, the drawn bars ease toward them, and they fall back when levels stop (lib/dictation), drawn without React renders. */
 function LevelBars() {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
+    // bars: the levels; shown: what is drawn, easing toward them each frame.
     let bars: number[] = new Array<number>(LEVEL_BARS).fill(0);
+    let shown = bars;
     let last = performance.now();
-    // Levels arrive about every 50 ms; the bars fall back only once they stop (a pause, the end).
+    // Levels arrive about every 100 ms; the bars fall back only once they stop (a pause, the end).
     let lastLevel = 0;
     let frame = 0;
-    const draw = () => {
-      const el = ref.current;
-      if (!el) return;
-      bars.forEach((v, i) => {
-        const bar = el.children[i] as HTMLElement | undefined;
-        if (bar) bar.style.height = `${String(barHeight(v))}px`;
-      });
-    };
     const tick = (t: number) => {
-      if (t - lastLevel > LEVEL_GAP_MS) bars = decayLevels(bars, t - last);
+      const dt = t - last;
+      if (t - lastLevel > LEVEL_GAP_MS) bars = decayLevels(bars, dt);
+      shown = easeLevels(shown, bars, dt);
       last = t;
-      draw();
+      const el = ref.current;
+      if (el) {
+        shown.forEach((v, i) => {
+          const bar = el.children[i] as HTMLElement | undefined;
+          if (bar) bar.style.height = `${barHeight(v).toFixed(1)}px`;
+        });
+      }
       frame = requestAnimationFrame(tick);
     };
     const off = onDictationLevel((rms) => {
       bars = pushLevel(bars, rms);
       lastLevel = performance.now();
-      draw();
     });
     frame = requestAnimationFrame(tick);
     return () => {

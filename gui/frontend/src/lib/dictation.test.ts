@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeight, decayLevels, downloadProgress, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, phraseAtCaret, pushLevel } from "./dictation";
+import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, phraseAtCaret, pushLevel } from "./dictation";
 
 describe("phraseAtCaret", () => {
   it.each([
@@ -32,11 +32,25 @@ describe("level bars", () => {
     expect(pushLevel([], 0.25)).toEqual([0, 0, 0, 0, 0, 0, levelOf(0.25)]);
   });
 
-  it("maps rms to 0..1", () => {
-    expect(levelOf(0)).toBe(0);
-    expect(levelOf(Number.NaN)).toBe(0);
-    expect(levelOf(1)).toBe(1);
-    expect(levelOf(0.04)).toBeCloseTo(0.44);
+  it.each([
+    { rms: 0, want: 0 },
+    { rms: Number.NaN, want: 0 },
+    { rms: 0.003, want: 0 }, // a quiet room, below the -50 dBFS floor
+    { rms: 0.00316, want: 0 },
+    { rms: 0.02, want: 0.46 }, // speech, as PR 3 measured it
+    { rms: 0.05, want: 0.69 },
+    { rms: 0.178, want: 1 },
+    { rms: 1, want: 1 },
+  ])("maps rms $rms to $want on the dBFS scale", ({ rms, want }) => {
+    expect(levelOf(rms)).toBeCloseTo(want, 2);
+  });
+
+  it("eases drawn bars toward their levels", () => {
+    const [one] = easeLevels([0], [1], LEVEL_EASE_MS);
+    expect(one).toBeCloseTo(1 - Math.exp(-1));
+    expect(easeLevels([0.5], [0.2], 0)).toEqual([0.5]);
+    expect(easeLevels([0.5], [0.2], LEVEL_EASE_MS * 20)).toEqual([0.2]);
+    expect(easeLevels([], [0.3, 0], LEVEL_EASE_MS)[0]).toBeGreaterThan(0);
   });
 
   it("halves each half-life and drops to zero", () => {
