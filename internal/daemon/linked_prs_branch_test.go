@@ -33,16 +33,16 @@ func branchPR(repo string, n int, head string) gh.PullRequest {
 // (O/Web: mixed case, worktrees main and cf/x), p-local (no GitHub slug, cf/x).
 func branchProjects() *project.Snapshot {
 	return &project.Snapshot{Projects: []project.Project{
-		{ID: "p-api", GitHubSlug: "o/api", Worktrees: []project.Worktree{
+		{ID: "p-api", GitHubSlug: "o/api", Path: "/api", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-api", Path: "/api", Branch: "main", IsMain: true},
 			{ProjectID: "p-api", Path: "/wt/api-x", Branch: "cf/x"},
 			{ProjectID: "p-api", Path: "/wt/api-det", Detached: true},
 		}},
-		{ID: "p-web", GitHubSlug: "O/Web", Worktrees: []project.Worktree{
+		{ID: "p-web", GitHubSlug: "O/Web", Path: "/web", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-web", Path: "/web", Branch: "main", IsMain: true},
 			{ProjectID: "p-web", Path: "/wt/web-x", Branch: "cf/x"},
 		}},
-		{ID: "p-local", Worktrees: []project.Worktree{
+		{ID: "p-local", Path: "/local", Git: true, Worktrees: []project.Worktree{
 			{ProjectID: "p-local", Path: "/local", Branch: "cf/x", IsMain: true},
 		}},
 	}}
@@ -117,6 +117,16 @@ func TestBranchLinksFor(t *testing.T) {
 			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x", CreatedWorktree: true, Branch: "cf/ws"}},
 			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/ws")},
 			want:    []string{"t: o/api#1@1 o/web#2@2"}},
+		{name: "worktree-mode thread: a moved checkout has its HEAD's branch, not the one it was made for",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x", CreatedWorktree: true, Branch: "cf/old",
+				CheckoutPaths: map[string]string{"p-api": "/wt/api-x", "p-web": "/wt/web-x"}}},
+			prs:  []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "cf/old")},
+			want: []string{"t: o/api#1@1 o/web#2@2"}},
+		{name: "checkout mode: a recorded worktree, not the main checkout",
+			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/api",
+				CheckoutPaths: map[string]string{"p-api": "/api", "p-web": "/wt/web-x"}}},
+			prs:  []gh.PullRequest{branchPR("o/api", 1, "main"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "main")},
+			want: []string{"t: o/api#1@1 o/web#2@2"}},
 		{name: "checkout mode: each member's own checkout",
 			threads: []thread.Thread{{ID: "t", ProjectID: "p-api", ProjectIDs: []string{"p-api", "p-web"}, WorktreePath: "/wt/api-x"}},
 			prs:     []gh.PullRequest{branchPR("o/api", 1, "cf/x"), branchPR("o/web", 2, "cf/x"), branchPR("o/web", 3, "main")},

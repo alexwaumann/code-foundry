@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,18 +14,21 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// Derived checkouts (docs/notes/workspaces-v2-handoff.md §3,
+// A thread's checkouts (docs/notes/thread-checkouts.md, after
 // docs/notes/workspaces-v2-1-threads.md). A thread has a project set (Thread.ProjectIDs)
-// and every member has one checkout, derived from the thread's row and the project
-// store, never stored:
+// and owns one checkout per member: its path is recorded on the thread
+// (Thread.CheckoutPaths; the primary's is the cwd, Thread.WorktreePath), and what it has
+// checked out (HEAD, detached, upstream, an operation in progress) is read from the
+// project snapshot at that path, never from the row. A checkout whose branch moved
+// (git switch, a stacked branch) is the same checkout on another branch.
 //
-//   - the primary (Thread.ProjectID): the cwd, Thread.WorktreePath;
-//   - worktree mode (Thread.CreatedWorktree with a Branch): a git member's worktree on
-//     the branch, at project.Git.DefaultWorktreePath, which every thread computes alike,
-//     so threads on one branch share it; a plain folder is the folder itself;
-//   - checkout mode: the member's own checkout (its main worktree, or the folder).
-//
-// Missing worktrees are made at spawn (ensureCheckouts) and given to Claude as --add-dir
+// Placement records every member's path at Create (placement.go): in worktree mode
+// (Thread.CreatedWorktree with a Branch) a git member's worktree made or reused for the
+// branch, a plain folder the folder itself; in checkout mode the member's own checkout.
+// A member with no path recorded (a row from before migration 0049 not filled yet, or a
+// worktree missing when it was filled) is resolved by that rule (resolveMember) and
+// recorded at its next start (ensureMembers). Missing worktree-mode worktrees are made
+// again at spawn on the thread's branch and given to Claude as --add-dir
 // (claudeCommand); an archive removes the ones nobody else has (the daemon's
 // cleanupArchived).
 
@@ -33,20 +37,43 @@ type Checkout struct {
 	ProjectID string
 	// ProjectName is the project's name; "" when it is no longer registered.
 	ProjectName string
-	Path        string
-	// Branch is what the checkout has checked out now (the project snapshot), else the
-	// thread's branch for a derived worktree; "" for a plain folder or when unknown.
+	// Path is the checkout: the thread's record (the cwd for the primary), else, for a
+	// member with none recorded, where the creation rule puts it (resolveMember); "" when
+	// nothing is recorded and the project is no longer registered.
+	Path string
+	// Recorded: Path is the thread's own record, not resolved.
+	Recorded bool
+	// Listed: the project snapshot lists a worktree at Path; Branch, Head, Detached, Main
+	// and Status are read from it, and are zero otherwise.
+	Listed bool
+	// Branch is what the checkout has checked out now (its HEAD); "" when detached, for
+	// a plain folder, and when it is not listed (missing, or not reconciled yet).
 	Branch string
+	// Head is the commit checked out; "" on an unborn branch and for a plain folder.
+	Head     string
+	Detached bool
+	// Main: the project's main checkout (its own folder), not a linked worktree; a plain
+	// folder's one checkout too.
+	Main bool
+	// Status is the project store's git status of the checkout (upstream ahead/behind,
+	// changes, the operation in progress): the same one the project store keeps fresh
+	// (FSEvents and its live tier), not read again here.
+	Status project.Status
 	// Primary: the thread's cwd.
 	Primary bool
 	// Git: the project has git; false for a plain folder and for a project that is no
 	// longer registered (Registered false).
 	Git        bool
 	Registered bool
-	// Derived: a worktree-mode git member's (project, branch) worktree, which the app
-	// makes when missing and an archive may remove.
-	Derived bool
-	// Missing: Path does not exist (a derived worktree not made yet, or removed).
+	// WorktreeMode: a git member of a worktree-mode thread, never the main checkout: the
+	// app made (or reused) this worktree for the thread's branch, makes it again when
+	// missing and an archive may remove it.
+	WorktreeMode bool
+	// CreatedBranch is the branch a WorktreeMode checkout was made for (Thread.Branch);
+	// "" otherwise. Moved: it is listed with another branch checked out, or detached.
+	CreatedBranch string
+	Moved         bool
+	// Missing: Path does not exist (a worktree not made yet, or removed).
 	Missing bool
 	// Instructions is Path/CLAUDE.md when that file exists.
 	Instructions string
@@ -73,14 +100,62 @@ func CleanProjectIDs(primary string, ids []string) []string {
 // it).
 func (t Thread) Projects() []string { return CleanProjectIDs(t.ProjectID, t.ProjectIDs) }
 
-// worktreeMode: t's git members work in worktrees on t.Branch.
+// worktreeMode: t's git members work in worktrees made for t.Branch.
 func (t Thread) worktreeMode() bool { return t.CreatedWorktree && t.Branch != "" }
 
-// CheckoutsOf derives t's checkouts, in project id order, from the project snapshot.
-// pathFor is where the project store puts a project's worktree for a branch
+// CheckoutPath is the checkout t records for project id: the cwd for the primary, else
+// its CheckoutPaths entry; ok false when there is none (nothing recorded, or "").
+func (t Thread) CheckoutPath(projectID string) (string, bool) {
+	if projectID != "" && projectID == t.ProjectID && t.WorktreePath != "" {
+		return t.WorktreePath, true
+	}
+	p := t.CheckoutPaths[projectID]
+	return p, p != ""
+}
+
+// withCheckout is t with path recorded as project id's checkout (copy on write).
+func (t Thread) withCheckout(projectID, path string) Thread {
+	if projectID == "" {
+		return t
+	}
+	paths := maps.Clone(t.CheckoutPaths)
+	if paths == nil {
+		paths = map[string]string{}
+	}
+	paths[projectID] = path
+	t.CheckoutPaths = paths
+	return t
+}
+
+// movedTo is t with its cwd moved to path, the checkout of project projectID ("" for a
+// workspace's folder; RunIn): the checkout it leaves stays recorded (a user's worktree
+// is not forgotten), and the one it moves to is recorded.
+func (t Thread) movedTo(projectID, path string) Thread {
+	if t.ProjectID != "" && t.WorktreePath != "" {
+		t = t.withCheckout(t.ProjectID, t.WorktreePath)
+	}
+	t.WorktreePath, t.ProjectID = path, projectID
+	return t.withCheckout(projectID, path)
+}
+
+// CheckoutsOf is t's checkouts, in project id order, read from the project snapshot at
+// each recorded path; a member with none recorded is resolved (resolveMember). pathFor
+// is where the project store puts a project's worktree for a branch
 // (project.Git.DefaultWorktreePath); exists reports whether a path is a directory. Pure
-// apart from what those two read.
+// apart from what those two read and the CLAUDE.md lookup (Instructions).
 func CheckoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool) []Checkout {
+	return checkoutsOf(t, snap, pathFor, exists, true)
+}
+
+// ListedCheckouts is CheckoutsOf from the snapshot alone, for a caller that reads only
+// what it lists (the daemon's branch links, on every pass): no path rule (an unrecorded
+// worktree-mode member not listed on the branch has no path), no stat (Missing only when
+// there is no path) and no CLAUDE.md lookup.
+func ListedCheckouts(t Thread, snap *project.Snapshot) []Checkout {
+	return checkoutsOf(t, snap, func(string, string) string { return "" }, func(string) bool { return true }, false)
+}
+
+func checkoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool, files bool) []Checkout {
 	ids := t.Projects()
 	out := make([]Checkout, 0, len(ids))
 	for _, id := range ids {
@@ -89,29 +164,20 @@ func CheckoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branc
 		if ok {
 			c.ProjectName, c.Registered, c.Git = r.Name, true, r.Git
 		}
-		switch {
-		case c.Primary:
-			c.Path = t.WorktreePath
-			c.Derived = c.Git && t.worktreeMode()
-			c.Branch = branchAt(snap, id, c.Path, t.Branch, c.Derived)
-		case !ok:
-			// Nothing to derive from: the checkout is unknown.
-		case !r.Git:
-			c.Path = r.Path
-		case t.worktreeMode():
-			c.Derived = true
-			if w, ok := derivedWorktree(r, t.Branch, pathFor(id, t.Branch)); ok {
-				c.Path = w.Path
-			} else {
-				c.Path = pathFor(id, t.Branch)
-			}
-			c.Branch = branchAt(snap, id, c.Path, t.Branch, true)
-		default:
-			c.Path = mainCheckout(r)
-			c.Branch = branchAt(snap, id, c.Path, "", false)
+		if p, rec := t.CheckoutPath(id); rec {
+			c.Path, c.Recorded = p, true
+		} else if ok {
+			c.Path = resolveMember(t, r, pathFor)
+		}
+		if w, ok := snap.Worktree(id, c.Path); ok && c.Path != "" {
+			c.Listed, c.Branch, c.Head, c.Detached, c.Main, c.Status = true, w.Branch, w.Head, w.Detached, w.IsMain, w.Status
+		}
+		if c.WorktreeMode = c.Git && t.worktreeMode() && !c.Main; c.WorktreeMode {
+			c.CreatedBranch = t.Branch
+			c.Moved = c.Listed && (c.Detached || c.Branch != t.Branch)
 		}
 		c.Missing = c.Path == "" || !exists(c.Path)
-		if !c.Missing {
+		if !c.Missing && files {
 			if p := filepath.Join(c.Path, "CLAUDE.md"); fileExists(p) {
 				c.Instructions = p
 			}
@@ -121,24 +187,62 @@ func CheckoutsOf(t Thread, snap *project.Snapshot, pathFor func(projectID, branc
 	return out
 }
 
-// branchAt is the branch the worktree at path has checked out, else fallback (when
-// derived).
-func branchAt(snap *project.Snapshot, projectID, path, fallback string, derived bool) string {
-	if w, ok := snap.Worktree(projectID, path); ok && w.Branch != "" {
-		return w.Branch
+// resolveMember is where the creation rule puts t's checkout of r, for a member with
+// none recorded: a plain folder is the folder; in worktree mode r's worktree for t's
+// branch (branchWorktree), else the default path for it, which a start makes; otherwise
+// r's own checkout.
+func resolveMember(t Thread, r project.Project, pathFor func(projectID, branch string) string) string {
+	switch {
+	case !r.Git:
+		return r.Path
+	case t.worktreeMode():
+		want := pathFor(r.ID, t.Branch)
+		if w, ok := branchWorktree(r, t.Branch, want); ok {
+			return w.Path
+		}
+		return want
+	default:
+		return mainCheckout(r)
 	}
-	if derived {
-		return fallback
-	}
-	return ""
 }
 
-// derivedWorktree is r's worktree for branch: the one at want (the default path) when
+// fillPaths is the checkouts recorded for a row from before migration 0049: each
+// member's as the derivation it replaces gave it (resolveMember; the primary's is the
+// cwd), "" when that is not on disk (its start makes it). decided is false while a git
+// member's project has not listed its worktrees yet, unless force (the wait is over:
+// such a member gets "" too). A member whose project is not registered gets "".
+func fillPaths(t Thread, snap *project.Snapshot, pathFor func(projectID, branch string) string, exists func(string) bool, force bool) (map[string]string, bool) {
+	out := map[string]string{}
+	for _, id := range t.Projects() {
+		if id == t.ProjectID {
+			out[id] = t.WorktreePath
+			continue
+		}
+		r, ok := snap.Project(id)
+		switch {
+		case !ok:
+			out[id] = ""
+		case r.Git && len(r.Worktrees) == 0 && !force:
+			return nil, false
+		case r.Git && len(r.Worktrees) == 0:
+			out[id] = ""
+		default:
+			p := resolveMember(t, r, pathFor)
+			if p == "" || !exists(p) {
+				p = ""
+			}
+			out[id] = p
+		}
+	}
+	return out, true
+}
+
+// branchWorktree is r's worktree for branch: the one at want (the default path) when
 // listed, else another linked worktree with the branch checked out (one made before the
 // path rule, or by hand). Never the main checkout, even on the branch: it is the user's,
 // who may switch it to another branch under the thread (fuzz finding A7); making the
 // thread's worktree is refused while it is there (mainCheckoutBusy).
-func derivedWorktree(r project.Project, branch, want string) (project.Worktree, bool) {
+func branchWorktree(r project.Project, branch, want string) (project.Worktree, bool) {
 	for _, w := range r.Worktrees {
 		if !w.IsMain && want != "" && samePath(w.Path, want) {
 			return w, true
@@ -192,6 +296,13 @@ func fileExists(p string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
+// pathExists reports whether anything is at p (a worktree's .git is a file, a main
+// checkout's a directory).
+func pathExists(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
+}
+
 // checkouts is CheckoutsOf over the project store; with none (tests), only the primary.
 func (m *Manager) checkouts(t Thread) []Checkout {
 	var snap *project.Snapshot
@@ -224,7 +335,7 @@ func (m *Manager) memberDirs(t Thread) (dirs []string, missing []Checkout) {
 // requireCheckouts refuses a spawn of t while one of its members' checkouts is missing
 // (claude refuses a missing --add-dir, and the thread would silently lose a project). A
 // member whose project is no longer registered is skipped (logged): nothing can be
-// derived for it.
+// resolved or made for it.
 func (m *Manager) requireCheckouts(t Thread) error {
 	for _, c := range m.checkouts(t) {
 		if c.Primary {
@@ -396,9 +507,11 @@ func within(path, root string) bool {
 }
 
 // CheckoutHints implements Store: for each of t's members whose checkout another thread
-// that is not archived also has (the same path), one line: in worktree mode a plain
-// folder cannot be isolated ("<name> is a folder, not a repo: thread <other> also works
-// there"), and in any mode "<name> @ <branch> is also open in <other>".
+// that is not archived also has (the same path, whatever either has checked out: two
+// threads on one branch in different worktrees do not collide), one line: in worktree
+// mode a plain folder cannot be isolated ("<name> is a folder, not a repo: thread
+// <other> also works there"), and in any mode "<name> @ <branch> is also open in
+// <other>", the branch its HEAD.
 func (m *Manager) CheckoutHints(t Thread) []string {
 	mine := m.checkouts(t)
 	var hints []string
@@ -416,8 +529,8 @@ func (m *Manager) CheckoutHints(t Thread) []string {
 			continue
 		}
 		at := name
-		if c.Branch != "" {
-			at += " @ " + c.Branch
+		if b := cmp.Or(c.Branch, c.CreatedBranch); b != "" {
+			at += " @ " + b
 		}
 		hints = append(hints, at+" is also open in "+holderLabel(other))
 	}
@@ -446,11 +559,18 @@ func (m *Manager) outsideWorkspaceHint(t Thread, cos []Checkout) []string {
 
 // otherHolder is a thread other than id, not archived, with a checkout at path.
 func (m *Manager) otherHolder(id, path string) (Thread, bool) {
-	for _, o := range m.Snapshot().Threads {
+	return holderOf(m.Snapshot().Threads, id, path, m.checkouts)
+}
+
+// holderOf is the first of threads other than id, not archived or being removed, with a
+// checkout at path (a collision: the same checkout, whatever either has checked out).
+// Pure apart from checkouts.
+func holderOf(threads []Thread, id, path string, checkouts func(Thread) []Checkout) (Thread, bool) {
+	for _, o := range threads {
 		if o.ID == id || !o.ArchivedAt.IsZero() || o.Removing {
 			continue
 		}
-		for _, c := range m.checkouts(o) {
+		for _, c := range checkouts(o) {
 			if c.Path != "" && samePath(c.Path, path) {
 				return o, true
 			}

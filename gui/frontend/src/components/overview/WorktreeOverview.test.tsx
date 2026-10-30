@@ -73,7 +73,7 @@ const pr = (number: number, o: Partial<PullRequestView> = {}): PullRequestView =
     ...o,
   }) as PullRequestView;
 
-const thread = (id: string, worktreePath: string, o: Partial<ThreadView> = {}) => ({ id, worktreePath, archivedAtMs: null, projectIds: [], branch: "", ...o }) as ThreadView;
+const thread = (id: string, worktreePath: string, o: Partial<ThreadView> = {}) => ({ id, worktreePath, archivedAtMs: null, projectIds: [], checkoutPaths: [], branch: "", ...o }) as ThreadView;
 const term = (id: string, cwd: string, state: TerminalView["state"] = "running") => ({ id, cwd, state }) as TerminalView;
 
 async function show(): Promise<void> {

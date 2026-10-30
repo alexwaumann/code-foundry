@@ -394,7 +394,7 @@ func (r *runner) finish(fn func(*Thread)) {
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
 		if owed := r.unsentCd(); owed != nil {
 			// The process is gone; the next reconnect resumes in the requested member.
-			s.WorktreePath, s.ProjectID = owed.path, owed.projectID
+			*s = s.movedTo(owed.projectID, owed.path)
 		}
 		s.PendingWorktreePath = ""
 		s.EffortPending = false // the next spawn uses the row's effort

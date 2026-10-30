@@ -101,8 +101,9 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	}
 	lines = append(lines, "worktree: "+s.GetWorktreePath())
 	if s.GetBranch() != "" {
-		// The branch the worktree was made for (what a recreation checks out again).
-		lines = append(lines, "branch: "+s.GetBranch())
+		// The branch the worktree was made for (what a recreation checks out again), not
+		// what it has checked out now (thread checkouts).
+		lines = append(lines, "created for branch: "+s.GetBranch())
 	}
 	if s.GetCreatedBy() != "" {
 		name, exists := creatorName(s, names)

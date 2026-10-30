@@ -5,6 +5,7 @@ package codefoundry.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "codefoundry/v1/project.proto";
 
 // Thread lifecycle messages: the thread record (Thread), its state and status, and the
 // requests and events of ThreadService's lifecycle RPCs (Create, Fork, List, Get, Rename,
@@ -61,9 +62,12 @@ enum ThreadStatus {
 }
 
 // Projects: a thread has a project set (project_ids, sorted by id) and one primary
-// (project_id and worktree_path: its cwd). Every member has a checkout, derived, never
-// stored (ThreadService.Checkouts): in worktree mode (created_worktree) a git member's
-// worktree on branch, a plain folder the folder; otherwise each member's own checkout.
+// (project_id and worktree_path: its cwd). The thread owns one checkout per member, by
+// path (checkout_paths): in worktree mode (created_worktree) a git member's worktree the
+// app made (or reused) for branch, a plain folder the folder; otherwise each member's own
+// checkout. What a checkout has checked out is read from it (ThreadService.Checkouts,
+// ProjectService's worktree at the path), never from the thread: a checkout whose branch
+// moved is the same checkout. See docs/notes/thread-checkouts.md.
 // A thread without a project (CreateThreadRequest.no_project) has an empty set and runs
 // in the daemon's home directory. workspace_id is an optional reference to a workspace,
 // independent of the set. Rows from before projects were required may also have an
@@ -134,9 +138,12 @@ message Thread {
   // missing and removed by an archive when nothing else has it. False: checkout mode,
   // each member in its own checkout.
   bool created_worktree = 21;
-  // The branch of a worktree-mode thread (with created_worktree; a fork has its
-  // parent's). When a cleanup removed a member's worktree, a start of the thread makes
-  // it again on this branch at the same path. Empty in checkout mode.
+  // The branch the thread was created for, a record: a worktree-mode thread's (with
+  // created_worktree; a fork, and a thread placed like it, has the copied thread's).
+  // When a cleanup removed a member's worktree, a start of the thread makes it again on
+  // this branch at the same path. Not what its checkouts have checked out now: that is
+  // each one's HEAD (ThreadCheckout.branch; moved when they differ). Empty in checkout
+  // mode.
   string branch = 52;
   // An optional reference to a workspace (its instructions and skills), independent of
   // project_ids; empty without one. Until the workspace store's reshape, a spawn also
@@ -346,6 +353,18 @@ message Thread {
   // start is fresh); archive and remove work. Computed at daemon start and when the
   // process ends, never per snapshot; not persisted. See docs/notes/transcript-deleted.md.
   bool transcript_missing = 69;
+  // Every member's checkout, the thread's own, in project id order: one per project_ids
+  // entry, the primary's path is worktree_path. An empty path is a member with none
+  // recorded yet (a thread from before checkouts were recorded, or a worktree missing
+  // when they were), which the next start resolves and records. What each has checked
+  // out is ProjectService's worktree at the path. See docs/notes/thread-checkouts.md.
+  repeated ThreadCheckoutPath checkout_paths = 70;
+}
+
+// One member's checkout as the thread records it (Thread.checkout_paths).
+message ThreadCheckoutPath {
+  string project_id = 1;
+  string path = 2;
 }
 
 // ThreadKind is what kind of thread a Thread is.
@@ -905,15 +924,20 @@ message ThreadCheckoutsRequest {
   string cwd = 2;
 }
 
-// ThreadCheckout is one member of a thread's project set and its checkout.
+// ThreadCheckout is one member of a thread's project set and its checkout: the path the
+// thread records (Thread.checkout_paths), and what is checked out there now, read from
+// the project store's worktree at the path (the same status the Projects page shows, kept
+// fresh by its file events and its live tier; no other git command).
 message ThreadCheckout {
   string project_id = 1;
   // Empty when the project is no longer registered.
   string project_name = 2;
-  // Empty when nothing can be derived (the project is no longer registered).
+  // The thread's checkout: the recorded path, else for a member with none recorded where
+  // its next start puts it. Empty when nothing is recorded and the project is no longer
+  // registered.
   string path = 3;
-  // Checked out there now; for a derived worktree not made yet, the thread's branch.
-  // Empty for a plain folder.
+  // The branch checked out there now (HEAD). Empty when detached, for a plain folder, and
+  // when the project does not list a worktree at the path (missing).
   string branch = 4;
   // The thread's cwd.
   bool primary = 5;
@@ -926,9 +950,28 @@ message ThreadCheckout {
   string instructions = 8;
   // The project has git; false for a plain folder (one checkout, shared by every thread).
   bool git = 9;
-  // A worktree-mode git member: the app makes this worktree when missing and an archive
-  // may remove it (never its branch).
-  bool derived = 10;
+  // A worktree-mode git member, never the project's main checkout: when it is missing a
+  // start makes the member's worktree again on created_branch, at the default path for
+  // it (the same path when the worktree was made there; the cwd always keeps its path),
+  // and records where it went; an archive may remove it (never its branch). Was derived.
+  bool worktree_mode = 10;
+  // The commit checked out (HEAD); empty when unknown or on an unborn branch.
+  string head = 11;
+  // HEAD is not on a branch.
+  bool detached = 12;
+  // The project's main checkout (its own folder), not a linked worktree; a plain folder's
+  // one checkout too.
+  bool is_main = 13;
+  // The project store's status of the checkout: upstream, ahead/behind it, changes, the
+  // git operation in progress (rebase, merge, cherry-pick, ...). Unset when the project
+  // does not list a worktree at the path.
+  GitStatus status = 14;
+  // With worktree_mode: the branch the thread was created for (Thread.branch), which a
+  // missing worktree is made on again. moved: the checkout has another branch checked
+  // out now, or is detached (git switch in it, a stacked branch): still the thread's
+  // checkout.
+  string created_branch = 15;
+  bool moved = 16;
 }
 
 message ThreadCheckoutsResponse {

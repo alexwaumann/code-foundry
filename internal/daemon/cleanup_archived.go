@@ -14,7 +14,9 @@ import (
 )
 
 // Cleanup on archive (docs/notes/workspaces-v2-1-threads.md). When a thread is
-// archived, each of its derived worktrees (worktree mode, any member that has git) goes
+// archived, each of its worktree-mode checkouts (thread.Checkout.WorktreeMode: any member
+// that has git, at the path the thread records, whatever it has checked out; never a
+// main checkout; docs/notes/thread-checkouts.md) goes
 // at once when the app made it, its status is clean with no operation in progress
 // (project.ArchivedVerdict), no other thread that is not archived has it as a checkout
 // or its cwd, and no terminal is open in it
@@ -27,7 +29,7 @@ import (
 // member).
 const archiveCleanupTimeout = 2 * time.Minute
 
-// archiveCleaner removes archived and removed threads' derived worktrees.
+// archiveCleaner removes archived and removed threads' worktree-mode worktrees.
 type archiveCleaner struct {
 	log       *slog.Logger
 	projects  project.Store
@@ -65,10 +67,10 @@ func (c *archiveCleaner) start(t thread.Thread, cause string) {
 	}()
 }
 
-// clean removes t's derived worktrees that nothing else holds.
+// clean removes t's worktree-mode worktrees that nothing else holds.
 func (c *archiveCleaner) clean(ctx context.Context, t thread.Thread, cause string) {
 	for _, co := range c.checkouts(t) {
-		if !co.Derived || co.Missing || !co.Registered || co.Path == "" {
+		if !co.WorktreeMode || co.Missing || !co.Registered || co.Path == "" {
 			continue
 		}
 		c.cleanOne(ctx, cause, "thread", t.ID, co.ProjectID, co.Path)

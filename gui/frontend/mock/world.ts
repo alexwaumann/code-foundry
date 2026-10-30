@@ -78,16 +78,21 @@ export interface MockWorkspace {
   createdAt: Date;
 }
 
-/** One checkout of a thread (ThreadService.Checkouts). */
+/** One checkout of a thread (ThreadService.Checkouts): the path it records and what is checked out there now. */
 interface MockCheckout {
   projectId: string;
   projectName: string;
   path: string;
   branch: string;
+  head: string;
+  detached: boolean;
+  isMain: boolean;
   primary: boolean;
   missing: boolean;
   git: boolean;
-  derived: boolean;
+  worktreeMode: boolean;
+  createdBranch: string;
+  moved: boolean;
 }
 
 interface MockThread {
@@ -138,8 +143,14 @@ interface MockThread {
    * thread's members (docs/notes/workspaces-v2-1-threads.md).
    */
   projectIds: string[];
-  /** Thread.branch: a worktree-mode thread's branch (createdWorktree); "" in checkout mode. */
+  /** Thread.branch: the branch a worktree-mode thread was created for (createdWorktree), a record; "" in checkout mode. */
   branch: string;
+  /**
+   * Thread.checkout_paths: the checkouts the thread records by project id (the primary's is
+   * its cwd), whatever they have checked out now; a member not here is resolved like the
+   * daemon's (checkoutsOf) and recorded once it exists (docs/notes/thread-checkouts.md).
+   */
+  checkoutPaths: Record<string, string>;
   /** The workspace the thread references; "" when none. */
   workspaceId: string;
   /** A queued thread.run-in target; "" when none (published, not "persisted"). */
@@ -1421,8 +1432,7 @@ export class World {
     if (s.state === ThreadState.CLOSING) throw new CommandError("unavailable", `thread ${s.id} is closing`);
     if (s.state === ThreadState.DISCONNECTED || target.path === s.worktreePath) {
       s.pendingWorktreePath = "";
-      s.worktreePath = target.path;
-      s.projectId = target.projectId;
+      this.moveTo(s, target.projectId, target.path);
     } else {
       s.pendingWorktreePath = target.path;
       s.moveIn = 2;
@@ -1450,13 +1460,19 @@ export class World {
     const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
     const c = this.checkoutsOf(s).find((x) => x.path === path);
     if (c) {
-      s.worktreePath = c.path;
-      s.projectId = c.projectId;
+      this.moveTo(s, c.projectId, c.path);
     } else if (ws && path === this.workspaceDirOf(ws)) {
-      s.worktreePath = path;
-      s.projectId = "";
+      this.moveTo(s, "", path);
     }
     this.publishThread(s);
+  }
+
+  /** The daemon's movedTo: the cwd moves, the checkout it leaves stays recorded and the one it moves to is. */
+  private moveTo(s: MockThread, projectId: string, path: string): void {
+    if (s.projectId) s.checkoutPaths = { ...s.checkoutPaths, [s.projectId]: s.worktreePath };
+    s.worktreePath = path;
+    s.projectId = projectId;
+    if (projectId) s.checkoutPaths = { ...s.checkoutPaths, [projectId]: path };
   }
 
   /** workspace.add-project: nothing on disk changes. */
@@ -1531,6 +1547,7 @@ export class World {
       createdWorktree: false,
       projectIds: [],
       branch: "",
+      checkoutPaths: {},
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
@@ -1559,8 +1576,19 @@ export class World {
       ...o,
       state,
     };
+    // Create records every checkout that exists (the daemon's placement); the rest at a later start.
+    s.checkoutPaths = { ...this.recordedPaths(s), ...o.checkoutPaths };
     this.threads.set(s.id, s);
     return s;
+  }
+
+  /** The checkouts of s that exist, by project id: what the daemon records (Thread.checkout_paths). */
+  private recordedPaths(s: MockThread): Record<string, string> {
+    return Object.fromEntries(
+      this.checkoutsOf(s)
+        .filter((c) => c.path && !c.missing)
+        .map((c) => [c.projectId, c.path]),
+    );
   }
 
   /** Thread.project_ids: the set and the primary, sorted (a workspace's members are copied into the set when the thread is made). */
@@ -1571,27 +1599,48 @@ export class World {
   }
 
   /**
-   * ThreadService.Checkouts' derivation (the daemon's CheckoutsOf): per project of the set,
-   * by id, the primary at the thread's cwd; a plain folder the folder; in worktree mode a
-   * git member's worktree on the thread's branch (missing when not made yet, at the path
-   * the daemon would make it); otherwise its main worktree.
+   * ThreadService.Checkouts (the daemon's CheckoutsOf): per project of the set, by id, the
+   * path the thread records (the primary at its cwd) and what that worktree has checked out
+   * now; a member with none recorded is resolved: a plain folder the folder; in worktree
+   * mode a git member's worktree on the thread's branch (missing when not made yet, at the
+   * path the daemon would make it); otherwise its main worktree.
    */
   checkoutsOf(s: MockThread): MockCheckout[] {
+    const worktreeMode = s.createdWorktree && s.branch !== "";
     return this.projectIdsOf(s).map((id) => {
       const project = this.projects.get(id);
-      if (!project) return { projectId: id, projectName: "", path: "", branch: "", primary: false, missing: false, git: false, derived: false };
-      const base = { projectId: id, projectName: project.name, git: project.git !== false, derived: false, missing: false };
-      if (id === s.projectId && project.worktrees.some((w) => s.worktreePath === w.path || s.worktreePath.startsWith(`${w.path}/`))) {
-        const wt = project.worktrees.find((w) => s.worktreePath === w.path || s.worktreePath.startsWith(`${w.path}/`));
-        return { ...base, path: wt?.path ?? s.worktreePath, branch: wt?.branch ?? "", primary: true, derived: s.createdWorktree && project.git !== false };
+      const recorded = id === s.projectId ? "" : (s.checkoutPaths[id] ?? "");
+      const none = { branch: "", head: "", detached: false, isMain: false, createdBranch: "", moved: false };
+      if (!project) return { projectId: id, projectName: "", path: recorded, ...none, primary: false, missing: true, git: false, worktreeMode: false };
+      const git = project.git !== false;
+      const at = (path: string, primary: boolean, missing = false): MockCheckout => {
+        const wt = project.worktrees.find((w) => path === w.path || (primary && path.startsWith(`${w.path}/`)));
+        const mode = git && worktreeMode && wt?.isMain !== true;
+        const branch = wt?.branch ?? (mode && !wt ? s.branch : "");
+        return {
+          projectId: id,
+          projectName: project.name,
+          path: primary ? (wt?.path ?? path) : path,
+          branch,
+          head: wt?.head ?? "",
+          detached: wt?.detached === true,
+          isMain: wt?.isMain === true,
+          primary,
+          missing: missing || (git && !wt),
+          git,
+          worktreeMode: mode,
+          createdBranch: mode ? s.branch : "",
+          moved: mode && wt !== undefined && (wt.detached === true || wt.branch !== s.branch),
+        };
+      };
+      if (id === s.projectId && project.worktrees.some((w) => s.worktreePath === w.path || s.worktreePath.startsWith(`${w.path}/`))) return at(s.worktreePath, true);
+      if (recorded) return at(recorded, false);
+      if (!git) return at(project.path, false);
+      if (worktreeMode) {
+        const wt = project.worktrees.find((w) => !w.isMain && w.branch === s.branch);
+        return at(wt?.path ?? this.worktreePathFor(project, s.branch), false, !wt);
       }
-      if (project.git === false) return { ...base, path: project.path, branch: "", primary: false };
-      if (s.createdWorktree && s.branch) {
-        const wt = project.worktrees.find((w) => w.branch === s.branch);
-        return { ...base, path: wt?.path ?? this.worktreePathFor(project, s.branch), branch: s.branch, primary: false, missing: !wt, derived: true };
-      }
-      const main = project.worktrees.find((w) => w.isMain);
-      return { ...base, path: main?.path ?? project.path, branch: main?.branch ?? "", primary: false };
+      return at(project.worktrees.find((w) => w.isMain)?.path ?? project.path, false);
     });
   }
 
@@ -1637,6 +1686,7 @@ export class World {
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
       branch: s.branch,
+      checkoutPaths: this.projectIdsOf(s).map((id) => ({ projectId: id, path: id === s.projectId ? s.worktreePath : (s.checkoutPaths[id] ?? "") })),
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
@@ -2687,9 +2737,12 @@ export class World {
     if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
     if (prompt.includes("FAIL")) throw new CommandError("unavailable", 'start claude: exec: "claude": executable file not found in $PATH');
     const worktreeMode = src.createdWorktree && src.branch !== "";
+    // The daemon's sharedCheckouts: the same mode and branch, so the same checkouts, whatever they have checked out.
+    const shared = this.recordedPaths(src);
     const placeOf = (): string => {
       if (inFolder && ws) return this.workspaceDirOf(ws);
       if (primary === src.projectId) return src.worktreePath;
+      if (shared[primary]) return shared[primary];
       const p = this.projectRef(primary);
       return worktreeMode && p.git !== false ? (p.worktrees.find((w) => w.branch === src.branch)?.path ?? this.addWorktree(p, src.branch, src.baseRef || p.defaultBranch).path) : this.mainPathOf(primary);
     };
@@ -2704,6 +2757,7 @@ export class World {
       createdWorktree: worktreeMode,
       branch: worktreeMode ? src.branch : "",
       projectIds: set,
+      checkoutPaths: shared,
       workspaceId: src.workspaceId,
       firstMessage: firstMessageOf(args),
     });
@@ -3242,7 +3296,7 @@ export class World {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           this.refuseTranscriptMissing(s.id);
-          const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
+          const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id, checkoutPaths: { ...s.checkoutPaths } });
           this.logs.fork(s.id, f.id, s.name || s.id);
           this.focusThread(f.id);
           return `Forked ${s.name || s.id}`;

@@ -5,10 +5,13 @@
  * that is not archived. Pure, over the threads and projects the GUI knows. The composer
  * shows them as one banner (collisionBanner) and a line per project (collisionTip).
  *
- * Checkouts are derived the way the daemon does (docs/notes/workspaces-v2-1-threads.md):
- * the primary's is the thread's cwd; a plain folder is its folder; a worktree-mode git
- * member's is the worktree on the thread's branch (only when the project lists it: the
- * GUI does not compute the daemon's worktree path rule); otherwise the main checkout.
+ * A thread's checkouts are the paths it records (Thread.checkout_paths; the primary's is
+ * its cwd), whatever they have checked out now, so a collision is the same path, never
+ * the same branch (docs/notes/thread-checkouts.md). A member with none recorded is
+ * resolved the way the daemon does: a plain folder is its folder; a worktree-mode git
+ * member's is the linked worktree on the thread's branch, never the main checkout (only
+ * when the project lists it: the GUI does not compute the daemon's worktree path rule);
+ * otherwise the main checkout.
  */
 import { WORKSPACE_PRIMARY } from "./projectSet";
 
@@ -37,7 +40,10 @@ export interface HintThread {
   projectIds: readonly string[];
   worktreePath: string;
   createdWorktree: boolean;
+  /** The branch a worktree-mode thread was created for (Thread.branch): resolves a member with no checkout recorded. */
   branch: string;
+  /** The checkouts the thread records (Thread.checkout_paths); a path "" (or none listed) is resolved. */
+  checkoutPaths?: readonly Checkout[];
   archived: boolean;
   /** Claude is at work in it (lib/thread isWorkingThread); else it reads as idle. */
   working?: boolean;
@@ -59,11 +65,13 @@ export function threadCheckouts(t: HintThread, projects: HintProjects): Checkout
   const out: Checkout[] = [];
   for (const id of ids) {
     const p = projects[id];
+    const recorded = t.checkoutPaths?.find((c) => c.projectId === id)?.path ?? "";
     if (id === t.projectId && t.worktreePath) out.push({ projectId: id, path: t.worktreePath });
+    else if (recorded) out.push({ projectId: id, path: recorded });
     else if (!p) continue;
     else if (!p.git) out.push({ projectId: id, path: mainCheckout(p) });
     else if (t.createdWorktree && t.branch) {
-      const w = p.worktrees.find((x) => x.branch === t.branch);
+      const w = branchWorktree(p, t.branch);
       if (w) out.push({ projectId: id, path: w.path });
     } else out.push({ projectId: id, path: mainCheckout(p) });
   }
@@ -74,9 +82,11 @@ export function threadCheckouts(t: HintThread, projects: HintProjects): Checkout
  * The checkouts a draft's thread would have that the GUI knows already: in place (not
  * worktree mode), every member's own checkout, the primary's at `primaryPath` when the
  * user picked a worktree; in worktree mode the plain folders, and with an existing
- * `branch` picked each git member's listed worktree on it (the daemon reuses it; a new
- * branch gets new worktrees). A primary of WORKSPACE_PRIMARY runs in the workspace's
- * folder, which no project owns.
+ * `branch` picked each git member's linked worktree that has it checked out (the daemon
+ * reuses it; a new branch gets new worktrees). Never the main checkout, nor a worktree made
+ * for the branch that was switched to another one: the daemon refuses both, so neither is
+ * a checkout the draft would share. A primary of WORKSPACE_PRIMARY runs in the
+ * workspace's folder, which no project owns.
  */
 export function draftCheckouts(
   d: { projectIds: readonly string[]; primary: string; worktreeMode: boolean; primaryPath?: string; branch?: string },
@@ -88,13 +98,18 @@ export function draftCheckouts(
     if (!p) continue;
     if (!p.git) out.push({ projectId: id, path: mainCheckout(p) });
     else if (d.worktreeMode) {
-      const w = d.branch ? p.worktrees.find((x) => x.branch === d.branch) : undefined;
+      const w = d.branch ? branchWorktree(p, d.branch) : undefined;
       if (w) out.push({ projectId: id, path: w.path });
     }
     else if (id === d.primary && d.primary !== WORKSPACE_PRIMARY && d.primaryPath) out.push({ projectId: id, path: d.primaryPath });
     else out.push({ projectId: id, path: mainCheckout(p) });
   }
   return out;
+}
+
+/** A project's linked worktree with branch checked out (a detached one has no branch); never its main checkout. */
+function branchWorktree(p: HintProject, branch: string): HintWorktree | undefined {
+  return p.worktrees.find((x) => !x.isMain && x.branch === branch);
 }
 
 /** The branch a checkout is on ("" for a plain folder, the short head when detached). */

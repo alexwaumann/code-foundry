@@ -69,7 +69,8 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 	case rec.reserved != nil:
 		return Thread{}, fmt.Errorf("%w: thread %s is starting; try again in a moment", ErrFailedPrecondition, id)
 	case rec.run == nil:
-		rec.s.WorktreePath, rec.s.ProjectID, rec.s.PendingWorktreePath = mem.WorktreePath, mem.ProjectID, ""
+		rec.s = rec.s.movedTo(mem.ProjectID, mem.WorktreePath)
+		rec.s.PendingWorktreePath = ""
 		m.commitLocked(rec, true)
 		m.log.Info("thread moved to another checkout", "thread", id, "path", mem.WorktreePath)
 		return rec.s, nil

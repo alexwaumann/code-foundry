@@ -33,8 +33,8 @@ func TestArchiveCleanup(t *testing.T) {
 			return []thread.Checkout{{ProjectID: "web", Path: t.WorktreePath, Primary: true}}
 		}
 		return []thread.Checkout{
-			{ProjectID: "api", Path: apiWT, Derived: true, Registered: true, Git: true},
-			{ProjectID: "web", Path: webWT, Derived: true, Registered: true, Git: true, Primary: true},
+			{ProjectID: "api", Path: apiWT, WorktreeMode: true, Registered: true, Git: true},
+			{ProjectID: "web", Path: webWT, WorktreeMode: true, Registered: true, Git: true, Primary: true},
 		}
 	}
 	tests := []struct {

@@ -22,8 +22,11 @@ import (
 //
 // It applies when the cwd is missing, lies under the app's worktrees directory
 // (Options.WorktreeRoot) and the row has a branch. Anything else keeps the refusal
-// resumeLaunch gives a missing worktree. The thread's other members' worktrees are made
-// again the same way (ensureMembers, placement.go).
+// resumeLaunch gives a missing worktree. The branch is the one the thread was created
+// for, not what the worktree had checked out when it went (it may have moved; the path
+// is the thread's checkout, docs/notes/thread-checkouts.md). The thread's other members'
+// worktrees are made again the same way (ensureMembers, placement.go), which records
+// where they land.
 
 // fetchBranchTimeout bounds the fetch that looks for a branch on origin.
 const fetchBranchTimeout = 30 * time.Second
@@ -49,8 +52,8 @@ func (rw recreatedWorktree) note() string {
 }
 
 // recreatable reports whether s's missing cwd may be made again (see above). A
-// workspace reference no longer stops it: the members' worktrees are derived from the
-// thread's branch (checkouts.go), and ensureMembers makes the others' again.
+// workspace reference no longer stops it: ensureMembers makes the other members'
+// worktrees again too (checkouts.go).
 func (m *Manager) recreatable(s Thread) bool {
 	return s.Branch != "" && s.ProjectID != "" && m.opts.Projects != nil &&
 		project.InsideRoot(s.WorktreePath, m.opts.WorktreeRoot)
@@ -160,7 +163,8 @@ func gitFetchBranch(ctx context.Context, dir, branch string) bool {
 // worktree at the row's path gives the branch, or the row is left without one (the
 // worktree is gone, or detached).
 
-// backfillLimit is how long backfillBranches waits for projects to list their worktrees.
+// backfillLimit is how long backfillBranches and fillCheckouts wait for projects to list
+// their worktrees.
 const backfillLimit = 2 * time.Minute
 
 // backfillPending are the threads whose branch can still be read: the app made their
@@ -177,32 +181,45 @@ func (m *Manager) backfillPending() []string {
 	return ids
 }
 
-// startBackfill runs backfillBranches in the background when some row needs it.
+// startBackfill runs backfillBranches, then fillCheckouts, in the background when some
+// row needs them.
 func (m *Manager) startBackfill() {
-	pending := m.backfillPending()
-	if len(pending) == 0 || m.opts.Projects == nil {
+	branches, checkouts := m.backfillPending(), m.fillPending()
+	if (len(branches) == 0 && len(checkouts) == 0) || m.opts.Projects == nil {
 		return
 	}
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		m.backfillBranches(pending, m.opts.Tick, backfillLimit)
+		m.backfillBranches(branches, m.opts.Tick, backfillLimit)
+		m.fillCheckouts(checkouts, m.opts.Tick, backfillLimit)
 	}()
 }
 
 // backfillBranches checks pending against the project snapshot every tick until each
 // is decided, Shutdown, or limit passed.
 func (m *Manager) backfillBranches(pending []string, tick, limit time.Duration) {
+	m.untilDecided(pending, tick, limit, m.backfillStep, func(left []string) {
+		m.log.Info("branches of threads not filled in: their projects did not list worktrees", "threads", len(left))
+	})
+}
+
+// untilDecided runs step over pending every tick until it decides them all, Shutdown,
+// or limit passed; then late gets what is left.
+func (m *Manager) untilDecided(pending []string, tick, limit time.Duration, step func([]string) []string, late func([]string)) {
+	if len(pending) == 0 {
+		return
+	}
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	deadline := time.Now().Add(limit)
 	for {
-		pending = m.backfillStep(pending)
+		pending = step(pending)
 		if len(pending) == 0 {
 			return
 		}
 		if time.Now().After(deadline) {
-			m.log.Info("branches of threads not filled in: their projects did not list worktrees", "threads", len(pending))
+			late(pending)
 			return
 		}
 		select {
@@ -260,4 +277,62 @@ func backfillBranch(snap *project.Snapshot, s Thread) (branch string, decided bo
 		return "", true
 	}
 	return wt.Branch, true
+}
+
+// Rows from before the checkouts column (migration 0049) record no checkouts.
+// fillCheckouts records them once their projects have listed their worktrees: each
+// member's checkout as the derivation it replaces gave it then (fillPaths), "" for one
+// whose worktree is missing (its next start makes it on the thread's branch, at that same
+// default path). Until then they resolve as before (resolveMember), so a start meanwhile
+// behaves as it did.
+
+// fillPending are the threads with projects and no checkouts recorded.
+func (m *Manager) fillPending() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var ids []string
+	for id, rec := range m.recs {
+		if rec.s.CheckoutPaths == nil && len(rec.s.Projects()) > 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// fillCheckouts records pending's checkouts every tick until each is decided, Shutdown,
+// or limit passed; past it, members still undecided are recorded "" (resolved at their
+// thread's next start).
+func (m *Manager) fillCheckouts(pending []string, tick, limit time.Duration) {
+	m.untilDecided(pending, tick, limit, func(p []string) []string { return m.fillStep(p, false) }, func(left []string) {
+		m.log.Info("checkouts of threads recorded without their projects' worktrees listed", "threads", len(left))
+		m.fillStep(left, true)
+	})
+}
+
+// fillStep records what it can of pending's checkouts against the current project
+// snapshot (all of them with force) and returns the threads still undecided.
+func (m *Manager) fillStep(pending []string, force bool) []string {
+	snap := m.opts.Projects.Snapshot()
+	if snap == nil && !force {
+		return pending
+	}
+	var left []string
+	for _, id := range pending {
+		s, ok := m.Snapshot().Thread(id)
+		if !ok || s.CheckoutPaths != nil {
+			continue
+		}
+		paths, decided := fillPaths(s, snap, m.opts.Projects.DefaultWorktreePath, isDir, force)
+		if !decided {
+			left = append(left, id)
+			continue
+		}
+		m.update(id, true, func(r *record) {
+			if r.s.CheckoutPaths == nil && r.s.WorktreePath == s.WorktreePath && r.s.ProjectID == s.ProjectID {
+				r.s.CheckoutPaths = paths
+			}
+		})
+		m.log.Info("checkouts of thread recorded from its derivation", "thread", id, "checkouts", paths)
+	}
+	return left
 }

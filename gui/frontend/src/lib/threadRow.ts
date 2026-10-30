@@ -46,8 +46,10 @@ export interface ThreadRowModel {
   /** A thread without a project (isNoProject): no branch, no worktree, the House icon. */
   noProject: boolean;
   /**
-   * The branch: a multi-project thread's in worktree mode (Thread.branch), else the one
-   * checked out in the cwd (branch, else the short head, else the directory name); "" without git.
+   * The branch checked out in the cwd, read from its HEAD (branch, else the short head, else
+   * the directory name; docs/notes/thread-checkouts.md); "" without git. A multi-project
+   * thread with no checkout to read there (its workspace's folder, a plain folder) shows the
+   * branch it was created for (Thread.branch).
    */
   branch: string;
   /** The cwd's project is not a git repository: show the No git badge instead of a branch. */
@@ -108,8 +110,9 @@ export function setLabel(s: Pick<ThreadPlaceInput, "projectId" | "workspaceId" |
 export function threadRowModel(s: ThreadPlaceInput, projects: ProjectLookup, workspaces: WorkspaceLookup): ThreadRowModel {
   if (isNoProject(s, projects)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, set: null, movingTo: null, worktree: false };
   const set = setLabel(s, workspaces);
-  // A multi-project thread in worktree mode is on one branch everywhere; in its workspace's folder it has no checkout branch.
-  const branch = set !== null && (s.createdWorktree === true || s.projectId === "") ? (s.branch ?? "") : worktreeBranch(projects, s.projectId, s.worktreePath);
+  // The cwd's HEAD, even when the branch moved; a multi-project thread whose cwd has no git (its workspace's folder, a plain folder) shows the branch it was created for.
+  const here = worktreeBranch(projects, s.projectId, s.worktreePath);
+  const branch = set !== null && (s.projectId === "" || (here === "" && s.createdWorktree === true)) ? (s.branch ?? "") : here;
   return {
     noProject: false,
     // A thread in its workspace's folder (no project id) is in no project: its set label names it, never the folder's w-<id>.

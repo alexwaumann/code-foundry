@@ -4,8 +4,8 @@
 // the files themselves (a thread writes CLAUDE.md, AGENTS.md and .claude/skills there);
 // a rooted one came from a real folder (root_path) and its managed dir holds symlinks
 // CLAUDE.md, AGENTS.md and .claude to the same names under the root. A workspace has no
-// branch and no worktrees: those are a thread's (its project set and branch; the thread
-// store's derived checkouts).
+// branch and no worktrees: those are a thread's (its project set and the checkouts it
+// records; docs/notes/thread-checkouts.md).
 //
 // The store persists workspaces in SQLite, publishes an immutable Snapshot behind an
 // atomic pointer and emits Updated/Removed events on the bus. It never looks at threads.

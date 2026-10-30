@@ -63,51 +63,29 @@ func prsByHead(prs []gh.PullRequest) map[headKey][]gh.PullRequest {
 }
 
 // threadBranches is the branches thread th works on, each in its project's GitHub
-// repository: every member's of its project set (each checkout's branch; th.Branch for a
-// derived worktree that is gone). A project without a GitHub slug and a
-// detached worktree contribute nothing; so does a thread without a project.
+// repository: what each of its checkouts has checked out (its HEAD, at the path the
+// thread records; docs/notes/thread-checkouts.md), and for a worktree-mode checkout or a
+// cwd that is gone the branch the thread was created for (it is made again on it). A
+// project without a GitHub slug and a detached checkout contribute nothing; so does a
+// thread without a project.
 func threadBranches(th thread.Thread, projects *project.Snapshot) []headKey {
 	var out []headKey
-	add := func(projectID, path, fallback string) {
-		r, ok := projects.Project(projectID)
+	// From the snapshot alone (every pass): an unlisted checkout is "not on a branch now".
+	for _, c := range thread.ListedCheckouts(th, projects) {
+		r, ok := projects.Project(c.ProjectID)
 		if !ok || r.GitHubSlug == "" {
-			return
+			continue
 		}
-		head := fallback
-		if wt, ok := projects.Worktree(projectID, path); ok {
-			head = wt.Branch // "" when detached
+		head := c.Branch // "" when detached
+		if !c.Listed && (c.WorktreeMode || c.Primary) {
+			head = th.Branch
 		}
 		if head == "" {
-			return
+			continue
 		}
 		k := headKey{strings.ToLower(r.GitHubSlug), head}
 		if !slices.Contains(out, k) {
 			out = append(out, k)
-		}
-	}
-	// Every member of the thread's set (docs/notes/workspaces-v2-1-threads.md): the
-	// primary's worktree, in worktree mode each other one's on the thread's branch, else
-	// each other one's own checkout.
-	for _, pid := range th.Projects() {
-		switch {
-		case pid == th.ProjectID:
-			add(pid, th.WorktreePath, th.Branch)
-		case th.CreatedWorktree && th.Branch != "":
-			path := ""
-			if r, ok := projects.Project(pid); ok {
-				i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Branch == th.Branch && !w.Detached })
-				if i >= 0 {
-					path = r.Worktrees[i].Path
-				}
-			}
-			add(pid, path, th.Branch)
-		default:
-			if r, ok := projects.Project(pid); ok {
-				i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.IsMain })
-				if i >= 0 {
-					add(pid, r.Worktrees[i].Path, "")
-				}
-			}
 		}
 	}
 	return out

@@ -278,6 +278,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		PendingWorktreePath: s.PendingWorktreePath,
 		Pinned:              s.Pinned,
 		EffortPending:       s.EffortPending,
+		CheckoutPaths:       checkoutPathsToProto(s),
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

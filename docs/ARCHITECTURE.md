@@ -463,31 +463,45 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
 * A thread has a **project set** (`project_ids`, sorted by id; persisted as a JSON column)
   and one **primary** (`project_id`/`worktree_path`: the cwd); a thread without a project
   has an empty set, runs in the home directory (`Options.Home`), pre-trusted like any cwd,
-  and RunIn refuses it (`docs/notes/no-project-1-daemon.md`). Every member's **checkout**
-  is derived, never stored (`checkouts.go`): in worktree mode (`created_worktree`) a git
-  member's worktree on the thread's `branch` at the project store's
-  `DefaultWorktreePath`, which every thread computes alike, so threads on one branch
-  share it (or a hand-made linked worktree on the branch; never the project's main
-  checkout: while it has the branch checked out, making the thread's worktree is refused,
-  naming the project, the branch and the checkout, since a second worktree on one branch
-  makes a commit in one look reverted in the other); a plain folder is the folder; in
-  checkout mode each member's own checkout.
+  and RunIn refuses it (`docs/notes/no-project-1-daemon.md`). The thread owns one
+  **checkout** per member, by path (`checkout_paths`, the `checkouts` JSON column; the
+  primary's is the cwd), and what a checkout has checked out (HEAD, detached, upstream
+  ahead/behind, the operation in progress) is read from the project snapshot at that
+  path, never from the row, so a checkout whose branch moved (`git switch`, a stacked
+  branch) is the same checkout (`checkouts.go`, `docs/notes/thread-checkouts.md`).
+  `branch` is the branch a worktree-mode thread was created for, a record: recreate
+  checks it out again, and a checkout on another one is `moved`. Create records the
+  paths by the creation rule: in worktree mode (`created_worktree`) a git member's
+  worktree made for the branch at the project store's `DefaultWorktreePath`, or one that
+  exists for it (that path while it has the branch checked out, or a hand-made linked
+  worktree on the branch; never the project's main checkout: while it has the branch
+  checked out, making the thread's worktree is refused, naming the project, the branch and
+  the checkout, since a second worktree on one branch makes a commit in one look reverted
+  in the other; nor a worktree at that path switched to another branch, another thread's
+  checkout now: refused too, naming its HEAD and thread); a plain folder is the folder; in
+  checkout mode each member's own checkout. A member with none recorded (a row from
+  before, filled at daemon start from that rule; a worktree missing then) is resolved by
+  the same rule and recorded at its next start; a recorded checkout-mode one that is gone
+  falls back to the member's own checkout, with a timeline note. Collision hints compare
+  paths.
   `thread new` places a thread (`placement.go`): `--projects` gives the set,
   `--new-worktree` makes one new branch in every git member (in parallel, fetch first,
   pre-trusted, recorded as made; one failure removes what the others got and fails the
   Create naming the project; a named `--branch` only on origin is fetched and tracked;
   Creates at the same time share a named branch's worktrees under the per-(project,
   branch) lock and reserve an auto-named one, so the second gets `-2`), `--like` copies
-  another thread's set, branch, primary, workspace reference and mode (`--workspace` with
-  it replaces only the reference), and a thread made by another (`created_by`) copies its
+  another thread's set, branch, primary, workspace reference, mode and checkouts (the
+  same paths, whatever they have checked out; `--workspace` with it replaces only the
+  reference), and a thread made by another (`created_by`) copies its
   creator's the same way unless `--project`/`--worktree` name a place outside its set
   (`--created-by=` opts out of both). A narrowed `--projects` with no git project drops
   worktree mode. Create reports what it did with the primary (`CreateThreadResponse`
   `made_worktree`, `existing_worktree`/`shared_with`, `worktree_mode_dropped`) for the
   CLI's summary (`docs/notes/workspaces-v2-fix-2-threads.md`).
-  Every spawn (create, a start on send, fork) first makes missing derived worktrees again
-  (`ensureMembers`, beside `recreate.go`'s for the primary) and gives Claude `--add-dir`
-  for every other member's checkout; a missing one is a spawn error. `workspace_id` is an
+  Every spawn (create, a start on send, fork) first makes missing worktree-mode worktrees
+  again on the created-for branch and records unrecorded members (`ensureMembers`, beside
+  `recreate.go`'s for the primary) and gives Claude `--add-dir` for every other member's
+  checkout; a missing one is a spawn error. `workspace_id` is an
   optional reference to a workspace (`thread new --workspace`: its members are the set
   unless `--projects`, its default primary the cwd, `workspace` its folder): every spawn
   re-checks its managed dir, passes it as an `--add-dir` (not when the thread runs in it
@@ -502,7 +516,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `docs/notes/orch-skill-v2.md`, `docs/notes/workspaces-v2-2-workspaces.md`). `ThreadService.Checkouts` (`thread checkouts`) lists a
   thread's checkouts; Create answers collision hints (a checkout another live thread has)
   that the CLI prints on stderr. An archive hands the thread to the daemon
-  (`Options.Archived`), which removes each derived worktree the app made that is clean
+  (`Options.Archived`), which removes each worktree-mode worktree the app made that is clean
   and that no other thread or terminal holds (`project.ArchivedVerdict`,
   `internal/daemon/cleanup_archived.go`; cleanups of one path run one at a time), never
   its branch (`docs/notes/workspaces-v2-1-threads.md`). A removal does the same with the
@@ -566,7 +580,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   running in the background; up at least 5 minutes), disconnect reason "idle"
   (`docs/notes/thread-lifecycle.md`). A start of a thread whose worktree the app made and
   a cleanup removed makes it again first, on the branch the row records, at the same
-  path, so `--resume` finds the transcript, and the thread's other derived worktrees too;
+  path, so `--resume` finds the transcript, and the thread's other worktree-mode worktrees too;
   user checkouts keep the refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
   A conversation whose transcript Claude Code deleted (its `cleanupPeriodDays`) cannot
   continue: the start is refused (`ErrTranscriptMissing`, FAILED_PRECONDITION, nothing
@@ -619,7 +633,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   thread also has every link of the threads it created (`CreatedBy`, transitively, not
   forks): each new link is copied up the chain with its source and the direct child it
   came through (`docs/notes/linked-prs-children.md`). And it has every pull request whose
-  head is a branch it works on (each of its checkouts') in the
+  head is a branch it works on (each of its checkouts' HEAD) in the
   project's GitHub repository: the daemon matches them against the GitHub store's cached
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
   store as `branch` links (`docs/notes/linked-prs-branch.md`).

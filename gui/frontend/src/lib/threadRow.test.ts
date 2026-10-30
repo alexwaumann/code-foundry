@@ -28,9 +28,9 @@ describe("threadRowModel", () => {
       { project: "web", branch: "cf/login", set: null, worktree: true },
     ],
     [
-      "several projects with a workspace in worktree mode: its name and the thread's branch",
+      "several projects with a workspace in worktree mode: its name and the cwd's branch, read from HEAD, not the one it was created for",
       { projectId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "", projectCount: 3, branch: "feat/x", createdWorktree: true },
-      { project: "web", branch: "feat/x", set: "login", worktree: true },
+      { project: "web", branch: "cf/login", set: "login", worktree: true },
     ],
     [
       "several projects without a workspace, in place: N projects and the cwd's branch",

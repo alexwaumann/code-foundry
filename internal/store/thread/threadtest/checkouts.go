@@ -10,7 +10,8 @@ import (
 )
 
 // SetCheckouts makes Checkouts list cos for thread id (otherwise one checkout per
-// project in its set, the primary at its cwd and the others under /checkouts).
+// project in its set at the path the thread records, the primary at its cwd, the others
+// under /checkouts when none is recorded).
 func (f *Fake) SetCheckouts(id string, cos []thread.Checkout) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -54,10 +55,14 @@ func (f *Fake) Checkouts(_ context.Context, ref thread.CheckoutsRef) (thread.Thr
 	cos, ok := f.checkouts[s.ID]
 	if !ok {
 		for _, pid := range s.Projects() {
-			c := thread.Checkout{ProjectID: pid, ProjectName: pid, Registered: true, Git: true, Branch: s.Branch, Primary: pid == s.ProjectID}
+			c := thread.Checkout{ProjectID: pid, ProjectName: pid, Registered: true, Git: true, Branch: s.Branch, Primary: pid == s.ProjectID,
+				WorktreeMode: s.CreatedWorktree && s.Branch != "", Listed: true}
+			if c.WorktreeMode {
+				c.CreatedBranch = s.Branch
+			}
 			c.Path = "/checkouts/" + pid
-			if c.Primary {
-				c.Path = s.WorktreePath
+			if p, ok := s.CheckoutPath(pid); ok {
+				c.Path, c.Recorded = p, true
 			}
 			cos = append(cos, c)
 		}

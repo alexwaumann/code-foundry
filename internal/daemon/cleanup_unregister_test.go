@@ -45,7 +45,7 @@ func TestArchiveCleanupSharedWorktree(t *testing.T) {
 	snap := &thread.Snapshot{Threads: threads}
 	// Each cleanup reads the checkouts when it starts, all before the first removal.
 	checkouts := func(thread.Thread) []thread.Checkout {
-		return []thread.Checkout{{ProjectID: "web", Path: wt, Derived: true, Registered: true, Git: true, Primary: true}}
+		return []thread.Checkout{{ProjectID: "web", Path: wt, WorktreeMode: true, Registered: true, Git: true, Primary: true}}
 	}
 	var logs strings.Builder
 	c := &archiveCleaner{
@@ -84,8 +84,8 @@ func TestUnregisterCleansUpWorktrees(t *testing.T) {
 	snap := &thread.Snapshot{Threads: []thread.Thread{live, gone}}
 	checkouts := func(t thread.Thread) []thread.Checkout {
 		return []thread.Checkout{
-			{ProjectID: "api", Path: "/wt/api/" + strings.TrimPrefix(t.Branch, "feat/"), Derived: true, Registered: true, Git: true},
-			{ProjectID: "web", Path: t.WorktreePath, Derived: true, Registered: true, Git: true, Primary: true},
+			{ProjectID: "api", Path: "/wt/api/" + strings.TrimPrefix(t.Branch, "feat/"), WorktreeMode: true, Registered: true, Git: true},
+			{ProjectID: "web", Path: t.WorktreePath, WorktreeMode: true, Registered: true, Git: true, Primary: true},
 		}
 	}
 	c := &archiveCleaner{

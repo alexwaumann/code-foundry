@@ -413,13 +413,14 @@ func TestRender(t *testing.T) {
 	}
 
 	// Workspaces v2 (workspaces-v2-5-skills): a child inherits its creator's projects,
-	// workspace, branch and mode; --projects narrows a worker, one worker per checkout,
-	// archiving removes clean worktrees. Nothing says a new worktree is in one project.
+	// workspace, mode and checkouts (thread-checkouts: whatever they have checked out);
+	// --projects narrows a worker, one worker per checkout, archiving removes clean
+	// worktrees. Nothing says a new worktree is in one project.
 	// Compared with the line breaks folded to spaces: the paragraph is reflowed as it grows.
 	orch := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/SKILL.md"])), " ")
 	patterns := strings.Join(strings.Fields(string(files[skills.Orchestrate+"/reference/patterns.md"])), " ")
-	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`), workspace, branch and mode",
-		"without `--new-worktree` (or `--new-branch`) it shares your worktrees", "one worker per checkout",
+	for _, want := range []string{"A child inherits your projects (`code-foundry thread checkouts`), workspace, mode and checkouts",
+		"without `--new-worktree` (or `--new-branch`) it works in your worktrees, whatever they have checked out", "one worker per checkout",
 		"`--projects` keeps it to the projects its task touches", "thread new --projects <project id> --new-worktree",
 		"removes clean worktrees no other thread uses, never a branch"} {
 		if !strings.Contains(orch, want) {

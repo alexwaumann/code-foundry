@@ -3,7 +3,8 @@ package project
 import "time"
 
 // ArchivedVerdict is the git half of the cleanup a thread's archive runs on each of its
-// derived worktrees (docs/notes/workspaces-v2-1-threads.md): CleanupVerdict without the
+// worktree-mode checkouts (docs/notes/workspaces-v2-1-threads.md,
+// docs/notes/thread-checkouts.md): CleanupVerdict without the
 // base rule. A worktree the app made, on a branch, whose status reads clean (no staged,
 // modified, untracked or conflicted entries) with no operation in progress, goes at
 // once: its commits live on its branch, which is never deleted, so a pushed or unpushed

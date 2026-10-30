@@ -121,12 +121,14 @@ const ReasonArchived = "archived"
 // codefoundry.v1.Thread.
 //
 // Projects: a thread has a set of projects (ProjectIDs, sorted by id), one of which is
-// the primary (ProjectID and WorktreePath: the cwd). Every member has a checkout,
-// derived and never stored (checkouts.go, docs/notes/workspaces-v2-1-threads.md): in
-// worktree mode (CreatedWorktree) a git member's is the worktree for (project, Branch),
-// a plain folder's the folder; otherwise each member's own checkout. A thread without a
-// project (CreateOptions.NoProject) has an empty set and runs in Options.Home.
-// WorkspaceID is an optional reference to a workspace, independent of the set.
+// the primary (ProjectID and WorktreePath: the cwd). Every member has a checkout, which
+// the thread owns: its path is recorded (CheckoutPaths; checkouts.go,
+// docs/notes/thread-checkouts.md), and what it has checked out is read from it (the
+// project snapshot), never from the row. In worktree mode (CreatedWorktree) a git
+// member's checkout is a worktree the app made (or reused) for Branch, a plain folder's
+// the folder; otherwise each member's own checkout. A thread without a project
+// (CreateOptions.NoProject) has an empty set and runs in Options.Home. WorkspaceID is an
+// optional reference to a workspace, independent of the set.
 type Thread struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
@@ -136,8 +138,15 @@ type Thread struct {
 	// without a project. Persisted (threads.project_ids). Copy on write.
 	ProjectIDs   []string
 	WorktreePath string // the cwd
-	Name         string
-	AutoNamed    bool
+	// CheckoutPaths is every member's checkout by project id: the primary's is
+	// WorktreePath (kept equal whenever the cwd moves to a project's checkout), and ""
+	// is a member with none recorded, resolved by the creation rule at the next start
+	// (resolveMember, ensureMembers). nil: not recorded yet (a row from before migration
+	// 0049, filled at daemon start by fillCheckouts). Persisted (threads.checkouts).
+	// Copy on write.
+	CheckoutPaths map[string]string
+	Name          string
+	AutoNamed     bool
 	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
 	// namer still replaces it; a rename or the namer's title clears it. Persisted.
 	NameProvisional bool
@@ -170,16 +179,17 @@ type Thread struct {
 	// BaseRef is the ref the worktree's branch was created from, when Create made the
 	// worktree (CreatedWorktree).
 	BaseRef string
-	// CreatedWorktree is worktree mode: every git member works in its worktree for
-	// Branch, made at spawn when missing (checkouts.go). False: checkout mode, every
-	// member in its own checkout.
+	// CreatedWorktree is worktree mode: every git member works in a worktree the app
+	// made (or reused) for Branch, made again at spawn when missing (checkouts.go).
+	// False: checkout mode, every member in its own checkout.
 	CreatedWorktree bool
-	// Branch is the branch of a worktree-mode thread (CreatedWorktree; copied by Fork):
-	// its members' worktrees are on it, and one a cleanup removed is made again on it, at
-	// the same path, when the thread starts (recreate.go). It is what the thread was
-	// created for, not what the worktree has checked out now. Persisted; rows from before
-	// it are filled in from the project store at startup while their worktree exists
-	// (backfillBranches).
+	// Branch is the branch a worktree-mode thread was created for (CreatedWorktree;
+	// copied by Fork and by a thread placed like it): its members' worktrees were made on
+	// it, and one a cleanup removed is made again on it, at the same path, when the
+	// thread starts (recreate.go). A record, not what a checkout has checked out now:
+	// that is its HEAD (Checkout.Branch; Checkout.Moved when they differ). Persisted; rows
+	// from before it are filled in from the project store at startup while their
+	// worktree exists (backfillBranches).
 	Branch string
 	// WorkspaceID is an optional reference to a workspace (its managed dir and
 	// instructions reach every spawn; workspace.go), independent of ProjectIDs. A thread

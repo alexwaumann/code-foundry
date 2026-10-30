@@ -47,13 +47,15 @@ func threadCheckouts(b CheckoutsBackend) Command {
 }
 
 // FormatCheckouts renders thread.checkouts for people and for Claude: a line naming the
-// thread and its mode, then one aligned line per project, then the workspace.
+// thread and its mode, then one aligned line per project (the branch checked out there
+// now, "moved from" the one a worktree was made for when they differ), then the
+// workspace.
 func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 	var b strings.Builder
 	t := m.GetThread()
 	mode := "each project in its own checkout"
 	if t.GetCreatedWorktree() && t.GetBranch() != "" {
-		mode = "worktrees on branch " + t.GetBranch()
+		mode = "worktrees made for branch " + t.GetBranch()
 	}
 	if t.GetProjectId() == "" && t.GetWorkspaceId() != "" {
 		mode += "; runs in its workspace's folder " + t.GetWorktreePath()
@@ -70,11 +72,19 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 				name = c.GetProjectId() + " (not registered)"
 			}
 			branch := c.GetBranch()
-			if branch == "" {
+			switch {
+			case branch != "":
+			case c.GetDetached():
+				branch = "(detached " + shortHead(c.GetHead()) + ")"
+			case c.GetMissing() && c.GetCreatedBranch() != "":
+				branch = c.GetCreatedBranch() // made on it at the next start
+			case !c.GetGit() && c.GetProjectName() != "":
+				branch = "(folder)"
+			default:
 				branch = "-"
-				if !c.GetGit() && c.GetProjectName() != "" {
-					branch = "(folder)"
-				}
+			}
+			if c.GetMoved() {
+				branch += " (moved from " + c.GetCreatedBranch() + ")"
 			}
 			if c.GetCurrent() {
 				branch += " (current)"
@@ -113,3 +123,6 @@ func FormatCheckouts(m *v1.ThreadCheckoutsResponse) string {
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
+
+// shortHead is a commit's first 7 characters.
+func shortHead(sha string) string { return sha[:min(7, len(sha))] }

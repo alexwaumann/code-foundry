@@ -7,10 +7,11 @@ import { useThreadsStore } from "@/stores/threads";
 
 const SEP = "\u0001";
 const LIST = "\u0002";
+const PAIR = "\u0003";
 
 /**
  * One string per running thread (lib/thread isRunningThread: not archived, not
- * snoozed, starting or connected): what its checkouts derive from and whether it works
+ * snoozed, starting or connected): its checkouts (recorded, or what they resolve from) and whether it works
  * (shallow-stable). A thread that starts, stops, is snoozed or archived changes the list.
  */
 function useThreadKeys(): string[] {
@@ -20,7 +21,8 @@ function useThreadKeys(): string[] {
       return s.order.flatMap((id) => {
         const t = s.byId[id];
         if (!t || !isRunningThread(t, now)) return [];
-        return [[t.id, t.name, t.projectId, t.projectIds.join(","), t.worktreePath, t.createdWorktree ? "1" : "", t.branch, isWorkingThread(t) ? "1" : ""].join(SEP)];
+        const recorded = t.checkoutPaths.map((c) => c.projectId + PAIR + c.path).join(LIST);
+        return [[t.id, t.name, t.projectId, t.projectIds.join(","), t.worktreePath, t.createdWorktree ? "1" : "", t.branch, isWorkingThread(t) ? "1" : "", recorded].join(SEP)];
       });
     }),
   );
@@ -42,8 +44,14 @@ function useProjectKeys(): string[] {
 
 function decodeThreads(keys: readonly string[]): HintThread[] {
   return keys.map((k) => {
-    const [id = "", name = "", projectId = "", ids = "", worktreePath = "", wt = "", branch = "", working = ""] = k.split(SEP);
-    return { id, name, projectId, projectIds: ids ? ids.split(",") : [], worktreePath, createdWorktree: wt === "1", branch, archived: false, working: working === "1" };
+    const [id = "", name = "", projectId = "", ids = "", worktreePath = "", wt = "", branch = "", working = "", recorded = ""] = k.split(SEP);
+    const checkoutPaths = recorded
+      ? recorded.split(LIST).map((c) => {
+          const [pid = "", path = ""] = c.split(PAIR);
+          return { projectId: pid, path };
+        })
+      : [];
+    return { id, name, projectId, projectIds: ids ? ids.split(",") : [], worktreePath, createdWorktree: wt === "1", branch, checkoutPaths, archived: false, working: working === "1" };
   });
 }
 
