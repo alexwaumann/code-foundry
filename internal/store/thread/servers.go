@@ -349,15 +349,18 @@ func (m *Manager) StopShell(ctx context.Context, id, taskID string) (Thread, err
 		return Thread{}, fmt.Errorf("%w: thread %s runs no background shell %q", ErrNotFound, id, taskID)
 	}
 	sh := t.BackgroundShells[i]
-	pgid := sh.PGID
-	if pgid == 0 && sh.ClaudePID > 0 {
-		groups, err := m.opts.ServerProbe.ShellGroups(ctx, sh.ClaudePID)
-		if err != nil {
-			return Thread{}, fmt.Errorf("thread %s: find background shell %s: %w", id, taskID, err)
-		}
-		pgid = groups[taskID]
+	// Looked up again right before the kill: the group must still be this Claude's child
+	// writing this task's output, and the one found before if one was. A pid reused since
+	// (the shell ended, another process took its number) is never signalled.
+	if pid := m.claudePID(id); pid == 0 || pid != sh.ClaudePID {
+		return Thread{}, fmt.Errorf("%w: background shell %s of thread %s: the Claude process that started it is gone", ErrFailedPrecondition, taskID, id)
 	}
-	if pgid <= 1 {
+	groups, err := m.opts.ServerProbe.ShellGroups(ctx, sh.ClaudePID)
+	if err != nil {
+		return Thread{}, fmt.Errorf("thread %s: find background shell %s: %w", id, taskID, err)
+	}
+	pgid := groups[taskID]
+	if pgid <= 1 || (sh.PGID != 0 && pgid != sh.PGID) {
 		return Thread{}, fmt.Errorf("%w: background shell %s of thread %s: its process was not found", ErrFailedPrecondition, taskID, id)
 	}
 	if _, err := m.verbItem(ctx, id, func(Thread) (Item, error) {
@@ -373,6 +376,27 @@ func (m *Manager) StopShell(ctx context.Context, id, taskID string) (Thread, err
 	}()
 	cur, _ := m.Snapshot().Thread(id)
 	return cur, nil
+}
+
+// claudePID is thread id's running Claude process, 0 when none (or a restart is swapping
+// it).
+func (m *Manager) claudePID(id string) int {
+	m.mu.Lock()
+	rec, ok := m.recs[id]
+	var r *runner
+	if ok {
+		r = rec.run
+	}
+	m.mu.Unlock()
+	if r == nil || r.st == nil {
+		return 0
+	}
+	r.st.connMu.Lock()
+	defer r.st.connMu.Unlock()
+	if r.st.swapping || r.st.proc == nil {
+		return 0
+	}
+	return r.st.proc.Pid()
 }
 
 // shellStopNote is the conversation's note for a stopped shell: its command, else its
