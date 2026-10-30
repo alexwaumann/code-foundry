@@ -821,7 +821,8 @@ type Thread struct {
 	//	otherwise         -> threads.show_created_threads (default false: hidden).
 	//
 	// A shown thread is the user's to manage; a hidden one its creator's: it stays out of
-	// the sidebar and the Dock badge, is listed in its creator's Threads tab, and is
+	// the sidebar and the Dock badge, is listed in its creator's thread info card (its
+	// lineage group), and is
 	// archived with its creator (ThreadService.Archive). See
 	// docs/notes/hidden-children-1-daemon.md.
 	InSidebar *bool `protobuf:"varint,62,opt,name=in_sidebar,json=inSidebar,proto3,oneof" json:"in_sidebar,omitempty"`

@@ -205,7 +205,7 @@ const staticFields: FieldInit[] = [
     section: "threads",
     type: S.BOOL,
     title: "Show threads created by other threads",
-    description: "When off, threads an agent creates stay out of the sidebar and the Dock badge and are archived with their creator. They still appear in the creator's Threads tab.",
+    description: "When off, threads an agent creates stay out of the sidebar and the Dock badge and are archived with their creator. They still appear in the creator's thread info card, in its lineage group.",
     defaultValue: "false",
   },
   { key: "threads.auto_name", group: "threads", page: "general", section: "threads", type: S.BOOL, title: "Name threads automatically", description: "Give each new thread a name based on its first message.", defaultValue: "true" },

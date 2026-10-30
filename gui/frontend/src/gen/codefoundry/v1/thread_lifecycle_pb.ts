@@ -576,7 +576,8 @@ export type Thread = Message<"codefoundry.v1.Thread"> & {
    *   in_sidebar set    -> in_sidebar;
    *   otherwise         -> threads.show_created_threads (default false: hidden).
    * A shown thread is the user's to manage; a hidden one its creator's: it stays out of
-   * the sidebar and the Dock badge, is listed in its creator's Threads tab, and is
+   * the sidebar and the Dock badge, is listed in its creator's thread info card (its
+   * lineage group), and is
    * archived with its creator (ThreadService.Archive). See
    * docs/notes/hidden-children-1-daemon.md.
    *

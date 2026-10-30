@@ -368,7 +368,7 @@ var staticFields = []Field{
 		Key: KeyShowCreatedThreads, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool,
 		Title: "Show threads created by other threads",
 		Description: "When off, threads an agent creates stay out of the sidebar and the Dock badge and are archived with their creator. " +
-			"They still appear in the creator's Threads tab.",
+			"They still appear in the creator's thread info card, in its lineage group.",
 		Default: "false",
 		bind:    func(s *Settings) any { return &s.Threads.ShowCreatedThreads },
 	},
