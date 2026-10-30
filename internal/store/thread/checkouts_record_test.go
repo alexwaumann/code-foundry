@@ -260,3 +260,41 @@ func TestMovedDefaultWorktreeIsNotTheBranchs(t *testing.T) {
 		t.Errorf("CreateWorktree calls %d, want %d (shared)", n, calls)
 	}
 }
+
+// An in-place thread that ran in a user's worktree of a project, moved to another with Run
+// in, and whose worktree was then deleted still starts: the member falls back to the
+// project's own checkout, recorded, with a timeline note (its set never changes, so it
+// could not start otherwise).
+func TestGoneUserCheckoutFallsBackToTheProjects(t *testing.T) {
+	e, rr := multiEnv(t)
+	mine := mkWorktree(t, rr, "r1", "mine")
+	s := e.create(CreateOptions{ProjectID: "r1", WorktreePath: mine, ProjectIDs: []string{"r1", "r2"}})
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "api"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(mine); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := rr.Snapshot().Project("r1")
+	r.Worktrees = slices.DeleteFunc(slices.Clone(r.Worktrees), func(w project.Worktree) bool { return w.Path == mine })
+	rr.Put(r)
+	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "again"}); err != nil {
+		t.Fatal(err)
+	}
+	got := e.waitFor(s.ID, "connected again", func(s Thread) bool { return s.State == StateConnected })
+	own := mainCheckout(r)
+	if got.CheckoutPaths["r1"] != own {
+		t.Errorf("r1 recorded %q, want its own checkout %s", got.CheckoutPaths["r1"], own)
+	}
+	if dirs := addDirs(e.spec(s.ID).Argv); !slices.Contains(dirs, own) || slices.Contains(dirs, mine) {
+		t.Errorf("add-dirs %q, want r1's own checkout %s", dirs, own)
+	}
+	e.waitItems(s.ID, "the note", func(items []Item) bool {
+		return slices.ContainsFunc(items, func(it Item) bool {
+			return it.Kind == KindNote && strings.Contains(it.Text, "("+mine+") no longer exists") && strings.Contains(it.Text, "own checkout ("+own+")")
+		})
+	})
+}

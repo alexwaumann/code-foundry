@@ -185,10 +185,12 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		}
 	}
 	var remade []madeWorktree // the other members' worktrees made again
+	var replaced []string     // notes for members whose recorded checkout is gone
 	if launchErr == nil {
-		if remade, launchErr = m.ensureMembers(ctx, prev); len(remade) > 0 {
+		if remade, replaced, launchErr = m.ensureMembers(ctx, prev); len(remade) > 0 {
 			notes = append(notes, remadeNote(remade, prev.Branch))
 		}
+		notes = append(notes, replaced...)
 	}
 	if launchErr == nil {
 		launchErr = m.ensureCwd(ctx, prev)
@@ -199,7 +201,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	}
 	gone := m.unregisteredMembers(prev) // left out of the spawn (requireCheckouts)
 	noteLog := log
-	if noteLog == nil && (rw != nil || len(remade) > 0 || len(gone) > 0) {
+	if noteLog == nil && (rw != nil || len(remade) > 0 || len(replaced) > 0 || len(gone) > 0) {
 		// No message: the recreation is still told in the timeline.
 		if noteLog, err = m.thread(ctx, id); err != nil {
 			m.log.Warn("note the recreated worktree", "thread", id, "err", err)

@@ -799,19 +799,23 @@ func (m *Manager) lockWorktree(projectID, branch string) (unlock func()) {
 }
 
 // ensureMembers makes s's other members' checkouts whole before it starts and returns
-// the worktrees it made. In worktree mode a missing worktree (a cleanup or a hand removed
-// it, or none was recorded) is made again on the thread's branch, in parallel; a member
-// with none recorded gets the checkout the creation rule gives (resolveMember). What it
-// made or resolved is recorded on the thread (persisted with the start's next save), so
-// the checkout stays the thread's when its branch moves. The primary's is recreate.go's
-// (ensureWorktree).
-func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, error) {
+// the worktrees it made, and a timeline note for each checkout it replaced. In worktree
+// mode a missing worktree (a cleanup or a hand removed it, or none was recorded) is made
+// again on the thread's branch, in parallel; a member with none recorded gets the
+// checkout the creation rule gives (resolveMember). A recorded checkout the app cannot
+// make again (checkout mode: a user's worktree the thread ran in and left with Run in,
+// since deleted) falls back to the member's own checkout, said in the note: the project
+// set never changes, so the thread could not start otherwise. What it made or resolved is
+// recorded on the thread (persisted with the start's next save), so the checkout stays the
+// thread's when its branch moves. The primary's is recreate.go's (ensureWorktree).
+func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, []string, error) {
 	if m.opts.Projects == nil || len(s.Projects()) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	snap := m.opts.Projects.Snapshot()
 	found := map[string]string{}
 	var todo []project.Project
+	var notes []string
 	for _, c := range m.checkouts(s) {
 		if c.Primary || !c.Registered {
 			continue
@@ -823,6 +827,18 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			}
 		case !c.Recorded && !c.Missing:
 			found[c.ProjectID] = c.Path
+		case c.Recorded && c.Missing:
+			r, ok := snap.Project(c.ProjectID)
+			if !ok {
+				continue
+			}
+			own := resolveMember(s, r, m.opts.Projects.DefaultWorktreePath)
+			if own == "" || samePath(own, c.Path) || !isDir(own) {
+				continue // nothing else to run in: requireCheckouts names the missing one
+			}
+			m.log.Info("member checkout of thread is gone; using the project's own checkout", "thread", s.ID, "project", c.ProjectID, "was", c.Path, "now", own)
+			found[c.ProjectID] = own
+			notes = append(notes, fallbackNote(cmp.Or(c.ProjectName, c.ProjectID), c.Path, own))
 		}
 	}
 	var made []madeWorktree
@@ -831,7 +847,7 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 		m.log.Info("member worktrees of thread are gone; making them again", "thread", s.ID, "projects", len(todo), "branch", s.Branch)
 		var err error
 		if made, err = m.makeWorktrees(ctx, todo, s.Branch, func(string) string { return "" }, false, m.opts.BaseFromOrigin()); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, r := range todo {
 			path := ""
@@ -866,5 +882,12 @@ func (m *Manager) ensureMembers(ctx context.Context, s Thread) ([]madeWorktree, 
 			}
 		})
 	}
-	return made, nil
+	return made, notes, nil
+}
+
+// fallbackNote is the timeline line for a member whose recorded checkout is gone and
+// that now works in the project's own checkout (ensureMembers).
+func fallbackNote(project, was, now string) string {
+	return "The checkout of project " + project + " this thread worked in (" + was + ") no longer exists, so the thread now works in " +
+		project + "'s own checkout (" + now + "). Commits on its branch are still in the repository; files that were only in that folder are gone."
 }

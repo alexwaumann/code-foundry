@@ -870,7 +870,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, err
 	}
 	// The fork shares the parent's checkouts: one a cleanup removed is made again first.
-	remade, err := m.ensureMembers(ctx, s)
+	remade, replaced, err := m.ensureMembers(ctx, s)
 	if err != nil {
 		drop()
 		return Thread{}, err
@@ -880,14 +880,19 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		return Thread{}, err
 	}
 	m.persistForkLog(ctx, newID, items)
-	if len(remade) > 0 {
-		// As a start's (startStopped): the note in the fork's timeline, then the
+	if len(remade) > 0 || len(replaced) > 0 {
+		// As a start's (startStopped): the notes in the fork's timeline, then the
 		// projects' on-worktree-create actions.
 		if log, err := m.thread(ctx, newID); err != nil {
 			m.log.Warn("note the recreated worktrees", "thread", newID, "err", err)
 		} else {
-			itemWriter{log: log, save: func(it Item) { m.saveItem(newID, it) }}.add(
-				Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: remadeNote(remade, s.Branch)})
+			w := itemWriter{log: log, save: func(it Item) { m.saveItem(newID, it) }}
+			if len(remade) > 0 {
+				w.add(Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: remadeNote(remade, s.Branch)})
+			}
+			for _, note := range replaced {
+				w.add(Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: note})
+			}
 		}
 		if m.opts.WorktreeCreated != nil {
 			for _, w := range remade {
