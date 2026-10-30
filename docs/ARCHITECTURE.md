@@ -473,13 +473,16 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   checks it out again, and a checkout on another one is `moved`. Create records the
   paths by the creation rule: in worktree mode (`created_worktree`) a git member's
   worktree made for the branch at the project store's `DefaultWorktreePath`, or one that
-  exists for it (that path, or a hand-made linked worktree on the branch; never the
-  project's main checkout: while it has the branch checked out, making the thread's
-  worktree is refused, naming the project, the branch and the checkout, since a second
-  worktree on one branch makes a commit in one look reverted in the other); a plain folder
-  is the folder; in checkout mode each member's own checkout. A member with none recorded
-  (a row from before, filled at daemon start from that rule; a worktree missing then) is
-  resolved by the same rule and recorded at its next start. Collision hints compare
+  exists for it (that path while it has the branch checked out, or a hand-made linked
+  worktree on the branch; never the project's main checkout: while it has the branch
+  checked out, making the thread's worktree is refused, naming the project, the branch and
+  the checkout, since a second worktree on one branch makes a commit in one look reverted
+  in the other; nor a worktree at that path switched to another branch, another thread's
+  checkout now: refused too, naming its HEAD and thread); a plain folder is the folder; in
+  checkout mode each member's own checkout. A member with none recorded (a row from
+  before, filled at daemon start from that rule; a worktree missing then) is resolved by
+  the same rule and recorded at its next start; a recorded checkout-mode one that is gone
+  falls back to the member's own checkout, with a timeline note. Collision hints compare
   paths.
   `thread new` places a thread (`placement.go`): `--projects` gives the set,
   `--new-worktree` makes one new branch in every git member (in parallel, fetch first,
