@@ -9,7 +9,7 @@ import { findCitation, putCitation } from "@/stores/compose";
 import { endEdit, focusCiteTarget, insertCite, takeFlash, useCiteStore } from "@/stores/cite";
 import { threadDraftKey } from "@/stores/threadActions";
 import { CITE_ITEM_ATTR, citeItemSelector, clampToRoot, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
-import { dockTop, frame, revealQuote } from "./reveal";
+import { dockTop, frame, paneBox, revealQuote } from "./reveal";
 import "./cite.css";
 
 /** Where the floating surface hangs: a span of an answer's plain text, centred on a pointer x (px from the pane's left) or the span's end. */
@@ -224,7 +224,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       const pane = paneRef.current;
       const content = contentRef.current;
       if (!pane || !content) return;
-      const box = pane.getBoundingClientRect();
+      const box = paneBox(pane);
       const size = content.getBoundingClientRect();
       const floor = dockTop(pane);
       let p: CitePlacement | null = null;

@@ -486,7 +486,7 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
   return (
     <div
       ref={root}
-      className="absolute inset-0 z-40 bg-black/55"
+      className="absolute inset-y-0 right-[var(--ti-inset,0px)] left-0 z-40 bg-black/55"
       data-testid="thread-html-lightbox"
       role="dialog"
       aria-label="Page"
