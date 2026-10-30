@@ -12,8 +12,7 @@ import { getActionPick } from "@/api/actions";
 import { listEditorApps, type EditorAppView } from "@/api/gitops";
 import { sendErrorMessage } from "@/api/stream";
 import { copyText } from "@/lib/clipboard";
-import type { MemberPick } from "@/lib/threadInfo";
-import { isRunningThread } from "@/lib/thread";
+import { otherModelWorksIn, type MemberPick } from "@/lib/threadInfo";
 import { useActionsStore } from "./actions";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { holdFailedNotice } from "./failedNotice";
@@ -79,21 +78,9 @@ export function useActionPicks(threadId: string, memberIds: readonly string[]): 
   return { withActions, picks };
 }
 
-/**
- * Whether another live thread (not archived or snoozed, its Claude running) works in the
- * checkout at `path`: its cwd, or a checkout it records there.
- */
+/** Whether another thread's model is working in the checkout at `path` (lib/threadInfo otherModelWorksIn). */
 export function useCheckoutShared(threadId: string, path: string): boolean {
-  return useThreadsStore((s) => {
-    if (!path) return false;
-    const now = Date.now();
-    return s.order.some((id) => {
-      if (id === threadId) return false;
-      const t = s.byId[id];
-      if (!t || !isRunningThread(t, now)) return false;
-      return t.worktreePath === path || t.checkoutPaths.some((c) => c.path === path);
-    });
-  });
+  return useThreadsStore((s) => otherModelWorksIn(s, threadId, path));
 }
 
 /**

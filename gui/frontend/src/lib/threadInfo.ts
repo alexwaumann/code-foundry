@@ -7,6 +7,8 @@
 import type { ActionPickView, ActionView } from "@/api/actions";
 import type { PullRequestView } from "@/api/gh";
 import type { GitStatusView } from "@/api/project";
+import type { ThreadView } from "@/api/threads";
+import { isWorkingThread } from "./thread";
 
 /** The git state row: at most one, in this priority (gitStateRow). */
 export type GitStateRow =
@@ -96,17 +98,37 @@ export interface GitBusyInput {
   working: boolean;
   /** Its subagent runs running now. */
   agentsRunning: number;
-  /** Another live thread works in the same checkout. */
+  /** Another thread's model is working in the same checkout (otherModelWorksIn). */
   collision: boolean;
 }
 
 /**
  * The reason Push, Pull and Rebase are disabled (not queued), or null when they may run:
- * this thread's Claude or any of its subagents is working, or another live thread shares
- * the checkout.
+ * this thread's Claude or any of its subagents is working, or another thread's model works in
+ * the same checkout.
  */
 export function gitButtonsBlocked(i: GitBusyInput): string | null {
   return i.working || i.agentsRunning > 0 || i.collision ? MODEL_WORKING_REASON : null;
+}
+
+/**
+ * Whether a model other than `self`'s is working in the checkout at `path` now: another
+ * thread whose cwd or recorded checkout it is, and whose Claude is mid-turn (its badge is
+ * busy) or has subagents running. A thread whose process is up but idle at its prompt does
+ * not count; an archived or snoozed one is stopped, so it never does.
+ */
+export function otherModelWorksIn(
+  threads: { order: readonly string[]; byId: Readonly<Record<string, Pick<ThreadView, "state" | "status" | "agentsRunning" | "worktreePath" | "checkoutPaths">>> },
+  self: string,
+  path: string,
+): boolean {
+  if (!path) return false;
+  return threads.order.some((id) => {
+    if (id === self) return false;
+    const t = threads.byId[id];
+    if (!t || !(isWorkingThread(t) || t.agentsRunning > 0)) return false;
+    return t.worktreePath === path || t.checkoutPaths.some((c) => c.path === path);
+  });
 }
 
 /** One member project's pick (ActionService.LastRun for the thread), in the set's order. */

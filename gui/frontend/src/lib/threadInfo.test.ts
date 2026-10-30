@@ -15,6 +15,7 @@ import {
   moreProjects,
   operationLabel,
   operationStep,
+  otherModelWorksIn,
   prCheck,
   prRows,
   rebasePrompt,
@@ -60,6 +61,23 @@ describe("gitStateRow", () => {
     expect(fixPrompt(3, 1)).toContain("(3 ahead, 1 behind)");
     expect(fixPrompt(3, 1)).toContain("--force-with-lease");
     expect(rebasePrompt("origin/main")).toBe("Rebase this branch onto origin/main, resolve any conflicts, run the checks, then report.");
+  });
+});
+
+describe("otherModelWorksIn", () => {
+  type T = Parameters<typeof otherModelWorksIn>[0]["byId"][string];
+  const t = (o: Partial<T>): T => ({ state: "connected", status: "idle", agentsRunning: 0, worktreePath: "/wt", checkoutPaths: [], ...o });
+  const run = (others: Record<string, T>) => otherModelWorksIn({ order: ["me", ...Object.keys(others)], byId: { me: t({ status: "busy" }), ...others } }, "me", "/wt");
+  it.each<[string, Record<string, T>, boolean]>([
+    ["only this thread", {}, false],
+    ["another, mid-turn in the cwd", { b: t({ status: "busy" }) }, true],
+    ["another, its process up but idle at its prompt", { b: t({}) }, false],
+    ["another, idle but its subagents running", { b: t({ agentsRunning: 1 }) }, true],
+    ["another, mid-turn with the path as a recorded checkout", { b: t({ status: "busy", worktreePath: "/other", checkoutPaths: [{ projectId: "p", path: "/wt" }] }) }, true],
+    ["another, mid-turn elsewhere", { b: t({ status: "busy", worktreePath: "/other" }) }, false],
+    ["another, stopped with a stale busy status", { b: t({ status: "busy", state: "disconnected" }) }, false],
+  ])("%s", (_name, others, want) => {
+    expect(run(others)).toBe(want);
   });
 });
 
