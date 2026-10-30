@@ -248,10 +248,11 @@ test("servers: a listening shell is a row that opens its port and stops the shel
   const opened = async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url);
   await expect.poll(opened).toEqual(["http://localhost:9399"]);
 
-  // The stop square stops the shell, by click or by Enter, without opening the port.
+  // The stop square stops the shell, by click or by Enter, without opening the port; a
+  // double click stops once.
   const stops = async () => (await invocations()).filter((i) => i.name === "thread.shell.stop").map((i) => `${i.args.id ?? ""} ${i.args.task ?? ""}`);
   await docs.hover();
-  await c.locator('[data-testid="ti-server-stop"][data-task="bd9r3t6w1"]').click();
+  await c.locator('[data-testid="ti-server-stop"][data-task="bd9r3t6w1"]').dblclick();
   await expect.poll(stops).toEqual([`${id} bd9r3t6w1`]);
   await expect(servers).toHaveCount(1);
   await expect(page.getByTestId("thread-pane").getByText("Stopped background shell: python3 -m http.server 9399 --directory docs/_build")).toBeVisible();

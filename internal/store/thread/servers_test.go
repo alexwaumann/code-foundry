@@ -285,19 +285,36 @@ func TestServerPortsAndStopThroughTheStream(t *testing.T) {
 	if _, err := e.m.StopShell(e.ctx(), s.ID, "nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("stop of an unknown shell: %v, want ErrNotFound", err)
 	}
+	maps, _ := probe.counts()
 	if _, err := e.m.StopShell(e.ctx(), s.ID, "by3gxdr0o"); err != nil {
 		t.Fatal(err)
+	}
+	// A second stop while the first runs (a double click) does nothing more.
+	if _, err := e.m.StopShell(e.ctx(), s.ID, "by3gxdr0o"); err != nil {
+		t.Fatalf("second stop: %v", err)
+	}
+	if m, _ := probe.counts(); m != maps+1 {
+		t.Errorf("the group was looked up %d times for two stops, want once", m-maps)
 	}
 	select {
 	case <-exited:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the shell's process group still runs after stop")
 	}
-	e.waitItems(s.ID, "the stop note", func(items []Item) bool {
+	items := e.waitItems(s.ID, "the stop note", func(items []Item) bool {
 		return slices.ContainsFunc(items, func(it Item) bool {
 			return it.Kind == KindNote && it.Text == "Stopped background shell: "+sh.Command
 		})
 	})
+	notes := 0
+	for _, it := range items {
+		if it.Kind == KindNote {
+			notes++
+		}
+	}
+	if notes != 1 {
+		t.Errorf("%d notes for one stop:\n%s", notes, describeItems(items))
+	}
 
 	// Claude reports the end: the shell and its ports are gone at once.
 	if err := os.WriteFile(filepath.Join(gates, "turn-2"), nil, 0o600); err != nil {

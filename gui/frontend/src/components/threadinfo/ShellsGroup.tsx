@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Globe, LoaderCircle, Square, SquareTerminal } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
@@ -9,6 +9,7 @@ import { serverAddress, shellCount, shellRuntime } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { stopShell } from "@/stores/threadActions";
+import { holdOnce, pendingKey, releasePending, useCardPending } from "@/stores/threadInfo";
 import { useThreadsStore } from "@/stores/threads";
 import { Group, HOVER_CARD, Row, SubLine } from "./Row";
 
@@ -52,6 +53,16 @@ function ShellRow({ shell }: { shell: BackgroundShellView }) {
  */
 function ServerRow({ threadId, shell }: { threadId: string; shell: BackgroundShellView }) {
   const [first = 0, ...rest] = shell.ports;
+  // A stop holds the square until the shell leaves the list (the row unmounts): a second
+  // press sends nothing.
+  const key = pendingKey(threadId, `shell:${shell.taskId}`);
+  const stopping = useCardPending(key);
+  useEffect(
+    () => () => {
+      releasePending(key);
+    },
+    [key],
+  );
   const runtime = shellRuntime(shell.command);
   const card = (
     <div className={cn(HOVER_CARD, "flex flex-col gap-0.5")}>
@@ -92,12 +103,13 @@ function ServerRow({ threadId, shell }: { threadId: string; shell: BackgroundShe
         <button
           type="button"
           aria-label={`Stop ${serverAddress(first)}`}
-          className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/srv:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 [&_svg]:size-3 [&_svg]:fill-current"
+          aria-disabled={stopping}
+          className="absolute top-1/2 right-7 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-cf-error-text opacity-0 group-hover/srv:opacity-100 hover:bg-cf-text/10 focus-visible:opacity-100 aria-disabled:opacity-50 aria-disabled:hover:bg-transparent [&_svg]:size-3 [&_svg]:fill-current"
           data-testid="ti-server-stop"
           data-task={shell.taskId}
           onClick={(e) => {
             e.stopPropagation();
-            void stopShell(threadId, shell.taskId);
+            void holdOnce(key, () => stopShell(threadId, shell.taskId));
           }}
           onKeyDown={(e) => {
             e.stopPropagation();

@@ -349,19 +349,16 @@ func (m *Manager) StopShell(ctx context.Context, id, taskID string) (Thread, err
 		return Thread{}, fmt.Errorf("%w: thread %s runs no background shell %q", ErrNotFound, id, taskID)
 	}
 	sh := t.BackgroundShells[i]
-	// Looked up again right before the kill: the group must still be this Claude's child
-	// writing this task's output, and the one found before if one was. A pid reused since
-	// (the shell ended, another process took its number) is never signalled.
-	if pid := m.claudePID(id); pid == 0 || pid != sh.ClaudePID {
-		return Thread{}, fmt.Errorf("%w: background shell %s of thread %s: the Claude process that started it is gone", ErrFailedPrecondition, taskID, id)
+	k := shellKey{id, taskID}
+	if !m.beginShellStop(k) {
+		// A second click while the first stop runs: one SIGTERM, one note.
+		m.log.Info("background shell already stopping", "thread", id, "task", taskID)
+		return t, nil
 	}
-	groups, err := m.opts.ServerProbe.ShellGroups(ctx, sh.ClaudePID)
+	pgid, err := m.shellGroupNow(ctx, id, sh)
 	if err != nil {
-		return Thread{}, fmt.Errorf("thread %s: find background shell %s: %w", id, taskID, err)
-	}
-	pgid := groups[taskID]
-	if pgid <= 1 || (sh.PGID != 0 && pgid != sh.PGID) {
-		return Thread{}, fmt.Errorf("%w: background shell %s of thread %s: its process was not found", ErrFailedPrecondition, taskID, id)
+		m.endShellStop(k)
+		return Thread{}, err
 	}
 	if _, err := m.verbItem(ctx, id, func(Thread) (Item, error) {
 		return Item{Kind: KindNote, Text: shellStopNote(sh)}, nil
@@ -372,10 +369,51 @@ func (m *Manager) StopShell(ctx context.Context, id, taskID string) (Thread, err
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
+		defer m.endShellStop(k)
 		procscan.StopGroups(m.ctx, []int{pgid}, ShellStopGrace)
 	}()
 	cur, _ := m.Snapshot().Thread(id)
 	return cur, nil
+}
+
+// beginShellStop marks shell k as being stopped; false when it already is.
+func (m *Manager) beginShellStop(k shellKey) bool {
+	m.shellStops.Lock()
+	defer m.shellStops.Unlock()
+	if m.shellStops.keys == nil {
+		m.shellStops.keys = map[shellKey]bool{}
+	}
+	if m.shellStops.keys[k] {
+		return false
+	}
+	m.shellStops.keys[k] = true
+	return true
+}
+
+// endShellStop forgets shell k's stop: refused, or its group got SIGKILL.
+func (m *Manager) endShellStop(k shellKey) {
+	m.shellStops.Lock()
+	delete(m.shellStops.keys, k)
+	m.shellStops.Unlock()
+}
+
+// shellGroupNow is thread id's shell sh's process group, looked up again right before a
+// kill: it must still be the child of the Claude process that started the shell, writing
+// this task's output, and the group found before if one was. A pid reused since (the
+// shell ended, another process took its number) is never signalled.
+func (m *Manager) shellGroupNow(ctx context.Context, id string, sh BackgroundShell) (int, error) {
+	if pid := m.claudePID(id); pid == 0 || pid != sh.ClaudePID {
+		return 0, fmt.Errorf("%w: background shell %s of thread %s: the Claude process that started it is gone", ErrFailedPrecondition, sh.TaskID, id)
+	}
+	groups, err := m.opts.ServerProbe.ShellGroups(ctx, sh.ClaudePID)
+	if err != nil {
+		return 0, fmt.Errorf("thread %s: find background shell %s: %w", id, sh.TaskID, err)
+	}
+	pgid := groups[sh.TaskID]
+	if pgid <= 1 || (sh.PGID != 0 && pgid != sh.PGID) {
+		return 0, fmt.Errorf("%w: background shell %s of thread %s: its process was not found", ErrFailedPrecondition, sh.TaskID, id)
+	}
+	return pgid, nil
 }
 
 // claudePID is thread id's running Claude process, 0 when none (or a restart is swapping

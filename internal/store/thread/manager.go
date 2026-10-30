@@ -346,6 +346,11 @@ type Manager struct {
 	// servers maps the threads' background shells to their processes and probes the
 	// ports they listen on (servers.go).
 	servers *serverWatch
+	// shellStops are the background shells StopShell is stopping (servers.go).
+	shellStops struct {
+		sync.Mutex
+		keys map[shellKey]bool
+	}
 	// wtLocks serialize making one (project, branch) worktree (placement.go): key ->
 	// *sync.Mutex.
 	wtLocks sync.Map
