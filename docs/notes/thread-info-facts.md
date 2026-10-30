@@ -129,6 +129,14 @@ cherry-pick, revert, bisect; no status for a path the project does not list).
 * `TestSpawnPreTrustsEveryCheckout` (an in-place two-project thread: both folders trusted;
   none with pre-trust off). It fails with only the cwd trusted.
 
+## The agent guide
+
+The three new queries (`thread.placement.check`, `action.last`, `worktree.editors`) took
+the generated guide from under its 25,500-byte soft cap to 26,102 (`TestWriteTopic`).
+They are GUI facts, not agent work, so they join the guide's `leftOut` list beside
+`thread.new-like` and `composer.history`; `code-foundry commands` and `help <command>`
+still show them.
+
 ## Gotchas
 
 * Copying a new build over an executable a stopped daemon ran (`cp bin/code-foundry
