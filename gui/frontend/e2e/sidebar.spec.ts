@@ -560,7 +560,8 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
   await expect(row(page, `s:${folder.id}`).getByTestId("row-project")).toHaveText("login");
 
   expect(await card(ws.id)).toEqual(["tip-name", "tip-workspace", "tip-project", "tip-branch", "tip-model"]);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("login");
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
+  await expect(tip.getByTestId("tip-workspace-meta")).toHaveText("2 projects");
   await expect(tip.getByTestId("tip-project")).toHaveText("ghostty-playgroundFresh copy");
   await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
   await expect(tip.getByTestId("tip-branch")).toHaveText("cf/login");
@@ -569,11 +570,12 @@ test("a multi-project thread's card: workspace (or N projects), the run-in proje
 
   await card(set.id);
   await expect(tip.getByTestId("tip-workspace")).toHaveText("2 projects");
+  await expect(tip.getByTestId("tip-workspace-meta")).toHaveCount(0);
   await expect(tip.getByTestId("tip-project-chip")).toHaveText("Fresh copy");
   await expect(tip.getByTestId("tip-branch")).toHaveText("feat/x");
 
   await card(folder.id);
-  await expect(tip.getByTestId("tip-workspace")).toHaveText("login");
+  await expect(tip.getByTestId("tip-workspace")).toHaveText("login2 projects");
   await expect(tip.getByTestId("tip-project")).toHaveText("Workspace folder");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
   await page.mouse.move(0, 0);

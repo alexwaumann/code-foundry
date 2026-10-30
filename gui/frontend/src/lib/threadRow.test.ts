@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canNewLike, canRunElsewhere, isNoProject, modelLabel, NO_PROJECT, projectOfPath, setLabel, threadPlace, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
+import { canNewLike, canRunElsewhere, isNoProject, modelLabel, NO_PROJECT, projectOfPath, projectsLabel, setLabel, threadPlace, threadRowModel, worktreeBranch, type ProjectLookup, type ThreadPlaceInput, type WorkspaceLookup } from "./threadRow";
 
 const projects: ProjectLookup & { order: string[] } = {
   order: ["api", "notes", "web"],
@@ -97,6 +97,16 @@ describe("threadPlace (the card's Fresh copy / Project folder chip)", () => {
   it("threadRowModel carries it; a thread without a project has none", () => {
     expect(threadRowModel({ projectId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "", projectCount: 2, branch: "cf/login", createdWorktree: true }, projects, workspaces).place).toBe("fresh");
     expect(threadRowModel({ projectId: "", worktreePath: "/Users/dev", workspaceId: "", pendingWorktreePath: "" }, projects, workspaces).place).toBeNull();
+  });
+});
+
+describe("projectsLabel", () => {
+  it.each<[number, string]>([
+    [1, "1 project"],
+    [2, "2 projects"],
+    [9, "9 projects"],
+  ])("%d", (n, want) => {
+    expect(projectsLabel(n)).toBe(want);
   });
 });
 

@@ -13,7 +13,7 @@ import { shortRemaining } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { FRESH_COPY, PROJECT_FOLDER } from "@/lib/compose";
 import { WORKSPACE_FOLDER } from "@/lib/projectSet";
-import { modelLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel, projectsLabel, threadRowModel, type ThreadPlace, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useMadeByThread } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
@@ -239,12 +239,20 @@ function ThreadLabel({ id }: { id: string }) {
   );
 }
 
-/** One line of the thread tooltip: an icon, the text, and an optional muted chip on the right. */
-function TipRow({ icon, chip, children, testId }: { icon: ReactNode; chip?: string | null; children: ReactNode; testId: string }) {
+/**
+ * One line of the thread tooltip: an icon, the text, and on the right an optional muted
+ * chip or a muted meta text (a count), never both.
+ */
+function TipRow({ icon, chip, meta, children, testId }: { icon: ReactNode; chip?: string | null; meta?: string | null; children: ReactNode; testId: string }) {
   return (
     <div className="flex items-center gap-2 leading-5" data-testid={testId}>
       {icon}
       <span className="min-w-0 truncate">{children}</span>
+      {meta && !chip && (
+        <span className="ml-auto shrink-0 pl-1 text-cf-text-muted tabular-nums" data-testid={`${testId}-meta`}>
+          {meta}
+        </span>
+      )}
       {chip && (
         <Chip className="ml-auto" data-testid={`${testId}-chip`}>
           {chip}
@@ -319,7 +327,7 @@ const placeWords: Readonly<Record<NonNullable<ThreadPlace>, string>> = { fresh: 
 /**
  * The tooltip's body: name, status (attention or error only; a thread waiting on its child
  * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
- * the workspace of a multi-project thread (its name, else "N projects"), the project it runs in ("No project" with
+ * the workspace of a multi-project thread (its name with "N projects" as muted meta on the right, else "N projects"), the project it runs in ("No project" with
  * the House icon for a thread without one; "Workspace folder" for its workspace's folder) with where it runs as the
  * chip (Fresh copy, Project folder), branch (git only), model, and the linked pull requests (TipLinkedPrs).
  * Mounted only while open (docs/notes/sidebar-thread-card.md).
@@ -348,7 +356,8 @@ function ThreadTipBody({ id }: { id: string }) {
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
       {m.set !== null && (
-        <TipRow icon={<TipIcon icon={Layers} />} testId="tip-workspace">
+        // A named workspace says how many projects it spans on the right; an unnamed set's label already is "N projects".
+        <TipRow icon={<TipIcon icon={Layers} />} meta={wsName ? projectsLabel(where.projectCount ?? 0) : null} testId="tip-workspace">
           {m.set}
         </TipRow>
       )}

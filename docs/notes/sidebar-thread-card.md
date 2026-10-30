@@ -88,3 +88,12 @@ the row's branch is read from HEAD) and the linked-PR tag (docs/notes/sidebar-pr
   `E2E_MOCK_PORT=7820 E2E_VITE_PORT=9320 pnpm e2e e2e/linkedprs.spec.ts e2e/sidebar.spec.ts e2e/project-sets.spec.ts e2e/composer-fixes.spec.ts e2e/workspace-cards.spec.ts e2e/lineage.spec.ts`.
 * `make check` green.
 * Screenshots from the mock daemon (WebKit, deviceScaleFactor 2, dark and light) in the PR.
+
+## Follow-up: the workspace row's project count
+
+A named workspace's row on the card now ends with "N projects" on the right, muted
+(`TipRow`'s new `meta` slot: a muted text where a chip would go, never both). An unnamed set
+already says "N projects" as its label, so it gets no meta. The count is the thread's
+project list (`projectCount`), including a thread in its workspace's folder. The label
+comes from `projectsLabel` in lib/threadRow, which `setLabel` now shares ("1 project" for a
+one-member workspace). Test ids: `tip-workspace-meta`.
