@@ -348,7 +348,16 @@ export function PromptEditor({
   useLayoutEffect(() => {
     if (value === shown.current) return;
     shown.current = value;
-    editor.chain().setMeta("addToHistory", false).setContent(toDoc(value), { emitUpdate: false }).setTextSelection(editor.state.doc.content.size).run();
+    // The end of the new document (tr.doc): editor.state here would still be the old one.
+    editor
+      .chain()
+      .setMeta("addToHistory", false)
+      .setContent(toDoc(value), { emitUpdate: false })
+      .command(({ tr }) => {
+        tr.setSelection(TextSelection.atEnd(tr.doc));
+        return true;
+      })
+      .run();
   }, [editor, value]);
 
   useImperativeHandle(

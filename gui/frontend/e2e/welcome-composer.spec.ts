@@ -59,8 +59,8 @@ test("the first project: the heading reverts and an untouched prompt is cleared"
 
 test("the first project: a prompt the user edited stays", async ({ page }) => {
   await openWelcome(page);
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.press("Meta+ArrowDown");
+  // The prompt has focus and the caret is after the prefilled text: typing appends.
+  await expect(page.getByTestId("composer-input")).toBeFocused();
   await page.keyboard.type(" Slowly.");
   await expect(prompt(page)).toHaveAttribute("data-value", `${PROMPT} Slowly.`);
   await addFirstProject(page);
