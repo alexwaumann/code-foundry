@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
@@ -195,6 +195,41 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
     fireEvent.click(screen.getByTestId("snooze-pick"));
     expect(openSnoozeDialog).toHaveBeenCalledWith("s-1");
+  });
+
+  it.each([
+    ["Pin", "menu-pin", {}],
+    ["Archive", "menu-archive", {}],
+    ["Unsnooze", "menu-unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }],
+  ])("%s from the title menu asks the thread's prompt for the keyboard", async (_label, testId, o) => {
+    setThread(o);
+    const before = useUiStore.getState().promptFocusSeq;
+    fireEvent.click(within(openTitleMenu()).getByTestId(testId));
+    await waitFor(() => {
+      expect(screen.queryByTestId("thread-title-menu")).toBeNull();
+    });
+    expect(useUiStore.getState().promptFocusSeq).toBe(before + 1);
+  });
+
+  it("a snooze preset from the title menu does too", async () => {
+    setThread({});
+    const before = useUiStore.getState().promptFocusSeq;
+    fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
+    fireEvent.click(screen.getAllByTestId("snooze-preset")[0] as HTMLElement);
+    await waitFor(() => {
+      expect(screen.queryByTestId("thread-title-menu")).toBeNull();
+    });
+    expect(useUiStore.getState().promptFocusSeq).toBe(before + 1);
+  });
+
+  it("Pin from the sidebar row's menu leaves the prompt alone", async () => {
+    setThread({});
+    const before = useUiStore.getState().promptFocusSeq;
+    fireEvent.click(within(openRowMenu()).getByTestId("menu-pin"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("row-menu")).toBeNull();
+    });
+    expect(useUiStore.getState().promptFocusSeq).toBe(before);
   });
 
   it("Rename starts the sidebar row's inline edit, and the menu leaves focus there", () => {

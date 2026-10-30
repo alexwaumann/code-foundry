@@ -16,7 +16,7 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
  * for confirmation only mid-turn. The Snooze submenu of a thread's menu
  * (components/thread/ThreadMenuItems.tsx).
  */
-export function SnoozePresetItems({ id, Item, Separator }: { id: string; Item: MenuItem; Separator: ComponentType }) {
+export function SnoozePresetItems({ id, Item, Separator, onPreset }: { id: string; Item: MenuItem; Separator: ComponentType; onPreset?: () => void }) {
   // Mounted when the menu opens: the times are as of then.
   const [now] = useState(() => Date.now());
   return (
@@ -29,6 +29,7 @@ export function SnoozePresetItems({ id, Item, Separator }: { id: string; Item: M
             data-testid="snooze-preset"
             data-preset={p.id}
             onSelect={() => {
+              onPreset?.();
               void snoozeThread(id, p.untilMs);
             }}
           >

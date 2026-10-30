@@ -9,7 +9,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { dropdownMenuKit, keepFocusAfterMenu } from "./menuKit";
+import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
 import { ThreadMenuItems } from "./ThreadMenuItems";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
 
@@ -143,7 +143,9 @@ function ThreadTitleMenu({ id }: { id: string }) {
         className="min-w-52"
         data-testid="thread-title-menu"
         onCloseAutoFocus={(e) => {
-          if (keepFocusAfterMenu(id)) e.preventDefault();
+          if (!keepFocusAfterMenu(id)) return;
+          e.preventDefault();
+          focusPromptAfterMenu(id);
         }}
       >
         <ThreadMenuItems id={id} kit={dropdownMenuKit} />

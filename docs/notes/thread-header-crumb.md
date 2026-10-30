@@ -35,6 +35,12 @@ side-panel surface the card replaces goes, with its entry points.
   SubContent) and `keepFocusAfterMenu` (Rename's inline input and New thread on this
   branch's composer keep focus when the menu closes). `RowMenu` renders it in the sidebar's
   `ContextMenuContent`, the title in a `DropdownMenuContent`.
+* **Focus**: Pin, Snooze (a preset), Unsnooze, Archive and Unarchive leave the thread where
+  it is, so from the title menu the keyboard goes to the thread's prompt, as the header's
+  old buttons left it (`markInPlace`, then `keepFocusAfterMenu` and
+  `focusPromptAfterMenu` on close; the kit's `promptAfterInPlace`). The sidebar row's
+  menu hands focus back to the list as before. A mark the menu never consumed (its pane
+  went with an archive) lapses after a second.
 * Order: Rename, Pin/Unpin, Snooze ▸ (Unsnooze while snoozed) | New thread on this branch,
   Save as workspace, Run in ▸, Hide from sidebar / Show in sidebar, Restart Claude, Clear
   flag | Archive/Unarchive. An item a thread cannot use is left out (the middle group and its

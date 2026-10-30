@@ -11,7 +11,7 @@ import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace
 import { archiveThread, pinThread, runThreadIn, setThreadSidebar, snoozeThread, threadContext, THREAD_COMMANDS } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import type { MenuKit } from "./menuKit";
+import { markInPlace, type MenuKit } from "./menuKit";
 import { useNoProjectThread } from "./useNoProject";
 import { useThreadCheckouts } from "./useThreadCheckouts";
 
@@ -124,6 +124,7 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
       <kit.Item
         data-testid="menu-pin"
         onSelect={() => {
+          markInPlace(kit, id);
           void pinThread(id, !pinned);
         }}
       >
@@ -136,14 +137,22 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           Snooze
         </kit.SubTrigger>
         <kit.SubContent data-testid="menu-snooze-presets">
-          <SnoozePresetItems id={id} Item={kit.Item} Separator={kit.Separator} />
+          <SnoozePresetItems
+            id={id}
+            Item={kit.Item}
+            Separator={kit.Separator}
+            onPreset={() => {
+              markInPlace(kit, id);
+            }}
+          />
         </kit.SubContent>
       </kit.Sub>
       {snoozed && (
         <kit.Item
           data-testid="menu-unsnooze"
           onSelect={() => {
-            void snoozeThread(id, null);
+            markInPlace(kit, id);
+          void snoozeThread(id, null);
           }}
         >
           <AlarmClockOff />
@@ -211,6 +220,7 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
       <kit.Item
         data-testid="menu-archive"
         onSelect={() => {
+          markInPlace(kit, id);
           void archiveThread(id, !archived);
         }}
       >

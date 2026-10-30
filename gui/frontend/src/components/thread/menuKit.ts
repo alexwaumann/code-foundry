@@ -36,6 +36,12 @@ export interface MenuKit {
   Sub: ComponentType<Children>;
   SubTrigger: ComponentType<Tagged>;
   SubContent: ComponentType<Tagged>;
+  /**
+   * After an item that leaves the thread where it is (Pin, Snooze, Archive and their undo),
+   * the keyboard goes to the thread's prompt, as the header's old buttons left it: the
+   * title menu's. The sidebar row's menu hands it back to the list as before.
+   */
+  promptAfterInPlace: boolean;
 }
 
 export const contextMenuKit: MenuKit = {
@@ -45,6 +51,7 @@ export const contextMenuKit: MenuKit = {
   Sub: ContextMenuSub,
   SubTrigger: ContextMenuSubTrigger,
   SubContent: ContextMenuSubContent,
+  promptAfterInPlace: false,
 };
 
 export const dropdownMenuKit: MenuKit = {
@@ -54,14 +61,40 @@ export const dropdownMenuKit: MenuKit = {
   Sub: DropdownMenuSub,
   SubTrigger: DropdownMenuSubTrigger,
   SubContent: DropdownMenuSubContent,
+  promptAfterInPlace: true,
 };
 
+/** The thread an in-place item just ran for from a promptAfterInPlace menu (markInPlace). */
+let inPlace: string | null = null;
+let lapse: ReturnType<typeof setTimeout> | undefined;
+
+/** An in-place item ran for thread `id` from `kit`'s menu: on close, its prompt takes the keyboard. */
+export function markInPlace(kit: MenuKit, id: string): void {
+  if (!kit.promptAfterInPlace) return;
+  inPlace = id;
+  // A menu that never got to close (its pane went with an archive) leaves no stale mark;
+  // a newer mark replaces the older one's timer, which must not clear it.
+  clearTimeout(lapse);
+  lapse = setTimeout(() => {
+    inPlace = null;
+  }, 1000);
+}
+
 /**
- * For a menu's onCloseAutoFocus: Rename puts an input in the sidebar row, and New thread
- * on this branch focuses the composer's prompt, so closing must not move focus back to
- * the menu's trigger. True when it should stay where the item put it.
+ * For a menu's onCloseAutoFocus: Rename puts an input in the sidebar row, New thread on
+ * this branch focuses the composer's prompt, and an in-place item of the title menu hands
+ * the keyboard to the thread's prompt (focusPromptAfterMenu), so closing must not move
+ * focus back to the menu's trigger. True when it should stay where the item put it.
  */
 export function keepFocusAfterMenu(id: string): boolean {
   const ui = useUiStore.getState();
-  return ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id);
+  return inPlace === id || ui.renamingThreadId === id || (ui.selection.kind === "compose" && ui.selection.likeThreadId === id);
+}
+
+/** After keepFocusAfterMenu: when an in-place item closed the menu, asks the selected thread's prompt for the keyboard. */
+export function focusPromptAfterMenu(id: string): void {
+  if (inPlace !== id) return;
+  inPlace = null;
+  const sel = useUiStore.getState().selection;
+  if (sel.kind === "thread" && sel.id === id) useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 /**
  * The thread header (docs/notes/thread-header-crumb.md): the crumb (where the thread
@@ -64,6 +64,8 @@ test("the title menu: the sidebar row's items; Pin pins the thread", async ({ pa
   await expect(menu.getByRole("menuitem")).toHaveText(["Rename", "Pin", "Snooze", "New thread on this branch", "Archive"]);
   await menu.getByTestId("menu-pin").click();
   await expect(menu).toHaveCount(0);
+  // The keyboard goes to the prompt, as the header's old Pin button left it.
+  await expect(threadPrompt(page)).toBeFocused();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.pin").map((i) => i.args.pinned)).toEqual(["true"]);
   await expect(row(page, `s:${id}`).getByTestId("row-pinned")).toBeVisible();
 
