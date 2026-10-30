@@ -27,8 +27,9 @@ bottom of the list, or click **Add project** on the Projects page. Then choose:
 
 ### Start a thread
 
-Click **New thread** (<kbd>⌘N</kbd>), pick the project, type what you want and press
-Enter. Paste or attach screenshots with the paperclip. Type <kbd>@</kbd> to mention a
+The window opens on a new thread with **No project**: type and press Enter to ask
+anything, working in your home folder. For a thread in a project, click **New thread**
+(<kbd>⌘N</kbd>), pick the project, type what you want and press Enter. Paste or attach screenshots with the paperclip. Type <kbd>@</kbd> to mention a
 file and <kbd>/</kbd> to run one of the project's skills or commands. To speak instead
 of typing, turn on Settings › General › **Dictation** (a one-time model download; audio
 never leaves your Mac), then press the microphone beside the paperclip or <kbd>⇧⌘M</kbd>.
@@ -57,7 +58,7 @@ the default for every project under Settings › Threads › **New threads work 
 
 The sidebar lists your threads. A thread whose second line is amber is waiting on you:
 a question, a permission, a plan to approve. Click it, answer, and it carries on. The
-bell at the top of the sidebar and the badge on the Dock icon count what is waiting.
+window title and the badge on the Dock icon count what is waiting.
 
 When a thread's agent starts threads of its own, they belong to that thread: they stay
 out of the sidebar and the Dock badge, and its **Threads** tab in the side panel lists

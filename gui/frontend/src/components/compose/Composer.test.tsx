@@ -7,6 +7,7 @@ import { draftKey } from "@/lib/compose";
 import { updateDraft, useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
+import { HOME, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { Composer } from "./Composer";
 
@@ -55,6 +56,23 @@ describe("Composer without a project", () => {
     expect(screen.queryByTestId("composer-base")).toBeNull();
     expect(screen.getByTestId("composer-checkout-branch").textContent).toBe("On main");
     expect(screen.getByTestId("composer-members")).not.toBeNull();
+  });
+});
+
+describe("Escape with nothing typed (docs/notes/remove-dashboard.md)", () => {
+  const escape = () => {
+    fireEvent.keyDown(screen.getByTestId("composer-input"), { key: "Escape" });
+  };
+
+  it.each<[string, () => void, unknown]>([
+    ["a project's composer goes to the Projects page", () => render(<Composer projectId="web" />), { kind: "view", name: "projects" }],
+    ["the No project composer stays home", () => render(<Composer projectId="" noProject />), HOME],
+  ])("%s", (_name, mount, want) => {
+    useUiStore.setState({ selection: { kind: "thread", id: "elsewhere" } });
+    mount();
+    escape();
+    expect(useUiStore.getState().selection).toEqual(want);
+    expect(useUiStore.getState().palette.open).toBe(false);
   });
 });
 

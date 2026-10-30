@@ -55,7 +55,7 @@ func TestThreadRestart(t *testing.T) {
 		{name: "a stopped thread is left as it is", args: map[string]string{"id": "s5"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED},
 			wantMsg: "Claude is not running for thread drv (s5); its next message starts it with the current environment"},
-		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -81,7 +81,7 @@ func TestThreadRemoveIDs(t *testing.T) {
 			args: map[string]string{"id": "55556666"}, wantMsg: "removed thread s-cccc55556666", wantIDs: []string{"s-cccc55556666"}},
 		{name: "the GUI removes the thread in view", ctx: command.Context{ActiveThreadID: "s-cccc55556666", ActiveView: "thread"},
 			wantMsg: "removed thread s-cccc55556666", wantIDs: []string{"s-cccc55556666"}},
-		{name: "the GUI still needs a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "the GUI still needs a thread", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

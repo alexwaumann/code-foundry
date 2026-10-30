@@ -8,10 +8,6 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// ViewDashboard is the ShowView name of the dashboard: the start page, and what the
-// GUI selects when it loads.
-const ViewDashboard = "dashboard"
-
 // ViewPullRequests is the ShowView name of the Pull Requests page.
 const ViewPullRequests = "pullrequests"
 
@@ -129,8 +125,8 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 
 // RegisterView registers the View category's verbs, all emitted as UiIntent.ShowView:
 //
-//   - the pages, which move every window: view.dashboard, view.usage,
-//     view.pullrequests, view.projects, view.settings and view.help (showPage);
+//   - the pages, which move every window: view.usage, view.pullrequests,
+//     view.projects, view.settings and view.help (showPage);
 //   - actions on each window's state: view.bottom.toggle, view.back, view.forward,
 //     thread.previous and thread.next;
 //   - the side panel verbs (commands_view_thread.go), which act on a thread's panel:
@@ -177,15 +173,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 	}
 	pageArgs := []ArgSpec{pageFocusArg}
 	cmds := []Command{
-		{
-			Name:        "view.dashboard",
-			Title:       "Show Dashboard",
-			Description: "Show the dashboard in every app window.",
-			Category:    "View",
-			// No default chord; bindable in settings.
-			Args: pageArgs,
-			Run:  page(ViewDashboard),
-		},
 		{
 			Name:        "view.usage",
 			Title:       "Usage",

@@ -109,7 +109,7 @@ func TestReadOnlyMarker(t *testing.T) {
 		{"view.inline", false},
 		{"view.panel.file", false},
 		{"view.panel.page", false},
-		{"view.dashboard", false},
+		{"view.projects", false},
 		{"thread.focus", false},
 		{"ui.notify", false},
 		{"ui.palette.open", false},

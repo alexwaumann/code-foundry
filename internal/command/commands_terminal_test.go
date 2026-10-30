@@ -107,7 +107,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/elsewhere is not inside a registered project"},
 		{name: "CLI without any path", ctx: cli, wantErr: command.ErrInvalidArgs, wantMsg: "needs a thread, a worktree, or --cwd"},
 		// The GUI offers it only with a thread or a worktree.
-		{name: "dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "pull requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		{name: "pull requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		{name: "a project alone is not enough", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
 		{name: "bad argv", ctx: cli, args: map[string]string{"here": app, "argv": `"oops`}, wantErr: command.ErrInvalidArgs},
