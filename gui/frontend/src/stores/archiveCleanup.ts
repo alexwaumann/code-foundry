@@ -8,17 +8,17 @@
  * already knew), so panels opened later on an archived or snoozed thread are left alone,
  * a re-snooze to another time resets nothing, and neither does the first snapshot.
  * The selection follows the same rule: when the selected thread is archived, snoozed or
- * removed (a `removed` event, or a snapshot without it) the window selects the dashboard
- * instead of showing a put-away or missing thread. The dashboard is selected, not
- * focused: the keyboard stays where it was (a row menu, the header). Only the selected
- * thread counts; unarchiving and waking leave the selection alone.
- * See docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md and
- * put-away-focuses-dashboard.md.
+ * removed (a `removed` event, or a snapshot without it) the window selects HOME (the No
+ * project composer) instead of showing a put-away or missing thread. HOME is selected,
+ * not focused: the keyboard stays where it was (a row menu, the header). Only the
+ * selected thread counts; unarchiving and waking leave the selection alone.
+ * See docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md,
+ * put-away-focuses-dashboard.md and remove-dashboard.md.
  */
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { emptyEntry, keyOf, usePanelStore } from "./panel";
 import { useThreadsStore, type ThreadsData } from "./threads";
-import { DASHBOARD, useUiStore, type Selection } from "./ui";
+import { HOME, useUiStore, type Selection } from "./ui";
 
 /** The fields whose null → set transition puts a thread away. */
 type PutAwayField = "archivedAtMs" | "snoozedUntilMs";
@@ -62,7 +62,7 @@ export function putAwaySelected(selection: Selection, putAway: ReadonlySet<strin
 }
 
 /**
- * Starts resetting archived and snoozed threads' panels, and selecting the dashboard when
+ * Starts resetting archived and snoozed threads' panels, and selecting HOME when
  * the selected thread is archived, snoozed or removed; returns the unsubscribe.
  */
 export function startArchiveCleanup(): () => void {
@@ -71,6 +71,6 @@ export function startArchiveCleanup(): () => void {
     for (const id of putAway) resetThreadPanels(id);
     for (const id of newlyRemoved(prev, s)) putAway.add(id);
     const ui = useUiStore.getState();
-    if (putAwaySelected(ui.selection, putAway)) ui.select(DASHBOARD);
+    if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);
   });
 }

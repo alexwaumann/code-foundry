@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
-import { placeThread, type ListOptions, type ListThread, type TreeProject, type WorktreeRef } from "@/lib/tree";
+import { placeThread, type ListOptions, type ListThread, type WorktreeRef } from "@/lib/tree";
 import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useProjectsStore, type ProjectsData } from "./projects";
@@ -13,12 +13,13 @@ import { isNoProject } from "@/lib/threadRow";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
+/** No thread, project, worktree or terminal: HOME's context (the composer on No project). */
 export const emptyContext: UiContextView = {
   activeTerminalId: "",
   activeThreadId: "",
   activeProjectId: "",
   activeWorktreePath: "",
-  activeView: "dashboard",
+  activeView: "compose",
   activeWorkspaceId: "",
 };
 
@@ -76,6 +77,7 @@ export function deriveContext(sel: Selection, projects: ProjectsData, threads: T
 
 function deriveSelectionContext(sel: Selection, projects: ProjectsData, threads: ThreadsData): UiContextView {
   switch (sel.kind) {
+    // `none` shows HOME (App.tsx), whose context is emptyContext.
     case "none":
       return emptyContext;
     case "thread": {
@@ -124,18 +126,6 @@ export function getUiContext(sel?: Selection): UiContextView {
 }
 
 const SEP = "\u0001";
-
-/** One string per project: id + worktree paths. Shallow-stable across unrelated updates. */
-export function useProjectStructureKeys(): string[] {
-  return useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
-}
-
-export function decodeProjectKeys(keys: readonly string[]): TreeProject[] {
-  return keys.map((k) => {
-    const [id = "", ...worktreePaths] = k.split(SEP);
-    return { id, worktreePaths };
-  });
-}
 
 /**
  * One string per thread for the sidebar list: id + pin + group + archive time + snooze

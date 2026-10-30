@@ -7,7 +7,7 @@ import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyProjects, replaceProjects, useProjectsStore } from "./projects";
-import { activeThreadIds, applyRetiredUsage, applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, runningCount, useThreadsStore } from "./threads";
+import { applyRetiredUsage, applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, runningCount, useThreadsStore } from "./threads";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -185,7 +185,7 @@ describe("thread reducers", () => {
     expect(attentionIds(d, false)).toEqual(["a", "b", "g"]);
   });
 
-  it("start page counts and thread list: waiting first, then running (starting included); a stopped busy never", () => {
+  it("running counts starting threads, never a stopped busy one", () => {
     const d = replaceThreads(emptyThreads, [
       thread("busy1", { status: "busy", createdAtMs: 1 }),
       thread("idle", { createdAtMs: 2 }),
@@ -196,7 +196,6 @@ describe("thread reducers", () => {
       thread("stopped", { status: "idle", state: "disconnected", createdAtMs: 7 }),
     ]);
     expect(runningCount(d, false)).toBe(2);
-    expect(activeThreadIds(d, false)).toEqual(["wait1", "wait2", "busy1", "start"]);
   });
 
   it("a thread is never both waiting and running: attention wins (an MCP start keeps a saved finished turn)", () => {
@@ -207,10 +206,6 @@ describe("thread reducers", () => {
     ]);
     expect(attentionIds(d, false)).toEqual(["mcp", "asking"]);
     expect(runningCount(d, false)).toBe(1);
-    const ids = activeThreadIds(d, false);
-    expect(ids).toEqual(["mcp", "asking", "busy"]);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(activeThreadIds(emptyThreads, false)).toEqual([]);
   });
 });
 

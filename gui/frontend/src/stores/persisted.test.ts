@@ -4,7 +4,7 @@ import { setPreviewMode, useCodeViewStore } from "./codeView";
 import { usePanelStore } from "./panel";
 import { addRecentReviewer, useReviewerRecentsStore } from "./reviewerRecents";
 import { useSettingsPrefsStore } from "./settingsPrefs";
-import { FONT_MAX, FONT_DEFAULT, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
+import { FONT_MAX, FONT_DEFAULT, HOME, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
 
 // Every persisted store, with what a well-formed state must look like after loading and a
 // use of its reducers (what used to throw on a bad shape: getBottom on byKey null).
@@ -49,7 +49,7 @@ const stores: Persisted[] = [
       for (const n of [s.sidebarWidth, s.fontSize, s.zoom]) expect(Number.isFinite(n)).toBe(true);
       expect(typeof s.sidebarVisible).toBe("boolean");
       expect(s.collapsedProjects).toBeInstanceOf(Array);
-      expect(s.selection).toEqual({ kind: "view", name: "dashboard" });
+      expect(s.selection).toEqual(HOME);
     },
   },
   {

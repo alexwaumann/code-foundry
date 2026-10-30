@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
-import { DASHBOARD, HISTORY_MAX, pruneHistory, useUiStore, type Selection } from "./ui";
+import { HOME, HISTORY_MAX, pruneHistory, useUiStore, type Selection } from "./ui";
 import { historyCommand, showView, useViewsStore } from "./views";
 import { useWorkspacesStore } from "./workspaces";
 
@@ -26,24 +26,24 @@ describe("selection history", () => {
     useProjectsStore.setState({ loaded: false, byId: {}, order: [] });
     useWorkspacesStore.setState({ loaded: false, byId: {}, order: [] });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: DASHBOARD, history: [DASHBOARD], historyIndex: 0, promptFocusSeq: 0 });
+    useUiStore.setState({ selection: HOME, history: [HOME], historyIndex: 0, promptFocusSeq: 0 });
   });
 
-  it("starts on the dashboard as entry 0, with nothing to go back or forward to", () => {
-    expect(useUiStore.getInitialState().history).toEqual([DASHBOARD]);
+  it("starts on HOME (the No project composer) as entry 0, with nothing to go back or forward to", () => {
+    expect(useUiStore.getInitialState().history).toEqual([HOME]);
     expect(useUiStore.getInitialState().historyIndex).toBe(0);
     expect(useUiStore.getState().back()).toBe(false);
     expect(useUiStore.getState().forward()).toBe(false);
-    expect(state()).toEqual({ selection: DASHBOARD, history: [DASHBOARD], index: 0 });
+    expect(state()).toEqual({ selection: HOME, history: [HOME], index: 0 });
   });
 
   it("select pushes every kind of selection after the current entry", () => {
     const ui = useUiStore.getState();
     ui.select(thread("a"));
     ui.select(projects);
-    ui.select({ kind: "compose", projectId: "", noProject: true });
+    ui.select({ kind: "compose", projectId: "p1" });
     ui.select(thread("b"));
-    expect(state().history).toEqual([DASHBOARD, thread("a"), projects, { kind: "compose", projectId: "", noProject: true }, thread("b")]);
+    expect(state().history).toEqual([HOME, thread("a"), projects, { kind: "compose", projectId: "p1" }, thread("b")]);
     expect(state().index).toBe(4);
   });
 
@@ -51,9 +51,9 @@ describe("selection history", () => {
     const ui = useUiStore.getState();
     ui.select(thread("a"));
     ui.select({ kind: "thread", id: "a" }, { focusPrompt: true });
-    ui.select(DASHBOARD);
-    ui.select({ kind: "view", name: "dashboard" });
-    expect(state().history).toEqual([DASHBOARD, thread("a"), DASHBOARD]);
+    ui.select(HOME);
+    ui.select({ kind: "compose", projectId: "", noProject: true });
+    expect(state().history).toEqual([HOME, thread("a"), HOME]);
   });
 
   it("back and forward move through the entries without pushing", () => {
@@ -65,12 +65,12 @@ describe("selection history", () => {
     expect(state()).toMatchObject({ selection: projects, index: 2 });
     expect(ui.back()).toBe(true);
     expect(ui.back()).toBe(true);
-    expect(state()).toMatchObject({ selection: DASHBOARD, index: 0 });
+    expect(state()).toMatchObject({ selection: HOME, index: 0 });
     expect(ui.back()).toBe(false);
     expect(ui.forward()).toBe(true);
     expect(ui.forward()).toBe(true);
     expect(ui.forward()).toBe(true);
-    expect(state()).toEqual({ selection: thread("b"), history: [DASHBOARD, thread("a"), projects, thread("b")], index: 3 });
+    expect(state()).toEqual({ selection: thread("b"), history: [HOME, thread("a"), projects, thread("b")], index: 3 });
     expect(ui.forward()).toBe(false);
   });
 
@@ -93,7 +93,7 @@ describe("selection history", () => {
     ui.back();
     ui.back();
     ui.select(prs);
-    expect(state()).toEqual({ selection: prs, history: [DASHBOARD, thread("a"), prs], index: 2 });
+    expect(state()).toEqual({ selection: prs, history: [HOME, thread("a"), prs], index: 2 });
     expect(ui.forward()).toBe(false);
   });
 
@@ -103,7 +103,7 @@ describe("selection history", () => {
     ui.select(thread("b"));
     ui.back();
     ui.select(thread("a"));
-    expect(state()).toMatchObject({ history: [DASHBOARD, thread("a"), thread("b")], index: 1 });
+    expect(state()).toMatchObject({ history: [HOME, thread("a"), thread("b")], index: 1 });
     expect(ui.forward()).toBe(true);
   });
 
@@ -125,7 +125,7 @@ describe("selection history", () => {
     ui.select(thread("c"));
     threadsExist("a", "c"); // b removed
     expect(ui.back()).toBe(true);
-    expect(state()).toEqual({ selection: thread("a"), history: [DASHBOARD, thread("a"), thread("c")], index: 1 });
+    expect(state()).toEqual({ selection: thread("a"), history: [HOME, thread("a"), thread("c")], index: 1 });
     expect(ui.forward()).toBe(true);
     expect(state().selection).toEqual(thread("c"));
   });
@@ -138,9 +138,9 @@ describe("selection history", () => {
     ui.select(projects);
     threadsExist("a"); // b removed
     expect(ui.back()).toBe(true);
-    expect(state()).toEqual({ selection: thread("a"), history: [DASHBOARD, thread("a"), projects], index: 1 });
+    expect(state()).toEqual({ selection: thread("a"), history: [HOME, thread("a"), projects], index: 1 });
     expect(ui.back()).toBe(true);
-    expect(state().selection).toEqual(DASHBOARD);
+    expect(state().selection).toEqual(HOME);
   });
 
   it("with only removed threads behind, back stays put and drops them", () => {
@@ -154,20 +154,30 @@ describe("selection history", () => {
     const ui = useUiStore.getState();
     ui.select({ kind: "compose", projectId: "p1" });
     ui.select({ kind: "compose", projectId: "p1", workspaceId: "w1" });
-    ui.select({ kind: "compose", projectId: "", noProject: true });
+    ui.select(projects);
     ui.select(thread("a"));
     useProjectsStore.setState({ loaded: true, byId: {}, order: [] });
     useWorkspacesStore.setState({ loaded: true, byId: {}, order: [] });
     expect(ui.back()).toBe(true);
-    expect(state().selection).toEqual({ kind: "compose", projectId: "", noProject: true });
+    expect(state().selection).toEqual(projects);
     expect(ui.back()).toBe(true);
-    expect(state().selection).toEqual(DASHBOARD);
+    expect(state().selection).toEqual(HOME);
+  });
+
+  it("never drops HOME (no project to lose); back past it stays on it", () => {
+    const ui = useUiStore.getState();
+    ui.select(thread("a"));
+    useProjectsStore.setState({ loaded: true, byId: {}, order: [] });
+    useWorkspacesStore.setState({ loaded: true, byId: {}, order: [] });
+    expect(ui.back()).toBe(true);
+    expect(ui.back()).toBe(false);
+    expect(state()).toEqual({ selection: HOME, history: [HOME, thread("a")], index: 0 });
   });
 
   it("pruneHistory keeps the current entry even when it is gone", () => {
     const gone = (s: Selection) => s.kind === "thread";
-    expect(pruneHistory([DASHBOARD, thread("a"), projects], 1, gone)).toEqual({ history: [DASHBOARD, thread("a"), projects], index: 1 });
-    expect(pruneHistory([thread("a"), DASHBOARD, thread("b"), DASHBOARD, thread("c")], 3, gone)).toEqual({ history: [DASHBOARD], index: 0 });
+    expect(pruneHistory([HOME, thread("a"), projects], 1, gone)).toEqual({ history: [HOME, thread("a"), projects], index: 1 });
+    expect(pruneHistory([thread("a"), HOME, thread("b"), HOME, thread("c")], 3, gone)).toEqual({ history: [HOME], index: 0 });
   });
 
   it("is not persisted", () => {
@@ -176,7 +186,7 @@ describe("selection history", () => {
     expect(saved).not.toHaveProperty("history");
     expect(saved).not.toHaveProperty("historyIndex");
     const merged = useUiStore.persist.getOptions().merge?.({ history: [thread("a")], historyIndex: 3 }, useUiStore.getInitialState());
-    expect(merged).toMatchObject({ history: [DASHBOARD], historyIndex: 0 });
+    expect(merged).toMatchObject({ history: [HOME], historyIndex: 0 });
   });
 });
 
@@ -184,13 +194,13 @@ describe("view.back and view.forward", () => {
   beforeEach(() => {
     threadsExist("a", "b");
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: DASHBOARD, history: [DASHBOARD], historyIndex: 0 });
+    useUiStore.setState({ selection: HOME, history: [HOME], historyIndex: 0 });
   });
 
   it("are what ShowView back and forward run", () => {
     useUiStore.getState().select(thread("a"));
     expect(showView("back")).toBe(true);
-    expect(useUiStore.getState().selection).toEqual(DASHBOARD);
+    expect(useUiStore.getState().selection).toEqual(HOME);
     expect(showView("forward")).toBe(true);
     expect(useUiStore.getState().selection).toEqual(thread("a"));
   });

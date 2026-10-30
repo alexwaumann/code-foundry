@@ -20,7 +20,7 @@ const { ConnectError, Code } = await import("@connectrpc/connect");
 const { RememberedSection } = await import("./RememberedSection");
 const { applyMemoryEvent, resetMemory } = await import("@/stores/memory");
 const { useThreadsStore } = await import("@/stores/threads");
-const { useUiStore } = await import("@/stores/ui");
+const { HOME, useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 
 const NOW = Date.now();
@@ -48,7 +48,7 @@ beforeEach(() => {
   toastInfo.mockClear();
   getMemory.mockReset();
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", "Renamed thread"), "s-7": thread("s-7", "Old work", 5) }, order: ["s-1", "s-7"] });
-  useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+  useUiStore.setState({ selection: HOME });
   useViewsStore.setState({ settingsOpen: true, settingsPage: "memory" });
 });
 afterEach(cleanup);

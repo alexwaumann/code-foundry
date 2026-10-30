@@ -13,7 +13,7 @@ const { getUiContext } = await import("./context");
 const { inPalette, presentCommand } = await import("@/keys/bindings");
 const { useThreadStore } = await import("./thread");
 const { useThreadsStore } = await import("./threads");
-const { useUiStore } = await import("./ui");
+const { HOME, useUiStore } = await import("./ui");
 
 /** The subagent view's window state (stores/subagentView.ts) and how commands and intents reach it. */
 
@@ -187,7 +187,7 @@ describe("commands and intents", () => {
   });
 
   it("UiIntent.ShowAgentRun shows the run, ShowView agent.up leaves it", () => {
-    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    useUiStore.setState({ selection: HOME });
     applyIntent({ kind: "showAgentRun", threadId: "s1", runId: "a2" });
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
     expect(getViewing()).toEqual({ threadId: "s1", runId: "a2" });

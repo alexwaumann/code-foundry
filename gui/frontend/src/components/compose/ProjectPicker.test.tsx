@@ -5,7 +5,7 @@ import type { ProjectView } from "@/api/project";
 import { useAddProjectStore } from "@/stores/addProject";
 import { useComposeStore } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
-import { useUiStore } from "@/stores/ui";
+import { HOME, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ProjectPicker } from "./ProjectPicker";
 
@@ -27,7 +27,7 @@ beforeAll(() => {
 beforeEach(() => {
   useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ projectId: "web", worktreePath: "/wt/web" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
   useProjectsStore.setState({ byId: { web: project("web"), api: project("api") }, order: ["web", "api"], loaded: true });
-  useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+  useUiStore.setState({ selection: HOME });
 });
 
 afterEach(() => {

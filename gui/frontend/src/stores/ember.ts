@@ -266,7 +266,7 @@ export function useFlameState(threadId: string): FlameState {
  * Ember's thread when it needs the user (a prompt, a reply not seen yet, or a worker of
  * its board waiting on an answer: `workersWaiting`) and Ember is on; "" otherwise.
  * cmd+shift+a reaches it first (its row is the sidebar's first);
- * the Dock badge and the start page leave it out, as every resident. A worker's prompt
+ * the Dock badge leaves it out, as every resident. A worker's prompt
  * stays until it is answered: opening Ember's chat does not clear it.
  */
 export function emberAttentionId(threads: ThreadsData, enabled: boolean, workersWaiting = 0): string {

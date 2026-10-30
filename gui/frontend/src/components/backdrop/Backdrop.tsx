@@ -14,9 +14,9 @@ const ART: Record<string, { narrow: string; wide: string } | undefined> = {
 const DEFAULT_BACKDROP = "forest";
 
 /**
- * Faint artwork behind a pane's centred content (the start page, the new-thread
- * composer). Absolutely positioned and inert: put it first in a `relative` container
- * and give the content `relative` so it paints above. Renders nothing for
+ * Faint artwork behind a pane's centred content (the new-thread composer). Absolutely
+ * positioned and inert: put it first in a `relative` container and give the content
+ * `relative` so it paints above. Renders nothing for
  * appearance.backdrop = none. Custom shows the image appearance.backdrop_file names, once
  * it has loaded (nothing meanwhile); with no file named, or the file gone, it falls back
  * to the default's art.

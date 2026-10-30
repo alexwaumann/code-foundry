@@ -26,18 +26,15 @@ export type Selection =
   | { kind: "view"; name: string };
 
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
-export const viewNames: readonly string[] = ["dashboard", "pullrequests", "projects", "ember"];
+export const viewNames: readonly string[] = ["pullrequests", "projects", "ember"];
 
 /**
- * The dashboard page (view.dashboard): what the window selects when it loads and when its
- * selection goes away. `none` still renders the same page (App.tsx), but only this one
- * highlights the sidebar's Dashboard button. Selections are not persisted.
+ * The window's home: the new-thread composer on No project (the project picker closed).
+ * What the window selects when it loads and when its selection goes away (an archived,
+ * snoozed or removed thread, a composer cancelled with nothing typed); `none` renders it
+ * too (App.tsx). Selections are not persisted. See docs/notes/remove-dashboard.md.
  */
-export const DASHBOARD: Selection = { kind: "view", name: "dashboard" };
-
-export function isDashboard(sel: Selection): boolean {
-  return sel.kind === "none" || (sel.kind === "view" && sel.name === "dashboard");
-}
+export const HOME: Extract<Selection, { kind: "compose" }> = { kind: "compose", projectId: "", noProject: true };
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
 export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom";
@@ -120,7 +117,7 @@ interface UiState {
   /**
    * The selections this window visited, oldest first, for view.back and view.forward
    * (docs/notes/selection-history.md): browser semantics, `historyIndex` being the current
-   * one. Not persisted, like the selection: a window starts with just the dashboard.
+   * one. Not persisted, like the selection: a window starts with just HOME.
    */
   history: Selection[];
   historyIndex: number;
@@ -386,8 +383,8 @@ function selectionUpdate(s: UiState, sel: Selection, opts: { focusPrompt?: boole
 export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
-      selection: DASHBOARD,
-      history: [DASHBOARD],
+      selection: HOME,
+      history: [HOME],
       historyIndex: 0,
       focus: "content",
       promptFocusSeq: 0,

@@ -14,7 +14,7 @@ const { onNewTerminal, revealArrived } = await import("./bottomActions");
 const { usePanelStore } = await import("./panel");
 const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
-const { useUiStore } = await import("./ui");
+const { HOME, useUiStore } = await import("./ui");
 const { useSettingsStore } = await import("./settings");
 const { getDraft, updateDraft } = await import("./compose");
 const { threadDraftKey } = await import("./threadActions");
@@ -38,7 +38,7 @@ beforeEach(() => {
   usePanelStore.setState({ byKey: {} });
   useThreadsStore.setState({ byId: { s1: thread("s1") }, order: ["s1"] });
   setTerminals([term("sh", shell), term("raw", {})]);
-  useUiStore.setState({ selection: { kind: "view", name: "dashboard" }, promptFocusSeq: 0, bottomFocusSeq: 0 });
+  useUiStore.setState({ selection: HOME, promptFocusSeq: 0, bottomFocusSeq: 0 });
   clearPendingFocus();
 });
 
@@ -55,7 +55,7 @@ describe("a pending focusTerminal", () => {
     const late = term("late", shell);
     setTerminals([late]);
     onNewTerminal(late);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);
   });
 
@@ -65,7 +65,7 @@ describe("a pending focusTerminal", () => {
     const c9 = term("c9", { thread: "s1" });
     setTerminals([c9]);
     onNewTerminal(c9);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
     vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
     expect(toastError).not.toHaveBeenCalled();
   });
@@ -95,9 +95,9 @@ describe("a pending focusTerminal", () => {
     revealArrived();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
     expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "relist" });
-    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    useUiStore.setState({ selection: HOME });
     revealArrived();
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
   });
 });
 
@@ -116,13 +116,13 @@ describe("the focusTerminal intent", () => {
   ])("a known terminal with %s changes nothing and says why", (_name, id, labels) => {
     setTerminals([term(id, labels)]);
     focusTerminal(id);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
     expect(toastInfo).toHaveBeenCalledWith(`Terminal ${id} belongs to no thread or project`, expect.anything());
   });
 
   it("an unknown terminal that arrives as a shell is revealed there, not in the thread's prompt", () => {
     focusTerminal("later");
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
     const later = term("later", shell);
     setTerminals([later]);
     onNewTerminal(later);
@@ -136,7 +136,7 @@ describe("a playAlertSound intent (notifications.test)", () => {
   it("plays the sound at the intent's volume, without moving the window", () => {
     applyIntent({ kind: "playAlertSound", volume: 15 });
     expect(playAlertSound).toHaveBeenCalledExactlyOnceWith(15);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().selection).toEqual(HOME);
   });
 });
 
@@ -163,7 +163,7 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     setShowCreated(showCreated);
     useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", over) }, order: ["s1", "n"] });
     applyIntent({ kind: "focusThread", threadId: "n" });
-    expect(selected()).toEqual(switches ? { kind: "thread", id: "n" } : { kind: "view", name: "dashboard" });
+    expect(selected()).toEqual(switches ? { kind: "thread", id: "n" } : HOME);
     expect(useUiStore.getState().promptFocusSeq).toBe(switches ? 1 : 0);
   });
 
@@ -183,9 +183,9 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     ["a hidden child", { createdBy: "s1" }, false],
   ])("one not in the list yet is decided when it arrives: %s", (_name, over, switches) => {
     applyIntent({ kind: "focusThread", threadId: "late" });
-    expect(selected()).toEqual({ kind: "view", name: "dashboard" });
+    expect(selected()).toEqual(HOME);
     useThreadsStore.setState({ byId: { s1: thread("s1"), late: made("late", over) }, order: ["s1", "late"] });
-    expect(selected()).toEqual(switches ? { kind: "thread", id: "late" } : { kind: "view", name: "dashboard" });
+    expect(selected()).toEqual(switches ? { kind: "thread", id: "late" } : HOME);
   });
 
   it("a pending one is dropped by a selection, another intent, or PENDING_FOCUS_MS", () => {
@@ -200,11 +200,11 @@ describe("the focusThread intent (hidden child threads, docs/notes/hidden-childr
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, later: made("later", {}) }, order: [...s.order, "later"] }));
     expect(selected()).not.toEqual({ kind: "thread", id: "later" });
 
-    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    useUiStore.setState({ selection: HOME });
     applyIntent({ kind: "focusThread", threadId: "latest" });
     vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, latest: made("latest", {}) }, order: [...s.order, "latest"] }));
-    expect(selected()).toEqual({ kind: "view", name: "dashboard" });
+    expect(selected()).toEqual(HOME);
   });
 });
 
@@ -233,7 +233,7 @@ describe("the stageComposer intent (composer.stage)", () => {
   it("a window showing something else leaves the thread and its selection alone", () => {
     stage("hello");
     expect(getDraft(threadDraftKey("s1")).text).toBe("");
-    expect(useUiStore.getState()).toMatchObject({ selection: { kind: "view", name: "dashboard" }, promptFocusSeq: 0 });
+    expect(useUiStore.getState()).toMatchObject({ selection: HOME, promptFocusSeq: 0 });
   });
 });
 

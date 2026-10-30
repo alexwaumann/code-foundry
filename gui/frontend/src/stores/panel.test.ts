@@ -59,7 +59,7 @@ function legacy(open: boolean, tabs: readonly Tab[], activeTabId: string | null,
 describe("keyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["none has no panel", { kind: "none" }, null],
-    ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
+    ["HOME (the No project composer)", { kind: "compose", projectId: "", noProject: true }, "compose:home:"],
     ["thread", { kind: "thread", id: "s-1" }, "thread:s-1"],
     ["composer", { kind: "compose", projectId: "r-1" }, "compose:r-1"],
     ["workspace composer", { kind: "compose", projectId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
