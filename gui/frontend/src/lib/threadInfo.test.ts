@@ -136,8 +136,10 @@ describe("prCheck", () => {
     ["checks failing beat the review", { checks: failing, review: "approved" }, { icon: "failed", word: "checks failing" }],
     ["checks running", { checks: running }, { icon: "running", word: "checks running" }],
     ["green and approved", { review: "approved" }, { icon: "ok", word: "approved" }],
-    ["green, review requested", {}, { icon: "ok", word: "review requested" }],
-    ["no checks, review requested", { checks: { ...green, state: "none" } }, { icon: null, word: "review requested" }],
+    ["green, reviewers asked", { reviewRequests: ["kim"] }, { icon: "ok", word: "review requested" }],
+    ["green, a review required but nobody asked", {}, { icon: "ok", word: "review required" }],
+    ["no checks, no review needed or asked", { checks: { ...green, state: "none" }, review: null }, { icon: null, word: "no review" }],
+    ["no review decision but someone asked", { review: null, reviewRequests: ["acme/core"] }, { icon: "ok", word: "review requested" }],
   ])("%s", (_name, o, want) => {
     expect(prCheck(pr(1, o))).toEqual(want);
   });

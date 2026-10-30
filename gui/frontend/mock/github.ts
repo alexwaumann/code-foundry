@@ -394,7 +394,7 @@ export class GhWorld {
    * The thread info card's fixtures (World.addThreadInfo): a pull request on `head` (into
    * `base`) beside the branch's others, with its checks and review, so its detail resolves.
    */
-  addCardPullRequest(slug: string, number: number, title: string, o: { head: string; base?: string; state: "open" | "draft" | "merged"; checks?: "ok" | "failed" | "running"; review?: "approved" | "required"; ageMs?: number }): void {
+  addCardPullRequest(slug: string, number: number, title: string, o: { head: string; base?: string; state: "open" | "draft" | "merged"; checks?: "ok" | "failed" | "running"; review?: "approved" | "required"; requested?: string[]; ageMs?: number }): void {
     const ageMs = o.ageMs ?? 2 * HOUR;
     const merged = o.state === "merged";
     const checks = o.checks === "failed" ? rollup(CheckRollupState.FAILURE, 9, 2) : o.checks === "running" ? rollup(CheckRollupState.PENDING, 4, 0, 5) : rollup(CheckRollupState.SUCCESS, 12);
@@ -407,6 +407,7 @@ export class GhWorld {
       mergedAt: merged ? this.at(ageMs) : undefined,
       checks,
       reviewDecision: o.review === "approved" ? ReviewDecision.APPROVED : ReviewDecision.REVIEW_REQUIRED,
+      reviewRequests: o.requested ?? [],
     });
     const key = `${slug}\u0000${o.head}`;
     this.branches.set(key, [...(this.branches.get(key) ?? []).filter((p) => p.number !== number), pr]);

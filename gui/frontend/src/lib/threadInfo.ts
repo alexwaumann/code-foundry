@@ -216,9 +216,12 @@ export function prCheck(pr: Pick<PullRequestView, "state" | "draft" | "checks" |
   if (c === "failure" || c === "error") return { icon: "failed", word: "checks failing" };
   if (c === "pending" || c === "expected") return { icon: "running", word: "checks running" };
   const ok = c === "success" ? "ok" : null;
+  // The review in the PR tab's words (prs/format reviewLabel); "review requested" only while someone is asked.
   if (pr.review === "approved") return { icon: ok, word: "approved" };
   if (pr.review === "changes_requested") return { icon: ok, word: "changes requested" };
-  return { icon: ok, word: "review requested" };
+  if (pr.reviewRequests.length > 0) return { icon: ok, word: "review requested" };
+  if (pr.review === "review_required") return { icon: ok, word: "review required" };
+  return { icon: ok, word: "no review" };
 }
 
 const STATE_ORDER: Readonly<Record<PrRowState, number>> = {

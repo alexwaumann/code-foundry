@@ -1495,7 +1495,7 @@ export class World {
       const s = this.addThread({ ...base, id: "s-ti-1", projectId: "repo-cf", worktreePath: wt.path, name: "Fix the stale PR badge", createdWorktree: true, branch: "cf/sidebar-tree", contextTokens: 221_000, lastResultAt: ago(19) });
       this.logs.load(s.id, "agents");
       const slug = cf.githubSlug;
-      this.gh.addCardPullRequest(slug, 78, "Include the head SHA in the fingerprint", { head: "cf/sidebar-tree", state: "open", checks: "ok" });
+      this.gh.addCardPullRequest(slug, 78, "Include the head SHA in the fingerprint", { head: "cf/sidebar-tree", state: "open", checks: "ok", requested: ["teammate-kim"] });
       this.gh.addCardPullRequest(slug, 63, "Sidebar tree rows", { head: "cf/sidebar-tree-1", state: "merged", ageMs: 30 * 3_600_000 });
       s.linkedPullRequests = [63, 78].map((n) => ({ slug, number: n, url: `https://github.com/${slug}/pull/${String(n)}`, linkedAt: ago(30) }));
       this.gh.setCardDetail("repo-cf", wt.path, [
