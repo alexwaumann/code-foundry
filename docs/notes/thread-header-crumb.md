@@ -65,7 +65,10 @@ side-panel surface the card replaces goes, with its entry points.
   the attention group for good. The chip's click (open the plugin's surface) has no header
   place: a click on the sidebar row still opens it (`stores/flagSurface.ts
   openFlagSurface`). `useFlagSurfaceKind` and `clearThreadFlag` went with the chip.
-* The env note's Restart → the title menu's Restart Claude.
+* The env note's Restart → the title menu's Restart Claude. With the card off nothing else
+  said the environment changed, so the title's chevron carries a warning dot
+  (`bg-cf-warning`) while `pluginEnvStale`, its tooltip "Plugin environment changed ·
+  Restart Claude from this menu".
 * **Linked PRs** → the card's PR rows. The sidebar row's PR tag stays; its click now turns
   the card on (it opened the Linked PRs surface) and goes on to select the row.
 * Snooze, Pin, Archive, Hide/Show in sidebar, New thread on this branch, Save as workspace,

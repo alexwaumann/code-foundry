@@ -6,6 +6,7 @@ import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { tooltipText } from "@/test/tooltip";
 import { HeaderActions } from "./HeaderActions";
 import { ThreadTitle } from "./ThreadParts";
 
@@ -64,6 +65,20 @@ describe("the thread header's crumb", () => {
     expect(removed.textContent).toBe("At creation");
     expect(removed.tagName).toBe("SPAN");
     expect(removed.dataset.removed).toBe("true");
+  });
+
+  it("a warning dot on the chevron while the plugin environment changed, its tooltip pointing at the menu", () => {
+    show({});
+    expect(screen.queryByTestId("thread-title-stale")).toBeNull();
+    expect(tooltipText(screen.getByTestId("thread-title"))).toBeNull();
+    act(() => {
+      screen.getByTestId("thread-title").blur();
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", { pluginEnvStale: true, pluginEnvChange: "Hello removed CF_HELLO" }) } }));
+    });
+    const dot = screen.getByTestId("thread-title-stale");
+    expect(dot.className).toContain("bg-cf-warning");
+    expect(dot.getAttribute("aria-label")).toBe("Plugin environment changed · Restart Claude from this menu");
+    expect(tooltipText(screen.getByTestId("thread-title"))).toBe("Plugin environment changed · Restart Claude from this menu");
   });
 
   it("a provisional name is muted and italic", () => {

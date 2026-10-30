@@ -100,32 +100,43 @@ function ThreadCrumb({ id }: { id: string }) {
   );
 }
 
+const STALE_TIP = "Plugin environment changed · Restart Claude from this menu";
+
 /**
  * The thread's title as a menu button: its name, then a small muted chevron, always
  * shown. It opens the thread's menu (ThreadMenuItems, the sidebar row's items verbatim):
- * Enter or Space from the keyboard. While the menu is up the button stays pressed.
+ * Enter or Space from the keyboard. While the menu is up the button stays pressed. While a
+ * plugin's environment changed since Claude started, a warning dot on the chevron says so
+ * (its tooltip points at the menu's Restart Claude).
  */
 function ThreadTitleMenu({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name || id);
   // The daemon's cut of the first prompt until the naming model's title lands: muted and italic, as in the sidebar.
   const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
+  // With the card off nothing else says it: a warning dot on the chevron, and the menu has Restart Claude.
+  const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
   const [open, setOpen] = useState(false);
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-6 min-w-12 shrink-[100] cursor-pointer items-center gap-1 rounded-md px-1.5 text-label font-medium text-cf-text outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover dark:hover:bg-cf-control-hover/50 dark:aria-expanded:bg-cf-control-hover/50",
-          )}
-          data-testid="thread-title"
-        >
-          <span className={cn("truncate", provisional && "text-cf-text-muted italic")} data-testid="thread-title-name">
-            {name}
-          </span>
-          <ChevronDown className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
+      <Tip label={stale ? STALE_TIP : null} data-testid="thread-title-stale-tip">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex h-6 min-w-12 shrink-[100] cursor-pointer items-center gap-1 rounded-md px-1.5 text-label font-medium text-cf-text outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover dark:hover:bg-cf-control-hover/50 dark:aria-expanded:bg-cf-control-hover/50",
+            )}
+            data-testid="thread-title"
+          >
+            <span className={cn("truncate", provisional && "text-cf-text-muted italic")} data-testid="thread-title-name">
+              {name}
+            </span>
+            <span className="relative flex shrink-0">
+              <ChevronDown className="size-3.5 text-cf-text-muted" aria-hidden />
+              {stale && <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning" data-testid="thread-title-stale" role="img" aria-label={STALE_TIP} />}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent
         align="start"
         className="min-w-52"

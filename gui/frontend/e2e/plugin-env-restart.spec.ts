@@ -29,8 +29,12 @@ test("an idle stale thread: the card's project row says so; Restart Claude resta
   await expect(menu.getByTestId("menu-restart")).toHaveCount(0);
   await page.keyboard.press("Escape");
 
+  const dot = page.getByTestId("thread-header").getByTestId("thread-title-stale");
+  await expect(dot).toHaveCount(0);
   await stale("s-1", "Hello removed CF_HELLO");
   await expect(project.getByTestId("ti-project-mark")).toBeVisible();
+  // With the card off or on, the title's chevron carries a warning dot.
+  await expect(dot).toBeVisible();
   await project.hover();
   const notes = page.getByTestId("ti-project-notes");
   await expect(notes.getByTestId("ti-project-env-stale")).toHaveText(
@@ -42,6 +46,7 @@ test("an idle stale thread: the card's project row says so; Restart Claude resta
   await menu.getByTestId("menu-restart").click();
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
   await expect(project.getByTestId("ti-project-mark")).toHaveCount(0);
+  await expect(dot).toHaveCount(0);
   await expect(page.getByTestId("thread-pane").getByText("Restarted Claude")).toBeVisible();
   const calls = (await invocations()).filter((i) => i.name === "thread.restart");
   expect(calls.map((i) => [i.context?.activeThreadId, i.confirmed ?? false])).toEqual([["s-1", false]]);
