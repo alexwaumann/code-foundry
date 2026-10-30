@@ -1,0 +1,199 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="/cf/theme.css">
+<link rel="stylesheet" href="/cf/ui.css">
+<script src="/cf/bridge.js"></script>
+<script src="/cf/jsx.js"></script>
+<style>body{margin:0}</style>
+<body class="text-body"><div id="root"></div>
+<script type="text/tsx">
+  import { useEffect, useState } from "react";
+  import { createRoot } from "react-dom/client";
+  import { Badge, Button, Label, Switch, Separator } from "@cf/ui";
+  import { Check, Circle, Lock, FolderPlus, Send, Pencil, Play, Sparkles, Mic } from "@cf/icons";
+  await cf.ready;
+
+  // Progress lives in the thread's page storage, so it survives reloads and restarts.
+  const store = cf.storage("welcome");
+  const say = (e: any) => alert(e?.message ?? String(e));
+
+  type Chip = { text: string; send?: boolean; note?: string };
+  type After = { label: string; verb: string; args?: Record<string, string>; once?: string }[];
+  const STEP1: (Chip & { after: After })[] = [
+    { text: "give the app a calmer look: a soft teal accent and slightly warmer dark grays", send: true, note: "it restyles the app",
+      after: [{ label: "Open theme settings", verb: "theme.pick" }] },
+    { text: "remember that I like short answers, and ask before you assume", send: true, note: "it keeps that, everywhere",
+      after: [{ label: "Open memories", verb: "view.settings", args: { page: "memory" } }, { label: "Reset memory", verb: "memory.clear", once: "Memory reset" }] },
+    { text: "make me a to-do page with three boxes: things to try today, questions for you, things to come back to. Keep everything I do on it between visits", send: true, note: "it builds tools you keep",
+      after: [] },
+  ];
+  const demoSentence = (p: any) => `start three threads on the project ${p.name} (id ${p.id}), each read-only and not in the sidebar: what it is in two paragraphs; the ten most-changed files; anything unfinished or risky. The welcome page in the panel shows them, so do not build another board; reply in one line when they are started.`;
+
+  function Chips({ items, dim, onSend }: { items: Chip[]; dim?: boolean; onSend?: (t: string) => void }) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.map((c) => {
+          const Icon = c.send ? Send : Pencil;
+          return (
+            <button key={c.text} type="button" disabled={dim}
+              onClick={() => { if (c.send) onSend?.(c.text); cf.run(c.send ? "thread.send" : "composer.stage", { text: c.text }).catch(say); }}
+              className="group flex items-start gap-2 rounded-2xl border border-cf-border bg-cf-surface-raised px-3 py-1.5 text-left text-body-sm text-cf-text hover:border-cf-border-strong hover:bg-cf-control-hover disabled:opacity-60">
+              <span className="min-w-0">“{c.text}”{c.note && <span className="ml-2 inline-block whitespace-nowrap text-caption text-cf-text-muted">{c.note}</span>}</span>
+              <Icon className="mt-0.5 size-3.5 shrink-0 text-cf-text-muted group-hover:text-cf-accent" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  function SentChip({ c, after }: { c: Chip; after: After }) {
+    const [used, setUsed] = useState<Record<string, boolean>>(() => Object.fromEntries(after.filter((a) => a.once).map((a) => [a.label, store.get("used:" + a.label) === true])));
+    const run = (a: After[number]) => cf.run(a.verb, a.args ?? {}).then(() => { if (a.once) { setUsed((m) => ({ ...m, [a.label]: true })); store.set("used:" + a.label, true).catch(() => {}); } }).catch(say);
+    return (
+      <div className="mt-2 rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2">
+        <div className="flex items-center gap-2 text-body-sm"><Check className="size-3.5 text-cf-success-text" /><span className="text-cf-text-muted">Sent:</span><span>“{c.text}”</span></div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {after.map((a) => <Button key={a.label} size="xs" variant="outline" disabled={!!used[a.label]} onClick={() => run(a)}>{used[a.label] ? a.once : a.label}</Button>)}
+        </div>
+      </div>
+    );
+  }
+
+  /** The thread's children (the demo's threads), with the app's words for their state. */
+  function Board({ live, ran, onRun, project }: { live: boolean; ran: boolean; onRun: () => void; project: any }) {
+    const [threads, setThreads] = useState<any[]>([]);
+    useEffect(() => cf.on("thread-list", (list: any[]) => setThreads(list ?? []), () => {}), []);
+    // The app's states: busy; error; attention with a reason ("finished", "permission: …",
+    // "question: …", "snooze ended"); idle ("at prompt"). Finished is done, not a request.
+    const label = (t: any) => {
+      const r = String(t.statusReason ?? "");
+      if (t.status === "busy") return ["Working", "text-cf-accent"];
+      if (t.status === "error") return [r.startsWith("crashed") ? "Crashed" : "Interrupted", "text-cf-error-text"];
+      if (t.status === "attention") {
+        if (r.startsWith("permission")) return ["Needs permission", "text-cf-warning-text"];
+        if (r.startsWith("question")) return ["Asked a question", "text-cf-warning-text"];
+        if (r === "finished" || r === "") return ["Finished", "text-cf-success-text"];
+        return ["Needs you", "text-cf-warning-text"];
+      }
+      return ["Finished", "text-cf-success-text"];
+    };
+    const rows = threads.filter((t) => t.createdBy === cf.thread.id && !t.archivedAtMs).sort((a, b) => a.createdAtMs - b.createdAtMs);
+    return (
+      <div className="mt-3 rounded-lg border border-cf-border bg-cf-surface-sunken p-3">
+        <div className="flex items-center justify-between">
+          <p className="text-overline">Your agents, live · click one to open it</p>
+          <Button size="xs" disabled={!live || ran} onClick={() => { onRun(); cf.run("thread.send", { text: demoSentence(project) }).catch(say); }}><Play /> {ran ? "Demo started" : "Run the demo"}</Button>
+        </div>
+        {rows.length === 0
+          ? <p className="mt-2 text-body-sm text-cf-text-muted">Three agents read your folder at the same time and report back here. Nothing is changed.</p>
+          : rows.map((t) => { const [word, tone] = label(t); return (
+              <button key={t.id} type="button" onClick={() => cf.run("thread.focus", { id: t.id }).catch(say)}
+                className="mt-1 flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-body-sm hover:bg-cf-control-hover">
+                <span className="truncate text-link">{t.name}</span><span className={tone}>{word}</span>
+              </button>); })}
+      </div>
+    );
+  }
+
+  /** The switch: the model downloads first when it is not on disk (dictation turns on when it lands). */
+  function Dictation({ onOn }: { onOn: () => void }) {
+    const [snap, setSnap] = useState<any>(null);
+    const [note, setNote] = useState("");
+    const refresh = () => cf.run("dictation.status", {}).then((r) => setSnap(r.json)).catch(() => setSnap({}));
+    useEffect(() => { refresh(); const id = setInterval(refresh, 5000); return () => clearInterval(id); }, []);
+    const on = !!snap?.enabled;
+    const downloading = !!snap?.model?.download;
+    const toggle = (next: boolean) => {
+      if (next && !snap?.model?.downloaded) {
+        cf.run("dictation.download", {}).then((r) => { setNote(r.text); refresh(); }).catch(say);
+        return;
+      }
+      cf.run("settings.set", { key: "dictation.enabled", value: String(next) }).then(() => { if (next) onOn(); refresh(); }).catch(say);
+    };
+    return (
+      <div>
+        <div className="flex items-center gap-2"><Switch id="d" checked={on} disabled={snap === null || downloading} onCheckedChange={toggle} /><Label htmlFor="d" className="flex items-center gap-1"><Mic className="size-3.5" /> Dictation</Label>
+          <span className="text-body-sm text-cf-text-muted">{downloading ? "downloading the model; it turns on when that finishes" : on ? "on: ⇧⌘M in any composer" : "talk instead of typing; audio stays on this Mac"}</span></div>
+        {note && !downloading && <p className="mt-1 text-caption text-cf-text-muted">{note}</p>}
+      </div>
+    );
+  }
+
+  const Mark = ({ s }: { s: string }) => s === "done" ? <Check className="size-3.5" /> : s === "locked" ? <Lock className="size-3.5" /> : <Circle className="size-3.5" />;
+  function Step({ title, state, badge, children, last }: { title: string; state: "done" | "now" | "next" | "locked"; badge?: React.ReactNode; children: React.ReactNode; last?: boolean }) {
+    return (
+      <li className="flex gap-4">
+        <div className="flex flex-col items-center">
+          <span className={"flex size-7 shrink-0 items-center justify-center rounded-full border text-caption " + (state === "now" ? "border-cf-accent bg-cf-accent text-cf-accent-foreground" : state === "locked" ? "border-cf-border text-cf-text-muted" : state === "done" ? "border-cf-success-text text-cf-success-text" : "border-cf-border-strong text-cf-text")}><Mark s={state} /></span>
+          {!last && <span className="my-1 w-px flex-1 bg-cf-border" />}
+        </div>
+        <div className={"min-w-0 flex-1 pb-6 " + (state === "locked" ? "opacity-70" : "")}>
+          <div className="flex items-center gap-2"><h2 className="text-heading">{title}</h2>{badge}</div>
+          <div className="mt-1">{children}</div>
+        </div>
+      </li>
+    );
+  }
+
+  function App() {
+    const [projects, setProjects] = useState<any[]>([]);
+    const [sent, setSent] = useState<Record<string, boolean>>(() => Object.fromEntries(STEP1.map((c) => [c.text, store.get("sent:" + c.text) === true])));
+    const [ran, setRan] = useState<boolean>(store.get("demo") === true);
+    const [dictated, setDictated] = useState<boolean>(store.get("dictation") === true);
+    useEffect(() => cf.on("project", (list: any[]) => setProjects(list ?? []), () => {}), []);
+    const hasProject = projects.length > 0;
+    const first = projects[0];
+    const step1 = Object.values(sent).some(Boolean);
+    const markSent = (t: string) => { setSent((m) => ({ ...m, [t]: true })); store.set("sent:" + t, true).catch(() => {}); };
+    const markRan = () => { setRan(true); store.set("demo", true).catch(() => {}); };
+    const markDictated = () => { setDictated(true); store.set("dictation", true).catch(() => {}); };
+    const addProject = () => cf.run("project.add", {}).then((r) => { if (r.text && /hint|code-foundry project add/i.test(r.text)) alert(r.text); }).catch(say);
+    const now = !step1 ? 1 : !hasProject ? 2 : !ran ? 3 : 4;
+    const st = (n: number, done: boolean, locked = false): "done" | "now" | "next" | "locked" => done ? "done" : locked ? "locked" : now === n ? "now" : "next";
+    const here = <Badge>start here</Badge>;
+    return (
+      <main className="m-4">
+        <h1 className="flex items-center gap-2 text-title"><Sparkles className="size-5 text-cf-accent" /> What do you want to make today?</h1>
+        <p className="mt-1 text-body text-cf-text-muted">Code Foundry puts Claude to work on your Mac. There are no menus to learn: you say what you want in the composer. Every bubble on this page is a sentence; <Send className="inline size-3.5" /> sends it, <Pencil className="inline size-3.5" /> puts it in the composer for you to finish.</p>
+        <ol className="mt-5 flex flex-col">
+          <Step title="Say something to it" state={st(1, step1)} badge={now === 1 && here}>
+            <p className="text-body-sm text-cf-text-muted">No setup. Each one shows a different thing it can do.</p>
+            {STEP1.map((c) => sent[c.text] ? <SentChip key={c.text} c={c} after={c.after} /> : <Chips key={c.text} items={[c]} onSend={markSent} />)}
+          </Step>
+          <Step title="Point it at your work" state={st(2, hasProject)} badge={now === 2 && here}>
+            <p className="text-body-sm text-cf-text-muted">A folder of code, or of specs and docs. No git needed. It reads before it writes, and asks first.</p>
+            {hasProject
+              ? <p className="mt-2 text-body-sm"><span className="font-medium text-cf-text">{first.name}</span> is added. This thread stays where it is; new threads can work in it, and the demo below runs there. <button className="text-link" onClick={addProject}>Add another</button></p>
+              : <div className="mt-2"><Button size="sm" onClick={addProject}><FolderPlus /> Add a project…</Button></div>}
+          </Step>
+          <Step title="Put several agents on it" state={st(3, ran, !hasProject)} badge={!hasProject ? <Badge variant="outline">after step 2</Badge> : now === 3 && here}>
+            <p className="text-body-sm text-cf-text-muted">One sentence can start several threads at once, each on its own copy of your work. You watch them from here.</p>
+            <Board live={hasProject} ran={ran} onRun={markRan} project={first} />
+            <Chips dim={!hasProject} items={[
+              { text: "split this into three threads, one per module, and show me a board" },
+              { text: "what is this project, in plain words?" },
+              { text: "what changed last week, and who did it?" },
+              { text: "find anything unfinished and list it" },
+            ]} />
+          </Step>
+          <Step title="Make it yours" state={st(4, dictated)} badge={now === 4 && here} last>
+            <Dictation onOn={markDictated} />
+            <Chips items={[
+              { text: "every morning, list what's waiting on me" },
+              { text: "tell me when someone reviews one of my PRs" },
+              { text: "show me a board of my open pull requests" },
+            ]} />
+          </Step>
+        </ol>
+        <Separator />
+        <p className="mt-3 text-body-sm text-cf-text-muted">If the app can do it, you can ask for it. Say what you want in the composer.</p>
+      </main>
+    );
+  }
+  createRoot(document.getElementById("root")!).render(<App />);
+  // Scroll position survives reloads (the page itself scrolls inside its frame).
+  const y = Number(store.get("scroll") ?? 0);
+  if (y > 0) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  let t: any;
+  addEventListener("scroll", () => { clearTimeout(t); t = setTimeout(() => store.set("scroll", Math.round(scrollY)).catch(() => {}), 200); }, { passive: true });
+</script>

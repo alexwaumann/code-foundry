@@ -6,7 +6,8 @@
  * on the refresh button, when the window becomes visible, when the daemon recomputes the
  * file's worktree (worktree_detail_updated, seen through the worktree detail resource),
  * and when the visible thread's Edit, MultiEdit, Write or NotebookEdit on the file
- * finishes. Event-driven reads are debounced.
+ * finishes; a file outside every project, whenever its stamp changes (useFileChanges).
+ * Event-driven reads are debounced.
  */
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { errorMessage, isAbort, onVisibilityChange } from "@/api/stream";
@@ -157,17 +158,16 @@ export function useToolEdits(path: string, onEdit: () => void): void {
  * own tools, its Bash (`cp` over it, `touch`), another process (stores/fileStamps.ts). The
  * visible thread's finished Edit, MultiEdit, Write or NotebookEdit of it reads its stamp at
  * once rather than at the next poll, so that edit shows without the wait and still loads
- * once.
+ * once. An empty path watches nothing.
  */
 export function useFileChanges(path: string, onChange: () => void): void {
   const fire = useEffectEvent(onChange);
-  useEffect(
-    () =>
-      fileWatcher.watch(path, () => {
-        fire();
-      }),
-    [path],
-  );
+  useEffect(() => {
+    if (!path) return;
+    return fileWatcher.watch(path, () => {
+      fire();
+    });
+  }, [path]);
   useToolEdits(path, () => {
     fileWatcher.check(path);
   });

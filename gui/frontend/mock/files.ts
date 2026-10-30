@@ -205,6 +205,11 @@ ${Array.from({ length: 40 }, (_, i) => `<p>Line ${String(i + 1)} of a page longe
 /** A page that calls Code Foundry through /cf/bridge.js (mock/bridge-page.html; docs/notes/bridge-2-gui.md). */
 export const BRIDGE_PAGE_HTML = readFileSync(new URL("./bridge-page.html", import.meta.url), "utf8");
 
+/** Where the daemon places the first-run welcome page (internal/skills welcome.go). */
+export const WELCOME_PAGE = `${HOME}/.code-foundry/pages/welcome.html`;
+/** The page itself, from the pages skill (the one source the daemon embeds). */
+const WELCOME_HTML = readFileSync(new URL("../../../internal/skills/files/code-foundry-pages/reference/welcome.html", import.meta.url), "utf8");
+
 /**
  * A page with no thread that tries every other frame on screen (docs/notes/bridge-fix-frames.md):
  * body[data-probe] lists "blocked" or "reached" per sibling, from an opaque origin always "blocked".
@@ -261,6 +266,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
     // The page library's pages (mock/pagelib/; e2e/page-library.spec.ts).
     ...Object.entries(pagelibPages()).map(([name, html]): [string, Entry] => [`${CF}/docs/pagelib/${name}`, text(html, "text/html")]),
+    // Outside every project, as the daemon places it (e2e/welcome-page.spec.ts).
+    [WELCOME_PAGE, text(WELCOME_HTML, "text/html")],
     // Outside the checkout, so it is served under a grant of its own.
     [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],

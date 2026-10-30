@@ -95,7 +95,7 @@ func prune(dir string) error {
 
 // writeAtomic writes b to name through a temporary file in the same directory.
 func writeAtomic(name string, b []byte) error {
-	f, err := os.CreateTemp(filepath.Dir(name), ".new-version-")
+	f, err := os.CreateTemp(filepath.Dir(name), "."+filepath.Base(name)+".new-")
 	if err != nil {
 		return fmt.Errorf("skills: %w", err)
 	}

@@ -53,7 +53,7 @@ func realSources(t *testing.T) skills.Sources {
 	return skills.Sources{Version: "v9.9.9", Commands: listed.Msg.GetCommands(),
 		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields(),
 		Commit: "0123456789abcdef0123456789abcdef01234567", SkillsDir: "/Users/ada/.code-foundry/claude/.claude/skills",
-		Facts: plugin.HostFactNames()}
+		PagesDir: "/Users/ada/.code-foundry/pages", Facts: plugin.HostFactNames()}
 }
 
 // frontmatter is a SKILL.md's YAML frontmatter lines, key → value.
@@ -137,11 +137,14 @@ func TestRender(t *testing.T) {
 		// from 70, for "Making a theme" (theme-model-flow): the theme flow has no other skill.
 		// 83 for the three lines the theme fuzz showed models missing (theme-fuzz-daemon): the
 		// verbs, the contrast floors and how to lower contrast, --replace and the scheme.
-		{skills.Entry, "false", 400, 83},
+		// 84 for the first-run row (welcome-page): it routes to the pages skill's welcome.md.
+		{skills.Entry, "false", 400, 84},
 		// Its routing and the app's description moved to the entry skill (control-4);
 		// the cap came down from 120 with them. 109 for the workspaces answer path
 		// (workspaces-v2-5-skills): what a workspace is, its card, where its files go.
-		{skills.Help, "", 400, 109},   // both: no invocation keys
+		// 121 for the welcome tutorial (welcome-page): a first run's thread reads this skill
+		// first, so how to show the page and the exact reply are here, not behind a pointer.
+		{skills.Help, "", 400, 121},   // both: no invocation keys
 		{skills.Plugin, "", 600, 122}, // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
@@ -457,9 +460,10 @@ func TestRender(t *testing.T) {
 	}
 }
 
-// checkProvenance checks every file but the plugin skill's example (a new plugin's own
-// files, copied out as they are) carries src's provenance line once, right under its
-// title, and has no placeholder left.
+// checkProvenance checks every file but those copied out as they are (the plugin skill's
+// example, a new plugin's own files, and the welcome page, which PlaceWelcome writes to
+// the pages root) carries src's provenance line once, right under its title, and has no
+// placeholder left.
 func checkProvenance(t *testing.T, files skills.Files, src skills.Sources) {
 	t.Helper()
 	line := src.Provenance()
@@ -468,9 +472,9 @@ func checkProvenance(t *testing.T, files skills.Files, src skills.Sources) {
 		t.Fatalf("provenance line %q", line)
 	}
 	for p, b := range files {
-		if strings.HasPrefix(p, skills.Plugin+"/example/") {
+		if strings.HasPrefix(p, skills.Plugin+"/example/") || p == skills.Pages+"/reference/"+skills.WelcomeFile {
 			if bytes.Contains(b, []byte("Rendered by Code Foundry")) {
-				t.Errorf("%s (the example) has the provenance line", p)
+				t.Errorf("%s (copied out as it is) has the provenance line", p)
 			}
 			continue
 		}

@@ -320,7 +320,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer startPluginChecks(ctx, events, plugins)()
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
-	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
+	installSkills(ctx, log.With("component", "skills"), p.Claude(), p.Pages(), opts.Version, commandAPI, settingsAPI, st.settings)
+	placeWelcome(log.With("component", "skills"), p.Pages())
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),

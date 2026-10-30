@@ -12,7 +12,7 @@ other threads' folders or the app's home), shown with `code-foundry view.inline 
 interactive, in this conversation, in the user's theme. With `/cf/bridge.js` it reads the app
 live and runs the CLI's commands as this thread. Beside this file, in `reference/`:
 `examples.md` (complete pages), `verbs.md` (the verbs pages use), `sources.md` (`cf.on` fields,
-storage, `cf.fetch`), `react.md` (React, mockups, Tailwind), `components.md` (`@cf/ui`).
+storage, `cf.fetch`), `react.md` (React, mockups, Tailwind), `components.md` (`@cf/ui`), `welcome.md` (the first-run welcome page).
 
 ## Page, wake, plugin or reply
 

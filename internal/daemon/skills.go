@@ -36,8 +36,8 @@ func shippedSkills(log *slog.Logger, dir string) func() []command.ShippedSkill {
 // every claude's first --add-dir; the thread store creates it). Called once at start,
 // before the servers listen, so no thread starts meanwhile. A failure is logged: threads
 // work without the skills.
-func installSkills(ctx context.Context, log *slog.Logger, dir string, v version.Info, cmds *api.Command, set *api.Settings, st *settings.Store) {
-	files, err := renderSkills(ctx, v, filepath.Join(dir, skills.SkillsDir), cmds, set, st)
+func installSkills(ctx context.Context, log *slog.Logger, dir, pagesDir string, v version.Info, cmds *api.Command, set *api.Settings, st *settings.Store) {
+	files, err := renderSkills(ctx, v, filepath.Join(dir, skills.SkillsDir), pagesDir, cmds, set, st)
 	if err == nil {
 		err = skills.Install(dir, v.Version, files)
 	}
@@ -48,10 +48,26 @@ func installSkills(ctx context.Context, log *slog.Logger, dir string, v version.
 	log.Info("skills installed", "dir", dir, "files", len(files))
 }
 
+// placeWelcome writes the build's first-run welcome page to <home>/pages/welcome.html
+// (skills.PlaceWelcome), after the thread store's start-up cleanup of that root, which
+// leaves files alone. A failure is logged: a first run's thread then copies the page from
+// the pages skill instead (reference/welcome.md).
+func placeWelcome(log *slog.Logger, pagesRoot string) {
+	wrote, err := skills.PlaceWelcome(pagesRoot)
+	if err != nil {
+		log.Error("no welcome page placed", "dir", pagesRoot, "err", err)
+		return
+	}
+	if wrote {
+		log.Info("welcome page placed", "path", skills.WelcomePath(pagesRoot))
+	}
+}
+
 // renderSkills lists the commands (unavailable ones too, as `code-foundry guide` does)
 // and the settings schema, and renders the skills from them, the build's commit and the
-// plugins' host facts; skillsDir is where they will be installed.
-func renderSkills(ctx context.Context, v version.Info, skillsDir string, cmds *api.Command, set *api.Settings, st *settings.Store) (skills.Files, error) {
+// plugins' host facts; skillsDir is where they will be installed, pagesDir the pages
+// root the welcome page is placed in (placeWelcome).
+func renderSkills(ctx context.Context, v version.Info, skillsDir, pagesDir string, cmds *api.Command, set *api.Settings, st *settings.Store) (skills.Files, error) {
 	listed, err := cmds.List(ctx, connect.NewRequest(&v1.ListCommandsRequest{IncludeUnavailable: true}))
 	if err != nil {
 		return nil, fmt.Errorf("list commands: %w", err)
@@ -65,7 +81,7 @@ func renderSkills(ctx context.Context, v version.Info, skillsDir string, cmds *a
 	return skills.Render(skills.Sources{
 		Version: v.Version, Commands: commands,
 		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields(),
-		Commit: v.Commit, SDKTag: v.PluginSDKTag, SkillsDir: skillsDir, Facts: plugin.HostFactNames(),
+		Commit: v.Commit, SDKTag: v.PluginSDKTag, SkillsDir: skillsDir, PagesDir: pagesDir, Facts: plugin.HostFactNames(),
 	})
 }
 

@@ -12,6 +12,9 @@ Two words come up everywhere. A **project** is a folder on your Mac. A **thread*
 one conversation with an agent working in that folder. Threads keep working when you
 close the window; a thread keeps its history, and a message always continues it.
 
+New here, with no projects yet? Ask a thread for "the welcome tutorial": it opens a page of
+four steps in the side panel, beside the conversation, and walks you through the app.
+
 ### Add a project
 
 Click **New thread** at the top of the sidebar and pick **Add a project…** at the
