@@ -1343,8 +1343,7 @@ export class World {
   /**
    * Scenario: thread lineage (docs/notes/agents-3-lineage-gui.md). "Fix login redirect"
    * (working) created "Add retry to login redirect" (finished; its log starts with the
-   * daemon's "Created by" note) and six siblings of it, one archived, so the Threads tab
-   * caps them at five; "Add retry…" created "Write retry backoff tests". All held (the
+   * daemon's "Created by" note) and six siblings of it, one archived; "Add retry…" created "Write retry backoff tests". All held (the
    * clock leaves them alone). Every created thread follows threads.show_created_threads
    * (hidden from the sidebar by default) except "Tidy redirect logging", shown by its
    * override (docs/notes/hidden-children-2-gui.md). POST /__mock/lineage. Idempotent.
@@ -1359,7 +1358,7 @@ export class World {
     const PN = "Fix login redirect";
     const C = "s-l-child";
     const CN = "Add retry to login redirect";
-    // Models and efforts vary, for the Threads tab's model words (docs/notes/threads-tab-model.md); Haiku 4.5 at medium otherwise.
+    // Models and efforts vary, for the thread info card's lineage rows (their hover cards); Haiku 4.5 at medium otherwise.
     type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
     const specs: Spec[] = [
       { id: P, name: PN, model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },
@@ -1474,7 +1473,10 @@ export class World {
    *           Typecheck run in web (the action row names web);
    *   busy    single, working (Push waits for the model);
    *   child   single, then s-ti-child made by s-ti-1 (its parent row);
-   *   nogit   s-ti-nogit in "writing" (no git: no git group).
+   *   nogit   s-ti-nogit in "writing" (no git: no git group);
+   *   unnamed s-ti-un "Sweep the config readers": three projects in no workspace, cwd
+   *           ghostty-playground (the header crumb "ghostty-playground +2");
+   *   home    s-ti-home "Plan the week": no project (the header crumb "No project").
    */
   addThreadInfo(scenario: string): string {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1594,8 +1596,20 @@ export class World {
         this.publishThread(s);
         return s.id;
       }
+      case "unnamed": {
+        // Three projects in no workspace: the header's crumb reads "ghostty-playground +2".
+        const s = this.threads.get("s-ti-un") ?? this.addMultiThread(["repo-cf", "repo-gp", "repo-dot"], "repo-gp", "cf/config-readers", "Sweep the config readers", "", "s-ti-un");
+        s.held = true;
+        this.publishThread(s);
+        return s.id;
+      }
+      case "home": {
+        const s = this.threads.get("s-ti-home") ?? this.addThread({ ...base, id: "s-ti-home", projectId: "", worktreePath: HOME, name: "Plan the week" });
+        this.publishThread(s);
+        return s.id;
+      }
       default:
-        throw new CommandError("invalid", "scenario must be single, ws9, busy, child or nogit");
+        throw new CommandError("invalid", "scenario must be single, ws9, busy, child, nogit, unnamed or home");
     }
   }
 
@@ -1834,19 +1848,6 @@ export class World {
       }
       return at(project.worktrees.find((w) => w.isMain)?.path ?? project.path, false);
     });
-  }
-
-  /** ThreadService.Checkouts for a thread by id. */
-  checkoutsMsg(id: string) {
-    const s = this.thread(id);
-    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
-    return {
-      thread: this.threadMsg(s),
-      checkouts: this.checkoutsOf(s).map((c) => ({ ...c, current: c.primary, instructions: "" })),
-      workspaceId: s.workspaceId,
-      workspaceName: ws?.name ?? "",
-      workspaceDir: ws ? this.managedDirOf(ws) : "",
-    };
   }
 
   threadMsg(s: MockThread): ThreadInit {
@@ -4266,58 +4267,6 @@ export class World {
         },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "composer.history" } } }))}`,
-      },
-      {
-        cmd: {
-          name: "view.panel.worktree",
-          title: "Show Worktree in Side Panel",
-          category: "View",
-          description: "Open the Worktree surface in the selected thread's side panel: the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
-          keybindings: [],
-          args: panelThreadArgs,
-        },
-        // Like the daemon: a thread is active and it sits in a registered worktree.
-        when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeProjectId && ctx.activeWorktreePath),
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.worktree", args),
-      },
-      {
-        cmd: {
-          name: "view.panel.linked-prs",
-          title: "Show Linked PRs in Side Panel",
-          category: "View",
-          description: "Open the Linked PRs surface in the selected thread's side panel: the pull requests the thread created or touched, newest first, with state, checks and branch.",
-          keybindings: [],
-          args: panelThreadArgs,
-        },
-        // Like the daemon: a thread is active (with or without linked pull requests).
-        when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.linked-prs", args),
-      },
-      {
-        cmd: {
-          name: "view.panel.usage",
-          title: "Show Usage in Side Panel",
-          category: "View",
-          description: "Open the Usage surface in the selected thread's side panel: its cost at Claude API rates, tokens and requests, per model and per token kind.",
-          keybindings: [],
-          args: panelThreadArgs,
-        },
-        // Like the daemon: a thread is active (with or without usage).
-        when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.usage", args),
-      },
-      {
-        cmd: {
-          name: "view.panel.threads",
-          title: "Show Related Threads in Side Panel",
-          category: "View",
-          description: "Open the Threads surface in the selected thread's side panel: the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
-          keybindings: [],
-          args: panelThreadArgs,
-        },
-        // Like the daemon: a thread is active (with or without lineage).
-        when: (ctx) => Boolean(ctx?.activeThreadId),
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.threads", args),
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },

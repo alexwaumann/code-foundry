@@ -9,7 +9,7 @@ import type { SurfaceSpec } from "./types";
 
 /**
  * Diff: one changed file of a worktree against its base (components/files/DiffTab.tsx),
- * working tree or branch. Tabs are opened from the worktree panel's Changes rows
+ * working tree or branch. Tabs are opened from the Changes tab's rows
  * (stores/filePanel.ts), one per file: params { project, worktree, path, oldPath?, scope }
  * (surfaces/fileTarget.ts). D (and the list) bring back the panel's last Diff tab, so the
  * entry is live only while the panel has one; dimmed otherwise, hidden without a project.

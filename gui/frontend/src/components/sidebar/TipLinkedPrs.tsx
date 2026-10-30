@@ -6,7 +6,7 @@ import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
 
 /**
  * The thread card's linked pull requests, below a hairline (docs/notes/sidebar-thread-card.md):
- * one row each, newest linked first as the Linked PRs surface lists them, the state icon
+ * one row each, newest linked first, the state icon
  * and the number in the state's colour, then the title (the bare number while it is unknown).
  * Closed ones are left out, as in the row's tag; at most LINKED_PR_TIP_CAP, then "+N more".
  * Nothing, not even the hairline, when none is left. Mounted only while the card is open.

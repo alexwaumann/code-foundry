@@ -10,7 +10,7 @@
  *   POST /__mock/thread/agent-end?id=s-r1&run=a1[&status=done|failed]   a run ends: its
  *        Agent call's item finishes, a note follows, the list and the counts are published.
  *
- * The commands thread.agents, view.panel.agents and thread.agent.open (any active thread)
+ * The commands thread.agents and thread.agent.open (any active thread)
  * and thread.agent.up (the subagent view, or the CLI), like the daemon's. "PR 1" and the
  * failed run carry their own items (parent_tool_use_id = their Agent call) for the
  * read-only subagent view; the done Explore has its work and report.
@@ -23,7 +23,6 @@ import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type Thre
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { launchShell, type ShellCall } from "./shells";
-import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
 import type { UiIntentInit } from "./world";
 
 export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
@@ -286,8 +285,7 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
 
 /**
  * The thread list's agent_runs for a thread's runs, like the daemon's Thread.agent_runs:
- * open while running, closed once ended, no usage (the mock prices none per run). The GUI
- * lists the Agents surface only for a thread with some (docs/notes/panel-polish.md).
+ * open while running, closed once ended, no usage (the mock prices none per run).
  */
 export function listRuns(runs: readonly AgentRunInit[]): AgentRunListInit[] {
   return runs.map((r) => ({
@@ -324,7 +322,7 @@ function shellsNote(n: number): string {
   return ` · ${String(n)} ${n === 1 ? "shell" : "shells"} in the background`;
 }
 
-/** thread.agents, view.panel.agents, thread.agent.open and thread.agent.up, like the daemon's. */
+/** thread.agents, thread.agent.open and thread.agent.up, like the daemon's. */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   return [
@@ -350,18 +348,6 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
           resultJson: JSON.stringify({ threadId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
         });
       },
-    },
-    {
-      cmd: {
-        name: "view.panel.agents",
-        title: "Show Agents",
-        category: "View",
-        description: "Open the Agents surface in the selected thread's side panel: its subagent runs with their status, activity and report.",
-        keybindings: [],
-        args: panelThreadArgs,
-      },
-      when,
-      run: (_ctx, args) => runPanelVerb(emit, "panel.agents", args),
     },
     {
       cmd: {

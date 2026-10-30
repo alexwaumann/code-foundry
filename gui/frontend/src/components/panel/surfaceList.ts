@@ -8,8 +8,7 @@ export function surfaceContext(panelKey: string): SurfaceContext {
 
 /**
  * The surface list unmounts when a tab opens or picking ends. Focus that was in it (a
- * row reached with Tab) moves to the panel first, so cmd+w and the letters keep working,
- * as in LinkedPRsSurface's openLink.
+ * row reached with Tab) moves to the panel first, so cmd+w and the letters keep working.
  */
 export function keepPanelFocus(from: Element): void {
   const list = from.closest("[data-surface-list]");

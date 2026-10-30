@@ -1,15 +1,11 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Pencil, Play, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { runAction, type ActionOwner } from "@/stores/actionActions";
 import { openActionEditor } from "@/stores/actionDialog";
-import { isStartable } from "@/keys/bindings";
 import { useAction, useProjectActionIds } from "@/stores/actions";
-import { useCommandsStore } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
-import { useThreadsStore } from "@/stores/threads";
 import { ACTION_ICON } from "./actionIcons";
 
 type From = "thread" | "projects";
@@ -70,24 +66,13 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
 }
 
 /**
- * The thread header's actions menu: only for a thread with a project (actions belong to
- * one), and hidden when the daemon does not list action.run here, like a CommandButton.
- */
-export function ThreadActionsMenu({ threadId }: { threadId: string }) {
-  const projectId = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
-  const available = useCommandsStore((s) => s.commands.some((c) => c.name === "action.run" && isStartable(c)));
-  if (!projectId || !available) return null;
-  return <ActionsMenu projectId={projectId} owner={{ kind: "thread", threadId }} from="thread" variant="header" testId="pane-actions-menu" />;
-}
-
-/**
- * A project's actions as a dropdown, from a thread's header (runs for the thread) or a
- * Projects page worktree row (runs for that worktree): one row per action (click runs it,
+ * A project's actions as a dropdown, from a Projects page worktree row (runs for that
+ * worktree; a thread's run from its info card's action row): one row per action (click runs it,
  * the pencil edits it), then "New action…". With none: "No actions for <project> yet" and
  * "New action…". What was picked runs once the menu has closed and handed focus back
  * (a run's tab or the editor then takes it), like the Projects page's overflow menus.
  */
-export function ActionsMenu({ projectId, owner, from, variant, testId }: { projectId: string; owner: ActionOwner; from: From; variant: "header" | "row"; testId: string }) {
+export function ActionsMenu({ projectId, owner, from, testId }: { projectId: string; owner: ActionOwner; from: From; testId: string }) {
   const ids = useProjectActionIds(projectId);
   const project = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const [open, setOpen] = useState(false);
@@ -129,22 +114,6 @@ export function ActionsMenu({ projectId, owner, from, variant, testId }: { proje
     >
       <Tip label={label}>
         <DropdownMenuTrigger asChild>
-          {variant === "header" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={label}
-              tabIndex={-1}
-              data-testid={testId}
-              className="[--wails-draggable:no-drag] aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text dark:aria-expanded:bg-cf-control-hover/50"
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-            >
-              <Play aria-hidden className="size-3.5" />
-            </Button>
-          ) : (
             <button
               type="button"
               tabIndex={-1}
@@ -160,7 +129,6 @@ export function ActionsMenu({ projectId, owner, from, variant, testId }: { proje
             >
               <Play aria-hidden />
             </button>
-          )}
         </DropdownMenuTrigger>
       </Tip>
       <DropdownMenuContent

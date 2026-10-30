@@ -1,149 +1,169 @@
-import { CornerDownRight, Folder, FolderGit2, House, Layers } from "lucide-react";
-import { CommandButton } from "@/components/command/CommandButton";
-import { NoGitBadge } from "@/components/projects/NoGitBadge";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ChevronDown, ChevronRight, Folder, Folders, House, Layers, type LucideIcon } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
-import { useThreadPlace, useThreadPlaceInput } from "./useThreadPlace";
+import { crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
 import { cn } from "@/lib/utils";
-import { useCreator } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
-import { showWorkspaceCard } from "@/stores/projectsPage";
 import { useThreadsStore } from "@/stores/threads";
+import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { Chip } from "./Chip";
+import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
+import { ThreadMenuItems } from "./ThreadMenuItems";
+import { TranscriptDeletedChip } from "./TranscriptDeleted";
 
-const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
+const crumbIcons: Readonly<Record<CrumbIcon, LucideIcon>> = { folder: Folder, layers: Layers, folders: Folders, house: House };
 
-/**
- * The thread's name. A click runs thread.rename exactly as the palette does (the inline
- * editor in the sidebar row), so it adds no user action of its own; where rename is not
- * available the name is plain text.
- */
-function ThreadName({ id }: { id: string }) {
-  const name = useThreadsStore((s) => s.byId[id]?.name || id);
-  // The daemon's cut of the first prompt until the naming model's title lands: muted and italic, as in the sidebar.
-  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
-  return (
-    <CommandButton
-      command="thread.rename"
-      whenUnavailable="plain"
-      size="xs"
-      className={cn("-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-cf-text", provisional && "text-cf-text-muted italic")}
-      data-testid="thread-title"
-    >
-      <span className="truncate">{name}</span>
-    </CommandButton>
+/** The fields of a thread the crumb's place reads (shallow-stable: primitives, its project ids joined). */
+function usePlaceInput(id: string) {
+  return useThreadsStore(
+    useShallow((s) => {
+      const t = s.byId[id];
+      return {
+        projectId: t?.projectId ?? "",
+        workspaceId: t?.workspaceId ?? "",
+        worktreePath: t?.worktreePath ?? "",
+        pendingWorktreePath: t?.pendingWorktreePath ?? "",
+        projectIds: (t?.projectIds ?? []).join("\u0000"),
+      };
+    }),
   );
 }
 
-/**
- * Where the thread runs: project @ branch (mono; for several projects, or a workspace's
- * folder, the workspace's name or "N projects"), and a "worktree" chip off the main
- * checkout; a project without git shows a plain folder and the No git badge instead; a
- * thread without a project the House icon and "No project", nothing else. The
- * same threadRowModel the sidebar row reads, so the two never disagree. A click opens the
- * Worktree surface in the side panel (view.panel.worktree); where that is not available it
- * is plain text. When it names the thread's workspace (several projects, or the
- * workspace's folder, with a workspace the slice knows) a click opens the Projects page
- * with that workspace's card as the cursor row instead (stores/projectsPage
- * showWorkspaceCard, as after Add as workspace).
- */
-function ThreadLocation({ id }: { id: string }) {
-  const where = useThreadPlaceInput(id);
-  const place = useThreadPlace(id);
-  const worktree = useProjectsStore((st) => threadRowModel(where, st, NO_WORKSPACES).worktree);
-  const workspaceKnown = useWorkspacesStore((s) => where.workspaceId !== "" && where.workspaceId in s.byId);
-  // A thread of several projects, or in its workspace's folder: the workspace's name (else "N projects"), as on line 2.
-  const m = { ...place, project: place.set ?? place.project, worktree };
-  const Icon = m.noProject ? House : m.set !== null ? Layers : m.noGit ? Folder : FolderGit2;
-  const className = "flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-cf-text-muted";
-  const content = (
-    <>
-      <Icon className="size-3.5 shrink-0" aria-hidden />
-      <span className="truncate" data-testid="thread-project" data-no-project={m.noProject || undefined}>
-        {m.project}
-      </span>
-      {m.noProject || (m.set !== null && !m.branch) ? null : m.noGit ? (
-        <NoGitBadge />
-      ) : (
-        <>
-          <span className="shrink-0 opacity-60">@</span>
-          <span className="truncate text-code" data-testid="thread-branch">
-            {m.branch}
-          </span>
-          {m.worktree && <Chip data-testid="thread-worktree-chip">worktree</Chip>}
-        </>
-      )}
-    </>
-  );
-  if (!m.noProject && m.set !== null && workspaceKnown) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        className={className}
-        data-testid="thread-location"
-        data-opens="workspace"
-        onClick={() => {
-          showWorkspaceCard(where.workspaceId);
-        }}
-      >
-        {content}
-      </Button>
-    );
-  }
-  return (
-    <CommandButton command="view.panel.worktree" whenUnavailable="plain" size="xs" className={className} data-testid="thread-location">
-      {content}
-    </CommandButton>
-  );
+/** The crumb's separator. */
+function Sep() {
+  return <ChevronRight className="size-3.5 shrink-0 text-cf-text-muted" aria-hidden />;
 }
 
-const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center gap-[5px] rounded-md bg-cf-text/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-cf-text-muted";
-
-/**
- * "↳ from <creator>" for a thread an agent created (docs/notes/agents-3-lineage-gui.md,
- * sketch variant A): the creator's current name (its name at creation once removed,
- * docs/notes/lineage-by-id.md). A click opens the Threads surface in the side panel
- * (view.panel.threads). When the creator was removed the chip is inert and muted, with
- * "Thread removed" as its tooltip; an archived creator still exists. Nothing for the
- * user's threads.
- */
-function CreatedByChip({ id }: { id: string }) {
-  const creator = useCreator(id);
-  if (creator === null) return null;
-  const content = (
-    <>
-      <CornerDownRight className="size-3 shrink-0" aria-hidden />
-      <span className="min-w-0 truncate">
-        from <span className={creator.exists ? "font-medium text-cf-text/80" : undefined}>{creator.name}</span>
-      </span>
-    </>
-  );
-  if (!creator.exists)
+/** The parent segment: a click opens that thread; a removed creator is plain text, "Thread removed" on hover. */
+function ParentSegment({ parent }: { parent: CrumbParent }) {
+  const className = "min-w-0 truncate rounded-sm px-1 text-cf-text-muted";
+  if (!parent.exists)
     return (
       <Tip label="Thread removed">
-        <span className={`${CREATED_BY_CHIP} opacity-60`} data-testid="thread-created-by" data-removed="true">
-          {content}
+        <span className={cn(className, "opacity-60")} data-testid="thread-crumb-parent" data-removed="true">
+          {parent.name}
         </span>
       </Tip>
     );
   return (
-    <CommandButton command="view.panel.threads" whenUnavailable="plain" size="xs" className={`${CREATED_BY_CHIP} hover:bg-cf-text/12 hover:text-cf-text-muted dark:hover:bg-cf-text/12`} data-testid="thread-created-by">
-      {content}
-    </CommandButton>
+    <button
+      type="button"
+      className={cn(className, "cursor-pointer outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus")}
+      data-testid="thread-crumb-parent"
+      data-id={parent.id}
+      onClick={() => {
+        useUiStore.getState().select({ kind: "thread", id: parent.id }, { focusPrompt: true });
+      }}
+    >
+      {parent.name}
+    </button>
   );
 }
 
-/** Left side of a thread's header: its name, who created it (an agent's thread), then where it runs. */
+/**
+ * Where the thread runs, in front of its title (lib/threadCrumb.ts): a project's folder
+ * and name, a workspace's layers and name, an unnamed set's folders and "api +8", or home
+ * and "No project"; then the parent thread (its creator, or what it was forked from),
+ * which opens on a click. Muted, each segment followed by "›". The branch and the rest of
+ * the place are the thread info card's.
+ */
+function ThreadCrumb({ id }: { id: string }) {
+  const input = usePlaceInput(id);
+  const wsName = useWorkspacesStore((s) => (input.workspaceId ? (s.byId[input.workspaceId]?.name ?? null) : null));
+  // One string over the projects: a status refresh elsewhere does not re-render the crumb.
+  const place = useProjectsStore((s) => {
+    const t = { ...input, projectIds: input.projectIds ? input.projectIds.split("\u0000") : [] };
+    const p = crumbPlace(t, s, { byId: wsName === null ? {} : { [input.workspaceId]: { name: wsName } } });
+    return `${p.icon}\u0000${p.label}`;
+  });
+  const [icon, label] = place.split("\u0000") as [CrumbIcon, string];
+  const parent = useThreadsStore(useShallow((s) => crumbParent(s.byId[id] ?? { createdBy: "", createdByName: "", parentId: "" }, s)));
+  const crumb = { icon, label, parent };
+  const Icon = crumbIcons[crumb.icon];
+  return (
+    <span className="flex min-w-0 shrink items-center gap-1 text-label text-cf-text-muted" data-testid="thread-crumb" data-icon={crumb.icon}>
+      <span className="flex min-w-0 items-center gap-1.5 px-1">
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate" data-testid="thread-crumb-place">
+          {crumb.label}
+        </span>
+      </span>
+      <Sep />
+      {crumb.parent && (
+        <>
+          <ParentSegment parent={crumb.parent} />
+          <Sep />
+        </>
+      )}
+    </span>
+  );
+}
+
+const STALE_TIP = "Plugin environment changed · Restart Claude from this menu";
+
+/**
+ * The thread's title as a menu button: its name, then a small muted chevron, always
+ * shown. It opens the thread's menu (ThreadMenuItems, the sidebar row's items verbatim):
+ * Enter or Space from the keyboard. While the menu is up the button stays pressed. While a
+ * plugin's environment changed since Claude started, a warning dot on the chevron says so
+ * (its tooltip points at the menu's Restart Claude).
+ */
+function ThreadTitleMenu({ id }: { id: string }) {
+  const name = useThreadsStore((s) => s.byId[id]?.name || id);
+  // The daemon's cut of the first prompt until the naming model's title lands: muted and italic, as in the sidebar.
+  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
+  // With the card off nothing else says it: a warning dot on the chevron, and the menu has Restart Claude.
+  const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
+  const [open, setOpen] = useState(false);
+  return (
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <Tip label={stale ? STALE_TIP : null} data-testid="thread-title-stale-tip">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex h-6 min-w-12 shrink-[100] cursor-pointer items-center gap-1 rounded-md px-1.5 text-label font-medium text-cf-text outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover dark:hover:bg-cf-control-hover/50 dark:aria-expanded:bg-cf-control-hover/50",
+            )}
+            data-testid="thread-title"
+          >
+            <span className={cn("truncate", provisional && "text-cf-text-muted italic")} data-testid="thread-title-name">
+              {name}
+            </span>
+            <span className="relative flex shrink-0">
+              <ChevronDown className="size-3.5 text-cf-text-muted" aria-hidden />
+              {stale && <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning" data-testid="thread-title-stale" role="img" aria-label={STALE_TIP} />}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+      </Tip>
+      <DropdownMenuContent
+        align="start"
+        className="min-w-52"
+        data-testid="thread-title-menu"
+        onCloseAutoFocus={(e) => {
+          if (!keepFocusAfterMenu(id)) return;
+          e.preventDefault();
+          focusPromptAfterMenu(id);
+        }}
+      >
+        <ThreadMenuItems id={id} kit={dropdownMenuKit} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * Left side of a thread's header: the crumb (where it runs, its parent), then the title
+ * and its menu, then "Transcript deleted" when Claude Code deleted the transcript.
+ */
 export function ThreadTitle({ id }: { id: string }) {
   return (
-    <>
-      <ThreadName id={id} />
-      <CreatedByChip id={id} />
-      <ThreadLocation id={id} />
-    </>
+    <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="thread-title-bar">
+      <ThreadCrumb id={id} />
+      <ThreadTitleMenu id={id} />
+      <TranscriptDeletedChip id={id} />
+    </span>
   );
 }

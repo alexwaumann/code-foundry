@@ -33,7 +33,7 @@ var (
 
 // ViewPanelMcp is the ShowView name that opens (or reveals) the MCP surface in the side
 // panel of the selected thread: its MCP servers with status, tools and Reconnect. An
-// action on per-selection GUI state like ViewPanelUsage; a window whose selection is
+// action on per-selection GUI state like ViewPanelToggle; a window whose selection is
 // not a thread ignores it.
 const ViewPanelMcp = "panel.mcp"
 
@@ -101,8 +101,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
 				"the thread's MCP servers with status, errors and tools, and Reconnect.",
 			Category: "View",
-			// No default chord, like view.panel.usage (M opens it while the panel has
-			// focus).
+			// No default chord: in the app the thread info card's MCP row opens it.
 			When: hasThread,
 			Args: panelThreadArgs(),
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {

@@ -6,7 +6,7 @@
  */
 import { useShallow } from "zustand/react/shallow";
 import { inSidebar } from "@/lib/inSidebar";
-import { childIds, creatorOf, lineageStatus, noteCreator, projectCount, siblingIds, type Creator, type LineageCounts, type LineageStatus } from "@/lib/lineage";
+import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";
 import { useShowCreatedThreads } from "./settings";
 import { useThreadsStore } from "./threads";
 
@@ -17,38 +17,6 @@ import { useThreadsStore } from "./threads";
  */
 export function useCreator(threadId: string): Creator | null {
   return useThreadsStore(useShallow((s) => creatorOf(s, threadId)));
-}
-
-/** The creator's other threads, in spawn order. */
-export function useSiblingIds(threadId: string): readonly string[] {
-  return useThreadsStore(useShallow((s) => siblingIds(s, threadId)));
-}
-
-/** Threads created from this one, in spawn order. */
-export function useChildIds(threadId: string): readonly string[] {
-  return useThreadsStore(useShallow((s) => childIds(s, threadId)));
-}
-
-/** The Threads panel header's figures. */
-export function useLineageCounts(threadId: string): LineageCounts {
-  return useThreadsStore(
-    useShallow((s) => {
-      const c = creatorOf(s, threadId);
-      const children = childIds(s, threadId);
-      return {
-        creator: c === null ? "" : c.exists ? "created" : "removed",
-        creatorName: c?.name ?? "",
-        siblings: siblingIds(s, threadId).length,
-        children: children.length,
-        childProjects: projectCount(s, children),
-      } satisfies LineageCounts;
-    }),
-  );
-}
-
-/** A thread's status word in the panel (lib/lineage lineageStatus). */
-export function useLineageStatus(id: string): LineageStatus {
-  return useThreadsStore((s) => lineageStatus(s.byId[id]));
 }
 
 /** Whether a thread made by an agent: the sidebar's ↳ glyph. */
@@ -68,7 +36,7 @@ export function useNoteCreator(createdBy: string, recorded: string): Creator {
 /**
  * Whether a thread another thread created is shown in the sidebar (lib/inSidebar.ts, with
  * threads.show_created_threads); null for the user's own thread (always shown, no override).
- * The Show / Hide in sidebar actions and the Threads tab's "hidden" mark.
+ * The thread menu's Show / Hide in sidebar item.
  */
 export function useSidebarShown(id: string): boolean | null {
   const showCreated = useShowCreatedThreads();

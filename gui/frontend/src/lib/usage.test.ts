@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UsageBucketView } from "@/api/threads";
-import { bucketTokens, emptyTotals, fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, modelSlot, TOKEN_KINDS, totalUsage, usageByModel } from "./usage";
+import { bucketTokens, emptyTotals, fmtShare, fmtTok, fmtUsd, modelColorVars, modelSlot, TOKEN_KINDS, totalUsage, usageByModel } from "./usage";
 
 function bucket(model: string, o: Partial<UsageBucketView> = {}): UsageBucketView {
   return {
@@ -143,9 +143,5 @@ describe("formats", () => {
     [0, 0, "—"],
   ])("fmtShare(%d, %d) = %s", (part, total, want) => {
     expect(fmtShare(part, total)).toBe(want);
-  });
-
-  it("pluralises requests", () => {
-    expect([fmtRequests(1), fmtRequests(3), fmtRequests(1200)]).toEqual(["1 request", "3 requests", "1,200 requests"]);
   });
 });

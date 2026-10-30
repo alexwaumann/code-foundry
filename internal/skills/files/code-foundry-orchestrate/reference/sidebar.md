@@ -10,7 +10,7 @@ archiving takes along.
 A thread you create (`thread new`, whose `--created-by` defaults to you) is yours to
 manage, not the user's: it stays out of the app's sidebar and out of the Dock badge, so
 its questions and finished turns do not reach the user there. The user still finds it in
-your thread's Threads tab (the panel lists every thread you created). A thread the user
+your thread's info card (its lineage group lists every thread you created). A thread the user
 creates is always shown. The user's setting `threads.show_created_threads` (default off)
 shows every created thread; a thread's own override wins over the setting either way.
 

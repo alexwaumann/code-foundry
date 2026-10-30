@@ -106,9 +106,10 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
 test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes without asking; Unsnooze brings it back", async ({ page }) => {
   await openApp(page);
   const { menu, sub } = await openSnoozeSub(page, "s:s-3");
-  // After Pin, before Archive.
+  // After Pin; Archive later, after the thread's other items.
   const items = await menu.locator("[role=menuitem]").evaluateAll((els) => els.map((e) => e.textContent.trim()));
-  expect(items.slice(0, 4)).toEqual(["Rename", "Pin", "Snooze", "Archive"]);
+  expect(items.slice(0, 3)).toEqual(["Rename", "Pin", "Snooze"]);
+  expect(items.indexOf("Archive")).toBeGreaterThan(2);
   await expect(menu.getByTestId("menu-unsnooze")).toHaveCount(0);
   const presets = sub.getByTestId("snooze-preset");
   await expect(presets).toHaveCount(4);
@@ -146,7 +147,7 @@ test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes wi
   expect((await lastSnooze())?.args).toEqual({ clear: "true" });
 });
 
-test("snoozing a working thread from the header asks first; it then drops its panels, and its page says until when", async ({ page }) => {
+test("snoozing a working thread from the title menu asks first; it then drops its panels, and its page says until when", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
@@ -156,8 +157,10 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
   const header = page.getByTestId("thread-header");
-  await header.getByRole("button", { name: "Snooze Thread", exact: true }).click();
-  const presets = page.getByTestId("pane-snooze-presets");
+  const titleMenu = page.getByTestId("thread-title-menu");
+  await header.getByTestId("thread-title").click();
+  await titleMenu.getByTestId("menu-snooze").click();
+  const presets = page.getByTestId("menu-snooze-presets");
   await expect(presets).toBeVisible();
   await presets.locator('[data-preset="tomorrow"]').click();
   const dialog = page.getByTestId("confirm-dialog");
@@ -186,9 +189,10 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, groups: [{ tabs: [], activeTabId: null }] });
-  // The header button unsnoozes now.
-  await expect(header.getByRole("button", { name: "Unsnooze Thread" })).toBeVisible();
-  await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toHaveCount(0);
+  // The title menu offers Unsnooze now.
+  await header.getByTestId("thread-title").click();
+  await expect(titleMenu.getByTestId("menu-unsnooze")).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // The note's Unsnooze: back in the main list (interrupted), no attention added; the note goes.
   await note.getByTestId("thread-unsnooze").click();
@@ -196,7 +200,9 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "attention");
   await expect(note).toHaveCount(0);
   await expect(card).toBeVisible();
-  await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toBeVisible();
+  await header.getByTestId("thread-title").click();
+  await expect(titleMenu.getByTestId("menu-unsnooze")).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // Snoozed from the CLI (another client): the same panel reset.
   await row(page, "s:s-2").click();
@@ -228,7 +234,7 @@ test("Pick a date and time… opens the dialog for the row's thread; Snooze send
   expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
 });
 
-test("a wake brings the thread back needing attention: Snooze ended in amber, counted in the window title; snooze it again from the header", async ({ page }) => {
+test("a wake brings the thread back needing attention: Snooze ended in amber, counted in the window title; snooze it again from the title menu", async ({ page }) => {
   await openApp(page);
   await expectAttention(page, 1);
   await mockPost("thread/wake?id=s-8");
@@ -248,9 +254,10 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(card.getByTestId("thread-snooze-ended")).toHaveClass(/text-cf-warning-text/);
   await expect(card.getByTestId("thread-unsnooze")).toHaveCount(0);
 
-  // Snooze again from the header: 3 hours.
-  await page.getByTestId("thread-header").getByRole("button", { name: "Snooze Thread", exact: true }).click();
-  await page.getByTestId("pane-snooze-presets").locator('[data-preset="3h"]').click();
+  // Snooze again from the title menu: 3 hours.
+  await page.getByTestId("thread-header").getByTestId("thread-title").click();
+  await page.getByTestId("thread-title-menu").getByTestId("menu-snooze").click();
+  await page.getByTestId("menu-snooze-presets").locator('[data-preset="3h"]').click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expectAttention(page, 1);
   // Snoozing the selected thread selects the dashboard (#119); open it from the Snoozed section.

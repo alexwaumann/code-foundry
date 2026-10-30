@@ -117,26 +117,18 @@ describe("surface registry", () => {
       ["files", "f"],
       ["diff", "d"],
       ["pullrequest", "p"],
-      ["linkedprs", "l"],
-      ["usage", "u"],
-      ["mcp", "m"],
-      ["agents", "a"],
-      ["threads", "h"],
-      ["worktree", "t"],
+      ["changes", undefined],
+      ["mcp", undefined],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
+    expect(surfaceOf("changes")?.title).toBe("Changes");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");
     expect(surfaceByHotkey("W")).toBeUndefined();
-    expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
-    expect(surfaceByHotkey("U")?.kind).toBe("usage");
-    expect(surfaceByHotkey("m")?.kind).toBe("mcp");
-    expect(surfaceByHotkey("A")?.kind).toBe("agents");
     expect(surfaceByHotkey("b")?.kind).toBe("ember");
-    expect(surfaceByHotkey("h")?.kind).toBe("threads");
-    expect(surfaceByHotkey("T")?.kind).toBe("worktree");
-    // s-1 is unknown here: no pull request, no linked pull requests, not a known thread,
-    // no worktree to place it in.
-    // The Board is Ember's chat's only.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden"]);
+    // The removed surfaces' letters open nothing; Changes and MCP have none.
+    for (const k of ["l", "u", "m", "a", "h", "t"]) expect(surfaceByHotkey(k)).toBeUndefined();
+    // s-1 is unknown here: no pull request, not a known thread.
+    // The Board is Ember's chat's only; Changes and MCP are never listed.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden"]);
   });
 });

@@ -1,0 +1,106 @@
+import { expect, test, type Page } from "@playwright/test";
+import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+
+/**
+ * The thread header (docs/notes/thread-header-crumb.md): the crumb (where the thread
+ * runs, then its parent) and the title menu on the left, the three toggles on the right,
+ * over the mock's POST /__mock/thread-info scenarios; the side panel's "+" without the
+ * removed surfaces; the card's Changes row opening the Changes tab.
+ */
+
+async function open(page: Page, scenario: string): Promise<string> {
+  const { id } = (await mockPost(`thread-info?scenario=${scenario}`)) as { id: string };
+  await openApp(page);
+  await row(page, `s:${id}`).click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
+  return id;
+}
+
+const header = (page: Page) => page.getByTestId("thread-header");
+
+test.beforeEach(async () => {
+  await resetMock();
+});
+
+for (const [scenario, icon, place, title] of [
+  ["single", "folder", "code-foundry", "Fix the stale PR badge"],
+  ["ws9", "layers", "platform", "Roll out refresh tokens"],
+  ["unnamed", "folders", "ghostty-playground +2", "Sweep the config readers"],
+  ["home", "house", "No project", "Plan the week"],
+] as const) {
+  test(`the crumb of ${scenario}: ${place} › ${title}`, async ({ page }) => {
+    await open(page, scenario);
+    const h = header(page);
+    await expect(h.getByTestId("thread-crumb")).toHaveAttribute("data-icon", icon);
+    await expect(h.getByTestId("thread-crumb-place")).toHaveText(place);
+    await expect(h.getByTestId("thread-crumb-parent")).toHaveCount(0);
+    await expect(h.getByTestId("thread-title-name")).toHaveText(title);
+    // The right side is the three toggles, nothing else.
+    await expect(h.getByTestId("pane-actions").locator("button")).toHaveCount(3);
+    for (const gone of ["pane-linked-pr", "pane-linked-prs", "pane-snooze", "pane-sidebar", "pane-thread-menu", "pane-actions-menu", "thread-flag", "thread-env-stale", "thread-location"]) {
+      await expect(h.getByTestId(gone)).toHaveCount(0);
+    }
+  });
+}
+
+test("a child's crumb names its parent, which opens on a click", async ({ page }) => {
+  await open(page, "child");
+  const h = header(page);
+  await expect(h.getByTestId("thread-crumb-place")).toHaveText("code-foundry");
+  await expect(h.getByTestId("thread-crumb-parent")).toHaveText("Fix the stale PR badge");
+  await expect(h.getByTestId("thread-title-name")).toHaveText("Port the rotation to web");
+  await h.getByTestId("thread-crumb-parent").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-ti-1");
+  await expect(header(page).getByTestId("thread-crumb-parent")).toHaveCount(0);
+});
+
+test("the title menu: the sidebar row's items; Pin pins the thread", async ({ page }) => {
+  const id = await open(page, "single");
+  const title = header(page).getByTestId("thread-title");
+  await expect(title).toHaveAttribute("aria-expanded", "false");
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "true");
+  const menu = page.getByTestId("thread-title-menu");
+  await expect(menu.getByRole("menuitem")).toHaveText(["Rename", "Pin", "Snooze", "New thread on this branch", "Archive"]);
+  await menu.getByTestId("menu-pin").click();
+  await expect(menu).toHaveCount(0);
+  // The keyboard goes to the prompt, as the header's old Pin button left it.
+  await expect(threadPrompt(page)).toBeFocused();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.pin").map((i) => i.args.pinned)).toEqual(["true"]);
+  await expect(row(page, `s:${id}`).getByTestId("row-pinned")).toBeVisible();
+
+  // The keyboard opens it too, and it now offers Unpin; Escape closes it.
+  await title.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("thread-title-menu").getByTestId("menu-pin")).toHaveText("Unpin");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("thread-title-menu")).toHaveCount(0);
+
+  // The sidebar row's context menu starts with the same items.
+  await row(page, `s:${id}`).click({ button: "right" });
+  await expect(page.getByTestId("row-menu").getByRole("menuitem").first()).toHaveText("Rename");
+  await expect(page.getByTestId("row-menu").getByRole("menuitem")).toHaveText(["Rename", "Unpin", "Snooze", "New thread on this branch", "Archive", "New terminal here", "Fork", "Remove…"]);
+});
+
+test("the side panel's + lists none of the removed surfaces", async ({ page }) => {
+  await open(page, "single");
+  await page.getByTestId("panel-toggle").click();
+  const empty = page.getByTestId("side-panel").getByTestId("panel-empty");
+  await expect(empty).toBeVisible();
+  const entries = empty.locator('[data-surface]:not([data-surface^="plugin."])');
+  await expect(entries).toHaveText(["FileF", "DiffD", "Pull requestP"]);
+  for (const gone of ["usage", "linkedprs", "threads", "agents", "worktree", "mcp", "changes"]) await expect(empty.locator(`[data-surface="${gone}"]`)).toHaveCount(0);
+});
+
+test("the card's Changes row opens the Changes tab", async ({ page }) => {
+  await open(page, "single");
+  await page.getByTestId("thread-info-toggle").click();
+  await page.getByTestId("thread-info-card").getByTestId("ti-changes").click();
+  const body = page.getByTestId("panel-body");
+  await expect(body).toHaveAttribute("data-surface", "changes");
+  await expect(body.getByTestId("changes-totals")).toHaveText("4 files · +42 −9");
+  // Only the lists: the old Worktree tab's header, facts and pull request row are gone.
+  await expect(body.getByTestId("worktree-surface-header")).toHaveCount(0);
+  await body.getByTestId("file-name").first().click();
+  await expect(body).toHaveAttribute("data-surface", "diff");
+});

@@ -74,34 +74,7 @@ const ViewThreadPrevious = "thread.previous"
 // window's sidebar order, wrapping at the bottom; from a page it selects the first row.
 const ViewThreadNext = "thread.next"
 
-// ViewPanelLinkedPRs is the ShowView name that opens (or reveals) the Linked PRs surface
-// in the side panel of the selected thread: the pull requests Claude linked to it (its
-// pr-link transcript records). An action on per-selection GUI state like
-// ViewPanelToggle; a window whose selection is not a thread ignores it, and one whose
-// thread has no linked pull requests says so instead of opening an empty surface.
-const ViewPanelLinkedPRs = "panel.linked-prs"
-
-// ViewPanelUsage is the ShowView name that opens (or reveals) the Usage surface in the
-// side panel of the selected thread: its token usage and cost, per model and per token
-// kind. An action on per-selection GUI state like ViewPanelLinkedPRs; a window whose
-// selection is not a thread ignores it. A thread without usage shows "No usage yet".
-const ViewPanelUsage = "panel.usage"
-
-// ViewPanelWorktree is the ShowView name that opens (or reveals) the Worktree surface in
-// the side panel of the selected thread: the overview of the worktree it runs in (sync
-// state, GitHub activity, files, log). An action on per-selection GUI state like
-// ViewPanelUsage; a window whose selection is not a thread in a registered worktree
-// ignores it.
-const ViewPanelWorktree = "panel.worktree"
-
-// ViewPanelThreads is the ShowView name that opens (or reveals) the Threads surface in
-// the side panel of the selected thread: its lineage, the thread whose agent created it,
-// its siblings and the threads created from it (docs/notes/agents-3-lineage-gui.md). An
-// action on per-selection GUI state like ViewPanelUsage; a window whose selection is not
-// a thread ignores it.
-const ViewPanelThreads = "panel.threads"
-
-// hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
+// hasWorktreeThreadContext is view.panel.diff's availability: a thread is active and
 // it sits in a registered worktree (the GUI passes the placement as ActiveProjectID and
 // ActiveWorktreePath; the CLI with --context-thread plus --context-project and
 // --context-worktree). A terminal alone does not count: the GUI never selects one (a
@@ -115,7 +88,7 @@ type ViewDeps struct {
 	Emitter Emitter
 	// Thread reads threads for the thread-scoped panel verbs (commands_view_thread.go).
 	// Nil: they check nothing.
-	Thread PanelThreads
+	Thread ThreadGetter
 	// Viewed reports whether a window shows a thread now (PresenceDeps.Viewed): a page
 	// verb from the CLI in a thread no window shows refuses without --focus. Nil: page
 	// verbs never refuse.
@@ -161,9 +134,8 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 //   - actions on each window's state: view.bottom.toggle, view.back, view.forward,
 //     thread.previous and thread.next;
 //   - the side panel verbs (commands_view_thread.go), which act on a thread's panel:
-//     view.panel.toggle, expand, new-tab and split, and the surfaces
-//     view.panel.workspace, linked-prs, usage, threads and worktree (view.panel.mcp and
-//     view.panel.agents live with their domains);
+//     view.panel.toggle, expand, new-tab and split (view.panel.mcp lives with its
+//     domain);
 //   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
 //     view.panel.pr;
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
@@ -203,8 +175,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			return showPanel(ctx, d.Thread, d.Emitter, uctx, a, name, check)
 		}
 	}
-	// Checks run only with d.Thread set (showScoped), so lineage's lister is never nil.
-	lineage := withLineage(d.Thread)
 	pageArgs := []ArgSpec{pageFocusArg}
 	cmds := []Command{
 		{
@@ -329,57 +299,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+]"},
 			Run:         show(ViewThreadNext),
-		},
-		{
-			Name:  "view.panel.linked-prs",
-			Title: "Show Linked PRs in Side Panel",
-			Description: "Open the Linked PRs surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the pull requests the thread created or touched, newest first, with state, checks and branch.",
-			Category: "View",
-			// No default chord, like view.panel.expand (L opens it while the panel has
-			// focus). Available for any thread, even one without links, so the palette
-			// finds it and the GUI can say there are none yet; a scoped call refuses one.
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelLinkedPRs, withLinkedPRs),
-		},
-		{
-			Name:  "view.panel.usage",
-			Title: "Show Usage in Side Panel",
-			Description: "Open the Usage surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the thread's cost at Claude API rates, tokens and requests, per model and per token kind.",
-			Category: "View",
-			// No default chord, like view.panel.linked-prs (U opens it while the panel has
-			// focus). Available for any thread, even one without usage yet.
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelUsage, nil),
-		},
-		{
-			Name:  "view.panel.threads",
-			Title: "Show Related Threads in Side Panel",
-			Description: "Open the Threads surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
-			Category: "View",
-			// No default chord, like view.panel.usage (H opens it while the panel has focus).
-			// Available for any thread, like view.panel.linked-prs; a scoped call refuses
-			// one no thread created and that created none.
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelThreads, lineage),
-		},
-		{
-			Name:  "view.panel.worktree",
-			Title: "Show Worktree in Side Panel",
-			Description: "Open the Worktree surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the overview of the worktree the thread runs in, with sync state, GitHub activity, changed files and log.",
-			Category: "View",
-			// No default chord, like view.panel.usage (T opens it while the panel has focus).
-			When: func(c Context) bool {
-				return hasWorktreeThreadContext(c) || inWorkspaceFolderContext(c) || cliThread(c)
-			},
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelWorktree, inWorktreeOrFolder),
 		},
 	}
 	return r.RegisterAll(append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand())...)

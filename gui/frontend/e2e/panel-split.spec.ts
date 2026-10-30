@@ -4,7 +4,7 @@
 // panel-split / panel-group / panel-split-divider element, and only one strip.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -53,7 +53,7 @@ function rect(l: Locator) {
   });
 }
 
-/** s-1's panel at `width` with its worktree tab and README.md's diff (README.md active). */
+/** s-1's panel at `width` with its Changes tab and README.md's diff (README.md active). */
 async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
   await openApp(page);
   await row(page, "s:s-1").click();
@@ -61,10 +61,10 @@ async function worktreeAndDiff(page: Page, width = 420): Promise<void> {
   await page.keyboard.press("Meta+Shift+e");
   await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await setPanelWidth(page, width);
-  await page.keyboard.press("t");
+  await openThreadChanges(page);
   await expect(page.getByTestId("worktree-changes")).toBeVisible();
   await page.locator('[data-nav-key="f:README.md"]').click();
-  await expect(panel(page).getByRole("tab")).toHaveText(["code-foundry", "README.md"]);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Changes", "README.md"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
 }
 
@@ -104,11 +104,11 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   // 420px: stacked. The active tab (README.md) moved to the new second group, which has focus.
   await expect(split(page)).toHaveAttribute("data-split", "true");
   await expect(split(page)).toHaveAttribute("data-orientation", "stack");
-  await expect(tabsOf(page, 0)).toHaveText(["code-foundry"]);
+  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
   await expect(tabsOf(page, 1)).toHaveText(["README.md"]);
   await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
   await expect(group(page, 0)).not.toHaveAttribute("data-focused");
-  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
   await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
   await expect.poll(() => region(page)).toBe("panel");
   // The palette ran the local presenter: no daemon call.
@@ -123,7 +123,7 @@ test("view.panel.split from the palette splits a stacked panel; it goes side by 
   // Stacked: the buttons in the first (top) group's header.
   expect(await controlsGroup(page)).toBe("0");
   // The unfocused group's active tab is tinted lighter than the focused one's.
-  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="worktree"]')).toHaveClass(/bg-cf-control-hover\/40/);
+  await expect(group(page, 0).locator('[role="presentation"][data-tab-id^="changes"]')).toHaveClass(/bg-cf-control-hover\/40/);
   await expect(group(page, 1).locator('[role="presentation"][data-tab-id^="diff"]')).toHaveClass(/dark:bg-cf-control-hover\/50/);
 
   // Just under the threshold (two 360px groups and the divider): still stacked. At it: side by side.
@@ -194,7 +194,7 @@ test("cmd+\\ joins and splits again; the CLI's view.panel.split does too", async
   await expect(split(page)).not.toHaveAttribute("data-split");
   await expect(divider(page)).toHaveCount(0);
   await expect(group(page, 1)).toHaveCount(0);
-  await expect(panel(page).getByRole("tab")).toHaveText(["code-foundry", "README.md"]);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Changes", "README.md"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
   expect(await controlsGroup(page)).toBe("0");
   // Focus stayed in the panel, so the keys still work.
@@ -306,18 +306,19 @@ test("dragging the divider sets the persisted ratio, within each group's minimum
   expect((await entry(page)).ratio).toBe(kept);
 });
 
-test("each group has its own +, picker and letters; cmd+alt+\\ moves between groups; cmd+w on an empty group collapses the split", async ({ page }) => {
+test("each group has its own + and picker; cmd+alt+\\ moves between groups; cmd+w on an empty group collapses the split", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+Shift+e");
   await setPanelWidth(page, 420);
-  await page.keyboard.press("t");
+  await openThreadChanges(page);
   await expect(page.getByTestId("worktree-changes")).toBeVisible();
+  await panel(page).click({ position: { x: 200, y: 300 } });
 
   // One tab: the split keeps it, and the new second group starts on its surface list, focused.
   await page.keyboard.press("Meta+Backslash");
   await expect(split(page)).toHaveAttribute("data-split", "true");
-  await expect(tabsOf(page, 0)).toHaveText(["code-foundry"]);
+  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
   await expect(tabsOf(page, 1)).toHaveCount(0);
   await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
   await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
@@ -328,29 +329,27 @@ test("each group has its own +, picker and letters; cmd+alt+\\ moves between gro
   // cmd+w there collapses the split, back to the one group.
   await page.keyboard.press("Meta+w");
   await expect(split(page)).not.toHaveAttribute("data-split");
-  await expect(panel(page).getByRole("tab")).toHaveText(["code-foundry"]);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Changes"]);
   await expect.poll(() => region(page)).toBe("panel");
 
-  // Again, and a letter picks in the focused (second) group.
+  // Again, and a tab opened from elsewhere (a path chip's File tab) lands in the focused (second) group.
   await page.keyboard.press("Meta+Backslash");
   await expect(group(page, 1)).toHaveAttribute("data-picking", "true");
-  await page.keyboard.press("u");
-  await expect(tabsOf(page, 1)).toHaveText(["Usage"]);
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "usage");
-  await expect(tabsOf(page, 0)).toHaveText(["code-foundry"]);
+  await page.evaluate(`import("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: `${CF}/README.md` })}))`);
+  await expect(tabsOf(page, 1)).toHaveText(["README.md"]);
+  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
+  await expect(tabsOf(page, 0)).toHaveText(["Changes"]);
   await expect(group(page, 1)).not.toHaveAttribute("data-picking");
 
-  // The first group's "+": that group picks (and takes focus); the second is untouched.
+  // The first group's "+": that group picks (and takes focus); the second is untouched; Escape goes back.
   await group(page, 0).getByTestId("panel-new-tab").click();
   await expect(group(page, 0)).toHaveAttribute("data-picking", "true");
   await expect(group(page, 0)).toHaveAttribute("data-focused", "true");
   await expect(group(page, 1)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "usage");
-  // Its list opens in its group.
-  await group(page, 0).getByTestId("panel-empty").locator('[data-surface="mcp"]').click();
-  await expect(tabsOf(page, 0)).toHaveText(["code-foundry", "MCP"]);
-  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
-  await expect(tabsOf(page, 1)).toHaveText(["Usage"]);
+  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
+  await page.keyboard.press("Escape");
+  await expect(group(page, 0)).not.toHaveAttribute("data-picking");
+  await expect(group(page, 0).getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
 
   // The second group's "+", then Escape: back to its tab.
   await group(page, 1).getByTestId("panel-new-tab").click();
@@ -358,10 +357,10 @@ test("each group has its own +, picker and letters; cmd+alt+\\ moves between gro
   await expect(group(page, 1)).toHaveAttribute("data-focused", "true");
   await page.keyboard.press("Escape");
   await expect(group(page, 1)).not.toHaveAttribute("data-picking");
-  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "usage");
+  await expect(group(page, 1).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
 
-  // A click in a group's body focuses that group.
-  await group(page, 0).getByTestId("panel-body").click({ position: { x: 100, y: 60 } });
+  // A click in a group's body (its padding: a row would open its diff) focuses that group.
+  await group(page, 0).getByTestId("panel-body").click({ position: { x: 4, y: 4 } });
   await expect(group(page, 0)).toHaveAttribute("data-focused", "true");
   // cmd+alt+\ moves the keyboard to the other group, and back.
   await page.keyboard.press("Meta+Alt+Backslash");
@@ -371,15 +370,11 @@ test("each group has its own +, picker and letters; cmd+alt+\\ moves between gro
   await expect(group(page, 0)).toHaveAttribute("data-focused", "true");
   await expect.poll(() => focusedGroupEl(page)).toBe("0");
 
-  // cmd+w acts on the focused group: the first group's MCP tab closes, Usage stays.
-  await page.keyboard.press("Meta+w");
-  await expect(tabsOf(page, 0)).toHaveText(["code-foundry"]);
-  await expect(tabsOf(page, 1)).toHaveText(["Usage"]);
   // Closing a group's last tab collapses the split; focus stays in the panel.
   await page.keyboard.press("Meta+Alt+Backslash");
   await page.keyboard.press("Meta+w");
   await expect(split(page)).not.toHaveAttribute("data-split");
-  await expect(panel(page).getByRole("tab")).toHaveText(["code-foundry"]);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Changes"]);
   await expect.poll(() => region(page)).toBe("panel");
 });
 

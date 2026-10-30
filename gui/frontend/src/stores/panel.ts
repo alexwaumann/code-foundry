@@ -496,6 +496,56 @@ export function migratePanelV2(byKey: Readonly<Record<string, PanelEntryV2>>): R
   return out;
 }
 
+/** Surfaces the thread info card replaced (docs/notes/thread-header-crumb.md): their stored tabs are dropped. */
+const REMOVED_KINDS: ReadonlySet<string> = new Set(["usage", "linkedprs", "threads", "agents"]);
+
+/**
+ * A version 3 tab as version 4 keeps it: a Worktree tab of a worktree is that worktree's
+ * Changes tab (the same { project, path }, titled "Changes · <its old title>"); a Worktree
+ * tab of a workspace's folder, and a tab of a removed surface, is dropped (null).
+ */
+function tabV4(t: Tab): Tab | null {
+  if (REMOVED_KINDS.has(t.kind)) return null;
+  if (t.kind !== "worktree") return t;
+  const { project, path } = t.params;
+  return project && path ? makeTab("changes", `Changes · ${t.title}`, { project, path }) : null;
+}
+
+/**
+ * Version 3 to 4: the side panel's Worktree, Usage, Linked PRs, Threads and Agents
+ * surfaces are gone (tabV4). A group's active tab and pickFrom follow their tab's new id;
+ * a group whose active tab went shows its first tab left; a split whose group emptied is
+ * one group again. Input repaired by sanitizePanelState first.
+ */
+export function migratePanelV3(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+  const out: Record<string, PanelEntry> = {};
+  for (const [key, e] of Object.entries(byKey)) {
+    const groups = e.groups.map((g): PanelGroup => {
+      const ids = new Map<string, string>();
+      const tabs: Tab[] = [];
+      for (const t of g.tabs) {
+        const next = tabV4(t);
+        if (!next) continue;
+        ids.set(t.id, next.id);
+        tabs.push(next);
+      }
+      const pickFrom = g.pickFrom === undefined ? undefined : ids.get(g.pickFrom);
+      const active = g.activeTabId === null ? null : (ids.get(g.activeTabId) ?? null);
+      // Picking with its tab still there stays picking; anything else shows a tab when there is one.
+      if (g.activeTabId === null && pickFrom !== undefined) return { tabs, activeTabId: null, pickFrom };
+      return { tabs, activeTabId: active ?? tabs[0]?.id ?? null };
+    });
+    const kept = groups.filter((g) => g.tabs.length > 0);
+    const { focused: _focused, ratio: _ratio, ...rest } = e;
+    if (groups.length > 1 && kept.length < 2) {
+      out[key] = { ...rest, groups: [kept[0] ?? emptyGroup] };
+    } else {
+      out[key] = { ...e, groups };
+    }
+  }
+  return out;
+}
+
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** A stored tab with every field the surface registry needs; anything else is dropped. */
@@ -556,11 +606,13 @@ export const usePanelStore = create<PanelState>()(
     name: "code-foundry.panel",
     // 2: worktree tabs name their project with `project`, not `repo` (migratePanelV1).
     // 3: tab groups; the flat tab list is the first group (migratePanelV2).
-    version: 3,
+    // 4: Worktree tabs are Changes tabs; the removed surfaces' tabs go (migratePanelV3).
+    version: 4,
     migrate: (persisted, version) => {
       const byKey = ((persisted ?? {}) as { byKey?: Record<string, PanelEntryV2> }).byKey ?? {};
-      if (version >= 3) return { byKey }; // a store from a newer build: merge repairs what it can
-      return { byKey: migratePanelV2(version < 2 ? migratePanelV1(byKey) : byKey) };
+      if (version >= 4) return { byKey }; // a store from a newer build: merge repairs what it can
+      const v3 = version >= 3 ? byKey : migratePanelV2(version < 2 ? migratePanelV1(byKey) : byKey);
+      return { byKey: migratePanelV3(sanitizePanelState(v3)) };
     },
     // Every rehydrate, migrated or not, goes through sanitizePanelState: a store another
     // build wrote is never trusted as is.

@@ -1,8 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, openTooltip, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, openProjects, openTooltip, resetMock, row } from "./fixtures";
 
-// Actions (docs/notes/actions-2-gui.md): the thread header's Play menu, the editor dialog,
-// and a run's bottom-panel tab with its command echo and status line. Mock seeds
+// Actions (docs/notes/actions-2-gui.md): the Projects page row's actions menu (the thread
+// header's Play menu is gone, docs/notes/thread-header-crumb.md), the thread info card's
+// action row, the editor dialog, and a run's bottom-panel tab with its command echo and
+// status line. Mock seeds
 // (mock/actions.ts): code-foundry (s-1's project) has Dev (runs until stopped), Test
 // (exits 1 after ~2.6 s), Check, Build, Install deps (on worktree create) and Debug daemon
 // (ignores SIGHUP: Stop ends it with 137 after ~1.5 s); every other project has none. Set SHOTS=<dir> to save the notes' screenshots.
@@ -14,8 +16,10 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-const trigger = (page: Page) => page.getByTestId("thread-header").getByTestId("pane-actions-menu");
-const menu = (page: Page) => page.getByTestId("pane-actions-menu-menu");
+/** A project's main worktree row's actions menu on the Projects page. */
+const trigger = (page: Page, project = "repo-cf") => page.locator(`[data-nav-key^="pw:${project}::"]`).first().getByTestId("worktree-actions-menu");
+const menu = (page: Page) => page.getByTestId("worktree-actions-menu-menu");
+const card = (page: Page) => page.getByTestId("thread-info-card");
 const items = (page: Page) => menu(page).getByTestId("action-item");
 const item = (page: Page, name: string) => items(page).filter({ hasText: name });
 const dialog = (page: Page) => page.getByTestId("action-dialog");
@@ -29,11 +33,18 @@ async function selectThread(page: Page, id: string): Promise<void> {
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
 
-async function openMenu(page: Page, thread = "s-1"): Promise<void> {
+async function openMenu(page: Page, project = "repo-cf"): Promise<void> {
   await openApp(page);
-  await selectThread(page, thread);
-  await trigger(page).click();
+  await openProjects(page);
+  await trigger(page, project).click();
   await expect(menu(page)).toBeVisible();
+}
+
+/** The selected thread's card, its action row's menu open (its chevron). */
+async function openCardActions(page: Page): Promise<void> {
+  if ((await page.getByTestId("thread-info-toggle").getAttribute("aria-pressed")) !== "true") await page.getByTestId("thread-info-toggle").click();
+  await card(page).getByTestId("ti-action").locator("[data-row-chevron]").click();
+  await expect(page.getByTestId("ti-action-menu")).toBeVisible();
 }
 
 async function calls(name: string) {
@@ -47,23 +58,18 @@ async function actionsOf(projectId: string): Promise<{ id: string; name: string;
   return body.actions.filter((a) => a.projectId === projectId);
 }
 
-/** Runs an action from the header menu and waits for its tab to be the active one. */
+/** Runs an action from the thread info card's action menu and waits for its tab to be the active one. */
 async function runFromMenu(page: Page, name: string): Promise<string> {
-  await trigger(page).click();
-  await item(page, name).click();
-  await expect(menu(page)).toHaveCount(0);
+  await openCardActions(page);
+  await page.getByTestId("ti-action-item").filter({ hasText: name }).click();
+  await expect(page.getByTestId("ti-action-menu")).toHaveCount(0);
   const tab = bottom(page).locator('[data-kind="action"]').filter({ hasText: name }).last();
   await expect(tab.getByRole("tab")).toHaveAttribute("aria-selected", "true");
   return (await tab.getAttribute("data-tab-id")) ?? "";
 }
 
-test("the header's Play menu lists the project's actions and runs one in the thread's bottom panel", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  // Left of the bottom panel's toggle.
-  await expect(page.getByTestId("thread-header").locator('[data-testid="pane-actions-menu"] + [data-testid="bottom-toggle"]')).toHaveCount(1);
-  await expectTooltip(page, trigger(page), "Run an action");
-  await trigger(page).click();
+test("the Projects page row's menu: the project's actions, a pencil on the highlighted row, Escape through its tooltip", async ({ page }) => {
+  await openMenu(page);
   await expect(menu(page).getByTestId("actions-project")).toHaveText("code-foundry");
   await expect(items(page)).toHaveText(NAMES);
   await expect(menu(page).getByTestId("action-new")).toHaveText("New action…");
@@ -83,10 +89,17 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   await expect(menu(page)).toHaveCount(0);
   await trigger(page).click();
   await expect(items(page)).toHaveText(NAMES);
+});
 
-  // A click runs it for the thread, always in a terminal, without a toast.
-  await item(page, "Test").click();
-  await expect(menu(page)).toHaveCount(0);
+test("the card's action menu lists the project's actions and runs one in the thread's bottom panel", async ({ page }) => {
+  await openApp(page);
+  await selectThread(page, "s-1");
+  await openCardActions(page);
+  await expect(page.getByTestId("ti-action-item")).toHaveText(NAMES);
+  await page.getByTestId("ti-action-item").filter({ hasText: "Test" }).click();
+  await expect(page.getByTestId("ti-action-menu")).toHaveCount(0);
+
+  // It runs for the thread, always in a terminal, without a toast.
   await expect.poll(async () => (await calls("action.run")).map((c) => [c.args, c.context?.activeThreadId])).toEqual([[{ action: IDS.test, terminal: "true" }, "s-1"]]);
   await expect(bottom(page)).toBeVisible();
   await expect(tabs(page)).toHaveText(["code-foundry", "Test"]);
@@ -117,7 +130,7 @@ test("the header's Play menu lists the project's actions and runs one in the thr
 });
 
 test("a project without actions: the empty state and New action…", async ({ page }) => {
-  await openMenu(page, "s-2");
+  await openMenu(page, "repo-gp");
   await expect(menu(page).getByTestId("actions-empty")).toHaveText("No actions for ghostty-playground yet");
   await expect(items(page)).toHaveCount(0);
   await menu(page).getByTestId("action-new").click();
@@ -398,14 +411,12 @@ for (const scheme of ["dark", "light"] as const) {
       await page.keyboard.press("Escape");
       await expect(menu(page)).toHaveCount(0);
 
-      await selectThread(page, "s-2");
-      await trigger(page).click();
+      await trigger(page, "repo-gp").click();
       await settle();
       await page.screenshot({ path: `${dir}/menu-empty-${scheme}.png` });
       await page.keyboard.press("Escape");
       await expect(menu(page)).toHaveCount(0);
 
-      await selectThread(page, "s-1");
       await trigger(page).click();
       await menu(page).getByTestId("action-new").click();
       await dialog(page).getByTestId("action-name").fill("Install deps");

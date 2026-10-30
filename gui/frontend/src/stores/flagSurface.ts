@@ -2,19 +2,17 @@
  * From a plugin's flag on a thread to that plugin's surface (docs/notes/plugins-11-gui-gaps.md):
  * a click on a sidebar row whose line 2 shows a flag opens the thread and, when the flag's
  * plugin has a thread- or pr-scoped surface available for it, that surface's tab in the
- * thread's side panel, through the ShowView path its show command takes. The thread
- * header's flag chip opens the same surface.
+ * thread's side panel, through the ShowView path its show command takes.
  *
  * Availability is the show command's, listed for the thread's context (surfaces/plugin.ts
  * showState): right after the click the commands list is still the old selection's, so the
  * open waits for the thread's list (or gives up after a few seconds).
  */
-import { useSyncExternalStore } from "react";
 import type { ThreadFlagView } from "@/api/threads";
 import { statusLine } from "@/lib/statusLine";
 import { topFlag } from "@/lib/thread";
 import { showState } from "@/surfaces/plugin";
-import { runCommandForResult, useCommandsStore } from "./commands";
+import { useCommandsStore } from "./commands";
 import { allSurfaces, usePluginsStore, type PluginsState, type SurfaceManifest } from "./plugins";
 import { useUiStore, type Selection } from "./ui";
 import { showView } from "./views";
@@ -95,20 +93,7 @@ export function openFlagSurface(threadId: string, plugin: string, timeoutMs = 30
   });
 }
 
-/** The kind of the flag surface available for a thread, kept current ("" while unknown or none). */
-export function useFlagSurfaceKind(plugin: string, threadId: string): string {
-  return useSyncExternalStore(subscribe, () => {
-    const m = flagSurfaceFor(plugin, { kind: "thread", id: threadId });
-    return m === "unknown" || m === null ? "" : m.kind;
-  });
-}
-
-/** Opens a flag surface by kind in a thread's panel (the header chip's click). */
+/** Opens a flag surface by kind in a thread's panel. */
 export function showFlagSurface(kind: string, threadId: string): void {
   showView(`panel.${kind}?thread=${encodeURIComponent(threadId)}`);
-}
-
-/** Clears one plugin's flag on a thread (thread.flag.clear, ThreadService.ClearFlags). */
-export function clearThreadFlag(threadId: string, plugin: string): Promise<boolean> {
-  return runCommandForResult("thread.flag.clear", { id: threadId, plugin }, { quiet: true }).then((r) => r !== null);
 }

@@ -231,14 +231,14 @@ test("5: no Save as workspace for a thread in its workspace's folder", async ({ 
   const plain = (await mockPost("set-thread?projects=repo-cf,repo-gp,repo-wr&name=Plain")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await page.getByTestId("pane-thread-menu").click();
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch"]);
+  await page.getByTestId("thread-title").click();
+  await expect(page.getByTestId("thread-title-menu").locator('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')).toHaveText(["New thread on this branch"]);
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pane-thread-menu-items")).toHaveCount(0);
+  await expect(page.getByTestId("thread-title-menu")).toHaveCount(0);
   // The same set outside the folder is offered it.
   await row(page, `s:${plain.id}`).click();
-  await page.getByTestId("pane-thread-menu").click();
-  await expect(page.getByTestId("pane-thread-menu-items").getByRole("menuitem")).toHaveText(["New thread on this branch", "Save as workspace"]);
+  await page.getByTestId("thread-title").click();
+  await expect(page.getByTestId("thread-title-menu").locator('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')).toHaveText(["New thread on this branch", "Save as workspace"]);
 });
 
 test("9: a like draft whose thread is removed becomes a plain draft with the text, and says so", async ({ page }) => {
@@ -318,21 +318,15 @@ test("11, 13: the collisions the banner showed are not toasted again; a chip is 
   await expect(page.getByText(/is also open in Busy one \(s-set-/)).toHaveCount(0);
 });
 
-test("12: the thread header's place name opens the Projects page on its workspace's card (no separate chip)", async ({ page }) => {
-  for (const name of ["a1", "a2", "a3", "a4", "a5"]) await mockPost(`workspace?name=${name}&projects=repo-cf,repo-gp,repo-dot`);
+test("12: the thread header's crumb names the thread's workspace (no separate chip)", async ({ page }) => {
   await mockPost("workspace?name=shop&projects=repo-cf,repo-gp");
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&workspace=shop&name=Shop")) as ThreadSummary;
-  await page.setViewportSize({ width: 1100, height: 640 });
   await openApp(page);
   await row(page, `s:${t.id}`).click();
   await expect(page.getByTestId("pane-workspace")).toHaveCount(0);
-  const place = page.getByTestId("thread-location");
-  await expect(place.getByTestId("thread-project")).toHaveText("shop");
-  await place.click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  const header = page.locator('[data-nav-key="ws:w-000000000006"]');
-  await expect(header).toHaveAttribute("aria-selected", "true");
-  await expect(header).toBeInViewport();
+  const crumb = page.getByTestId("thread-crumb");
+  await expect(crumb).toHaveAttribute("data-icon", "layers");
+  await expect(crumb.getByTestId("thread-crumb-place")).toHaveText("shop");
 });
 
 test("16: cmd+N from a new-thread composer's prompt opens the project picker", async ({ page }) => {

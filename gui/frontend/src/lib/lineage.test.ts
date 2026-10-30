@@ -1,18 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import {
-  capIds,
   childIds,
   creatorOf,
-  hasLineage,
   lineageStatus,
-  lineageTail,
   noteCreator,
   parseCreatedByNote,
-  projectCount,
-  relatedCount,
-  siblingIds,
-  type LineageCounts,
   type LineageData,
 } from "./lineage";
 
@@ -81,71 +74,14 @@ describe("creatorOf", () => {
   });
 });
 
-describe("siblings and children", () => {
+describe("children", () => {
   it.each([
-    ["a child's siblings, spawn order, archived included", "a", siblingIds, ["b", "c", "d", "e", "f", "g"]],
-    ["the last child's siblings", "g", siblingIds, ["a", "b", "c", "d", "e", "f"]],
-    ["a removed creator's threads are still siblings", "orphan", siblingIds, ["orphan2"]],
-    ["the user's thread has no siblings", "p", siblingIds, []],
-    ["the creator's children", "p", childIds, ["a", "b", "c", "d", "e", "f", "g"]],
-    ["a child's children", "a", childIds, ["a1"]],
-    ["none", "u", childIds, []],
-    ["no thread", "", childIds, []],
-  ])("%s", (_n, id, fn, want) => {
-    expect(fn(D, id)).toEqual(want);
-  });
-
-  it("counts the projects children run in (no project is one place)", () => {
-    expect(projectCount(D, childIds(D, "p"))).toBe(3);
-    expect(projectCount(D, ["a", "d"])).toBe(1);
-    expect(projectCount(D, [])).toBe(0);
-  });
-});
-
-describe("hasLineage", () => {
-  it.each([
-    ["a creator with children", "p", true],
-    ["an agent's thread (a creator and siblings)", "a", true],
-    ["an only child: a creator, no siblings", "a1", true],
-    ["a removed creator still counts (its row stays)", "orphan", true],
-    ["a renamed creator's only child", "r1", true],
-    ["the user's thread with nothing related", "u", false],
-    ["an unknown thread", "zz", false],
-    ["no thread", "", false],
+    ["the creator's children, spawn order, archived included", "p", ["a", "b", "c", "d", "e", "f", "g"]],
+    ["a child's children", "a", ["a1"]],
+    ["none", "u", []],
+    ["no thread", "", []],
   ])("%s", (_n, id, want) => {
-    expect(hasLineage(D, id)).toBe(want);
-  });
-});
-
-describe("capIds", () => {
-  const six = ["1", "2", "3", "4", "5", "6"];
-  it.each([
-    ["under the cap", ["1", "2"], false, { shown: ["1", "2"], more: 0 }],
-    ["at the cap", six.slice(0, 5), false, { shown: six.slice(0, 5), more: 0 }],
-    ["over the cap", six, false, { shown: six.slice(0, 5), more: 1 }],
-    ["expanded", six, true, { shown: six, more: 0 }],
-  ])("%s", (_n, ids, expanded, want) => {
-    expect(capIds(ids, expanded)).toEqual(want);
-  });
-
-  it("takes another cap", () => {
-    expect(capIds(["1", "2", "3"], false, 1)).toEqual({ shown: ["1"], more: 2 });
-  });
-});
-
-describe("header figures", () => {
-  const c = (o: Partial<LineageCounts>): LineageCounts => ({ creator: "", creatorName: "", siblings: 0, children: 0, childProjects: 0, ...o });
-  it.each([
-    ["an agent's thread with siblings and a child", c({ creator: "created", siblings: 3, children: 1 }), "3 siblings · 1 child", 5],
-    ["one sibling, two children", c({ creator: "created", siblings: 1, children: 2 }), "1 sibling · 2 children", 4],
-    ["an agent's thread alone", c({ creator: "created" }), "", 1],
-    ["a removed creator", c({ creator: "removed", siblings: 2 }), "2 siblings", 3],
-    ["a foreman", c({ children: 6, childProjects: 3 }), "6 threads created from here, in 3 projects", 6],
-    ["one child", c({ children: 1, childProjects: 1 }), "1 thread created from here, in 1 project", 1],
-    ["nothing", c({}), "", 0],
-  ])("%s", (_n, counts, tail, related) => {
-    expect(lineageTail(counts)).toBe(tail);
-    expect(relatedCount(counts)).toBe(related);
+    expect(childIds(D, id)).toEqual(want);
   });
 });
 

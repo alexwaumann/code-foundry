@@ -32,7 +32,7 @@ test("Explain this PR starts a real thread with the explain prompt", async ({ pa
     await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(PROJECT, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
   };
   await openProject();
-  await expect(page.getByTestId("worktree-surface")).toBeVisible();
+  await expect(page.getByTestId("changes-surface")).toBeVisible();
   // Through the app's own store module, as a pull request row would.
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
   await expect(page.getByTestId("pr-title")).toBeVisible({ timeout: 60_000 });

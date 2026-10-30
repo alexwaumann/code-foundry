@@ -2045,7 +2045,7 @@ export enum DiffScope {
   UNSPECIFIED = 0,
 
   /**
-   * The merge base against the working tree (the worktree panel's file list).
+   * The merge base against the working tree (the Changes tab's file list).
    *
    * @generated from enum value: DIFF_SCOPE_WORKING = 1;
    */

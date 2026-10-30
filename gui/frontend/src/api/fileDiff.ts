@@ -4,7 +4,7 @@ import { orOutdatedDaemon } from "./errors";
 
 /**
  * What a worktree file diff compares: `working` the merge base with the file on disk (the
- * worktree panel's Changes list), `branch` the merge base with HEAD.
+ * Changes tab's list), `branch` the merge base with HEAD.
  */
 export type DiffScopeView = "working" | "branch";
 

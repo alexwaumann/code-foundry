@@ -13,8 +13,8 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// A thread's subagent runs (docs/notes/agents-1-daemon.md): thread.agents prints them,
-// view.panel.agents opens the GUI's Agents surface.
+// A thread's subagent runs (docs/notes/agents-1-daemon.md): thread.agents prints them;
+// the GUI shows them on the thread info card.
 
 // AgentsBackend is the slice of ThreadService the agents commands need (the runs come
 // with the items snapshot), in generated Connect signatures.
@@ -29,12 +29,7 @@ var (
 	_ AgentsBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
 
-// ViewPanelAgents is the ShowView name that opens (or reveals) the Agents surface in the
-// side panel of the selected thread: its subagent runs with their status, activity and
-// report. A window whose selection is not a thread ignores it.
-const ViewPanelAgents = "panel.agents"
-
-// RegisterAgents registers thread.agents, view.panel.agents, and the subagent view's
+// RegisterAgents registers thread.agents and the subagent view's
 // thread.agent.open and thread.agent.up (commands_agents_view.go).
 func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 	if err := r.RegisterAll(agentViewCommands(b, e)...); err != nil {
@@ -66,19 +61,6 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 				}
 				shells := int(got.Msg.GetThread().GetBackgroundShellsRunning())
 				return Result{Message: FormatAgents(runs, shells, time.Now()), JSON: &v1.ThreadAgentsChange{ThreadId: snap.GetThreadId(), Seq: snap.GetSeq(), Agents: runs}}, nil
-			},
-		},
-		Command{
-			Name:        "view.panel.agents",
-			Title:       "Show Agents",
-			Description: "Open the Agents surface in a thread's side panel (from a thread: its own; in the app: the selected one): the thread's subagent runs with their status, activity and report.",
-			Category:    "View",
-			// No default chord, like view.panel.mcp (the surface has its own key while the
-			// panel has focus).
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-				return showPanel(ctx, b, e, uctx, a, ViewPanelAgents, withAgentRuns)
 			},
 		},
 	)

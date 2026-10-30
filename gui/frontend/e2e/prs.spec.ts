@@ -172,7 +172,7 @@ test.describe("Pull Requests page", () => {
   test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {
     await openApp(page);
     await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    await expect(page.getByTestId("worktree-surface")).toBeVisible();
+    await expect(page.getByTestId("changes-surface")).toBeVisible();
     await page.keyboard.press("Meta+Shift+d");
     await expect(page.getByTestId("prs-page")).toBeVisible();
     expect((await invocations()).some((i) => i.name === "view.pullrequests")).toBe(true);

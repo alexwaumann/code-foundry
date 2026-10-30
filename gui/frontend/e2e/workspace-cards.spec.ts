@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
- * The Projects page's workspace cards and the Worktree tab's Also in list (workspaces v2,
+ * The Projects page's workspace cards (workspaces v2,
  * docs/notes/workspaces-v2-4-projects-page.md). The mock's projects: code-foundry
  * (repo-cf) and ghostty-playground (repo-gp) on GitHub, dotfiles (repo-dot), sketches
  * (repo-sk) and writing (repo-wr, no git).
@@ -260,65 +260,6 @@ test("Reveal in Finder is workspace.reveal with the card's workspace", async ({ 
   expect(inv?.args).toEqual({ workspace: mono });
 });
 
-const GP_FEAT = "/Users/dev/.code-foundry/worktrees/alexwaumann/ghostty-playground/feat-multi";
-const CF_FEAT = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/feat-multi";
-
-test("the Worktree tab's Also in: the thread's other checkouts, each opening as its own tab; none for a single-project thread", async ({ page }) => {
-  const t = (await mockPost("multi-thread?projects=repo-cf,repo-gp,repo-wr&project=repo-cf&branch=feat/multi&name=multi")) as { id: string };
-  await openApp(page);
-  await row(page, `s:${t.id}`).click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await page.keyboard.press("Meta+Shift+e");
-  await page.keyboard.press("t");
-  const surface = page.getByTestId("worktree-surface");
-  await expect(surface).toHaveAttribute("data-path", CF_FEAT);
-  const also = surface.getByTestId("worktree-also-in");
-  await expect(also.getByTestId("also-in-name")).toHaveText(["ghostty-playground", "writing"]);
-  await expect(also.locator('[data-project="repo-gp"]').getByTestId("also-in-branch")).toHaveText("feat/multi");
-  await expect(also.locator('[data-project="repo-wr"]').getByTestId("also-in-branch")).toHaveCount(0);
-  await expect(also.getByTestId("also-in-dirty")).toHaveCount(0);
-
-  // A dirty member shows its changed files, live from the project's status.
-  await mockPost(`worktree/dirty?path=${encodeURIComponent(GP_FEAT)}&modified=3`);
-  await expect(also.locator('[data-project="repo-gp"]').getByTestId("also-in-dirty")).toHaveText("3");
-
-  // A click opens that checkout as its own Worktree tab, in the thread's panel.
-  await also.locator('[data-project="repo-gp"]').click();
-  const panel = page.getByTestId("side-panel");
-  await expect(panel).toHaveAttribute("data-panel-key", `thread:${t.id}`);
-  await expect(panel.getByRole("tab", { selected: true })).toHaveText("ghostty-playground · feat/multi");
-  await expect(surface).toHaveAttribute("data-path", GP_FEAT);
-  // From there, the primary is one of the others.
-  await expect(surface.getByTestId("worktree-also-in").getByTestId("also-in-name")).toHaveText(["code-foundry", "writing"]);
-
-  // A single-project thread has no list.
-  await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+Shift+e");
-  await page.keyboard.press("t");
-  await expect(surface).toHaveAttribute("data-path", CF);
-  await expect(surface.getByTestId("worktree-surface-title")).toHaveText("code-foundry@main");
-  await expect(surface.getByTestId("worktree-also-in")).toHaveCount(0);
-});
-
-test("Also in follows the thread's set: a worktree not made yet is marked, and the list asks again when one is made", async ({ page }) => {
-  // repo-gp's worktree on the branch is made here; repo-cf's is not (a resumed thread recreates it).
-  const t = (await mockPost("multi-thread?projects=repo-gp&project=repo-gp&branch=feat/later&name=later")) as { id: string };
-  await mockPost(`thread/project-ids?id=${t.id}&projects=repo-cf,repo-gp`);
-  await openApp(page);
-  await row(page, `s:${t.id}`).click();
-  await page.keyboard.press("Meta+Shift+e");
-  await page.keyboard.press("t");
-  const also = page.getByTestId("worktree-surface").getByTestId("worktree-also-in");
-  const cf = also.locator('[data-project="repo-cf"]');
-  await expect(cf).toHaveAttribute("data-missing", "true");
-  await expect(cf.getByTestId("also-in-missing")).toHaveText("made at the next start");
-  // The worktree appears (a start made it): the list reads the checkouts again.
-  await mockPost("worktree/merged?project=repo-cf&branch=feat/later");
-  await expect(cf).not.toHaveAttribute("data-missing");
-});
-
-// ---- Fuzz round C fixes (docs/notes/workspaces-v2-fix-3-gui.md) ----
-
 test("a project named “workspace”: its star sets the project, by id, not the workspace's folder", async ({ page }) => {
   await mockPost("project/rename?id=repo-dot&name=workspace");
   const { mono } = await twoWorkspaces();
@@ -353,10 +294,10 @@ test("an unregistered member reads “not registered” and opens nothing", asyn
   await sk.dblclick();
   await page.keyboard.press("Enter");
   // No blank tab: the page's panel has no tab for it (nor opened at all).
-  await expect(page.getByTestId("side-panel").getByRole("tab", { name: "repo-sk" })).toHaveCount(0);
+  await expect(page.getByTestId("side-panel").getByRole("tab", { name: /repo-sk/ })).toHaveCount(0);
   // A registered member still opens its main worktree.
   await member(page, ws.id, "repo-cf").dblclick();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry");
+  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("Changes · code-foundry");
 });
 
 test("Edit instructions steers once: the toast names the thread (no CLI text); while it works a press only shows it", async ({ page }) => {
@@ -386,7 +327,7 @@ test("Edit instructions steers once: the toast names the thread (no CLI text); w
   expect((await invocations()).filter((i) => i.name === "thread.new")).toHaveLength(0);
 });
 
-test("member rows, Also in and the New workspace list show projects by name, not by id", async ({ page }) => {
+test("member rows and the New workspace list show projects by name, not by id", async ({ page }) => {
   // repo-cf sorts first by id; as "Zebra" it goes last by name.
   await mockPost("project/rename?id=repo-cf&name=Zebra");
   const ws = (await mockPost("workspace?name=zoo&projects=repo-cf,repo-gp,repo-dot")) as { id: string };
@@ -401,38 +342,6 @@ test("member rows, Also in and the New workspace list show projects by name, not
   await page.getByTestId("projects-new-workspace").click();
   await expect(page.getByTestId("new-workspace-project").locator("label")).toHaveText(["dotfiles", "ghostty-playground", "sketches", "writing", "Zebra"]);
   await page.keyboard.press("Escape");
-
-  // Also in, from ghostty-playground's tab: by name too.
-  const t = (await mockPost("multi-thread?projects=repo-cf,repo-gp,repo-dot&project=repo-gp&branch=feat/zoo&name=zoo")) as { id: string };
-  await row(page, `s:${t.id}`).click();
-  await page.keyboard.press("Meta+Shift+e");
-  await page.keyboard.press("t");
-  await expect(page.getByTestId("worktree-surface").getByTestId("also-in-name")).toHaveText(["dotfiles", "Zebra"]);
-});
-
-test("a thread in its workspace's folder gets a Worktree tab: the workspace and folder, then every member under Also in", async ({ page }) => {
-  const { mono } = await twoWorkspaces();
-  const t = (await mockPost(`workspace-thread?workspace=${mono}&project=workspace&name=folder`)) as { id: string };
-  await openApp(page);
-  await row(page, `s:${t.id}`).click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await page.keyboard.press("Meta+Shift+e");
-  await page.keyboard.press("t");
-  const surface = page.getByTestId("worktree-surface");
-  await expect(surface).toHaveAttribute("data-folder", "true");
-  await expect(surface).toHaveAttribute("data-workspace", mono);
-  await expect(surface.getByTestId("worktree-surface-title")).toHaveText("mono");
-  await expect(surface.getByTestId("worktree-surface-folder")).toHaveText("~/mono");
-  // No git facts for a folder.
-  await expect(surface.getByTestId("worktree-facts")).toHaveCount(0);
-  const also = surface.getByTestId("worktree-also-in");
-  await expect(also.getByTestId("also-in-name")).toHaveText(["dotfiles"]);
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("mono");
-
-  // A member opens as its own Worktree tab in the thread's panel.
-  await also.locator('[data-project="repo-dot"]').click();
-  await expect(surface).toHaveAttribute("data-project", "repo-dot");
-  await expect(surface.getByTestId("worktree-also-in")).toHaveCount(0);
 });
 
 test("skills: eight chips, then “+N more” whose tooltip lists the rest; the label sits on the first row", async ({ page }) => {

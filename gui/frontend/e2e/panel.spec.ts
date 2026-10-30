@@ -93,14 +93,13 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
   // The built-in surfaces (the mock's hello plugin adds its demo below them: plugins.spec.ts).
   const entries = empty.locator('[data-surface]:not([data-surface^="plugin."])');
-  // Agents and Threads are listed only for a thread with runs or lineage (docs/notes/panel-polish.md).
-  await expect(entries).toHaveCount(6);
-  await expect(entries).toHaveText(["FileF", "DiffD", "Pull requestP", "UsageU", "MCPM", "WorktreeT"]);
+  // The thread's own surfaces are the thread info card's (docs/notes/thread-header-crumb.md):
+  // Changes and MCP open from its rows, so the list has File, Diff and Pull request.
+  await expect(entries).toHaveCount(3);
+  await expect(entries).toHaveText(["FileF", "DiffD", "Pull requestP"]);
   for (const kind of ["files", "diff", "pullrequest"]) {
     await expect(empty.locator(`[data-surface="${kind}"]`)).toBeDisabled();
   }
-  // The thread sits in a worktree, so its Worktree entry is live (worktree-panel.spec.ts).
-  await expect(empty.locator('[data-surface="worktree"]')).toBeEnabled();
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 
   // Two panes, a shell gap (12px) apart, the panel 12px in from the window's right and bottom edges.
@@ -619,18 +618,18 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   await expect(panel(page)).not.toHaveAttribute("data-picking");
   await expect(body).toHaveAttribute("data-tab-id", "diff");
 
-  // Picking a surface adds its tab and activates it.
+  // Picking a surface activates its tab (File brings back the panel's File tab).
   await plus.click();
-  await empty.locator('[data-surface="worktree"]').click();
-  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
-  await expect(body).toHaveAttribute("data-surface", "worktree");
+  await empty.locator('[data-surface="files"]').click();
+  await expect(tabs).toHaveText(["Files", "Diff"]);
+  await expect(body).toHaveAttribute("data-surface", "files");
   await expect(panel(page)).not.toHaveAttribute("data-picking");
 
   // cmd+w goes back too (handled), instead of closing a tab or hiding the panel.
   await plus.click();
   await page.keyboard.press("Meta+w");
-  await expect(body).toHaveAttribute("data-surface", "worktree");
-  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
+  await expect(body).toHaveAttribute("data-surface", "files");
+  await expect(tabs).toHaveText(["Files", "Diff"]);
   await expect.poll(() => cmdW(page)).toEqual([true]);
 });
 
@@ -883,17 +882,15 @@ for (const scheme of ["dark", "light"] as const) {
     await openApp(page);
     await selectThread(page, "s-1");
     await page.getByTestId("panel-toggle").click();
-    const empty = panel(page).getByTestId("panel-empty");
-    await empty.locator('[data-surface="worktree"]').click();
-    await panel(page).getByTestId("panel-new-tab").click();
-    await empty.locator('[data-surface="usage"]').click();
+    await injectTab(page, "files", "Files");
+    await injectTab(page, "diff", "Diff");
     await injectTab(page, "pullrequest", "#12", { number: "12" });
     const tabs = panel(page).getByRole("tab");
     await expect(tabs).toHaveCount(3);
     await tabs.first().click();
-    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
 
-    // Lift Usage and hold it just past the first slot: the worktree tab has slid right to make room.
+    // Lift Diff and hold it just past the first slot: the Files tab has slid right to make room.
     const first = await tabs.first().boundingBox();
     await startTabDrag(page, tabs.nth(1), (first?.x ?? 0) + 22);
     await expect(panel(page).locator("[data-dragging]")).toHaveCount(1);
@@ -902,7 +899,7 @@ for (const scheme of ["dark", "light"] as const) {
     const header = await box(page, "panel-header");
     await page.screenshot({ path: `${shots ?? ""}/panel-tab-reorder-drag-closeup${suffix}.png`, clip: { x: header.left, y: header.top, width: header.right - header.left, height: header.bottom - header.top + 120 } });
     await page.mouse.up();
-    await expect(tabs.first()).toHaveText("Usage");
+    await expect(tabs.first()).toHaveText("Diff");
   });
 }
 
@@ -918,13 +915,11 @@ for (const scheme of ["dark", "light"] as const) {
     await openApp(page);
     await selectThread(page, "s-1");
     await page.getByTestId("panel-toggle").click();
-    const empty = panel(page).getByTestId("panel-empty");
-    await empty.locator('[data-surface="worktree"]').click();
-    await panel(page).getByTestId("panel-new-tab").click();
-    await empty.locator('[data-surface="usage"]').click();
+    await injectTab(page, "files", "Files");
+    await injectTab(page, "diff", "Diff");
     await expect(panel(page).getByRole("tab")).toHaveCount(2);
     await panel(page).getByRole("tab").first().click();
-    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
     await page.mouse.move(0, 0);
     await shot("panel-new-tab-strip");
 

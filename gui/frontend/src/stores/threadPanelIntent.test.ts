@@ -43,11 +43,7 @@ beforeEach(() => {
 });
 
 describe("a ShowView scoped to a thread", () => {
-  it.each([
-    ["panel.usage", "usage"],
-    ["panel.mcp", "mcp"],
-    ["panel.worktree", `worktree?path=${encodeURIComponent(WEB_FEAT)}&project=web`],
-  ])("%s opens the tab in that thread's panel and leaves the selection and focus alone", (name, tab) => {
+  it.each([["panel.mcp", "mcp"]])("%s opens the tab in that thread's panel and leaves the selection and focus alone", (name, tab) => {
     show(name, "b");
     expect(useUiStore.getState().selection).toEqual(inA);
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
@@ -57,38 +53,36 @@ describe("a ShowView scoped to a thread", () => {
   });
 
   it("on the selected thread shows the change at once, still without taking focus", () => {
-    show("panel.usage", "a");
+    show("panel.mcp", "a");
     expect(getPanel().open).toBe(true);
-    expect(tabIds("thread:a")).toEqual(["usage"]);
+    expect(tabIds("thread:a")).toEqual(["mcp"]);
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
     expect(useUiStore.getState().focus).toBe("content");
   });
 
   it("is there when the user opens the thread", () => {
-    show("panel.usage", "b");
+    show("panel.mcp", "b");
     useUiStore.getState().select({ kind: "thread", id: "b" });
     expect(getPanel().open).toBe(true);
-    expect(tabIds("thread:b")).toEqual(["usage"]);
+    expect(tabIds("thread:b")).toEqual(["mcp"]);
   });
 
   it("applies while the settings page is up, which stays", () => {
     useViewsStore.setState({ settingsOpen: true });
-    show("panel.usage", "b");
+    show("panel.mcp", "b");
     expect(getPanel("thread:b").open).toBe(true);
     expect(useViewsStore.getState().settingsOpen).toBe(true);
   });
 
-  it("a surface the thread cannot show changes nothing and says nothing", () => {
-    expect(showThreadView("panel.worktree", "home")).toBe(false); // in no worktree
-    expect(showThreadView("panel.linked-prs", "b")).toBe(false); // no linked pull requests
-    expect(showThreadView("panel.agents", "b")).toBe(false); // no subagent runs
+  it("the removed surfaces' names change nothing and say nothing", () => {
+    for (const name of ["panel.worktree", "panel.linked-prs", "panel.agents", "panel.usage", "panel.threads"]) expect(showThreadView(name, "b")).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
     expect(toast).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
   it("a thread the window does not know, or a name that is no panel action, changes nothing", () => {
-    expect(showThreadView("panel.usage", "zz")).toBe(false);
+    expect(showThreadView("panel.mcp", "zz")).toBe(false);
     expect(showThreadView("settings", "b")).toBe(false);
     show("settings", "b");
     show("dashboard", "b");
@@ -98,10 +92,10 @@ describe("a ShowView scoped to a thread", () => {
   });
 
   describe("the panel actions", () => {
-    const usage = makeTab("usage", "Usage");
+    const file = makeTab("files", "a.go", { path: "/src/web/a.go" });
     const mcp = makeTab("mcp", "MCP");
     beforeEach(() => {
-      usePanelStore.setState({ byKey: { "thread:b": { open: false, groups: [{ tabs: [usage, mcp], activeTabId: usage.id }] } } });
+      usePanelStore.setState({ byKey: { "thread:b": { open: false, groups: [{ tabs: [file, mcp], activeTabId: file.id }] } } });
     });
 
     it("panel.toggle shows, then hides the thread's panel", () => {
@@ -120,7 +114,7 @@ describe("a ShowView scoped to a thread", () => {
 
     it("panel.new-tab shows the surface list", () => {
       show("panel.new-tab", "b");
-      expect(getPanel("thread:b")).toMatchObject({ open: true, groups: [{ activeTabId: null, pickFrom: usage.id }] });
+      expect(getPanel("thread:b")).toMatchObject({ open: true, groups: [{ activeTabId: null, pickFrom: file.id }] });
     });
 
     it("panel.split splits a hidden panel, shown; then joins it", () => {
@@ -200,22 +194,22 @@ describe("a ShowView scoped to a thread", () => {
   });
 
   it("without a thread id it acts on the selection as before, and takes focus", () => {
-    show("panel.usage");
-    expect(tabIds("thread:a")).toEqual(["usage"]);
+    show("panel.mcp");
+    expect(tabIds("thread:a")).toEqual(["mcp"]);
     expect(useUiStore.getState().panelFocusSeq).toBe(1);
   });
 
   it("--focus: the focusThread before it selects the thread, then its panel opens", () => {
     applyIntent({ kind: "focusThread", threadId: "b" });
-    show("panel.usage", "b");
+    show("panel.mcp", "b");
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "b" });
     expect(getPanel().open).toBe(true);
-    expect(tabIds("thread:b")).toEqual(["usage"]);
+    expect(tabIds("thread:b")).toEqual(["mcp"]);
   });
 
   it("does not drop a pending focusThread", () => {
     applyIntent({ kind: "focusThread", threadId: "late" });
-    show("panel.usage", "b");
+    show("panel.mcp", "b");
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, late: thread("late", { createdAtMs: null }) }, order: [...s.order, "late"] }));
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "late" });
   });

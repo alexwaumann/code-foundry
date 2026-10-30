@@ -138,7 +138,7 @@ message UiIntent {
   // Project dialog (project.add without a path). Unknown names are ignored.
   message ShowView {
     string name = 1;
-    // The thread whose side panel a panel action ("panel.toggle", "panel.worktree", ...)
+    // The thread whose side panel a panel action ("panel.toggle", "panel.mcp", ...)
     // applies to, without changing what any window has selected: the thread's panel
     // changes now if a window shows it, and is that way when the user opens it. Empty:
     // the action applies to whatever each window has selected. Set by the view.panel.*

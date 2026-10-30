@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { expectProjectRevealed } from "./fixtures";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
@@ -61,7 +62,7 @@ test("create a project with the New tab; the publish picker lists the viewer", a
   try {
     await page.getByTestId("add-project-create").click();
     await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
-    await expect(page.getByTestId("worktree-surface-title")).toHaveText(new RegExp(`^${name}@`));
+    await expectProjectRevealed(page, name);
     expect(await projectAt(dest)).not.toBe("");
 
     await page.getByTestId("publish-github").click();

@@ -465,7 +465,7 @@ message GetWorktreeDetailResponse {
 // What GetWorktreeFileDiff compares.
 enum DiffScope {
   DIFF_SCOPE_UNSPECIFIED = 0;
-  // The merge base against the working tree (the worktree panel's file list).
+  // The merge base against the working tree (the Changes tab's file list).
   DIFF_SCOPE_WORKING = 1;
   // The merge base against HEAD (what is committed on the branch).
   DIFF_SCOPE_BRANCH = 2;

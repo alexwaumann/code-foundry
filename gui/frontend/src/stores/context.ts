@@ -26,7 +26,7 @@ function allWorktrees(projects: ProjectsData): WorktreeRef[] {
   return projects.order.flatMap((id) => projects.byId[id]?.worktrees.map((w) => ({ projectId: id, path: w.path })) ?? []);
 }
 
-/** The context of an action on one worktree (the Projects page's rows, the panel's worktree tab): no selection involved. */
+/** The context of an action on one worktree (the Projects page's rows): no selection involved. */
 export function worktreeContext(projectId: string, path: string): UiContextView {
   return { ...emptyContext, activeProjectId: projectId, activeWorktreePath: path, activeView: "projects" };
 }
@@ -59,7 +59,7 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
  * its place (project, worktree) and its workspace; a thread has no terminal of its own, so
  * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
  * composer looks only at its project. Actions on a worktree that is not
- * selected (the Projects page, the panel's worktree tab) build their context with
+ * selected (the Projects page) build their context with
  * worktreeContext / projectContext.
  */
 export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {

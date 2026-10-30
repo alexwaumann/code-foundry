@@ -256,7 +256,7 @@ export class PrDetailWorld {
     this.details.set(key(CF, 140), this.readOnlyDetail());
     this.details.set(key(CF, 146), this.forkDetail());
     // #147: the viewer's open pull request whose checks fail, on no dashboard (the
-    // Linked PRs surface's fixtures link it with /__mock/link-pr).
+    // linked PRs fixtures, e2e/linkedprs.spec.ts, link it with /__mock/link-pr).
     this.details.set(key(CF, 147), this.linkedDetail());
     // #139: a teammate's pull request awaiting the viewer's review, in a repository the
     // viewer can write to (the summary-built detail would be read-only).

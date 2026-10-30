@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, listProjects, mockPost, mockUrl, openAddProjectDialog, openApp, projectAt, resetMock } from "./fixtures";
+import { expectProjectRevealed, invocations, listProjects, mockPost, mockUrl, openAddProjectDialog, openApp, projectAt, resetMock } from "./fixtures";
 
 // The Add Project dialog's folder-of-repos scan (docs/notes/workspaces-v2-6-scan.md): a
 // folder that is not a git repository but has git repositories directly inside it asks
@@ -96,7 +96,7 @@ test("Add as project adds the folder as one plain project", async ({ page }) => 
   expect(await projectAt("/Users/dev/product/web")).toBeUndefined();
   expect(await listWorkspaces()).toEqual([]);
   expect((await invocations()).filter((i) => i.name === "project.add-workspace")).toEqual([]);
-  await expect(page.getByTestId("worktree-surface-title")).toContainText("product");
+  await expectProjectRevealed(page, "product");
 });
 
 test("editing the path drops the question; repos and plain folders add at once", async ({ page }) => {

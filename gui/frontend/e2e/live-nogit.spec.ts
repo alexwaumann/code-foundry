@@ -44,9 +44,7 @@ test("register a plain folder, see No git everywhere, then project git init turn
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
 
     await page.locator(`[data-nav-key="p:${project.id}"]`).dblclick();
-    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "false");
-    await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
-    await expect(page.getByTestId("init-git")).toBeEnabled();
+    await expect(page.getByTestId("changes-nogit")).toContainText("Not a git repository");
     await expect(page.getByTestId("worktree-changes")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-overview.png") });
 
@@ -55,11 +53,10 @@ test("register a plain folder, see No git everywhere, then project git init turn
     const branch = after.defaultBranch ?? "";
     expect(branch).not.toBe("");
 
-    // The open overview follows the project event: the normal git overview, no remote.
-    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "true");
-    await expect(page.getByTestId("worktree-surface-title")).toHaveText(`${project.name}@${branch}`);
-    await expect(page.getByTestId("worktree-facts")).toBeVisible();
-    await expect(page.getByTestId("publish-github")).toBeEnabled();
+    // The open Changes tab follows the project event: the lists, and the row offers Publish (no remote).
+    await expect(page.getByTestId("changes-nogit")).toHaveCount(0);
+    await expect(page.getByTestId("worktree-changes")).toBeVisible();
+    await expect(card.getByTestId("project-publish")).toBeVisible();
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-after-init.png") });
   } finally {
     cli("terminal", "kill", "--id", term.id, "--yes");

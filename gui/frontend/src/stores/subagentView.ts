@@ -6,7 +6,7 @@
  * when the run leaves the thread's list (or turns out to be a nested one).
  *
  * Opened through thread.agent.open (stores/subagentActions.ts: the Agent rows' Open, the
- * strip's names, the Agents tab's rows; the daemon answers with UiIntent.ShowAgentRun,
+ * strip's names, the thread info card's agent rows; the daemon answers with UiIntent.ShowAgentRun,
  * which reaches every window like the CLI's), left through thread.agent.up (Escape, the
  * header's back button and crumb, the plate's Back; this window's own, presented locally
  * like view.panel.toggle, the CLI's through ShowView "agent.up").
@@ -44,11 +44,6 @@ export function getViewing(): SubagentViewing | null {
 /** The run the content pane shows for this thread, "" for the thread itself (narrow: a string). */
 export function useViewingRun(threadId: string): string {
   return useSubagentViewStore((s) => (s.viewing?.threadId === threadId ? s.viewing.runId : ""));
-}
-
-/** Whether this run of this thread is the one on screen (the Agents tab's "viewing" row). */
-export function useIsViewing(threadId: string, runId: string): boolean {
-  return useSubagentViewStore((s) => s.viewing?.threadId === threadId && s.viewing.runId === runId);
 }
 
 /**

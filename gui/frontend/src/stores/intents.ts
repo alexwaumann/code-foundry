@@ -16,7 +16,7 @@ import { showThreadView } from "./threadPanelIntent";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
-import { showWorktreeOnProjectsPage } from "./worktreePanel";
+import { showProjectOnProjectsPage } from "./projectsPage";
 
 /**
  * A focusTerminal intent whose terminal the stores did not know yet. revealShell shows it
@@ -119,8 +119,8 @@ export function applyIntent(intent: UiIntentView): void {
       focusThread(intent.threadId, intent.explicit ?? false);
       break;
     case "focusProject":
-      // The Projects page with the worktree (default: the project's main one) in its panel.
-      showWorktreeOnProjectsPage(intent.projectId, intent.worktreePath);
+      // The Projects page, its cursor on the project (or the worktree's) row.
+      showProjectOnProjectsPage(intent.projectId, intent.worktreePath);
       break;
     case "openPalette":
       ui.openPalette(intent.query);

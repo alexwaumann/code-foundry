@@ -5,12 +5,10 @@ import { emptyThreads, replaceThreads, useThreadsStore } from "@/stores/threads"
 import type { Selection } from "@/stores/ui";
 import { diffSurface } from "./diff";
 import { filesSurface } from "./files";
-import { linkedPrsSurface } from "./linkedprs";
+import { changesSurface } from "./changes";
 import { mcpSurface } from "./mcp";
 import { selectionHasNoProject } from "./noProject";
 import { pullRequestSurface } from "./pullrequest";
-import { usageSurface } from "./usage";
-import { worktreeSurface } from "./worktree";
 
 const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "r1", workspaceId: "", worktreePath: "/src/app", pendingWorktreePath: "", linkedPullRequests: [], ...o }) as ThreadView;
 const projects = replaceProjects([
@@ -46,14 +44,13 @@ describe("selectionHasNoProject", () => {
 });
 
 describe("the side panel of a thread without a project", () => {
-  it("lists no files, diff, pull request, workspace or worktree surface; thread surfaces stay", () => {
+  it("lists no files, diff or pull request surface; Changes and MCP are never listed", () => {
     useProjectsStore.setState(projects);
     useThreadsStore.setState(threads);
     const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "thread:home" };
-    for (const spec of [filesSurface, diffSurface, pullRequestSurface, worktreeSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
-    for (const spec of [linkedPrsSurface, usageSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "enabled"]);
     const proj = { selection: { kind: "thread", id: "proj" } as Selection, panelKey: "thread:proj" };
+    for (const spec of [filesSurface, diffSurface, pullRequestSurface, changesSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
+    for (const spec of [changesSurface, mcpSurface]) expect([spec.kind, spec.available(proj)]).toEqual([spec.kind, "hidden"]);
     expect(filesSurface.available(proj)).toBe("disabled");
-    expect(worktreeSurface.available(proj)).toBe("enabled");
   });
 });

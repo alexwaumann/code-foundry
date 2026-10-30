@@ -1,22 +1,19 @@
 /**
  * Thread lineage (docs/notes/agents-3-lineage-gui.md): which thread's agent created a
- * thread (`createdBy`, docs/notes/agents-2-metadata.md), its siblings (the creator's other
- * threads) and its children (threads created from it). Pure, over the thread list; the
+ * thread (`createdBy`, docs/notes/agents-2-metadata.md) and its children (threads created
+ * from it). Pure, over the thread list; the
  * narrow selectors live in stores/lineage.ts. Order is always spawn order: the list's
  * `order` (creation time, then id). A creator is resolved by its id and shown under its
  * current name (docs/notes/lineage-by-id.md).
  */
 import type { ThreadView } from "@/api/threads";
-import { statusLine, type StatusTone } from "./statusLine";
+import { statusLine } from "./statusLine";
 
 /** The thread list as lineage reads it (stores/threads ThreadsData). */
 export interface LineageData {
   byId: Readonly<Record<string, ThreadView>>;
   order: readonly string[];
 }
-
-/** The Threads panel shows this many siblings, then a "+N more" row that expands. */
-export const SIBLINGS_CAP = 5;
 
 /**
  * Who created a thread, resolved by the creator's id (docs/notes/lineage-by-id.md): its id,
@@ -47,96 +44,14 @@ export function creatorOf(data: LineageData, id: string): Creator | null {
   return resolveCreator(data, t.createdBy, t.createdByName);
 }
 
-/** Other threads with the same creator, in spawn order; none for a thread the user made. */
-export function siblingIds(data: LineageData, id: string): string[] {
-  const by = data.byId[id]?.createdBy ?? "";
-  if (!by) return [];
-  return data.order.filter((x) => x !== id && data.byId[x]?.createdBy === by);
-}
-
 /** Threads created from this one, in spawn order. */
 export function childIds(data: LineageData, id: string): string[] {
   if (!id) return [];
   return data.order.filter((x) => x !== id && data.byId[x]?.createdBy === id);
 }
 
-/**
- * Whether the thread has any lineage to show: a creator (removed ones count: the panel
- * keeps their row), siblings or children. The Threads surface is listed only then.
- */
-export function hasLineage(data: LineageData, id: string): boolean {
-  return creatorOf(data, id) !== null || siblingIds(data, id).length > 0 || childIds(data, id).length > 0;
-}
-
-/** The first `cap` ids while collapsed, and how many the "+N more" row hides. */
-export function capIds(ids: readonly string[], expanded: boolean, cap = SIBLINGS_CAP): { shown: readonly string[]; more: number } {
-  if (expanded || ids.length <= cap) return { shown: ids, more: 0 };
-  return { shown: ids.slice(0, cap), more: ids.length - cap };
-}
-
-/** How many projects the threads run in ("" for no project counts as one place). */
-export function projectCount(data: LineageData, ids: readonly string[]): number {
-  return new Set(ids.map((x) => data.byId[x]?.projectId ?? "")).size;
-}
-
-/** The figures of the panel's header. */
-export interface LineageCounts {
-  /** "created" when an agent made the thread, "removed" when that thread is gone, "" when the user did. */
-  creator: "" | "created" | "removed";
-  creatorName: string;
-  siblings: number;
-  children: number;
-  /** Projects the children run in. */
-  childProjects: number;
-}
-
-/** Rows besides "This thread": the creator (removed too: its row stays), siblings and children. */
-export function relatedCount(c: LineageCounts): number {
-  return (c.creator ? 1 : 0) + c.siblings + c.children;
-}
-
-function plural(n: number, one: string, many: string): string {
-  return `${String(n)} ${n === 1 ? one : many}`;
-}
-
-/**
- * The header's second line after the creator part: "3 siblings · 1 child" for an agent's
- * thread (zero parts left out), "6 threads created from here, in 3 projects" for one the
- * user made. "" when there is nothing to add.
- */
-export function lineageTail(c: LineageCounts): string {
-  if (c.creator) {
-    const parts: string[] = [];
-    if (c.siblings > 0) parts.push(plural(c.siblings, "sibling", "siblings"));
-    if (c.children > 0) parts.push(plural(c.children, "child", "children"));
-    return parts.join(" · ");
-  }
-  if (c.children === 0) return "";
-  return `${plural(c.children, "thread", "threads")} created from here, in ${plural(c.childProjects, "project", "projects")}`;
-}
-
-/** A related thread's status in the panel, in the sidebar's words and tones. */
+/** A related thread's status (the card's lineage rows), in the sidebar's terms. */
 export type LineageStatus = "working" | "input" | "finished" | "error" | "idle" | "archived" | "snoozed";
-
-export const lineageStatusWords: Readonly<Record<LineageStatus, string>> = {
-  working: "Working",
-  input: "Needs input",
-  finished: "Finished",
-  error: "Error",
-  idle: "Idle",
-  archived: "Archived",
-  snoozed: "Snoozed",
-};
-
-export const lineageStatusTones: Readonly<Record<LineageStatus, StatusTone>> = {
-  working: "sky",
-  input: "amber",
-  finished: "emerald",
-  error: "red",
-  idle: "muted",
-  archived: "muted",
-  snoozed: "muted",
-};
 
 /**
  * The thread's status word: archived and snoozed first (such a thread is stopped and

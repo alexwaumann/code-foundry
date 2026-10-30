@@ -60,7 +60,7 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
 
 /**
  * Makes a fresh copy the composer's default Work in choice (the default is the project
- * folder itself), for specs that exercise the new-worktree flow: the base picker, Also in,
+ * folder itself), for specs that exercise the new-worktree flow: the base picker,
  * thread.new --new-worktree.
  */
 export async function freshCopyByDefault(): Promise<void> {
@@ -141,7 +141,7 @@ export async function openProjects(page: Page): Promise<void> {
 }
 
 /**
- * Shows a worktree's overview: the Projects page with the worktree's tab in the page's
+ * Shows a worktree's Changes tab: the Projects page with the worktree's tab in the page's
  * side panel, by double-clicking its row (a project's worktree row, or a workspace
  * member row when `workspaceId` is given). The page stays selected: the palette has no
  * worktree context here; tests that need one select a thread in the worktree.
@@ -150,14 +150,31 @@ export async function selectWorktree(page: Page, projectId: string, path: string
   await openProjects(page);
   const key = workspaceId ? `m:${workspaceId}::${projectId}` : `pw:${projectId}::${path}`;
   await page.locator(`[data-nav-key="${key}"]`).dblclick();
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-path", path);
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", path);
 }
 
-/** Shows a project's main worktree in the Projects page's side panel by double-clicking the project row. */
+/** Shows a project's main worktree's Changes tab in the Projects page's side panel by double-clicking the project row. */
 export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjects(page);
   await page.locator(`[data-nav-key="p:${projectId}"]`).dblclick();
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-project", projectId);
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", projectId);
+}
+
+/**
+ * Opens the selected thread's own Changes tab in its panel, as the thread info card's
+ * Changes row does (stores/changesPanel.ts openChangesTab), without the card: tests of
+ * the panel's tabs start from it. The panel shows, unfocused.
+ */
+export async function openThreadChanges(page: Page): Promise<void> {
+  const path = await page.evaluate(`Promise.all([import("/src/stores/changesPanel.ts"), import("/src/stores/threads.ts"), import("/src/stores/ui.ts")]).then(([c, t, u]) => {
+    const sel = u.useUiStore.getState().selection;
+    const th = sel.kind === "thread" ? t.useThreadsStore.getState().byId[sel.id] : undefined;
+    if (!th) return "";
+    c.openChangesTab("current", th.projectId, th.worktreePath, true);
+    return th.worktreePath;
+  })`);
+  expect(path).not.toBe("");
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-path", String(path));
 }
 
 export function row(page: Page, key: string) {
@@ -268,4 +285,16 @@ export async function dragSelect(page: Page, within: Locator, text: string): Pro
   await page.mouse.move(to.x, to.y, { steps: 4 });
   await page.mouse.up();
   return to;
+}
+
+/**
+ * The Projects page shows with its cursor on a project's row (or, for `worktreeBranch`,
+ * on that worktree's row): where a project just added or ui.focus.project lands
+ * (stores/projectsPage.ts showProjectOnProjectsPage).
+ */
+export async function expectProjectRevealed(page: Page, name: string, worktreeBranch?: string): Promise<void> {
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  const prefix = worktreeBranch ? "pw:" : "p:";
+  const cursor = page.locator(`[data-nav-key^="${prefix}"][aria-selected="true"]`);
+  await expect(cursor).toContainText(worktreeBranch ?? name);
 }

@@ -88,9 +88,11 @@ test("one project: place, branch, pull requests, changes, shells, lineage, MCP, 
   await expect(c.getByTestId("ti-usage-kind")).toHaveCount(4);
   await expect(c.getByTestId("ti-usage-detail")).toContainText("Requests");
 
-  // Changes opens the cwd's Worktree tab; a pull request its PR tab.
+  // Changes opens the cwd's Changes tab (its files and commits); a pull request its PR tab.
   await c.getByTestId("ti-changes").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
+  await expect(page.getByTestId("changes-surface").getByTestId("file-name")).toHaveText(["tree.ts", "Sidebar.tsx", "tree.test.ts", "sidebar-tree.md"]);
+  await expect(page.getByRole("tab", { selected: true })).toHaveText(/^Changes$/);
   // At 1280px the side panel leaves the conversation too little room: the card steps aside until it closes.
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
   await page.getByTestId("panel-toggle").click();
@@ -163,6 +165,12 @@ test("nine projects in a workspace: Run in menu, other projects' pull requests, 
   await expect(c.getByTestId("ti-changes-meta")).toHaveText(/· 4 projects/);
   await c.getByTestId("ti-changes").click();
   await expect(c.getByTestId("ti-changes-project")).toHaveCount(4);
+  // A project's row opens that checkout's Changes tab, named for the project.
+  await c.locator('[data-testid="ti-changes-project"][data-project="repo-web"]').click();
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "changes");
+  await expect(page.getByTestId("changes-surface")).toHaveAttribute("data-project", "repo-web");
+  await expect(page.getByTestId("changes-surface").getByTestId("file-name")).toHaveText(["auth.ts", "auth.test.ts"]);
+  await page.getByTestId("panel-toggle").click();
 
   // Diverged: Fix sends the thread its prompt, the composer's draft untouched.
   await expect(c.getByTestId("ti-git")).toHaveAttribute("data-kind", "diverged");

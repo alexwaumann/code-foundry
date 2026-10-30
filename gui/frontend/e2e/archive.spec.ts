@@ -134,8 +134,9 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
-  // The header's Archive button: the mock, like the daemon, asks while Claude is working.
-  await page.getByTestId("thread-header").getByRole("button", { name: "Archive Thread" }).click();
+  // The title menu's Archive: the mock, like the daemon, asks while Claude is working.
+  await page.getByTestId("thread-header").getByTestId("thread-title").click();
+  await page.getByTestId("thread-title-menu").getByTestId("menu-archive").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Claude is still working; archiving ends the turn.");
   await page.getByTestId("confirm-ok").click();
@@ -158,8 +159,10 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
-  // The header button now unarchives.
-  await expect(page.getByTestId("thread-header").getByRole("button", { name: "Unarchive Thread" })).toBeVisible();
+  // The title menu now unarchives.
+  await page.getByTestId("thread-header").getByTestId("thread-title").click();
+  await expect(page.getByTestId("thread-title-menu").getByTestId("menu-archive")).toHaveText("Unarchive");
+  await page.keyboard.press("Escape");
   const confirmed = (await invocations()).filter((i) => i.name === "thread.archive");
   expect(confirmed.map((i) => i.confirmed)).toEqual([false, true]);
 

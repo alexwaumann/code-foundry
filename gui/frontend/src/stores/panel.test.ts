@@ -12,6 +12,7 @@ import {
   makeTab,
   migratePanelV1,
   migratePanelV2,
+  migratePanelV3,
   movePanelTab,
   moveTab,
   openSurface,
@@ -101,10 +102,11 @@ describe("migratePanelV1", () => {
     expect(got["thread:s-2"]).toEqual(legacy(false, [files, pr], pr.id));
   });
 
-  it("rehydrates a version 1 store through it", async () => {
+  it("rehydrates a version 1 store through it (and on: its Worktree tab is a Changes tab now)", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": legacy(true, [old], old.id) } } }));
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("thread:s-1")).toEqual(entry(true, [renamed], renamed.id));
+    const changes = makeTab("changes", "Changes · web", { project: "web", path: "/src/web" });
+    expect(getPanel("thread:s-1")).toEqual(entry(true, [changes], changes.id));
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });
@@ -126,11 +128,54 @@ describe("migratePanelV2", () => {
     expect(migratePanelV2({ a: legacy(true, [files], files.id), b: legacy(false, [], null) })).toEqual({ a: entry(true, [files], files.id), b: emptyEntry });
   });
 
-  it("rehydrates a version 2 store through it and saves it as version 3", async () => {
+  it("rehydrates a version 2 store through it and saves it as version 4", async () => {
     localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 2, state: { byKey: { "thread:s-1": { ...legacy(true, [files, diff], null, files.id), width: 500 } } } }));
     await usePanelStore.persist.rehydrate();
     expect(getPanel("thread:s-1")).toEqual({ ...picking([files, diff], files.id), width: 500 });
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 3, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 4, state: { byKey: { "thread:s-1": { groups: [{ pickFrom: files.id }] } } } });
+    localStorage.clear();
+    usePanelStore.setState({ byKey: {} });
+  });
+});
+
+describe("migratePanelV3 (docs/notes/thread-header-crumb.md)", () => {
+  const wt = makeTab("worktree", "web · cf/x", { project: "web", path: "/wt/web/cf-x" });
+  const changes = makeTab("changes", "Changes · web · cf/x", { project: "web", path: "/wt/web/cf-x" });
+  const folder = makeTab("worktree", "platform", { workspace: "w-1", path: "/ws/platform" });
+  const usage = makeTab("usage", "Usage");
+  const linked = makeTab("linkedprs", "Linked PRs");
+  const threads = makeTab("threads", "Threads");
+  const agents = makeTab("agents", "Agents");
+
+  const cases: [string, PanelEntry, PanelEntry][] = [
+    ["a worktree tab is its worktree's Changes tab, active still", entry(true, [files, wt], wt.id), entry(true, [files, changes], changes.id)],
+    ["the removed surfaces' tabs go; the active one's place goes to the first left", entry(true, [usage, files, linked, threads, agents], agents.id), entry(true, [files], files.id)],
+    ["a workspace folder's Worktree tab goes", entry(true, [folder, diff], diff.id), entry(true, [diff], diff.id)],
+    ["nothing left: an empty group", entry(false, [usage, folder], usage.id), entry(false, [], null)],
+    ["picking from a worktree tab picks from its Changes tab", picking([wt, files], wt.id), picking([changes, files], changes.id)],
+    ["picking from a removed tab shows the first tab left", picking([usage, files], usage.id), entry(true, [files], files.id)],
+    ["other tabs and the entry's fields stay", { ...entry(true, [pr, files], pr.id), width: 480, expanded: true }, { ...entry(true, [pr, files], pr.id), width: 480, expanded: true }],
+    [
+      "a split keeps both groups while each has a tab, its ratio and focus too",
+      { open: true, groups: [{ tabs: [wt], activeTabId: wt.id }, { tabs: [files, usage], activeTabId: usage.id }], ratio: 0.4, focused: 1 },
+      { open: true, groups: [{ tabs: [changes], activeTabId: changes.id }, { tabs: [files], activeTabId: files.id }], ratio: 0.4, focused: 1 },
+    ],
+    [
+      "a split whose group emptied is one group, no ratio or focus",
+      { open: true, groups: [{ tabs: [files], activeTabId: files.id }, { tabs: [threads, agents], activeTabId: threads.id }], ratio: 0.4, focused: 1 },
+      entry(true, [files], files.id),
+    ],
+  ];
+  it.each(cases)("%s", (_name, before, want) => {
+    expect(migratePanelV3({ k: before })).toEqual({ k: want });
+  });
+
+  it("rehydrates a version 3 store through it and saves it as version 4", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 3, state: { byKey: { "thread:s-1": entry(true, [usage, wt], usage.id), "view:projects": entry(true, [wt], wt.id) } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("thread:s-1")).toEqual(entry(true, [changes], changes.id));
+    expect(getPanel("view:projects")).toEqual(entry(true, [changes], changes.id));
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ version: 4 });
     localStorage.clear();
     usePanelStore.setState({ byKey: {} });
   });

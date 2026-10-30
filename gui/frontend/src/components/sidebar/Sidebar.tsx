@@ -72,7 +72,7 @@ function useListRows(): ListRows {
 
 /**
  * The row the selection highlights: the selected thread's, or for a thread hidden from the
- * sidebar (opened from the Threads tab, the palette, a link) its nearest shown ancestor's
+ * sidebar (opened from its creator's thread info card, the palette, a link) its nearest shown ancestor's
  * (lib/inSidebar.ts sidebarAnchor); null when none (the dashboard, a page, a hidden thread
  * with no shown ancestor). Arrow keys start from it. Derived, a primitive selector.
  */
@@ -230,7 +230,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   // The ring is drawn only for a keyboard cursor that is on a shown row.
   const shownCursor = cursorKey !== null && rows[cursorIndex]?.key === cursorKey ? cursorKey : null;
 
-  // A selection made elsewhere (the palette, the Threads tab, a link, an intent) moves the
+  // A selection made elsewhere (the palette, the thread info card, a link, an intent) moves the
   // highlight: an old keyboard cursor elsewhere is dropped, so arrows start from the
   // highlighted row (a hidden thread's shown ancestor included). A row's own click or
   // Enter sets the cursor to that row first, so it stays.

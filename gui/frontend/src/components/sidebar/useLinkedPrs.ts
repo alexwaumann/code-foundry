@@ -25,7 +25,7 @@ const numberOf = (key: string): number => Number(key.slice(key.lastIndexOf("#") 
 
 /**
  * What the GUI already holds on each linked pull request, without reading anything new:
- * its cached detail (the Linked PRs surface's and the thread header's reads), the
+ * its cached detail (the thread info card's and the PR tab's reads), the
  * viewer's dashboard and any branch's list on screen; the freshest read wins. Each
  * selector returns the stores' own objects, so a row re-renders only when one of its
  * pull requests is re-read.

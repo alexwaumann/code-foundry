@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"connectrpc.com/connect"
 
@@ -25,13 +24,6 @@ import (
 // that the thread exists, and the surfaces that it has something to show.
 type ThreadGetter interface {
 	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
-}
-
-// PanelThreads reads threads for the panel verbs: one (Get), and the threads one
-// created (List), which view.panel.threads needs to know the thread has lineage.
-type PanelThreads interface {
-	ThreadGetter
-	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
 }
 
 // panelThreadArgs are the --thread and --focus args of every verb that acts on a side
@@ -84,47 +76,8 @@ func placed(ok func(*v1.Thread) bool, why string) panelCheck {
 	}
 }
 
-// inWorktree is view.panel.worktree's check (view.panel.diff's starts with it).
+// inWorktree is the first step of view.panel.diff's check: the thread runs in a project worktree.
 var inWorktree = placed(func(t *v1.Thread) bool { return t.GetProjectId() != "" && t.GetWorktreePath() != "" }, "runs in no project worktree")
-
-// inWorktreeOrFolder is view.panel.worktree's check: a project worktree, or its
-// workspace's folder (no primary project, a workspace reference), which the Worktree tab
-// shows with a folder head and every member checkout (docs/notes/workspaces-v2-fix-3-gui.md).
-var inWorktreeOrFolder = placed(func(t *v1.Thread) bool {
-	return t.GetWorktreePath() != "" && (t.GetProjectId() != "" || t.GetWorkspaceId() != "")
-}, "runs in no project worktree or workspace folder")
-
-// inWorkspaceFolderContext is the app's context for a thread whose primary is its
-// workspace's folder: a thread and a workspace, a cwd, no project.
-func inWorkspaceFolderContext(c Context) bool {
-	return hasThread(c) && c.ActiveWorkspaceID != "" && c.ActiveProjectID == "" && c.ActiveWorktreePath != ""
-}
-
-// withLinkedPRs is view.panel.linked-prs's check: the GUI lists the surface only for a
-// thread with links, and opening it for one without is a no-op there.
-var withLinkedPRs = placed(func(t *v1.Thread) bool { return len(t.GetLinkedPullRequests()) > 0 }, "has no linked pull requests yet")
-
-// withAgentRuns is view.panel.agents's check, like withLinkedPRs.
-var withAgentRuns = placed(func(t *v1.Thread) bool { return len(t.GetAgentRuns()) > 0 }, "has no subagent runs yet")
-
-// withLineage is view.panel.threads's check, like withLinkedPRs: a thread has lineage
-// when another thread created it (its siblings come with that) or it created one
-// (gui/frontend/src/lib/lineage.ts hasLineage).
-func withLineage(threads PanelThreads) panelCheck {
-	return func(ctx context.Context, t *v1.Thread, _ Args) (map[string]string, error) {
-		if t.GetCreatedBy() != "" {
-			return nil, nil
-		}
-		res, err := threads.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true, CreatedBy: t.GetId()}}))
-		if err != nil {
-			return nil, err
-		}
-		if slices.ContainsFunc(res.Msg.GetThreads(), func(c *v1.Thread) bool { return c.GetCreatedBy() == t.GetId() && c.GetId() != t.GetId() }) {
-			return nil, nil
-		}
-		return nil, refuse(t, "has no related threads: no thread created it and it created none")
-	}
-}
 
 // PanelResult is the JSON result of a thread-scoped panel verb; an unscoped one answers
 // EmitResult like every ui.* command.

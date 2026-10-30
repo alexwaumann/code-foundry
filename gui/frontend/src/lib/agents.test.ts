@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
 import {
-  agentCounts,
   agentElapsedMs,
-  agentMeta,
   agentName,
-  agentRows,
   agentStatusText,
   agentsLabel,
-  agentsSubline,
   backgroundLabel,
   fmtElapsed,
   parseAgentNote,
@@ -45,38 +41,6 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
   };
 }
 
-describe("agentRows", () => {
-  it("keeps spawn order and puts nested runs right under their parent", () => {
-    const runs = [run("a0"), run("a1"), run("a2"), run("a1b", { parentId: "a1", spawnDepth: 2 }), run("a1c", { parentId: "a1b", spawnDepth: 3 }), run("a3")];
-    expect(agentRows(runs)).toEqual([
-      { id: "a0", level: 0 },
-      { id: "a1", level: 0 },
-      { id: "a1b", level: 1 },
-      { id: "a1c", level: 2 },
-      { id: "a2", level: 0 },
-      { id: "a3", level: 0 },
-    ]);
-  });
-
-  it("never reorders by status", () => {
-    const runs = [run("a", { status: "done" }), run("b", { status: "failed" }), run("c")];
-    expect(agentRows(runs).map((r) => r.id)).toEqual(["a", "b", "c"]);
-  });
-
-  it("a run whose parent is not listed stays where it started, at its spawn depth", () => {
-    expect(agentRows([run("a"), run("x", { parentId: "gone", spawnDepth: 2 }), run("b")])).toEqual([
-      { id: "a", level: 0 },
-      { id: "x", level: 1 },
-      { id: "b", level: 0 },
-    ]);
-  });
-
-  it("survives a cycle (each run once)", () => {
-    const rows = agentRows([run("a", { parentId: "b" }), run("b", { parentId: "a" })]);
-    expect(rows.map((r) => r.id).sort()).toEqual(["a", "b"]);
-  });
-});
-
 describe("labels", () => {
   it.each([
     [{ description: "PR 1", agentType: "general-purpose" }, "PR 1"],
@@ -84,14 +48,6 @@ describe("labels", () => {
     [{ description: "", agentType: "" }, "Agent"],
   ])("agentName(%o) = %s", (r, want) => {
     expect(agentName(r)).toBe(want);
-  });
-
-  it.each([
-    [{ agentType: "general-purpose", model: "opus", effort: "high", background: true }, ["general-purpose", "opus", "high", "background"]],
-    [{ agentType: "Explore", model: "", effort: "", background: false }, ["Explore", "foreground"]],
-    [{ agentType: "claude", model: "", effort: "low", background: true }, ["claude", "low", "background"]],
-  ])("agentMeta(%o)", (r, want) => {
-    expect(agentMeta(r)).toEqual(want);
   });
 
   it.each([
@@ -113,15 +69,11 @@ describe("labels", () => {
   });
 
   it.each([
-    [1, 0, "1 agent running in the background"],
-    [3, 0, "3 agents running in the background"],
-    [0, 1, "1 shell running in the background"],
-    [0, 2, "2 shells running in the background"],
-    [2, 1, "2 agents and 1 shell running in the background"],
-    [1, 3, "1 agent and 3 shells running in the background"],
-    [0, 0, ""],
-  ])("backgroundLabel(%i, %i) = %s", (agents, shells, want) => {
-    expect(backgroundLabel(agents, shells)).toBe(want);
+    [1, "1 agent running in the background"],
+    [3, "3 agents running in the background"],
+    [0, ""],
+  ])("backgroundLabel(%i) = %s", (agents, want) => {
+    expect(backgroundLabel(agents)).toBe(want);
   });
 });
 
@@ -152,7 +104,7 @@ describe("agentStatusText", () => {
   });
 });
 
-describe("counts and the strip", () => {
+describe("the strip", () => {
   const runs = [
     run("a0", { status: "done" }),
     run("a1", { background: true, activity: "Running go test" }),
@@ -161,20 +113,6 @@ describe("counts and the strip", () => {
     run("a3", { background: true, status: "failed" }),
     run("a4"),
   ];
-
-  it("counts running runs (nested too), all runs, and the thread's own running background ones", () => {
-    expect(agentCounts(runs)).toEqual({ running: 4, total: 6, background: 2 });
-    expect(agentCounts([])).toEqual({ running: 0, total: 0, background: 0 });
-  });
-
-  it.each([
-    [{ running: 3, background: 2 }, "2 in the background keep running after the turn ends"],
-    [{ running: 1, background: 1 }, "1 in the background keeps running after the turn ends"],
-    [{ running: 2, background: 0 }, "2 in the foreground, part of the turn"],
-    [{ running: 0, background: 0 }, "No agents running"],
-  ])("agentsSubline(%o)", (c, want) => {
-    expect(agentsSubline(c)).toBe(want);
-  });
 
   it("the strip names the running background runs of the thread itself", () => {
     expect(stripRuns(runs).map((r) => r.id)).toEqual(["a1", "a2"]);

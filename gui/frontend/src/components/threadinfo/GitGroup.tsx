@@ -22,7 +22,7 @@ import {
 import type { PullRequestView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { fileTotals } from "@/components/overview/files";
+import { fileTotals } from "@/components/changes/files";
 import {
   commits,
   files,
@@ -47,7 +47,7 @@ import { copyBranchName, pendingKey, runOnce, sendThreadPrompt, useCardPending, 
 import { threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
-import { openWorktreeTab } from "@/stores/worktreePanel";
+import { openChangesTab } from "@/stores/changesPanel";
 import { DiffCounts, Group, HOVER_CARD, Row, RowMenu, SubLine } from "./Row";
 import { useMembers } from "./useMembers";
 
@@ -387,7 +387,7 @@ function GitStateRowView({ threadId }: { threadId: string }) {
   }
 }
 
-/** A git member's changes against its base, as the Worktree tab's Changes heading counts them. */
+/** A git member's changes against its base, as the Changes tab's heading counts them. */
 interface MemberChanges {
   projectId: string;
   path: string;
@@ -397,8 +397,8 @@ interface MemberChanges {
 }
 
 /**
- * Changes: added and deleted lines and files against the base, the Worktree tab's Changes
- * (a click opens that tab, whose list opens each file's Diff tab). With several projects:
+ * Changes: added and deleted lines and files against the base, as the Changes tab counts
+ * them (a click opens the cwd's Changes tab, whose list opens each file's Diff tab). With several projects:
  * the lines over all, the dirty projects counted, and a fold with a row per dirty project.
  * "No changes" when clean; nothing until every checkout's detail has been read.
  */
@@ -432,7 +432,7 @@ function ChangesRow({ threadId }: { threadId: string }) {
   const deleted = dirty.reduce((n, d) => n + d.deleted, 0);
   const count = dirty.reduce((n, d) => n + d.count, 0);
   const openTab = () => {
-    if (cwd) openWorktreeTab("current", cwdProjectId, cwd);
+    if (cwd) openChangesTab("current", cwdProjectId, cwd, true);
   };
   if (dirty.length === 0) {
     return (
@@ -482,7 +482,7 @@ function ChangesSubRow({ d }: { d: MemberChanges }) {
         </>
       }
       onActivate={() => {
-        openWorktreeTab("current", d.projectId, d.path);
+        openChangesTab("current", d.projectId, d.path);
       }}
       testId="ti-changes-project"
       data-project={d.projectId}

@@ -507,7 +507,7 @@ describe("panel store with groups", () => {
     const want = two(grp([files], files.id), grp([diff], diff.id), { ratio: 0.3, focused: 1 });
     expect(getPanel()).toEqual(want);
     const saved = localStorage.getItem("code-foundry.panel") ?? "";
-    expect(JSON.parse(saved)).toMatchObject({ version: 3 });
+    expect(JSON.parse(saved)).toMatchObject({ version: 4 });
     usePanelStore.setState({ byKey: {} });
     localStorage.setItem("code-foundry.panel", saved);
     await usePanelStore.persist.rehydrate();
