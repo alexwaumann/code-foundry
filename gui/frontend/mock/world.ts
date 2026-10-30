@@ -1851,19 +1851,6 @@ export class World {
     });
   }
 
-  /** ThreadService.Checkouts for a thread by id. */
-  checkoutsMsg(id: string) {
-    const s = this.thread(id);
-    const ws = s.workspaceId ? this.workspaces.get(s.workspaceId) : undefined;
-    return {
-      thread: this.threadMsg(s),
-      checkouts: this.checkoutsOf(s).map((c) => ({ ...c, current: c.primary, instructions: "" })),
-      workspaceId: s.workspaceId,
-      workspaceName: ws?.name ?? "",
-      workspaceDir: ws ? this.managedDirOf(ws) : "",
-    };
-  }
-
   threadMsg(s: MockThread): ThreadInit {
     return {
       id: s.id,

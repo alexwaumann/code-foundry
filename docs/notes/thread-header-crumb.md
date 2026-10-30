@@ -131,7 +131,8 @@ side-panel surface the card replaces goes, with its entry points.
 part of `linkedprsTarget.ts` the sidebar and MCP use stays), `components/{linkedprs,lineage,agents}/`,
 `components/usage/UsageSurface.tsx`, `components/overview/` (its `files.ts` and `shortRef`
 moved to `components/changes/files.ts`), `stores/{usagePanel,linkedPrsPanel,threadsPanel,agentsPanel,worktreePanel,threadCheckouts}.ts`,
-`lib/alsoIn.ts`, `components/thread/{ThreadMenu,FlagChip,EnvStaleNote}.tsx` and the
+`lib/alsoIn.ts`, `api/checkouts.ts` and the mock's `ThreadService.Checkouts` handler (the
+Also in list was its one reader; the daemon RPC stays for the CLI), `components/thread/{ThreadMenu,FlagChip,EnvStaleNote}.tsx` and the
 header's old tests, `SnoozeRowItems`/`SnoozeButton`, `agentsSubline`, `shellsLabel`,
 `e2e/usage.spec.ts`, `e2e/worktree-panel.spec.ts`.
 

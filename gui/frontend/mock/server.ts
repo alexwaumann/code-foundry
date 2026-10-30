@@ -106,7 +106,6 @@
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   thread.new takes workspace and/or projects (the set; new-worktree makes worktrees on a new
  *   branch), or no-project (a thread in the home directory with no project or workspace).
- *   ThreadService.Checkouts derives a thread's checkouts (world.checkoutsOf).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
@@ -545,8 +544,6 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
     watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
-    // ThreadService.Checkouts: the thread's checkouts (world.checkoutsOf); the GUI's Worktree tab lists the others as Also in.
-    checkouts: (req) => guard(() => world.checkoutsMsg(req.id)),
     checkPlacement: (req) => world.checkPlacement(req.projectIds, req.branch, req.checkoutMode),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
