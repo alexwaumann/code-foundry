@@ -123,9 +123,9 @@ type Options struct {
 	// back into the store. The daemon removes the thread's worktree-mode worktrees nobody
 	// else has from it, in the background (docs/notes/workspaces-v2-1-threads.md).
 	Archived func(t Thread)
-	// Removed, when set, is called with the thread Remove just removed, as it was (a
-	// removal does not cascade: its children are adopted, orphans.go), after its
-	// tombstone is in and its row is gone from the snapshot, under the store's lock: it
+	// Removed, when set, is called with each thread Remove just removed, as it was (the
+	// cascade's hidden threads included, each in turn), after its tombstone is in and
+	// its row is gone from the snapshot, under the store's lock: it
 	// must return at once and not call back into the store. The daemon removes the
 	// thread's worktree-mode worktrees nobody else has from it, as for an archive
 	// (docs/notes/remove-cleans-worktrees.md).
@@ -1137,14 +1137,23 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 	}
 }
 
-// Remove closes the thread if needed, kills and removes the shells that belong to it
-// (terminals labelled termlabel.KindShell with its id), stops what it left running in
-// its worktree (stopStrays), then forgets it, keeping a
+// Remove forgets a thread: it closes it like Close, kills and removes the shells that
+// belong to it (terminals labelled termlabel.KindShell with its id), stops what it left
+// running in its worktree (stopStrays), retires its usage and deletes its row, keeping a
 // tombstone for RemovedTTL (tombstones.go). Meanwhile the thread is Removing, so the
-// closing snapshot meets no wait or wake condition; once it is forgotten its
-// subscribers get a CondRemoved wake (subscriptions_removed.go). The threads it
-// created that are not archived are shown in the sidebar from then on, still running
-// (orphans.go). When it fails the thread stays, no longer Removing.
+// closing snapshot meets no wait or wake condition; once it is forgotten its subscribers
+// get a CondRemoved wake (subscriptions_removed.go). When it fails the thread stays, no
+// longer Removing.
+//
+// Removing first removes, the same way, the hidden threads below it (ArchiveCascade with
+// the threads.show_created_threads setting, as Archive does): the thread's own process is
+// closed first, so it creates no more; then each pass takes the hidden threads below it
+// that are not being removed yet, in tree order, their closes beginning together, until a
+// pass finds none (one created below it while the others were being removed is caught by
+// the next pass); then the thread itself. A hidden archived thread below it goes too:
+// nothing would lead to it once the thread is gone. One that fails is skipped (logged,
+// and named in the *CascadeError returned once the thread itself was removed), and is
+// shown in the sidebar like any other child whose creator is gone (orphans.go).
 func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.refuseResident(id, "removed"); err != nil {
 		return err
@@ -1157,6 +1166,71 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 			_ = m.setRemoving(id, false) // gone meanwhile: nothing to clear
 		}
 	}()
+	if err := m.Close(ctx, id); err != nil { // before the cascade: it creates no more
+		return err
+	}
+	tried := map[string]bool{}
+	var failed []CascadeFailure
+	cascaded := 0
+	for pass := 0; pass < removeCascadePasses; pass++ {
+		targets := m.removeCascadeTargets(id, tried)
+		if len(targets) == 0 {
+			break
+		}
+		// They are all marked first: a child's removal then adopts no grandchild that
+		// goes in the same pass (orphanToAdopt). Their closes begin together.
+		for _, t := range targets {
+			tried[t.ID] = true
+			_ = m.setRemoving(t.ID, true) // gone meanwhile: removeOne says so
+		}
+		for _, t := range targets {
+			m.requestClose(t.ID)
+		}
+		for _, t := range targets {
+			if err := m.removeOne(ctx, t.ID); err != nil {
+				m.log.Warn("remove a hidden thread with the thread above it", "thread", t.ID, "root", id, "err", err)
+				failed = append(failed, CascadeFailure{ID: t.ID, Err: err})
+				_ = m.setRemoving(t.ID, false) // the root's removal adopts it
+				continue
+			}
+			cascaded++
+			m.log.Info("removed thread with the thread above it", "thread", t.ID, "root", id, "depth", t.Depth)
+		}
+	}
+	if err := m.removeOne(ctx, id); err != nil {
+		return err
+	}
+	if cascaded > 0 || len(failed) > 0 {
+		m.log.Info("removed thread's hidden threads", "thread", id, "cascaded", cascaded, "cascade_failed", len(failed))
+	}
+	if len(failed) > 0 {
+		return &CascadeError{ID: id, Failed: failed, Verb: "removed"}
+	}
+	return nil
+}
+
+// removeCascadePasses bounds Remove's passes over the hidden threads below the thread:
+// each pass closes what the last one found, so only a thread created in that window
+// needs another, and the root's own process is closed before the first.
+const removeCascadePasses = 4
+
+// removeCascadeTargets are the hidden threads below id that removing id takes with it
+// now (ArchiveCascade): not being removed, not in skip. Archived ones included.
+func (m *Manager) removeCascadeTargets(id string, skip map[string]bool) []Thread {
+	var out []Thread
+	for _, t := range ArchiveCascade(m.Snapshot().Threads, id, m.showCreatedThreads()) {
+		if !t.Removing && !skip[t.ID] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// removeOne is Remove for one thread, marked Removing already (setRemoving): it closes
+// it, kills and removes its shells, stops its strays and its TMPDIR, then, under m.mu,
+// retires its usage, deletes its row and leaves its tombstone. Its children not being
+// removed are shown in the sidebar (adoptOrphansLocked). A start meanwhile fails it.
+func (m *Manager) removeOne(ctx context.Context, id string) error {
 	if err := m.Close(ctx, id); err != nil {
 		return err
 	}
@@ -1180,7 +1254,8 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
-	// Its hidden children would be out of reach: they are the user's now (orphans.go).
+	// Its hidden children not going with it would be out of reach: they are the user's
+	// now (orphans.go).
 	m.adoptOrphansLocked(id)
 	delete(m.recs, id)
 	m.tmu.Lock()

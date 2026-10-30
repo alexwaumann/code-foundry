@@ -17,8 +17,8 @@ disk for good.
   (`rec.s`). The cleaner's "no other thread has it" check (`checkoutThreads`) reads the
   snapshot, so the removed thread never holds its own worktrees. A failed removal calls
   nothing.
-* **No cascade.** Removing a thread does not remove its children (they are adopted and
-  shown in the sidebar, `orphans.go`), so the hook fires once, for the removed thread only.
+* **No cascade** (then; since `docs/notes/remove-cascades.md` a removal takes the hidden
+  threads below it along and the hook fires for each of them, then the thread).
   `thread remove --ids` calls `Remove` per id: one hook call each.
 * **Same cleaner, same verdict.** The daemon wires `Removed` to `archiveCleaner.removed`,
   which runs the same `clean` as `archived`: `project.Cleanup` per derived, registered,

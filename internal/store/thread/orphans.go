@@ -2,12 +2,14 @@ package thread
 
 import "context"
 
-// Children of a removed thread (docs/notes/thread-lifecycle-fixes.md). A hidden child
-// (InSidebar false) is reached through its creator: the creator's Threads tab, its
-// wakes. Once the creator is removed nothing leads to it, yet it may still be working.
-// So removing a thread hands its children to the user: each one not archived gets the
+// Children of a removed thread. A hidden child (InSidebar false) is reached through its
+// creator: the creator's Threads tab, its wakes. Removing a thread removes its hidden
+// children with it (Remove's cascade, docs/notes/remove-cascades.md); one the cascade
+// could not remove, or a child created in the moment between the last pass and the
+// thread's own removal, would be out of reach, so it is handed to the user: it gets the
 // sidebar override (shown), and nothing is stopped. Threads whose creator was removed
-// before this rule (or by a daemon that crashed in between) get the same at load.
+// before the cascade (an older daemon, or one that crashed in between) get the same at
+// load.
 
 // adoptOrphansLocked shows in the sidebar the threads creator created that are not
 // archived, not being removed, and not shown by an override already; creator is being

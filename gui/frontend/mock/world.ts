@@ -2076,6 +2076,15 @@ export class World {
     return `archived thread ${label}`;
   }
 
+  /** Removes one thread: closes Claude, removes its shells, stops its background runs, forgets it. */
+  private removeOne(s: MockThread): void {
+    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_THREAD] === s.id);
+    this.actions.stopBackground((r) => r.threadId === s.id);
+    this.threads.delete(s.id);
+    this.threadListEvents.publish({ event: { case: "removedId", value: s.id } });
+  }
+
   /** The sidebar rule (lib/inSidebar.ts, the daemon's Thread.InSidebar) with the mock's threads.show_created_threads. */
   inSidebar(s: MockThread): boolean {
     if (!s.createdBy) return true;
@@ -3744,11 +3753,9 @@ export class World {
         run: (ctx) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
-          if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
-          this.closeShells((l) => l[LABEL_THREAD] === s.id);
-          this.actions.stopBackground((r) => r.threadId === s.id);
-          this.threads.delete(s.id);
-          this.threadListEvents.publish({ event: { case: "removedId", value: s.id } });
+          // Like the daemon: the hidden threads below it go first, in tree order, then the thread.
+          for (const c of this.archiveCascade(s.id)) this.removeOne(c);
+          this.removeOne(s);
           return `Removed ${s.name || s.id}`;
         },
       },

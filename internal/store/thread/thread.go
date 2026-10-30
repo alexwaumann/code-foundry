@@ -553,7 +553,11 @@ type Store interface {
 	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
 	// prompt. No command calls it: a message starts a stopped thread (Send).
 	Reconnect(ctx context.Context, id string) (Thread, error)
-	// Remove closes the thread if needed and forgets it.
+	// Remove closes the thread if needed and forgets it. Removing also removes, first
+	// and the same way, the threads below it that are not shown in the sidebar, through
+	// hidden threads only (ArchiveCascade, as Archive does), archived ones included; one
+	// that fails is skipped and shown in the sidebar, and the thread is still removed but
+	// the error (a *CascadeError) names the failures.
 	Remove(ctx context.Context, id string) error
 	// RunIn moves a thread to another of its checkouts (another member becomes the
 	// primary): set_cwd once the live thread is idle at its prompt (the row's cwd changes

@@ -3041,7 +3041,12 @@ export const ThreadService: GenService<{
     output: typeof ReconnectThreadResponseSchema;
   },
   /**
-   * Remove forgets a thread. Stops its Claude first if it runs.
+   * Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
+   * the same way and first, every thread below it that is not shown in the sidebar
+   * (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
+   * thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
+   * with include_archived). A thread of those that fails is skipped, shown in the
+   * sidebar and named in the error, which then comes after the thread itself was removed.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Remove
    */

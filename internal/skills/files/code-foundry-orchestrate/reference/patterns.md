@@ -298,7 +298,8 @@ code-foundry thread remove --id 5e6f --yes
 code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/build-bump-router --yes
 ```
 
-`thread remove` stops a working child itself: no `thread interrupt` first. The path
+`thread remove` stops a working child itself: no `thread interrupt` first, and the hidden
+threads below it go with it (like `thread archive`). The path
 names the project (`--project` only for a path no project has). Add `--delete-branch
 --force` to the second command when the user said yes: without `--force` a branch with
 commits not in the default branch is kept (the command says so), and a worktree a thread

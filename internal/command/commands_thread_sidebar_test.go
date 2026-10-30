@@ -171,9 +171,9 @@ func TestThreadArchiveHiddenChildren(t *testing.T) {
 	}
 }
 
-// TestThreadRemoveHiddenChildren: thread.remove names the hidden children of the
-// removed threads still working; they keep running (the daemon shows them in the
-// sidebar). A working grandchild has a creator still, and a listed child goes too.
+// TestThreadRemoveHiddenChildren: thread.remove names the hidden threads below the
+// removed threads that go with them (the daemon removes them too, like an archive), idle
+// ones included, with how many are still working; a listed child is not counted twice.
 func TestThreadRemoveHiddenChildren(t *testing.T) {
 	connected := v1.ThreadState_THREAD_STATE_CONNECTED
 	busy := v1.ThreadStatus_THREAD_STATUS_BUSY
@@ -189,15 +189,18 @@ func TestThreadRemoveHiddenChildren(t *testing.T) {
 		wantAsk string
 	}{
 		{name: "no hidden children", wantAsk: plain},
-		{name: "idle children and a working grandchild", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyGrand}}, wantAsk: plain},
-		{name: "one working child", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyKid}},
-			wantAsk: plain + " 1 hidden child thread is still working; it keeps running and is shown in the sidebar."},
+		{name: "one idle child", cascade: map[string][]*v1.Thread{"s5": {idleKid}},
+			wantAsk: plain + " 1 hidden child thread below it is removed too. To keep it, show it in the sidebar first."},
+		{name: "idle child and a working grandchild", cascade: map[string][]*v1.Thread{"s5": {idleKid, busyGrand}},
+			wantAsk: plain + " 2 hidden child threads below it are (1 still working) removed too. To keep one, show it in the sidebar first."},
+		{name: "one working child", cascade: map[string][]*v1.Thread{"s5": {busyKid}},
+			wantAsk: plain + " 1 hidden child thread below it is still working, and is removed too. To keep it, show it in the sidebar first."},
 		{name: "two working children", cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
-			wantAsk: plain + " 2 hidden child threads are still working; they keep running and are shown in the sidebar."},
-		{name: "ids: a listed child is removed too", args: map[string]string{"ids": "s5,k1"},
+			wantAsk: plain + " 2 hidden child threads below it are still working, and are removed too. To keep one, show it in the sidebar first."},
+		{name: "ids: a listed child is not counted", args: map[string]string{"ids": "s5,k1"},
 			cascade: map[string][]*v1.Thread{"s5": {busyKid, askingKid}},
 			wantAsk: "Remove 2 threads? Claude stops in each that runs, and they are forgotten: s5, k1. " +
-				"1 hidden child thread is still working; it keeps running and is shown in the sidebar."},
+				"1 hidden child thread below it is still working, and is removed too. To keep it, show it in the sidebar first."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

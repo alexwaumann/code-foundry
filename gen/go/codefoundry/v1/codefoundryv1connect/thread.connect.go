@@ -170,7 +170,12 @@ type ThreadServiceClient interface {
 	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
 	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
-	// Remove forgets a thread. Stops its Claude first if it runs.
+	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
+	// the same way and first, every thread below it that is not shown in the sidebar
+	// (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
+	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
+	// with include_archived). A thread of those that fails is skipped, shown in the
+	// sidebar and named in the error, which then comes after the thread itself was removed.
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
@@ -986,7 +991,12 @@ type ThreadServiceHandler interface {
 	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
 	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
-	// Remove forgets a thread. Stops its Claude first if it runs.
+	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
+	// the same way and first, every thread below it that is not shown in the sidebar
+	// (Thread.in_sidebar), through hidden threads only, archived ones included: a shown
+	// thread and everything below it stays (ThreadFilter.archive_cascade_of lists them,
+	// with include_archived). A thread of those that fails is skipped, shown in the
+	// sidebar and named in the error, which then comes after the thread itself was removed.
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a thread's cwd to another of its checkouts (Checkouts): that member
 	// becomes the primary. A live thread gets set_cwd once it is idle
