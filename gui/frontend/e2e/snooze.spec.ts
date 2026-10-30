@@ -71,17 +71,22 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   const s8 = row(page, "s:s-8");
   await expect(s8).toHaveAttribute("data-section", "snoozed");
   await expect(s8.getByTestId("thread-name")).toHaveText("Refactor the gh poller");
+  // The time left after an alarm clock: a countdown.
   await expect(s8.getByTestId("row-snooze-left")).toHaveText("2h");
+  await expect(s8.getByTestId("row-snooze-icon")).toBeVisible();
   await expect(row(page, "s:s-9").getByTestId("row-snooze-left")).toHaveText("4d");
-  // One line (no status line); not dimmed.
+  // One line (no status line); not dimmed, but quiet: the live rows' size, regular weight.
   await expect(s8.getByTestId("row-place")).toHaveCount(0);
   await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "1");
+  await expect(s8.getByTestId("thread-name")).toHaveCSS("font-weight", "400");
+  await expect(s8.getByTestId("thread-name")).toHaveCSS("font-size", await row(page, "s:s-2").getByTestId("thread-name").evaluate((el) => getComputedStyle(el).fontSize));
 
-  // The tooltip adds the full wake time.
+  // The tooltip does not repeat the wake time: the row says it.
   await s8.hover();
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
   await expect(tip).toBeVisible();
-  await expect(tip.getByTestId("tip-snooze")).toHaveText(/^Snoozed until (Sun|Mon|Tue|Wed|Thu|Fri|Sat), [A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d\d [AP]M$/);
+  await expect(tip.getByTestId("tip-name")).toHaveText("Refactor the gh poller");
+  await expect(tip.getByText(/Snoozed until/)).toHaveCount(0);
   await expect(tip.getByTestId("tip-status")).toHaveCount(0);
   await page.mouse.move(900, 400);
 

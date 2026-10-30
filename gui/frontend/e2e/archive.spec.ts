@@ -64,8 +64,11 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   await expect(archived).toHaveAttribute("data-section", "archived");
   await expect(archived.getByTestId("thread-name")).toHaveText("Spike a canvas sidebar");
   await expect(archived.getByTestId("row-archived-age")).toHaveText("1h");
-  // One line: no status line.
+  // One line: no status line; quiet (regular weight), and the age has no icon.
   await expect(archived.getByTestId("row-place")).toHaveCount(0);
+  await expect(archived.getByTestId("thread-name")).toHaveCSS("font-weight", "400");
+  await expect(row(page, "s:s-2").getByTestId("thread-name")).toHaveCSS("font-weight", "600");
+  await expect(archived.getByTestId("row-archived-age").locator("svg")).toHaveCount(0);
 
   // Hover: the same tooltip as other rows.
   await archived.hover();

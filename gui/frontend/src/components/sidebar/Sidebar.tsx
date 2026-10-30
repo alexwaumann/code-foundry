@@ -482,6 +482,11 @@ function SidebarShown({ width }: { width: number }) {
           <PullRequestsNav />
           <ProjectsNav />
         </nav>
+        {/* Pages above, threads below: a pane-border rule from the window's edge (through the
+            body's pl-shell) to the sidebar's. cf-sidebar-border is the sidebar's own colour
+            (no visible edge), so not that. mt-2 is the gap under Projects; mb-1 plus the main
+            list's 4px paddingStart is the same gap above the first row. */}
+        <div className="mt-2 mb-1 -ml-shell h-px shrink-0 bg-cf-border" data-testid="sidebar-divider" aria-hidden />
         <SidebarList bodyHeight={bodyHeight} />
         <ThreadsUnavailable />
         <SidebarStatus />

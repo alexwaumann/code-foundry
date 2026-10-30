@@ -9,7 +9,6 @@ import {
   shiftMonth,
   shortRemaining,
   snoozePresets,
-  snoozeTimeFull,
   snoozeTimeShort,
   wallTime,
 } from "./snooze";
@@ -164,11 +163,6 @@ describe("formatting", () => {
     ["yesterday (already due)", at(2026, 10, 13, 9), "Oct 13, 9:00 AM"],
   ])("snoozeTimeShort %s", (_name, ms, want) => {
     expect(snoozeTimeShort(ms, now)).toBe(want);
-  });
-
-  it("snoozeTimeFull: weekday, date and time; the year only when it is not this year", () => {
-    expect(snoozeTimeFull(at(2026, 10, 15, 9), now)).toBe("Thu, Oct 15, 9:00 AM");
-    expect(snoozeTimeFull(at(2027, 1, 7, 9), now)).toBe("Thu, Jan 7, 2027, 9:00 AM");
   });
 
   it("formatDay and monthTitle", () => {

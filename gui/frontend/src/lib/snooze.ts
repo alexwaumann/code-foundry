@@ -99,13 +99,6 @@ export function snoozeTimeShort(ms: number, now: number): string {
   return `${MONTHS[day.month] ?? ""} ${String(day.day)}${year}, ${formatClock(ms)}`;
 }
 
-/** "Thu, Oct 15, 9:00 AM"; "Thu, Jan 7, 2027, 9:00 AM" in another year. The row tooltip's. */
-export function snoozeTimeFull(ms: number, now: number): string {
-  const d = new Date(ms);
-  const year = d.getFullYear() === new Date(now).getFullYear() ? "" : `, ${String(d.getFullYear())}`;
-  return `${DAYS[d.getDay()] ?? ""}, ${MONTHS[d.getMonth()] ?? ""} ${String(d.getDate())}${year}, ${formatClock(ms)}`;
-}
-
 /** "Fri, Oct 16" (and the year when it is not this year): the custom dialog's summary. */
 export function formatDay(d: Day, now: number): string {
   const wd = DAYS[new Date(d.year, d.month, d.day, 12).getDay()] ?? "";
